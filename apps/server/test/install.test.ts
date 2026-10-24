@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseOptions } from "../../../packages/setup/src/lib";
 import { createApp } from "../src/app";
 
 /**
@@ -225,23 +226,39 @@ describe("install.sh", () => {
     expect(run.changes).toEqual([]);
   });
 
-  test("a Mac without Docker: native, with nothing to ask", async () => {
-    const run = await plan(mac);
-    expect(run.code).toBe(0);
-    expect(run.out).toContain("· No Docker on this Mac: agentes.chat runs natively, on Bun with an embedded Postgres");
-    expect(run.out).toContain(bunZip("darwin-aarch64"));
-    expect(run.out).toContain(`$ cd ${run.home}/.agentes`);
-    expect(run.out).toContain(
-      `$ ${run.home}/.agentes/.runtime/bun x --bun @agenteschat/setup@0.1.0 --native </dev/null`,
-    );
-    expect(run.changes).toEqual([]);
+  test("a Mac without Docker, or with it stopped, is told what to install or start; --native isn't there yet", async () => {
+    const none = await plan(mac);
+    expect(none.code).toBe(1);
+    expect(none.err).toContain("agentes.chat runs on Docker, and this Mac doesn't have it.");
+    expect(none.err).toContain("Docker Desktop, OrbStack or Colima");
+    expect(none.out).not.toContain("Bun");
+    expect(none.changes).toEqual([]);
 
-    // Docker installed but stopped: moving from native to Docker later costs a dump and restore, so it asks for a choice.
     const stopped = await plan({ ...mac, docker: "down" });
     expect(stopped.code).toBe(1);
     expect(stopped.err).toContain("Docker is on this Mac, but it doesn't answer.");
-    expect(stopped.err).toContain("pass --native");
-    expect((await plan({ ...mac, docker: "down" }, ["--native"])).out).toContain("· Native mode (--native): no Docker");
+
+    for (const machine of [mac, linuxRoot]) {
+      const native = await plan(machine, ["--native"]);
+      expect(native.code).toBe(1);
+      expect(native.err).toContain("(--native) isn't available yet");
+      expect(native.calls).toEqual([]);
+    }
+  });
+
+  test("every option it hands the setup is one the setup knows", async () => {
+    const runs = [
+      await plan(linuxRoot, ["--yes", "--network", "local", "--email", "skip"]),
+      await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--json"]),
+      await plan({ ...mac, docker: "28.5.1", bun: "1.4.4" }, ["--network", "local"]),
+      await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--email", "skip"], { piped: text }),
+    ];
+    for (const run of runs) {
+      const line = `${run.out}${run.err}`.split("\n").find((l) => l.includes("@agenteschat/setup@"));
+      const args = line?.split("@agenteschat/setup@0.1.0")[1]?.replace("</dev/null", "").trim().split(" ");
+      expect(args).toBeDefined();
+      expect(parseOptions((args ?? []).filter(Boolean), {})).not.toHaveProperty("error");
+    }
   });
 
   test("arm64 Linux gets the arm64 Bun and Compose", async () => {

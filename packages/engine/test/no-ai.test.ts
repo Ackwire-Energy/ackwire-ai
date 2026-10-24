@@ -3,6 +3,7 @@ import type { RealtimeEvent } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  addRunStep,
   answerNow,
   createAgent,
   createAgentRuns,
@@ -241,6 +242,25 @@ test("Responder agora: 409 while there's no AI; then the person's own message is
   // The card still shows, its run gone.
   const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
   expect(timeline.some((m) => m.id === card.id)).toBe(true);
+});
+
+test("Responder agora never starts over a run that had done something: 409, and the run stays", async () => {
+  f = await setup();
+  await revokeKeys();
+  await post("@dev resume o canal");
+  await drainOutbox(f.db, f.handlers);
+  const [card] = await cards();
+  const [failed] = await runs();
+  if (!card || !failed) throw new Error("no card");
+  // As a run that resumed after an approval and only then met no AI: a tool had already run.
+  await addRunStep(f.db, failed, "tool_call", { toolUseId: "t1", name: "create_issue", input: {} });
+  await restoreKeys();
+  const refused = await answerNow(deps(), f.owner.id, f.org.id, card.id).catch((e) => e);
+  expect(refused).toMatchObject({ name: "ConflictError", code: "run.not_restartable" });
+  expect(await runs()).toMatchObject([{ id: failed.id, status: "failed", error: "no_ai" }]);
+  expect(await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, failed.id))).not.toEqual(
+    [],
+  );
 });
 
 test("Responder agora on a message nobody could route: 409, then it is routed again and a run starts", async () => {

@@ -8,9 +8,9 @@
 #
 # It gets this computer ready, then hands over to the setup (@agenteschat/setup), which asks its few
 # questions, writes .env and starts everything. On Linux it makes sure of Docker and its Compose
-# plugin. On a Mac it uses Docker when Docker is running, and the native mode (no Docker) when there
-# is none. On both it fetches a pinned Bun to run the setup with. Downloads are HTTPS only, and the
-# pinned ones are checked against the SHA-256 below before anything runs them.
+# plugin. On a Mac it needs Docker running (Docker Desktop, OrbStack or Colima). On both it fetches
+# a pinned Bun to run the setup with. Downloads are HTTPS only, and the pinned ones are checked
+# against the SHA-256 below before anything runs them.
 #
 # Everything is inside main, which the last line calls, so a download cut short runs nothing.
 
@@ -27,7 +27,7 @@ main() {
   GUIDE=https://github.com/agentes-chat/agentes-chat/blob/main/SELF_HOSTING.md
   DOCKER_DOCS=https://docs.docker.com/engine/install/
 
-  PLAN=0 YES=0 MODE='' MODE_FLAG='' DIR='' DIR_FLAG='' OUT=1
+  PLAN=0 YES=0 DIR='' DIR_FLAG='' OUT=1
   n=$#
   while [ "$n" -gt 0 ]; do
     arg=$1
@@ -36,7 +36,10 @@ main() {
     case $arg in
       --plan | --dry-run) PLAN=1 ;;
       --yes | -y) YES=1 ;;
-      --docker | --native) MODE=${arg#--} MODE_FLAG=$arg ;;
+      --native)
+        die "Running without Docker (--native) isn't available yet." \
+          "Use Docker: on a Mac, Docker Desktop, OrbStack or Colima; on Linux, this installer sets it up."
+        ;;
       --dir)
         [ "$n" -gt 0 ] || die "--dir needs a folder, like --dir /srv/agentes."
         DIR=$1 DIR_FLAG=$1
@@ -132,42 +135,19 @@ main() {
   fi
 
   DOCKER_VERSION=''
-  if [ "$MODE" = native ]; then
-    step "Native mode (--native): no Docker"
-  elif [ -z "$MODE" ] && [ "$OS" = Darwin ]; then
-    if DOCKER_VERSION=$(docker_version); then
-      MODE=docker
-    elif command -v docker >/dev/null 2>&1; then
-      die "Docker is on this Mac, but it doesn't answer." \
-        "Start it (Docker Desktop, OrbStack or Colima) and run this again, or pass --native to run without Docker."
-    else
-      MODE=native
-      step "No Docker on this Mac: agentes.chat runs natively, on Bun with an embedded Postgres"
-    fi
+  if [ "$OS" = Linux ]; then
+    linux_docker "$@"
+  elif DOCKER_VERSION=$(docker_version); then
+    step "Docker $DOCKER_VERSION"
+  elif command -v docker >/dev/null 2>&1; then
+    die "Docker is on this Mac, but it doesn't answer." "Start it (Docker Desktop, OrbStack or Colima) and run this again."
   else
-    MODE=docker
-  fi
-  if [ "$MODE" = docker ]; then
-    if [ "$OS" = Linux ]; then
-      linux_docker "$@"
-    else
-      if [ -z "$DOCKER_VERSION" ]; then
-        DOCKER_VERSION=$(docker_version) ||
-          die "Docker doesn't answer on this Mac." \
-            "Start Docker Desktop, OrbStack or Colima (or install one), or pass --native to run without Docker."
-      fi
-      step "Docker $DOCKER_VERSION"
-    fi
+    die "agentes.chat runs on Docker, and this Mac doesn't have it." \
+      "Install Docker Desktop, OrbStack or Colima, start it, and run this again."
   fi
 
   if [ -z "$DIR" ]; then
-    if [ "$MODE" = native ]; then
-      DIR=$HOME/.agentes
-    elif [ "$IS_ROOT" = 1 ]; then
-      DIR=/opt/agentes
-    else
-      DIR=$HOME/agentes
-    fi
+    if [ "$IS_ROOT" = 1 ]; then DIR=/opt/agentes; else DIR=$HOME/agentes; fi
   fi
   case $DIR in /*) ;; *) DIR=$PWD/$DIR ;; esac
 
@@ -182,7 +162,6 @@ main() {
 
   get_bun
 
-  if [ "$MODE" = native ]; then set -- --native "$@"; fi
   if [ -n "${AGENTES_INSTALL_SETUP:-}" ]; then
     set -- "$BUN" "$SETUP" "$@"
   else
@@ -205,12 +184,9 @@ usage() {
 Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup options]
        sh install.sh [options] [setup options]
 
-  --docker, --native  Run with Docker and Postgres, or natively on Bun with an embedded Postgres.
-                      By default Linux uses Docker, and a Mac uses Docker when it's running and
-                      the native mode when it has none.
-  --dir <folder>      Where agentes.chat lives: /opt/agentes as root, ~/agentes otherwise, and
-                      ~/.agentes in native mode.
-  --yes               On Linux, install Docker without asking first.
+  --dir <folder>      Where agentes.chat lives: /opt/agentes as root, ~/agentes otherwise.
+  --yes               On Linux, install Docker without asking first. A Mac needs Docker Desktop,
+                      OrbStack or Colima running.
   --plan              Print what it would do, and do nothing (--dry-run too).
   -h, --help
 
@@ -384,7 +360,6 @@ as_root() {
   fi
   if [ -n "$DIR_FLAG" ]; then set -- --dir "$DIR_FLAG" "$@"; fi
   if [ "$YES" = 1 ]; then set -- --yes "$@"; fi
-  if [ -n "$MODE_FLAG" ]; then set -- "$MODE_FLAG" "$@"; fi
   say "  \$ sudo sh $script $*"
   if [ "$PLAN" = 1 ]; then
     say "With --plan it stops here; as root, --plan shows the rest."

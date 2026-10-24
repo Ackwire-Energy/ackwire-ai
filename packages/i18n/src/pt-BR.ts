@@ -6563,6 +6563,7 @@ export const ptBR = {
       notContinuable: "Esta resposta não pode mais ser continuada.",
       agentBusy: "O agente já está trabalhando nesta conversa. Espere ele terminar para continuar.",
       continueForbidden: "Só quem pediu, o dono do agente ou um admin pode continuar.",
+      notRestartable: "Esta resposta já tinha começado, então não dá para recomeçar. Mande a mensagem de novo.",
     },
     artifact: {
       fileTooLarge: "O arquivo passa de {{max}} MB, o limite por arquivo.",

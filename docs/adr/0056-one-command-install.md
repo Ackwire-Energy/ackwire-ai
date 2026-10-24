@@ -1,6 +1,6 @@
 # 0056. One-command install, native mode, and the server's computer
 
-- Status: Accepted (2026-10-24; to build, except the plain-words test)
+- Status: Accepted. Built: the installer, the server's computer and plain words. Not built yet: native mode (§2), so a Mac needs Docker for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
 - Date: 2026-10-24
 - Extends: ADR 0003 (PGlite), ADR 0025 (connected computers), ADR 0030 (isolation on computers), ADR 0036 (one runner per organization), ADR 0041 (accounts on a computer)
 - Out of scope for now: Windows, a container image as the agents' computer, native mode as a server database at scale
@@ -23,14 +23,14 @@ After the install, agents still need a computer, and on a fresh server nobody ha
 - **Docker (Linux):** Docker's own install script runs only after a yes (or `--yes`), and never when `docker` exists. When Compose v2 ≥ 2.23.1 is missing, it installs the official plugin binary, pinned with its SHA-256 in the script, instead of relying on package names (in Docker's system plugin folder as root, in the user's own otherwise). Without root and without access to Docker, it runs itself again with `sudo`: the same file under `sh install.sh`, or, under `curl | sh` where there is no file, the published installer.
 - **Bun:** a pinned version with its SHA-256 in the script, unless a new enough `bun` is on `PATH`. On x64 it's the `-baseline` build, because server CPUs may lack AVX2. musl systems are refused with a clear message.
 - **Hand-off:** `cd` to the install folder, then `bun x --bun @agenteschat/setup@<version>` with the flags passed through.
-- **Flags:** `--docker` / `--native`, `--dir`, `--yes`, and `--plan` (or `--dry-run`), which prints each decision and the commands it would run and runs nothing (what the tests assert). Every other flag goes to the wizard; with its `--json`, the installer's own lines go to stderr. `AGENTES_INSTALL_SETUP` points at a local build of the wizard. A version is held the compose file's way, with `AGENTES_IMAGE` in `.env`.
+- **Flags:** `--dir`, `--yes`, and `--plan` (or `--dry-run`), which prints each decision and the commands it would run and runs nothing (what the tests assert). `--native` comes with native mode; until then it says so and stops. Every other flag goes to the wizard, and a test checks the wizard accepts every option the installer hands it; with its `--json`, the installer's own lines go to stderr. `AGENTES_INSTALL_SETUP` points at a local build of the wizard. A version is held the compose file's way, with `AGENTES_IMAGE` in `.env`.
 - **Folders:** `/opt/agentes` as root, `~/agentes` for a user who can already use Docker, `~/.agentes` in native mode.
 - The docs also show "download, read, then run".
 
 ### 2. Docker or native
 
 - **Linux:** Docker and Postgres (the compose file).
-- **macOS:** Docker when an engine answers within 5 seconds (Docker Desktop, OrbStack, Colima). When Docker is installed but doesn't answer, it says "start Docker, or pass `--native`", because moving from native to Docker later is a dump and restore. With no Docker at all it goes native and says why.
+- **macOS:** Docker when an engine answers within 5 seconds (Docker Desktop, OrbStack, Colima). When Docker is installed but doesn't answer, it says "start Docker, or pass `--native`", because moving from native to Docker later is a dump and restore. With no Docker at all it goes native and says why. Until native mode is built, a Mac without a Docker that answers is told to install or start one, and nothing else runs.
 - **Native mode** is Bun plus PGlite, selected by `DATABASE_URL=pglite:///absolute/folder`. It's the same WASM Postgres with pgvector the tests run on (ADR 0003), so the migrations and the SQL are the same, with no native binaries. Embedded Postgres binaries have no pgvector, and Homebrew or Postgres.app are one more install.
 
 **PGlite's limits, and what the adapter does about them:**
@@ -51,10 +51,10 @@ After the install, agents still need a computer, and on a fresh server nobody ha
 
 ### 3. The server's computer
 
-The machine that runs agentes.chat is also a computer for its agents, "Computador deste servidor". It's on by default: the wizard asks, saying what it adds, and `--computer no` skips it.
+The machine that runs agentes.chat is also a computer for its agents, "Computador deste servidor". It's on by default: the wizard asks, saying what it adds, and `--computer no` skips it. Until the wizard asks, it's set up by hand: the token in `.env`, then the runner's install (`SELF_HOSTING.md`).
 
 - **Linux:** the runner is installed on the host in its system mode: a root supervisor that runs no agent code, and each agent as its own OS user with its own folder and memory limit. A container isn't used, because Chrome's sandbox doesn't start in a container with dropped capabilities and the default seccomp and AppArmor profiles, `--no-sandbox` next to every organization's tokens is not acceptable, and a container can't hold one OS user and one desktop per agent.
-- **macOS:** the runner on the Mac. Agents run as the person there, so their commands stay off until the person says yes ("they run as you and can reach this server's files"). A dedicated macOS user is the safer yes (ADR 0030).
+- **macOS:** the runner on the Mac. Agents run as the person there, so with native mode the wizard keeps their commands off until the person says yes ("they run as you and can reach this server's files"). A dedicated macOS user is the safer yes (ADR 0030). Run by hand, `agentes-runner host` turns commands on unless given `--no-exec`, like `pair`.
 
 **How it joins organizations:**
 
@@ -68,9 +68,9 @@ The machine that runs agentes.chat is also a computer for its agents, "Computado
 
 **Which organizations it serves:**
 
-- Only organizations where the installation's first account (the person who set it up) is an owner or an admin. Its rows are paired by that account.
+- Only organizations the installation's first account (the person who set it up) made and is still an owner or an admin of. Its rows are paired by that account.
   - So that person is the computer's owner for ADR 0041: they add the Claude and ChatGPT sign-ins on it, and pick them per agent.
-  - Someone who joins through an invitation and then creates an organization of their own doesn't get agents on the operator's machine.
+  - Someone who joins through an invitation and then creates an organization of their own doesn't get agents on the operator's machine. A role isn't enough on its own, since an organization's owner can make anyone an admin or an owner there; who made an organization is recorded on its #general, which can't be renamed or archived.
   - The server refuses to start with `HOST_COMPUTER_TOKEN` and `ALLOW_SIGNUP=true` together: with open sign-up, a stranger could be the installation's first account.
   - Serving more organizations is a later, explicit choice.
 - In an organization it serves, the row is created with the organization, so onboarding's computer step lists it first (selected once it's connected: a computer that never comes up would leave agents waiting), and the runner picks up its token at the next sync (60 seconds).
@@ -105,9 +105,10 @@ The terminal and the card stay short, and the full explanation lives in one publ
 
 ## Consequences
 
-- One line installs agentes.chat on a laptop, a server or a Mac mini, and agents have a computer from the first minute.
+- One line installs agentes.chat on a Linux server, or a Mac with Docker; with native mode, on a Mac without Docker too. With the server's computer, agents have a computer from the first minute.
 - Two database engines in production: every migration must also run on PGlite (the tests already do), and a PGlite upgrade across a Postgres major needs the dump-and-restore path.
 - On Linux, the server's computer runs agents' commands on the host. Their isolation is the system mode's OS users, not a container.
+- The server's computer holds the agents of every organization it serves, and so of different people, on one machine. Until the system mode's loopback guard checks each connection when it starts (it scans for ports every 2 seconds), local ports there are not a hard boundary between agents.
 - The first install is longer: the agent browser and the command-line tools come with the computer.
 - The installer needs `@agenteschat/setup` on npm; until then, `AGENTES_INSTALL_SETUP` and locally built images are how it's tested.
 

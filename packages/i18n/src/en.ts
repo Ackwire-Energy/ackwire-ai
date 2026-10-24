@@ -6542,6 +6542,7 @@ export const en: Translations = {
       notContinuable: "This answer can't be continued anymore.",
       agentBusy: "The agent is already working in this conversation. Wait for it to finish to continue.",
       continueForbidden: "Only who asked, the agent's owner or an admin can continue it.",
+      notRestartable: "This answer had already started, so it can't start over. Send your message again.",
     },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",

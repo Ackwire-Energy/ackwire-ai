@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
 import { recordAudit } from "./audit";
@@ -16,7 +16,7 @@ import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, agents, messages, routingDecisions } = schema;
+const { agentRunSteps, agentRuns, agents, messages, routingDecisions } = schema;
 
 /** The card's English body (the apps show `chat.body.no_ai`). */
 export const NO_AI_TEXT = "I can't answer yet: I have no AI connected.";
@@ -143,15 +143,36 @@ type AnsweringRun = Awaited<ReturnType<typeof answeringRuns>>[number];
 const forbidden = () =>
   new ForbiddenError("Only who asked, the agent's owner or an admin can do this", "run.answer_forbidden");
 const stillMissing = () => new ConflictError("There is still no AI connected", "ai.still_missing");
+const notRestartable = () =>
+  new ConflictError("This reply had already started, so it can't start over: ask again", "run.not_restartable");
+
+/**
+ * A `no_ai` run that resumed (after an approval or a question) or met a signed-out tool in a later turn may
+ * have done things; starting it over would do them again, and deleting it would take its approvals,
+ * questions and steps with it.
+ */
+const WORK_STEPS = ["tool_call", "message", "approval"] as const;
+
+async function didWork(db: Executor, runId: string) {
+  const [step] = await db
+    .select({ id: agentRunSteps.id })
+    .from(agentRunSteps)
+    .where(and(eq(agentRunSteps.runId, runId), inArray(agentRunSteps.kind, [...WORK_STEPS])))
+    .limit(1);
+  return step !== undefined;
+}
 
 /**
  * Starts a failed `no_ai` run again on the person's own message, in one transaction: the old run is
- * deleted (it failed before any call; its steps go with it), so `(trigger_message_id, agent_id)` stays
- * unique and the requester, authority and context are the normal ones. Null when another call got there first.
+ * deleted (it did nothing; its steps go with it), so `(trigger_message_id, agent_id)` stays unique and the
+ * requester, authority and context are the normal ones. Null when another call got there first; `worked`
+ * when the run had done something, and stays.
  */
 async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: AgentRun) {
   const trigger = await getMessage(deps.db, failed.orgId, failed.triggerMessageId);
   if (!trigger || trigger.deletedAt) return null;
+  // A failed run gets no more steps, so this still holds in the transaction below.
+  if (await didWork(deps.db, failed.id)) return "worked" as const;
   const started = await deps.db.transaction(async (tx) => {
     const [gone] = await tx
       .delete(agentRuns)
@@ -214,9 +235,10 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: Mem
 /**
  * "Responder agora" (`POST …/messages/{id}/answer-now`, ADR 0057), once an AI is connected. The id is a
  * no-AI card (its agent's newest run in that conversation) or the person's message (the runs it started,
- * else its `no_ai` routing decision). A failed `no_ai` run starts again on the person's own message; a
- * `no_ai` decision is routed again. Who asked, the agent's owner or an admin (like "Continuar"). 409
- * `ai.still_missing` while there's still none; pressed again, it returns what answers the message.
+ * else its `no_ai` routing decision). A failed `no_ai` run that did nothing starts again on the person's
+ * own message (one that did something: 409 `run.not_restartable`); a `no_ai` decision is routed again. Who
+ * asked, the agent's owner or an admin (like "Continuar"). 409 `ai.still_missing` while there's still none;
+ * pressed again, it returns what answers the message.
  */
 export async function answerNow(
   deps: AnswerNowDeps,
@@ -239,10 +261,13 @@ export async function answerNow(
     for (const r of allowed) if ((await agentAiState(deps, r.agent, r.run)).state !== "no_ai") ready.push(r);
     if (ready.length === 0) throw stillMissing();
     const runs: Answering = [];
+    let worked = false;
     for (const r of ready) {
       const started = await restartNoAiRun(deps, userId, r.run);
-      if (started) runs.push(started);
+      if (started === "worked") worked = true;
+      else if (started) runs.push(started);
     }
+    if (runs.length === 0 && worked) throw notRestartable();
     return { runs };
   }
   if (!card && message.authorType === "person") {

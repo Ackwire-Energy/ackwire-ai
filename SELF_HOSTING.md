@@ -534,11 +534,12 @@ plain http the computer's token travels unencrypted, and the runner's background
 load extra CA certificates.
 
 **This server as the agents' computer (Linux).** The machine agentes.chat runs on can be a computer
-too, for the organizations where the installation's first account is an owner or an admin, with each
-agent as its own user on it. Set a token in `.env` and give the same one to the runner, as root:
+too, for the organizations the installation's first account made and is an owner or an admin of,
+with each agent as its own user on it. Set a token in `.env` and give the same one to the runner, as
+root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you changed it):
 
 ```sh
-openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token
+(umask 077 && openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token)
 echo "HOST_COMPUTER_TOKEN=$(cat /root/host-computer-token)" >> .env
 docker compose up -d
 curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system \

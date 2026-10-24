@@ -605,7 +605,7 @@ export const envVars = {
       .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
       .optional(),
     description:
-      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations whose owner or admin is the installation's first account (one computer per organization). Can't be set with `ALLOW_SIGNUP=true`. Unset: off.",
+      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true`. Unset: off.",
     section: "Sandbox",
     example: "<output of openssl rand -base64 48>",
     secret: true,

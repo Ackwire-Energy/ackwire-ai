@@ -27,7 +27,7 @@ import {
 } from "./machines";
 import { can, type MemberRole, requirePermission } from "./organizations";
 
-const { agents, machines, organizationMembers, organizations, users } = schema;
+const { agents, channels, machines, organizationMembers, organizations, users } = schema;
 
 /**
  * The server's own computer (`HOST_COMPUTER_TOKEN`, and `agentes-runner host`
@@ -36,11 +36,12 @@ const { agents, machines, organizationMembers, organizations, users } = schema;
  * child runner per organization and the hub, outages, accounts and brains
  * work as for any computer.
  *
- * It serves only the organizations where the installation's first account
- * (the person who set it up) is an owner or an admin, and that account is
- * the rows' pairer, so it adds the computer's AI sign-ins (ADR 0041). Someone
- * who joins by invitation and makes an organization of their own doesn't get
- * agents on the operator's machine. A removed row is that organization's
+ * It serves only the organizations the installation's first account (the
+ * person who set it up) made and is still an owner or an admin of, and that
+ * account is the rows' pairer, so it adds the computer's AI sign-ins (ADR
+ * 0041). Someone who joins by invitation and makes an organization of their
+ * own doesn't get agents on the operator's machine, not even by inviting that
+ * account and making it an admin there. A removed row is that organization's
  * opt-out; turning it back on brings the same row back.
  */
 
@@ -79,20 +80,29 @@ export const hostKey = (hostToken: string) => sha256Hex(hostToken);
 
 const OSES = new Set(["linux", "darwin", "windows"]);
 
-const serves = (role: MemberRole | undefined) => role !== undefined && can(role, "configure");
-
 /** The installation's first account. */
 async function installOwner(db: Database): Promise<string | null> {
   const [first] = await db.select({ id: users.id }).from(users).orderBy(asc(users.createdAt), asc(users.id)).limit(1);
   return first?.id ?? null;
 }
 
-async function ownerRole(db: Database, ownerId: string, orgId: string) {
-  const [m] = await db
-    .select({ role: organizationMembers.role })
+/**
+ * The organizations served (or just `orgId`, when it is one): made by the first account and still run by it.
+ * Who made an organization is recorded only on its #general (`createOrganization`), which can't be renamed
+ * or archived. A role alone isn't enough: an organization's owner can make anyone an admin.
+ */
+async function servedOrgs(db: Database, ownerId: string, orgId?: string) {
+  const rows = await db
+    .select({ id: organizations.id, name: organizations.name, role: organizationMembers.role })
     .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, ownerId)));
-  return m?.role as MemberRole | undefined;
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .innerJoin(
+      channels,
+      and(eq(channels.orgId, organizations.id), eq(channels.name, "general"), eq(channels.createdByUserId, ownerId)),
+    )
+    .where(and(eq(organizationMembers.userId, ownerId), ...(orgId ? [eq(organizationMembers.orgId, orgId)] : [])))
+    .orderBy(asc(organizations.createdAt));
+  return rows.filter((o) => can(o.role as MemberRole, "configure"));
 }
 
 const revoke = (pubsub: PubSub | undefined, machineId: string) =>
@@ -109,16 +119,7 @@ export async function syncHostComputer(deps: HostDeps, input: HostSyncInput): Pr
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
   const ownerId = await installOwner(db);
-  const served = ownerId
-    ? (
-        await db
-          .select({ id: organizations.id, name: organizations.name, role: organizationMembers.role })
-          .from(organizationMembers)
-          .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-          .where(eq(organizationMembers.userId, ownerId))
-          .orderBy(asc(organizations.createdAt))
-      ).filter((o) => serves(o.role as MemberRole))
-    : [];
+  const served = ownerId ? await servedOrgs(db, ownerId) : [];
   const ids = served.map((o) => o.id);
   const dropped = await db
     .update(machines)
@@ -264,7 +265,7 @@ async function joined(deps: HostDeps, row: MachineRow, now: Date) {
  */
 export async function addHostComputer(db: Database, orgId: string) {
   const ownerId = await installOwner(db);
-  if (!ownerId || !serves(await ownerRole(db, ownerId, orgId))) return;
+  if (!ownerId || (await servedOrgs(db, ownerId, orgId)).length === 0) return;
   const [same] = await db
     .select({
       name: machines.name,
@@ -286,7 +287,7 @@ export async function addHostComputer(db: Database, orgId: string) {
 /** The organization's row of the server's computer, removed or not; null when the server doesn't serve it. */
 async function servedRow(db: Database, orgId: string): Promise<MachineRow | null> {
   const ownerId = await installOwner(db);
-  if (!ownerId || !serves(await ownerRole(db, ownerId, orgId))) return null;
+  if (!ownerId || (await servedOrgs(db, ownerId, orgId)).length === 0) return null;
   const [row] = await db
     .select()
     .from(machines)

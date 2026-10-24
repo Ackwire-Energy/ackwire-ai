@@ -1,6 +1,6 @@
 # 0057. No AI connected, and agents that set up the workspace
 
-- Status: Accepted (2026-10-24; to build)
+- Status: Accepted
 - Date: 2026-10-24
 - Extends: ADR 0032 (brains and the fallback to the model), ADR 0037 (act with undo), ADR 0041 (plan sign-ins on a computer), ADR 0043 (tool groups chosen by the judge), ADR 0053 (who is behind a run)
 - Out of scope for now: invitation and app cards, agents creating agents or changing their own brain, plan sign-in from the phone app
@@ -69,6 +69,7 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
 - While there is still no AI: 409 `ai.still_missing`, and the card keeps its button.
 - The card stands for its conversation: its agent's newest run there. The person's message: the runs it started.
 - When that run failed with `no_ai`: in one transaction, the run is deleted (it did nothing, and its steps cascade), and a run starts again on the person's own message (`startOrJoinRun`). The requester, the authority (ADR 0053) and the context are the normal ones, and `(trigger_message_id, agent_id)` stays unique. Audited as `run.answered_after_connect`.
+- Only a run that did nothing starts over: no tool ran, nothing was posted, no approval was asked. A run that resumed (after an approval or a question), or met a signed-out tool in a later turn, gets 409 `run.not_restartable` and stays as it is, because starting over would do its work again and deleting it would lose its approvals and questions. The person asks again.
 - Otherwise, when a `no_ai` routing decision exists: it's deleted and `routeMessage` is called directly. Enqueueing `message.posted` again would do nothing, because its dedupe key already exists in the outbox.
 - A second call starts nothing new: it returns the runs that answer the message.
 - Who may press it: the person who asked, the agent's owner or an admin (the same people as Continuar). It's rate limited like other changes.

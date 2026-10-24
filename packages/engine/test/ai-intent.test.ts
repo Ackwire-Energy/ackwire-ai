@@ -27,7 +27,7 @@ let f: Fixture | undefined;
 afterEach(() => f?.close());
 
 /**
- * Jev's answers with this request (2026-10-24, the design's probe and the review's adversarial messages):
+ * Jev's answers with this request (recorded 2026-10-24, plain asks and adversarial ones: prices, cancelling, an injection):
  * the intent's top option and probability, the provider's, and the step they map to.
  */
 const RECORDED: [text: string, intent: string, p: number, provider: string, pp: number, step: ConnectIntent][] = [

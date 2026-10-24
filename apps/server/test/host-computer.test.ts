@@ -114,23 +114,23 @@ test("one computer per organization of the first account, its own token each; no
   expect(lost?.token).not.toBe(rotated?.token);
   expect(await authenticateMachine(t.db, rotated?.token ?? "")).toBeNull();
 
-  // A member of Beta is not enough; an admin of it is; demoted again, Beta's token stops working.
+  // Bia can make the first account an admin, even an owner, of Beta on her own: Beta still isn't served.
   await joinByLink(bia, betaId, owner);
-  expect((await synced({ have: [orgId] })).map((o) => o.orgId)).toEqual([orgId]);
   const ownerId = await userId("owner@example.com");
-  const promote = (role: string) =>
-    bia(`/api/app/organizations/${betaId}/members/${ownerId}`, { method: "PATCH", json: { role } });
-  expect((await promote("admin")).status).toBe(204);
-  const both = await synced({ have: [orgId] });
-  expect(both.map((o) => [o.orgName, Boolean(o.token)])).toEqual([
-    ["Acme", false],
-    ["Beta", true],
-  ]);
-  const beta = both[1]?.token ?? "";
-  expect(await authenticateMachine(t.db, beta)).toMatchObject({ orgId: betaId, kind: "host" });
-  expect((await promote("member")).status).toBe(204);
-  expect((await synced({ have: [orgId, betaId] })).map((o) => o.orgId)).toEqual([orgId]);
-  expect(await authenticateMachine(t.db, beta)).toBeNull();
+  const biaId = await userId("bia@example.com");
+  const setRole = async (by: Browser, org: string, who: string, role: string) =>
+    (await by(`/api/app/organizations/${org}/members/${who}`, { method: "PATCH", json: { role } })).status;
+  for (const role of ["admin", "owner"]) {
+    expect(await setRole(bia, betaId, ownerId, role)).toBe(204);
+    expect((await synced({ have: [orgId] })).map((o) => o.orgId)).toEqual([orgId]);
+  }
+  expect(await t.db.select().from(schema.machines).where(eq(schema.machines.orgId, betaId))).toEqual([]);
+
+  // Acme, which the first account made: served while it runs it; made a member there, its token stops working.
+  expect(await setRole(owner, orgId, biaId, "owner")).toBe(204);
+  expect(await setRole(bia, orgId, ownerId, "member")).toBe(204);
+  expect(await synced({ have: [orgId] })).toEqual([]);
+  expect(await authenticateMachine(t.db, lost?.token ?? "")).toBeNull();
 });
 
 test("an admin stops it in an organization (skipped from then on) and turns it back on", async () => {
