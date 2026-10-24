@@ -119,7 +119,11 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
         <span className="computers-card__title">
           <h2 id="sec-workspace-computer" className="ac-card__title">
             {machine ? (
-              <Link to="/org/$orgId/settings/computers/$machineId" params={{ orgId: org.id, machineId: machine.id }}>
+              <Link
+                to="/org/$orgId/settings/computers/$machineId"
+                params={{ orgId: org.id, machineId: machine.id }}
+                className="machine-row__name"
+              >
                 {title}
               </Link>
             ) : (
@@ -135,19 +139,20 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
       {view.phase !== "ready" && <SetupProgress view={view} />}
       <SetupFacts view={view} />
       {machine && machine.agents.length > 0 && (
-        <span
-          className="row"
-          style={{ gap: 4 }}
-          title={t("machines.usedBy", {
-            names: joinNames(
-              machine.agents.map((a) => a.name),
-              t("newAgent.and"),
-            ),
-          })}
-        >
-          {machine.agents.slice(0, 8).map((a) => (
-            <AgentAvatar key={a.id} agentId={a.id} size="sm" name={a.name} />
-          ))}
+        <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="row" style={{ gap: 4 }}>
+            {machine.agents.slice(0, 8).map((a) => (
+              <AgentAvatar key={a.id} agentId={a.id} size="sm" name={a.name} />
+            ))}
+          </span>
+          <span className="small muted">
+            {t("machines.usedBy", {
+              names: joinNames(
+                machine.agents.map((a) => a.name),
+                t("newAgent.and"),
+              ),
+            })}
+          </span>
         </span>
       )}
     </Card>

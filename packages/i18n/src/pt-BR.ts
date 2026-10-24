@@ -8167,6 +8167,8 @@ export const ptBR = {
     },
     agentWaiting: "{{The}} {{name}} começa a usar assim que ele ficar pronto.",
     managedHint: "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
+    sectionText:
+      "Onde os agentes rodam código e mexem em arquivos. Cada agente usa um: o computador do próprio workspace, ou um computador seu.",
     continue: "Pode seguir: os agentes começam a usar assim que ele ficar pronto.",
   },
   /** The agent's desktop (ADR 0058): watching it, taking control, its terminal. */

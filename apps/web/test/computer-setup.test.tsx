@@ -124,6 +124,9 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     });
     await push({ state: "ready", machineId: m.id });
     expect(card().textContent).toContain("Online");
+    expect(card().textContent).toContain("Usado por Ada");
+    // The page says what the agents' computers are here: the workspace's own, not the cloud's.
+    expect(document.body.textContent).toContain("o computador do próprio workspace, ou um computador seu");
     expect(card().textContent).not.toContain("Passo");
     expect(card().textContent).toContain("Um usuário para cada agente");
     // People's own computers are listed apart: the workspace's isn't one of them.

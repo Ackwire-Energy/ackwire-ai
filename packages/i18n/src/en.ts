@@ -8139,6 +8139,8 @@ export const en: Translations = {
     },
     agentWaiting: "{{name}} starts using it as soon as it's ready.",
     managedHint: "The workspace's own computer: always on, with a user of its own for each agent.",
+    sectionText:
+      "Where agents run code and work with files. Each agent uses one: the workspace's own computer, or a computer of yours.",
     continue: "You can go on: your agents start using it as soon as it's ready.",
   },
   /** The agent's desktop (ADR 0058): watching it, taking control, its terminal. */

@@ -937,7 +937,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
             <>
               <span className="small">{t("computerSetup.lead")}</span>
               {setup && <SetupFacts view={setup} />}
-              <span className="small muted">{seenText(t, i18n.language, m)}</span>
+              {!m.online && <span className="small muted">{seenText(t, i18n.language, m)}</span>}
             </>
           ) : (
             <span className="small muted">
