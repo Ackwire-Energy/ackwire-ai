@@ -220,7 +220,7 @@ interface Session {
   browser: BrowserManager;
   /** Desktop and terminal streams (ADR 0058): they end with the session. */
   streams: DataSockets;
-  /** The agents' use of their desktops (ADR 0057): its helpers end with the session, the desktops don't. */
+  /** The agents' use of their desktops (ADR 0060): its helpers end with the session, the desktops don't. */
   desktopUse: DesktopManager;
   connection: RunnerConnection;
   /** System mode: the agents' workers, where all their work runs. */
