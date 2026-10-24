@@ -5446,6 +5446,8 @@ export const en: Translations = {
       offlineName: "{{name}} (offline)",
       offlineText: "Offline now; the agent says so until it's back",
       connectHint: "Connect a computer of yours",
+      none: "No computer",
+      noneText: "Doesn't run programs or keep files",
     },
   },
   sandbox: {
@@ -8079,14 +8081,13 @@ export const en: Translations = {
     },
   },
   standing: {
-    paused: "Agents in this workspace are paused for now.",
+    paused: "Agents in this workspace are paused for review.",
     suspended: "This workspace is unavailable for now.",
     createRefused: "You can't create a workspace right now.",
     agentPaused: "This agent is paused for now.",
     onHold: "This workspace is on hold: {{reason}}",
     suspendedFor: "This workspace is suspended: {{reason}}",
-    review: "Agents in this workspace are paused for review.",
-    bannerSub: "You can still read and write here. Agents don't answer or work until then.",
+    bannerSub: "You can still read and write here; agents don't answer or work while it's on hold.",
     label: "Workspace status",
     screen: {
       title: "This workspace is unavailable",
@@ -8099,8 +8100,16 @@ export const en: Translations = {
       active: "The workspace is working again",
     },
   },
+  /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */
+  support: {
+    writeBefore: "Need help? Write to ",
+    writeAfter: ".",
+    ask: "Need help? Ask the people who run this server.",
+  },
   computerSetup: {
     managedNotRemovable: "This is the workspace's own computer: it can't be removed.",
+    managedAccess: "This is the workspace's own computer: its tools and folders stay as they are.",
+    notWorking: "Not working on this computer right now.",
     notification: {
       ready: "Your workspace's computer is ready",
     },

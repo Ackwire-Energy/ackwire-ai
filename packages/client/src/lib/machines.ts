@@ -88,11 +88,10 @@ export function computerKind(os: string | null | undefined, cloud = false): Comp
 }
 
 /**
- * A computer of the list's portrait: the workspace's own computer is drawn as the cloud one (its OS is never
- * shown); one not in the list (yet), as a server.
+ * Who may turn a tool off or take a folder away here: an admin or whoever connected it, never on the
+ * workspace's own computer, where nobody in the workspace could turn them back on (ADR 0056 §10).
  */
-export const machineKind = (m: Pick<Machine, "os" | "kind"> | undefined): ComputerKind =>
-  computerKind(m?.os, m?.kind === "managed");
+export const canReduceAccess = (m: Pick<Machine, "canManage" | "kind">) => m.canManage && m.kind !== "managed";
 
 /** Paused wins over online (a paused machine is still connected); otherwise online or offline. */
 export function computerState(m: Pick<Machine, "online" | "paused">, now = Date.now()): ComputerState {

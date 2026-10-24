@@ -1,4 +1,3 @@
-import { managedTitle } from "@agenteschat/client/lib/computer";
 import {
   agentWaitingPhrase,
   type ComputerBrain,
@@ -97,14 +96,6 @@ export function sheetDesc(t: TFunction, o: OutageLike, agentIds: ReadonlySet<str
     computer: o.name,
     names: namesText(t, shown),
   });
-}
-
-/**
- * The workspace's own computer as people call it ("Computador da Acme", its system never shown); any other
- * computer as it is. For outages and the sheet's targets alike.
- */
-export function named<T extends { name: string | null; managed?: boolean }>(t: TFunction, c: T, orgName: string): T {
-  return c.managed ? { ...c, name: managedTitle(t, c.name, orgName) } : c;
 }
 
 /** The icon of a target or a computer: by its platform, the cloud one for the cloud. */

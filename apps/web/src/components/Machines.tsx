@@ -9,12 +9,13 @@ import {
   useMachines,
   useReduceMachineAccess,
 } from "@agenteschat/client";
-import { managedTitle } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { daysBetween, formatShortDate, formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  canReduceAccess,
+  computerKind,
   computerState,
   DESKTOP_TARGET,
   downloadHref,
@@ -23,7 +24,6 @@ import {
   installCommand,
   isPaused,
   MACHINE_TOOLS,
-  machineKind,
   machineTitle,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -73,7 +73,7 @@ export function MachineIcon({ machineId, size = 14 }: { machineId: string | null
   const { org } = useOrg();
   const machines = useMachines(org.id, Boolean(machineId));
   const m = machineId ? machines.data?.find((x) => x.id === machineId) : undefined;
-  return m ? <ComputerIcon kind={machineKind(m)} size={size} /> : <Icon name="computer" size={size} />;
+  return m ? <ComputerIcon kind={computerKind(m.os)} size={size} /> : <Icon name="computer" size={size} />;
 }
 
 /** Online / Offline, with an icon (never a colored dot). */
@@ -328,7 +328,7 @@ function MachineRow({
   ].filter(Boolean);
   return (
     <div className="ac-list__row machine-row">
-      <ComputerPortrait className="machine-row__icon" kind={machineKind(m)} state={computerState(m)} />
+      <ComputerPortrait className="machine-row__icon" kind={computerKind(m.os)} state={computerState(m)} />
       <span className="list-col machine-row__main">
         <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Link
@@ -724,7 +724,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
                 ) : (
                   <span className="small muted">{t("machines.access.nobody")}</span>
                 )}
-                {m.canManage && (
+                {canReduceAccess(m) && (
                   <Menu
                     align="end"
                     label={label}
@@ -754,7 +754,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   );
 }
 
-/** Ferramentas: on/off chips; the owner can turn one off (never on). */
+/** Ferramentas: on/off chips; the owner can turn one off (never on), except on the workspace's own computer. */
 function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: Reduce) => void }) {
   const { t } = useTranslation();
   const access = m.access;
@@ -786,7 +786,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
                 {tool === "commands" && on && <span className="small muted">{t("machines.access.commandsWarn")}</span>}
               </span>
               <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
-              {on && m.canManage && (
+              {on && canReduceAccess(m) && (
                 <Button
                   size="sm"
                   aria-label={t("machines.access.disableLabel", { tool: name })}
@@ -917,10 +917,15 @@ export function MachinePage({ machineId }: { machineId: string }) {
       {back}
       <Card aria-labelledby="sec-machine">
         <div className="row machine-page__head">
-          <ComputerPortrait className="machine-page__icon" kind={machineKind(m)} state={computerState(m)} size={96} />
+          <ComputerPortrait
+            className="machine-page__icon"
+            kind={computerKind(m.os)}
+            state={computerState(m)}
+            size={96}
+          />
           <span className="list-col machine-page__title">
             <h2 id="sec-machine" className="ac-card__title">
-              {managed ? managedTitle(t, m.name, org.name) : machineTitle(m, t("machines.host.label"))}
+              {machineTitle(m, t("machines.host.label"))}
             </h2>
             <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               {m.kind === "host" && m.name && <Chip icon="computer">{t("machines.host.label")}</Chip>}

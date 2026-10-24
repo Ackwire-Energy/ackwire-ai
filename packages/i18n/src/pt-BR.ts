@@ -5462,6 +5462,8 @@ export const ptBR = {
       offlineName: "{{name}} (offline)",
       offlineText: "Offline agora; o agente avisa até ligarem",
       connectHint: "Conectar um computador seu",
+      none: "Nenhum computador",
+      noneText: "Não roda programas nem guarda arquivos",
     },
   },
   sandbox: {
@@ -8107,14 +8109,14 @@ export const ptBR = {
     },
   },
   standing: {
-    paused: "Os agentes deste workspace estão pausados por enquanto.",
+    paused: "Os agentes deste workspace estão pausados para uma revisão.",
     suspended: "Este workspace está indisponível por enquanto.",
     createRefused: "Você não pode criar um workspace agora.",
     agentPaused: "Este agente está pausado por enquanto.",
     onHold: "Este workspace está em espera: {{reason}}",
     suspendedFor: "Este workspace está suspenso: {{reason}}",
-    review: "Os agentes deste workspace estão pausados para uma revisão.",
-    bannerSub: "Dá para ler e escrever normalmente. Os agentes não respondem nem trabalham até lá.",
+    bannerSub:
+      "Dá para ler e escrever normalmente; os agentes não respondem nem trabalham enquanto ele estiver em espera.",
     label: "Status do workspace",
     screen: {
       title: "Este workspace está indisponível",
@@ -8127,8 +8129,16 @@ export const ptBR = {
       active: "O workspace voltou a funcionar",
     },
   },
+  /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */
+  support: {
+    writeBefore: "Precisa de ajuda? Escreva para ",
+    writeAfter: ".",
+    ask: "Precisa de ajuda? Fale com quem cuida deste servidor.",
+  },
   computerSetup: {
     managedNotRemovable: "Este é o computador do próprio workspace: ele não pode ser removido.",
+    managedAccess: "Este é o computador do próprio workspace: as ferramentas e as pastas dele ficam como estão.",
+    notWorking: "Não está funcionando neste computador agora.",
     notification: {
       ready: "O computador do seu workspace está pronto",
     },

@@ -6,9 +6,17 @@ import { leaves } from "./leaves";
  * Screens about the agents' computer (onboarding, preparing, its own page) are read by people who aren't
  * developers: no system names, addresses or tool lists. Sizes ("4 CPUs · 8 GB de memória") and "um usuário
  * para cada agente" are fine. A new screen about computers adds its namespace here; so do the workspace's
- * standing screens (the hold banner, the suspended screen), read by the same people.
+ * standing screens (the hold banner, the suspended screen) and where to ask for help, read by the same people.
  */
-const NAMESPACES = ["onboarding.computer.", "computer.", "computerSetup.", "machine.", "machines.host.", "standing."];
+const NAMESPACES = [
+  "onboarding.computer.",
+  "computer.",
+  "computerSetup.",
+  "machine.",
+  "machines.host.",
+  "standing.",
+  "support.",
+];
 
 /** What the workspace computer's screens say in each state (`setupView` in packages/client/src/lib/computer.ts). */
 const SETUP_KEYS = [
@@ -23,9 +31,14 @@ const SETUP_KEYS = [
   "computerSetup.users",
   "computerSetup.notice.title",
   "computerSetup.agentWaiting",
+  "computerSetup.notWorking",
+  "computer.target.none",
   "standing.onHold",
-  "standing.review",
+  "standing.paused",
+  "standing.bannerSub",
   "standing.screen.title",
+  "support.writeBefore",
+  "support.ask",
 ];
 
 /** Case-insensitive, so the Go language is left out: it would match English "Go to…". */

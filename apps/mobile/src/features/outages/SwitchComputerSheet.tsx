@@ -7,13 +7,12 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { useOrg } from "@/providers/org";
 import { Button, Card, Chip, Icon, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, Tile, tapHaptic } from "../shared/parts";
-import { computerIcon, type MachineOutage, moveToast, named, sheetDesc, targetText, waitingText } from "./logic";
+import { computerIcon, type MachineOutage, moveToast, sheetDesc, targetText, waitingText } from "./logic";
 import { useMachineOutages, useMoveAgents } from "./queries";
 
 /**
@@ -26,10 +25,7 @@ export function SwitchComputerSheet({ machineId, onClose }: { machineId: string;
   const { t } = useTranslation();
   const c = useColors();
   const q = useMachineOutages();
-  const orgName = useOrg().org?.name ?? "";
-  const found = q.data?.outages.find((o) => o.machineId === machineId);
-  // The workspace's own computer goes by "Computador da Acme" everywhere in the sheet.
-  const outage = found ? named(t, found, orgName) : null;
+  const outage = q.data?.outages.find((o) => o.machineId === machineId) ?? null;
 
   let body: ReactNode;
   if (!q.data) {
@@ -44,9 +40,7 @@ export function SwitchComputerSheet({ machineId, onClose }: { machineId: string;
       </>
     );
   } else {
-    body = (
-      <SwitchForm key={outage.machineId} outage={outage} targets={q.targets} orgName={orgName} onClose={onClose} />
-    );
+    body = <SwitchForm key={outage.machineId} outage={outage} targets={q.targets} onClose={onClose} />;
   }
   return (
     <SheetScreen>
@@ -59,12 +53,10 @@ export function SwitchComputerSheet({ machineId, onClose }: { machineId: string;
 function SwitchForm({
   outage: o,
   targets,
-  orgName,
   onClose,
 }: {
   outage: MachineOutage;
   targets: Parameters<typeof targetOptions>[1];
-  orgName: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -78,10 +70,7 @@ function SwitchForm({
     () => new Set(o.agents.filter((a) => !unchecked.has(a.agentId)).map((a) => a.agentId)),
     [o.agents, unchecked],
   );
-  const options = useMemo(
-    () => targetOptions(o, targets, chosen).map((x) => named(t, x, orgName)),
-    [o, targets, chosen, t, orgName],
-  );
+  const options = useMemo(() => targetOptions(o, targets, chosen), [o, targets, chosen]);
   const targetKey = pickedTargetKey(options, picked);
   const target = options.find((x) => x.key === targetKey) ?? null;
   const count = chosen.size;
@@ -247,7 +236,7 @@ function TargetRow({
         !x.enabled && styles.off,
       ]}
     >
-      <Tile icon={computerIcon(x.platform, x.kind === "cloud" || x.managed)} size={36} />
+      <Tile icon={computerIcon(x.platform, x.kind === "cloud")} size={36} />
       <View style={styles.grow}>
         <View style={styles.titleLine}>
           <Text variant="body" tone="ink" numberOfLines={1} style={styles.shrink}>

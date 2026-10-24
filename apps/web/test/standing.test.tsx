@@ -14,8 +14,9 @@ const STATUS = "Status do workspace";
 const OTHER_ID = "00000000-0000-4000-8000-0000000000b2";
 
 /** #eng of Acme with the standing `/me` says, and its socket open to push what the operator changes. */
-async function open(standing?: OrgStanding, other = false) {
+async function open(standing?: OrgStanding, other = false, supportEmail: string | null = null) {
   const state = seedState();
+  state.authConfig = { ...state.authConfig, supportEmail };
   if (state.me) {
     state.me.organizations = [
       { id: ORG_ID, name: "Acme", role: "owner", ...(standing ? { standing } : {}) },
@@ -44,7 +45,11 @@ describe("on hold: a line on top of the work area", () => {
     const { set } = await open({ state: "hold", reason: "verificação de pagamento" });
     const banner = () => screen().getByRole("region", { name: STATUS });
     expect(banner().textContent).toContain("Este workspace está em espera: verificação de pagamento");
-    expect(banner().textContent).toContain("Dá para ler e escrever normalmente.");
+    expect(banner().textContent).toContain(
+      "Dá para ler e escrever normalmente; os agentes não respondem nem trabalham enquanto ele estiver em espera.",
+    );
+    // Where to ask: nobody named on this server, so whoever runs it.
+    expect(banner().textContent).toContain("Precisa de ajuda? Fale com quem cuida deste servidor.");
     // People still read and write: the chat is there under it.
     expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
 
@@ -54,6 +59,15 @@ describe("on hold: a line on top of the work area", () => {
 
     await set({ state: "active", reason: null });
     expect(screen().queryByRole("region", { name: STATUS })).toBeNull();
+  });
+
+  test("where to write when the server names an address", async () => {
+    await open({ state: "hold", reason: null }, false, "ajuda@acme.test");
+    const banner = screen().getByRole("region", { name: STATUS });
+    expect(banner.textContent).toContain("Precisa de ajuda? Escreva para ajuda@acme.test.");
+    expect(within(banner).getByRole("link", { name: "ajuda@acme.test" }).getAttribute("href")).toBe(
+      "mailto:ajuda@acme.test",
+    );
   });
 
   test("an active workspace shows nothing", async () => {
@@ -87,16 +101,18 @@ describe("suspended: a screen of its own", () => {
     await open({ state: "suspended", reason: null });
     expect(screen().getByRole("heading", { name: "Este workspace está indisponível" })).toBeTruthy();
     expect(document.body.textContent).toContain("As conversas e os agentes dele estão fechados por enquanto.");
+    expect(document.body.textContent).toContain("Precisa de ajuda? Fale com quem cuida deste servidor.");
     expect(screen().queryByRole("combobox", { name: "Mensagem para #eng" })).toBeNull();
   });
 
-  test("in place of the shell, live: why when told, the other workspaces, Sair; back once lifted", async () => {
-    const { set } = await open(undefined, true);
+  test("in place of the shell, live: why when told, where to ask, the other workspaces, Sair; back once lifted", async () => {
+    const { set } = await open(undefined, true, "ajuda@acme.test");
     expect(screen().queryByRole("heading", { name: "Este workspace está indisponível" })).toBeNull();
 
     await set({ state: "suspended", reason: "uso fora dos termos" });
     expect(screen().getByRole("heading", { name: "Este workspace está indisponível" })).toBeTruthy();
     expect(document.body.textContent).toContain("Este workspace está suspenso: uso fora dos termos");
+    expect(screen().getByRole("link", { name: "ajuda@acme.test" }).getAttribute("href")).toBe("mailto:ajuda@acme.test");
     // No sidebar, no chat: nothing of the workspace is open.
     expect(screen().queryByRole("combobox", { name: "Mensagem para #eng" })).toBeNull();
     const others = screen().getByRole("navigation", { name: "Seus outros workspaces" });

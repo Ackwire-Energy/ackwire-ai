@@ -1,4 +1,4 @@
-import type { Me, OrgSummary } from "@agenteschat/client";
+import { type Me, type OrgSummary, useAuthConfig } from "@agenteschat/client";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { Button, EmptyState, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,8 +10,28 @@ import { useOrg } from "@/components/org-context";
 /**
  * The workspace's standing (ADR 0056 §8), as its people see it: on hold, a line at the top of the work area
  * (the reason only when the workspace is told one, else only that its agents are paused for review);
- * suspended, a screen of its own in place of the shell. `org.standing` events move both live.
+ * suspended, a screen of its own in place of the shell. Both say where to ask about it. `org.standing` events
+ * move both live.
  */
+
+/** "Precisa de ajuda? Escreva para …" when the server says where (`SUPPORT_EMAIL`), else to ask who runs it. */
+export function SupportLine() {
+  const { t } = useTranslation();
+  const email = useAuthConfig().data?.supportEmail;
+  return (
+    <span className="support-line">
+      {email ? (
+        <>
+          {t("support.writeBefore")}
+          <a href={`mailto:${email}`}>{email}</a>
+          {t("support.writeAfter")}
+        </>
+      ) : (
+        t("support.ask")
+      )}
+    </span>
+  );
+}
 
 export function HoldBanner() {
   const { t } = useTranslation();
@@ -25,13 +45,14 @@ export function HoldBanner() {
         <span className="outage__text">
           <b>{text}</b>
           <span>{t("standing.bannerSub")}</span>
+          <SupportLine />
         </span>
       </div>
     </section>
   );
 }
 
-/** Closed for now, why when told, the person's other workspaces, and Sair. */
+/** Closed for now, why when told, where to ask, the person's other workspaces, and Sair. */
 export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
   const { t } = useTranslation();
   const auth = useAuth();
@@ -59,7 +80,7 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
           </Button>
         }
       >
-        {reason ? t("standing.suspendedFor", { reason }) : t("standing.screen.text")}
+        {reason ? t("standing.suspendedFor", { reason }) : t("standing.screen.text")} <SupportLine />
       </EmptyState>
       {others.length > 0 && (
         <nav className="suspended-page__others" aria-label={t("standing.screen.others")}>

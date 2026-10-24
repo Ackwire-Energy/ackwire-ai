@@ -11,10 +11,8 @@ import {
   useAgentBrowserSettings,
   useApi,
   useBrowserHandoffMutations,
-  useMachines,
   usesBrowser,
 } from "@agenteschat/client";
-import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Dialog, DialogBody, Icon } from "@agenteschat/ui";
@@ -101,7 +99,6 @@ export function AgentBrowserNow({
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
-  const machines = useMachines(org.id);
   const actions = useBrowserHandoffMutations(org.id);
   const handoff = useOpenHandoff(agent.id, true);
   const run = useBrowsingRun(agent.id);
@@ -183,13 +180,7 @@ export function AgentBrowserNow({
               <b>{t("browser.inCard.group", g)}</b>
               <span>
                 {settings.machine
-                  ? t("browser.now.ready", {
-                      computer: computerName(
-                        t,
-                        machines.data?.find((m) => m.id === settings.machine?.id) ?? settings.machine,
-                        org.name,
-                      ),
-                    })
+                  ? t("browser.now.ready", { computer: settings.machine.name })
                   : t("browser.machine.ready")}
               </span>
             </span>

@@ -5962,6 +5962,18 @@ a.machine-row__name:hover {
   align-items: center;
   gap: 6px;
 }
+/* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
+.hold-banner .outage__text {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  white-space: normal;
+}
+/* Where to write for help: the address reads as part of the sentence. */
+.support-line a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 /* A suspended workspace's screen: its other workspaces under the notice. */
 .suspended-page__others {
   display: flex;

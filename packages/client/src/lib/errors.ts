@@ -75,6 +75,7 @@ const KNOWN = {
   "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
   "org.create_refused": "standing.createRefused",
   "machine.managed": "computerSetup.managedNotRemovable",
+  "machine.managed_access": "computerSetup.managedAccess",
 } as const;
 
 /** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */
@@ -101,10 +102,10 @@ export function standingRefusalText(
   return reason ? t(keys[1], { reason }) : t(keys[0]);
 }
 
-/** The hold banner's line: the reason when the workspace is told one, else only "paused for review". Null unless on hold. */
+/** The hold banner's line: the reason when the workspace is told one, else what a refused run says. Null unless on hold. */
 export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
   if (standing?.state !== "hold") return null;
-  return standing.reason ? t("standing.onHold", { reason: standing.reason }) : t("standing.review");
+  return standingRefusalText(t, "org.paused", { reason: standing.reason });
 }
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */

@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { ComputerSetup } from "@agenteschat/client";
+import type { ComputerSetup, Machine } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -22,6 +22,46 @@ const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(4);
 };
+
+/** The workspace's own computer as the server lists it: named by the server, no system, nobody paired it. */
+const WORKSPACE_COMPUTER: Partial<Machine> & { name: string } = {
+  name: "Computador da Acme",
+  kind: "managed",
+  os: "other",
+  arch: "",
+  hostname: "",
+  workspace: null,
+  pairedBy: null,
+  mode: "system",
+};
+
+/** A combobox's options, opened. */
+async function optionsOf(combobox: HTMLElement) {
+  combobox.focus();
+  await act(async () => fireEvent.keyDown(combobox, { key: "Enter" }));
+  await settle(2);
+  const names = screen()
+    .getAllByRole("option")
+    .map((o) => o.textContent ?? "");
+  await act(async () => fireEvent.keyDown(document.activeElement ?? combobox, { key: "Escape" }));
+  await settle(2);
+  return names;
+}
+
+/** Acme where the workspace's computer is ready (Ada on it) and the server has no cloud computer. */
+async function readyWorkspace(path: string, patch: Partial<Machine> = {}) {
+  const state = seedState();
+  const api = createFakeApi(state);
+  const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+  const m = machines.pair({ ...WORKSPACE_COMPUTER, ...patch });
+  machines.setSetup({ state: "ready", machineId: m.id, specs: SPECS });
+  await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
+  const settings = api.sandbox.settings;
+  api.sandbox.settings = async (orgId) => ({ ...(await settings(orgId)), available: false });
+  const r = await renderApp(path.replace("$machineId", m.id), { api });
+  await settle(10);
+  return { ...r, state, api, m };
+}
 
 /** The app at `path` where the workspace gets its own computer (`setup`), or where people pair theirs (null). */
 async function open(path: string, setup: Partial<ComputerSetup> | null, state = seedState()) {
@@ -111,17 +151,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(card().textContent).toContain("Está demorando mais que o normal. Nada se perde");
 
     // Its first hello: ready, its row among the computers, the agents on it.
-    const m = machines.pair({
-      name: "Acme",
-      kind: "managed",
-      os: "other",
-      arch: "",
-      hostname: "",
-      workspace: null,
-      pairedBy: null,
-      mode: "system",
-      agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }],
-    });
+    const m = machines.pair({ ...WORKSPACE_COMPUTER, agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }] });
     await push({ state: "ready", machineId: m.id });
     expect(card().textContent).toContain("Online");
     expect(card().textContent).toContain("Usado por Ada");
@@ -142,7 +172,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(page).not.toMatch(TECHNICAL);
     expect(page).not.toContain("Pasta:");
     expect(page).not.toContain("Para liberar mais");
-    const actions = screen().getByRole("button", { name: "Ações de Acme" });
+    const actions = screen().getByRole("button", { name: "Ações de Computador da Acme" });
     actions.focus();
     await act(async () => {
       fireEvent.keyDown(actions, { key: "Enter" });
@@ -152,6 +182,71 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     const menu = screen().getByRole("menu");
     expect(within(menu).getByRole("menuitem", { name: "Renomear" })).toBeTruthy();
     expect(within(menu).queryByRole("menuitem", { name: "Remover" })).toBeNull();
+  });
+
+  test("its page: nothing to turn off that nobody here could turn back on; plain words when something fails", async () => {
+    await readyWorkspace(`/org/${ORG_ID}/settings/computers/$machineId`, {
+      agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }],
+      access: {
+        folders: [{ path: "/srv/shared", agents: [ADA_ID] }],
+        tools: { claude: true, codex: true, commands: true, browser: true, desktop: true },
+      },
+      browser: {
+        available: false,
+        version: null,
+        chrome: null,
+        reason: "ETXTBSY: text file is busy; run `agentes-runner browser install`",
+      },
+      desktopUse: { available: false, reason: "Missing packages: run `sudo apt-get install xdotool`" },
+    });
+    expect(screen().getByRole("heading", { name: "Computador da Acme" })).toBeTruthy();
+    expect(screen().getAllByText("Ligado").length).toBeGreaterThan(0);
+    expect(screen().queryAllByRole("button", { name: /^Desligar/ })).toEqual([]);
+    expect(screen().queryByRole("button", { name: "Ações de shared" })).toBeNull();
+    const page = document.body.textContent ?? "";
+    expect(page).toContain("Não está funcionando neste computador agora.");
+    expect(page).toContain("Precisa de ajuda? Fale com quem cuida deste servidor.");
+    for (const word of ["ETXTBSY", "agentes-runner", "apt-get", "Preferências", "Linux"])
+      expect(page).not.toContain(word);
+  });
+
+  test("an agent on it: no word about allowing more on the computer itself", async () => {
+    await readyWorkspace(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, {
+      access: { folders: [], tools: { claude: true, codex: true, commands: true } },
+    });
+    const pc = document.querySelector(".agp-pc") as HTMLElement;
+    expect(pc.textContent).toContain("Computador da Acme");
+    expect(pc.textContent).toContain("Usa só a própria pasta no Computador da Acme.");
+    expect(pc.textContent).not.toContain("por quem o conectou");
+  });
+
+  test("ready, on a server with no cloud computer: no Nuvem to pick; an agent without one says so", async () => {
+    await readyWorkspace(`/org/${ORG_ID}/settings/computers`);
+    const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
+    const ada = within(card).getByRole("combobox", { name: "Computador de Ada" });
+    expect(ada.textContent).toContain("Computador da Acme");
+    expect((await optionsOf(ada)).join(" | ")).not.toContain("Nuvem");
+    const atlas = within(card).getByRole("combobox", { name: "Computador de Atlas" });
+    expect(atlas.textContent).toContain("Nenhum computador");
+    expect(card.textContent).not.toContain("Nuvem");
+    expect(within(card).queryByRole("button", { name: /Ações do PC/ })).toBeNull();
+  });
+
+  test("ready: Onde trabalha offers the workspace's computer, never a cloud this server doesn't have", async () => {
+    const { state } = await readyWorkspace(`/org/${ORG_ID}/agents/${ATLAS_ID}`);
+    const work = document.querySelector(".agp-workcard") as HTMLElement;
+    expect(work.textContent).toContain("Nenhum computador");
+    expect(work.textContent).not.toContain("nuvem");
+    await click(screen().getByRole("button", { name: "Mudar onde trabalha" }));
+    const d = screen().getByRole("dialog", { name: "Onde o Atlas trabalha?" });
+    const radios = within(d)
+      .getAllByRole("radio")
+      .map((r) => r.textContent ?? "");
+    expect(radios.join(" | ")).not.toContain("Nuvem");
+    await click(within(d).getByRole("radio", { name: /^Computador da Acme/ }));
+    await click(within(d).getByRole("button", { name: "Usar o Computador da Acme" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "sandbox.setTarget" && c.args[1] === ATLAS_ID)?.args[2]).toBeTruthy();
   });
 
   test("which computer each agent uses: the workspace's computer while it is on its way, no cloud PC controls", async () => {
@@ -174,20 +269,46 @@ describe("an agent's computer while the workspace's is on its way", () => {
     expect(document.body.textContent).toContain("A Ada começa a usar assim que ele ficar pronto.");
   });
 
-  test("once ready, the agent works on the workspace's computer, called by its workspace's name", async () => {
-    const state = seedState();
-    const api = createFakeApi(state);
-    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
-    const m = machines.pair({ name: "Acme", kind: "managed", os: "other", arch: "", hostname: "", mode: "system" });
-    machines.setSetup({ state: "ready", machineId: m.id, specs: SPECS });
-    await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
-    await settle(10);
+  test("once ready, the agent works on the workspace's computer, by its name", async () => {
+    await readyWorkspace(`/org/${ORG_ID}/agents/${ADA_ID}`);
     const work = document.querySelector(".agp-workcard") as HTMLElement;
     expect(work.textContent).toContain("Trabalha no");
     expect(work.textContent).toContain("Computador da Acme");
     expect(document.body.textContent).not.toContain("A Ada começa a usar");
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
+  });
+
+  test("moving an agent there while it is on its way: what it will be, when, and its brain kept", async () => {
+    const state = seedState();
+    state.scopes[ADA_ID] = [...(state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+    machines.pair({
+      id: "machine_1",
+      name: "MacBook",
+      os: "darwin",
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+      browser: { available: true, version: "1", chrome: null, reason: null },
+    });
+    machines.setSetup({ state: "preparing", step: "starting" });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet" });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+    await settle(10);
+    await click(screen().getByRole("button", { name: "Mudar onde trabalha" }));
+    const d = screen().getByRole("dialog", { name: "Onde a Ada trabalha?" });
+    const option = within(d).getByRole("radio", { name: /^Computador da Acme/ });
+    expect(option.textContent).toContain("Ligando");
+    await click(option);
+    expect(d.textContent).toContain("A Ada começa a usar assim que ele ficar pronto.");
+    expect(d.textContent).not.toContain("Volta para o modelo da organização");
+    expect(d.textContent).not.toContain("Deixa de navegar");
+    expect(within(d).queryByRole("button", { name: "Usar a Nuvem" })).toBeNull();
+    await click(within(d).getByRole("button", { name: "Usar o Computador da Acme" }));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "sandbox.setTarget").at(-1)?.args).toEqual([ORG_ID, ADA_ID, null]);
+    expect(state.calls.some((c) => c.method === "agents.setBrain")).toBe(false);
+    expect(document.body.textContent).toContain("A Ada agora trabalha no Computador da Acme.");
   });
 
   test("Configurações › its computer: the progress, and no cloud PC to create", async () => {

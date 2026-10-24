@@ -4,7 +4,7 @@ import { resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
-import { computerIcon, type MachineOutage, named, noticeText, targetText } from "../../src/features/outages/logic";
+import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
 import { withMobileKeys } from "../../src/i18n/merge";
 import { suspendedOf } from "../../src/lib/org-choice";
 
@@ -19,11 +19,11 @@ async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
   return i18n.t;
 }
 
-/** The workspace's own computer (ADR 0056 §10): named after the workspace, its system never said. */
+/** The workspace's own computer (ADR 0056 §10): the server names it ("Computador da Acme"), its system never said. */
 const managed: OutageTargetLike = {
   kind: "machine",
   machineId: "ws",
-  name: "Acme",
+  name: "Computador da Acme",
   platform: "other",
   managed: true,
   online: true,
@@ -39,32 +39,20 @@ const air: MachineOutage = {
   agents: [{ agentId: "ada", name: "Ada", brain: "claude_code", waiting: { routines: 0, conversations: 1 } }],
 };
 
-describe("the workspace's own computer on the phone (the switch sheet's card, the offline notice)", () => {
-  test("as a target: 'Computador da Acme', always on, one user per agent, the cloud's icon", async () => {
+describe("the workspace's own computer on the phone (the switch sheet's card)", () => {
+  test("as a target: its name, always on, one user per agent, drawn as a server", async () => {
     const t = await translator("pt-BR");
     const [option] = targetOptions(air, [managed], ["ada"]);
     expect(option).toMatchObject({ managed: true, enabled: true });
     if (!option) throw new Error("no option");
-    expect(targetText(t, named(t, option, "Acme"))).toEqual({
+    expect(targetText(t, option)).toEqual({
       title: "Computador da Acme",
       tag: "Sempre ligado",
       desc: "Só deste workspace · um usuário para cada agente",
     });
-    expect(computerIcon(option.platform, option.managed)).toBe("computerCloud");
+    expect(computerIcon(option.platform, option.kind === "cloud")).toBe("computerLinux");
     const en = await translator("en");
-    expect(targetText(en, named(en, option, "Acme"))).toMatchObject({
-      title: "Acme's computer",
-      desc: "Just for this workspace · one user per agent",
-    });
-  });
-
-  test("offline, its notice names it the same way; any other computer keeps its own name", async () => {
-    const t = await translator("pt-BR");
-    const ws: MachineOutage = { ...air, machineId: "ws", name: "Acme", platform: "other", managed: true };
-    expect(noticeText(t, named(t, ws, "Acme")).title).toBe("O Computador da Acme desconectou");
-    expect(named(t, air, "Acme")).toBe(air);
-    // Renamed by an admin: its own name.
-    expect(named(t, { ...ws, name: "Servidor" }, "Acme").name).toBe("Servidor");
+    expect(targetText(en, option)).toMatchObject({ desc: "Just for this workspace · one user per agent" });
   });
 });
 

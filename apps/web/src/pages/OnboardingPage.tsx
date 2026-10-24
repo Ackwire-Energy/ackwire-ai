@@ -1,6 +1,6 @@
 import type { Machine, Model, Role } from "@agenteschat/client";
 import { keys, useComputerSetup, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
-import { type SetupView, setupPortrait, setupView } from "@agenteschat/client/lib/computer";
+import { type SetupView, setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
@@ -1394,7 +1394,7 @@ function WorkspaceComputerStep({ view, orgName }: { view: SetupView; orgName: st
   return (
     <Card as="div" className="onb__workspace-computer">
       <div className="row" style={{ gap: 16, alignItems: "center" }}>
-        <ComputerPortrait kind="cloud" state={setupPortrait(view, true)} size={96} />
+        <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state={setupPortrait(view, true)} size={96} />
         <span className="stack-4" style={{ gap: 4, flex: "1 1 220px", minWidth: 0 }}>
           <b>{t("computerSetup.title", { org: orgName })}</b>
           <span className="small muted">{t("computerSetup.lead")}</span>

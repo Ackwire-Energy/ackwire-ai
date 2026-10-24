@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { artifactRefs } from "../lib/artifacts";
+import { newerSetup } from "../lib/computer";
 import {
   allItems,
   matchesFilter,
@@ -1941,9 +1942,11 @@ export const useHostComputer = (orgId: string, enabled = true) => {
  */
 export const useComputerSetup = (orgId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
+  const qc = useQueryClient();
   return useQuery({
     queryKey: keys.computerSetup(orgId),
-    queryFn: () => api.machines.computerSetup(orgId),
+    queryFn: async () =>
+      newerSetup(qc.getQueryData(keys.computerSetup(orgId)), await api.machines.computerSetup(orgId)),
     enabled: enabled && orgId.length > 0,
     retry: false,
     refetchInterval: pollMs,

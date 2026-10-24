@@ -20,6 +20,8 @@ export interface AuthConfig {
   /** Linked on the sign-in screen; the line shows only when both are set. */
   termsUrl?: string | null;
   privacyUrl?: string | null;
+  /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
+  supportEmail?: string | null;
 }
 
 export type SignInProvider = "google" | "github" | "apple";

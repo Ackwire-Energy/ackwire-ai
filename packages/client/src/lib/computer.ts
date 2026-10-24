@@ -1,6 +1,5 @@
-import type { TFunction } from "i18next";
 import type { AgentComputer, ComputerSetup, ComputerSetupStep, Machine } from "../api/types";
-import type { ComputerState } from "./machines";
+import { type ComputerState, computerKind } from "./machines";
 
 /** What a person asked the agent's PC to do. */
 export type ComputerAction = "start" | "stop" | "remove";
@@ -105,6 +104,16 @@ export function setupView(setup: ComputerSetup | null | undefined): SetupView | 
   };
 }
 
+/**
+ * What the setup query keeps when an answer arrives: one asked before a `machine.provisioning` event and back
+ * after it never undoes that event (`since`, when the state began, only moves forward while the workspace keeps
+ * its computer).
+ */
+export function newerSetup(cached: ComputerSetup | undefined, fetched: ComputerSetup): ComputerSetup {
+  if (!cached?.since || !fetched.since) return fetched;
+  return Date.parse(fetched.since) < Date.parse(cached.since) ? cached : fetched;
+}
+
 /** The portrait: lit once ready and online, dimmed while on its way, dark when stuck or offline. */
 export function setupPortrait(view: SetupView, online: boolean): ComputerState {
   if (view.phase === "ready") return online ? "online" : "offline";
@@ -130,13 +139,24 @@ export function agentsWaitingForComputer<A extends { id: string }>(
 export const setupNoticeKey = (orgId: string, view: SetupView) =>
   `${orgId}:${view.phase}:${view.step ?? view.reason ?? ""}`;
 
-/** "Oficina E2E's computer" until an admin gives it a name of its own (it starts with the workspace's). */
-export const managedTitle = (t: TFunction, name: string | null | undefined, orgName: string) =>
-  name && name !== orgName ? name : t("computerSetup.title", { org: orgName });
+/**
+ * The workspace's own computer's portrait, before and after it exists: a server (its OS reads `other`), never
+ * the cloud computer an agent may get of its own.
+ */
+export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 
-/** A computer as people call it: the workspace's own by `managedTitle` (a list row's `kind`, an outage's `managed`). */
-export const computerName = (
-  t: TFunction,
-  c: { name: string | null; kind?: string; managed?: boolean },
-  orgName: string,
-) => (c.kind === "managed" || c.managed ? managedTitle(t, c.name, orgName) : (c.name ?? ""));
+export type NoComputer = "cloud" | "workspace" | "none";
+
+/**
+ * What an agent's "no computer" choice (`machineId` null) stands for in a picker: `cloud` where people
+ * connect their own computers or this server has the cloud computer; `workspace` while the workspace's own
+ * computer is on its way (the agents with none get it); `none` once it is ready on a server without the cloud
+ * computer, shown only for an agent that has none (picking it would leave an agent with no computer). Null:
+ * not offered.
+ */
+export function noComputerChoice(view: SetupView | null, cloudAvailable: boolean, current: boolean): NoComputer | null {
+  if (!view) return "cloud";
+  if (setupPending(view)) return "workspace";
+  if (cloudAvailable) return "cloud";
+  return current ? "none" : null;
+}

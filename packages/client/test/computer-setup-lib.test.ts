@@ -6,16 +6,17 @@ import { keys } from "../src/api/keys";
 import type { ComputerSetup, Me } from "../src/api/types";
 import {
   agentsWaitingForComputer,
-  computerName,
-  managedTitle,
+  newerSetup,
+  noComputerChoice,
   SETUP_STEPS,
   setupNoticeKey,
   setupPending,
   setupPortrait,
   setupView,
+  WORKSPACE_COMPUTER_KIND,
 } from "../src/lib/computer";
 import { errorText, holdText, standingRefusalText } from "../src/lib/errors";
-import { machineKind } from "../src/lib/machines";
+import { canReduceAccess } from "../src/lib/machines";
 import { applyWorkspaceEvent } from "../src/realtime/machines";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
@@ -141,19 +142,40 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupNoticeKey("o1", starting)).not.toBe(setupNoticeKey("o2", starting));
   });
 
-  test("its name: the workspace's computer until it gets one of its own; drawn as the cloud computer", () => {
-    expect(managedTitle(t, "Oficina E2E", "Oficina E2E")).toBe('computerSetup.title {"org":"Oficina E2E"}');
-    expect(managedTitle(t, undefined, "Acme")).toBe('computerSetup.title {"org":"Acme"}');
-    expect(managedTitle(t, "Servidor", "Acme")).toBe("Servidor");
-    // Every surface that names a computer: a list row (`kind`), an outage or a target (`managed`), any other.
-    expect(computerName(t, { name: "Acme", kind: "managed" }, "Acme")).toBe('computerSetup.title {"org":"Acme"}');
-    expect(computerName(t, { name: "Acme", managed: true }, "Acme")).toBe('computerSetup.title {"org":"Acme"}');
-    expect(computerName(t, { name: "MacBook", kind: "connected" }, "Acme")).toBe("MacBook");
-    expect(computerName(t, { name: "PC", managed: false }, "Acme")).toBe("PC");
-    expect(machineKind({ os: "other", kind: "managed" })).toBe("cloud");
-    expect(machineKind({ os: "darwin", kind: "connected" })).toBe("mac");
-    expect(machineKind({ os: "linux" })).toBe("linux");
-    expect(machineKind(undefined)).toBe("linux");
+  test("drawn as a server before and after it exists, never as the cloud computer an agent gets", () => {
+    expect(WORKSPACE_COMPUTER_KIND).toBe("linux");
+  });
+
+  test('"no computer" in the pickers: the cloud, the workspace\'s computer on its way, or plainly none', () => {
+    const at = (state: ComputerSetup["state"]) => setupView(external({ state }));
+    // People connect their own computers: as ever.
+    expect(noComputerChoice(null, false, false)).toBe("cloud");
+    // On its way: the agents with no computer get it, so that's what the choice is.
+    for (const state of ["preparing", "waiting", "problem"] as const) {
+      expect(noComputerChoice(at(state), false, false)).toBe("workspace");
+    }
+    // Ready, on a server with no cloud computer: never offered, only shown for an agent that has none.
+    expect(noComputerChoice(at("ready"), false, false)).toBeNull();
+    expect(noComputerChoice(at("ready"), false, true)).toBe("none");
+    expect(noComputerChoice(at("ready"), true, false)).toBe("cloud");
+  });
+
+  test("nobody turns a tool off or takes a folder away on the workspace's own computer", () => {
+    expect(canReduceAccess({ canManage: true, kind: "connected" })).toBe(true);
+    expect(canReduceAccess({ canManage: true })).toBe(true);
+    expect(canReduceAccess({ canManage: false, kind: "connected" })).toBe(false);
+    expect(canReduceAccess({ canManage: true, kind: "managed" })).toBe(false);
+  });
+
+  test("an answer that left before an event never undoes it; a newer one, or one after a reset, does", () => {
+    const ready = external({ state: "ready", since: "2026-10-24T19:00:00.000Z", machineId: "m1" });
+    const stale = external({ state: "preparing", step: "connecting", since: "2026-10-24T18:59:00.000Z" });
+    expect(newerSetup(ready, stale)).toBe(ready);
+    expect(newerSetup(stale, ready)).toBe(ready);
+    expect(newerSetup(undefined, stale)).toBe(stale);
+    // Taken back (since null): the next answer starts over.
+    const reset = external({ state: "preparing", since: null });
+    expect(newerSetup(reset, stale)).toBe(stale);
   });
 });
 
@@ -228,7 +250,8 @@ describe("the workspace's standing in words (ADR 0056 §8)", () => {
     expect(holdText(t, { state: "hold", reason: "verificação de pagamento" })).toBe(
       'standing.onHold {"reason":"verificação de pagamento"}',
     );
-    expect(holdText(t, { state: "hold", reason: null })).toBe("standing.review");
+    // Silent: the same words a refused run says.
+    expect(holdText(t, { state: "hold", reason: null })).toBe("standing.paused");
     expect(holdText(t, { state: "active", reason: null })).toBeNull();
     expect(holdText(t, { state: "suspended", reason: null })).toBeNull();
     expect(holdText(t, undefined)).toBeNull();

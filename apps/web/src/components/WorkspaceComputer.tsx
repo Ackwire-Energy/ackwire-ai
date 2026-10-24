@@ -2,13 +2,13 @@ import type { Machine } from "@agenteschat/client";
 import { useAgents, useComputerSetup, useMachines } from "@agenteschat/client";
 import {
   agentsWaitingForComputer,
-  managedTitle,
   SETUP_STEPS,
   type SetupView,
   setupNoticeKey,
   setupPending,
   setupPortrait,
   setupView,
+  WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames } from "@agenteschat/client/lib/format";
 import {
@@ -27,6 +27,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { SupportLine } from "@/components/Standing";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
@@ -87,6 +88,22 @@ export function SetupFacts({ view }: { view: SetupView }) {
   );
 }
 
+/**
+ * Something on the workspace's own computer doesn't work (its browser, the agents' desktops): nobody here can
+ * run a command on it, so no runner reason or command, only that it doesn't work and who to ask.
+ */
+export function NotWorkingNote() {
+  const { t } = useTranslation();
+  return (
+    <div className="brw-note">
+      <Icon name="alert" size={16} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {t("computerSetup.notWorking")} <SupportLine />
+      </div>
+    </div>
+  );
+}
+
 /** The chip beside its name: online or not once ready (like any computer's), else where it is ("Sendo preparado"). */
 function SetupChip({ view, machine }: { view: SetupView; machine: Machine | undefined }) {
   const { t } = useTranslation();
@@ -111,11 +128,16 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const machine = managedOf(useMachines(org.id).data);
-  const title = managedTitle(t, machine?.name, org.name);
+  // Its own name once it exists ("Computador da Acme" until someone renames it).
+  const title = machine?.name ?? t("computerSetup.title", { org: org.name });
   return (
     <Card aria-labelledby="sec-workspace-computer" className="setup-card" data-phase={view.phase}>
       <div className="computers-card__head">
-        <ComputerPortrait kind="cloud" state={setupPortrait(view, machine?.online ?? false)} size={96} />
+        <ComputerPortrait
+          kind={WORKSPACE_COMPUTER_KIND}
+          state={setupPortrait(view, machine?.online ?? false)}
+          size={96}
+        />
         <span className="computers-card__title">
           <h2 id="sec-workspace-computer" className="ac-card__title">
             {machine ? (
@@ -193,7 +215,7 @@ export function ComputerSetupNotice() {
   return (
     <section className="outages" aria-label={t("computerSetup.notice.label")}>
       <div className="outage setup-notice" role="status" data-phase={view.phase}>
-        <ComputerIcon kind="cloud" size={20} className="outage__icon" />
+        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={20} className="outage__icon" />
         <span className="outage__text">
           <b>{t("computerSetup.notice.title", { org: org.name })}</b>
           <span>{line}</span>
