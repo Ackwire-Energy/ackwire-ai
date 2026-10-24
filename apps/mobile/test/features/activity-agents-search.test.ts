@@ -374,7 +374,7 @@ describe("Busca", () => {
     ).toEqual([]);
   });
 
-  test("the team's actions (ADR 0058): only those that open where they happened, with their own chip", () => {
+  test("the team's actions (ADR 0064): only those that open where they happened, with their own chip", () => {
     const action = {
       kind: "action" as const,
       sourceId: "a1",

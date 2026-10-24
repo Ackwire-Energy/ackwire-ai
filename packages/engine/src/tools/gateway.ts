@@ -67,7 +67,7 @@ const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool
 const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
   decision.action === "approve" || isSensitive(tool) || (tool.name === ASK_USER && isBuiltIn(tool));
 
-/** A check that failed for any reason never stops the action (ADR 0058): it only misses a notice. */
+/** A check that failed for any reason never stops the action (ADR 0064): it only misses a notice. */
 const UNCHECKED: TeamCheck = { proceed: true, reason: null };
 
 /** `permission_prompt`'s question (Claude Code and Codex commands): a new command, or the state of one asked. */
@@ -139,7 +139,7 @@ export type InvokeResult =
  * 7. `tool_call` / `tool_result` / `approval` steps are recorded;
  * 8. an outside call (a connected app's write, a command that leaves the
  *    computer) is held once when the team already did it to the same target,
- *    and recorded for the team once it went out (ADR 0058, `team-actions.ts`).
+ *    and recorded for the team once it went out (ADR 0064, `team-actions.ts`).
  */
 export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Date }) {
   const now = deps.now ?? (() => new Date());
@@ -292,7 +292,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         whyMissing = !taken.why;
         call = { ...call, input: taken.input };
       }
-      // Team actions (ADR 0058): an outside call repeated after the agent was told the team already did it
+      // Team actions (ADR 0064): an outside call repeated after the agent was told the team already did it
       // may say why (kept on the record); the tool never sees it.
       const outside = isOutsideTool(tool);
       let repeatWhy: string | null = null;
@@ -320,7 +320,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 
-      // Team actions (ADR 0058): before acting outside, has the team already done this to the same target?
+      // Team actions (ADR 0064): before acting outside, has the team already done this to the same target?
       // A routine's action belongs where it delivers, never to its room.
       const actionChannel =
         authority?.kind === "routine" ? (authority.brief?.deliverTo.channelId ?? ctx.channelId) : ctx.channelId;
@@ -476,7 +476,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .returning({ id: approvals.id });
         if (claimed.length === 0) return { content: "Already executed", isError: false };
         output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
-        // Team actions (ADR 0058): what a person approved and went out is the team's too.
+        // Team actions (ADR 0064): what a person approved and went out is the team's too.
         if (isOutsideTool(tool) && !output.isError) {
           await recordTeamAction(ctx.db, {
             orgId: ctx.orgId,

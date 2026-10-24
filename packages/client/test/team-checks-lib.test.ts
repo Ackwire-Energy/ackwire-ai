@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { targetKind, teamChecksOf } from "../src/lib/team-checks";
 
-describe("team checks (ADR 0058)", () => {
+describe("team checks (ADR 0064)", () => {
   test("a message carries them in meta.teamChecks, or none", () => {
     const check = { id: "c1", tool: "open_pull_request", targets: ["acme/app@fix/login"], matches: [] };
     expect(teamChecksOf({ teamChecks: [check] })).toEqual([check]);

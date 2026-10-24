@@ -2,7 +2,7 @@ import type { Agent, Channel, DirectMessage, SearchHit, SearchKind } from "@agen
 
 /**
  * Busca (the search bar of Conversas): actions, agents and conversations match the words here; the team's
- * outside actions (ADR 0058), messages and files come from the search API (`GET …/search`, kinds
+ * outside actions (ADR 0064), messages and files come from the search API (`GET …/search`, kinds
  * `action`, `message` and `file`). Results are grouped (Conversas, Ações do time, Mensagens, Arquivos)
  * with a chip per group.
  */

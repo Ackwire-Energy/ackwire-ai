@@ -1,6 +1,6 @@
 import type { TeamCheck } from "../api/types";
 
-/** The team checks a message carries (`meta.teamChecks`, ADR 0058), if any. */
+/** The team checks a message carries (`meta.teamChecks`, ADR 0064), if any. */
 export const teamChecksOf = (meta: Record<string, unknown> | undefined): TeamCheck[] =>
   Array.isArray(meta?.teamChecks) ? (meta.teamChecks as TeamCheck[]) : [];
 

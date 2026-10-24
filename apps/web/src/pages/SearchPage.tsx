@@ -15,7 +15,7 @@ const KINDS: Record<Filter, SearchKind[]> = {
   context_item: ["context_item"],
   action: ["action"],
 };
-/** The team's outside actions (ADR 0058) come first: "has anyone already…?" is what they answer. */
+/** The team's outside actions (ADR 0064) come first: "has anyone already…?" is what they answer. */
 const ORDER: SearchKind[] = ["action", "message", "context_item"];
 
 /** Hits grouped by kind (the team's actions first), each group in the order the server ranked it. */

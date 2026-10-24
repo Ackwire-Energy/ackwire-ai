@@ -846,7 +846,7 @@ export interface OrgSettings {
   timezone: string;
   /** Admins only: monthly budget of every agent without its own (US$). Absent for members. */
   defaultAgentBudgetUsd?: number;
-  /** Agents check what the team already did before acting outside (ADR 0058). On by default. */
+  /** Agents check what the team already did before acting outside (ADR 0064). On by default. */
   actionCheck: boolean;
 }
 
@@ -1079,7 +1079,7 @@ export interface SearchHit {
 }
 
 /**
- * `message.meta.teamChecks` (ADR 0058, server-made): outside actions the agent didn't repeat because the
+ * `message.meta.teamChecks` (ADR 0064, server-made): outside actions the agent didn't repeat because the
  * team already did them. `agentId` null = it happened where the agent can't see: only "someone" and when.
  */
 export interface TeamCheck {

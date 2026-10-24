@@ -3,7 +3,7 @@ import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-cor
 import { organizations } from "./tenancy";
 
 /**
- * What an agent did outside the organization (ADR 0058): a connected app's
+ * What an agent did outside the organization (ADR 0064): a connected app's
  * write through the Tool Gateway, an action a person approved, or a command
  * that left the computer. Searchable (kind `action`) by whoever sees
  * `channel_id`; before the next outside action on one of the same `targets`,
@@ -60,7 +60,7 @@ export interface TeamActionMatch {
 
 /**
  * An outside call held because the team already acted on one of its targets
- * (ADR 0058 §4): `held` the first time in a run, `repeated` when the agent
+ * (ADR 0064 §4): `held` the first time in a run, `repeated` when the agent
  * went on anyway. Rides on the run's reply like a receipt (`message_id`).
  */
 export const teamActionChecks = pgTable(

@@ -48,7 +48,7 @@ export interface OrgSettings {
   teamSize: TeamSize | null;
   /** Monthly budget of agents without their own (nano-USD). Routes show it to admins only. */
   defaultAgentBudgetNanoUsd: number;
-  /** Agents check what the team already did before an outside action (ADR 0058). On by default. */
+  /** Agents check what the team already did before an outside action (ADR 0064). On by default. */
   actionCheck: boolean;
 }
 

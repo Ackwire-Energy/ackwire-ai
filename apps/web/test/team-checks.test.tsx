@@ -55,7 +55,7 @@ const article = () =>
     .find((a) => a.textContent?.includes("Revisei o PR")) as HTMLElement;
 const group = () => within(article()).getByRole("group", { name: "O que o agente não repetiu" });
 
-describe("what the agent didn't repeat, under its reply (ADR 0058)", () => {
+describe("what the agent didn't repeat, under its reply (ADR 0064)", () => {
   test("a teammate's action: who, with what, when, where, and Ver opens that conversation", async () => {
     await open([check()]);
     const row = group().querySelector(".ag-rc") as HTMLElement;

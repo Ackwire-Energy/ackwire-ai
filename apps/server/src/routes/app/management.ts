@@ -55,7 +55,7 @@ const Settings = z
       description: "Monthly budget of every agent without its own. Admins only (absent for members).",
     }),
     actionCheck: z.boolean().openapi({
-      description: "Agents check what the team already did before acting outside (ADR 0058). On by default.",
+      description: "Agents check what the team already did before acting outside (ADR 0064). On by default.",
     }),
   })
   .openapi("OrgSettings");

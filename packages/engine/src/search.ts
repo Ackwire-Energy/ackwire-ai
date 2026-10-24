@@ -272,7 +272,7 @@ export async function describeHits<H extends SearchHit>(
         .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids)))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
-  // The team's outside actions (ADR 0058): the agent that did it.
+  // The team's outside actions (ADR 0064): the agent that did it.
   const actionIds = hits.filter((h) => h.kind === "action").map((h) => h.sourceId);
   const actionRows = actionIds.length
     ? await db

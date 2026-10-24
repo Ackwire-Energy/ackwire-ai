@@ -19,7 +19,7 @@ const ICONS: Record<ReturnType<typeof targetKind>, IconName> = {
 };
 
 /**
- * Team actions (ADR 0058) on the phone: under an agent's reply, what it didn't do because the team
+ * Team actions (ADR 0064) on the phone: under an agent's reply, what it didn't do because the team
  * already had (the same address, number, page or pull request), whose action it found and Ver, which
  * opens that conversation. The receipts' sunken row (Receipts.tsx); nothing to undo.
  */

@@ -24,7 +24,7 @@ const { teamActions, teamActionChecks, organizationSettings, agents, channels } 
 type TeamActionMatch = schema.TeamActionMatch;
 
 /**
- * Team actions (ADR 0058): what agents did outside the organization becomes a
+ * Team actions (ADR 0064): what agents did outside the organization becomes a
  * short searchable record, and before the next outside action on the same
  * target the agent is told once. Nothing of it goes into prompts.
  */
@@ -95,7 +95,7 @@ const branchTarget = (repo: string | null, branch: string) => {
 };
 
 /**
- * The identifiers a call's input touches (ADR 0058 §2): addresses, phone numbers, URLs and GitHub
+ * The identifiers a call's input touches (ADR 0064 §2): addresses, phone numbers, URLs and GitHub
  * references, normalized. Free text (bodies, titles) is never read: a name in a message isn't who it goes to.
  */
 export function callTargets(input: Record<string, unknown>, extra?: Record<string, unknown>): string[] {
@@ -187,7 +187,7 @@ function gitVerb(argv: string[]): string | null {
 }
 
 /**
- * A computer command that acts outside (ADR 0058 §1): `gh` writes, `git push`, a `curl`/`wget`/`http`
+ * A computer command that acts outside (ADR 0064 §1): `gh` writes, `git push`, a `curl`/`wget`/`http`
  * that sends. Null for everything else, and for a line we can't follow.
  */
 export function commandAction(
@@ -321,7 +321,7 @@ export type TeamCheck = { proceed: true; reason: string | null } | { proceed: fa
 const GO: TeamCheck = { proceed: true, reason: null };
 
 /**
- * Before an outside call (ADR 0058 §4). Goes on when the switch is off, the call has no target, nothing in
+ * Before an outside call (ADR 0064 §4). Goes on when the switch is off, the call has no target, nothing in
  * the last 30 days matches, or this run was already told about these targets (the agent decided to go on:
  * its `why`, if any, is kept). Otherwise the call is held once and the agent gets one line.
  */

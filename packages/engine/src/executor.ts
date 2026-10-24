@@ -730,7 +730,7 @@ async function executeRunInner(
       !note && carriesCredential(body) && (await runAuthority(tx, current)).kind !== "person"
         ? maskCredentials(body)
         : body;
-    // Team actions (ADR 0058): what the run didn't repeat because the team already did it rides on its reply.
+    // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     const m = await postAgentMessage(
       tx,

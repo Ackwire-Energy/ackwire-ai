@@ -16,7 +16,7 @@ const ICONS: Record<ReturnType<typeof targetKind>, IconName> = {
 };
 
 /**
- * Team actions (ADR 0058): under an agent's reply, what it didn't do because
+ * Team actions (ADR 0064): under an agent's reply, what it didn't do because
  * the team already had (the same address, number, page or pull request), and
  * whose action it found, with Ver where it happened. Same rows as the receipts
  * (agent-actions.css); nothing to undo, so no button but Ver.
