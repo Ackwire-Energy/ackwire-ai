@@ -223,8 +223,16 @@ const insideOrTmp = (scope: CommandScope, p: string) => {
 };
 
 /**
- * Folders that hold keys and tokens, anywhere (the runner's own home too): nothing under them is read.
- * One list for the server's checks (`SECRET_PATH`) and Claude Code's own rules (`SECRET_READ_DENY_RULES`).
+ * System mode: where each agent's worker keeps its own secrets, git credentials and task journal
+ * (`<this>/<the agent's user>`). The agent's commands run as that user too, so only these rules keep its
+ * model from reading them.
+ */
+export const AGENT_WORKER_HOMES = "/var/lib/agentes-runner-agents";
+
+/**
+ * Folders that hold keys and tokens, anywhere (the runner's own home and its agents' workers' too): nothing
+ * under them is read. One list for the server's checks (`SECRET_PATH`) and Claude Code's own rules
+ * (`SECRET_READ_DENY_RULES`).
  */
 const SECRET_DIRS = [
   ".ssh",
@@ -237,6 +245,7 @@ const SECRET_DIRS = [
   ".password-store",
   "Keychains",
   ".agentes-runner",
+  path.basename(AGENT_WORKER_HOMES),
   ".config/gh",
   ".config/gcloud",
 ] as const;
@@ -871,9 +880,10 @@ export const INLINE_CODE_DENY_RULES: readonly string[] = [
 ];
 
 /**
- * Credential stores in the person's home, named in a shell command: refused by
- * Claude Code itself even where a settings rule allows the command (`Bash(cat *)`
- * in a mission). Our own check is `secretRead`, which covers more.
+ * Credential stores in the person's home (and the system-mode workers' own), named
+ * in a shell command: refused by Claude Code itself even where a settings rule
+ * allows the command (`Bash(cat *)` in a mission). Our own check is `secretRead`,
+ * which covers more.
  */
 export const SECRET_BASH_DENY_RULES: readonly string[] = [
   ".ssh",
@@ -885,6 +895,7 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
   ".config/gh",
   ".config/gcloud",
   ".agentes-runner",
+  path.basename(AGENT_WORKER_HOMES),
   ".git-credentials",
   ".netrc",
   ".pgpass",

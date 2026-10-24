@@ -46,12 +46,14 @@ import {
 } from "./access";
 import { AccountManager } from "./accounts";
 import { ActivityLog } from "./activity";
+import { AgentUsers, readAgentUsers } from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import {
   configPath,
   connectUrl,
+  DEFAULT_AGENT_UID_RANGE,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,
@@ -70,11 +72,13 @@ import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { redactCommon, tailLines } from "./logfile";
+import { LoopbackGuard } from "./loopback-guard";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
+import { launchWorker, Supervisor, type SupervisorOptions, type WorkerState } from "./supervisor";
 import { type SettledTask, TaskManager } from "./tasks";
 
 /**
@@ -137,6 +141,8 @@ export function prepareWorkspace(dir: string): string {
  * The config after a device-code pairing. Limits of an earlier pairing of
  * this home stay; access starts from `tools` with no folders, except when
  * the server gave back the same machine (a reconnect): its folders and tools stay.
+ * The mode always stays: a system home paired again must never become a
+ * root runner that does agents' work itself.
  */
 export function configFromGrant(
   prev: StoredConfig | null,
@@ -145,6 +151,8 @@ export function configFromGrant(
   const { grant, tools } = input;
   const same = prev?.machineId === grant.machineId && prev?.server === input.server;
   return {
+    ...(prev?.mode ? { mode: prev.mode } : {}),
+    ...(prev?.agentUidRange ? { agentUidRange: prev.agentUidRange } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
     ...(prev?.brainIdleMinutes ? { brainIdleMinutes: prev.brainIdleMinutes } : {}),
@@ -206,6 +214,8 @@ interface Session {
   mcp: McpBridge;
   browser: BrowserManager;
   connection: RunnerConnection;
+  /** System mode: the agents' workers, where all their work runs. */
+  supervisor: Supervisor | null;
 }
 
 export interface DaemonOptions {
@@ -232,6 +242,8 @@ export interface DaemonOptions {
   watch?: boolean;
   caffeinate?: boolean;
   pairSleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** Tests (system mode): how agents' users are found and their workers started. */
+  workers?: Pick<SupervisorOptions, "user" | "start">;
 }
 
 export class RunnerDaemon implements RequestObserver {
@@ -462,9 +474,25 @@ export class RunnerDaemon implements RequestObserver {
       };
       this.session.brains.setLimits(brainLimits);
       this.session.codexApp.setLimits(brainLimits);
+      this.session.supervisor?.stateChanged();
     }
     this.queueStatus();
     void this.reconcile();
+  }
+
+  /** System mode: what each agent's worker must know about this computer. */
+  private workerState(): WorkerState {
+    const c = this.config;
+    return {
+      access: this.access(),
+      paused: this.pauseState(),
+      limits: {
+        maxConcurrentTasks: c?.maxConcurrentTasks ?? DEFAULT_LIMITS.maxConcurrentTasks,
+        taskMaxSeconds: c?.taskMaxSeconds ?? DEFAULT_LIMITS.taskMaxSeconds,
+        brainIdleMinutes: c?.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes,
+        brainMaxProcesses: c?.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+      },
+    };
   }
 
   /** Resumes on its own when `until` passes (also after a restart). */
@@ -616,6 +644,26 @@ export class RunnerDaemon implements RequestObserver {
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
+    let supervisor: Supervisor | null = null;
+    if (config.mode === "system") {
+      const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
+      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor.
+      const guard = this.opts.workers
+        ? undefined
+        : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
+      supervisor = new Supervisor({
+        home,
+        user: (agent) => users.ensure(agent),
+        start: launchWorker(this.self.command),
+        ...this.opts.workers,
+        ...(guard ? { guard } : {}),
+        token: config.token,
+        server: config.server,
+        send: (frame) => live?.send(frame) ?? false,
+        state: () => this.workerState(),
+        log,
+      });
+    }
     const context: HandlerContext = {
       workspaceReal,
       get exec() {
@@ -628,6 +676,9 @@ export class RunnerDaemon implements RequestObserver {
       brains,
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
+      // A config written later without the mode never turns a system session back into one that does agents' work.
+      systemMode: () => config.mode === "system" || this.stored?.mode === "system",
+      ...(supervisor ? { workers: supervisor } : {}),
       access: () => this.access(),
       accessOps: {
         request: (agent, req) => this.accessRequest(agent, req),
@@ -653,11 +704,13 @@ export class RunnerDaemon implements RequestObserver {
       },
       executors: () => this.helloExecutors(),
       context,
-      mcp,
+      // System mode: the agents' tasks and MCP calls are their workers'.
+      ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
       log,
       observer: this,
       onAgents: (raw) => this.setAgents(raw),
-      onBrowserHandoff: (frame) => browser.setHandoff(frame.agentId, frame.handoff),
+      onBrowserHandoff: (frame) =>
+        supervisor ? supervisor.handoff(frame) : browser.setHandoff(frame.agentId, frame.handoff),
       onState: (state) => {
         // Offline: frames have nowhere to go; the server starts the live view again when it is back.
         if (state !== "online") {
@@ -674,8 +727,9 @@ export class RunnerDaemon implements RequestObserver {
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
     live = connection;
-    const session: Session = { config, workspaceReal, tasks, brains, codexApp, mcp, browser, connection };
+    const session: Session = { config, workspaceReal, tasks, brains, codexApp, mcp, browser, connection, supervisor };
     this.session = session;
+    supervisor?.boot();
     log(
       `agentes-runner ${RUNNER_VERSION}: connecting to ${config.server} (workspace ${workspaceReal}${this.access().tools.commands ? "" : ", commands off"})`,
     );
@@ -684,6 +738,7 @@ export class RunnerDaemon implements RequestObserver {
 
   private async closeSession(s: Session) {
     s.connection.stop();
+    await s.supervisor?.close();
     s.tasks.close();
     s.brains.close();
     s.codexApp.close();
