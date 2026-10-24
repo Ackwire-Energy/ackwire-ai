@@ -785,7 +785,7 @@ function GrantCard({ machine: m }: { machine: Machine }) {
   );
 }
 
-/** "Tela ao vivo" beside an agent whose desktop runs on this computer (ADR 0056): its panel on the agent's page. */
+/** "Tela ao vivo" beside an agent whose desktop runs on this computer (ADR 0058): its panel on the agent's page. */
 function DesktopLink({ agentId, name }: { agentId: string; name: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();

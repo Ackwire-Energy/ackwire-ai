@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
+import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { hasBunTerminal } from "../../runner/launch";
 import type { DataSocket } from "../../runner/streams";
@@ -8,6 +10,7 @@ import {
   type PtyOptions,
   runnerTerminalUser,
   type SpawnPty,
+  systemTerminalUser,
   type TerminalLimits,
   Terminals,
   type TerminalUser,
@@ -163,6 +166,30 @@ test("the agent's login shell in its folder, through its launcher, with TERM and
   const t = setup({}, async () => ({ ...USER, prefix }));
   const { shell } = await t.open();
   expect(shell.argv).toEqual([...prefix, "/bin/sh", "-l"]);
+});
+
+test("system mode's terminal: root starts it in the agent's home, the agent's own user moves to its folder", () => {
+  const home = tempDir("term-home-");
+  dirs.push(home);
+  const launcher = {
+    prefix: ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"],
+    env: { HOME: home, USER: "ag-01a142cb", PATH: "/usr/bin:/bin", SHELL: "/bin/bash" },
+    home,
+  };
+  const folder = path.join(home, "dev-01a142cb");
+  mkdirSync(folder);
+  // Even with the folder there: the agent could swap it for a link before root's chdir.
+  const user = systemTerminalUser(launcher, dev);
+  expect(user.cwd).toBe(home);
+  expect(user.env).toEqual(launcher.env);
+  expect(user.prefix.slice(0, launcher.prefix.length)).toEqual(launcher.prefix);
+  // What runs after the launcher, here as this test's user: in the folder once made, else in the home.
+  const pwd = (agent: AgentScope) => {
+    const rest = systemTerminalUser(launcher, agent).prefix.slice(launcher.prefix.length);
+    return Bun.spawnSync([...rest, "/bin/sh", "-c", "pwd -P"], { cwd: home, env: launcher.env }).stdout.toString();
+  };
+  expect(pwd(dev).trim()).toBe(realpathSync(folder));
+  expect(pwd(ops).trim()).toBe(realpathSync(home));
 });
 
 test("what the shell prints before the data socket is ready waits for it; keys and a resize reach the shell", async () => {

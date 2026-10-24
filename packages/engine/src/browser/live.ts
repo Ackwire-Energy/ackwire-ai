@@ -167,7 +167,7 @@ interface AgentLive {
   mode: BrowserStreamMode | null;
   controllerUserId: string | null;
   handoff: BrowserHandoffView | null;
-  /** The open handoff of the agent's desktop while its browser runs there (ADR 0056 §5). */
+  /** The open handoff of the agent's desktop while its browser runs there (ADR 0058 §5). */
   shared: BrowserHandoffView | null;
   /** The page of the latest frame (address and title), for what the agent is told after a person's turn. */
   page: BrowserPage | null;

@@ -14,7 +14,7 @@ import "../browser/browser.css";
 import "./desktop.css";
 
 /**
- * A terminal on the agent's computer (ADR 0056 §6): xterm.js on a socket of its own, sized to the panel. Keys go
+ * A terminal on the agent's computer (ADR 0058 §6): xterm.js on a socket of its own, sized to the panel. Keys go
  * out as bytes and the panel's size as `resize`; what the shell prints comes back as bytes. When the shell or the
  * connection ends it says so and waits for "Abrir de novo": a new socket is a new shell, so a person never types
  * into one they didn't see start. Whether this person may open it, and whether the computer serves one, the

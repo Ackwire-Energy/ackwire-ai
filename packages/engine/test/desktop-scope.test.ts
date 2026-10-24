@@ -83,7 +83,7 @@ test("the migration grants desktop:use only to live agents that may browse and r
   await drop(codes.id, ["browser:use"]);
   await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, archived.id));
 
-  const file = await Bun.file(new URL("../../db/migrations/0092_desktop_scope.sql", import.meta.url)).text();
+  const file = await Bun.file(new URL("../../db/migrations/0096_desktop_scope.sql", import.meta.url)).text();
   await f.db.execute(sql.raw(file));
   await f.db.execute(sql.raw(file));
 

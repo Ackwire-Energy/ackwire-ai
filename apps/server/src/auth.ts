@@ -1,7 +1,17 @@
 import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
-import { deriveSecret, emailLocale, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
+import {
+  deriveSecret,
+  emailLocale,
+  isSignupAllowed,
+  isUserBlocked,
+  onUserCreated,
+  queueEmail,
+  recordSession,
+  recordSignUp,
+  sha256,
+} from "@agenteschat/engine";
 import { expo } from "@better-auth/expo";
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -185,6 +195,33 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
             } catch (error) {
               log.error("post-signup setup failed", { userId: user.id, error: String(error) });
             }
+          },
+        },
+      },
+      // The operator API's events feed (ADR 0056). These run after the sign-in has committed: a failure
+      // here is logged and never fails the sign-in.
+      account: {
+        create: {
+          after: async (account) => {
+            await recordSignUp(db, account).catch((error) =>
+              log.error("operator event failed", { type: "user.signed_up", error: String(error) }),
+            );
+          },
+        },
+      },
+      session: {
+        create: {
+          // A blocked account (ADR 0056 §9) gets no session, whatever the sign-in method. The code also
+          // makes a social sign-in's callback send the person back to the sign-in page.
+          before: async (session) => {
+            if (await isUserBlocked(db, session.userId)) {
+              throw new APIError("FORBIDDEN", { code: "ACCOUNT_BLOCKED", message: "This account can't sign in." });
+            }
+          },
+          after: async (session) => {
+            await recordSession(db, session).catch((error) =>
+              log.error("operator event failed", { type: "session.created", error: String(error) }),
+            );
           },
         },
       },

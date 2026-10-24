@@ -78,7 +78,7 @@ import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, SidebarOrgSky } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
@@ -125,6 +125,19 @@ export function useSidebarCollapsed(): [boolean, () => void] {
 
 /** File → Novo canal in the desktop app's menu bar (DesktopMenus.tsx): the sidebar opens its dialog. */
 export const NEW_CHANNEL_EVENT = "agentes:new-channel";
+
+/**
+ * On the icon rail every channel would be the same "#": its initials instead ("eng-backend" → "Eb",
+ * "general" → "Ge"), so the rail still reads which is which.
+ */
+export function channelInitials(name: string) {
+  const words = name
+    .split(/[-_.\s]+/)
+    .filter(Boolean)
+    .map((w) => Array.from(w));
+  const letters = (words.length > 1 ? [words[0]?.[0], words[1]?.[0]] : (words[0] ?? []).slice(0, 2)).join("");
+  return letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase();
+}
 
 /** The workspace sidebar. */
 export function Sidebar() {
@@ -197,7 +210,6 @@ export function Sidebar() {
     const busy = runningAgents(st);
     return agentIds ? agentIds.split(",").filter((id) => busy.has(id)).length : 0;
   });
-  const orgRef = useRef<HTMLDivElement>(null);
   // Narrow screens: the sidebar is a drawer (id, open state, close on link / swipe).
   const drawer = useNavDrawer();
   // Desktop: the person can shrink the sidebar to an icon rail (remembered). Tablets always get the rail.
@@ -273,8 +285,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
       <div className="sidebar__top">
-        <div className="sidebar__org" ref={orgRef}>
-          <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
+        <div className="sidebar__org">
           <WorkspaceMenu
             summary={
               overview.data
@@ -413,6 +424,9 @@ export function Sidebar() {
                 onContextMenu={channelMenu(c)}
               >
                 <Icon name="channel" className="sidebar__channel-icon" />
+                <span className="sidebar__channel-abbr" aria-hidden="true">
+                  {channelInitials(c.name)}
+                </span>
                 <span className="sidebar__item-label">{c.name}</span>
               </Link>
             ))}
@@ -490,7 +504,7 @@ export function Sidebar() {
       <div className="sidebar__foot">
         <SidebarHorizon working={working} total={dir.agents.length} />
         {can(org.role, "manage_agents") && (
-          <Button asChild block className="ac-btn--cut sidebar__create">
+          <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />
               <span className="sidebar__item-label">{t("shell.createAgent")}</span>

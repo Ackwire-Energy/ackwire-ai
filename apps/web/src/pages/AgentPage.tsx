@@ -42,6 +42,7 @@ import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useMatchMedia } from "@/hooks/useMatchMedia";
 import {
   AGENT_TABS,
   type AgentSection,
@@ -522,6 +523,8 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   // Closing the panel with unsaved changes asks first, like leaving the page.
   const [closing, setClosing] = useState(false);
   const close = onClose && (() => (dirtyRef.current ? setClosing(true) : onClose()));
+  // The wide full page puts "Como trabalha" in the overview's side column (responsive.css: one column at 1100).
+  const wide = useMatchMedia("(min-width: 1101px)");
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
@@ -605,6 +608,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     },
     ownerFirst,
     openWork: setWork,
+    workInAside: wide && !onClose,
   };
 
   return (
@@ -626,7 +630,6 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         <div className="agp-tabs" ref={top}>
           <Tabs
             label={t("agentPage.tabsLabel", g)}
-            variant="segmented"
             value={tab}
             onValueChange={(next) => goTo(next)}
             items={AGENT_TABS.map((id) => ({ value: id, label: tabLabel(id) }))}

@@ -66,7 +66,7 @@ export interface RealtimeDeps {
   machines?: MachineSockets;
   /** The agent browser's live view (ADR 0040, `browser.*` frames); absent = not offered. */
   browserLive?: BrowserLive;
-  /** Agents' desktops and terminals (ADR 0056): people's stream sockets and the runners' data sockets. */
+  /** Agents' desktops and terminals (ADR 0058): people's stream sockets and the runners' data sockets. */
   streams?: StreamSockets;
 }
 
@@ -85,7 +85,7 @@ export interface BrowserSocketData {
   browsers: Map<string, () => void>;
 }
 
-/** Every socket of the server: browsers (`/api/ws`), runners (`/api/machines/connect`) and streams (ADR 0056). */
+/** Every socket of the server: browsers (`/api/ws`), runners (`/api/machines/connect`) and streams (ADR 0058). */
 export type SocketData = BrowserSocketData | MachineSocketData | StreamSocketData;
 
 type BrowserSocket = Bun.ServerWebSocket<BrowserSocketData>;

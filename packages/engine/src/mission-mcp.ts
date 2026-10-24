@@ -45,6 +45,7 @@ import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
 import { bridgeToolsFor, invokeToolForRun } from "./run-tools";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { agentSearchChannels, searchVisible } from "./search";
+import { standingRefusal } from "./standing";
 import { maskSecrets } from "./tool-detail";
 import { createToolGateway, type ToolGateway } from "./tools/gateway";
 import { toBrainSchema } from "./tools/schema-compat";
@@ -358,6 +359,8 @@ export async function handleMissionMcpCall(
   const who = await identityOf(deps, machineId, frame);
   if (!who.ok) return refuse(who.error.code, who.error.message);
   const id = who.identity;
+  const held = await standingRefusal(deps.db, id.orgId, id.agentId);
+  if (held) return refuse(held.code, held.message);
   const tools = id.taskId ? taskGatewayOf(deps) : (deps.tools ?? null);
   try {
     const out = await invokeToolForRun({ db: deps.db, pubsub: deps.pubsub, tools }, id, {
@@ -387,6 +390,8 @@ export async function handleMissionMcpList(
   const who = await identityOf(deps, machineId, frame);
   if (!who.ok) return { ok: false, error: who.error };
   const id = who.identity;
+  const held = await standingRefusal(deps.db, id.orgId, id.agentId);
+  if (held) return { ok: false, error: { code: held.code, message: held.message } };
   try {
     const tools = await bridgeToolsFor(
       { db: deps.db, tools: id.taskId ? taskGatewayOf(deps) : (deps.tools ?? null) },

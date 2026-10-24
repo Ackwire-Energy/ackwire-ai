@@ -26,6 +26,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import type { MachineCaller, MachineHub } from "./machine-hub";
 import { drivesComputer, getMachine, machineOnline, requireComputerDriver } from "./machines";
 import { can, getMembership } from "./organizations";
+import { orgStanding } from "./standing";
 import type { Stream, StreamBroker, StreamInput, StreamTarget } from "./streams";
 
 const { agents, browserHandoffs } = schema;
@@ -33,7 +34,7 @@ const { agents, browserHandoffs } = schema;
 const refused = (code: number, reason: string) => ({ refused: code, reason });
 
 /**
- * Who may watch an agent's desktop (ADR 0056 §4): the browser's rule on the `desktop` screen, and whoever
+ * Who may watch an agent's desktop (ADR 0058 §4): the browser's rule on the `desktop` screen, and whoever
  * may drive its computer (`requireBrowserAccess`).
  */
 export const requireDesktopAccess = (db: Database, userId: string, orgId: string, agentId: string) =>
@@ -90,13 +91,15 @@ export async function desktopTarget(
  * Whether the person may have this stream now, as `authorizeStream` decides and the broker checks again
  * every 30 s while it is open: watching follows the desktop's rule, control and the terminal its computer's
  * driver. While someone controls the desktop, or the browser showing the same window, nobody else sees it;
- * control is only theirs, on the desktop's own handoff (`control`: its id).
+ * control is only theirs, on the desktop's own handoff (`control`: its id). Nobody has one in a suspended
+ * workspace, where every permission check refuses (`standing.ts`).
  */
 async function streamAccess(
   db: Database,
   input: StreamInput,
 ): Promise<{ refused: number; reason: string } | { driven: string | null; control: string | null }> {
   const { userId, orgId, agentId, request } = input;
+  if ((await orgStanding(db, orgId)).state === "suspended") return refused(STREAM_CLOSE.forbidden, "suspended");
   let driven: string | null = null;
   try {
     if (request.kind === "terminal" || request.mode === "control") {
@@ -171,7 +174,7 @@ export async function streamClosed(db: Database, s: Stream) {
   await auditStream(db, s);
 }
 
-/** A stream that ran, in the org's audit log (ADR 0056 §12): who, which agent and computer, how long, how many bytes. */
+/** A stream that ran, in the org's audit log (ADR 0058 §12): who, which agent and computer, how long, how many bytes. */
 export async function auditStream(db: Database, s: Stream) {
   const action =
     s.request.kind === "terminal"
@@ -329,7 +332,7 @@ export interface DesktopControlDeps {
 }
 
 /**
- * The desktops' side of handoffs on this server (ADR 0056 §5). When control
+ * The desktops' side of handoffs on this server (ADR 0058 §5). When control
  * of an agent's desktop, or of the browser showing the same window, changes
  * hands (on any server), the streams here that may no longer show it close:
  * everyone else's while someone is in control (4409), and a control stream

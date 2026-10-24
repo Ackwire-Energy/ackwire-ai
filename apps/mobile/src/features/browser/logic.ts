@@ -14,7 +14,7 @@ import {
 
 /**
  * What the card shows: waiting for someone, me in control, someone else helping, or how it ended;
- * `computer`: an open request on the agent's desktop, which the phone can't show (ADR 0056), so it is
+ * `computer`: an open request on the agent's desktop, which the phone can't show (ADR 0058), so it is
  * never taken here.
  */
 export type CardState = "waiting" | "mine" | "helping" | "computer" | "done" | "failed" | "expired" | "cancelled";

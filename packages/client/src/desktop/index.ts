@@ -6,7 +6,7 @@ import { handoffScreen } from "../browser";
 import { type SocketBase, socketUrl } from "../realtime/connection";
 
 /**
- * The agent's desktop in the apps (ADR 0056): what the panel shows, the
+ * The agent's desktop in the apps (ADR 0058): what the panel shows, the
  * viewer sockets' addresses, and what each of their close codes means.
  */
 

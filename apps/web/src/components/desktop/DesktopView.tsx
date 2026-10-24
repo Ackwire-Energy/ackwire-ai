@@ -54,7 +54,7 @@ async function startingKeyboard(): Promise<DesktopKeyboard> {
 }
 
 /**
- * An agent's desktop, live (ADR 0056): noVNC on a socket of its own. Watching is view-only at quality 3; in
+ * An agent's desktop, live (ADR 0058): noVNC on a socket of its own. Watching is view-only at quality 3; in
  * control (the desktop's own handoff is this person's) it takes the pointer and keys at quality 6, with the
  * person's keyboard layout, "Colar texto", and what the desktop copies behind "Copiar" (never written to the
  * person's clipboard by itself). While someone else is in control the screen stays hidden; it opens again

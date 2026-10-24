@@ -22,8 +22,10 @@ import {
   readPack,
   refRule,
   revokeComputerGitCredentials,
+  setAgentHold,
   setAgentRepositories,
   setAgentScopes,
+  setOrgStanding,
   type ToolContext,
   verifyGitToken,
   withSandbox,
@@ -375,6 +377,29 @@ describe("git proxy", () => {
       auth: `Basic ${Buffer.from(`agentes:${w2token}`).toString("base64")}`,
     });
     expect(noScope.status).toBe(403);
+  });
+
+  test("standing: a workspace on hold or suspended, or a held agent, gets no git through us", async () => {
+    const w = await world();
+    const refs = () => w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" });
+    const standing = (state: "active" | "hold" | "suspended") =>
+      setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, { state, reason: "Review", notice: "silent" });
+    expect((await refs()).status).toBe(200);
+    for (const state of ["hold", "suspended"] as const) {
+      await standing(state);
+      const refused = await refs();
+      expect(refused.status).toBe(403);
+      expect(await refused.text()).not.toContain("Review");
+      await standing("active");
+    }
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "Spam" });
+    const held = await refs();
+    expect(held.status).toBe(403);
+    expect(await held.text()).toBe("agentes: This agent is paused for now.\n");
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: false, reason: null });
+    expect((await refs()).status).toBe(200);
+    // Refused before anything reached GitHub.
+    expect(w.github.calls).toHaveLength(2);
   });
 });
 

@@ -1,4 +1,4 @@
-/* ---------- the agent's desktop, live (ADR 0056): the browser card's frame around noVNC's screen ---------- */
+/* ---------- the agent's desktop, live (ADR 0058): the browser card's frame around noVNC's screen ---------- */
 .brw-ac.dsk {
   max-width: none;
   /* Behind the desktop and the terminal; the terminal reads it for its own background. */

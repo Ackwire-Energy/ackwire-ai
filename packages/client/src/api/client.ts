@@ -997,7 +997,7 @@ export interface ApiClient {
     stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
   };
   /**
-   * The agent's desktop (ADR 0056): its state and "Ligar". The screen itself is a WebSocket
+   * The agent's desktop (ADR 0058): its state and "Ligar". The screen itself is a WebSocket
    * (`desktopSocketUrl`); control, "Devolver" and "Desligar" are the browser's screen routes with `desktop`.
    */
   desktop: {

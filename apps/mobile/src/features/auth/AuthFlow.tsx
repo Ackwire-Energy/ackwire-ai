@@ -1,4 +1,5 @@
 import { ApiError, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
+import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { router } from "expo-router";
 import { type ReactNode, useEffect, useState } from "react";
@@ -111,6 +112,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       if (res.error) {
         haptics.warning();
         if (res.error.status === 401) setWrong(true);
+        else if (res.error.code === ACCOUNT_BLOCKED) setError(t("auth.accountBlocked"));
         else failed(res.error.status);
         return;
       }

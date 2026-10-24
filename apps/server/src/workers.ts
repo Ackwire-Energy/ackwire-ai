@@ -20,6 +20,7 @@ import {
   type MailDeps,
   pollImapWatches,
   pruneMessageClientIds,
+  pruneOperatorEvents,
   purgeDeletedArtifacts,
   queueApprovalDigests,
   reapRoutineRuns,
@@ -44,7 +45,7 @@ export interface WorkerDeps {
   mail?: { deps: MailDeps; pollSeconds: number };
   /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
   browserLive?: BrowserLive;
-  /** Agents' desktops (ADR 0056): the ones with an open handoff stay up. */
+  /** Agents' desktops (ADR 0058): the ones with an open handoff stay up. */
   desktops?: Pick<DesktopControl, "keepAlive">;
   log: Logger;
   workerId?: string;
@@ -142,6 +143,8 @@ export function startWorkers(deps: WorkerDeps) {
     // Old send ids (idempotent resends) are no longer needed.
     const pruned = await pruneMessageClientIds(db);
     if (pruned > 0) log.info("pruned message client ids", { pruned });
+    const events = await pruneOperatorEvents(db);
+    if (events > 0) log.info("pruned operator events", { pruned: events });
   });
 
   every("approvals", WORKER_INTERVALS_MS.approvals, async () => {

@@ -20,12 +20,15 @@ import {
   setTool,
   TOOL_NAMES,
 } from "./access";
+import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
 import {
   configPath,
+  DEFAULT_AGENT_UID_RANGE,
   effectiveAccess,
   expandHome,
   normalizeServerUrl,
   pairedConfig,
+  parseUidRange,
   readConfig,
   readStoredConfig,
   runnerHome,
@@ -35,20 +38,28 @@ import {
 } from "./config";
 import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
-import { DesktopSessions, runnerUser } from "./desktop-session";
+import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
 import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
-import { devicePair, formatUserCode, PairingError } from "./pairing";
+import {
+  type DeviceGrant,
+  devicePair,
+  formatUserCode,
+  PairingError,
+  redeemIssuedCode,
+  takeEnrollCode,
+} from "./pairing";
 import { agentWorkspace } from "./paths";
 import { connectVnc, type VncConnection, vncInit } from "./rfb";
-import { installService, serviceStatus, uninstallService } from "./service";
+import { installService, installSystemService, serviceStatus, uninstallService } from "./service";
 import type { DataListener, DataSocket } from "./streams";
 import { runTaskWrapper } from "./tasks";
-import { runnerTerminalUser, Terminals } from "./terminal";
+import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalsOptions } from "./terminal";
+import { runWorker } from "./worker";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
 
@@ -60,10 +71,16 @@ Usage:
       --dir      the folder agents work in (default ~/agentes)
       --no-exec  files and uploads only; agents can't run commands
       --new      connect as a new computer instead
+  agentes-runner pair --server <url> --enroll-file <path> [--dir <workspace>] [--name <name>] [--no-exec]
+      Connects with a code issued for this computer by whoever provisions it; nobody confirms it.
+      The file is removed as soon as it is read.
   agentes-runner start
       Connects and stays connected (reconnects on its own).
   agentes-runner service install|uninstall
       Runs it in the background at login (systemd user unit, launchd agent, or Task Scheduler on Windows).
+  agentes-runner service install --system [--agent-uid-range <first-last>] [--no-start]
+      Linux, as root: the runner for the whole computer, each agent as its own user
+      (uids 20000-29999 unless given). install.sh --system runs it.
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
@@ -80,6 +97,8 @@ Usage:
       The desktop app's runner (a JSON-lines protocol on stdin/stdout; not for people).
   agentes-runner mcp --task <taskId> | --run <runId>
       The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
+  agentes-runner worker --agent <id> --dir <folder> --home <dir>
+      System mode: one agent's work, as that agent's own user (started by the runner, not by people).
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
@@ -99,7 +118,18 @@ interface Parsed {
   lists: Map<string, string[]>;
 }
 
-const VALUE_FLAGS = new Set(["server", "dir", "name", "task", "run", "home", "agent", "code"]);
+const VALUE_FLAGS = new Set([
+  "server",
+  "dir",
+  "name",
+  "task",
+  "run",
+  "home",
+  "agent",
+  "code",
+  "agent-uid-range",
+  "enroll-file",
+]);
 const LIST_FLAGS = new Set(["agent"]);
 
 function parseArgs(argv: string[]): Parsed {
@@ -145,9 +175,23 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
   }
 }
 
-/** The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site. */
+/**
+ * The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site.
+ * With `--enroll-file`, redeems a code issued for this computer instead (ADR 0056 §10).
+ */
 async function pair(p: Parsed): Promise<number> {
-  const usage = "Usage: agentes-runner pair --server <url> [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
+  const usage =
+    "Usage: agentes-runner pair --server <url> [--enroll-file <path>] [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
+  let enrollCode: string | undefined;
+  if (p.flags.has("enroll-file")) {
+    // Taken first, so no failure below leaves the code on disk.
+    try {
+      enrollCode = takeEnrollCode(flagString(p, "enroll-file") ?? "");
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      return 1;
+    }
+  }
   if (p.flags.has("code")) {
     console.error(
       "Pairing codes from the site are gone: run agentes-runner pair --server <url> and confirm the code it shows.",
@@ -173,26 +217,31 @@ async function pair(p: Parsed): Promise<number> {
   const ac = new AbortController();
   const onSignal = () => ac.abort();
   process.once("SIGINT", onSignal);
-  let grant: Awaited<ReturnType<typeof devicePair>>;
+  let grant: DeviceGrant;
   try {
-    grant = await devicePair(
-      server,
-      deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
-      (code) => {
-        console.log("");
-        console.log(`To connect this computer, open this link and confirm the code ${formatUserCode(code.userCode)}:`);
-        console.log("");
-        console.log(`  ${code.verificationUrl}`);
-        console.log("");
-        console.log(
-          `The code expires in ${Math.max(1, Math.round(code.expiresIn / 60))} minutes. Waiting for the confirmation...`,
+    grant = enrollCode
+      ? await redeemIssuedCode(server, enrollCode, { signal: ac.signal })
+      : await devicePair(
+          server,
+          deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
+          (code) => {
+            console.log("");
+            console.log(
+              `To connect this computer, open this link and confirm the code ${formatUserCode(code.userCode)}:`,
+            );
+            console.log("");
+            console.log(`  ${code.verificationUrl}`);
+            console.log("");
+            console.log(
+              `The code expires in ${Math.max(1, Math.round(code.expiresIn / 60))} minutes. Waiting for the confirmation...`,
+            );
+          },
+          { signal: ac.signal },
         );
-      },
-      { signal: ac.signal },
-    );
   } catch (err) {
     if (err instanceof PairingError) {
       if (err.code === "canceled") console.error("Canceled.");
+      else if (enrollCode) console.error(err.message);
       else if (err.code === "denied") console.error("The connection was refused on the site. Nothing changed.");
       else if (err.code === "expired") console.error("The code expired before it was confirmed. Run this again.");
       else console.error(err.message);
@@ -313,11 +362,51 @@ async function app(): Promise<number> {
   }
 }
 
+/**
+ * `agentes-runner worker` (system mode): stdout is the link to the root
+ * runner, so it carries frames only; anything printed goes to stderr, which
+ * the root runner logs.
+ */
+async function worker(p: Parsed): Promise<number> {
+  const agentId = flagString(p, "agent");
+  const dir = flagString(p, "dir");
+  if (!agentId || !dir || !flagString(p, "home")) {
+    console.error("Usage: agentes-runner worker --agent <id> --dir <folder> --home <dir>");
+    return 1;
+  }
+  if (process.getuid?.() === 0) {
+    console.error("A worker runs as its agent's own user, never as root.");
+    return 1;
+  }
+  const toStderr = (...args: unknown[]) =>
+    process.stderr.write(`${args.map((a) => (a instanceof Error ? a.message : String(a))).join(" ")}\n`);
+  console.log = toStderr;
+  console.info = toStderr;
+  console.debug = toStderr;
+  process.stdout.on("error", () => {});
+  return runWorker({
+    agentId,
+    home: runnerHome(),
+    dir: expandHome(dir),
+    input: process.stdin,
+    output: process.stdout,
+    // The root runner's log stamps it.
+    log: (line) => toStderr(line),
+  });
+}
+
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
 async function update(): Promise<number> {
   const stored = storedOrNull();
   if (stored?.managedBy === "desktop") {
     console.error(`${DESKTOP_MANAGED} To update, install the new version of the app.`);
+    return 1;
+  }
+  // A root runner never replaces itself with whatever the server sends.
+  if (stored?.mode === "system") {
+    console.error(
+      `This computer runs the runner for all its agents: update it with the installer, as root (curl -fsSL ${stored.server ?? "<server>"}/api/machines/install.sh | sh -s -- --system).`,
+    );
     return 1;
   }
   if (runningCompiled()) {
@@ -373,18 +462,25 @@ function status(): number {
       ? `Running: pid ${holder.pid}${holder.mode ? ` (${holder.mode})` : ""}`
       : "Running: no",
   );
-  const service = serviceStatus();
+  const service = serviceStatus(undefined, stored?.mode === "system");
   console.log(service ? `Service: ${service}` : "Service: not installed");
-  printDesktopAndTerminal(home, stored ? effectiveAccess(stored).tools : undefined);
+  printDesktopAndTerminal(home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
   return 0;
 }
 
-/** `status`: whether the agents' desktops and the terminal can run here (what `hello` tells the server), and their switches. */
-function printDesktopAndTerminal(home: string, tools: RunnerTools | undefined) {
+/**
+ * `status`: whether the agents' desktops and the terminal can run here (what `hello` tells the server), and
+ * their switches. In system mode root runs them as each agent's own user, so being root is no reason.
+ */
+function printDesktopAndTerminal(home: string, tools: RunnerTools | undefined, agentUsers: boolean) {
   const log = () => undefined;
   const infos = [
-    ["desktop", "Desktops", new DesktopSessions({ home, log, user: async (a) => runnerUser(home, home, a) }).info()],
-    ["terminal", "Terminal", new Terminals({ log, user: async () => runnerTerminalUser(home) }).info()],
+    [
+      "desktop",
+      "Desktops",
+      new DesktopSessions({ home, log, user: async (a) => runnerUser(home, home, a), agentUsers }).info(),
+    ],
+    ["terminal", "Terminal", new Terminals({ log, user: async () => runnerTerminalUser(home), agentUsers }).info()],
   ] as const;
   for (const [tool, label, info] of infos) {
     const state = !info.available
@@ -538,8 +634,9 @@ function tools(p: Parsed): number {
 }
 
 /**
- * `agentes-runner desktop-check --agent <handle>` (ADR 0056): the agent's
- * desktop and terminal on this computer, through the runner's own code. It
+ * `agentes-runner desktop-check --agent <handle>` (ADR 0058): the agent's
+ * desktop and terminal on this computer, through the runner's own code, as
+ * the user the runner would run them as (in system mode the agent's own). It
  * holds the runner's lock: it starts and stops the agent's desktop itself.
  */
 async function desktopCheck(p: Parsed): Promise<number> {
@@ -551,7 +648,8 @@ async function desktopCheck(p: Parsed): Promise<number> {
   }
   const agents = readAgents(home);
   const agent = resolveAgentHandle(agents, handle);
-  const workspace = storedOrNull(home)?.workspace;
+  const stored = storedOrNull(home);
+  const workspace = stored?.workspace;
   if (!agent || !workspace) {
     console.error(unknownAgent(handle, agents));
     return 1;
@@ -562,9 +660,22 @@ async function desktopCheck(p: Parsed): Promise<number> {
     return 1;
   }
   try {
+    if (stored?.mode === "system") {
+      const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
+      const launcher = systemLauncher(u);
+      const desktop = await checkDesktop(home, agent, {
+        user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }),
+        agentUsers: true,
+      });
+      const terminal = await checkTerminal(agent, {
+        user: async () => systemTerminalUser(launcher, agent),
+        agentUsers: true,
+      });
+      return desktop && terminal ? 0 : 1;
+    }
     const folder = await agentWorkspace(prepareWorkspace(workspace), agent);
-    const desktop = await checkDesktop(home, agent, folder);
-    const terminal = await checkTerminal(agent, folder);
+    const desktop = await checkDesktop(home, agent, { user: async (a) => runnerUser(home, folder, a) });
+    const terminal = await checkTerminal(agent, { user: async () => runnerTerminalUser(folder) });
     return desktop && terminal ? 0 : 1;
   } finally {
     lock.release();
@@ -575,12 +686,12 @@ const since = (t0: number) => `${Math.round(performance.now() - t0)} ms`;
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** Its desktop starts (or runs), both logins work, and a watcher's pointer is ignored; a desktop it started stops. */
-async function checkDesktop(home: string, agent: AgentScope, folder: string): Promise<boolean> {
-  const desktops = new DesktopSessions({
-    home,
-    log: (line) => console.log(`     ${line}`),
-    user: async (a) => runnerUser(home, folder, a),
-  });
+async function checkDesktop(
+  home: string,
+  agent: AgentScope,
+  as: Pick<DesktopSessionsOptions, "user" | "agentUsers">,
+): Promise<boolean> {
+  const desktops = new DesktopSessions({ home, log: (line) => console.log(`     ${line}`), ...as });
   desktops.restore();
   const info = desktops.info();
   if (!info.available) {
@@ -642,8 +753,8 @@ async function checkDesktop(home: string, agent: AgentScope, folder: string): Pr
 }
 
 /** A terminal opens as the agent's OS user in its folder, at its size, and ends with its shell. */
-async function checkTerminal(agent: AgentScope, folder: string): Promise<boolean> {
-  const terminals = new Terminals({ log: () => undefined, user: async () => runnerTerminalUser(folder) });
+async function checkTerminal(agent: AgentScope, as: Pick<TerminalsOptions, "user" | "agentUsers">): Promise<boolean> {
+  const terminals = new Terminals({ log: () => undefined, ...as });
   const info = terminals.info();
   if (!info.available) {
     console.log(`FAIL terminal: ${info.reason}`);
@@ -740,6 +851,8 @@ async function main(argv: string[]): Promise<number> {
         ...(runId ? {} : { tokenFile: path.join(runnerHome(), "tasks", taskId, MCP_TOKEN_FILE) }),
       });
     }
+    case "worker":
+      return worker(p);
     case "task-wrapper": {
       // A compiled runner's background task wrapper (tasks.ts); it exits on its own when the task ends.
       if (!sub) return 1;
@@ -748,17 +861,33 @@ async function main(argv: string[]): Promise<number> {
     }
     case "update":
       return update();
-    case "service":
+    case "service": {
+      const stored = storedOrNull();
+      const system = p.flags.has("system") || stored?.mode === "system";
       if (sub === "install") {
-        if (storedOrNull()?.managedBy === "desktop") {
+        if (stored?.managedBy === "desktop") {
           console.error(DESKTOP_MANAGED);
           return 1;
         }
-        return installService({ print: (l) => console.log(l) });
+        if (!system) return installService({ print: (l) => console.log(l) });
+        const range = flagString(p, "agent-uid-range");
+        const agentUidRange = range === undefined ? undefined : parseUidRange(range);
+        if (agentUidRange === null) {
+          console.error(
+            "--agent-uid-range takes two uids between 1000 and 59999, the first not above the second, like 20000-29999",
+          );
+          return 1;
+        }
+        return installSystemService({
+          print: (l) => console.log(l),
+          start: !p.flags.has("no-start"),
+          ...(agentUidRange ? { agentUidRange } : {}),
+        });
       }
-      if (sub === "uninstall") return uninstallService({ print: (l) => console.log(l) });
+      if (sub === "uninstall") return uninstallService({ print: (l) => console.log(l), system });
       console.error("Usage: agentes-runner service install|uninstall");
       return 1;
+    }
     default:
       console.error(`Unknown command: ${command}\n\n${HELP}`);
       return 1;

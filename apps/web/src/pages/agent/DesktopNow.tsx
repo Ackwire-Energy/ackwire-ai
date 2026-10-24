@@ -10,7 +10,7 @@ import { useToast } from "@/lib/toast";
 import { useAgentEdit } from "./context";
 
 /**
- * The agent's desktop now (ADR 0056), at the top of the overview under its browser, for whoever may watch
+ * The agent's desktop now (ADR 0058), at the top of the overview under its browser, for whoever may watch
  * it once its computer serves desktops: a request waiting for someone (amber, Abrir), or a line with "Ver a
  * tela" that opens the live panel. `?desktop=1` (a notification's link, the browser card's "Ver a tela
  * inteira", a computer's page) opens it.

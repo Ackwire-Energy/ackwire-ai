@@ -25,6 +25,7 @@ import {
   type MachineReplies,
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
+import type { Launcher } from "./agent-users";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
@@ -33,7 +34,7 @@ import { tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
 
 /**
- * The agents' desktops (ADR 0056 §1): per agent, one Xtigervnc (the X server
+ * The agents' desktops (ADR 0058 §1): per agent, one Xtigervnc (the X server
  * and the VNC server in one process) and an XFCE session, on Linux.
  *
  * - Xvnc listens on a Unix socket only (0600, its user's): a loopback port can
@@ -202,6 +203,14 @@ export function runnerUser(runnerHome: string, agentFolder: string, agent: Agent
   return { prefix: [], env: runnerEnv(home), home, dir: path.join(runnerHome, "desktop", id8(agent)) };
 }
 
+/**
+ * System mode: the agent's own OS user runs its desktop, through its launcher, with its own home as HOME and
+ * its cookie and socket in `~/.agentes/desktop`; the password file is root's, readable by the agent's group.
+ */
+export function systemDesktopUser(launcher: Launcher, ids: { uid: number; gid: number }): DesktopUser {
+  return { ...launcher, dir: path.join(launcher.home, ".agentes", "desktop"), ids };
+}
+
 /** A process a desktop started. */
 export interface DesktopProcess {
   /** 0 when it couldn't start. */
@@ -351,7 +360,7 @@ function parseSaved(v: unknown): Saved | null {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** The agents' desktops on this computer: started, used, watched, stopped (ADR 0056 §1). */
+/** The agents' desktops on this computer: started, used, watched, stopped (ADR 0058 §1). */
 export class DesktopSessions {
   private readonly desktops = new Map<string, Desktop>();
   /** Each agent's starts, stops and restarts, one after another. */
@@ -451,7 +460,7 @@ export class DesktopSessions {
   }
 
   /**
-   * The keyboard layout of the person taking control (ADR 0056 §5), set as the agent with `setxkbmap`.
+   * The keyboard layout of the person taking control (ADR 0058 §5), set as the agent with `setxkbmap`.
    * Best effort: without it, or when it fails, the desktop keeps the layout it had.
    */
   async setKeyboard(agent: AgentScope, keyboard: DesktopKeyboard): Promise<void> {

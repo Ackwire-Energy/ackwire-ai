@@ -11,7 +11,7 @@ import { errnoCode, RunnerError } from "./errors";
 import type { DataSocket } from "./streams";
 
 /**
- * A person's view of an agent's desktop on the computer (ADR 0056 §3): the
+ * A person's view of an agent's desktop on the computer (ADR 0058 §3): the
  * runner logs in to the agent's Xvnc over its Unix socket with the view-only
  * password for a watcher and the full one for the person in control (Xvnc
  * itself then ignores a watcher's input), and offers the viewer security type

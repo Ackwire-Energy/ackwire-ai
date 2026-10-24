@@ -361,7 +361,7 @@ describe("a new computer connected (ADR 0036, admins)", () => {
   });
 });
 
-describe("an agent asks for a hand (ADR 0040, ADR 0056)", () => {
+describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
   test("in its browser, or on its computer when the request is on its desktop", async () => {
     const ask = (id: string, screen?: "desktop") =>
       notification({

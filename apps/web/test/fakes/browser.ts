@@ -1,5 +1,5 @@
 /**
- * Test fake — the agent browser (ADR 0040) and desktop (ADR 0056), same shapes as the server's
+ * Test fake — the agent browser (ADR 0040) and desktop (ADR 0058), same shapes as the server's
  * `…/agents/{id}/browser`, `…/agents/{id}/desktop` and `…/browser/handoffs/*` routes. Agents start
  * without a browser or a desktop (their computer is the cloud one); tests put handoffs in
  * `fake.handoffs`, settings in `fake.settings` and desktops in `fake.desktops`.

@@ -8,7 +8,7 @@ import { STREAM_PATHS } from "../src/realtime/streams";
 import { UUID } from "../src/realtime/ws";
 
 /**
- * `bun run smoke --desktop-agent <handle>` (ADR 0056): an agent's desktop and
+ * `bun run smoke --desktop-agent <handle>` (ADR 0058): an agent's desktop and
  * terminal through a running server, as a person in the web app reaches them.
  * The smoke signs in as someone who may use the agent's computer as the agent
  * (`computerDrivers`), through the server's own sign-in for the Mac app

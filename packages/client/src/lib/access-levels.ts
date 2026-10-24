@@ -64,7 +64,7 @@ export const AREA_ORDER = [
   "desktop",
 ];
 
-/** Areas "all tools" doesn't cover: running code, and the agent's browser and desktop (ADR 0040, ADR 0056). */
+/** Areas "all tools" doesn't cover: running code, and the agent's browser and desktop (ADR 0040, ADR 0058). */
 export const NOT_IN_ALL_AREAS = ["sandbox", "browser", "desktop"];
 
 /** "drive:read" → "drive"; "memory:write" → "context"; "" (always-on "ask the person") → null. */

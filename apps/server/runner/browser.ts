@@ -70,7 +70,7 @@ import { agentFolderName, isInside } from "./paths";
  *   active tab's address and title; a page that isn't repainting gets one
  *   screenshot as its first frame. A stream can't start on a closed browser
  *   (`browser_closed`): a command opens it first.
- * - On the agent's desktop (ADR 0056 §7, a request's `desktop`): the same
+ * - On the agent's desktop (ADR 0058 §7, a request's `desktop`): the same
  *   Chrome runs headed on that display, so people watching the desktop see it;
  *   the desktop starts first. A Chrome in the other mode moves at the next
  *   command that may start one (same profile, same page), never while someone
@@ -682,7 +682,7 @@ export interface BrowserManagerOptions {
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string, env?: Record<string, string>) => Promise<OwnChrome>;
-  /** The agents' desktops (ADR 0056 §7): without them every Chrome is headless. */
+  /** The agents' desktops (ADR 0058 §7): without them every Chrome is headless. */
   desktops?: Pick<DesktopSessions, "ensure" | "session" | "status">;
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
   isOurChrome?: (pid: number, profile: string) => Promise<boolean>;

@@ -10,6 +10,7 @@ import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
 import { runAuthorityById } from "../authority";
+import { recordOperatorEvent } from "../operator-events";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
@@ -24,6 +25,7 @@ import {
 } from "./accounts";
 import { agentMailPolicies, type MailPolicy } from "./policies";
 import {
+  addressDomain,
   cutBody,
   formatAddress,
   isEmailAddress,
@@ -588,6 +590,17 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
             action: "mail.sent",
             target: { type: "mail_account", id: account.id },
             details: { kind: verb, recipients, subject: p.subject.slice(0, 200), runId: ctx.runId },
+          });
+          await recordOperatorEvent(ctx.db, {
+            type: "mail.sent",
+            orgId: ctx.orgId,
+            data: {
+              agentId: ctx.agentId,
+              runId: ctx.runId || null,
+              kind: verb,
+              recipients: recipients.length,
+              domains: [...new Set(recipients.map(addressDomain))],
+            },
           });
           return {
             content: `Sent "${oneLine(p.subject, 120)}" to ${recipients.join(", ")} from ${p.from}.`,

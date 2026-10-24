@@ -110,14 +110,14 @@ const SCREENS: Record<ScreenKind, Screen> = {
     machine: (agent) => agent.machineId,
     stop: (hub, machineId, agent) =>
       hub.call<"desktop.session.stop">(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 30_000 }),
-    // A desktop in control has a terminal: who may run commands as its OS user (ADR 0056 §4).
+    // A desktop in control has a terminal: who may run commands as its OS user (ADR 0058 §4).
     mayControl: requireComputerDriver,
     ask: { tool: DESKTOP_ASK_PERSON_TOOL, card: "Help needed on the desktop", code: "desktop_handoff" },
   },
 };
 
 /**
- * The screen showing the same window as another one: an agent whose Chrome runs on its desktop (ADR 0056 §7)
+ * The screen showing the same window as another one: an agent whose Chrome runs on its desktop (ADR 0058 §7)
  * has one window on both. An open handoff on either then blocks a take over of the other and the agent's
  * tools on both, and hides both views.
  */
@@ -381,7 +381,7 @@ export async function requireBrowserAccess(
 }
 
 /**
- * Whether the agent's Chrome runs on its desktop (ADR 0056 §7), so both screens show one window: it may use
+ * Whether the agent's Chrome runs on its desktop (ADR 0058 §7), so both screens show one window: it may use
  * its desktop, its browser runs on its own computer (`machineId`: the one it is about to run on; by default
  * the one its browser last used), and that computer serves desktops. Its browser requests say so (`desktop`).
  */
@@ -681,7 +681,7 @@ export function createBrowserHandoffToolSource(
       };
     }
     const where = runWhere(run);
-    // A desktop goes only to who may drive its computer (ADR 0056 §4); a browser to who asked for the work.
+    // A desktop goes only to who may drive its computer (ADR 0058 §4); a browser to who asked for the work.
     const drivers = screen === "desktop" ? await computerDrivers(ctx.db, ctx.orgId, ctx.agentId) : null;
     if (drivers?.length === 0) {
       return {

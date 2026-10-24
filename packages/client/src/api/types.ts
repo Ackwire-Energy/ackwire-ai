@@ -1976,10 +1976,15 @@ export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: s
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
+/** `connected`: a person paired it; `host`: the server's own; `managed`: the workspace's own (ADR 0056 §10). */
+export type MachineKind = "connected" | "host" | "managed";
+
 /** `GET …/machines`: a computer connected with `agentes-runner`. */
 export interface Machine {
   id: string;
   name: string;
+  /** A `managed` one can't be removed, and its hostname, OS and arch are blank. Absent from older servers. */
+  kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
   lastSeenAt: string | null;
@@ -2037,7 +2042,7 @@ export interface MachineAccess {
   folders: MachineFolderGrant[];
   /**
    * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
-   * `terminal` (ADR 0056): the agents' desktops and terminals; absent before protocol 18 (off).
+   * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
    */
   tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
 }
@@ -3525,7 +3530,11 @@ export type NotificationKind =
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
-  | "browser_handoff";
+  | "browser_handoff"
+  /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
+  | "org_standing"
+  /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
+  | "computer_ready";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -3550,7 +3559,7 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
-  /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0056: `desktop`). */
+  /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
@@ -3942,7 +3951,7 @@ export interface AgentBrowserSettings {
   machine: { id: string; name: string } | null;
 }
 
-/** `GET …/agents/{id}/desktop` (ADR 0056): the agent's desktop as this person sees it. */
+/** `GET …/agents/{id}/desktop` (ADR 0058): the agent's desktop as this person sees it. */
 export interface DesktopStatus {
   /** Whether it can be shown now, else why (`reason`). */
   available: boolean;

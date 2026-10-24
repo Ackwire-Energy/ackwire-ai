@@ -25,6 +25,7 @@ import { caches } from "./cache";
 import { decryptCredential } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
+import { assertCanWork } from "./standing";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
 const { usageRecords, agentBudgetPeriods, budgetReservations, providerCredentials, organizationSettings } = schema;
@@ -106,6 +107,7 @@ const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
+ * 0. refuse it for a workspace on hold or suspended, or a held agent (`standing.ts`);
  * 1. resolve the model from the catalog (agent's model, or the fixed org-call model);
  * 2. agent calls: atomically reserve the worst-case cost against the agent's
  *    monthly counter (row lock), shrinking `maxTokens` to fit the budget;
@@ -506,6 +508,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /** An agent's model call (runs). Streams deltas through `onDelta`. */
     async stream(call: GatewayCall): Promise<GatewayResult> {
+      await assertCanWork(db, call.orgId, call.agentId);
       const row =
         call.agent && call.agent.id === call.agentId && call.agent.orgId === call.orgId
           ? call.agent
@@ -645,6 +648,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /** A call for the organization (router, summaries). Not streamed to anyone; no agent budget. */
     async complete(call: OrgCall): Promise<GatewayResult> {
+      await assertCanWork(db, call.orgId);
       const info = MODEL_CATALOG[call.model];
       if (!info) throw new ValidationError(`Model ${call.model} is not in the catalog`);
       const provider = providerFor(info.provider);

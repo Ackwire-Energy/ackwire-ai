@@ -150,7 +150,7 @@ export const BRAIN_PROFILES_PROTOCOL = 16;
  */
 export const BROWSER_FAST_PROTOCOL = 17;
 /**
- * From this protocol on (ADR 0056): the agent's desktop and a terminal on its
+ * From this protocol on (ADR 0058): the agent's desktop and a terminal on its
  * computer. `hello.desktop` and `hello.terminal` say whether the runner can
  * serve them; the person turns them on on the machine (`access.tools.desktop`,
  * `access.tools.terminal`). `desktop.session.*` starts, stops and reports an
@@ -169,7 +169,7 @@ export const DESKTOP_PROTOCOL = 18;
 export const DESKTOP_SIZE = { width: 1280, height: 900 } as const;
 
 /**
- * The keyboard layouts a person in control can give the agent's desktop (ADR 0056 §5), as XKB layout and
+ * The keyboard layouts a person in control can give the agent's desktop (ADR 0058 §5), as XKB layout and
  * variant: noVNC sends key codes, and the desktop's layout turns them into characters, so it must be the
  * person's own. A closed list: the value ends up in `setxkbmap`'s arguments.
  */
@@ -880,9 +880,9 @@ export interface RunnerTools {
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
   browser?: boolean;
-  /** Protocol 18: the agents' desktops: they use them, people watch and take control (ADR 0056). Absent = off. */
+  /** Protocol 18: the agents' desktops: they use them, people watch and take control (ADR 0058). Absent = off. */
   desktop?: boolean;
-  /** Protocol 18: terminals people open as an agent (ADR 0056). Absent = off. */
+  /** Protocol 18: terminals people open as an agent (ADR 0058). Absent = off. */
   terminal?: boolean;
 }
 
@@ -933,12 +933,12 @@ export interface RunnerInfo {
   browser?: RunnerBrowserInfo;
   /** Protocol 13: the accounts on the machine (ADR 0041). */
   accounts?: RunnerAccountInfo[];
-  /** Protocol 18: whether the agents' desktops can run here (ADR 0056). */
+  /** Protocol 18: whether the agents' desktops can run here (ADR 0058). */
   desktop?: RunnerDesktopInfo;
   /** Protocol 18: whether people can open a terminal here. */
   terminal?: RunnerTerminalInfo;
   /**
-   * Protocol 18: `system` when each agent works as its own OS user (ADR 0056 §10); absent, every agent
+   * Protocol 18: `system` when each agent works as its own OS user (ADR 0058 §10); absent, every agent
    * works as the runner's own user. Who may control a desktop or open a terminal follows it (§4).
    */
   mode?: "system";
@@ -1030,7 +1030,7 @@ export type MachineRequest = (
       /** The conversation the command is for (`/org/…/c/…`): the desktop app's "Ver" opens it. */
       link?: string;
       /**
-       * Protocol 18: the agent's Chrome belongs on its desktop (ADR 0056 §7). The runner
+       * Protocol 18: the agent's Chrome belongs on its desktop (ADR 0058 §7). The runner
        * starts it there (the desktop first), or moves it there or back at a command that
        * may start Chrome, never while someone watches it or a person's turn is open.
        */

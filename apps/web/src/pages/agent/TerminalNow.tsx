@@ -9,7 +9,7 @@ import { useOpenParam } from "@/lib/open-param";
 import { useAgentEdit } from "./context";
 
 /**
- * A terminal on the agent's computer (ADR 0056 §6), on its overview under its desktop, only for whoever may run
+ * A terminal on the agent's computer (ADR 0058 §6), on its overview under its desktop, only for whoever may run
  * commands there as the agent (the desktop's `terminal.allowed`): a line with "Abrir o terminal" once the computer
  * serves one. `?terminal=1` opens it (and says why when it can't).
  */

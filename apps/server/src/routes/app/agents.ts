@@ -340,6 +340,8 @@ export function agentRoutes(deps: AppDeps) {
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
+      // Born on the workspace's own computer: it lists its agents again.
+      if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
     },
   );

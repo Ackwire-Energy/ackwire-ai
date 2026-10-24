@@ -49,7 +49,7 @@ export function useCurrentHandoff(orgId: string, handoff: BrowserHandoff) {
 
 /**
  * An agent asks a person for help in its browser (`browser_ask_person`,
- * ADR 0040 §6) or on its desktop (`desktop_ask_person`, ADR 0056): the
+ * ADR 0040 §6) or on its desktop (`desktop_ask_person`, ADR 0058): the
  * request, the time left, "Abrir" to the live view; who is helping; and how
  * it ended. Same family as the approval card.
  */

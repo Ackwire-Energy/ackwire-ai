@@ -170,7 +170,11 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
-  else if (n.kind === "machine_connected" || (n.kind === "browser_handoff" && s.screen === "desktop"))
+  else if (
+    n.kind === "machine_connected" ||
+    n.kind === "computer_ready" ||
+    (n.kind === "browser_handoff" && s.screen === "desktop")
+  )
     [icon, label] = ["computer", t("notifications.source.machine")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
   else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
@@ -276,6 +280,11 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
     case "reaction":
       return k("reaction", { names, count });
+    case "org_standing":
+      if (n.latest.statusTo === "suspended") return t("standing.notification.suspended");
+      return n.latest.statusTo === "active" ? t("standing.notification.active") : t("standing.notification.hold");
+    case "computer_ready":
+      return t("computerSetup.notification.ready");
   }
 }
 
