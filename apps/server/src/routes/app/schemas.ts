@@ -179,6 +179,7 @@ export const AgentAction = z
         "routine.updated",
         "routine.deleted",
         "channel.agent_added",
+        "channel.created",
         "wiki.page_created",
         "wiki.page_edited",
         "thread.renamed",

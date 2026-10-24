@@ -1,6 +1,7 @@
 import type { ConnectIntent, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAgentBrain, useApi } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { PLAN_BRAIN } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   BrainLogo,
@@ -34,8 +35,6 @@ import "./no-ai.css";
 type PlanStep = "claude" | "chatgpt";
 type Step = "any" | PlanStep | "api_key";
 
-const PLAN_BRAIN: Record<PlanStep, MachineAccountKind> = { claude: "claude_code", chatgpt: "codex" };
-
 const stepFor = (intent: ConnectIntent | undefined): Step =>
   intent === "claude" || intent === "chatgpt" || intent === "api_key" ? intent : "any";
 
@@ -46,6 +45,8 @@ export interface ConnectAiRequest {
   provider?: string;
   /** The agent to connect: a plan changes who thinks for it. */
   agentId?: string;
+  /** The agents to choose from (an agent's card names them); `agentId` is shown first. */
+  agentIds?: string[];
   /** The no-AI card or the person's message: once connected, it is answered ("Responder agora"). */
   from?: string;
   /** A key pasted in the composer. */
@@ -132,7 +133,8 @@ function ConnectAiDialog({
   // An API key is the organization's (admins); a plan changes who thinks for an agent (its owner or an admin).
   const mayAddKey = can(org.role, "manage_credentials");
   const editable = dir.agents.filter((a) => can(org.role, "manage_agents") || a.ownerUserId === me.user.id);
-  const agents = request.agentId ? editable.filter((a) => a.id === request.agentId) : editable;
+  const named = request.agentIds?.length ? request.agentIds : request.agentId ? [request.agentId] : null;
+  const agents = named ? editable.filter((a) => named.includes(a.id)) : editable;
   const plans = agents.length > 0;
   const step =
     request.step === "api_key"

@@ -1,4 +1,4 @@
-import type { AiStatus, ConnectIntent } from "../api/types";
+import type { AiStatus, ConnectIntent, MachineAccountKind } from "../api/types";
 
 /**
  * No AI connected (ADR 0057): an agent's card when it can't answer, and the Connect step a person who
@@ -42,6 +42,9 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
  */
 export const opensByItself = (x: { intent?: string; autoOpen?: boolean }) =>
   x.autoOpen === true && (x.intent === "claude" || x.intent === "chatgpt" || x.intent === "api_key");
+
+/** The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex. */
+export const PLAN_BRAIN: Record<"claude" | "chatgpt", MachineAccountKind> = { claude: "claude_code", chatgpt: "codex" };
 
 /** An agent's state in the AI status; undefined while it loads or for an agent it doesn't list. */
 export const aiStateOf = (status: AiStatus | undefined, agentId: string) =>

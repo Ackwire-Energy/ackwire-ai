@@ -158,6 +158,7 @@ export * from "./screen";
 export * from "./search";
 export * from "./secret-helper";
 export * from "./secrets";
+export * from "./setup-tools";
 export * from "./skill-tools";
 export * from "./skills";
 export * from "./storage";

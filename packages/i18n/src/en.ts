@@ -920,6 +920,16 @@ export const en: Translations = {
     remove: "Remove it",
     send: "Send anyway",
   },
+  actionCard: {
+    connect_ai: {
+      title: "Connect an AI for {{agents}}",
+      title_claude: "Connect a Claude plan for {{agents}}",
+      title_chatgpt: "Connect a ChatGPT plan for {{agents}}",
+      title_api_key: "Add an API key for {{agents}}",
+    },
+    connect: "Connect",
+    connected: "Connected",
+  },
   dm: {
     subtitle: "{{role}} · answers to {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
@@ -965,6 +975,7 @@ export const en: Translations = {
     },
     channel: {
       agent_added: "Brought {{agentName}} into <b>#{{channel}}</b>",
+      created: "Created the channel <b>#{{name}}</b>",
     },
     wiki: {
       page_created: "Created the wiki page <b>{{title}}</b>",
@@ -2478,6 +2489,11 @@ export const en: Translations = {
       label: "Use a browser",
       description:
         "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
+    },
+    setup_write: {
+      label: "Set up the workspace",
+      description:
+        "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo.",
     },
     github_git_read: {
       label: "Clone repositories (git)",
@@ -5345,6 +5361,7 @@ export const en: Translations = {
       forum: "Forum",
       sandbox: "Run code",
       browser: "Browser",
+      setup: "Workspace setup",
     },
     areaText: {
       context: {
@@ -5363,6 +5380,7 @@ export const en: Translations = {
       forum: { write: "Opens topics, reads and posts in the forum." },
       sandbox: { write: "Runs code on the agent's PC; machine time costs money." },
       browser: { write: "Browses websites in its own browser on its connected computer; logins stay per agent." },
+      setup: { write: "Offers to connect an AI and creates channels for whoever asked." },
     },
   },
   artifacts: {
@@ -7132,6 +7150,8 @@ export const en: Translations = {
         readingWiki: "Read the wiki",
         linkingWiki: "Linked a wiki page",
         readingForum: "Read the forum",
+        creatingChannel: "Created a channel",
+        offeringConnectAi: "Offered to connect an AI",
         usingTool: "Used the {{tool}} tool",
         thinking: "Thought",
         typing: "Wrote",
@@ -7192,6 +7212,8 @@ export const en: Translations = {
       readingWiki: "reading the wiki",
       linkingWiki: "linking a wiki page",
       readingForum: "reading the forum",
+      creatingChannel: "creating a channel",
+      offeringConnectAi: "getting an AI ready to connect",
       usingTool: "using a tool",
     },
     tokens: "{{value}} tokens",
@@ -7252,6 +7274,7 @@ export const en: Translations = {
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
       no_ai: "I can't answer yet: I have no AI connected.",
+      action_connect_ai: "Connect an AI",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       browser_handoff: "I need help in my browser.",
@@ -7422,6 +7445,14 @@ export const en: Translations = {
     link_to_wiki: {
       label: "Link wiki pages",
       description: "Links a page to others when someone asks.",
+    },
+    offer_connect_ai: {
+      label: "Offer to connect an AI",
+      description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+    },
+    create_channel: {
+      label: "Create channel",
+      description: "Creates a channel with people and agents for the person asking, with Undo.",
     },
     run_code: {
       label: "Run code",

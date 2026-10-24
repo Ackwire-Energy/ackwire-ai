@@ -932,6 +932,17 @@ export const ptBR = {
     remove: "Tirar do texto",
     send: "Enviar mesmo assim",
   },
+  /** An agent's card whose button opens the app's own dialog, filled in (`meta.actionCard`). */
+  actionCard: {
+    connect_ai: {
+      title: "Conectar uma IA para {{agents}}",
+      title_claude: "Conectar o plano do Claude para {{agents}}",
+      title_chatgpt: "Conectar o plano do ChatGPT para {{agents}}",
+      title_api_key: "Adicionar uma chave de API para {{agents}}",
+    },
+    connect: "Conectar",
+    connected: "Conectado",
+  },
   dm: {
     subtitle: "{{role}} · responde a {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
@@ -977,6 +988,7 @@ export const ptBR = {
     },
     channel: {
       agent_added: "Chamei {{agentName}} para <b>#{{channel}}</b>",
+      created: "Criei o canal <b>#{{name}}</b>",
     },
     wiki: {
       page_created: "Criei a página <b>{{title}}</b> na wiki",
@@ -2495,6 +2507,11 @@ export const ptBR = {
       label: "Usar um navegador",
       description:
         "Navegar em sites no navegador próprio do agente, no computador conectado (o login fica salvo por agente). Precisa do navegador ligado nesse computador.",
+    },
+    setup_write: {
+      label: "Configurar o workspace",
+      description:
+        "Oferecer conectar uma IA com um card que uma pessoa clica, e criar canais para quem pediu, com Desfazer.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",
@@ -5362,6 +5379,7 @@ export const ptBR = {
       forum: "Fórum",
       sandbox: "Rodar código",
       browser: "Navegador",
+      setup: "Configurar o workspace",
     },
     areaText: {
       context: {
@@ -5379,6 +5397,7 @@ export const ptBR = {
       browser: {
         write: "Navega em sites com o próprio navegador no computador conectado; os logins ficam por agente.",
       },
+      setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
     },
   },
   artifacts: {
@@ -7156,6 +7175,8 @@ export const ptBR = {
         readingWiki: "Leu a wiki",
         linkingWiki: "Ligou a uma página da wiki",
         readingForum: "Leu o fórum",
+        creatingChannel: "Criou um canal",
+        offeringConnectAi: "Ofereceu conectar uma IA",
         usingTool: "Usou a ferramenta {{tool}}",
         thinking: "Pensou",
         typing: "Escreveu",
@@ -7216,6 +7237,8 @@ export const ptBR = {
       readingWiki: "lendo a wiki",
       linkingWiki: "ligando a uma página da wiki",
       readingForum: "lendo o fórum",
+      creatingChannel: "criando um canal",
+      offeringConnectAi: "preparando a conexão de uma IA",
       usingTool: "usando uma ferramenta",
     },
     tokens: "{{value}} tokens",
@@ -7276,6 +7299,7 @@ export const ptBR = {
       brain_unavailable: "O {{brain}} não está disponível agora; respondo quando ele voltar.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
+      action_connect_ai: "Conectar uma IA",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
@@ -7445,6 +7469,14 @@ export const ptBR = {
     link_to_wiki: {
       label: "Ligar páginas da wiki",
       description: "Liga uma página a outras quando alguém pede.",
+    },
+    offer_connect_ai: {
+      label: "Oferecer conectar uma IA",
+      description: "Posta um card cujo botão abre a conexão de um plano ou de uma chave de API.",
+    },
+    create_channel: {
+      label: "Criar canal",
+      description: "Cria um canal com pessoas e agentes para quem pediu, com Desfazer.",
     },
     run_code: {
       label: "Rodar código",

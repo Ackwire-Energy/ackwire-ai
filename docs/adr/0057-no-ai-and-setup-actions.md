@@ -92,10 +92,11 @@ The key step gets "Conectar depois". The agents are created without one, and the
 
 - The card is an agent message with `meta.actionCard = { kind, forUserId, params }`. Its button opens the app's own dialog, filled in.
 - Cards keep no state: "done" comes from live data (the AI is ready, the invitation exists, the app is connected).
+- A Connect card (`offer_connect_ai`) names the agents to connect, by default the agent itself for a plan. It reads "Conectado" once they can think, and for a plan's card once they think with that plan. A card for the organization's key names no agent and stays a button: nothing live says which key it was for.
 
 **Direct actions.** Internal, reversible ones act directly, with an Undo receipt (ADR 0037):
 
-- `create_channel` acts as the person behind the run, with that person's rights. Undo archives the channel (`channel.created`).
+- `create_channel` acts as the person behind the run, with that person's rights, and adds the people and agents asked for. Adding an agent needs its owner or an admin; one refused, nothing is created. Undo archives the channel (`channel.created`), unless someone already wrote there (it would hide their messages); Redo brings it back.
 
 **The tools:**
 

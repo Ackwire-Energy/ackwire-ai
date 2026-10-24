@@ -264,9 +264,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.authorType !== "person") {
         // Between agents only (`ask_agent`, ADR 0034): the consultation runs are started by the tool.
         if (where && isAgentOnlyDm(where)) return;
-        // A notice is for its own agent (`deliverNotice` starts or joins its run), and a no-AI card says why
-        // its agent didn't answer: nobody else chimes in.
-        if (message.meta.notice || message.meta.noAi) return;
+        // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
+        // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
+        if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {

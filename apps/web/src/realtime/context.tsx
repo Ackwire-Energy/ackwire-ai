@@ -670,8 +670,12 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "message.memories")
         cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
       // Act with undo: an agent message's receipts changed (made, undone, redone): replace the list.
-      if (event.type === "message.actions")
+      if (event.type === "message.actions") {
         cacheMessageActions(qc, orgId, event.channelId, event.messageId, event.actions);
+        // A channel an agent created (or its undo archived): the sidebar lists it now, not at the next refetch.
+        if (event.actions.some((a) => a.kind === "channel.created"))
+          void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });

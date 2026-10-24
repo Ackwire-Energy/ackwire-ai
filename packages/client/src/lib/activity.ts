@@ -63,6 +63,8 @@ export type ActivityKind =
   | "readingWiki"
   | "linkingWiki"
   | "readingForum"
+  | "creatingChannel"
+  | "offeringConnectAi"
   | "usingTool";
 
 export interface Activity {
@@ -137,6 +139,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   read_wiki_page: "readingWiki",
   search_wiki: "readingWiki",
   link_to_wiki: "linkingWiki",
+  // Setting up the workspace.
+  create_channel: "creatingChannel",
+  offer_connect_ai: "offeringConnectAi",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */

@@ -1087,6 +1087,7 @@ export type AgentActionKind =
   | "routine.created"
   | "routine.updated"
   | "channel.agent_added"
+  | "channel.created"
   | "wiki.page_created"
   | "wiki.page_edited"
   | "thread.renamed"
@@ -1117,6 +1118,7 @@ export interface AgentActionTarget {
  *   English words, never shown), `active`; `routine.updated`: `name`,
  *   `fields` (name, prompt, target, schedule, active), `active`, `schedule`
  * - `channel.agent_added`: `agentId`, `agentName`, `agentHandle`, `channel`
+ * - `channel.created`: `name` (undo archives it)
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
  */

@@ -59,6 +59,7 @@ import {
   useUpdateChannel,
   useWikiTree,
 } from "@agenteschat/client";
+import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
@@ -165,6 +166,7 @@ import {
   saysNothingYet,
 } from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
+import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
@@ -2929,10 +2931,13 @@ export const TimelineMessage = memo(function TimelineMessage({
   const waitNotice = brainNotice && isOfflineNotice(brainNotice) ? brainNotice : null;
   // "Ada não vai responder porque não tem uma IA conectada": one card with Connect, in place of its text.
   const noAi = m.author.type === "agent" && noAiCardOf(meta) !== null;
+  // An agent's card whose button opens the app's own dialog, filled in ("Conectar uma IA para Ada").
+  const actionCard = m.author.type === "agent" && actionCardOf(meta) !== null;
   const card =
     approvalId ||
     waitNotice ||
     noAi ||
+    actionCard ||
     proposalId ||
     memoryUpdates.length > 0 ||
     question ||
@@ -3117,6 +3122,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             !issueWork &&
             !waitNotice &&
             !noAi &&
+            !actionCard &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0)) && (
@@ -3160,6 +3166,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             ))}
           {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
           {noAi && <NoAiCard message={m} />}
+          {actionCard && <ActionCard message={m} />}
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}

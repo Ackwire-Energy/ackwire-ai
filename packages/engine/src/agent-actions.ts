@@ -17,8 +17,8 @@ export const UNDO_WINDOW_MS = 5 * 60_000;
 /**
  * What an agent did. Covered: issues (created, fields changed, assigned),
  * memory (saved, changed, forgotten), routines (created, changed), an agent
- * added to a channel, wiki pages (created, edited), threads (renamed,
- * closed). Merge, deploy, rollback, anything that leaves the organization
+ * added to a channel, a channel created, wiki pages (created, edited), threads
+ * (renamed, closed). Merge, deploy, rollback, anything that leaves the organization
  * and deletes that can't be restored keep asking (approvals).
  */
 export type AgentActionKind =
@@ -32,6 +32,7 @@ export type AgentActionKind =
   | "routine.updated"
   | "routine.deleted"
   | "channel.agent_added"
+  | "channel.created"
   | "wiki.page_created"
   | "wiki.page_edited"
   | "thread.renamed"
@@ -48,6 +49,7 @@ export const UNDOABLE_TOOLS = new Set([
   "update_routine",
   "delete_routine",
   "add_agent_to_channel",
+  "create_channel",
   "create_wiki_page",
   "update_wiki_page",
   "link_to_wiki",
@@ -261,6 +263,8 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `deleted the routine${title}`;
     case "channel.agent_added":
       return `added ${typeof p.agentName === "string" ? p.agentName : "an agent"} to #${t.title ?? "?"}`;
+    case "channel.created":
+      return `created the channel #${t.title ?? "?"}`;
     case "wiki.page_created":
       return `created the wiki page${title}`;
     case "wiki.page_edited":
