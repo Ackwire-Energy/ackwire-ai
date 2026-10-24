@@ -27,7 +27,7 @@ export interface Launcher {
   prefix: string[];
   /** The command's whole environment; callers add what it needs (DISPLAY, TERM…). */
   env: Record<string, string>;
-  /** The agent's home, which is its folder. */
+  /** The agent's home (its worker makes the agent's folder inside it, as everywhere: `<handle>-<id8>`). */
   home: string;
 }
 

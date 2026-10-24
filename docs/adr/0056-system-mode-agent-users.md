@@ -1,0 +1,62 @@
+# 0056. System mode: each agent works as its own OS user
+
+- Status: Accepted (2026-10-24)
+- Date: 2026-10-24
+- Extends: ADR 0025 (connected computers), ADR 0027 (secrets to agent computers), ADR 0029 (background tasks), ADR 0030 (isolation)
+- Code: `apps/server/runner/install-script.ts`, `service.ts`, `agent-users.ts`, `supervisor.ts`, `worker.ts`, `OP_ROUTES` in `handlers.ts`
+
+## Context
+
+A connected computer runs every agent's work as the OS user that runs the runner (ADR 0030, level 1). The agents on it can read each other's folders, sign-ins and browser profiles, and kill each other's processes. That is acceptable on a person's own laptop. It is not on a computer shared by agents of different people: a hosted workspace's computer, or a team's server. ADR 0030's level 3 (a dedicated user for the runner) separates the agents from the owner, not from each other.
+
+## Decision
+
+### 1. Install and service (Linux, root)
+
+- `install.sh --system` installs the runner for the whole computer: a pinned Bun checked against its SHA-256 (never a `bun` from the `PATH`, which root would then run), the bundle in `/opt/agentes-runner`, the launcher `/usr/local/bin/agentes-runner`, the home `/var/lib/agentes-runner` (0700) and the root unit `agentes-runner.service` (`KillMode=process`, so a restart leaves background tasks running). Flags: `--agent-uid-range FIRST-LAST` (default 20000–29999), `--desktop`, `--no-pair`, `--no-start`.
+- `config.json` gets `mode: "system"`; pairing again keeps it. A system-mode runner never replaces itself with what the server sends: the installer updates it.
+
+### 2. One OS user per agent
+
+- `ag-<first 8 of the agent id>`, made on the agent's first request with the lowest uid of the range that no user has and that was never handed out. `agents.json` (`[{ id, user, uid }]`) lists it before `useradd` runs, so a uid is never given twice. Users are never removed here: wiping the computer does that.
+- Root runs anything as an agent through its launcher: `systemd-run --quiet --scope --collect --slice=agents-<uid>.slice -- runuser -u ag-… --` (`runuser` alone where systemd isn't PID 1), with only `HOME`, `USER`, `LOGNAME`, `SHELL`, `PATH` and `LANG`.
+- Every agent's slice gets `MemoryMax=1536M`, `TasksMax=1024`, `CPUQuota=200%`, from one drop-in for the slice prefix.
+
+### 3. A root supervisor and one worker per agent
+
+- The root process keeps the server's socket and runs no agent work. Each op has a route in `OP_ROUTES`: `machine` ops (the computer's accounts, folder requests and reductions) are answered by root; pause is checked there before anything else; every `agent` op goes to the worker of the request's agent. A new op doesn't compile until it has a route.
+- A worker is `agentes-runner worker --agent <id>`, started through the agent's launcher on the agent's first request, or at boot when it has background tasks to watch. It refuses to run as root and serves only its own agent. It has the same managers and handlers as a single runner. The agent's folder is `<handle>-<id8>` in the agent's home, as in any workspace; the home itself keeps the agent's own dotfiles.
+- The worker's own state (task journal, secrets, git credentials, browser) is in `/var/lib/agentes-runner-agents/<user>` (the agent's, 0700, in a folder root owns, 0711): outside the agent's home, so the file tools never reach it, and no agent can list another's.
+- The link is the machine protocol as JSON lines on the worker's stdin and stdout, the supervisor playing the server, plus frames of its own: `worker.state` (pause, the tool switches, the limits and only this agent's allowed folders, sent after each hello and on every change), `worker.close` and the upload frames (§5). Its stderr is its log, prefixed with its user in the supervisor's.
+- Sessions follow the server's. When the socket drops, each worker's session ends (its requests are aborted and its MCP calls fail or wait, as in a single runner), and the worker says hello again; it is welcomed when the server is back. Pings every 10 s keep sessions up meanwhile.
+
+### 4. What a worker may say
+
+A worker runs as the uid the agent's own code runs as, so the supervisor takes every frame from it as that agent's word:
+
+- `result` and `output` only for requests it was sent (under ids the supervisor gives);
+- `brain.event` and `brain.done` only for its turns in flight;
+- `task.event` and `task.done` only for its own tasks: `worker-tasks.json`, in root's home, records whose each task is from its `task.start` until the server acknowledges its end;
+- browser frames only for its own agent;
+- `mcp.call` and `mcp.list` go up (the server checks the run's token) and their answers go back to that worker only;
+- never the computer's own frames (`runner.state`, `access.*`, `accounts.changed`).
+
+A worker that sends a line longer than a frame, or leaves 64 MB of what it was sent unread, is stopped.
+
+### 5. Uploads without the machine token
+
+No worker holds the machine token. For `push`, the worker reads or zips the file with its own path checks and sends the bytes to the supervisor in 1 MB pieces. The supervisor uploads them once per `push` request, to that request's URL, with the token. Only the file's name, type and hash come from the worker; more bytes than the request allows are refused.
+
+### 6. hello, restarts
+
+- `hello.tasks` lists every task in `worker-tasks.json` as `running`, whether its worker runs or not: the server keeps them, and each worker sends `task.done` again until it is acknowledged.
+- A worker that stops fails what it was running. It starts again after a backoff (1 s, doubling to 60 s while it keeps stopping soon after starting): at once when it has tasks to watch, else on its agent's next request. One that doesn't say hello within 20 s is stopped.
+- When the supervisor restarts, its workers see their stdin close and exit; background tasks keep running (ADR 0029) and the next workers pick them up from their journals.
+
+## Consequences
+
+- Agents of different people can share one computer: files, sign-ins, browser profiles and processes belong to each agent's uid. An agent's code can rewrite its own worker's state but never get another agent's work accepted.
+- A worker costs tens of MB, and only agents that work have one.
+- The limits in `config.json` (tasks, brains) apply to each agent.
+- Accounts (ADR 0041) stay in root's home: in a worker, a turn that names an account fails with `account_missing` until that account's folder belongs to the agent's user.
+- Local ports without authentication of their own (Chrome's debugging port, the browser stream) are open to every local user until a loopback firewall limits each to its agent.

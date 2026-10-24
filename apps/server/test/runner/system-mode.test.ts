@@ -12,7 +12,7 @@ import {
   writeConfig,
 } from "../../runner/config";
 import { configFromGrant } from "../../runner/daemon";
-import { type HandlerContext, handleRequest, SYSTEM_MODE_OPS } from "../../runner/handlers";
+import { type HandlerContext, handleRequest, OP_ROUTES } from "../../runner/handlers";
 import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION } from "../../runner/install-script";
 import {
   AGENT_SLICE_LIMITS,
@@ -179,7 +179,7 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(calls).toEqual([]);
 });
 
-test("a system-mode runner (root) does no agent work itself; machine-level ops still answer", async () => {
+test("a system-mode runner (root) without workers does no agent work; machine-level ops still answer", async () => {
   const ws = home();
   let system = true;
   const ctx: HandlerContext = { workspaceReal: ws, exec: true, token: "t", systemMode: () => system };
@@ -204,7 +204,13 @@ test("a system-mode runner (root) does no agent work itself; machine-level ops s
   expect(await errorCode(() => handleRequest(ctx, account, scope))).toBe("bad_request");
   const reduce = { op: "access.reduce", folders: [] } as unknown as MachineRequest;
   expect(await errorCode(() => handleRequest(ctx, reduce, scope))).toBe("bad_request");
-  for (const op of SYSTEM_MODE_OPS) expect(MACHINE_OPS).toContain(op as never);
+  // Every op has its place; only the computer's accounts and access settings stay in the root process.
+  expect(Object.keys(OP_ROUTES).sort()).toEqual([...MACHINE_OPS].sort());
+  expect(MACHINE_OPS.filter((op) => OP_ROUTES[op] === "machine")).toEqual([
+    "account",
+    "access.request",
+    "access.reduce",
+  ]);
 
   if (posix) {
     system = false;

@@ -43,6 +43,7 @@ import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import { devicePair, formatUserCode, PairingError } from "./pairing";
 import { installService, installSystemService, serviceStatus, uninstallService } from "./service";
 import { runTaskWrapper } from "./tasks";
+import { runWorker } from "./worker";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
 
@@ -72,6 +73,8 @@ Usage:
       The desktop app's runner (a JSON-lines protocol on stdin/stdout; not for people).
   agentes-runner mcp --task <taskId> | --run <runId>
       The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
+  agentes-runner worker --agent <id> --dir <folder> --home <dir>
+      System mode: one agent's work, as that agent's own user (started by the runner, not by people).
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
@@ -303,6 +306,39 @@ async function app(): Promise<number> {
   } finally {
     if (lock.ok) lock.release();
   }
+}
+
+/**
+ * `agentes-runner worker` (system mode): stdout is the link to the root
+ * runner, so it carries frames only; anything printed goes to stderr, which
+ * the root runner logs.
+ */
+async function worker(p: Parsed): Promise<number> {
+  const agentId = flagString(p, "agent");
+  const dir = flagString(p, "dir");
+  if (!agentId || !dir || !flagString(p, "home")) {
+    console.error("Usage: agentes-runner worker --agent <id> --dir <folder> --home <dir>");
+    return 1;
+  }
+  if (process.getuid?.() === 0) {
+    console.error("A worker runs as its agent's own user, never as root.");
+    return 1;
+  }
+  const toStderr = (...args: unknown[]) =>
+    process.stderr.write(`${args.map((a) => (a instanceof Error ? a.message : String(a))).join(" ")}\n`);
+  console.log = toStderr;
+  console.info = toStderr;
+  console.debug = toStderr;
+  process.stdout.on("error", () => {});
+  return runWorker({
+    agentId,
+    home: runnerHome(),
+    dir: expandHome(dir),
+    input: process.stdin,
+    output: process.stdout,
+    // The root runner's log stamps it.
+    log: (line) => toStderr(line),
+  });
 }
 
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
@@ -558,6 +594,8 @@ async function main(argv: string[]): Promise<number> {
         ...(runId ? {} : { tokenFile: path.join(runnerHome(), "tasks", taskId, MCP_TOKEN_FILE) }),
       });
     }
+    case "worker":
+      return worker(p);
     case "task-wrapper": {
       // A compiled runner's background task wrapper (tasks.ts); it exits on its own when the task ends.
       if (!sub) return 1;
