@@ -349,7 +349,7 @@ export const ptBR = {
     optional: "Opcional.",
     platformChoice: "Usar créditos da plataforma",
     platformKeyDesc:
-      "Sem chave: a plataforma cobra por uso. Você vê o custo de cada agente.",
+      "Sem chave: a plataforma cobra por uso, com US$ 5 grátis para testar. Você vê o custo de cada agente.",
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
