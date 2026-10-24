@@ -497,6 +497,40 @@ Use HTTPS with a certificate from a public authority (Tailscale and the Caddy pr
 plain http the computer's token travels unencrypted, and the runner's background service doesn't
 load extra CA certificates.
 
+**Agents using apps on their desktops (Linux).** Besides being watched and controlled, an agent's
+desktop is one it can use itself: open an app, click, type and read the screen, for apps with no API or
+web version (web pages stay in its browser). It reads the screen through the desktop's accessibility
+tree, so most elements have a name and a number, and finds the rest on a screenshot. Driving a desktop
+runs anything as the agent, so it needs:
+
+- each agent working as its own user on that computer (the installer's `--system` option, as root),
+  never a desktop shared with the runner's user or with another agent;
+- these packages (Debian and Ubuntu names), besides the desktops':
+
+  ```sh
+  sudo apt install --no-install-recommends python3 python3-gi python3-xlib xdotool scrot at-spi2-core
+  ```
+
+- the desktop and commands turned on at that computer (`agentes-runner tools enable desktop`, then
+  `agentes-runner tools enable commands`);
+- the agent's **Use its desktop** and **Run code** permissions, and the organization's code environment on.
+
+The agents' desktops start with `ACCESSIBILITY_ENABLED=1` and `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`, so
+GTK, Chromium and Electron apps show their buttons and fields; Qt apps, games and canvases are found on
+the screenshot only. The computer's page in the app (**Apps on the agents' desktops**) says whether
+agents can use their desktops there and, if not, what is missing and the command to run;
+`agentes-runner desktop-check --agent <handle>` (with the runner stopped) times a look, an action, a
+screenshot and a close-up on that agent's desktop.
+
+With `TYPESAFE_API_KEY` (Jev), agents name targets in words, small ones are looked at again up close on
+the screenshot, and checks can look at the screen's image. Without it they act by the numbers on the
+screen and exact names, checks use the organization's cheap model on the screen's text, and nothing is
+found on images. Each step an agent takes shows on its message, and every app or file it opens is in
+the organization's audit log. Programs on one desktop aren't isolated from each other: code the agent
+runs there can see its screen and keys, so agents never type passwords into desktop apps; a person signs
+in with take control, and the sign-in stays in the agent's home. Mac and Windows computers have no
+desktop use.
+
 </details>
 
 <details>

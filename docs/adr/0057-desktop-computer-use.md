@@ -34,6 +34,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 | The helper on Xtigervnc at 1280×800 (`--self-check`) | a look with a native app in front 62–88 ms (p50), with Chromium's whole tree (950 items) 296 ms; capture 29–49 ms, a region 12–21 ms; act and settle 409–650 ms; a 2,000-character fill 130 ms; the pt-BR and symbol strings above typed and filled exactly |
 | Apps' caches | at-spi2-core 2.56's apps answer `GetItems` only once some client listens for an event; until then the method doesn't exist |
 | The runner's `desktop-check` on Xtigervnc at 1280×800 | a desktop's first look 4–5 s after it starts (its session coming up: the panel's window shows about half a second before its elements answer); then a look with the panel only 138 ms; an action checked, done, settled and looked at 0.55–0.9 s (the Applications menu opened 566 ms); launching the terminal, waiting for its window, 1.3 s; a screenshot 59 ms, a close-up 37 ms; a pt-BR line with capitals and `Ç` typed into the terminal exactly; the panel's Log Out refused |
+| `eval:desktop:micro` on three scenes recorded on Xtigervnc at 1280×800 (the helper's JPEGs and the runner's looks; close-ups cut from them at q70), 3 trials | Box on 13 small targets: first pass 22/39, with the close-up 35/39; the close-up misses are the title bars' × (2–8 px left of or below it), so the agent's guidance says to close windows with their keys. 4 large targets 12/12 first pass; 4 absent targets said absent 12/12. Choice over the tree 14/14 (p50 199 ms). Checks: 5/7 on the text, 7/7 with the image; a check only the image can answer (a terminal behind another window) fails on the text with p 0.15, so the image re-check, which only follows an unsure answer, never sees it |
 
 ### Alternatives considered
 
@@ -138,7 +139,9 @@ Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and 
 - Screen text reaches the model only inside the untrusted block; reports name elements by role and number.
 - The judge only points. Costly picks need 0.85, nothing on the screen grants anything, and approvals are the agent's to ask for, as before.
 - X11 doesn't isolate programs on one display, and `ptrace` is open within one user: code the agent runs can read its desktop's screen and keys and the helper's memory. Typing a delivered secret into a native app is therefore not offered; logins go through ADR 0056's take control, and the session stays in the agent's home.
-- Every Jev call is recorded with `org_id` and `agent_id`; each step goes on the message's trail; `launch` and `open_file` are audited.
+- Every Jev call is recorded with `org_id` and `agent_id`.
+- Each step goes on the message the run posts next (`meta.desktop.steps`, as the browser's `meta.browser`): the tool it stands for (`desktop_click`, `desktop_open`…), the app an `open` started in the agent's words, when, and whether it failed; never what was typed or read. The chat shows it in the browser's card, with the app in place of the site and no link.
+- Each app and file a plan opens is in the org's audit log (`desktop.app_opened` with its desktop entry, `desktop.file_opened` with its path; the agent as actor, the computer as target), for whoever watches what agents run.
 
 ### 12. Without Jev, and on the Cloud
 

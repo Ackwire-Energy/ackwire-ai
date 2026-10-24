@@ -113,6 +113,8 @@ export interface DesktopSurfaceOptions {
   signal?: AbortSignal;
   /** Every look, as it happens (the caller keeps the last one). */
   onLook?: (o: ScreenObservation) => void;
+  /** Every action the computer did, as sent (an app by its desktop entry, a file by its path). */
+  onAct?: (action: DesktopAction) => void;
 }
 
 /** The desktop as a `ScreenSurface`: plans and reports say "screen", and close-ups of regions are taken. */
@@ -148,6 +150,7 @@ export function desktopSurface(options: DesktopSurfaceOptions): ScreenSurface {
           act = mapped;
         }
         const reply = await link.act(act, settle);
+        options.onAct?.(act);
         return { ok: true, observation: reply.look ? seen(observationOf(reply.look)) : null };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };

@@ -7773,5 +7773,47 @@ export const en: Translations = {
     control: {
       notice: "While you're in control, programs on the agent's computer can see the screen and what you type.",
     },
+    /** What the agent did on its desktop, on its message after the run (ADR 0057); the rest is the browser card's. */
+    after: {
+      titleNoSite: "Used its desktop",
+      noSite: "Before opening an app",
+    },
+    inCard: {
+      group: "{{name}}'s desktop",
+    },
+    watch: {
+      step: {
+        desktop_open: "Opened {{detail}}",
+        desktop_open_plain: "Opened an app",
+        desktop_open_file: "Opened a file",
+        desktop_read: "Read the screen",
+        desktop_click: "Clicked",
+        desktop_double_click: "Double-clicked",
+        desktop_right_click: "Right-clicked",
+        desktop_focus: "Switched windows",
+        desktop_fill: "Filled in a field",
+        desktop_type: "Typed",
+        desktop_select: "Picked an option",
+        desktop_check: "Checked an option",
+        desktop_press: "Pressed a key",
+        desktop_scroll: "Scrolled",
+        desktop_drag: "Dragged",
+        desktop_wait: "Waited for the screen",
+        desktop_screenshot: "Took a screenshot",
+        desktop_ask_person: "Asked for help",
+        other: "Used its desktop",
+      },
+    },
+    /** Whether agents can use apps on their desktops on a computer (ADR 0057): its page and the agent's. */
+    use: {
+      title: "Apps on the agents' desktops",
+      description:
+        "Agents open and use apps on their own desktops here, the way a person would, while people watch from each agent's page.",
+      ready: "Ready",
+      off: "Off",
+      unavailable: "Not available",
+      offHelp: "Turn on the desktop and commands on this computer:",
+      agent: "{{name}} can't use apps on its desktop on {{computer}} yet.",
+    },
   },
 };

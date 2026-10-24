@@ -40,6 +40,12 @@ export const installCommand = (origin: string) =>
 export const allowFolderCommand = (path: string, handle?: string) =>
   `agentes-runner folders allow ${shellQuote(path)}${handle ? ` --agent ${handle}` : ""}`;
 
+/** The first command in a runner's own words ("…run `agentes-runner browser install --with-deps`"), to copy. */
+export function commandInReason(reason: string | null | undefined): string | null {
+  const m = reason ? /`([^`]+)`/.exec(reason) : null;
+  return m?.[1] ?? null;
+}
+
 /** The last part of a path: "/Users/you/Projects/loja-v5" → "loja-v5". */
 export function folderName(path: string): string {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);

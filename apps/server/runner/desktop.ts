@@ -71,8 +71,9 @@ const NEEDS_LINUX = "Desktop use runs on Linux computers with the agents' deskto
 const RUNNER_USER =
   "Desktop use needs each agent to work as its own user on this computer (system mode): here every agent works as the runner's own user";
 const INSTALL = "sudo apt install --no-install-recommends python3 python3-gi python3-xlib xdotool scrot at-spi2-core";
+/** The command in backticks: the computer's page shows it to copy (`commandInReason`). */
 const installReason = (missing: readonly string[]) =>
-  `Install what desktop use needs: ${INSTALL} (missing: ${missing.join(", ")})`;
+  `Install what desktop use needs: \`${INSTALL}\` (missing: ${missing.join(", ")})`;
 
 /** After an action, the browser's numbers: quiet 120 ms after its first change, 400 ms for a late one, 2 s at most. */
 const SETTLE: HelperSettle = { lateMs: 400, quietMs: 120, capMs: 2000 };

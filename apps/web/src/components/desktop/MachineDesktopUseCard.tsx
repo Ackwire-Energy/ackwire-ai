@@ -1,0 +1,61 @@
+import type { Machine } from "@agenteschat/client";
+import { commandInReason } from "@agenteschat/client/lib/machines";
+import { Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
+import { useTranslation } from "react-i18next";
+import { CommandBlock } from "../Machines";
+import "../browser/browser.css";
+
+/** Both switches desktop use needs, turned on at the computer. */
+const TURN_ON = "agentes-runner tools enable desktop && agentes-runner tools enable commands";
+
+/**
+ * Apps on the agents' desktops, on a computer's page (ADR 0057): whether agents can use apps on their own
+ * desktops there; when not, the computer's own words on what is missing (a Linux computer, each agent its
+ * own user, packages) with the command in them, or the two switches to turn on.
+ */
+export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
+  const { t } = useTranslation();
+  const use = m.desktopUse;
+  if (!use) return null;
+  const off = use.available && !(m.access?.tools.desktop && m.access.tools.commands);
+  const command = use.available ? null : commandInReason(use.reason);
+  return (
+    <Card aria-labelledby="sec-machine-desktop-use">
+      <CardHeader
+        id="sec-machine-desktop-use"
+        icon="computer"
+        title={t("desktop.use.title")}
+        subtitle={t("desktop.use.description")}
+      />
+      <div className="brw-status">
+        {!use.available ? (
+          <Chip icon="alert">{t("desktop.use.unavailable")}</Chip>
+        ) : off ? (
+          <Chip icon="dash">{t("desktop.use.off")}</Chip>
+        ) : (
+          <Chip icon="check" tone="done">
+            {t("desktop.use.ready")}
+          </Chip>
+        )}
+      </div>
+      {off && (
+        <div className="brw-note">
+          <Icon name="computer" size={16} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {t("desktop.use.offHelp")}
+            <CommandBlock command={TURN_ON} />
+          </div>
+        </div>
+      )}
+      {!use.available && use.reason && (
+        <div className="brw-note">
+          <Icon name="alert" size={16} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {use.reason}
+            {command && <CommandBlock command={command} />}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}

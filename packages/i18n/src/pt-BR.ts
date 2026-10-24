@@ -7796,6 +7796,48 @@ export const ptBR = {
       notice:
         "Enquanto você está no controle, os programas do computador do agente podem ver a tela e o que você digita.",
     },
+    /** What the agent did on its desktop, on its message after the run (ADR 0057); the rest is the browser card's. */
+    after: {
+      titleNoSite: "Usou a tela",
+      noSite: "Antes de abrir um app",
+    },
+    inCard: {
+      group: "Tela {{of}} {{name}}",
+    },
+    watch: {
+      step: {
+        desktop_open: "Abriu {{detail}}",
+        desktop_open_plain: "Abriu um app",
+        desktop_open_file: "Abriu um arquivo",
+        desktop_read: "Leu a tela",
+        desktop_click: "Clicou",
+        desktop_double_click: "Clicou duas vezes",
+        desktop_right_click: "Clicou com o botão direito",
+        desktop_focus: "Trocou de janela",
+        desktop_fill: "Preencheu um campo",
+        desktop_type: "Digitou",
+        desktop_select: "Escolheu uma opção",
+        desktop_check: "Marcou uma opção",
+        desktop_press: "Apertou uma tecla",
+        desktop_scroll: "Rolou a tela",
+        desktop_drag: "Arrastou",
+        desktop_wait: "Esperou a tela",
+        desktop_screenshot: "Tirou um print",
+        desktop_ask_person: "Pediu ajuda",
+        other: "Usou a tela",
+      },
+    },
+    /** Whether agents can use apps on their desktops on a computer (ADR 0057): its page and the agent's. */
+    use: {
+      title: "Apps nas telas dos agentes",
+      description:
+        "Os agentes abrem e usam apps na própria tela aqui, como uma pessoa faria, e as pessoas assistem pela página de cada um.",
+      ready: "Pronto",
+      off: "Desligado",
+      unavailable: "Indisponível",
+      offHelp: "Ligue a tela e os comandos neste computador:",
+      agent: "{{The}} {{name}} ainda não consegue usar apps na própria tela no {{computer}}.",
+    },
   },
 };
 

@@ -2,10 +2,12 @@ import {
   type AgentScope,
   DESKTOP_AGENT_BROWSER,
   DESKTOP_LIMITS,
+  type DesktopAction,
   type DesktopLookReply,
   type PubSub,
 } from "@agenteschat/adapters";
 import { getAgentCached } from "../agents";
+import { recordAudit } from "../audit";
 import { handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl } from "../browser/handoff";
 import { agentFolderPath, MAX_PAGE_TEXT, MAX_PLAN_STEPS } from "../browser/tools";
 import { DESKTOP_SCOPE, DESKTOP_TOOL_INFO } from "../browser/types";
@@ -185,15 +187,46 @@ function explain(error: unknown, machineName: string): string {
   }
 }
 
-/** The steps for the message's trail of the desktop (`desktopTrail`): each verb, and the app an `open` started. */
+/** Verbs the message's trail tells as another: a hover is pointing, unchecking is checking. */
+const TRAIL_AS: Partial<Record<ScreenVerb, ScreenVerb>> = { hover: "click", uncheck: "check" };
+
+/**
+ * The steps for the message's trail of the desktop (`desktopTrail`, then `meta.desktop.steps`): each
+ * as `desktop_<verb>`, a file opened as `desktop_open_file`, and the app an `open` started in the
+ * agent's words; never what was typed or read.
+ */
 function trailOf(report: PlanReport) {
   return report.steps
     .filter((s) => s.status !== "skipped")
-    .map((s) => ({
-      step: s.step.do,
-      ...(s.step.do === "open" && s.step.app?.trim() ? { detail: s.step.app.trim().slice(0, 100) } : {}),
-      ...(s.status === "failed" && !s.ran ? { failed: true as const } : {}),
-    }));
+    .map(({ step, status, ran }) => {
+      const app = step.do === "open" ? step.app?.trim() : undefined;
+      const verb = step.do === "open" && !app && step.path?.trim() ? "open_file" : (TRAIL_AS[step.do] ?? step.do);
+      return {
+        tool: `desktop_${verb}`,
+        ...(app ? { detail: app.slice(0, 100) } : {}),
+        ...(status === "failed" && !ran ? { failed: true as const } : {}),
+      };
+    });
+}
+
+/**
+ * What a plan started on the computer, in the org's audit log: an app (its desktop entry) or a file
+ * in the agent's folder, for whoever watches what agents run.
+ */
+async function auditOpened(ctx: ToolContext, machineId: string, opened: DesktopAction[]) {
+  for (const a of opened) {
+    if (a.kind !== "launch" && a.kind !== "open_file") continue;
+    await recordAudit(ctx.db, {
+      orgId: ctx.orgId,
+      actor: { type: "agent", id: ctx.agentId },
+      action: a.kind === "launch" ? "desktop.app_opened" : "desktop.file_opened",
+      target: { type: "machine", id: machineId },
+      details: {
+        ...(a.kind === "launch" ? { app: a.app } : { path: a.path }),
+        ...(ctx.runId ? { runId: ctx.runId } : {}),
+      },
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -242,7 +275,8 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
   async function linkFor(
     ctx: ToolContext,
   ): Promise<
-    { ok: true; link: DesktopLink; write(path: string, base64: string): Promise<unknown> } | { ok: false; text: string }
+    | { ok: true; link: DesktopLink; machineId: string; write(path: string, base64: string): Promise<unknown> }
+    | { ok: false; text: string }
   > {
     const gate = await gateOf(ctx);
     if ("refused" in gate) return { ok: false, text: gate.refused };
@@ -267,6 +301,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     };
     return {
       ok: true,
+      machineId,
       link: {
         look: () => told(() => caller.call<"desktop.look">(machineId, { op: "desktop.look", agent }, options)),
         act: (action, settle) =>
@@ -302,13 +337,19 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     // A take over that begins and ends within one step leaves no open handoff to see: it is checked too.
     const started = new Date();
     let handedBack = false;
+    const acted: DesktopAction[] = [];
     const report = await runPlan(
       {
         judge,
         orgId: ctx.orgId,
         agentId: ctx.agentId,
         runId: ctx.runId,
-        surface: desktopSurface({ link: linked.link, signal: ctx.signal, onLook: (o) => seen.remember(key, o) }),
+        surface: desktopSurface({
+          link: linked.link,
+          signal: ctx.signal,
+          onLook: (o) => seen.remember(key, o),
+          onAct: (a) => acted.push(a),
+        }),
         cache: targets,
         scope: key,
         signal: ctx.signal,
@@ -334,6 +375,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
       },
       steps,
     );
+    await auditOpened(ctx, linked.machineId, acted);
     // The agent has seen the screen (the report shows it); not when a person changed it meanwhile.
     if (!handedBack && report.after) await markPageRead(ctx.db, ctx, "desktop");
     const f = formatPlanReport(report);

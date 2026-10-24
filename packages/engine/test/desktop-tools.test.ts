@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { DESKTOP_USE_PROTOCOL, type DesktopLookReply, type MachineRequest } from "@agenteschat/adapters";
+import { DESKTOP_USE_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentDesktopUseStatus,
@@ -23,6 +23,7 @@ import {
   updateSandboxSettings,
 } from "../src";
 import { pickApp } from "../src/desktop/surface";
+import { APPS, fakeHub, lookOf } from "./desktop-fixtures";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { runContext } from "./mail-fixtures";
@@ -35,78 +36,6 @@ afterEach(async () => {
 });
 
 const TOOLS = ["desktop_do", "desktop_read", "desktop_screenshot"];
-
-const APPS = [
-  { id: "thunar.desktop", name: "Thunar File Manager", generic: "File Manager" },
-  { id: "xfce4-terminal.desktop", name: "Xfce Terminal", generic: "Terminal Emulator" },
-  { id: "org.xfce.mousepad.desktop", name: "Mousepad", generic: "Text Editor" },
-  { id: "org.gnome.gedit.desktop", name: "gedit", generic: "Text Editor" },
-];
-
-const lookOf = (snapshot: string, title = "Files - Thunar"): DesktopLookReply => ({
-  snapshot,
-  refs: {},
-  address: "desktop://thunar/main",
-  title,
-  screen: { width: 1280, height: 800 },
-});
-
-/** A hub for one machine serving desktop use: its status as the test sets it, and every request it got. */
-function fakeHub(state: { machineId: string; orgId: string }) {
-  const calls: MachineRequest[] = [];
-  const s = {
-    status: {} as Partial<MachineStatus>,
-    look: lookOf(THUNAR),
-    /** Per request, when it answers (else the defaults below). */
-    respond: null as ((request: MachineRequest) => unknown) | null,
-    error: null as Error | null,
-  };
-  const hub: MachineCaller = {
-    async status(id) {
-      if (id !== state.machineId) return null;
-      return {
-        id,
-        orgId: state.orgId,
-        name: "Box",
-        online: true,
-        execAllowed: true,
-        os: "linux",
-        protocol: DESKTOP_USE_PROTOCOL,
-        executors: { desktop: { available: true }, desktopUse: { available: true } },
-        paused: null,
-        access: { folders: [], tools: { claude: false, codex: false, commands: true, desktop: true } },
-        ...s.status,
-      };
-    },
-    async call(_id, request) {
-      const r = request as MachineRequest;
-      calls.push(r);
-      if (s.error) throw s.error;
-      const answer = s.respond?.(r);
-      if (answer !== undefined) return answer as never;
-      switch (r.op) {
-        case "desktop.look":
-          return s.look as never;
-        case "desktop.act":
-          return { look: s.look, settled: true } as never;
-        case "desktop.capture":
-          return {
-            data: "JPEG",
-            width: 1280,
-            height: 800,
-            screen: { width: 1280, height: 800 },
-            region: r.region ?? null,
-            marks: [],
-          } as never;
-        case "desktop.apps":
-          return { apps: APPS } as never;
-        default:
-          return { size: 4 } as never;
-      }
-    },
-  };
-  return { hub, calls, s };
-}
 
 async function desktopSetup(options: { judge?: Judge } = {}) {
   const holder: { hub?: MachineCaller } = {};
@@ -238,9 +167,9 @@ test("a plan of three steps: an app by its name, a target by name, typing; each 
   expect(summary).not.toContain("Files - Thunar");
   expect(screen).toContain("Now in desktop://thunar/main — Files - Thunar");
   expect(out.data?.desktopTrail).toEqual([
-    { step: "open", detail: "Files" },
-    { step: "double_click" },
-    { step: "type" },
+    { tool: "desktop_open", detail: "Files" },
+    { tool: "desktop_double_click" },
+    { tool: "desktop_type" },
   ]);
 });
 

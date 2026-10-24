@@ -208,7 +208,7 @@ describe("only as the agent's own user", () => {
     expect(make({ uids: () => UIDS, system: { ...linux, platform: "darwin" } }).info().reason).toMatch(/Linux/);
     const noXdotool = { ...linux, which: (c: string) => (c === "xdotool" ? null : `/usr/bin/${c}`) };
     expect(make({ uids: () => UIDS, system: noXdotool }).info().reason).toMatch(
-      /sudo apt install --no-install-recommends python3 python3-gi python3-xlib xdotool scrot at-spi2-core \(missing: xdotool\)/,
+      /`sudo apt install --no-install-recommends python3 python3-gi python3-xlib xdotool scrot at-spi2-core` \(missing: xdotool\)/,
     );
     const noDesktops = { ...desktops, info: () => ({ available: false, reason: "Install the agents' desktops: …" }) };
     expect(make({ uids: () => UIDS, desktops: noDesktops }).info().reason).toBe("Install the agents' desktops: …");

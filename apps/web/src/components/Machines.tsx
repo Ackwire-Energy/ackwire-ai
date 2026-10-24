@@ -51,6 +51,7 @@ import { OpenPrefsButton, ThisMacButton, useIsThisMac } from "@/components/ThisM
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
+import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
 
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
@@ -903,6 +904,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
       <FoldersCard machine={m} onReduce={setReduce} />
       <ToolsCard machine={m} onReduce={setReduce} />
       <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
+      <MachineDesktopUseCard machine={m} />
       <GrantCard machine={m} />
       <ReduceDialog machine={m} reduce={reduce} onClose={() => setReduce(null)} />
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />

@@ -9,6 +9,7 @@ import {
   usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { commandInReason } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -21,12 +22,6 @@ import { useOrg } from "../org-context";
 import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
-
-/** The first command in the runner's own words ("…run `agentes-runner browser install --with-deps`"). */
-function commandIn(reason: string | null | undefined): string | null {
-  const m = reason ? /`([^`]+)`/.exec(reason) : null;
-  return m?.[1] ?? null;
-}
 
 /**
  * "Navegador" on a computer's page (ADR 0040): whether the browser is ready here, which agents are in it
@@ -79,7 +74,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   if (!access && !m.browser) return null;
   const switchedOn = access?.tools.browser === true;
   const ready = switchedOn && m.browser?.available === true;
-  const command = commandIn(m.browser?.reason);
+  const command = commandInReason(m.browser?.reason);
   const uses = m.agents.flatMap((a, i) => {
     const h = handoffs[i]?.data as BrowserHandoff | null | undefined;
     const open = h && isOpenHandoff(h) ? h : null;
