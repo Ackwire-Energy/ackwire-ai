@@ -497,6 +497,8 @@ export class RunnerDaemon implements RequestObserver {
       codex: "Codex",
       commands: "commands",
       browser: "the browser",
+      desktop: "the agents' desktops",
+      terminal: "the terminal",
     };
     for (const t of TOOL_NAMES)
       if ((a.tools[t] === true) !== (b.tools[t] === true)) out.push(`${label[t]} turned ${b.tools[t] ? "on" : "off"}`);

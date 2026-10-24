@@ -233,6 +233,17 @@ describe("one level per agent and connection", () => {
     expect(write.scopes.some((s) => s.connectionId === "conn-gh")).toBe(false);
   });
 
+  test("a built-in scope without tools shows no level, and saving another level keeps its grant", () => {
+    const access = tree((a) => {
+      a.builtins.push({ scope: "desktop:use", label: "Use its desktop", state: "granted", tools: [] });
+    });
+    expect(resourcesOf(access).some((r) => r.area === "desktop")).toBe(false);
+    expect(inputWithLevels(access, [], { "connector:conn-gh": "read" }).scopes).toContainEqual({
+      connectionId: null,
+      scope: "desktop:use",
+    });
+  });
+
   test("our tools by scope: sensitive ones always ask, *.read only reads", () => {
     expect(catalogToolClass({ scope: "github:pr.merge", sensitive: true })).toBe("approval");
     expect(catalogToolClass({ scope: "github:repo.read", sensitive: false })).toBe("read");

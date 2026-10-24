@@ -2442,6 +2442,11 @@ export const ptBR = {
       description:
         "Navegar em sites no navegador próprio do agente, no computador conectado (o login fica salvo por agente). Precisa do navegador ligado nesse computador.",
     },
+    desktop_use: {
+      label: "Usar a própria tela",
+      description:
+        "Usar qualquer app na tela própria do agente, no computador dele; as pessoas podem assistir e assumir o controle. Ali ele pode rodar qualquer coisa, então também precisa de Rodar código e da tela ligada nesse computador.",
+    },
     github_git_read: {
       label: "Clonar repositórios (git)",
       description:
@@ -5307,6 +5312,7 @@ export const ptBR = {
       forum: "Fórum",
       sandbox: "Rodar código",
       browser: "Navegador",
+      desktop: "Tela",
     },
     areaText: {
       context: {
@@ -5323,6 +5329,10 @@ export const ptBR = {
       sandbox: { write: "Roda código no PC do agente; custa tempo de máquina." },
       browser: {
         write: "Navega em sites com o próprio navegador no computador conectado; os logins ficam por agente.",
+      },
+      desktop: {
+        write:
+          "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
       },
     },
   },

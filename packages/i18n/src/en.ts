@@ -2428,6 +2428,11 @@ export const en: Translations = {
       description:
         "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
     },
+    desktop_use: {
+      label: "Use its desktop",
+      description:
+        "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
+    },
     github_git_read: {
       label: "Clone repositories (git)",
       description:
@@ -5293,6 +5298,7 @@ export const en: Translations = {
       forum: "Forum",
       sandbox: "Run code",
       browser: "Browser",
+      desktop: "Desktop",
     },
     areaText: {
       context: {
@@ -5311,6 +5317,10 @@ export const en: Translations = {
       forum: { write: "Opens topics, reads and posts in the forum." },
       sandbox: { write: "Runs code on the agent's PC; machine time costs money." },
       browser: { write: "Browses websites in its own browser on its connected computer; logins stay per agent." },
+      desktop: {
+        write:
+          "Uses any app on its own desktop on its computer, while people watch or take control. Needs Run code too.",
+      },
     },
   },
   artifacts: {

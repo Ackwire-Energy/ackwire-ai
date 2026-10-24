@@ -2035,15 +2035,18 @@ export interface MachineFolderGrant {
 /** What the machine allows (the runner's `RunnerAccess`). Granting only ever happens on the machine. */
 export interface MachineAccess {
   folders: MachineFolderGrant[];
-  /** `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). */
-  tools: Record<MachineToolName, boolean> & { browser?: boolean };
+  /**
+   * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
+   * `terminal` (ADR 0056): the agents' desktops and terminals; absent before protocol 18 (off).
+   */
+  tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
 export interface MachineAccessReduce {
   /** Without `agentId`: the folder for everyone. */
   removeFolder?: { path: string; agentId?: string };
-  disableTool?: MachineToolName | "browser";
+  disableTool?: MachineToolName | "browser" | "desktop" | "terminal";
 }
 
 /** Approximate location of the computer that asked for a code (best effort, from its IP). */

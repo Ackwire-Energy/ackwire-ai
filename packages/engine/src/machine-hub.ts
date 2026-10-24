@@ -229,9 +229,15 @@ export function isNewWork(request: MachineRequest) {
     case "brain.steer":
     // The owner managing the brains' accounts (ADR 0041) isn't agent work.
     case "account":
+    // Ending an agent's desktop, or asking about it (ADR 0056).
+    case "desktop.session.stop":
+    case "desktop.session.status":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove";
+    // Watching a desktop that already runs starts nothing; taking control of it or a terminal is work on it.
+    case "stream.open":
+      return request.kind === "terminal" || request.mode === "control";
     default:
       return true;
   }
@@ -411,12 +417,15 @@ export function createMachineHub(deps: MachineHubDeps) {
         workspace: frame.workspace,
         execAllowed: frame.exec,
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
-        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found.
-        ...(frame.executors || frame.browser
+        // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
+        // the same for the agents' desktops and the terminal (ADR 0056).
+        ...(frame.executors || frame.browser || frame.desktop || frame.terminal
           ? {
               executors: {
                 ...(frame.executors ?? {}),
                 ...(frame.browser ? { browser: frame.browser } : {}),
+                ...(frame.desktop ? { desktop: frame.desktop } : {}),
+                ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 detectedAt: now.toISOString(),
               },
             }

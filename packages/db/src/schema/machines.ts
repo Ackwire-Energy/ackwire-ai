@@ -16,13 +16,20 @@ import {
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
-/** What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7) and its browser (protocol 12). */
+/**
+ * What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7), its browser (protocol 12),
+ * its desktops and its terminal (protocol 18).
+ */
 export interface MachineExecutors {
   /** `loggedIn`/`authMethod`/`plan`: from `claude auth status` (protocol 8; absent = unknown). */
   claude?: { version: string; loggedIn?: boolean; authMethod?: string; plan?: string };
   codex?: { version: string };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string };
+  /** `hello.desktop` (ADR 0056): whether the agents' desktops can run there; absent = not reported. */
+  desktop?: { available: boolean; reason?: string; width?: number; height?: number };
+  /** `hello.terminal` (ADR 0056): whether people can open a terminal there; absent = not reported. */
+  terminal?: { available: boolean; reason?: string };
   detectedAt?: string;
 }
 
@@ -33,7 +40,14 @@ export interface MachineExecutors {
  */
 export interface MachineAccess {
   folders: { path: string; agents: string[] }[];
-  tools: { claude: boolean; codex: boolean; commands: boolean; browser?: boolean };
+  tools: {
+    claude: boolean;
+    codex: boolean;
+    commands: boolean;
+    browser?: boolean;
+    desktop?: boolean;
+    terminal?: boolean;
+  };
 }
 
 /**

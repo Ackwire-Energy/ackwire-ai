@@ -481,6 +481,8 @@ function tools(p: Parsed): number {
     codex: "Codex",
     commands: "Commands",
     browser: "Browser",
+    desktop: "Desktops (each agent's own screen, watched and controlled from the app)",
+    terminal: "Terminal (a shell as the agent, opened from the app)",
   };
   if (sub === "list") {
     for (const t of TOOL_NAMES) console.log(`${t.padEnd(9)} ${access.tools[t] ? "on " : "off"}  ${label[t]}`);

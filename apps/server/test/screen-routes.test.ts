@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -18,6 +18,9 @@ test("each screen has its own handoff routes, and they act on that screen alone"
     owner(`/api/app/organizations/${org.orgId}${path}`, init);
   const machine = await pairComputer(t, api, { os: "darwin", arch: "arm64", hostname: "mac", version: "0.3.0" });
   await t.db.update(schema.agents).set({ machineId: machine.machineId }).where(eq(schema.agents.id, org.agentId));
+  await t.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, org.agentId), eq(schema.agentScopes.scope, "desktop:use")));
 
   const taken = await (await api(`/agents/${org.agentId}/browser/takeover`, { json: {} })).json();
   expect(taken).toMatchObject({ screen: "browser", status: "active" });

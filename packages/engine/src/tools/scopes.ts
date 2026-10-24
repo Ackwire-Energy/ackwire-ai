@@ -76,15 +76,20 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     description:
       "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
   },
+  "desktop:use": {
+    label: "Use its desktop",
+    description:
+      "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
+  },
 };
 
 /**
  * Granted to every new agent: reading context, keeping its own notes,
  * reading and writing Drive files, and reading issues (so any agent can check
  * the org's issues before answering about them; low risk), and its computer
- * (running commands, its own browser): on a connected computer each
- * still needs the switch the person at that computer turned on. Admins and
- * owners can revoke them.
+ * (running commands, its own browser and desktop): on a connected computer
+ * each still needs the switch the person at that computer turned on. Admins
+ * and owners can revoke them.
  */
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
@@ -99,6 +104,7 @@ export const DEFAULT_AGENT_SCOPES = [
   "wiki:write",
   "sandbox:run",
   "browser:use",
+  "desktop:use",
 ];
 
 export interface ScopeGrant {

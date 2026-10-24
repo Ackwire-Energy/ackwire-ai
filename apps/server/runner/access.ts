@@ -16,10 +16,11 @@ import { isInside } from "./paths";
 /**
  * Folders and tools on the machine (protocol 10, ADR 0036 §8). The person
  * allows a folder beyond the agents' own folders for some agents, and turns
- * Claude Code, Codex, commands and the agent browser on or off. Everything here is a plain
- * transform of `RunnerAccess` (the caller writes the config), plus the
- * checks a folder must pass before it is allowed and the store of pending
- * requests. Access only widens on the machine: the server can only reduce.
+ * Claude Code, Codex, commands, the agent browser, the desktops and the
+ * terminal on or off. Everything here is a plain transform of `RunnerAccess`
+ * (the caller writes the config), plus the checks a folder must pass before it
+ * is allowed and the store of pending requests. Access only widens on the
+ * machine: the server can only reduce.
  */
 
 /** A refusal the desktop app (or the CLI) shows as is. */
@@ -33,7 +34,14 @@ export class ControlError extends Error {
   }
 }
 
-export const TOOL_NAMES: readonly (keyof RunnerTools)[] = ["claude", "codex", "commands", "browser"];
+export const TOOL_NAMES: readonly (keyof RunnerTools)[] = [
+  "claude",
+  "codex",
+  "commands",
+  "browser",
+  "desktop",
+  "terminal",
+];
 
 const caseless = process.platform === "win32" || process.platform === "darwin";
 const samePath = (a: string, b: string) => (caseless ? a.toLowerCase() === b.toLowerCase() : a === b);

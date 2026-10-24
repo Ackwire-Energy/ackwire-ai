@@ -61,10 +61,11 @@ export const AREA_ORDER = [
   "forum",
   "sandbox",
   "browser",
+  "desktop",
 ];
 
-/** Areas "all tools" doesn't cover: running code, and the agent browser (ADR 0040). */
-export const NOT_IN_ALL_AREAS = ["sandbox", "browser"];
+/** Areas "all tools" doesn't cover: running code, and the agent's browser and desktop (ADR 0040, ADR 0056). */
+export const NOT_IN_ALL_AREAS = ["sandbox", "browser", "desktop"];
 
 /** "drive:read" → "drive"; "memory:write" → "context"; "" (always-on "ask the person") → null. */
 export function builtinArea(scope: string): string | null {
@@ -104,7 +105,8 @@ function builtinResources(builtins: AccessScope[], all: boolean): AccessResource
   const by = new Map<string, AccessScope[]>();
   for (const s of builtins) {
     const area = builtinArea(s.scope);
-    if (area) by.set(area, [...(by.get(area) ?? []), s]);
+    // A scope with no tools has no level to show; its grant is still saved back (`inputFromAccess` reads the tree).
+    if (area && s.tools.length > 0) by.set(area, [...(by.get(area) ?? []), s]);
   }
   const order = (a: string) => (AREA_ORDER.includes(a) ? AREA_ORDER.indexOf(a) : AREA_ORDER.length);
   return [...by.entries()]
