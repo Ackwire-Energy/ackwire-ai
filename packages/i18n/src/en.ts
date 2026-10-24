@@ -7758,7 +7758,7 @@ export const en: Translations = {
   /** The agent's desktop (ADR 0056): watching it, taking control, its terminal. */
   desktop: {
     control: {
-      notice: "While you're in control, programs running on this computer can see the screen and what you type.",
+      notice: "While you're in control, programs on the agent's computer can see the screen and what you type.",
     },
   },
 };

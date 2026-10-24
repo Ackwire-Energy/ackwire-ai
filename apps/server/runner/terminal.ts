@@ -8,7 +8,7 @@ import {
   STREAM_CLOSE,
   STREAM_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
-import { type DesktopSystem, runnerEnv } from "./desktop-session";
+import { type DesktopSystem, NOT_AS_ROOT, runnerEnv } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { hasBunTerminal, runtimeName } from "./launch";
 import type { DataSocket } from "./streams";
@@ -130,10 +130,12 @@ export interface TerminalLimits {
 export interface TerminalsOptions {
   /** As whom and where the agent's terminal runs (single-user mode: `runnerTerminalUser`). */
   user(agent: AgentScope): Promise<TerminalUser>;
+  /** System mode: `user` runs each agent as its own OS user (its launcher), so a runner running as root may serve. */
+  agentUsers?: boolean;
   log(line: string): void;
   /** Tests: the PTY, the computer and shorter limits. */
   spawn?: SpawnPty;
-  system?: Pick<DesktopSystem, "platform" | "pty" | "runtime">;
+  system?: Pick<DesktopSystem, "platform" | "pty" | "runtime" | "uid">;
   limits?: Partial<TerminalLimits>;
 }
 
@@ -158,10 +160,22 @@ export class Terminals {
     };
   }
 
+  private get system() {
+    return (
+      this.opts.system ?? {
+        platform: process.platform,
+        pty: hasBunTerminal(),
+        runtime: runtimeName(),
+        uid: process.getuid?.() ?? null,
+      }
+    );
+  }
+
   /** `hello.terminal`: whether people can open terminals here, and what is missing when they can't. */
   info(): RunnerTerminalInfo {
-    const sys = this.opts.system ?? { platform: process.platform, pty: hasBunTerminal(), runtime: runtimeName() };
+    const sys = this.system;
     if (sys.platform === "win32") return { available: false, reason: "Terminals run on Linux and Mac computers only" };
+    if (sys.uid === 0 && !this.opts.agentUsers) return { available: false, reason: NOT_AS_ROOT };
     if (!sys.pty) {
       return {
         available: false,
@@ -209,6 +223,7 @@ export class Terminals {
     let pty: Pty | null = null;
     try {
       const user = await this.opts.user(agent);
+      if (this.system.uid === 0 && user.prefix.length === 0) throw new RunnerError("terminal_unavailable", NOT_AS_ROOT);
       let socket: DataSocket | null = null;
       let socketOpen = false;
       const early: Uint8Array[] = [];

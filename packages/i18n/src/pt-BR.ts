@@ -7781,7 +7781,7 @@ export const ptBR = {
   desktop: {
     control: {
       notice:
-        "Enquanto você está no controle, programas que rodam neste computador podem ver a tela e o que você digita.",
+        "Enquanto você está no controle, os programas do computador do agente podem ver a tela e o que você digita.",
     },
   },
 };

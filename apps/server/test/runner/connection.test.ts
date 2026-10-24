@@ -243,7 +243,7 @@ test("a browser command is logged when it ends, with how long it took", async ()
   expect(lines[2]).toBe("list .");
 });
 
-test("requests run concurrently up to 8; beyond that the runner answers busy; cancel aborts", async () => {
+test("requests run concurrently up to 8; beyond that the runner answers busy (never to a person's view); cancel aborts", async () => {
   const ws = tempDir();
   dirs.push(ws);
   const sent: Record<string, unknown>[] = [];
@@ -262,6 +262,17 @@ test("requests run concurrently up to 8; beyond that the runner answers busy; ca
   expect(runner.size).toBe(8);
   await runner.start("r8", { op: "list", path: "", depth: 1 });
   expect(sent).toEqual([{ type: "result", id: "r8", ok: false, error: { code: "internal", message: "busy" } }]);
+  // A person's view of an agent still opens on a computer full of agents' work.
+  const agent = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
+  const view = runner.start("v", {
+    op: "stream.open",
+    streamId: "s".repeat(43),
+    kind: "desktop",
+    mode: "watch",
+    agent,
+  });
+  expect(runner.size).toBe(9);
+  expect(sent).toHaveLength(1);
 
   runner.cancel("r0");
   await started[0];
@@ -272,7 +283,7 @@ test("requests run concurrently up to 8; beyond that the runner answers busy; ca
   expect(sent[2]).toEqual({ type: "result", id: "r1", ok: true, data: { done: true } });
 
   runner.close();
-  await Promise.all(started);
+  await Promise.all([...started, view]);
   expect(sent.length).toBe(3);
   expect(runner.size).toBe(0);
 });

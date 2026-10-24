@@ -25,3 +25,11 @@ regexes = ['''^hm_[0-9a-f]{48}$''']
 description = "Made-up private keys read as one in a test, in one past commit"
 targetRules = ["private-key"]
 commits = ["83ad3a9449549b2461cadc91b8d146f35d63f259"]
+
+# The characters the runner draws a desktop's VNC passwords from (letters and digits without look-alikes) sit
+# in a constant whose name says "password", so the generic rule reads the alphabet as a key. Only that exact
+# string is allowed.
+[[allowlists]]
+description = "The desktop's VNC password alphabet"
+targetRules = ["generic-api-key"]
+regexes = ['''^ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789$''']
