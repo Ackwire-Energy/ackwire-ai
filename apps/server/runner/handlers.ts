@@ -139,6 +139,8 @@ export interface HandlerContext {
     runs: Map<string, McpTaskInfo>;
     /** Protocol 15: long-lived `codex app-server`s (turns take messages mid-turn); without it, `codex exec`. */
     app?: CodexAppServers;
+    /** System mode, in a worker: the account folders lent to this agent (`accounts` is root's). */
+    accounts?: { accountDir(kind: "claude_code" | "codex", id: string): string | null };
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
@@ -367,7 +369,10 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     }
     // An op this runner doesn't know (`OP_ROUTES` has no row) goes nowhere.
     if (OP_ROUTES[req.op] !== "agent") throw new RunnerError("bad_request", `Unknown op ${String(req.op)}`);
-    return ctx.workers.run(req, scope);
+    const out = await ctx.workers.run(req, scope);
+    // The account's folder is root's to mark: what the worker's turn found out is told here.
+    if (req.op === "brain.turn") signedOut(ctx, req, (out as Partial<MachineReplies["brain.turn"]> | null)?.final);
+    return out;
   }
   if (req.op === "access.request" || req.op === "access.reduce") return handleAccess(ctx, req);
   // Protocol 13: accounts belong to the machine, not to an agent.
@@ -578,7 +583,13 @@ async function handleAccount(
       if (ctx.paused?.()) {
         throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
       }
-      return accounts.begin(req.kind, requireString(req.loginId, "loginId"), req.again === true);
+      return accounts.begin(
+        req.kind,
+        requireString(req.loginId, "loginId"),
+        req.again === true,
+        req.email === undefined ? undefined : requireString(req.email, "email"),
+        req.provider === undefined ? undefined : requireString(req.provider, "provider"),
+      );
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
       await accounts.code(requireString(req.loginId, "loginId"), requireString(req.aad, "aad"), req.box);
@@ -589,6 +600,8 @@ async function handleAccount(
       await accounts.cancel(requireString(req.loginId, "loginId"));
       return {};
     case "list":
+      // Protocol 19: usage looked up in the background; what it finds comes as `accounts.changed`.
+      if (Array.isArray(req.fresh)) accounts.probeUsage(req.fresh.filter((id) => typeof id === "string"));
       return { accounts: await accounts.list() };
     case "remove":
       await accounts.remove(req.kind, requireString(req.accountId, "accountId"));
@@ -670,15 +683,27 @@ function doBrainSteer(
 
 /**
  * A turn in an account that was refused (`not_logged_in`) or is gone
- * (`account_missing`): its CLI is asked again and the server hears the answer
- * either way (`accounts.changed`). The machine is the only one that says an
- * account is signed out or gone; a passing failure leaves it as it was.
+ * (`account_missing`): its CLI is asked again (a key, or a folder root can't
+ * run, is marked refused) and the server hears the answer either way
+ * (`accounts.changed`). The machine is the only one that says an account is
+ * signed out or gone; a passing failure leaves it as it was.
  */
-function signedOut(ctx: HandlerContext, req: { account?: unknown }, final: { type: string; code?: string }) {
-  if (!req.account || final.type !== "error") return;
+function signedOut(
+  ctx: HandlerContext,
+  req: { kind?: unknown; account?: unknown },
+  final: { type: string; code?: string } | undefined,
+) {
+  const accounts = ctx.accounts;
+  if (!accounts || typeof req.account !== "string" || !req.account || final?.type !== "error") return;
   if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
-  ctx.accounts?.invalidate();
-  ctx.accounts?.refresh(true).catch(() => undefined);
+  const kind = req.kind === "codex" ? "codex" : "claude_code";
+  void (final.code === "not_logged_in" ? accounts.refused(kind, req.account) : Promise.resolve())
+    .catch(() => undefined)
+    .then(() => {
+      accounts.invalidate();
+      return accounts.refresh(true);
+    })
+    .catch(() => undefined);
 }
 
 /**
@@ -720,7 +745,7 @@ async function doCodexTurn(
         ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
         ...(codex.mcp ? { mcp: codex.mcp } : {}),
         ...(ctx.grants ? { grants: ctx.grants } : {}),
-        ...(ctx.accounts ? { accounts: ctx.accounts } : {}),
+        ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
         ...(codex.app ? { app: codex.app } : {}),
       },
       req as unknown as CodexBrainTurnRequest,

@@ -10,7 +10,9 @@
 // refuses the steer as the real CLI does), "LIMIT" (usage limit), "CRASH"
 // (exits mid-turn), "APPROVE <command>" (asks the runner to approve the
 // command, answers with the decision), "APPROVE_FILE <path>" (the same for a
-// change of that file); anything else answers "pong".
+// change of that file), "RATE" (the plan's windows moved:
+// `account/rateLimits/updated`); anything else answers "pong".
+// `account/rateLimits/read` answers the 5 hours at 12% and the week at 55%.
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
@@ -26,6 +28,7 @@ log({
   codexHome: process.env.CODEX_HOME ?? null,
   token: process.env.AGENTES_MCP_TOKEN ?? null,
   secret: process.env.FAKE_SECRET ?? null,
+  openaiKey: process.env.OPENAI_API_KEY ?? null,
 });
 
 if (args[0] === "exec") {
@@ -136,6 +139,13 @@ function appServer() {
           platformFamily: "unix",
           platformOs: "linux",
         });
+      case "account/rateLimits/read":
+        return ok({
+          rateLimits: {
+            primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: 1900000000 },
+            secondary: { usedPercent: 55, windowDurationMins: 10080, resetsAt: 1900500000 },
+          },
+        });
       case "thread/start":
         total.input = 0;
         total.cached = 0;
@@ -212,6 +222,14 @@ function appServer() {
               complete("completed");
             },
           );
+        }
+        if (/\bRATE\b/.test(prompt)) {
+          note("account/rateLimits/updated", {
+            rateLimits: {
+              primary: { usedPercent: 91, windowDurationMins: 300, resetsAt: 1900000000 },
+              secondary: null,
+            },
+          });
         }
         if (/\bLIMIT\b/.test(prompt)) {
           note("error", {

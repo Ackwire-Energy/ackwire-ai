@@ -957,6 +957,7 @@ export class TaskManager {
           token: mcpToken,
           cwd,
           folders: [...new Set([cwd, missionRoot])],
+          runnerHome: path.dirname(this.opts.root),
         });
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
         // What it may run without asking: item tasks work (the main session plans as an engine run, ADR 0032).
@@ -972,6 +973,7 @@ export class TaskManager {
               prefix,
               allow,
               away ? path.resolve(missionRoot) : undefined,
+              { runnerHome: path.dirname(this.opts.root) },
             ),
           ),
           { mode: 0o600 },

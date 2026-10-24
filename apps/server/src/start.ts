@@ -45,7 +45,7 @@ import {
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
-import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
+import { createModelProviders } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
@@ -125,10 +125,12 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   const base = { config, db: database.db, edition, version };
-  const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
-    anthropic: createAnthropicProvider(),
-    openai: createOpenAIProvider(),
-  });
+  const { adapters, modelProviders, overridden } = await resolveAdapters(
+    modules,
+    base,
+    defaults,
+    createModelProviders(),
+  );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };
 

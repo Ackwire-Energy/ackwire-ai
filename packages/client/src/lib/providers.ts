@@ -1,21 +1,84 @@
 import type { Credential, Model } from "../api/types";
 
+interface ProviderEntry {
+  id: string;
+  label: string;
+  placeholder: string;
+  /** What its keys look like: only to catch paste mistakes (loose where the provider publishes no format). */
+  pattern: RegExp;
+  /** Where the provider hands out keys. */
+  site: string;
+  /** It also sells coding plans, whose keys only work in coding tools. */
+  plans?: boolean;
+}
+
 /**
- * Model providers the workspace can bring a key for. The backend catalog
- * starts with Anthropic and is adding OpenAI. Key formats are checked on the
- * client only to catch paste mistakes; the server validates for real.
+ * Model providers the workspace can bring a key for, the same ids as the backend catalog
+ * (`packages/providers/src/catalog.ts`). The server validates keys for real.
  */
 export const PROVIDERS = [
-  { id: "anthropic", label: "Anthropic", placeholder: "sk-ant-…", pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/ },
-  { id: "openai", label: "OpenAI", placeholder: "sk-…", pattern: /^sk-(?!ant-)[A-Za-z0-9_-]{16,}$/ },
-] as const;
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    placeholder: "sk-ant-…",
+    pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
+    site: "console.anthropic.com/settings/keys",
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    placeholder: "sk-…",
+    pattern: /^sk-(?!ant-)[A-Za-z0-9_-]{16,}$/,
+    site: "platform.openai.com/api-keys",
+  },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    placeholder: "sk-…",
+    pattern: /^sk-[A-Za-z0-9]{16,}$/,
+    site: "platform.deepseek.com/api_keys",
+  },
+  {
+    id: "moonshot",
+    label: "Kimi",
+    placeholder: "sk-…",
+    pattern: /^sk-[A-Za-z0-9]{16,}$/,
+    site: "platform.kimi.ai/console/api-keys",
+    plans: true,
+  },
+  {
+    id: "zai",
+    label: "Z.ai",
+    placeholder: "…",
+    pattern: /^(?!sk-)[A-Za-z0-9._-]{16,}$/,
+    site: "z.ai/manage-apikey/apikey-list",
+    plans: true,
+  },
+  {
+    id: "minimax",
+    label: "MiniMax",
+    placeholder: "…",
+    // `sk-cp-` keys are its coding plan's.
+    pattern: /^(?!sk-ant-|sk-cp-)[A-Za-z0-9._-]{16,}$/,
+    site: "platform.minimax.io/user-center/basic-information/interface-key",
+    plans: true,
+  },
+] as const satisfies readonly ProviderEntry[];
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
 
-export const providerLabel = (id: string) => PROVIDERS.find((p) => p.id === id)?.label ?? id;
+/** A provider's entry; undefined for an id this client doesn't know (it then shows the id itself). */
+export const providerOf = (id: string): ProviderEntry | undefined => PROVIDERS.find((p) => p.id === id);
+export const providerLabel = (id: string) => providerOf(id)?.label ?? id;
 export const isProviderId = (id: string): id is ProviderId => PROVIDERS.some((p) => p.id === id);
 export const keyLooksValid = (provider: ProviderId, key: string) =>
-  (PROVIDERS.find((p) => p.id === provider)?.pattern ?? /.{8,}/).test(key.trim());
+  (providerOf(provider)?.pattern ?? /.{8,}/).test(key.trim());
+
+/**
+ * The providers whose keys look like this one. Often several (any `sk-` key could be OpenAI's, DeepSeek's,
+ * Kimi's or MiniMax's), so the person says which instead of the app guessing.
+ */
+export const providersForKey = (key: string) => PROVIDERS.filter((p) => p.pattern.test(key.trim()));
 
 /** Live keys per provider. */
 export function providersWithKeys(credentials: Credential[]) {

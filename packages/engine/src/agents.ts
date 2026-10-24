@@ -1,6 +1,8 @@
 import { and, asc, type Database, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
+import { recordAudit } from "./audit";
+import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { recordOperatorEvent } from "./operator-events";
@@ -139,6 +141,22 @@ export async function createAgent(
   }
 }
 
+/** Whose plan the agent's computer brain thinks with: its account's owner, else whoever connected its computer. */
+async function planOwner(db: Database, agent: Agent): Promise<string | null> {
+  if (!agent.machineId) return null;
+  const { machineAccounts, machines } = schema;
+  const [row] = agent.brainAccountId
+    ? await db
+        .select({ owner: machineAccounts.createdBy })
+        .from(machineAccounts)
+        .where(and(eq(machineAccounts.orgId, agent.orgId), eq(machineAccounts.id, agent.brainAccountId)))
+    : await db
+        .select({ owner: machines.pairedByUserId })
+        .from(machines)
+        .where(and(eq(machines.orgId, agent.orgId), eq(machines.id, agent.machineId)));
+  return row?.owner ?? null;
+}
+
 export async function updateAgent(
   db: Database,
   actorId: string,
@@ -148,14 +166,37 @@ export async function updateAgent(
 ): Promise<Agent> {
   await requirePermission(db, actorId, orgId, "manage_agents");
   await validate(db, orgId, input);
+  const owner = input.ownerUserId;
+  const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
+  // A plan thinks only for its owner's agents (ADR 0059 §3): a new owner who doesn't own it sends the agent back
+  // to the API; one who does decides for themselves whether anyone else talks to it.
+  const handover =
+    before && before.ownerUserId !== owner && isComputerBrain(before.brain)
+      ? owner && (await planOwner(db, before)) === owner
+        ? { audienceMode: "owner" as const }
+        : { brain: "model", brainAccountId: null }
+      : {};
   const [agent] = await db
     .update(agents)
-    .set({ ...input, updatedAt: new Date() })
+    .set({ ...input, ...handover, updatedAt: new Date() })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
+  if (before && "brain" in handover) {
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.brain",
+      target: { type: "agent", id: agentId },
+      details: {
+        from: { brain: before.brain, account: before.brainAccountId },
+        to: { brain: "model", account: null },
+        reason: "owner_changed",
+      },
+    });
+  }
   if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
   return agent;
 }

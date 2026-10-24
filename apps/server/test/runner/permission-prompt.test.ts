@@ -8,6 +8,7 @@ import {
   rulesFor,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  claudeMcpConfig,
   claudePermissionSettings,
   DENY_RULES,
   handleMcpMessage,
@@ -152,6 +153,25 @@ test("the prompt tool: plain reads are allowed at once (no card, nothing posted)
     home: "/Users/w",
   });
   expect(mcpScopeFromEnv({ AGENTES_MCP_CWD: "relative" })).toBeUndefined();
+  // The runner's own home, wherever it is (system mode), is read by nothing either: its accounts are there.
+  const system = mcpScopeFromEnv({ AGENTES_MCP_CWD: "/w/ada", AGENTES_RUNNER_HOME: "/var/lib/agentes-runner" });
+  expect(system?.runnerHome).toBe("/var/lib/agentes-runner");
+  const account = "/var/lib/agentes-runner/accounts/claude_code/0193dddd-0000-4000-8000-000000000001";
+  const local = server([{ behavior: "allow" }]);
+  for (const command of [`cat ${account}/.credentials.json`, "ls /var/lib/agentes-runner"]) {
+    expect((await permissionPrompt(bash(command), local.call, { ...instant, scope: system })).behavior).toBe("deny");
+  }
+  expect(local.calls).toHaveLength(0);
+  const settings = claudePermissionSettings("work", "agentes/x/", [], undefined, {
+    promptReads: true,
+    runnerHome: "/var/lib/agentes-runner",
+  }).permissions;
+  expect(settings.deny).toContain("Read(//var/lib/agentes-runner/**)");
+  expect(settings.deny).toContain("Bash(*/var/lib/agentes-runner/*)");
+  expect(
+    claudeMcpConfig({ command: ["node", "r.mjs"], taskId: "t1", socketPath: "/s", token: "t", runnerHome: "/srv/r" })
+      .mcpServers.agentes.env,
+  ).toMatchObject({ AGENTES_RUNNER_HOME: "/srv/r" });
 });
 
 test("the prompt tool: pending, then allowed (the input comes back as is)", async () => {

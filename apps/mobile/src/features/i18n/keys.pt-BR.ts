@@ -1032,6 +1032,7 @@ export const featureKeysPtBR = {
       saved: "Memória corrigida",
       forgotten: "Esquecido",
     },
+    thinks: "Pensa com",
     uses: {
       title: "O que pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },

@@ -1688,6 +1688,12 @@ export const useAgentBrain = (orgId: string, agentId: string, enabled = true) =>
   });
 };
 
+/** "Contas de IA": the viewer's AI accounts on every computer, and where they can add one. */
+export const useAiAccounts = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.aiAccounts(orgId), queryFn: () => api.machines.aiAccounts(orgId), enabled });
+};
+
 /** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
 export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
   const api = useApi();

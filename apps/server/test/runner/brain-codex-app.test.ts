@@ -52,6 +52,7 @@ async function setup(
     accounts?: { accountDir(kind: string, id: string): string | null };
     /** A fake server for the approvals the runner can't decide by itself. */
     ask?: CodexAppServersOptions["ask"];
+    onRateLimits?: CodexAppServersOptions["onRateLimits"];
   } = {},
 ) {
   const root = tempDir("brain-codex-app-");
@@ -67,7 +68,12 @@ async function setup(
   const folder = await agentWorkspace(ws, AGENT);
   mkdirSync(path.join(folder, "app"), { recursive: true });
   const runs = new Map<string, McpTaskInfo>();
-  const app = new CodexAppServers({ runs, deltaMs: 5, ...(opts.ask ? { ask: opts.ask } : {}) });
+  const app = new CodexAppServers({
+    runs,
+    deltaMs: 5,
+    ...(opts.ask ? { ask: opts.ask } : {}),
+    ...(opts.onRateLimits ? { onRateLimits: opts.onRateLimits } : {}),
+  });
   servers.push(app);
   const ctx = {
     workspaceReal: ws,
@@ -385,6 +391,37 @@ test.skipIf(!posix)(
     expect(t.rpcs("thread/start")[0]).toMatchObject({ developerInstructions: "You are Dev." });
     expect(new CodexThreads(codexThreadsFile(t.home)).get(codexThreadKey(SESSION, ACCOUNT))).toBe(THREAD);
     expect(new CodexThreads(codexThreadsFile(t.home)).get(SESSION)).toBeUndefined();
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "rate limits Codex reports during a turn go to the process's account (or its own sign-in); account turns see no stray key",
+  async () => {
+    process.env.OPENAI_API_KEY = "sk-stray";
+    try {
+      const ACCOUNT = "0193ffff-0000-7000-8000-000000000003";
+      const home = tempDir("brain-codex-app-acct-");
+      dirs.push(home);
+      const noted: [string | null, unknown][] = [];
+      const t = await setup({
+        accounts: { accountDir: (kind, id) => (kind === "codex" && id === ACCOUNT ? home : null) },
+        onRateLimits: (account, rateLimits) => noted.push([account, rateLimits]),
+      });
+      await start(t.ctx, request(16, "RATE", { account: ACCOUNT })).done;
+      await start(t.ctx, request(17, "RATE")).done;
+      const limits = { primary: { usedPercent: 91, windowDurationMins: 300, resetsAt: 1900000000 }, secondary: null };
+      expect(noted).toEqual([
+        [ACCOUNT, limits],
+        [null, limits],
+      ]);
+      expect(t.starts().map((s) => [s.codexHome === home, s.openaiKey])).toEqual([
+        [true, null],
+        [false, "sk-stray"],
+      ]);
+    } finally {
+      delete process.env.OPENAI_API_KEY;
+    }
   },
   20_000,
 );

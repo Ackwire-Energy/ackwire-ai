@@ -428,8 +428,11 @@ describe("Onboarding", () => {
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
     expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
-    // Thinking on the computer is what spares the key: the Claude plan warning comes right away.
-    await click(button("Entendi, usar mesmo assim"), 2);
+    // Thinking on the computer is what spares the key: the question comes right away, saying whom they answer.
+    expect(document.body.textContent).toContain(
+      "Os agentes vão pensar com o seu plano do Claude e responder só a você.",
+    );
+    await click(button("Usar meu plano"), 2);
     await next();
 
     // The agents step: who thinks is already the computer's Claude Code, so no key screen.
@@ -444,8 +447,8 @@ describe("Onboarding", () => {
     // Both agents use the connected computer and think with its Claude Code.
     expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
-      { brain: "claude_code", fallback: true, acceptPlanTerms: true },
-      { brain: "claude_code", fallback: true, acceptPlanTerms: true },
+      { brain: "claude_code", fallback: true },
+      { brain: "claude_code", fallback: true },
     ]);
 
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();

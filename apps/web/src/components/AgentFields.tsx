@@ -11,6 +11,7 @@ import {
   Carousel,
   Field,
   Icon,
+  ProviderLogo,
   Select,
   type SelectOption,
 } from "@agenteschat/ui";
@@ -52,7 +53,10 @@ export function modelDescription(t: TFunction, locale: string, model: Model) {
   return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
 }
 
-/** Key choices: the workspace default first (with its masked hint), then the other stored keys. */
+/**
+ * Key choices by their provider's mark: the workspace default first (with its masked hint), then the other
+ * stored keys.
+ */
 export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
   const live = credentials.filter((c) => !c.revokedAt);
   const def = live.find((c) => c.id === defaultId);
@@ -63,6 +67,13 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
       description: def
         ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
         : undefined,
+      leading: def ? (
+        <ProviderLogo id={def.provider} size="sm" />
+      ) : (
+        <span className="newag__ib">
+          <Icon name="key" size={16} />
+        </span>
+      ),
     },
     ...live
       .filter((c) => c.id !== defaultId)
@@ -70,6 +81,7 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
         value: c.id,
         label: c.label,
         description: t("newAgent.otherKeyDesc", { provider: providerLabel(c.provider), hint: c.keyHint }),
+        leading: <ProviderLogo id={c.provider} size="sm" />,
       })),
   ];
 }
@@ -316,14 +328,7 @@ export function KeySelect({
       value={value}
       onValueChange={onChange}
       placeholder={t("newAgent.noKeys")}
-      options={options.map((k) => ({
-        ...k,
-        leading: (
-          <span className="newag__ib">
-            <Icon name="key" size={16} />
-          </span>
-        ),
-      }))}
+      options={options}
       renderValue={pickerValue}
     />
   );
@@ -354,7 +359,10 @@ function ModelCard({
     <>
       <span className="newag__model-head">
         <b>{model.label}</b>
-        <span className="newag__model-prov">{providerLabel(provider)}</span>
+        <span className="newag__model-prov">
+          <ProviderLogo id={provider} size="xs" />
+          {providerLabel(provider)}
+        </span>
       </span>
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || /sonnet|opus|haiku/i.test(model.id)) && (

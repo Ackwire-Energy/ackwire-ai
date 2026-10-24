@@ -4,7 +4,6 @@ import {
   appendOutputLine,
   cellsFromCounts,
   editDiff,
-  executorIcon,
   executorName,
   executorOnText,
   formatSpan,
@@ -39,7 +38,7 @@ import {
   waitingParts,
   waitingText,
 } from "@agenteschat/client/lib/missions";
-import { bodyTones, iconNames, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
+import { bodyTones, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { executorOptions } from "@/components/missions/MissionBits";
 import { createI18n } from "@/i18n";
@@ -483,14 +482,6 @@ describe("the mission link card", () => {
 });
 
 describe("who programs, as a mark", () => {
-  test("Claude Code and Codex have their own icons; the agent uses its avatar (no icon)", () => {
-    expect(executorIcon("claude")).toBe("executorClaude");
-    expect(executorIcon("codex")).toBe("executorCodex");
-    expect(executorIcon("agent")).toBeNull();
-    expect(iconNames).toContain("executorClaude");
-    expect(iconNames).toContain("executorCodex");
-  });
-
   test("'Claude Code no mac' (no 'via'), the agent's name when it works itself; options carry the mark", () => {
     expect(executorOnText(t, "claude", "Ada", "mac")).toBe("Claude Code no mac");
     expect(executorOnText(te, "codex", "Ada", "mac")).toBe("Codex on mac");

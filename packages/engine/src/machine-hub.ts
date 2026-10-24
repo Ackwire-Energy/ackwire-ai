@@ -26,7 +26,13 @@ import {
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
-import { syncMachineAccounts } from "./machine-accounts";
+import {
+  accountsToRemove,
+  forgetRemovedAccount,
+  type MachineAccountRef,
+  storeOwnUsage,
+  syncMachineAccounts,
+} from "./machine-accounts";
 import { onManagedMachineHello } from "./machine-provisioning";
 import {
   applyTaskDone,
@@ -410,6 +416,8 @@ export function createMachineHub(deps: MachineHubDeps) {
       await closeConn(old);
     }
     const now = new Date();
+    // Protocol 19: the own sign-ins' usage it knows, over the last known (a runner that just started knows none).
+    const ownUsage = { ...(machine.executors?.ownUsage ?? {}), ...(frame.ownUsage ?? {}) };
     // In single-user mode the agents' own code runs as the runner's user and can send any hello: system mode
     // is believed only from a computer's first hello, and from one that has said so ever since.
     const system = frame.mode === "system" && (machine.lastSeenAt === null || machine.executors?.mode === "system");
@@ -437,6 +445,7 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.desktop ? { desktop: frame.desktop } : {}),
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 ...(system ? { mode: "system" as const } : {}),
+                ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
                 detectedAt: now.toISOString(),
               },
             }
@@ -484,9 +493,13 @@ export function createMachineHub(deps: MachineHubDeps) {
     }
     // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
     if (frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts) {
-      await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch((error) =>
-        deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) }),
+      const remove = await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch(
+        (error) => {
+          deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) });
+          return [];
+        },
       );
+      removeAccounts(conn, remove);
     }
     if (frame.protocol >= TASKS_PROTOCOL) {
       await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
@@ -502,6 +515,21 @@ export function createMachineHub(deps: MachineHubDeps) {
             deps.log?.warn("mission reconnect failed", { machineId: machine.id, error: String(error) }),
           ),
       );
+    }
+  }
+
+  /**
+   * Accounts whose row is a tombstone (removed while the computer was off, or
+   * their person left) that the runner still has: signed out and deleted
+   * there now, then the row goes. A failure leaves it for the next hello.
+   */
+  function removeAccounts(conn: MachineConnection, refs: MachineAccountRef[]) {
+    const { machineId, orgId } = conn;
+    if (!machineId || !orgId) return;
+    for (const ref of refs) {
+      void callLocal(conn, { op: "account", action: "remove", kind: ref.kind, accountId: ref.id })
+        .then(() => forgetRemovedAccount(db, orgId, ref.id))
+        .catch((error) => deps.log?.warn("account removal failed", { machineId, error: String(error) }));
     }
   }
 
@@ -860,6 +888,19 @@ export function createMachineHub(deps: MachineHubDeps) {
         });
         return;
       }
+      if (event.type === "machine.accounts" && typeof event.machineId === "string") {
+        // New tombstones (a person left): the runner here removes them now (outside the publisher's call stack).
+        const conn = local.get(event.machineId);
+        const { machineId, orgId } = conn ?? {};
+        if (!conn || !machineId || !orgId || conn.protocol < ACCOUNTS_PROTOCOL) return;
+        queueMicrotask(
+          () =>
+            void accountsToRemove(db, orgId, machineId)
+              .then((refs) => removeAccounts(conn, refs))
+              .catch(() => undefined),
+        );
+        return;
+      }
       if (event.type === "machine.agents" && typeof event.orgId === "string") {
         // The org's agents changed: its machines here list them again (outside the publisher's call stack).
         for (const conn of local.values()) {
@@ -958,9 +999,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         if (conn.machineId && conn.orgId) {
           const machineId = conn.machineId;
           const orgId = conn.orgId;
-          await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) =>
-            deps.log?.warn("account sync failed", { machineId, error: String(error) }),
-          );
+          const remove = await syncMachineAccounts({ db, pubsub }, orgId, machineId, frame.accounts).catch((error) => {
+            deps.log?.warn("account sync failed", { machineId, error: String(error) });
+            return [];
+          });
+          removeAccounts(conn, remove);
+          if (frame.ownUsage) {
+            await storeOwnUsage({ db, pubsub }, orgId, machineId, frame.ownUsage).catch((error) =>
+              deps.log?.warn("own usage failed", { machineId, error: String(error) }),
+            );
+          }
         }
       } else if (frame.type === "access.changed") {
         const machineId = conn.machineId;

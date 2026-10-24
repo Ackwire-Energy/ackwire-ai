@@ -195,6 +195,8 @@ export interface AgentBrainLine {
   /** A computer brain's model ("Sonnet"); null for the model brain. */
   model: string | null;
   computer?: string;
+  /** A plan account's provider (`zai`, `kimi`…), whose mark replaces the brain's; absent for the CLI's own sign-in. */
+  provider?: string | null;
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -215,6 +217,8 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Edits: the owner confirmed answering other people on their personal plan (a wider audience, the first time). */
+  acceptPlanTerms?: boolean;
 }
 
 export interface Model {
@@ -3141,14 +3145,23 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
-  /** The accounts added on the agent's computer (both kinds); "Conta deste computador" isn't listed. */
+  /**
+   * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
+   * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0059).
+   */
   accounts: MachineAccount[];
-  /** Whose subscriptions those are (the computer's owner); null without a computer. */
-  accountsOwner: { id: string; name: string } | null;
-  /** The viewer owns the computer: only they add accounts and pick an agent's. */
+  /** The viewer may add an account there for this agent: its owner, on a computer where they add accounts. */
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
+  /** "Só responde a você": nobody but the agent's owner talks to it. */
+  onlyOwner: boolean;
+  /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
+  canUsePlans: boolean;
+  /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
+  ownSignIn: boolean;
+  /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
+  ownUsage: Partial<Record<MachineAccountKind, PlanUsage>>;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -3158,27 +3171,81 @@ export type BrainEffortSetting = BrainEffort | "auto";
 
 export type MachineAccountKind = "claude_code" | "codex";
 
-/** ADR 0041 §3: a Claude Code or Codex account signed in on a connected computer (metadata only). */
+/** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
   id: string;
   kind: MachineAccountKind;
   label: string;
+  /** Only for its owner. */
   email: string | null;
   /** "Pro", "Max", "Team"… as the provider reports it. */
   plan: string | null;
   status: "active" | "signed_out";
-  /** Names of the agents that think with it. */
+  /** Whose it is (the person who signed it in); null: nobody's. */
+  ownerId: string | null;
+  ownerName: string | null;
+  /** The viewer owns it: only they rename it or pick it for an agent. */
+  mine: boolean;
+  /** Names of the agents that think with it (one at most). */
   usedBy: string[];
+  /** Its plan's usage limits; null: not known yet. */
+  usage: PlanUsage | null;
+  /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
+  provider: string | null;
+  /** The last 4 of a key account's key (its owner only). */
+  keyHint: string | null;
+}
+
+/** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
+export interface AiAccounts {
+  accounts: (MachineAccount & { machineId: string; computer: string })[];
+  computers: AiComputer[];
+}
+
+export interface AiComputer {
+  machineId: string;
+  name: string;
+  online: boolean;
+  /** The viewer connected it. */
+  mine: boolean;
+  /** The viewer adds accounts there (they connected it, or nobody did), on a runner that knows accounts. */
+  canAdd: boolean;
+  /** Its runner takes coding plans' keys. */
+  keys: boolean;
+  /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
+  brains: { claude_code: boolean; codex: boolean };
+}
+
+/** A plan's usage window: how much of it is used (0–100) and when it resets. */
+export interface PlanWindow {
+  kind: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+  /** `other`: the provider's name for it ("Extra usage", a model's name). */
+  label?: string;
+  usedPercent: number;
+  resetsAt?: string;
+}
+
+/** A plan's usage limits, as the CLI on its computer said them (`at`); no token is ever read. */
+export interface PlanUsage {
+  windows: PlanWindow[];
+  /** The plan refused a request for its limit (until a window resets). */
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
 }
 
 export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** The person confirmed the personal-subscription warning (switching to Claude Code or Codex). */
+  /** "Só responde a você": false lets everyone talk to it (on the API, whoever did before a plan). */
+  onlyOwner?: boolean;
+  /** The owner confirmed answering other people on their personal plan (with `onlyOwner: false`, the first time). */
   acceptPlanTerms?: boolean;
-  /** Only the computer's owner; null = "Conta deste computador". */
+  /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
+  /** The account thinks for another agent: take it from that one. */
+  moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
 }
 
@@ -3186,8 +3253,10 @@ export interface AgentBrainInput {
 export interface AccountLoginStart {
   loginId: string;
   kind: MachineAccountKind;
-  /** The provider's own page (Claude's sign-in, or the device page for Codex). */
+  /** The provider's own page (Claude's sign-in, the device page for Codex, or where a plan's key is made). */
   url: string;
+  /** A coding plan's key account. */
+  provider?: string;
   /** Claude Code: the computer's one-time key the pasted code is sealed to. */
   publicKey?: string;
   /** Codex: the one-time code to type on the device page. */
@@ -3200,6 +3269,8 @@ export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
+  /** `failed`: the viewer already has this account on that computer (named `label`). */
+  duplicate?: { label: string };
 }
 
 /** `GET …/missions/{id}/brain`: who does the work and with which model. */

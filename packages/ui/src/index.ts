@@ -191,7 +191,18 @@ export {
   type PixelSpinnerProps,
   type PixelSpinnerSize,
 } from "./components/PixelSpinner";
+export {
+  PLAN_ALMOST,
+  PlanMeter,
+  type PlanMeterText,
+  type PlanMeterUsage,
+  type PlanMeterWindow,
+  type PlanState,
+  planState,
+  planWindows,
+} from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
+export { ProviderLogo, type ProviderLogoProps } from "./components/ProviderLogo";
 export {
   modeOf,
   monthlyKindOf,

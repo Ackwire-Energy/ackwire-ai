@@ -16,18 +16,57 @@ export interface TokenPrices {
   cacheWrite: number;
 }
 
+export interface ProviderInfo {
+  label: string;
+  /** The API it speaks, which picks its adapter (`createModelProviders`). */
+  protocol: "anthropic" | "openai";
+  /** Replaces the SDK's default host. */
+  baseURL?: string;
+  /**
+   * Another company's Anthropic-compatible endpoint, sent only what it takes
+   * (`createAnthropicProvider`). `toolChoiceAny`: it honors `tool_choice: any`,
+   * so structured output can force its tool.
+   */
+  compat?: { toolChoiceAny: boolean };
+}
+
 /**
- * Model providers agentes.chat can talk to. Adding one (e.g. `openai`) is an
- * entry here, catalog rows with its prices, and an adapter implementing
- * `ModelProvider`; the database stores the provider id as text, so no
- * migration is needed.
+ * Model providers agentes.chat can talk to. Adding one is an entry here,
+ * catalog rows with its prices, and an adapter for its protocol; the database
+ * stores the provider id as text, so no migration is needed.
  */
 export const PROVIDERS = {
-  anthropic: { label: "Anthropic" },
-  openai: { label: "OpenAI" },
-} as const satisfies Record<string, { label: string }>;
+  anthropic: { label: "Anthropic", protocol: "anthropic" },
+  openai: { label: "OpenAI", protocol: "openai" },
+  deepseek: {
+    label: "DeepSeek",
+    protocol: "anthropic",
+    baseURL: "https://api.deepseek.com/anthropic",
+    compat: { toolChoiceAny: true },
+  },
+  moonshot: {
+    label: "Kimi",
+    protocol: "anthropic",
+    baseURL: "https://api.moonshot.ai/anthropic",
+    compat: { toolChoiceAny: true },
+  },
+  // Z.ai and MiniMax document only `tool_choice: auto`.
+  zai: {
+    label: "Z.ai",
+    protocol: "anthropic",
+    baseURL: "https://api.z.ai/api/anthropic",
+    compat: { toolChoiceAny: false },
+  },
+  minimax: {
+    label: "MiniMax",
+    protocol: "anthropic",
+    baseURL: "https://api.minimax.io/anthropic",
+    compat: { toolChoiceAny: false },
+  },
+} as const satisfies Record<string, ProviderInfo>;
 
 export type ProviderId = keyof typeof PROVIDERS;
+export const PROVIDER_IDS = Object.keys(PROVIDERS) as [ProviderId, ...ProviderId[]];
 
 export const isKnownProvider = (id: string): id is ProviderId => Object.hasOwn(PROVIDERS, id);
 
@@ -130,11 +169,90 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     cheap: true,
     tier: "small",
   },
+  // Anthropic-compatible providers, from each one's pricing page (2026-10-24). A cache write costs the
+  // input rate. DeepSeek stores its peak rates (off-peak is half), so budgets err high.
+  "deepseek-flash": {
+    provider: "deepseek",
+    label: "DeepSeek Flash",
+    prices: { input: 300, output: 1200, cacheRead: 6, cacheWrite: 300 },
+    contextWindow: 1_000_000,
+    serverSideFallback: false,
+    cheap: true,
+    recommended: true,
+    tier: "small",
+  },
+  "deepseek-v4-pro": {
+    provider: "deepseek",
+    label: "DeepSeek V4 Pro",
+    prices: { input: 1320, output: 3960, cacheRead: 44, cacheWrite: 1320 },
+    contextWindow: 1_000_000,
+    serverSideFallback: false,
+    tier: "large",
+  },
+  // K3.1 Pro is Kimi's strongest and cheapest; K3 (previous flagship) stays choosable, never picked by "Automático".
+  "kimi-k3.1-pro": {
+    provider: "moonshot",
+    label: "Kimi K3.1 Pro",
+    prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2000 },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    recommended: true,
+    tier: "medium",
+  },
+  "kimi-k3": {
+    provider: "moonshot",
+    label: "Kimi K3",
+    prices: { input: 3000, output: 15000, cacheRead: 300, cacheWrite: 3000 },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+  },
+  "glm-5.3": {
+    provider: "zai",
+    label: "GLM-5.3",
+    prices: { input: 1400, output: 4400, cacheRead: 260, cacheWrite: 1400 },
+    contextWindow: 1_000_000,
+    serverSideFallback: false,
+    recommended: true,
+    tier: "medium",
+  },
+  "glm-5.3-flash": {
+    provider: "zai",
+    label: "GLM-5.3 Flash",
+    prices: { input: 150, output: 500, cacheRead: 30, cacheWrite: 150 },
+    contextWindow: 1_000_000,
+    serverSideFallback: false,
+    cheap: true,
+    tier: "small",
+  },
+  "MiniMax-M3": {
+    provider: "minimax",
+    label: "MiniMax M3",
+    prices: { input: 300, output: 1200, cacheRead: 60, cacheWrite: 300 },
+    longContext: { aboveInputTokens: 512_000, prices: { input: 600, output: 2400, cacheRead: 120, cacheWrite: 600 } },
+    contextWindow: 1_000_000,
+    serverSideFallback: false,
+    recommended: true,
+    tier: "medium",
+  },
+  "MiniMax-M3.1-Flash": {
+    provider: "minimax",
+    label: "MiniMax M3.1 Flash",
+    prices: { input: 150, output: 600, cacheRead: 15, cacheWrite: 150 },
+    contextWindow: 1_000_000,
+    serverSideFallback: false,
+    cheap: true,
+    tier: "small",
+  },
 };
 
-/** The cheap model of a provider (router fallback, summaries), from the catalog. */
-export const cheapModelOf = (provider: string) =>
-  Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === provider && m.cheap)?.[0] ?? null;
+/**
+ * The model a provider's system tasks use (router fallback, summaries): its
+ * cheap one, else its recommended one (a line with no small model, like Kimi's).
+ */
+export function cheapModelOf(provider: string): string | null {
+  const own = Object.entries(MODEL_CATALOG).filter(([, m]) => m.provider === provider);
+  return (own.find(([, m]) => m.cheap) ?? own.find(([, m]) => m.recommended))?.[0] ?? null;
+}
 
 /**
  * A provider's model for a tier: that tier, else the nearest smaller one (a
