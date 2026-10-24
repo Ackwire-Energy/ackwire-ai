@@ -521,7 +521,7 @@ export const ptBR = {
       title: "Onde a gente vai trabalhar?",
       lead: "Para rodar código e mexer em arquivos, a gente precisa de um computador. Ações sensíveis continuam pedindo aprovação.",
       cloud: "Computador na nuvem",
-      cloudDesc: "Um Linux só do workspace, nada para instalar. Precisa de uma chave de API.",
+      cloudDesc: "Um computador só do workspace, nada para instalar. Precisa de uma chave de API.",
       cloudUnavailable: "Ainda não disponível neste servidor. Conecte um computador seu.",
       cloudReady: "Computador na nuvem ligado. Fica pronto quando o primeiro agente precisar.",
       mine: "Este computador ou um servidor",

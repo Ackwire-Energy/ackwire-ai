@@ -444,8 +444,10 @@ organization can also keep its files in a bucket of its own (**Settings → Stor
 <details>
 <summary><b>Optional services and what they receive</b></summary>
 
-Nothing on the instance contacts agentes.chat on its own. Besides the model providers each
-organization chooses, it talks to a third party only when you turn that service on:
+Nothing on the instance contacts agentes.chat on its own: it sends no usage report or telemetry. If
+a release ever adds one, it is listed here first, with what it sends and how to turn it off. Besides
+the model providers each organization chooses, it talks to a third party only when you turn that
+service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |

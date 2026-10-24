@@ -512,7 +512,7 @@ export const en: Translations = {
       title: "Where will we work?",
       lead: "To run code and work with files, we need a computer. Sensitive actions still ask for approval.",
       cloud: "Cloud computer",
-      cloudDesc: "A Linux machine just for the workspace, nothing to install. Needs an API key.",
+      cloudDesc: "A computer just for the workspace, nothing to install. Needs an API key.",
       cloudUnavailable: "Not available on this server yet. Connect a computer of yours.",
       cloudReady: "Cloud computer on. It gets ready when the first agent needs it.",
       mine: "This computer or a server",
