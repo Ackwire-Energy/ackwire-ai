@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { DESKTOP_PROTOCOL, STREAM_CLOSE } from "@agenteschat/adapters";
+import { DESKTOP_PROTOCOL, type RunnerAccess, type RunnerInfo, STREAM_CLOSE } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { DESKTOP_SCOPE, grantScopes } from "@agenteschat/engine";
+import { connectUrl } from "../runner/config";
+import { RunnerConnection } from "../runner/connection";
+import type { DesktopSessions } from "../runner/desktop-session";
+import { DataSockets } from "../runner/streams";
+import { type SpawnPty, Terminals } from "../runner/terminal";
 import {
   type Browser,
   browser,
@@ -14,6 +19,7 @@ import {
   type TestServer,
   upgradeStatus,
 } from "./harness";
+import { desktopOn, fakeXvnc, removeDirs, tempDir } from "./runner/helpers";
 
 let t: TestServer;
 let server: ReturnType<typeof listen>;
@@ -225,4 +231,104 @@ test("after the upgrade, refusals are close codes: a member who may not watch, a
   const elsewhere = openViewer(desktop, owner);
   await until(() => elsewhere.closed !== null, "the refusal");
   expect(elsewhere.closed).toEqual({ code: STREAM_CLOSE.unreachable, reason: "other_server" });
+});
+
+const bytesOf = (viewer: ReturnType<typeof openViewer>) =>
+  Buffer.concat(viewer.got.filter((f): f is ArrayBuffer => typeof f !== "string").map((f) => Buffer.from(f)));
+
+test("the runner's own stream code through the server: a watcher's RFB handshake to the desktop, a terminal's bytes and exit", async () => {
+  const { owner, machine, desktop, terminal } = await seeded();
+  const dir = tempDir("streams-e2e-");
+  const xvnc = await fakeXvnc(dir);
+  const shells: { written: string; sizes: [number, number][]; print(text: string): void; exit(code: number): void }[] =
+    [];
+  const spawn: SpawnPty = (_argv, opts) => {
+    let settle: (code: number | null) => void = () => undefined;
+    const exited = new Promise<number | null>((resolve) => {
+      settle = resolve;
+    });
+    const shell = {
+      written: "",
+      sizes: [] as [number, number][],
+      print: (text: string) => opts.data(Buffer.from(text)),
+      exit: (code: number) => settle(code),
+    };
+    shells.push(shell);
+    return {
+      write: (data) => {
+        shell.written += Buffer.from(data).toString();
+      },
+      resize: (cols, rows) => {
+        shell.sizes.push([cols, rows]);
+      },
+      hangup: () => settle(null),
+      kill: () => settle(null),
+      exited,
+    };
+  };
+  const http = `http://127.0.0.1:${server.port}`;
+  const runner = new RunnerConnection({
+    url: connectUrl(http),
+    token: machine.token,
+    info: RUNNER as RunnerInfo,
+    context: {
+      workspaceReal: dir,
+      exec: true,
+      token: machine.token,
+      access: () => ACCESS as RunnerAccess,
+      desktops: desktopOn(xvnc.socketPath).desktops as unknown as DesktopSessions,
+      terminals: new Terminals({
+        user: async () => ({ prefix: [], env: { PATH: "/usr/bin:/bin" }, cwd: dir }),
+        log: () => undefined,
+        spawn,
+        system: { platform: "linux", pty: true, runtime: "Bun 1.4.4" },
+      }),
+      streams: new DataSockets({ url: connectUrl(http, "stream"), token: machine.token }),
+    },
+  });
+  void runner.run();
+  try {
+    await until(() => runner.online, "the runner");
+
+    // noVNC's side: the runner offers RFB 3.8 and security None, and the desktop's ServerInit follows ClientInit.
+    const viewer = openViewer(desktop, owner);
+    const sendBytes = (bytes: Uint8Array | string) =>
+      viewer.socket.send(typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes);
+    await until(() => bytesOf(viewer).length >= 12, "the desktop's version");
+    expect(bytesOf(viewer).toString("latin1")).toBe("RFB 003.008\n");
+    sendBytes("RFB 003.008\n");
+    await until(() => bytesOf(viewer).length >= 14, "the security types");
+    sendBytes(Uint8Array.of(1));
+    await until(() => bytesOf(viewer).length >= 18, "the security result");
+    sendBytes(Uint8Array.of(0));
+    await until(() => bytesOf(viewer).length >= 18 + 27, "the ServerInit");
+    expect([...bytesOf(viewer).subarray(12, 18)]).toEqual([1, 1, 0, 0, 0, 0]);
+    expect(
+      bytesOf(viewer)
+        .subarray(18 + 24)
+        .toString(),
+    ).toBe("Dev");
+    expect(xvnc.logins[0]).toMatchObject({ password: "view", shared: 1 });
+    viewer.socket.close();
+    await until(() => xvnc.logins[0]?.socket.destroyed === true, "the desktop's connection to close");
+
+    // xterm.js's side: the shell's bytes, keys and a resize, then its exit.
+    const term = openViewer(terminal, owner);
+    await until(() => shells.length === 1, "the shell");
+    const shell = shells[0] as (typeof shells)[number];
+    shell.print("$ ");
+    await until(() => bytesOf(term).toString() === "$ ", "the prompt");
+    term.socket.send(new TextEncoder().encode("ls\r"));
+    term.socket.send(JSON.stringify({ type: "resize", cols: 132, rows: 40 }));
+    await until(() => shell.written === "ls\r" && shell.sizes.length === 1, "the keys and the resize");
+    expect(shell.sizes).toEqual([[132, 40]]);
+    shell.exit(0);
+    await until(() => term.closed !== null, "the end");
+    expect(term.got.filter((f) => typeof f === "string")).toEqual(['{"type":"exit","code":0}']);
+    expect(term.closed?.code).toBe(STREAM_CLOSE.normal);
+  } finally {
+    runner.stop();
+    xvnc.close();
+    removeDirs([dir]);
+  }
 });

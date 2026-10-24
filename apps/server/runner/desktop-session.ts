@@ -25,6 +25,7 @@ import {
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
+import { hasBunTerminal, runtimeName } from "./launch";
 import { tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
 
@@ -165,27 +166,31 @@ export interface DesktopUser {
 const id8 = (agent: AgentScope) => agentFolderName(agent).suffix.slice(1);
 
 /**
+ * Single-user mode: the whole environment of an agent's desktop or a
+ * terminal as the agent, with `home` as HOME. Of the runner's own
+ * environment, only PATH.
+ */
+export function runnerEnv(home: string): Record<string, string> {
+  const me = os.userInfo();
+  return {
+    HOME: home,
+    USER: me.username,
+    LOGNAME: me.username,
+    SHELL: me.shell || "/bin/sh",
+    PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+    LANG: "C.UTF-8",
+  };
+}
+
+/**
  * Single-user mode: the runner's own user runs the agent's desktop. Its HOME
  * is in the agent's folder (XFCE's files stay out of the agent's work); its
  * cookie and socket are in the runner's home, since a socket's path has at
  * most 107 bytes and an agent's folder can be deeper than that.
  */
 export function runnerUser(runnerHome: string, agentFolder: string, agent: AgentScope): DesktopUser {
-  const me = os.userInfo();
   const home = path.join(agentFolder, ".agentes", "home");
-  return {
-    prefix: [],
-    env: {
-      HOME: home,
-      USER: me.username,
-      LOGNAME: me.username,
-      SHELL: me.shell || "/bin/sh",
-      PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
-      LANG: "C.UTF-8",
-    },
-    home,
-    dir: path.join(runnerHome, "desktop", id8(agent)),
-  };
+  return { prefix: [], env: runnerEnv(home), home, dir: path.join(runnerHome, "desktop", id8(agent)) };
 }
 
 /** A process a desktop started. */
@@ -245,8 +250,8 @@ function spawnProcess(argv: string[], opts: DesktopSpawnOptions): DesktopProcess
 
 const hostSystem = (): DesktopSystem => ({
   platform: process.platform,
-  pty: typeof Bun !== "undefined" && "Terminal" in Bun,
-  runtime: process.versions.bun ? `Bun ${process.versions.bun}` : `Node ${process.versions.node}`,
+  pty: hasBunTerminal(),
+  runtime: runtimeName(),
   which(command, pathList) {
     const found = resolveCommand(command, pathList);
     return path.isAbsolute(found) ? found : null;

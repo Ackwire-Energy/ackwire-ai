@@ -5,9 +5,11 @@
  * or compiled to one executable for the desktop app (ADR 0036), no runtime needed:
  *   bun build --compile --target=bun-darwin-arm64 apps/server/runner/main.ts --outfile agentes-runner
  */
+import { spawnSync } from "node:child_process";
 import { mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { MACHINE_PROTOCOL_VERSION, type RunnerTools } from "@agenteschat/adapters/machine-protocol";
+import { setTimeout as sleep } from "node:timers/promises";
+import { type AgentScope, MACHINE_PROTOCOL_VERSION, type RunnerTools } from "@agenteschat/adapters/machine-protocol";
 import {
   addFolder,
   ControlError,
@@ -33,6 +35,7 @@ import {
 } from "./config";
 import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
+import { DesktopSessions, runnerUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
 import { runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
@@ -40,8 +43,12 @@ import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import { devicePair, formatUserCode, PairingError } from "./pairing";
+import { agentWorkspace } from "./paths";
+import { connectVnc, type VncConnection, vncInit } from "./rfb";
 import { installService, serviceStatus, uninstallService } from "./service";
+import type { DataListener, DataSocket } from "./streams";
 import { runTaskWrapper } from "./tasks";
+import { runnerTerminalUser, Terminals } from "./terminal";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
 
@@ -64,6 +71,10 @@ Usage:
       Folders agents may use besides their own (an agent's handle, as on the site).
   agentes-runner tools [list | enable <tool> | disable <tool>]
       Turns claude (Claude Code), codex (Codex) or commands on or off on this computer.
+  agentes-runner desktop-check --agent <handle>
+      Checks an agent's desktop and terminal here (Linux): starts its desktop, logs in to it as the
+      person in control and as a watcher (who can't move the pointer), opens a terminal as the
+      agent, then stops what it started. Stop the runner first.
   agentes-runner app --home <dir>
       The desktop app's runner (a JSON-lines protocol on stdin/stdout; not for people).
   agentes-runner mcp --task <taskId> | --run <runId>
@@ -381,6 +392,10 @@ function saveAccess(home: string, access: ReturnType<typeof effectiveAccess>) {
   updateConfig((c) => ({ ...c, access, exec: access.tools.commands }), home);
 }
 
+/** What `--agent <handle>` says when no agent by that handle uses this computer. */
+const unknownAgent = (given: string, agents: ReturnType<typeof readAgents>) =>
+  `No agent @${given.replace(/^@/, "")} uses this computer.${agents.length ? ` Known: ${agents.map((x) => `@${x.handle}`).join(", ")}` : " (The list comes from the server: start the runner once.)"}`;
+
 /** `agentes-runner folders …`: the same config the app edits (a running runner applies it at once). */
 function folders(p: Parsed): number {
   const home = runnerHome();
@@ -398,9 +413,7 @@ function folders(p: Parsed): number {
   for (const h of handles) {
     const a = resolveAgentHandle(agents, h);
     if (!a) {
-      console.error(
-        `No agent @${h.replace(/^@/, "")} uses this computer.${agents.length ? ` Known: ${agents.map((x) => `@${x.handle}`).join(", ")}` : " (The list comes from the server: start the runner once.)"}`,
-      );
+      console.error(unknownAgent(h, agents));
       return 1;
     }
     ids.push(a.id);
@@ -500,6 +513,158 @@ function tools(p: Parsed): number {
   return 1;
 }
 
+/**
+ * `agentes-runner desktop-check --agent <handle>` (ADR 0056): the agent's
+ * desktop and terminal on this computer, through the runner's own code. It
+ * holds the runner's lock: it starts and stops the agent's desktop itself.
+ */
+async function desktopCheck(p: Parsed): Promise<number> {
+  const home = runnerHome();
+  const handle = flagString(p, "agent");
+  if (!handle) {
+    console.error("Usage: agentes-runner desktop-check --agent <handle>");
+    return 1;
+  }
+  const agents = readAgents(home);
+  const agent = resolveAgentHandle(agents, handle);
+  const workspace = storedOrNull(home)?.workspace;
+  if (!agent || !workspace) {
+    console.error(unknownAgent(handle, agents));
+    return 1;
+  }
+  const lock = acquireLock(home, "desktop-check");
+  if (!lock.ok) {
+    console.error(lockedMessage(home, lock.holder));
+    return 1;
+  }
+  try {
+    const folder = await agentWorkspace(prepareWorkspace(workspace), agent);
+    const desktop = await checkDesktop(home, agent, folder);
+    const terminal = await checkTerminal(agent, folder);
+    return desktop && terminal ? 0 : 1;
+  } finally {
+    lock.release();
+  }
+}
+
+const since = (t0: number) => `${Math.round(performance.now() - t0)} ms`;
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** Its desktop starts (or runs), both logins work, and a watcher's pointer is ignored; a desktop it started stops. */
+async function checkDesktop(home: string, agent: AgentScope, folder: string): Promise<boolean> {
+  const desktops = new DesktopSessions({
+    home,
+    log: (line) => console.log(`     ${line}`),
+    user: async (a) => runnerUser(home, folder, a),
+  });
+  desktops.restore();
+  const info = desktops.info();
+  if (!info.available) {
+    console.log(`FAIL desktop: ${info.reason}`);
+    return false;
+  }
+  const opened: VncConnection[] = [];
+  let started = false;
+  try {
+    const t0 = performance.now();
+    const reply = await desktops.ensure(agent);
+    started = reply.started;
+    console.log(
+      `ok   desktop: ${started ? "started" : "running already"} on :${reply.display} (${reply.width}×${reply.height}) in ${since(t0)}`,
+    );
+    const session = desktops.session(agent.id);
+    if (!session) throw new Error("the desktop has no session");
+    const login = async (what: string, password: string) => {
+      const t = performance.now();
+      const vnc = await connectVnc(session.socket, password);
+      opened.push(vnc);
+      const init = await vncInit(vnc);
+      console.log(`ok   ${what}: logged in in ${since(t)}, ${init.width}×${init.height} "${init.name}"`);
+      return vnc;
+    };
+    const control = await login("control (the full password)", session.passwords.full);
+    const watch = await login("watch (the view-only password)", session.passwords.view);
+    // RFB PointerEvent: type 5, no buttons, x and y.
+    const point = async (vnc: VncConnection, x: number, y: number) => {
+      vnc.socket.write(Uint8Array.of(5, 0, x >> 8, x & 255, y >> 8, y & 255));
+      await sleep(300);
+      const found = spawnSync("xdotool", ["getmouselocation"], {
+        env: { ...process.env, DISPLAY: `:${session.display}`, XAUTHORITY: session.xauthority },
+        encoding: "utf8",
+      });
+      const m = /x:(\d+) y:(\d+)/.exec(found.stdout ?? "");
+      return m ? `${m[1]},${m[2]}` : null;
+    };
+    const moved = await point(control, 100, 120);
+    if (moved === null) console.log("--   view-only: not checked (install xdotool to check it)");
+    else if (moved !== "100,120") throw new Error(`the person in control moved the pointer to ${moved}, not 100,120`);
+    else {
+      const after = await point(watch, 640, 400);
+      if (after !== "100,120") throw new Error(`a watcher moved the pointer (to ${after})`);
+      console.log("ok   view-only: a watcher's pointer is ignored, the controller's moves it");
+    }
+    return true;
+  } catch (err) {
+    console.log(`FAIL desktop: ${errorText(err)}`);
+    return false;
+  } finally {
+    for (const vnc of opened) vnc.socket.destroy();
+    if (started) {
+      await desktops.stop(agent);
+      console.log("ok   desktop: stopped");
+    }
+    desktops.close();
+  }
+}
+
+/** A terminal opens as the agent's OS user in its folder, at its size, and ends with its shell. */
+async function checkTerminal(agent: AgentScope, folder: string): Promise<boolean> {
+  const terminals = new Terminals({ log: () => undefined, user: async () => runnerTerminalUser(folder) });
+  const info = terminals.info();
+  if (!info.available) {
+    console.log(`FAIL terminal: ${info.reason}`);
+    return false;
+  }
+  const decoder = new TextDecoder();
+  let output = "";
+  let firstAt = 0;
+  const peer: { on?: DataListener; closed?: () => void } = {};
+  const closed = new Promise<void>((resolve) => {
+    peer.closed = resolve;
+  });
+  // The data socket's place, here on the computer: the shell's bytes come to this check.
+  const local: DataSocket = {
+    bufferedAmount: 0,
+    send: (data) => {
+      if (typeof data === "string") return;
+      firstAt ||= performance.now();
+      output += decoder.decode(data, { stream: true });
+    },
+    close: () => peer.closed?.(),
+    listen: (on) => {
+      peer.on = on;
+    },
+  };
+  try {
+    const t0 = performance.now();
+    await terminals.open(agent, { cols: 80, rows: 24 }, async () => local);
+    // Quoted apart, so the echo of the typed line never matches.
+    peer.on?.bytes(new TextEncoder().encode('echo "CHECK""=$(id -un)=$(tput cols)=$PWD"; exit\n'));
+    await Promise.race([closed, sleep(10_000)]);
+    const m = /CHECK=([^=\r\n]+)=(\d+)=([^\r\n]*)/.exec(output);
+    if (!m) throw new Error(`no answer from the shell: ${JSON.stringify(output.slice(-300))}`);
+    console.log(
+      `ok   terminal: a shell as ${m[1]} in ${m[3]}, ${m[2]} columns, first output in ${Math.round(firstAt - t0)} ms`,
+    );
+    return true;
+  } catch (err) {
+    console.log(`FAIL terminal: ${errorText(err)}`);
+    return false;
+  } finally {
+    terminals.closeAll();
+  }
+}
+
 async function main(argv: string[]): Promise<number> {
   let p: Parsed;
   try {
@@ -533,6 +698,8 @@ async function main(argv: string[]): Promise<number> {
       return folders(p);
     case "tools":
       return tools(p);
+    case "desktop-check":
+      return desktopCheck(p);
     case "mcp": {
       // `--task <taskId>`: a mission task's or a Claude Code brain process's server.
       // `--run <runId>`: a Codex brain turn's (its token only in the env).

@@ -75,7 +75,9 @@ import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrg
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
+import { DataSockets } from "./streams";
 import { type SettledTask, TaskManager } from "./tasks";
+import { runnerTerminalUser, Terminals } from "./terminal";
 
 /**
  * The runner's long-lived core, shared by `agentes-runner start` (terminal,
@@ -205,6 +207,8 @@ interface Session {
   codexApp: CodexAppServers;
   mcp: McpBridge;
   browser: BrowserManager;
+  /** Desktop and terminal streams (ADR 0056): they end with the session. */
+  streams: DataSockets;
   connection: RunnerConnection;
 }
 
@@ -276,6 +280,8 @@ export class RunnerDaemon implements RequestObserver {
   readonly accounts: AccountManager;
   /** The agents' desktops (ADR 0056): they outlive sessions and this process. */
   readonly desktops: DesktopSessions;
+  /** Terminals people open as an agent (ADR 0056 §6). */
+  readonly terminals: Terminals;
 
   constructor(private readonly opts: DaemonOptions) {
     this.activity = new ActivityLog(opts.home);
@@ -300,12 +306,19 @@ export class RunnerDaemon implements RequestObserver {
     this.desktops = new DesktopSessions({
       home: opts.home,
       log: opts.log,
-      user: async (agent) => {
-        const workspace = this.session?.workspaceReal;
-        if (!workspace) throw new RunnerError("internal", "This runner isn't connected to a workspace");
-        return runnerUser(opts.home, await agentWorkspace(workspace, agent), agent);
-      },
+      user: async (agent) => runnerUser(opts.home, await this.agentFolder(agent), agent),
     });
+    this.terminals = new Terminals({
+      log: opts.log,
+      user: async (agent) => runnerTerminalUser(await this.agentFolder(agent)),
+    });
+  }
+
+  /** The agent's folder in the connected workspace. */
+  private async agentFolder(agent: AgentScope) {
+    const workspace = this.session?.workspaceReal;
+    if (!workspace) throw new RunnerError("internal", "This runner isn't connected to a workspace");
+    return agentWorkspace(workspace, agent);
   }
 
   get home() {
@@ -463,6 +476,7 @@ export class RunnerDaemon implements RequestObserver {
         void this.session?.browser.closeAll();
       }
       if (prevAccess.tools.desktop === true && nextAccess.tools.desktop !== true) void this.desktops.stopAll();
+      if (prevAccess.tools.terminal === true && nextAccess.tools.terminal !== true) this.terminals.closeAll();
     }
 
     if (this.session && paired) {
@@ -629,6 +643,7 @@ export class RunnerDaemon implements RequestObserver {
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
+    const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });
     const context: HandlerContext = {
       workspaceReal,
       get exec() {
@@ -649,6 +664,8 @@ export class RunnerDaemon implements RequestObserver {
       browser,
       accounts: this.accounts,
       desktops: this.desktops,
+      terminals: this.terminals,
+      streams,
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
     // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
@@ -662,6 +679,7 @@ export class RunnerDaemon implements RequestObserver {
           ...this.info(workspaceReal),
           browser: browser.info(),
           desktop: this.desktops.info(),
+          terminal: this.terminals.info(),
           ...(accounts ? { accounts } : {}),
         };
       },
@@ -688,7 +706,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
     live = connection;
-    const session: Session = { config, workspaceReal, tasks, brains, codexApp, mcp, browser, connection };
+    const session: Session = { config, workspaceReal, tasks, brains, codexApp, mcp, browser, streams, connection };
     this.session = session;
     log(
       `agentes-runner ${RUNNER_VERSION}: connecting to ${config.server} (workspace ${workspaceReal}${this.access().tools.commands ? "" : ", commands off"})`,
@@ -698,6 +716,7 @@ export class RunnerDaemon implements RequestObserver {
 
   private async closeSession(s: Session) {
     s.connection.stop();
+    s.streams.closeAll();
     s.tasks.close();
     s.brains.close();
     s.codexApp.close();

@@ -4,6 +4,8 @@ import path from "node:path";
 import {
   type AgentScope,
   type FileEntry,
+  isStreamId,
+  isTerminalSize,
   MAX_INLINE_FILE_BYTES,
   type MachineErrorCode,
   type MachineReplies,
@@ -27,8 +29,11 @@ import type { McpTaskInfo } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
+import { openDesktopStream } from "./rfb";
 import { agentSecrets, handleSecret } from "./secrets";
+import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
+import type { Terminals } from "./terminal";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
 export const MAX_LIST_ENTRIES = 5000;
@@ -109,6 +114,10 @@ export interface HandlerContext {
   accounts?: AccountManager;
   /** Protocol 18: the agents' desktops (ADR 0056); without it the runner refuses `desktop.session.*`. */
   desktops?: DesktopSessions;
+  /** Protocol 18: terminals people open as an agent; without it the runner refuses terminal streams. */
+  terminals?: Terminals;
+  /** Protocol 18: where `stream.open` dials its data socket; without it the runner refuses streams. */
+  streams?: DataSockets;
 }
 
 export interface RequestScope {
@@ -288,10 +297,14 @@ async function doList(
   return { entries };
 }
 
+/** Protocol 18: a stream that is new work (control of a desktop, a terminal); watching one that runs isn't. */
+const workStream = (req: MachineRequest) =>
+  req.op === "stream.open" && (req.kind === "terminal" || req.mode === "control");
+
 /** Runs one request; throws RunnerError (or fs errors) on failure. */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
-  if (NEW_WORK_OPS.has(req.op) && ctx.paused?.()) {
+  if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) {
     throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
   }
   if (req.op === "access.request" || req.op === "access.reduce") return handleAccess(ctx, req);
@@ -302,6 +315,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   if (req.op === "desktop.session.start" || req.op === "desktop.session.stop" || req.op === "desktop.session.status") {
     return handleDesktop(ctx, req);
   }
+  if (req.op === "stream.open") return handleStream(ctx, req, scope);
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -391,12 +405,46 @@ function handleDesktop(
   switch (req.op) {
     case "desktop.session.stop":
       return desktops.stop(req.agent);
-    case "desktop.session.status":
-      return desktops.status(req.agent);
+    case "desktop.session.status": {
+      const status = desktops.status(req.agent);
+      return { ...status, streams: status.streams + (ctx.terminals?.count(req.agent.id) ?? 0) };
+    }
     case "desktop.session.start":
       requireTool(ctx, "desktop");
       return desktops.ensure(req.agent);
   }
+}
+
+/**
+ * Protocol 18: one viewer of the agent's desktop or one terminal as the agent
+ * (ADR 0056 §11), each behind its machine switch; answered once its data
+ * socket got `stream.ready`, while the bytes go on flowing over it.
+ */
+async function handleStream(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "stream.open" }>,
+  scope: RequestScope,
+): Promise<MachineReplies["stream.open"]> {
+  const { agent, streamId } = req;
+  const streams = ctx.streams;
+  if (!agent || !isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs an agent and its id");
+  if (!streams) throw new RunnerError("bad_request", "This runner opens no streams");
+  const dial = () => streams.dial(streamId, scope.signal);
+  if (req.kind === "desktop") {
+    requireTool(ctx, "desktop");
+    if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
+    if (req.mode !== "watch" && req.mode !== "control") throw new RunnerError("bad_request", "watch or control");
+    await openDesktopStream(ctx.desktops, agent, req.mode, dial);
+  } else if (req.kind === "terminal") {
+    requireTool(ctx, "terminal");
+    if (!ctx.terminals) throw new RunnerError("terminal_unavailable", "This runner opens no terminals");
+    if (!isTerminalSize(req.cols, req.rows))
+      throw new RunnerError("bad_request", "The terminal's size is out of bounds");
+    await ctx.terminals.open(agent, { cols: req.cols, rows: req.rows }, dial);
+  } else {
+    throw new RunnerError("bad_request", "A stream shows a desktop or a terminal");
+  }
+  return { opened: true };
 }
 
 /**
@@ -716,6 +764,10 @@ function describeOp(req: MachineRequest): string {
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
       return `browser.input ${Array.isArray(req.events) ? req.events.length : 0} events`;
+    case "stream.open":
+      return req.kind === "terminal"
+        ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`
+        : `stream.open desktop (${String(req.mode)})`;
     case "access.reduce":
       return `access.reduce${req.removeFolder ? ` folder ${String(req.removeFolder.path ?? "")}` : ""}${req.disableTool ? ` tool ${String(req.disableTool)}` : ""}`;
     default:
