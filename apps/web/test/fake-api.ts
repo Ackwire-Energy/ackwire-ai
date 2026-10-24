@@ -639,6 +639,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
   const seesCost = () => state.me?.organizations[0]?.role !== "member";
+  // A new `me` with the org's logo changed, as the server answers: what the app read before stays as it was.
+  const setOrgLogo = (orgId: string, logo: string | null) => {
+    if (!state.me) return;
+    state.me = { ...state.me, organizations: state.me.organizations.map((o) => (o.id === orgId ? { ...o, logo } : o)) };
+  };
   const spentOf = (agentId: string) => (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
   const budgetOf = (a: Agent) => a.monthlyBudgetUsd ?? state.defaultAgentBudgetUsd ?? 50;
   const percentOf = (a: Agent) => Math.round((spentOf(a.id) / budgetOf(a)) * 1000) / 10;
@@ -725,15 +730,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       setLogo: async (orgId, input) => {
         log("orgs.setLogo", orgId, { contentType: input.contentType });
-        const o = state.me?.organizations.find((x) => x.id === orgId);
-        if (!o) throw new ApiError(404, "not_found", "Organization not found");
-        o.logo = `data:${input.contentType};base64,${input.imageBase64}`;
-        return { logo: o.logo };
+        if (!state.me?.organizations.some((x) => x.id === orgId)) {
+          throw new ApiError(404, "not_found", "Organization not found");
+        }
+        const logo = `data:${input.contentType};base64,${input.imageBase64}`;
+        setOrgLogo(orgId, logo);
+        return { logo };
       },
       removeLogo: async (orgId) => {
         log("orgs.removeLogo", orgId);
-        const o = state.me?.organizations.find((x) => x.id === orgId);
-        if (o) o.logo = null;
+        setOrgLogo(orgId, null);
       },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {

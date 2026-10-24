@@ -8,6 +8,7 @@
 .claude
 coverage
 docs
+deploy
 *.log
 # Backups as SELF_HOSTING.md takes them.
 *.dump

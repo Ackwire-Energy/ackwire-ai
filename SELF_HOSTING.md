@@ -398,7 +398,7 @@ ones a self-hosted instance usually touches:
 | `POSTGRES_PASSWORD` | required | Database password. Read by the compose file only. |
 | `AGENTES_IMAGE` | `ghcr.io/agentes-chat/agentes:latest` | The image to run. A version tag or a digest holds a version. |
 | `BIND_ADDRESS`, `HOST_PORT` | `127.0.0.1`, `3000` | Where the compose file publishes the app. |
-| `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services. |
+| `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore). |
 | `DOMAIN` | | The public domain Caddy gets a certificate for. |
 | `TS_AUTHKEY` | | The auth key or OAuth client secret the server joins your tailnet with, read only until it has joined. The setup empties it then. |
 | `TS_HOSTNAME` | `agentes` | The server's name in your tailnet: `https://<TS_HOSTNAME>.<tailnet>.ts.net`. After changing it, run the setup again to update `PUBLIC_URL`. |
@@ -576,6 +576,37 @@ file's `FILES_DIR`), and `AGENTES_SECRET`. Keep the secret apart from the dumps:
 without it has every stored key (model providers, connectors, mailboxes, databases) unreadable, and
 anyone who holds both can read those keys.
 
+**Every day, to a bucket.** The `backup` service dumps the database at 03:00 UTC to a bucket on
+Cloudflare R2 or another S3-compatible store, and deletes dumps older than `BACKUP_RETENTION_DAYS`
+(14 by default). Create a private bucket for the dumps alone, since they hold every message, and a
+key that can read, write and delete in it. Then add to `.env`:
+
+```sh
+S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_BACKUP_BUCKET=agentes-backups
+```
+
+Add `backup` to `COMPOSE_PROFILES` too, comma-separated: `COMPOSE_PROFILES=tailscale,backup` on
+Tailscale (the setup's default), `https,backup` with Caddy, or `backup` alone. Running the setup
+again keeps it. Run `docker compose up -d`: the first dump runs right away, unless the bucket has one
+from the last 26 hours, and `docker compose logs backup` shows each one. These `S3_*` values also
+serve file storage when `S3_BUCKET` is set, so the key then needs both buckets. Outside R2, set
+`S3_PROVIDER` to rclone's name for the store (`AWS`, `Minio`, `Other` and so on) and `S3_REGION` if it
+needs one. The service runs `ghcr.io/agentes-chat/backup`, published with each release under the
+app's tags; `AGENTES_BACKUP_IMAGE` holds a version the way `AGENTES_IMAGE` does.
+
+```sh
+docker compose run --rm backup now     # a dump right away, before a big upgrade for example
+docker compose run --rm backup list    # the dumps in the bucket
+```
+
+The dumps cover the database, files kept in Postgres included. Files in an S3 bucket stay there;
+files in the `files` volume need the commands below.
+
+**By hand**, on the server:
+
 ```sh
 (
   umask 077
@@ -586,11 +617,17 @@ anyone who holds both can read those keys.
 
 The `umask` makes both files readable by you alone: they hold every message and file. The dump is
 consistent while the app runs. Schedule both and copy the results off the server (in a crontab,
-start the line with `cd /path/to/compose/dir && umask 077;` and write `\%F`). Files kept in an S3
-bucket stay there; files kept in Postgres are in the dump.
+start the line with `cd /path/to/compose/dir && umask 077;` and write `\%F`).
 
-Restore with the app stopped, so nothing writes in between, into an emptied database: tables that a
-newer version added aren't in an older dump and would keep it from replacing the rest.
+**Restore** with the app stopped, so nothing writes in between, into an emptied database: tables that
+a newer version added aren't in an older dump and would keep it from replacing the rest. A dump in
+the bucket comes down to the server first, under a name from `list`:
+
+```sh
+(umask 077 && docker compose run --rm -T backup fetch agentes-20261020-030000.dump > agentes-2026-10-20.dump)
+```
+
+Then:
 
 ```sh
 docker compose stop agentes
@@ -607,8 +644,8 @@ docker compose start agentes
 ```
 
 On a new server: the compose file and the old `.env`, `docker compose up -d --wait postgres`, the
-restore commands above, then `docker compose up -d`. Restore into the version that took the dump or
-a newer one.
+restore commands above (with the old `.env`, `list` and `fetch` reach the bucket from there too), then
+`docker compose up -d`. Restore into the version that took the dump or a newer one.
 
 On Tailscale, the new server needs a key of its own: its login stays in the old server's
 `tailscale-state` volume. On https://console.tailscale.com/admin/machines, remove the old server

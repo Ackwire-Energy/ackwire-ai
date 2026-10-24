@@ -1,3 +1,4 @@
+import { useMe } from "@agenteschat/client";
 import { membershipIn } from "@agenteschat/client/lib/guards";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState } from "@agenteschat/ui";
@@ -31,7 +32,11 @@ export const Route = createFileRoute("/org/$orgId")({
 });
 
 function OrgLayout() {
-  const { me, membership } = Route.useRouteContext();
+  const loaded = Route.useRouteContext();
+  const { orgId } = Route.useParams();
+  // The cached person, so a new logo or workspace name shows at once, not at the next navigation.
+  const me = useMe().data ?? loaded.me;
+  const membership = membershipIn(me, orgId);
   const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).

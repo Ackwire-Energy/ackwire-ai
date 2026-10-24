@@ -97,7 +97,7 @@ Refs go stale after navigation; the tools say so (`stale_ref`) and the agent rea
 Modeled on Cloudflare's handoff:
 
 1. The agent calls `browser_ask_person("Sign in to Stripe with the shop's test account", 30 min)`. The run suspends, like `request_secret` and approvals.
-2. A card in the chat ("Dev needs you · Sign in to Stripe · Open"), at the top of "Waiting for you" in notifications, and a push to the phone. It goes to both the person who asked for the work and the agent's responsible person (once when they are the same); the first to open takes control, the other sees "Walter is helping".
+2. A card in the chat ("Dev needs you · Sign in to Stripe · Open"), at the top of "Waiting for you" in notifications, and a push to the phone. It goes to both the person who asked for the work and the agent's responsible person (once when they are the same); the first to open takes control, the other sees "Ana is helping".
 3. The person opens a full-screen live view (§7) with the agent's instructions on top, a "you're in control" badge, and two buttons: **Done** and **Couldn't**, each with an optional note. The agent reads every note; the card and the conversation's events carry only Couldn't's (the card shows it).
 4. The agent resumes with `{ result: done | failed | cancelled | expired, note? }` and the facts of the person's turn (below), reads the page again and checks the outcome (still on the login page → it says so in the chat instead of carrying on). The card resolves itself.
 

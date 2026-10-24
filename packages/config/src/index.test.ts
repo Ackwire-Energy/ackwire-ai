@@ -38,6 +38,22 @@ describe("loadConfig", () => {
     );
   });
 
+  test("agentes.chat's own site keeps its landing page and legal links without extra settings", () => {
+    const site = loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat" });
+    expect(site.LANDING_PAGE).toBe(true);
+    expect(site.TERMS_URL).toBe("https://agentes.chat/terms");
+    expect(site.PRIVACY_URL).toBe("https://agentes.chat/privacy");
+    expect(loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat", LANDING_PAGE: "false" }).LANDING_PAGE).toBe(
+      false,
+    );
+    const selfHosted = loadConfig({ ...valid, PUBLIC_URL: "https://chat.example.com" });
+    expect([selfHosted.LANDING_PAGE, selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([
+      false,
+      undefined,
+      undefined,
+    ]);
+  });
+
   test("treats empty strings as unset", () => {
     expect(loadConfig({ ...valid, PORT: "" }).PORT).toBe(3000);
   });

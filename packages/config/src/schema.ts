@@ -72,7 +72,7 @@ export const envVars = {
   LANDING_PAGE: {
     schema: z.stringbool().default(false),
     description:
-      "Show the agentes.chat marketing page, with its waiting list and analytics, to signed-out visitors at `/`. Off (default): `/` goes to sign-in.",
+      "Show the agentes.chat marketing page, with its waiting list and analytics, to signed-out visitors at `/`. Default: on when `PUBLIC_URL` is https://agentes.chat (the official site), off elsewhere (`/` goes to sign-in).",
     section: "Server",
   },
   DATABASE_URL: {
@@ -111,13 +111,14 @@ export const envVars = {
   TERMS_URL: {
     schema: z.url().optional(),
     description:
-      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too.",
+      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on https://agentes.chat: its /terms page.",
     section: "Sign-in",
     example: "https://example.com/terms",
   },
   PRIVACY_URL: {
     schema: z.url().optional(),
-    description: "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`.",
+    description:
+      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on https://agentes.chat: its /privacy page.",
     section: "Sign-in",
     example: "https://example.com/privacy",
   },
