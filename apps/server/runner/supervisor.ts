@@ -112,6 +112,8 @@ export interface SupervisorOptions {
   state: () => WorkerState;
   log: (line: string) => void;
   fetch?: FetchLike;
+  /** System mode: the loopback firewall (root), started with the supervisor. Absent in single-user and in tests. */
+  guard?: { start(): void; stop(): void };
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -188,6 +190,7 @@ export class Supervisor {
       for (const w of this.workers.values()) this.send(w, { type: "ping", at: Date.now() });
     }, WORKER_PING_MS);
     this.pinger.unref?.();
+    this.opts.guard?.start();
   }
 
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
@@ -277,6 +280,7 @@ export class Supervisor {
   async close(graceMs = 5000) {
     this.closed = true;
     if (this.pinger) clearInterval(this.pinger);
+    this.opts.guard?.stop();
     const exits: Promise<unknown>[] = [];
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);

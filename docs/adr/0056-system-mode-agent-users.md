@@ -3,7 +3,7 @@
 - Status: Accepted (2026-10-24)
 - Date: 2026-10-24
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets to agent computers), ADR 0029 (background tasks), ADR 0030 (isolation)
-- Code: `apps/server/runner/install-script.ts`, `service.ts`, `agent-users.ts`, `supervisor.ts`, `worker.ts`, `OP_ROUTES` in `handlers.ts`, `uploadUrl` in `push.ts`; `AGENT_WORKER_HOMES` in `packages/adapters/src/command-policy.ts`
+- Code: `apps/server/runner/install-script.ts`, `service.ts`, `agent-users.ts`, `supervisor.ts`, `worker.ts`, `loopback-guard.ts`, `OP_ROUTES` in `handlers.ts`, `uploadUrl` in `push.ts`; `AGENT_WORKER_HOMES` in `packages/adapters/src/command-policy.ts`
 
 ## Context
 
@@ -59,4 +59,4 @@ No worker holds the machine token. For `push`, the worker reads or zips the file
 - A worker costs tens of MB, and only agents that work have one.
 - The limits in `config.json` (tasks, brains) apply to each agent.
 - Accounts (ADR 0041) stay in root's home: in a worker, a turn that names an account fails with `account_missing` until that account's folder belongs to the agent's user.
-- Local ports without authentication of their own (Chrome's debugging port, the browser stream) are open to every local user until a loopback firewall limits each to its agent.
+- Local ports without authentication of their own (Chrome's debugging port, the browser stream) are OS-assigned and guarded on `lo` by `table inet agentes_runner`: the supervisor learns each agent's loopback listeners and their owner uid from `ss` and limits each port to its owner's uid and to root, so one agent can't reach another's. The guard needs `nftables` (and `nft_reject_inet`, or it falls back to dropping); without `nft` it is off with a warning, which is the single-user self-host where every agent is one OS user anyway.

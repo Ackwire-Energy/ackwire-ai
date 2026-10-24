@@ -45,7 +45,7 @@ import {
 } from "./access";
 import { AccountManager } from "./accounts";
 import { ActivityLog } from "./activity";
-import { AgentUsers } from "./agent-users";
+import { AgentUsers, readAgentUsers } from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -71,6 +71,7 @@ import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { redactCommon, tailLines } from "./logfile";
+import { LoopbackGuard } from "./loopback-guard";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
@@ -642,11 +643,16 @@ export class RunnerDaemon implements RequestObserver {
     let supervisor: Supervisor | null = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
+      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor.
+      const guard = this.opts.workers
+        ? undefined
+        : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
       supervisor = new Supervisor({
         home,
         user: (agent) => users.ensure(agent),
         start: launchWorker(this.self.command),
         ...this.opts.workers,
+        ...(guard ? { guard } : {}),
         token: config.token,
         server: config.server,
         send: (frame) => live?.send(frame) ?? false,
