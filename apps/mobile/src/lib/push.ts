@@ -2,9 +2,9 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { API_URL } from "@/config";
 import { authedFetch } from "./auth";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "./push-payload";
+import { serverUrl } from "./server";
 import { readValue, STORED, writeValue } from "./storage";
 
 /**
@@ -71,7 +71,7 @@ export async function registerForPush({ ask, locale }: { ask: boolean; locale: s
     .then((r) => r.data)
     .catch(() => null);
   if (!token) return false;
-  const res = await authedFetch(`${API_URL}/api/app/push/devices`, {
+  const res = await authedFetch(`${serverUrl()}/api/app/push/devices`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify(deviceBody(token, Platform.OS, locale)),
@@ -88,6 +88,9 @@ export const alreadyAskedForPush = async () => (await readValue(STORED.pushAsked
 /** Whether the person turned notifications off in the app. */
 export const pushTurnedOff = async () => (await readValue(STORED.pushOff)) === "1";
 
+/** How long signing out waits for each answer: a server that doesn't answer must not hold the phone. */
+export const SIGN_OUT_WAIT_MS = 5000;
+
 /**
  * Removes this phone's token from the server. Never throws. By default this is the person turning
  * notifications off (remembered, so the app doesn't register again on its own); sign-out passes
@@ -97,6 +100,9 @@ export async function unregisterPush({ optOut = true }: { optOut?: boolean } = {
   if (optOut) await writeValue(STORED.pushOff, "1");
   const token = await readValue(STORED.pushToken);
   if (!token) return;
-  await authedFetch(`${API_URL}${devicePath(token)}`, { method: "DELETE" }).catch(() => null);
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), SIGN_OUT_WAIT_MS);
+  await authedFetch(`${serverUrl()}${devicePath(token)}`, { method: "DELETE", signal: abort.signal }).catch(() => null);
+  clearTimeout(timer);
   await writeValue(STORED.pushToken, null);
 }

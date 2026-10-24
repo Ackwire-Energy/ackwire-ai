@@ -2,7 +2,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 /**
  * The app's Expo config. Builds run on EAS only (see README.md).
- * - `EXPO_PUBLIC_API_URL`: the backend the app talks to (default: production).
+ * - `EXPO_PUBLIC_API_URL`: the server the app talks to by default (production); people can pick their own.
  * - `EAS_PROJECT_ID`: overrides the EAS project (push tokens need it); defaults to ours on expo.dev.
  * - `APP_VARIANT`: "development" | "preview" | "production" (from eas.json), so the three install side by side.
  *
@@ -14,6 +14,8 @@ const suffix = variant === "production" ? "" : `.${variant}`;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://agentes.chat";
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
+// expo-image-picker and expo-camera both set iOS's camera text: one text for both uses.
+const CAMERA_USE = "To take pictures for your conversations and scan QR codes.";
 
 /**
  * Paths the app no longer has (the old Início and Conversas routes), sent to Conversas (`/`) so a stale link,
@@ -80,8 +82,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-image-picker",
       {
         photosPermission: "To send pictures in your conversations.",
-        cameraPermission: "To take pictures and send them in your conversations.",
+        cameraPermission: CAMERA_USE,
       },
+    ],
+    [
+      // Escanear QR code (Seu servidor): QR codes only, so no microphone.
+      "expo-camera",
+      { cameraPermission: CAMERA_USE, microphonePermission: false, recordAudioAndroid: false },
     ],
     [
       // Salvar em Fotos: add-only access (the read text matches expo-image-picker's).

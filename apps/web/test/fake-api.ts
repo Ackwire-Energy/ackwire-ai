@@ -63,6 +63,8 @@ export interface FakeState {
   me: Me | null;
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
   authConfig?: Partial<AuthConfig>;
+  /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
+  phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
@@ -669,6 +671,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
+      },
+      phoneSignIn: async () => {
+        log("account.phoneSignIn");
+        return {
+          token: `tok-${state.calls.filter((c) => c.method === "account.phoneSignIn").length}`,
+          server: state.phoneServer ?? "https://agentes.chat",
+          expiresIn: 180,
+        };
       },
     },
     orgs: {

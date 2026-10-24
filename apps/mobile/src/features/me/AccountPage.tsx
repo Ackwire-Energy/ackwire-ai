@@ -88,7 +88,7 @@ export function AccountPage({
     setError(null);
     try {
       if (changes.name) {
-        const res = await authClient.updateUser({ name: changes.name });
+        const res = await authClient().updateUser({ name: changes.name });
         if (res.error) throw new Error(res.error.message ?? "");
       }
       if (changes.profile) await api.orgs.updateMe(org.orgId, changes.profile);

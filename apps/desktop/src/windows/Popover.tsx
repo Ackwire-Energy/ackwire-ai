@@ -20,11 +20,11 @@ import {
 import { DOCK_PREF } from "../control/dock";
 import { NOTCH_PREF } from "../control/notch";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
+import { openSiteLabel, siteOf } from "../control/server";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
 import { answerThisMac, type PrefsTab } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
-import { SITE_URL } from "../control/version";
-import { agentOf, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import { agentOf, chosenServer, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
 import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
@@ -58,6 +58,7 @@ export function Popover() {
   const refused = homes.find(isRefusedHome);
   const outdated = homes.some((h) => h.status?.connection === "outdated");
   const machine = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? t("desktop.tray.label");
+  const site = siteOf(homes, chosenServer());
 
   // The tray icon follows the aggregate state.
   const tray = trayStateOf(homes, update.state.available || update.state.required || outdated);
@@ -167,7 +168,7 @@ export function Popover() {
   );
 
   const openSite = () => {
-    void host.openExternal(SITE_URL).catch(() => {});
+    void host.openExternal(site).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
   const openPrefs = (tab?: string) => {
@@ -449,7 +450,7 @@ export function Popover() {
               </>
             }
           >
-            {t("desktop.tray.openSite")}
+            {openSiteLabel(site, t)}
           </MenuRow>
           <MenuRow
             icon="settings"
@@ -564,7 +565,7 @@ function BrowserRow({ home, browser }: { home: Home; browser: ControlBrowser }) 
   const color = normalizeAppearance(agent.look).color;
   const state = browserRowState(browser);
   const open = (path?: string) => {
-    void host.openExternal(siteLink(home.status?.server, path, SITE_URL)).catch(() => {});
+    void host.openExternal(siteLink(home.status?.server, path, siteOf([home], chosenServer()))).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
   const stop = async () => {

@@ -57,7 +57,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://agentes.chat; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'",
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https:; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'",
       "devCsp": null
     }
   },

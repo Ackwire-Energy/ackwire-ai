@@ -75,6 +75,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
+import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, SidebarOrgSky } from "./Sky";
@@ -757,7 +758,8 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button; under the name, the workspace's budget use this month
  * (a percentage, never money). It opens the account's full-screen menu:
- * profile, time zone, theme, language, the budget and signing out.
+ * profile, time zone, opening the phone app, theme, language, the budget and
+ * signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -771,6 +773,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
+  const [phone, setPhone] = useState(false);
   const mine = dir.memberById.get(me.user.id);
   const photo = mine?.image ?? me.user.image;
   const zone = mine?.timezone || browserTimezone() || "UTC";
@@ -833,6 +836,14 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
           >
             {t("shell.timezone")}
           </MenuOverlayItem>
+          <MenuOverlayItem
+            icon="phone"
+            shortcut="3"
+            description={t("shell.openOnPhoneHint")}
+            onSelect={pick(() => setPhone(true))}
+          >
+            {t("shell.openOnPhone")}
+          </MenuOverlayItem>
           <MenuOverlayRow icon="bulb" label={t("shell.theme")}>
             <Segmented
               size="sm"
@@ -873,7 +884,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             (can(org.role, "view_usage") ? (
               <MenuOverlayItem
                 icon="wallet"
-                shortcut="3"
+                shortcut="4"
                 description={t("shell.thisMonth")}
                 hint={<BudgetBar percent={budgetUsed} />}
                 onSelect={pick(
@@ -903,6 +914,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         </MenuOverlayGroup>
       </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
+      <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
     </>
   );
 }

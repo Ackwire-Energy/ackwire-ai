@@ -7,9 +7,9 @@
  * person reading it in the browser; the machine's token stays with the runner.
  */
 
+import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
 import { ControlError } from "./client";
 import { type DesktopStore, type Home, isPairedHome, isRefusedHome, pairedHomes } from "./store";
-import { SITE_URL } from "./version";
 
 export type ThisMacRequest =
   | { kind: "status" }
@@ -100,7 +100,7 @@ async function connect({ store, codeTimeoutMs = 20_000 }: ThisMacDeps, orgId: st
   });
   void whenPaired(store, homeId);
   try {
-    await store.request(homeId, { type: "pair.start", server: SITE_URL });
+    await store.request(homeId, { type: "pair.start", server: CLOUD_SERVER });
   } catch (err) {
     if (err instanceof ControlError && err.code === "already_paired") return { userCode: null };
     throw err;

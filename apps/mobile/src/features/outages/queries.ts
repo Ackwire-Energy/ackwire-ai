@@ -1,10 +1,10 @@
-import { createRequester, enc, keys } from "@agenteschat/client";
+import { createRequester, enc, keys, type RequestOptions } from "@agenteschat/client";
 import type { MoveTarget } from "@agenteschat/client/lib/machine-outages";
 import { visibleOutages } from "@agenteschat/client/lib/machine-outages";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { API_URL } from "@/config";
 import { appHeaders, readCookie } from "@/lib/auth";
+import { serverUrl } from "@/lib/server";
 import { useOrgId } from "../shared/hooks";
 import { type MachineOutages, type MoveAgentsResult, OUTAGES_POLL_MS } from "./logic";
 
@@ -14,7 +14,8 @@ import { type MachineOutages, type MoveAgentsResult, OUTAGES_POLL_MS } from "./l
  * re-exports (same query key, so nothing else changes).
  */
 
-const request = createRequester({ baseUrl: API_URL, headers: async () => appHeaders(await readCookie()) });
+const request = <T>(path: string, options?: RequestOptions) =>
+  createRequester({ baseUrl: serverUrl(), headers: async () => appHeaders(await readCookie()) })<T>(path, options);
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 
 /** Under `keys.machines(orgId)`, so whatever refreshes the computers refreshes this too. */

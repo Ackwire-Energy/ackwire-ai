@@ -104,6 +104,7 @@ export function createFakeHost(initial: WindowName, scenario: "first" | "default
     openExternal: async (url) => {
       console.info("[fake] open in the browser:", url);
     },
+    setServer: async () => {},
     revealFolder: async (path) => {
       console.info("[fake] show in Finder:", path);
     },

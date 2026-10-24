@@ -5,8 +5,8 @@ import * as MediaLibrary from "expo-media-library";
 import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
-import { API_URL } from "@/config";
 import { appHeaders, readCookie } from "@/lib/auth";
+import { serverUrl } from "@/lib/server";
 import { resolveDownloadUrl, type ShareSource, safeFileName, shareSource } from "./logic";
 
 /**
@@ -24,7 +24,7 @@ export interface RemoteFile {
 
 async function remote(api: ApiClient, orgId: string, id: string, version?: number): Promise<RemoteFile> {
   const { url } = await api.artifacts.download(orgId, id, version);
-  const r = resolveDownloadUrl(API_URL, url);
+  const r = resolveDownloadUrl(serverUrl(), url);
   return { uri: r.uri, headers: r.needsSession ? appHeaders(await readCookie()) : {} };
 }
 

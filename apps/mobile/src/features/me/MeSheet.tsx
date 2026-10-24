@@ -5,11 +5,11 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import Animated, { SlideInLeft, SlideInRight } from "react-native-reanimated";
-import { API_URL } from "@/config";
 import { signOut } from "@/features/account";
 import { appHeaders, lastCookie } from "@/lib/auth";
 import { photoSource } from "@/lib/photo";
 import { pushPermission, registerForPush, unregisterPush } from "@/lib/push";
+import { serverUrl } from "@/lib/server";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import {
@@ -326,7 +326,7 @@ function AccountCard({
 /** A workspace: its logo, or its initial on a neutral tile. */
 function OrgTile({ name, logo }: { name: string; logo?: string | null | undefined }) {
   const c = useColors();
-  const source = photoSource(logo, API_URL, appHeaders(lastCookie()));
+  const source = photoSource(logo, serverUrl(), appHeaders(lastCookie()));
   if (source) return <Image source={source} style={styles.org} accessibilityIgnoresInvertColors />;
   return (
     <View style={[styles.org, { backgroundColor: c.ink2 }]}>

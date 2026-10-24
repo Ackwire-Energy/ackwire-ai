@@ -5711,6 +5711,29 @@ button.live-call__head:hover {
   margin: 0;
   font-weight: 600;
 }
+/* Abrir no celular: the QR code stays dark on white in both themes (cameras read that best), then the steps. */
+.phone-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.phone-code__qr {
+  width: 216px;
+  height: 216px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.phone-code__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.phone-code .machine-pair__steps {
+  align-self: stretch;
+}
 a.machine-row__name:hover {
   text-decoration: underline;
   text-underline-offset: 2px;

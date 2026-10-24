@@ -3,6 +3,7 @@ import { readDeleteResponse } from "../src/features/account/result";
 import { chooseOrg } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
+import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
 import { createSocketFactory } from "../src/lib/socket";
 import { ICON_NAMES } from "../src/ui/icons.data";
 
@@ -124,5 +125,66 @@ describe("person photo", () => {
     expect(photoSource("  ", base, headers)).toBeNull();
     expect(photoSource("//evil.example/x.png", base, headers)).toBeNull();
     expect(photoSource("javascript:alert(1)", base, headers)).toBeNull();
+  });
+});
+
+describe("choosing a server", () => {
+  const cloud = "https://agentes.chat";
+  const box = "https://box.tail1234.ts.net";
+
+  test("the one chosen, else the build's; nothing kept for the build's own", () => {
+    expect(currentServer(null, cloud)).toBe(cloud);
+    expect(currentServer(box, cloud)).toBe(box);
+    expect(currentServer("not a server", cloud)).toBe(cloud);
+    expect(savedServer(box, cloud)).toBe(box);
+    expect(savedServer(cloud, cloud)).toBeNull();
+  });
+
+  test("another server is left first: signing out, or only forgetting the cookie when nobody is in", () => {
+    expect(connectPlan(cloud, true, { server: box })).toEqual({
+      move: true,
+      signOut: true,
+      forget: false,
+      token: null,
+    });
+    expect(connectPlan(cloud, false, { server: box })).toEqual({
+      move: true,
+      signOut: false,
+      forget: true,
+      token: null,
+    });
+    expect(connectPlan(cloud, false, { server: box, token: "t" })).toEqual({
+      move: true,
+      signOut: false,
+      forget: true,
+      token: "t",
+    });
+    expect(connectPlan(cloud, true, { server: box, token: "t" })).toEqual({
+      move: true,
+      signOut: true,
+      forget: false,
+      token: "t",
+    });
+  });
+
+  test("a token on the same server replaces whoever is in", () => {
+    expect(connectPlan(box, true, { server: box, token: "t" })).toEqual({
+      move: false,
+      signOut: true,
+      forget: false,
+      token: "t",
+    });
+    expect(connectPlan(box, false, { server: box, token: "t" })).toEqual({
+      move: false,
+      signOut: false,
+      forget: false,
+      token: "t",
+    });
+    expect(connectPlan(box, true, { server: box })).toEqual({
+      move: false,
+      signOut: false,
+      forget: false,
+      token: null,
+    });
   });
 });

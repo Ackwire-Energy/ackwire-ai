@@ -2,8 +2,8 @@ import { type ConnectionStatus, RealtimeConnection, realtimeUrl } from "@agentes
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { AppState } from "react-native";
-import { API_URL } from "@/config";
 import { lastCookie, readCookie } from "@/lib/auth";
+import { serverUrl } from "@/lib/server";
 import { createSocketFactory } from "@/lib/socket";
 import { useOrgMaybe } from "./org";
 
@@ -43,7 +43,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     void readCookie().then(() => {
       if (stopped) return;
       const c = new RealtimeConnection({
-        url: realtimeUrl(API_URL, orgId),
+        url: realtimeUrl(serverUrl(), orgId),
         createSocket: createSocketFactory(lastCookie),
       });
       connection = c;
