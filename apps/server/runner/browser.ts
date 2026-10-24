@@ -894,6 +894,9 @@ export class BrowserManager {
   /** The Chrome for Testing executable every session launches. */
   private chromePath: string | null = null;
   private ready: Promise<string> | null = null;
+  private chromeInstall: Promise<void> | null = null;
+  /** Each agent's session while it opens: commands that come meanwhile get the same one (one queue, one Chrome). */
+  private readonly opening = new Map<string, Promise<Session>>();
   private failure: { reason: string; at: number } | null = null;
   private closed = false;
   /** Every `closeAll` still running; a new session starts only after them. */
@@ -1021,8 +1024,19 @@ export class BrowserManager {
     await rename(tmp, file);
   }
 
-  /** Chrome for Testing to drive: found, or installed once (`agent-browser install`). */
-  private async ensureChrome(command: string[]) {
+  /**
+   * Chrome for Testing to drive: found, or installed once (`agent-browser install`). Commands that find none at
+   * the same time share one install: two would write the same folder, and one would start `chrome` while the
+   * other still writes it (ETXTBSY).
+   */
+  private ensureChrome(command: string[]): Promise<void> {
+    this.chromeInstall ??= this.findOrInstallChrome(command).finally(() => {
+      this.chromeInstall = null;
+    });
+    return this.chromeInstall;
+  }
+
+  private async findOrInstallChrome(command: string[]) {
     const find = this.opts.chrome ?? (() => findChrome(this.userHome));
     this.chromePath = find();
     if (this.chromePath) return;
@@ -1300,6 +1314,15 @@ export class BrowserManager {
       existing.lastUsed = this.now();
       return existing;
     }
+    let opening = this.opening.get(agentId);
+    if (!opening) {
+      opening = this.openSession(agentId, agent, folder).finally(() => this.opening.delete(agentId));
+      this.opening.set(agentId, opening);
+    }
+    return opening;
+  }
+
+  private async openSession(agentId: string, agent: AgentScope, folder: string): Promise<Session> {
     const live = [...this.sessions.values()].filter((s) => this.now() - s.lastUsed < this.idleMs);
     if (live.length >= this.maxSessions) {
       throw new RunnerError(
