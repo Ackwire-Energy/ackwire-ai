@@ -16,6 +16,7 @@ import type {
   AgentDetail,
   AgentForYou,
   AgentMailbox,
+  AgentPlanUsage,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -97,6 +98,7 @@ import type {
   NotificationPage,
   Organization,
   OrgOverview,
+  OrgPlanUsage,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -353,9 +355,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       resendInvitation: (orgId, id) =>
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
+      planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
+      planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
       update: (orgId, agentId, input) =>

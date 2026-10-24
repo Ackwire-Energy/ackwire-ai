@@ -232,6 +232,13 @@ export const usageRecords = pgTable(
      * keep platform-billed rows apart.
      */
     billedTo: text().notNull().default("org"),
+    /**
+     * A plan row's computer and the account it spent (`machine_accounts.id`; null with a computer: that
+     * computer's own sign-in). Null on API rows, and on plan rows from before accounts were recorded.
+     * No foreign keys: the history outlives a removed account or computer.
+     */
+    machineId: uuid(),
+    brainAccountId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

@@ -7202,23 +7202,6 @@ a.machine-row__name:hover {
   }
 }
 
-/* Settings → Usage: one agent's spend against its budget (admins only). */
-.usage-agent__meter {
-  flex: 0 0 160px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.usage-agent__meter .ac-meter {
-  flex: 1;
-  height: 6px;
-}
-@media (max-width: 640px) {
-  .usage-agent__meter {
-    flex-basis: 96px;
-  }
-}
-
 /* Secrets (ADR 0027): the card's private field and the agent page's list. */
 .secret-card__form {
   display: grid;

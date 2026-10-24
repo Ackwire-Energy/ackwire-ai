@@ -4089,3 +4089,98 @@ export interface DesktopStatus {
   canStart: boolean;
   terminal: { available: boolean; reason: string | null; allowed: boolean };
 }
+
+/** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */
+export interface PlanWindowParts extends PlanWindow {
+  /**
+   * The window's percent × each agent's API-priced share of the account's use since it started, biggest
+   * first; null for a window of unknown length (no estimate).
+   */
+  agents: { agentId: string; name: string; percent: number }[] | null;
+}
+
+/** A plan account as the usage views name it. */
+export interface PlanAccountInfo {
+  /** `machineId:kind:accountId`, or `…:computer` for the computer's own sign-in. */
+  key: string;
+  machineId: string;
+  machineName: string;
+  kind: MachineAccountKind;
+  /** Null: the computer's own sign-in ("Conta deste computador"). */
+  accountId: string | null;
+  label: string | null;
+  plan: string | null;
+  /** A key account's coding plan (`zai`, `kimi`…). */
+  provider: string | null;
+  /** Its owner, or the person who connected the computer for its own sign-in. */
+  ownerName: string | null;
+  /** The viewer owns it. */
+  mine: boolean;
+  /** Only for its owner. */
+  email: string | null;
+  signedOut: boolean;
+}
+
+export interface PlanAccountUsage extends PlanAccountInfo {
+  /** Its windows as last reported, each with the agents' parts; null: not known yet. */
+  usage: (Omit<PlanUsage, "windows"> & { windows: PlanWindowParts[] }) | null;
+  /** This month per agent; `now`: it thinks with this account today. */
+  agents: { agentId: string; name: string; tokens: number; now: boolean }[];
+  monthTokens: number;
+  /** `view_usage` only: what the month's tokens would cost through the API (null: no price). */
+  equivalentUsd?: number | null;
+}
+
+/** `GET …/usage/plans`: every plan account by computer, and the API per agent this month. */
+export interface OrgPlanUsage {
+  /** `YYYY-MM`. */
+  month: string;
+  /** The viewer sees money. */
+  money: boolean;
+  accounts: PlanAccountUsage[];
+  api: {
+    agentId: string;
+    name: string;
+    tokens: number;
+    budgetPercent: number;
+    costUsd?: number;
+    budgetUsd?: number;
+    budgetIsDefault?: boolean;
+  }[];
+}
+
+export interface AgentUsageSource {
+  /** An account's key, `plan:<kind>` (before accounts were recorded) or `api`. */
+  key: string;
+  type: "plan" | "api";
+  kind: MachineAccountKind | null;
+  /** Null: the API, a removed account, or plan usage from before accounts were recorded. */
+  account: PlanAccountInfo | null;
+  /** A plan account that is no longer there. */
+  removed: boolean;
+  tokens: number;
+  /** Share of the agent's month, 0–100. */
+  share: number;
+  /** `YYYY-MM-DD`. */
+  lastDay: string | null;
+  /** The account it thinks with now. */
+  now: boolean;
+  /** Plan: what it would cost through the API (money only). */
+  equivalentUsd?: number | null;
+  /** API: what it cost (money only). */
+  costUsd?: number;
+  /** API: this month's spend over the agent's budget. */
+  budgetPercent?: number;
+}
+
+/** `GET …/agents/{id}/usage`: an agent's month by account and day, and the account it thinks with now. */
+export interface AgentPlanUsage {
+  month: string;
+  money: boolean;
+  tokens: number;
+  equivalentUsd?: number | null;
+  sources: AgentUsageSource[];
+  /** Every day of the month so far: tokens per source key. */
+  days: { date: string; tokens: Record<string, number> }[];
+  current: PlanAccountUsage | null;
+}

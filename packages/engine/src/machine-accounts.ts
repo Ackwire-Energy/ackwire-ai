@@ -67,7 +67,7 @@ export type MachineAccountRow = typeof machineAccounts.$inferSelect;
 export type MachineAccountStatus = "active" | "signed_out";
 
 /** Rows that are accounts: not a sign-in still in progress, not a tombstone. */
-const LISTED = ["active", "signed_out"];
+export const LISTED_ACCOUNT_STATUSES = ["active", "signed_out"];
 
 export interface MachineAccountView {
   id: string;
@@ -140,7 +140,7 @@ async function takenLabels(db: Executor, orgId: string, ownerId: string | null, 
       and(
         eq(machineAccounts.orgId, orgId),
         ownerId ? eq(machineAccounts.createdBy, ownerId) : isNull(machineAccounts.createdBy),
-        inArray(machineAccounts.status, LISTED),
+        inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
         ne(machineAccounts.id, exceptId),
       ),
     );
@@ -201,7 +201,7 @@ export async function listMachineAccounts(
       and(
         eq(machineAccounts.orgId, orgId),
         eq(machineAccounts.machineId, machineId),
-        inArray(machineAccounts.status, LISTED),
+        inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
       ),
     )
     .orderBy(machineAccounts.createdAt, machineAccounts.id);
@@ -343,7 +343,7 @@ async function duplicateOf(
         eq(machineAccounts.kind, row.kind),
         row.createdBy ? eq(machineAccounts.createdBy, row.createdBy) : isNull(machineAccounts.createdBy),
         row.provider ? eq(machineAccounts.provider, row.provider) : isNull(machineAccounts.provider),
-        inArray(machineAccounts.status, LISTED),
+        inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
         match,
       ),
     )
@@ -489,7 +489,7 @@ export async function syncMachineAccounts(
               inArray(machineAccounts.id, ids),
             ),
           );
-        changed ||= gone.some((r) => LISTED.includes(r.status));
+        changed ||= gone.some((r) => LISTED_ACCOUNT_STATUSES.includes(r.status));
       }
     }
     for (const a of reported.values()) {
@@ -607,7 +607,7 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
       and(
         eq(machineAccounts.orgId, orgId),
         eq(machineAccounts.createdBy, userId),
-        inArray(machineAccounts.status, LISTED),
+        inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
       ),
     );
   const paired = await deps.db
@@ -653,7 +653,7 @@ export async function getMachineAccount(db: Executor, orgId: string, machineId: 
 /** An account on that machine (not a sign-in in progress, not one being removed). */
 export async function getListedAccount(db: Executor, orgId: string, machineId: string, accountId: string) {
   const row = await getMachineAccount(db, orgId, machineId, accountId);
-  return row && LISTED.includes(row.status) ? row : null;
+  return row && LISTED_ACCOUNT_STATUSES.includes(row.status) ? row : null;
 }
 
 // ── Who may ─────────────────────────────────────────────────────────────────
@@ -936,7 +936,7 @@ export async function accountLoginStatus(
       duplicate: { label: settled.duplicate.label },
     };
   }
-  if (!settled.row || !LISTED.includes(settled.row.status)) {
+  if (!settled.row || !LISTED_ACCOUNT_STATUSES.includes(settled.row.status)) {
     return { state: "failed", error: "The account was removed from this computer." };
   }
   if (settled.changed) await publishAccountsChanged(deps.pubsub, orgId, machine.id);

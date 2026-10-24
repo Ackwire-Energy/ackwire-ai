@@ -79,6 +79,7 @@ import { useVisibleChannels } from "./agent/pieces";
 import { RepoDialog } from "./agent/Repos";
 import { SaveBar } from "./agent/SaveBar";
 import { SettingsTab } from "./agent/SettingsTab";
+import { UsageTab } from "./agent/UsageTab";
 import { type WorkDialog, WorkDialogs } from "./agent/Work";
 
 const fullLook = (a: AgentAppearance | undefined): Look => ({
@@ -651,6 +652,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
                 {tab === "access" && <AccessTab />}
                 {tab === "memory" && <MemoryTab />}
                 {tab === "files" && <FilesTab />}
+                {tab === "usage" && <UsageTab />}
                 {tab === "activity" && <ActivityTab />}
                 {tab === "settings" && (
                   <SettingsTab

@@ -149,19 +149,23 @@ export function Meter({
   max,
   label,
   marks,
+  part,
 }: {
   value: number;
   max: number;
   label: string;
   /** Ticks on the track, in percent (e.g. 80 for "aviso em 80%"). */
   marks?: number[];
+  /** A part of `value` in full ink, the rest of the bar lighter (one agent's share of a plan's use). */
+  part?: number;
 }) {
   const exact = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const pct = Math.round(exact);
+  const partPct = part !== undefined && max > 0 ? Math.min(pct, Math.round((part / max) * 100)) : null;
   return (
     // biome-ignore lint/a11y/useSemanticElements: the native <meter> has a native look we never show
     <div
-      className="ac-meter"
+      className={cx("ac-meter", partPct !== null && "ac-meter--parts")}
       role="meter"
       aria-label={label}
       aria-valuemin={0}
@@ -170,6 +174,9 @@ export function Meter({
     >
       {/* Anything above zero keeps a visible sliver, so 0.9% doesn't read as empty. */}
       <div className="ac-meter__bar" style={exact > 0 ? { width: `${pct}%`, minWidth: 6 } : { width: 0 }} />
+      {partPct !== null && part !== undefined && part > 0 && (
+        <div className="ac-meter__part" style={{ width: `${partPct}%`, minWidth: 6 }} />
+      )}
       {marks?.map((m) => (
         <span key={m} className="ac-meter__mark" style={{ left: `${m}%` }} aria-hidden="true" />
       ))}
