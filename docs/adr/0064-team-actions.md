@@ -119,6 +119,7 @@ Each held call is a row in `team_action_checks` (`org_id`, `run_id`, `agent_id`,
 
 - **In the chat ("B · Explica" in the prototype).** When the run posts its reply, its `held` checks not yet on a message go into the reply's `meta.teamChecks` (agent and channel names resolved then) and get its `message_id`. Under the message, each is a row in the receipts' style: "Não repeti: Theo já tinha feito isso com … há 2 h", the summary and the channel, and "Ver", which opens the conversation where it happened. The sentence is the app's (pt-BR and en), never the model's. A check the agent went past (`repeated`) shows nothing: it did act.
 - **In search.** "Buscar no workspace" gets a "Team actions" tab and group ("Ações do time"), shown above messages and context. Each row shows the summary, who did it, where and when. Agents find the same with `search_context` (kind `action`).
+- **On the phone app.** The same row under the reply (`features/chat/TeamChecks.tsx`) and an "Ações do time" group and chip in Busca. The switch stays on the web, with the other workspace settings.
 - **Settings.** The workspace settings get one switch, "Agents check what the team already did before acting" ("Agentes conferem o que o time já fez antes de agir"). It is on for every workspace (new ones and existing ones) and only admins change it.
   - Off means no checks and no notices.
   - Actions are still recorded and searchable, so turning it back on works right away.
@@ -137,7 +138,6 @@ Each held call is a row in `team_action_checks` (`org_id`, `run_id`, `agent_id`,
 - The approval card showing the earlier action, for an action that becomes a card after the notice.
 - **"C · Pergunta" for actions that can't be undone:** an email to a customer, a refund, a public post. The agent asks the person instead of deciding alone.
 - **Claims:** "I'm on X until Friday", a hold an agent takes before acting.
-- ⌘K "Team actions" on the phone app.
 - A setting for the 30-day window, and retention rules for `team_actions`.
 
 ## What we looked at
