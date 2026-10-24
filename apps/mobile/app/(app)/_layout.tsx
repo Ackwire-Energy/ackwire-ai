@@ -51,6 +51,11 @@ function AppStack() {
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={formSheet} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen
+        name="connectors/oauth"
+        options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}
+      />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="me" options={meSheet} />

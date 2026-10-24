@@ -64,7 +64,10 @@ export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, c
 
   if (!effect)
     return (
-      <View style={[{ backgroundColor: clear ? "transparent" : (tones[0] ?? "transparent") }, style]} onLayout={onLayout} />
+      <View
+        style={[{ backgroundColor: clear ? "transparent" : (tones[0] ?? "transparent") }, style]}
+        onLayout={onLayout}
+      />
     );
   return (
     <View

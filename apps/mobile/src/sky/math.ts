@@ -119,7 +119,8 @@ export const pillField: Field = (u, v, t) => {
 export const pillWorkField: Field = (u, v, t) => {
   const p = mod(t * 0.42, 1.6) - 0.3;
   const d = u - p;
-  return Math.min(0.75, 0.32 * u * u * u + 0.5 * Math.exp(-(d * d) / 0.02) * (0.5 + 0.5 * u)) + 0.04 * Math.sin(v * 6 + t);
+  const band = 0.32 * u * u * u + 0.5 * Math.exp(-(d * d) / 0.02) * (0.5 + 0.5 * u);
+  return Math.min(0.75, band) + 0.04 * Math.sin(v * 6 + t);
 };
 
 /** The grid of a drawing `width`×`height` (points) at `pixel` points per cell (Mobile.html `drawDithers`). */

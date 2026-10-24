@@ -228,6 +228,12 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
               chevron
               onPress={() => closeThenPush(onClose, "/drive")}
             />
+            <GroupedRow
+              icon="bolt"
+              label={t("mobile.me.connectors")}
+              chevron
+              onPress={() => closeThenPush(onClose, "/connectors")}
+            />
           </GroupedList>
           <GroupedHeader>{t("mobile.me.preferences")}</GroupedHeader>
           <GroupedList>
