@@ -27,6 +27,7 @@ import {
   renderPush,
   requireComputerDriver,
   type StreamBroker,
+  setOrgStanding,
   startDesktop,
   startTakeover,
   stopDesktop,
@@ -235,6 +236,20 @@ describe("one person in control of the desktop", () => {
       controllerUserId: bia.id,
     });
     await expect(requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("a suspended workspace: its views and terminals close at the next check and none opens; on hold they don't", async () => {
+    const { open } = await start({ recheckMs: 30 });
+    const watching = await open(f.owner.id, WATCH);
+    const shell = await open(f.owner.id, TERMINAL);
+    expect([watching.closed, shell.closed]).toEqual([null, null]);
+    await setOrgStanding(deps(), f.org.id, { state: "suspended", reason: null, notice: "silent" });
+    await until(() => watching.closed !== null && shell.closed !== null, "the recheck");
+    expect([watching.closed?.code, shell.closed?.code]).toEqual([STREAM_CLOSE.forbidden, STREAM_CLOSE.forbidden]);
+    expect((await open(f.owner.id, WATCH)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    // On hold only the agents stop: people still watch what runs.
+    await setOrgStanding(deps(), f.org.id, { state: "hold", reason: null, notice: "silent" });
+    expect((await open(f.owner.id, WATCH)).closed).toBeNull();
   });
 
   test("access is checked again while a stream is open; the controller's stream keeps their control alive", async () => {

@@ -68,7 +68,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
   - The server applies the rule from the mode the runner reports in `hello` (`mode: "system"`); a runner that reports none is single-user. In single-user mode the agents' own code runs as the runner's user and could send any `hello`, so system mode is believed only from a computer's first `hello` after pairing, and from one that has said so ever since.
 - `desktop_ask_person` asks only people who pass that rule: the agent's owner when they do, else everyone who does (the person who paired the computer; the admins in system mode). When nobody does, the tool says so to the agent.
 - "Ligar" and "Desligar" (start and stop the desktop): admins, the agent's owner and whoever passes the control rule.
-- Access is checked again every 30 s on open streams; an open control stream also keeps its holder's control alive, and when it closes the 2 minutes of grace start.
+- Access is checked again every 30 s on open streams; an open control stream also keeps its holder's control alive, and when it closes the 2 minutes of grace start. In a suspended workspace (ADR 0056 §8) nobody has a stream, as every permission check refuses there; on hold, people still watch, while taking control and opening a terminal are new work, refused like the agents' own.
 - In control or in the terminal a person can do whatever that OS user can do: that is the point, and why the rule is narrow. X11 has no input isolation: while a person is in control, any process of that user with the cookie (the agent's tasks, a brain's shell) can read the screen and the keys. The take-control text says so.
 
 ### 5. Control is a handoff on the `desktop` screen
