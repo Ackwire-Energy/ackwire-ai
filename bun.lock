@@ -148,10 +148,6 @@
         "vite": "^8.3.0",
       },
     },
-    "ee": {
-      "name": "@agenteschat/ee",
-      "version": "0.0.0",
-    },
     "packages/adapters": {
       "name": "@agenteschat/adapters",
       "version": "0.0.0",
@@ -278,8 +274,6 @@
     "@agenteschat/db": ["@agenteschat/db@workspace:packages/db"],
 
     "@agenteschat/desktop": ["@agenteschat/desktop@workspace:apps/desktop"],
-
-    "@agenteschat/ee": ["@agenteschat/ee@workspace:ee"],
 
     "@agenteschat/engine": ["@agenteschat/engine@workspace:packages/engine"],
 

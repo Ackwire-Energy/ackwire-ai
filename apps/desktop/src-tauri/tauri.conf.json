@@ -74,10 +74,16 @@
     "targets": ["app", "dmg"],
     "category": "Productivity",
     "shortDescription": "agentes.chat",
-    "copyright": "agentes.chat",
+    "copyright": "Copyright © 2026 Codari Global, LLC",
+    "license": "AGPL-3.0-only",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.png"],
     "externalBin": ["binaries/agentes-runner", "binaries/agent-browser"],
-    "resources": { "licenses/agent-browser/*": "licenses/agent-browser/" },
+    "resources": {
+      "../../../LICENSE": "LICENSE",
+      "../../../NOTICE": "NOTICE",
+      "licenses/agent-browser/*": "licenses/agent-browser/",
+      "licenses/bun/*": "licenses/bun/"
+    },
     "createUpdaterArtifacts": true,
     "macOS": {
       "signingIdentity": "-",

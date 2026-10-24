@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:preview": "eas build --profile preview --platform all --non-interactive --no-wait"
   },
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "@agenteschat/client": "workspace:*",
     "@agenteschat/i18n": "workspace:*",
