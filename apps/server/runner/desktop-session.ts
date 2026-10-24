@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createCipheriv, randomBytes, randomInt } from "node:crypto";
+import type { EventEmitter } from "node:events";
 import {
   chmodSync,
   chownSync,
@@ -246,9 +247,10 @@ function spawnProcess(argv: string[], opts: DesktopSpawnOptions): DesktopProcess
     stdio: [opts.input === undefined ? "ignore" : "pipe", out, out],
     detached: opts.detached === true,
   });
+  const events = child as unknown as EventEmitter;
   const exited = new Promise<number | null>((resolve) => {
-    child.once("exit", (code) => resolve(code));
-    child.once("error", () => resolve(null));
+    events.once("exit", (code: number | null) => resolve(code));
+    events.once("error", () => resolve(null));
   });
   if (child.stdin) {
     child.stdin.on("error", () => undefined);
