@@ -341,7 +341,7 @@ export const en: Translations = {
     openaiProject: "OpenAI project ID",
     optional: "Optional.",
     platformChoice: "Use platform credits",
-    platformKeyDesc: "No key: the platform charges per use, with US$ 5 free to try. You see each agent's cost.",
+    platformKeyDesc: "No key: the platform charges per use. You see each agent's cost.",
     suggestedAuto: "Starts on Automatic: it picks the model and effort for each task. You can change it later.",
     computer: {
       title: "Where will we work?",

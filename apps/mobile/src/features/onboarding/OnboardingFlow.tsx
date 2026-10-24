@@ -41,7 +41,8 @@ import {
  * The first run on the phone (telas/OnboardingMobile.html, A · Passos): signed in with no workspace yet, one
  * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
- * (optional; on the computer for now) → Agentes (platform credits by default; no API key on the phone) →
+ * (optional; on the computer for now) → Agentes (they think with the workspace's key or a subscription, set on the
+ * computer; nothing to pay or paste on the phone) →
  * Pessoas (optional: share a link or type e-mails) → Pronto, which opens the DM with Ada. The computer step
  * stays for the computer ("Depois, no computador").
  */
@@ -58,8 +59,6 @@ export function OnboardingFlow() {
   const [context, setContext] = useState("");
   const [savedContext, setSavedContext] = useState("");
   const [chosen, setChosen] = useState<ReadonlySet<Preset>>(() => new Set<Preset>(["ada", "theo", "lia"]));
-  const [platform, setPlatform] = useState<boolean | null>(null);
-  const [usePlatform, setUsePlatform] = useState(true);
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
   const [emails, setEmails] = useState<string[]>([]);
   const [typing, setTyping] = useState("");
@@ -95,10 +94,6 @@ export function OnboardingFlow() {
           zone ? api.orgs.updateMe(target.orgId, { timezone: zone }) : null,
           api.account.updateMe({ locale: i18n.language.startsWith("en") ? "en" : "pt-BR" }),
         ]).catch(() => undefined);
-        // Platform credits only where the server has them (Cloud); else the workspace's key, added on the computer.
-        const available = await api.agents.platformKeyAvailable(target.orgId).catch(() => false);
-        setPlatform(available);
-        setUsePlatform(available);
       } else {
         await api.orgs.updateSettings(target.orgId, { name: orgName });
       }
@@ -126,7 +121,7 @@ export function OnboardingFlow() {
           instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
           // "Automático" (D83): each task gets its model and effort.
           model: AUTO,
-          // null = the workspace's default (the platform's credits when there is no key).
+          // null = the workspace's default key (or a subscription, connected on the computer).
           credentialId: null,
           appearance: PRESET_LOOK[p],
         });
@@ -331,9 +326,6 @@ export function OnboardingFlow() {
               return next;
             })
           }
-          platform={platform === true}
-          usePlatform={usePlatform}
-          onSwitch={() => setUsePlatform((v) => !v)}
         />
       ) : null}
 
@@ -432,21 +424,15 @@ function ImportStep() {
   );
 }
 
-/** Agentes: the ready team (Ada always), and who pays for the thinking (platform credits by default). */
+/** Agentes: the ready team (Ada always), and how they think (the workspace's key or a subscription, on the computer). */
 function AgentsStep({
   chosen,
   created,
   onToggle,
-  platform,
-  usePlatform,
-  onSwitch,
 }: {
   chosen: ReadonlySet<Preset>;
   created: Partial<Record<Preset, string>>;
   onToggle: (p: Preset) => void;
-  platform: boolean;
-  usePlatform: boolean;
-  onSwitch: () => void;
 }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
@@ -489,10 +475,8 @@ function AgentsStep({
       })}
       <Line
         lead={<Icon name="bolt" size={18} />}
-        title={usePlatform ? t("mobile.onb.thinkPlatform") : t("mobile.onb.thinkOwn")}
-        sub={usePlatform ? t("mobile.onb.thinkPlatformSub") : t("mobile.onb.thinkOwnSub")}
-        end={platform ? t("mobile.onb.change") : undefined}
-        onPress={platform ? onSwitch : undefined}
+        title={t("mobile.onb.thinkOwn")}
+        sub={t("mobile.onb.thinkOwnSub")}
       />
     </>
   );
