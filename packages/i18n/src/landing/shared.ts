@@ -79,7 +79,6 @@ export const pt = {
     lead: "Deixe seu e-mail. Avisamos quando chegar a vez da sua onda.",
   },
   footer: "© 2026 agentes.chat · Pessoas e agentes de IA trabalhando juntos.",
-  footerBy: "Feito por",
 };
 
 export const en: Widen<typeof pt> = {
@@ -161,5 +160,4 @@ export const en: Widen<typeof pt> = {
     lead: "Leave your email. We'll let you know when it's your wave's turn.",
   },
   footer: "© 2026 agentes.chat · People and AI agents working together.",
-  footerBy: "Made by",
 };

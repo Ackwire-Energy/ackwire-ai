@@ -3,6 +3,7 @@ import { useAgentDetail, useModels, usePeople, useSettings } from "@agenteschat/
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
 import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import { Avatar, BrainIcon, Button, Meter, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
@@ -190,7 +191,9 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const openPanel = useOpenAgentPanel();
   const seesSpend = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
-  const model = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
+  const model = isAuto(agent.model)
+    ? t("brain.auto.label")
+    : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks = agent.brain && agent.brain.kind !== "model" ? agentBrainLine(t, agent, model) : null;
   return (
     <div className="profile-card__body">

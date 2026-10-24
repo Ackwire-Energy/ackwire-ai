@@ -38,7 +38,7 @@ function bundleRoutine(r: RoutineRow, channelIds: Set<string>): BundleRoutine | 
 }
 
 /**
- * This workspace as a migration bundle (ADR 0053; `GET …/export`, admins),
+ * This workspace as a migration bundle (ADR 0055; `GET …/export`, admins),
  * importable into another one (self-host ↔ Cloud) through `applyImport`.
  * Keys are our ids. Agents with their look and the skills they have on;
  * skills as `SKILL.md` (their other files are listed as left out); public

@@ -3,6 +3,7 @@ import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, 
 import { getAgent } from "./agents";
 import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
+import { runAuthorityById } from "./authority";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishOrgEvent } from "./events";
@@ -503,10 +504,27 @@ export async function createIssue(
   const view = await one(db, row);
   await announce(deps.pubsub, orgId, view, "issue.created");
   if (row.assigneeType === "person") await notifyIssueChanged(deps, author, null, row).catch(() => {});
-  await fireRoutineEvent(deps, orgId, "issue.created", {
-    summary: `New issue #${view.number}: ${view.title}`,
-    issueId: view.id,
-  }).catch(() => 0);
+  // Routines on `issue.created` (ADR 0053 §6.5): never for an issue a routine or an unattended run created
+  // (a routine would trigger itself), only for routines whose creator can see the issue, and with its id,
+  // not its title (the run reads it with its own tools).
+  const origin =
+    actor.type === "person"
+      ? "person"
+      : actor.runId
+        ? (await runAuthorityById(db, orgId, actor.runId).catch(() => null))?.kind
+        : "unattended";
+  if (origin === "person") {
+    await fireRoutineEvent(
+      deps,
+      orgId,
+      "issue.created",
+      { summary: `New issue #${view.number} (id ${view.id})`, issueId: view.id, number: view.number, origin },
+      {
+        dedupeKey: `issue:${view.id}`,
+        visibleTo: (userId) => canSee(db, { type: "person", userId }, orgId, row.channelId),
+      },
+    ).catch(() => 0);
+  }
   return view;
 }
 

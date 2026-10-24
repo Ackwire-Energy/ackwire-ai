@@ -1,5 +1,6 @@
 import type { Agent, BrainKind, BrainOption } from "@agenteschat/client";
 import { type EngineKind, engineOfBrain } from "@agenteschat/client/lib/brain";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import { Button, Dialog, DialogFooter, type IconName } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -23,7 +24,7 @@ export function agentBrainLine(
 ): { text: string; icon: IconName; kind: EngineKind } {
   const b = agent.brain;
   if (!b || b.kind === "model") return { text: apiModelLabel, icon: BRAIN_ICON.model, kind: "agent" };
-  const model = b.model ?? "";
+  const model = isAuto(b.model) ? t("brain.auto.label") : (b.model ?? "");
   const text = b.computer
     ? t(`brain.line.${b.kind}`, { model, computer: b.computer })
     : t(`brain.line.${b.kind}NoComputer`, { model });

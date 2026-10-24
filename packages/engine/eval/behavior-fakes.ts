@@ -3,6 +3,7 @@
  * like the real catalog/MCP ones (`github_search_code`, `sentry_search_issues`…),
  * returning canned results from the case. Nothing leaves the process.
  */
+import { wrapUntrusted } from "../src/mail/text";
 import { MISSION_FINDINGS_SCHEMA, proposeMissionDescription } from "../src/mission-tools";
 import type { JsonSchema } from "../src/tools/json-schema";
 import type { ToolDefinition, ToolSource } from "../src/tools/types";
@@ -23,6 +24,8 @@ interface FakeTool {
   sensitive?: boolean;
   /** What it answers when the case has nothing for this call. */
   empty?: Canned;
+  /** Its results come wrapped as outside content, like the real mailbox reads (`wrapUntrusted`). */
+  untrusted?: boolean;
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
 }
 
@@ -225,6 +228,71 @@ export const CONNECTORS = {
       empty: { result: "Deploy started." },
     },
   ],
+  // One connected mailbox (ADR 0038), named like the real ones (`mail_<slug>_<verb>`); sending asks a person.
+  mail: [
+    {
+      name: "mail_suporte_search",
+      scope: "mail:read",
+      untrusted: true,
+      description:
+        "[Email suporte@feiraboa.example] Search this mailbox (newest first). Returns ids, senders, subjects and short snippets; read a message with the read tool.",
+      properties: {
+        folder: str("Folder id; default the inbox."),
+        from: str("Sender address or @domain."),
+        subject: str("Words in the subject"),
+        text: str("Words in the subject or body."),
+        since: str("ISO date (inclusive)."),
+      },
+    },
+    {
+      name: "mail_suporte_read",
+      scope: "mail:read",
+      untrusted: true,
+      description: "[Email suporte@feiraboa.example] Read one message: sender, recipients, date, subject and body.",
+      properties: { id: str("The message id from search results.") },
+      required: ["id"],
+      empty: { result: "Not found: no message with that id", isError: true },
+    },
+    {
+      name: "mail_suporte_reply",
+      scope: "mail:send",
+      sensitive: true,
+      description: "[Email suporte@feiraboa.example] Reply to a message (to its sender; `replyAll` for everyone).",
+      properties: {
+        id: str("The message id from search results."),
+        body: str("Reply text"),
+        replyAll: { type: "boolean", description: "Reply to everyone on the message" },
+      },
+      required: ["id", "body"],
+      empty: { result: "Reply sent." },
+    },
+    {
+      name: "mail_suporte_forward",
+      scope: "mail:send",
+      sensitive: true,
+      description: "[Email suporte@feiraboa.example] Forward a message to other addresses.",
+      properties: {
+        id: str("The message id from search results."),
+        to: { type: "array", items: { type: "string" }, description: "Recipient addresses" },
+        body: str("Text above the forwarded message"),
+      },
+      required: ["id", "to"],
+      empty: { result: "Forwarded." },
+    },
+    {
+      name: "mail_suporte_send",
+      scope: "mail:send",
+      sensitive: true,
+      description: "[Email suporte@feiraboa.example] Send a new message from this mailbox.",
+      properties: {
+        to: { type: "array", items: { type: "string" }, description: "Recipient addresses" },
+        subject: str("Subject"),
+        body: str("Message text"),
+      },
+      required: ["to", "subject", "body"],
+      empty: { result: "Sent." },
+    },
+  ],
 } satisfies Record<string, FakeTool[]>;
 
 export type ConnectorId = keyof typeof CONNECTORS;
@@ -271,7 +339,8 @@ export function fakeConnectorSource(id: ConnectorId, fixtures: Record<string, Ca
         executed.push({ name: t.name, input });
         const canned = cannedFor(fixtures[t.name], input, t.empty);
         const content = t.name.endsWith("_search_code") ? onlyRepo(canned.result, input) : canned.result;
-        return { content, isError: canned.isError === true };
+        const isError = canned.isError === true;
+        return { content: t.untrusted && !isError ? wrapUntrusted(content) : content, isError };
       },
     }),
   );

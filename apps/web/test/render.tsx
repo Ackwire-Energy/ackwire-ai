@@ -1,4 +1,5 @@
 import type { ApiClient, SocketFactory } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { domWindow } from "@agenteschat/ui/testing/dom";
 import {
   createMemoryHistory,
@@ -32,13 +33,15 @@ export function makeServices(
   createSocket: SocketFactory = fakeSockets().factory,
 ): AppServices {
   const toasts = createToastStore();
+  const i18n = createI18n("pt-BR");
   const queryClient = createQueryClient({
     onUnauthorized: () => {},
     onMutationError: (m) => toasts.show(m, "error"),
     unknownError: () => "erro",
+    describeError: (error) => knownErrorText(i18n.t, error),
   });
   queryClient.setDefaultOptions({ queries: { retry: false, refetchOnWindowFocus: false } });
-  return { api, auth, queryClient, i18n: createI18n("pt-BR"), toasts, createSocket };
+  return { api, auth, queryClient, i18n, toasts, createSocket };
 }
 
 /** Lets pending promises and React updates settle. */

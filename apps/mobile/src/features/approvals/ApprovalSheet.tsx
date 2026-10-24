@@ -9,7 +9,7 @@ import { genderOf } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { approvalRisk } from "./logic";
-import { ApprovalDetails, ApprovalFuse, ApprovalSaid, ApprovalTraits } from "./parts";
+import { ApprovalDetails, ApprovalFuse, ApprovalTraits, ApprovalWhy } from "./parts";
 
 /**
  * A request, from anywhere (deep link `approval/<id>`): who asks, the exact
@@ -93,6 +93,7 @@ export function ApprovalSheet({
             </Text>
           </View>
         </View>
+        {refusing ? null : <ApprovalWhy approval={a} name={name} />}
         <Text variant="title2">{a.title}</Text>
         {refusing ? (
           <>
@@ -123,7 +124,6 @@ export function ApprovalSheet({
             ) : null}
             <ApprovalTraits approval={a} />
             <ApprovalDetails approval={a} max={6} />
-            <ApprovalSaid approval={a} name={name} />
             {pending ? (
               <>
                 <ApprovalFuse approval={a} />

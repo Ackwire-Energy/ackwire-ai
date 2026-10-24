@@ -12,6 +12,7 @@ import {
   listPushDevices,
   markNotificationRead,
   notify,
+  notifyApproval,
   openDm,
   PUSH_RECEIPTS_DELAY_MS,
   postPersonMessage,
@@ -73,6 +74,16 @@ describe("push text", () => {
     });
     expect(risky.title).toBe("Dev precisa da sua aprovação");
     expect(risky.body).toBe("Deploy api to production. Abra o app para revisar com calma.");
+    // Asked by a routine while nobody watched: the push names it.
+    const fromRoutine = renderPush("en", {
+      kind: "approval",
+      waiting: true,
+      actorName: "Dev",
+      title: "Deploy api to production",
+      highRisk: true,
+      routine: "Deploys",
+    });
+    expect(fromRoutine.body).toBe("Routine «Deploys»: Deploy api to production. Open the app to review it.");
     expect(renderPush("en", { kind: "dm", waiting: false, actorType: "user", text: "hi" }).title).toBe("Someone");
     const long = renderPush("en", { kind: "mention", waiting: false, actorName: "Ana", text: "x".repeat(500) });
     expect(long.body.length).toBeLessThanOrEqual(180);
@@ -161,6 +172,47 @@ describe("push delivery", () => {
       body: "Qual branch?",
       priority: "high",
       data: { kind: "agent_question", notificationId: question?.id },
+    });
+  });
+
+  test("an approval a routine asked: its why and origin in the inbox, the routine's name in the push", async () => {
+    f = await setup();
+    const { bia, push, drain } = await withPhone();
+    const origin = { kind: "routine", routineId: crypto.randomUUID(), routineName: "Revisar PRs" };
+    const [approval] = await f.db
+      .insert(schema.approvals)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: crypto.randomUUID(),
+        toolUseId: "toolu_1",
+        tool: "github.merge_pull_request",
+        scope: "github:merge",
+        params: { pr: 42 },
+        actionHash: "hash",
+        title: "Merge PR #42",
+        detail: '{"pr":42}',
+        why: "Os testes passaram e a correção do login é pequena.",
+        origin,
+        expiresAt: new Date(Date.now() + 3600_000),
+      })
+      .returning();
+    if (!approval) throw new Error("no approval");
+    await notifyApproval(deps(), approval, [bia.id]);
+    const [n] = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
+    // The why instead of the raw detail; where it came from, for the card and the push.
+    expect(n?.latest).toEqual({
+      title: "Merge PR #42",
+      text: "Os testes passaram e a correção do login é pequena.",
+      origin,
+      expiresAt: approval.expiresAt.toISOString(),
+    });
+    await drain();
+    expect(push.sent[0]).toMatchObject({
+      to: TOKEN_BIA,
+      title: "Dev precisa da sua aprovação",
+      body: "Rotina «Revisar PRs»: Merge PR #42",
     });
   });
 

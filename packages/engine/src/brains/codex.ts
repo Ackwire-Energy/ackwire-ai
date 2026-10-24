@@ -1,21 +1,24 @@
 import {
   type AgentScope,
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
   type PubSub,
   parseBrainEvent,
+  STEER_PROTOCOL,
 } from "@agenteschat/adapters";
 import type { MachineCaller } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
-import { accountFields, accountUnavailable } from "./claude-code";
+import { accountFields, accountUnavailable, steerOnMachine } from "./claude-code";
 import { computerPrompt } from "./prompt";
-import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
+import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
 /**
- * The Codex brain (ADR 0032, ADR 0029 "Codex"): one agent turn runs as
- * `codex exec --json` on the agent's connected computer, through the runner's
+ * The Codex brain (ADR 0032, ADR 0029 "Codex"): one agent turn runs on the
+ * agent's connected computer (a long-lived `codex app-server`, or
+ * `codex exec --json` where that can't run), through the runner's
  * `brain.turn` op. The runner owns the Codex side (command line, our session
  * → Codex thread id, JSONL → `BrainEvent`, the MCP bridge config); this brain
  * checks the computer can run it, builds the request (context on the first
@@ -26,6 +29,17 @@ import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
  * the run's identity), so `io.executeTool` is never used here; Codex's own
  * commands and file edits arrive as `tool_call` with `executed` (transcript
  * only). Usage is the person's plan (`source: "plan"`, cost zero).
+ *
+ * Live steering (runner protocol 15): once the turn is sent, the brain hands
+ * the engine `steer` (`BrainIO.steerable`, `brain.steer`); an app-server turn
+ * takes the messages (`turn/steer`) and says which it read (`steer_read`); an
+ * exec turn answers `unsupported` and they wait for its end, as before.
+ *
+ * Permissions (ADR 0053 §3): every turn carries its profile (`plan` reads in a
+ * read-only sandbox without network; `work` has each of Codex's approvals
+ * answered by the command policy) and a background turn `keepAlive: false`.
+ * A runner older than `BRAIN_PROFILES_PROTOCOL` would run Codex with no
+ * approvals and the network on: the turn fails with `runner_outdated` instead.
  */
 
 /** `brain.turn` as the server sends it to the runner (the shared wire type, `machine-protocol.ts`). */
@@ -51,6 +65,16 @@ export interface ComputerBrainLink {
     request: BrainTurnRequest & { agent?: AgentScope },
     options: { signal: AbortSignal; onEvent: (event: BrainEvent) => void },
   ): Promise<void>;
+  /**
+   * Protocol 15: messages for the turn of `runId` in progress (`brain.steer`).
+   * A runner whose Codex turn can't take them (`codex exec`) answers
+   * `unsupported`; without it, Codex turns read new messages at their end.
+   */
+  steer?(
+    machineId: string,
+    target: { runId: string; session: string; agent: AgentScope },
+    messages: SteerMessage[],
+  ): Promise<SteerReply>;
 }
 
 export interface CodexBrainDeps {
@@ -61,6 +85,10 @@ export interface CodexBrainDeps {
   agent?(turn: BrainTurn): Promise<AgentScope | undefined>;
   /** Before a chat turn: the agent's checkouts updated, where it starts and the "# Your code" block (`prepareAgentCode`). */
   prepare?(turn: BrainTurn, signal: AbortSignal): Promise<{ cwd: string; prompt: string } | null>;
+  /** The turn's permission profile (missions: their own; other runs: `computerTurnProfile`). */
+  permissions?(turn: BrainTurn): Promise<BrainTurnRequest["permissions"] | undefined>;
+  /** False for a background run: the runner keeps no Codex process for it after the turn. */
+  keepAlive?: boolean;
 }
 
 /** `codex-cli 0.163.0` is new enough (`CODEX_MIN_VERSION`). */
@@ -169,6 +197,17 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: account.code, message: account.message, retryable: true };
       return;
     }
+    const permissions = await this.deps.permissions?.(turn);
+    // An older runner ignores the profile (no approvals, network on): never more power than asked for.
+    if (permissions && status.protocol !== undefined && status.protocol < BRAIN_PROFILES_PROTOCOL) {
+      yield {
+        type: "error",
+        code: "runner_outdated",
+        message: "The runner on the computer is too old to keep Codex within this agent's permissions; update it.",
+        retryable: true,
+      };
+      return;
+    }
 
     const [mcp, agent, code] = await Promise.all([
       this.deps.mcp(turn),
@@ -186,6 +225,8 @@ export class CodexBrain implements Brain {
       mcp,
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),
+      ...(permissions ? { permissions } : {}),
+      ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
     };
 
     const events = channel<BrainEvent>();
@@ -202,16 +243,28 @@ export class CodexBrain implements Brain {
       })
       .finally(() => events.end());
 
-    for await (const event of events.read()) {
-      if (ended) continue;
-      if (event.type === "text_delta") text += event.text;
-      if (event.type === "done") {
-        ended = true;
-        yield { type: "done", text: event.text, session: { id: session.id } };
-        continue;
+    // The turn is on its way: on a runner that runs Codex as an app-server, a person's messages reach it mid-turn.
+    const steer = this.deps.link.steer?.bind(this.deps.link);
+    let steering = false;
+    if (io.steerable && steer && agent && (status.protocol ?? 0) >= STEER_PROTOCOL) {
+      const target = { runId: turn.runId, session: session.id, agent };
+      io.steerable((messages) => steer(session.machineId, target, messages));
+      steering = true;
+    }
+    try {
+      for await (const event of events.read()) {
+        if (ended) continue;
+        if (event.type === "text_delta") text += event.text;
+        if (event.type === "done") {
+          ended = true;
+          yield { type: "done", text: event.text, session: { id: session.id } };
+          continue;
+        }
+        if (event.type === "error") ended = true;
+        yield event;
       }
-      if (event.type === "error") ended = true;
-      yield event;
+    } finally {
+      if (steering) io.steerable?.(null);
     }
     await sent;
     if (ended) return;
@@ -247,6 +300,7 @@ export function hubBrainLink(deps: {
 }): ComputerBrainLink {
   return {
     status: (machineId) => deps.hub.status(machineId).catch(() => null),
+    steer: (machineId, target, messages) => steerOnMachine(deps.hub, { machineId, ...target }, messages),
     async turn(machineId, request, options) {
       let streamEnded = false;
       let finalSeen = false;

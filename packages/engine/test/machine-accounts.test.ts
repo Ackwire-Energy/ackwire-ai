@@ -371,6 +371,10 @@ test("the agent's account: owner only, on its computer, of its brain's kind; cle
   expect(missing.code).toBe("account.invalid");
   const effort = await setAgentBrain(deps, f.owner.id, f.org.id, f.agent.id, { effort: "turbo" }).catch((e) => e);
   expect(effort.code).toBe("brain.invalid_effort");
+  // "Automático": the model and the effort take auto, and read back as such.
+  const auto = await setAgentBrain(deps, f.owner.id, f.org.id, f.agent.id, { model: "auto", effort: "auto" });
+  expect(auto).toMatchObject({ model: "auto", effectiveModel: "auto", effort: "auto", account: CLAUDE_ID });
+  expect(await agentRow()).toMatchObject({ brainModel: "auto", brainEffort: "auto" });
 
   // An admin sees it locked: changes the effort, not the account.
   const seen = await getAgentBrain(deps, admin.id, f.org.id, f.agent.id);

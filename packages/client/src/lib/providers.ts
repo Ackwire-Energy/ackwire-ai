@@ -42,13 +42,9 @@ export function modelChoices(models: Model[], credentials: Credential[], platfor
   return [...groups.entries()];
 }
 
-/** The model the first agent starts with for a provider: the "recommended for most" tier when present. */
-export function suggestModel(models: Model[], provider: string, fallback?: string) {
-  const own = models.filter((m) => m.provider === provider);
-  return (
-    own.find((m) => /sonnet/i.test(m.id))?.id ??
-    own.find((m) => /gpt-5(?!.*mini)|gpt-4\.1(?!.*mini)/i.test(m.id))?.id ??
-    own[0]?.id ??
-    fallback
-  );
-}
+/**
+ * "Automático": the value an agent's model, a computer brain's model or
+ * its effort holds when each run picks them (the server's `auto-model.ts`).
+ */
+export const AUTO = "auto";
+export const isAuto = (value: string | null | undefined) => value === AUTO;

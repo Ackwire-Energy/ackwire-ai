@@ -267,7 +267,7 @@ export async function pairComputer(
   return (await token.json()) as { machineId: string; token: string; name: string; org: { id: string; name: string } };
 }
 
-/** Owner with an organization, a credential and an agent `@dev` in #general. */
+/** Owner with an organization, a credential and an agent `@dev` in #general (a fixed model, not Automático). */
 export async function seedOrg(b: Browser) {
   const created = (await (
     await b("/api/app/organizations", { json: { name: "Acme", context: "Acme builds rockets." } })
@@ -283,7 +283,13 @@ export async function seedOrg(b: Browser) {
   ).json()) as { id: string };
   const agent = (await (
     await b(`/api/app/organizations/${orgId}/agents`, {
-      json: { name: "Dev", handle: "dev", credentialId: credential.id, monthlyBudgetUsd: 50 },
+      json: {
+        name: "Dev",
+        handle: "dev",
+        model: "claude-sonnet-5-5",
+        credentialId: credential.id,
+        monthlyBudgetUsd: 50,
+      },
     })
   ).json()) as { id: string };
   await b(`/api/app/organizations/${orgId}/channels/${created.generalChannelId}/members`, {

@@ -22,6 +22,9 @@
     "eval:memory": "bun --env-file=.env packages/engine/eval/memory.ts",
     "eval:behavior": "bun --env-file=.env packages/engine/eval/behavior.ts",
     "eval:mentions": "bun --env-file=.env packages/engine/eval/mention-handoff.ts",
+    "eval:conversation": "bun --env-file=.env packages/engine/eval/conversation.ts",
+    "eval:browser": "bun --env-file=.env packages/engine/eval/browser/ab.ts",
+    "eval:browser:micro": "bun --env-file=.env packages/engine/eval/browser/micro.ts",
     "eval:brain-floor": "bun apps/server/scripts/brain-floor.ts"
   },
   "devDependencies": {

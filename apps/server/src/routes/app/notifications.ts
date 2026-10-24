@@ -9,6 +9,7 @@ import {
   snoozeNotification,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { ApprovalOrigin } from "./approvals";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
 const tags = ["Notifications"];
@@ -52,6 +53,13 @@ const Notification = z
       expiresAt: z.string().optional(),
       round: z.number().int().optional(),
       rounds: z.number().int().optional(),
+      reason: z
+        .string()
+        .optional()
+        .openapi({ description: "`routine_paused`: why it paused; `routine_failed`: its run's code (both coded)." }),
+      origin: ApprovalOrigin.optional().openapi({
+        description: "`approval`: asked while nobody watched, by a routine or by unattended work.",
+      }),
     }),
     readAt: z.string().nullable(),
     doneAt: z.string().nullable(),

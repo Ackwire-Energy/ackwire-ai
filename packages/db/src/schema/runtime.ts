@@ -131,6 +131,18 @@ export const agentRuns = pgTable(
      * (`resolveBrain`). Null for the model brain.
      */
     brainSessionId: text(),
+    /**
+     * Background work (a routine's run): it holds no conversation's slot. People's messages
+     * never join it and it never joins theirs; it posts no final reply (only cards and `hand_off`),
+     * and its computer session is never carried to the conversation's next run.
+     */
+    background: boolean().notNull().default(false),
+    /**
+     * The brain this run actually thinks with (`model`, `claude_code`, `codex`): the agent's, a
+     * mission's override or a fallback. Null until its first turn. Shared code reads this, never
+     * the agent's stored brain.
+     */
+    brain: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -343,6 +355,13 @@ export const approvals = pgTable(
     /** Human summary, e.g. "Merge PR #42 into main". */
     title: text().notNull(),
     detail: text().notNull().default(""),
+    /** The agent's own reason, required on every request (ADR 0053): what it found and why this action. */
+    why: text().notNull().default(""),
+    /**
+     * Asked while nobody was watching (ADR 0053): `{ kind: "routine" | "unattended", routineId?,
+     * routineName? }`. The card and the notification say so. Null when a person was behind the run.
+     */
+    origin: jsonb().$type<Record<string, unknown>>(),
     status: approvalStatusEnum().notNull().default("pending"),
     ownerUserId: text(),
     decidedByUserId: text(),

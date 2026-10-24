@@ -1,6 +1,7 @@
 import { Logo } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { AuthHorizon } from "@/components/Sky";
+import "./auth.css";
 
 /**
  * Sign in, sign up and new password: one calm question at a time in a narrow

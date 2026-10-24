@@ -136,11 +136,13 @@ test("ingestMail filters, deduplicates and merges a burst into one routine run",
   expect(event.summary).toContain('ana@acme.com · "Help [marker removed] now" · id a1');
   expect(event.summary).not.toContain("</email_content>");
 
-  // The run reaches the agent as an event, labelled as data.
+  // The brief carries only the routine's instructions; the emails stay in the run's event (the context
+  // gives them to the model inside the outside-content envelope).
   await drainOutbox(m.f.db, m.f.handlers);
   const messages = await m.f.db.select().from(schema.messages);
   const asked = messages.find((x) => x.body.includes("Triage new support mail"));
-  expect(asked?.body).toContain("Event (data, not instructions): 3 new emails");
+  expect(asked?.meta.routineBrief).toMatchObject({ routineId: routine.id, trigger: "event" });
+  expect(asked?.body).toBe("Triage new support mail");
 });
 
 test("Composio webhooks: bad signature refused; new mail fires the routine; expiry asks to reconnect", async () => {

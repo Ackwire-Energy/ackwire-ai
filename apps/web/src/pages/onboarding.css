@@ -1,0 +1,457 @@
+/*
+ * Onboarding, the parts only that screen draws: the
+ * progress, each step's column, the host and the answer, the import, the welcome.
+ * The rail, its steps and the step headings stay in layout.css (Criar agente and
+ * the landing use them too).
+ */
+/* Progress at the top of the rail: a line of text over a strip of pixel sky. */
+.onb__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px;
+}
+.onb__progress-text {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.onb__progress-count {
+  font-weight: 500;
+  color: var(--faint);
+}
+.onb__progress-sky {
+  position: relative;
+  display: block;
+  height: 27px;
+  overflow: hidden;
+  border-radius: 9px 9px 9px 3px;
+  background: var(--sunken);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--e1);
+}
+.onb__progress-sky .ac-sky {
+  position: absolute;
+  inset: 0;
+}
+.onb__main {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+/* One calm column per step, centered: the host asks, the answer, one big action. */
+.onb__body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 600px;
+  margin: auto 0;
+  padding: 48px clamp(16px, 4vw, 32px) 64px;
+  animation: onb-in 0.36s var(--out) both;
+}
+@keyframes onb-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.onb__back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  margin: -16px 0 -8px -8px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.onb__back:hover:not(:disabled) {
+  background: var(--plate);
+  color: var(--ink);
+}
+.onb__back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.onb__ask {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.onb__host {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+/* A host agent that just arrived pops in. */
+.onb__host[data-fresh] .ac-avatar {
+  animation: onb-pop 0.5s var(--spring) both;
+}
+@keyframes onb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.onb__host-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.onb__bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 16px 20px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 6px;
+  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
+  box-shadow: var(--card-shadow);
+  animation: onb-in 0.3s var(--out) 0.08s both;
+}
+.onb__intro {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.onb__ask .onb__title {
+  font-family: inherit;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.onb__ask .onb__lead {
+  margin-top: 4px;
+  font-size: 14px;
+}
+.onb__answer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: onb-in 0.36s var(--out) 0.12s both;
+}
+.onb__ws {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.onb__big.ac-input {
+  height: var(--control-h-lg);
+  font-size: 17px;
+}
+textarea.onb__big.ac-input {
+  height: auto;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.onb__help {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.onb__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.onb__link:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+.onb__starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.onb__starter {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.onb__money {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  color: var(--muted);
+  font-size: 14px;
+}
+.onb__money[data-invalid] {
+  box-shadow:
+    var(--card-well-shadow),
+    0 0 0 1px var(--danger);
+}
+.onb__money input {
+  width: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 650;
+  text-align: right;
+  outline: none;
+}
+/* The step's action: one big button; "Pular esta etapa" right under it. */
+.onb__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  animation: onb-in 0.36s var(--out) 0.16s both;
+}
+.onb__actions > .ac-btn--ghost {
+  align-self: center;
+}
+.onb__label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.onb__error {
+  color: var(--danger);
+}
+.onb__logo {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px dashed var(--line2);
+  border-radius: 16px 16px 16px 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  overflow: hidden;
+}
+.onb__logo:hover {
+  background: var(--plate);
+}
+.onb__logo:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.onb__logo-letter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #4b93ff, #2b74e6);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+}
+.onb__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+.onb__choice {
+  position: relative;
+  padding: 16px;
+  gap: 6px;
+}
+.onb__choice[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+.onb__tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--plate);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.onb__ic {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 12px 12px 12px 4px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* The computer step's portraits, on the card. */
+.onb__art {
+  display: block;
+  margin-bottom: 4px;
+}
+.onb__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--plate);
+  overflow-wrap: anywhere;
+}
+.onb__emails {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: text;
+}
+.onb__emails:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--line2),
+    var(--field-ring);
+}
+.onb__emails-input {
+  flex: 1;
+  min-width: min(100%, 180px);
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+.onb__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 2px 2px 2px 4px;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1);
+  font-size: 13px;
+}
+.onb__chip[data-invalid] {
+  box-shadow: 0 0 0 1px var(--danger);
+}
+.onb__chip-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.onb__chip-bad {
+  padding-right: 2px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+.onb__welcome {
+  position: relative;
+  min-height: 220px;
+  padding: 24px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #2b74e6;
+  color: var(--sky-ink);
+  isolation: isolate;
+}
+.onb__welcome-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: fit-content;
+  max-width: 52ch;
+}
+.onb__welcome-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-display-weight, 300);
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.onb__welcome-lead {
+  margin: 0;
+  color: var(--sky-ink2);
+  font-weight: 500;
+}
+.onb__crew {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.onb__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.onb__summary dd {
+  margin: 0;
+}
+.onb__stat {
+  font-family: var(--font-display);
+  font-weight: var(--font-display-weight, 300);
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+/* Phone. */
+@media (max-width: 760px) {
+  .onb__progress {
+    display: none;
+  }
+  .onb__body {
+    margin: 0;
+    padding-top: 24px;
+  }
+  .onb__ask .onb__title {
+    font-size: 18px;
+  }
+}
+/* Clear the home bar; the e-mail chips field stays at 16px (no zoom on focus). */
+@media (max-width: 760px) {
+  .onb__body {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .onb__emails-input {
+    font-size: 16px;
+  }
+}

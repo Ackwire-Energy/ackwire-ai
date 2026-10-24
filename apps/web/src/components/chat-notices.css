@@ -1,0 +1,72 @@
+/* What reached an agent's conversation (a notice) and a routine's background start: one quiet line,
+   like the other automatic lines of a conversation (`.iw-line`, `.mi-evt`); the text on demand. */
+.cn-line {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 4px 12px 4px var(--thread-indent, 56px);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--faint);
+}
+.cn-line > .ac-icon {
+  flex: none;
+  margin-top: 2px;
+}
+/* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
+.cn-line__text {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 22px);
+  overflow-wrap: anywhere;
+}
+.cn-line__toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cn-line__toggle:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cn-line__toggle:focus-visible {
+  outline: none;
+  border-radius: 2px;
+  box-shadow: var(--focus-ring);
+}
+/* The text itself, under the line, aligned with the words (not the icon). */
+.cn-line__body {
+  flex-basis: 100%;
+  margin: 2px 0 2px 22px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink2);
+}
+
+/* The routine report an agent's message answers, unfolded under it ("Ver relatório"). */
+.cn-report__toggle {
+  margin-left: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.cn-report {
+  margin: 2px 0 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink2);
+}
+
+/* A fast reply while the task kept working: a quiet word next to the agent's name. */
+.msg-talker {
+  font-weight: 400;
+}

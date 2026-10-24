@@ -27,6 +27,9 @@ import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 let f: Fixture;
 afterEach(() => f?.close());
 
+/** The agent's required reason for an action that asks a person (ADR 0053 §8). */
+const WHY = "The tests pass on main and the PR was reviewed: merging closes the release ticket.";
+
 describe("validateJson", () => {
   const schemaDef = {
     type: "object",
@@ -135,7 +138,7 @@ describe("Tool Gateway", () => {
     const result = await tools.invoke(ctx, {
       toolUseId: "tu_1",
       name: "github_merge_pr",
-      input: { repo: "acme/app", pr: 42 },
+      input: { repo: "acme/app", pr: 42, why: WHY },
     });
     if (result.type !== "approval") throw new Error("expected an approval");
     const approval = result.approval;
@@ -181,7 +184,7 @@ describe("Tool Gateway", () => {
     const result = await tools.invoke(ctx, {
       toolUseId: "tu_1",
       name: "github_close_pr",
-      input: { repo: "a/b", pr: 1 },
+      input: { repo: "a/b", pr: 1, why: WHY },
     });
     if (result.type !== "approval") throw new Error("expected an approval");
     await setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, [], async () => null);
@@ -278,7 +281,7 @@ describe("approval flow (end to end)", () => {
     if (said("github_get_pr ok"))
       return {
         chunks: ["Tests pass, merging."],
-        toolUses: [{ name: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }],
+        toolUses: [{ name: "github_merge_pr", input: { repo: "acme/app", pr: 42, why: WHY } }],
       };
     return {
       chunks: ["Let me look at the PR."],
@@ -310,10 +313,12 @@ describe("approval flow (end to end)", () => {
       "Tests pass, merging.",
       "Approval request: Merge PR #42 in acme/app",
     ]);
+    // The card carries the agent's reason (ADR 0053 §8).
     expect(main[2]?.meta).toEqual({
       approvalId: approval?.id,
       bodyCode: "approval_request",
       bodyParams: { title: "Merge PR #42 in acme/app" },
+      why: WHY,
     });
     expect(events.map((e) => e.type)).toContain("approval.created");
     expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "waiting_approval" });
@@ -372,7 +377,7 @@ describe("approval flow (end to end)", () => {
     expect(decidedEvents[1]).toMatchObject({ approval: { status: "approved", result: { ok: true } } });
     const [ran] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "decided" });
     expect(ran?.executedAt).not.toBeNull();
-    expect(ran).toMatchObject({ why: "Tests pass, merging.", issue: null });
+    expect(ran).toMatchObject({ why: WHY, issue: null });
     const detail = await getApproval(f.db, f.owner.id, f.org.id, ran?.id ?? "");
     expect(detail.trail?.map((s) => s.text)).toEqual(["Let me look at the PR.", "Tests pass, merging."]);
   });

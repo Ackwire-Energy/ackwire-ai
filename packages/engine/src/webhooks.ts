@@ -72,16 +72,22 @@ function validSignature(secret: string, body: string, given: string | null, pref
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** What happened, in our event names, with a one-line summary. Null = not something routines listen to. */
+/**
+ * What happened, in our event names, with a one-line summary and its identity (`dedupeKey`: GitHub's
+ * delivery id, Sentry's issue id and action), so a redelivered webhook never fires a routine twice.
+ * Null = not something routines listen to.
+ */
 export function webhookEvent(
   provider: WebhookProvider,
   headers: Headers,
   payload: Record<string, unknown>,
-): { event: RoutineEvent; summary: string; data: Record<string, unknown> } | null {
+): { event: RoutineEvent; summary: string; data: Record<string, unknown>; dedupeKey: string | null } | null {
   const get = (o: unknown, ...path: string[]): unknown =>
     path.reduce<unknown>((v, k) => (v && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined), o);
   if (provider === "github") {
     const kind = headers.get("x-github-event");
+    const delivery = headers.get("x-github-delivery")?.trim();
+    const dedupeKey = delivery ? `github:${delivery.slice(0, 100)}` : null;
     const repo = String(get(payload, "repository", "full_name") ?? "");
     if (kind === "pull_request" && payload.action === "opened") {
       const number = Number(get(payload, "pull_request", "number"));
@@ -91,6 +97,7 @@ export function webhookEvent(
         event: "github.pr_opened",
         summary: `PR #${number} opened in ${repo}: ${title}`,
         data: { repo, number, url },
+        dedupeKey,
       };
     }
     if (kind === "deployment_status" && get(payload, "deployment_status", "state") === "success") {
@@ -99,15 +106,22 @@ export function webhookEvent(
         event: "deploy.succeeded",
         summary: `Deploy to ${environment} finished (${repo})`,
         data: { repo, environment },
+        dedupeKey,
       };
     }
     return null;
   }
   const resource = headers.get("sentry-hook-resource");
   if (resource === "issue" && payload.action === "created") {
+    const issueId = String(get(payload, "data", "issue", "id") ?? "").slice(0, 100);
     const title = String(get(payload, "data", "issue", "title") ?? "");
     const url = String(get(payload, "data", "issue", "web_url") ?? get(payload, "data", "issue", "permalink") ?? "");
-    return { event: "sentry.issue_created", summary: `New Sentry error: ${title}`, data: { title, url } };
+    return {
+      event: "sentry.issue_created",
+      summary: `New Sentry error: ${title}`,
+      data: { title, url, ...(issueId ? { issueId } : {}) },
+      dedupeKey: issueId ? `sentry:${issueId}:${String(payload.action)}` : null,
+    };
   }
   return null;
 }
@@ -153,6 +167,12 @@ export async function handleWebhook(
   }
   const what = webhookEvent(provider, headers, payload);
   if (!what) return { fired: 0, event: null };
-  const fired = await fireRoutineEvent(deps, endpoint.orgId, what.event, { summary: what.summary, ...what.data });
+  const fired = await fireRoutineEvent(
+    deps,
+    endpoint.orgId,
+    what.event,
+    { summary: what.summary, ...what.data },
+    { dedupeKey: what.dedupeKey },
+  );
   return { fired, event: what.event };
 }

@@ -1,4 +1,4 @@
-import type { AgentAudience, Model } from "../api/types";
+import type { AgentAudience } from "../api/types";
 import { handleFrom, parseAmount } from "./text";
 
 /**
@@ -35,25 +35,6 @@ export const ROLE_GROUPS = [
   { id: "operations", roles: ["data", "finance", "people", "research", "assistant"] },
 ] as const satisfies readonly { id: string; roles: readonly Exclude<RoleId, "custom">[] }[];
 export type RoleGroupId = (typeof ROLE_GROUPS)[number]["id"];
-
-/** A model family a preset starts with (the catalog's own models; the first usable one of the family). */
-export type ModelFamily = "sonnet" | "haiku" | "opus";
-
-/** The first usable model of the family; else the deployment default when usable; else any usable one. */
-export function presetModel(
-  family: ModelFamily,
-  models: Model[],
-  usable: (m: Model) => boolean,
-  fallback?: string,
-): string | undefined {
-  const ok = models.filter(usable);
-  return (
-    ok.find((m) => m.id.toLowerCase().includes(family))?.id ??
-    ok.find((m) => m.id === fallback)?.id ??
-    ok[0]?.id ??
-    fallback
-  );
-}
 
 /* ---------- @handle ---------- */
 

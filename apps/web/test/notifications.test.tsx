@@ -86,7 +86,7 @@ function inbox(): AppNotification[] {
       kind: "routine_failed",
       actors: [{ type: "agent", id: ATLAS_ID }],
       source: { routineId: "r-1", label: "Resumo diário de vendas" },
-      latest: { text: "O CRM pediu para conectar de novo.", steps: { done: 3, total: 5, failedAt: 4 } },
+      latest: { reason: "budget_exceeded", steps: { done: 3, total: 5, failedAt: 4 } },
       readAt: yesterdayNoon(),
       updatedAt: yesterdayNoon(),
     }),
@@ -132,7 +132,10 @@ describe("Notificações", () => {
     const today = screen().getByRole("region", { name: "Hoje" });
     expect(today.textContent).toContain("João e Ada responderam em Login 401");
     expect(today.textContent).toContain("2 reações");
-    expect(screen().getByRole("region", { name: "Ontem" }).textContent).toContain("Parou na etapa 4 de 5");
+    const yesterday = screen().getByRole("region", { name: "Ontem" }).textContent ?? "";
+    expect(yesterday).toContain("Parou na etapa 4 de 5");
+    // A routine's failure in the person's words (its coded reason), never the server's English.
+    expect(yesterday).toContain("O orçamento do mês acabou");
     // My own @mention is highlighted.
     expect(today.querySelector(".ac-mention")?.textContent).toBe("@walter");
     const filters = screen().getByRole("radiogroup", { name: "Filtrar notificações" });
@@ -145,6 +148,29 @@ describe("Notificações", () => {
     await settle(4);
     expect(screen().queryByRole("region", { name: "Esperando você" })).toBeNull();
     expect(document.body.textContent).toContain("reagiram à sua mensagem");
+  });
+
+  test("an approval a routine asked while nobody watched says so, then the agent's why", async () => {
+    const asked = notification({
+      id: "n-ap",
+      kind: "approval",
+      waiting: true,
+      actors: [{ type: "agent", id: ATLAS_ID }],
+      source: { approvalId: "ap-deploy", channelId: ENG_ID },
+      latest: {
+        title: "Run deploy workflow",
+        text: "O erro 500 voltou depois do deploy 2.14.",
+        origin: { kind: "routine", routineId: "rt-1", routineName: "Vigiar erros" },
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+      createdAt: ago(5),
+      updatedAt: ago(5),
+    });
+    await go(seedState({ notifications: [asked] }));
+    const text = screen().getByRole("region", { name: "Esperando você" }).textContent ?? "";
+    const origin = text.indexOf("Pedido pela rotina «Vigiar erros» enquanto ninguém acompanhava.");
+    expect(origin).toBeGreaterThan(-1);
+    expect(text.indexOf("O erro 500 voltou depois do deploy 2.14.")).toBeGreaterThan(origin);
   });
 
   test("Feito leaves at once (optimistic) and Desfazer brings it back", async () => {
