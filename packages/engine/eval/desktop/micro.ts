@@ -264,6 +264,18 @@ report.box = {
     first: p50(boxes.filter((b) => b.pass === "first").map((b) => b.ms as number)),
     closeUp: p50(boxes.filter((b) => b.pass === "closeUp").map((b) => b.ms as number)),
   },
+  // Each target's score per pass, so a miss shows where it is.
+  byTarget: Object.fromEntries(
+    imageCases.map((c) => [
+      `${c.scene}: ${c.target}`,
+      Object.fromEntries(
+        passes.map((pass) => [
+          pass,
+          rate(boxes.filter((b) => b.pass === pass && b.scene === c.scene && b.target === c.target)).right,
+        ]),
+      ),
+    ]),
+  ),
   cases: boxes,
 };
 

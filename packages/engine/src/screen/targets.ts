@@ -381,8 +381,14 @@ const ON_IMAGE: Record<ScreenKind, { where: string; closeUp: string; present: st
 const PRESENT_AT = 0.6;
 /** A first box this small (of each side) is looked at again on a close-up, when the surface takes one. */
 const ZOOM_BELOW = 0.15;
-/** A close-up's size in screen pixels, at their native size: as measured for small desktop targets. */
-const CLOSE_UP = { width: 480, height: 300 };
+/** How much of the screen a close-up shows, in screen pixels. */
+const CLOSE_UP = { width: 240, height: 150 };
+/**
+ * How many times larger than on the screen a close-up is sent. At native size Jev's box on a 14 px
+ * control (a title bar's ×) lands on its neighbor, and Jev takes no image under 280 px a side, so a
+ * region this small is enlarged rather than sent as it is.
+ */
+const CLOSE_UP_SCALE = 2;
 
 /** One control: a box taller than half the image or wider than 80% of it isn't one. */
 const clearBox = (b: JudgeBox) => {
@@ -412,14 +418,25 @@ function closeUpAround(point: { x: number; y: number }, image: ScreenImage): Scr
   };
 }
 
+/** `image` drawn `times` larger (a JPEG at the runner's quality); what it shows, and where, stay the same. */
+async function enlarged(image: ScreenImage, times: number): Promise<ScreenImage> {
+  const width = Math.round(image.width * times);
+  const height = Math.round(image.height * times);
+  const data = await new Bun.Image(Buffer.from(image.data, "base64"))
+    .resize(width, height)
+    .jpeg({ quality: 70 })
+    .toBase64();
+  return { ...image, data, width, height };
+}
+
 /**
  * Looks for the target on an image of the screen (Jev's Box, plus whether it's
  * there). With marks (an annotated screenshot), the point lands on a marked
  * element's ref, so the action stays as exact as a ref; else it's a point.
- * With `zoom`, a small first box is boxed again on a close-up at the screen's
- * native size (small desktop targets: menu items, icons), and the close-up's
- * answer is the one taken. Words that can't be undone (delete, discard…) are
- * never taken at a bare point.
+ * With `zoom`, a small first box is boxed again on a close-up of the screen
+ * around it, enlarged (small desktop targets: menu items, icons, a title
+ * bar's buttons), and the close-up's answer is the one taken. Words that
+ * can't be undone (delete, discard…) are never taken at a bare point.
  */
 export async function locateOnImage(input: {
   judge: Judge;
@@ -470,9 +487,10 @@ export async function locateOnImage(input: {
 
   const small = first.box.right - first.box.left <= ZOOM_BELOW && first.box.bottom - first.box.top <= ZOOM_BELOW;
   if (input.zoom && small) {
-    const close = await input.zoom(closeUpAround(point, input.image)).catch(() => null);
+    const taken = await input.zoom(closeUpAround(point, input.image)).catch(() => null);
     // Only an image that says where it sits maps back; without one the first answer stands.
-    const second = close?.origin ? await boxOn(close, words.closeUp).catch(() => null) : null;
+    const close = taken?.origin ? await enlarged(taken, CLOSE_UP_SCALE).catch(() => null) : null;
+    const second = close ? await boxOn(close, words.closeUp).catch(() => null) : null;
     if (close && second) {
       // Up close it isn't there, or isn't one control: the first box was most likely on a neighbor.
       if (!second.box || second.present < PRESENT_AT || !clearBox(second.box)) {
