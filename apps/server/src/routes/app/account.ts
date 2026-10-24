@@ -98,6 +98,9 @@ export function accountRoutes(deps: AppDeps) {
               .string()
               .nullable()
               .openapi({ description: "Privacy policy linked on the sign-in screen (PRIVACY_URL)." }),
+            supportEmail: z.string().nullable().openapi({
+              description: "Where people write to whoever runs this server (SUPPORT_EMAIL): hold, suspension.",
+            }),
           }),
         ),
       },

@@ -10,7 +10,7 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
-import { ValidationError } from "./errors";
+import { ForbiddenError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { MachineCaller } from "./machine-hub";
 import { taskRequester } from "./machine-tasks";
@@ -86,6 +86,13 @@ export async function reduceMachineAccess(
     throw new ValidationError("Say which folder to remove or which tool to turn off", "machine.access_nothing");
   }
   const machine = await requireMachineManager(deps.db, actorId, orgId, machineId);
+  // Turned back on only on the computer itself, which nobody in the workspace reaches (ADR 0056 §10).
+  if (machine.kind === "managed") {
+    throw new ForbiddenError(
+      "This is the workspace's own computer: its tools and folders stay as they are",
+      "machine.managed_access",
+    );
+  }
   if (machine.protocol < ACCESS_PROTOCOL) {
     throw new ValidationError(
       "This computer's app is too old to change its access from here; update it",

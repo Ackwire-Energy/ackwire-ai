@@ -486,7 +486,7 @@ with their email, sign-ins with their IP address and browser, workspaces, invita
 sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
 credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/standing` puts a
 workspace on hold (its agents stop) or suspends it (nobody can use it, and what its agents are doing
-stops), and brings it back; `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
+stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to write about it); `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
 `PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
