@@ -1,4 +1,4 @@
-# 0060. Desktop computer use: the screen layer on the agent's desktop
+# 0062. Desktop computer use: the screen layer on the agent's desktop
 
 - Status: Proposed
 - Date: 2026-10-24

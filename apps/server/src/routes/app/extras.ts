@@ -6,6 +6,7 @@ import type {
   McpConnect,
   ModelGateway,
   ResolveHost,
+  RouterDeps,
   SandboxDeps,
   StorageDeps,
   StreamBroker,
@@ -46,4 +47,6 @@ export interface AppExtras {
   streams?: StreamBroker;
   /** Agents' conversation layer: fast replies while their task works or waits; absent = none. */
   talker?: Talker;
+  /** The router of messages nobody mentioned ("Responder agora" routes one again); null/absent = routing off. */
+  router?: RouterDeps | null;
 }

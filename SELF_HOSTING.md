@@ -17,10 +17,11 @@ never sent to browsers.
 
 **Requirements**
 
-- A 64-bit Linux server (amd64 or arm64) with Docker Engine and the Compose v2 plugin
-  (`docker compose`), 2.23.1 or newer. Docker Desktop works for trying it on a laptop. The setup
-  checks both and says how to install what's missing.
-- Node.js 18 or newer for `npx`, or nothing more: the setup also runs from the app's image.
+- A 64-bit Linux server (amd64 or arm64), or a Mac with Docker Desktop, OrbStack or Colima for
+  trying it. It runs on Docker Engine with the Compose v2 plugin (`docker compose`), 2.23.1 or
+  newer, and on Linux the installer below installs both when they're missing (Docker after asking).
+- Nothing else: the installer fetches the Bun it runs the setup on. With Node.js 18 or newer,
+  `npx @agenteschat/setup` is the same setup, and it also runs from the app's image.
 - Sizing has not been measured yet. As a starting point for a small team: 2 vCPUs, 4 GB of RAM and
   20 GB of disk. The image is large (about 2 GB of dependencies), and the database and the files
   volume grow with use.
@@ -46,18 +47,18 @@ tailnet can open it: no domain, no open port, nothing on the public internet.
 3. **An auth key.** Open https://console.tailscale.com/admin/settings/keys and click
    **Generate auth key**. Leave **Reusable** and **Ephemeral** off, turn **Pre-approved** on if you
    see it, and click **Generate key**. Copy the key (`tskey-auth-…`): it's shown once, and works once.
-4. **The setup.** On the server, in an empty directory:
+4. **Install.** On the server:
 
    ```sh
-   mkdir agentes && cd agentes
-   npx @agenteschat/setup
+   curl -fsSL https://agentes.chat/install | sh
    ```
 
-   Press Enter for **Tailscale**, paste the key, and press Enter to skip email, or set it up (Email,
-   under Configuration). The setup checks Docker, writes `.env` with generated secrets (readable by
-   you only), downloads `docker-compose.yml`, starts Tailscale, writes `PUBLIC_URL` from the address
-   Tailscale gives the server, starts the app, and waits for the certificate and `/api/health`. The
-   first time, it downloads about 2 GB. Done when it prints:
+   It installs what's missing, then runs the setup in `/opt/agentes` (`~/agentes` for a user who
+   can already use Docker). Press Enter for **Tailscale**, paste the key, and press Enter to skip
+   email, or set it up (Email, under Configuration). The setup checks Docker, writes `.env` with
+   generated secrets (readable by you only), downloads `docker-compose.yml`, starts Tailscale,
+   writes `PUBLIC_URL` from the address Tailscale gives the server, starts the app, and waits for
+   the certificate and `/api/health`. The first time, it downloads about 2 GB. Done when it prints:
 
    ```
    ✓ On your tailnet as agentes.tail1234.ts.net
@@ -77,7 +78,33 @@ tailnet can open it: no domain, no open port, nothing on the public internet.
    https://console.tailscale.com/admin/machines, open the server's **⋯** menu and choose
    **Disable Key Expiry**. A server added with an OAuth client secret (For AI agents) never expires.
 
-No Node.js on the server? The setup is in the app's image too, and works on the current directory:
+**The installer** is [`install.sh`](install.sh), and every instance serves it at `/install`. It only
+gets the computer ready, then hands over to the setup: on Linux, Docker (with Docker's own script,
+once you say yes) and the Compose plugin; on a Mac, Docker when Docker Desktop, OrbStack or Colima
+is running; and a pinned Bun (in `.runtime`) to run the setup with. Downloads are HTTPS, and the
+pinned ones are checked against the SHA-256 in the script before anything runs them. Without root
+and without access to Docker, it runs itself again with `sudo`, and a download cut short runs
+nothing. To read it before it runs:
+
+```sh
+curl -fsSLo install.sh https://agentes.chat/install
+less install.sh
+sh install.sh
+```
+
+Options go after `sh -s --`, or after `sh install.sh`: `--plan` prints what it would do and does
+nothing, `--yes` installs Docker without asking, `--dir <folder>` installs elsewhere, and every
+option of the setup passes through (`--network local`, `--email skip`):
+
+```sh
+curl -fsSL https://agentes.chat/install | sh -s -- --plan
+```
+
+Without a terminal (cloud-init, a CI job) nothing is asked: the setup takes its defaults and the
+options given, and Docker is installed only with `--yes`.
+
+Without the installer, the same setup runs with `npx @agenteschat/setup` in an empty directory
+(Node.js 18 or newer), or from the app's image, on the current directory:
 
 ```sh
 docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup
@@ -90,11 +117,10 @@ reads the address from Tailscale and writes `PUBLIC_URL`.
 (**Invite users**), or share only this server with their tailnet (its **⋯** menu on the Machines
 page, **Share**). Then invite them in the app, from **Settings → Members and invitations**.
 
-**Running the setup again** is safe: it keeps `.env` and fills in only what's missing, asking with
-your current answers as defaults. A `PUBLIC_URL` of your own (nginx, a tunnel) stays as it is.
-Choosing another way in removes the old one's container (Caddy or Tailscale), which
-`docker compose up` alone would leave running. `--dry-run` prints the plan and changes nothing, and
-`--help` lists every option.
+**Running the install again** is safe: the installer skips what's already there, and the setup
+keeps `.env` and fills in only what's missing, asking with your current answers as defaults. A
+`PUBLIC_URL` of your own (nginx, a tunnel) stays as it is. Choosing another way in removes the old
+one's container (Caddy or Tailscale), which `docker compose up` alone would leave running.
 
 `docker compose ps` shows the app as `healthy` once it answers `/api/health`, and
 `docker compose logs -f agentes` shows what it is doing.
@@ -166,6 +192,15 @@ tailnet policy file limits who reaches what, let your people reach `tag:agentes`
 AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' npx -y @agenteschat/setup --network tailscale --email skip --json
 ```
 
+No Node.js or Docker on the server? As root, the installer gets what's missing and then runs the
+same setup: give it `--yes` and the same options. Its own lines go to stderr, so stdout is still
+the setup's JSON; a failure before the setup starts is a line on stderr and exit code 1. Its
+`--plan` (`--dry-run` too) prints the installer's plan and runs nothing, not even the setup.
+
+```sh
+curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' sh -s -- --yes --network tailscale --email skip --json
+```
+
 - Every answer is a flag or an `AGENTES_SETUP_<OPTION>` variable; `--help` lists them, and a flag
   wins over a variable. With `--json` nothing is asked: a missing answer is a failed check.
 - stdout is one JSON object, and progress goes to stderr. Exit code 0: done; 1: a check failed;
@@ -218,7 +253,7 @@ the instance. A failure names the check, what happened and the fix:
 
 | `check` | What happened | Fix |
 | --- | --- | --- |
-| `docker`, `docker.compose` | Docker, or Compose v2 2.23.1 or newer, is missing | Linux: `curl -fsSL https://get.docker.com \| sudo sh`. Mac and Windows: Docker Desktop. |
+| `docker`, `docker.compose` | Docker, or Compose v2 2.23.1 or newer, is missing | Linux: the installer installs both (`curl -fsSL https://agentes.chat/install \| sh -s -- --yes`). Mac and Windows: Docker Desktop. |
 | `docker.daemon`, `docker.permission` | Docker isn't running, or this user can't use it | `sudo systemctl start docker`; `sudo usermod -aG docker $USER`, then log in again. |
 | `tailscale.key` | No key, or Tailscale refused it: expired, revoked, or a one-off key already used | A new auth key, or the OAuth client secret. |
 | `tailscale.approval` | The server waits for device approval | Machines page: the server marked **Needs approval**, its **⋯** menu, **Approve**. A pre-approved key or an OAuth client secret skips this. |
@@ -465,13 +500,15 @@ which removes the file as soon as it is read. Leave it `off` and people connect 
 <details>
 <summary><b>Optional services and what they receive</b></summary>
 
-Nothing on the instance contacts agentes.chat on its own. Besides the model providers each
-organization chooses, it talks to a third party only when you turn that service on:
+Nothing on the instance contacts agentes.chat on its own: it sends no usage report or telemetry. If
+a release ever adds one, it is listed here first, with what it sends and how to turn it off. Besides
+the model providers each organization chooses, it talks to a third party only when you turn that
+service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
 | Anthropic, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
-| TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory). Without it, the organization's own model does this. |
+| TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
@@ -588,6 +625,24 @@ the organization's audit log. Programs on one desktop aren't isolated from each 
 runs there can see its screen and keys, so agents never type passwords into desktop apps; a person signs
 in with take control, and the sign-in stays in the agent's home. Mac and Windows computers have no
 desktop use.
+
+**This server as the agents' computer (Linux).** The machine agentes.chat runs on can be a computer
+too, for the organizations the installation's first account made and is an owner or an admin of,
+with each agent as its own user on it. Set a token in `.env` and give the same one to the runner, as
+root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you changed it):
+
+```sh
+(umask 077 && openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token)
+echo "HOST_COMPUTER_TOKEN=$(cat /root/host-computer-token)" >> .env
+docker compose up -d
+curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system \
+  --server http://127.0.0.1:3000 --host-token-file /root/host-computer-token
+```
+
+Within a minute it shows as "Computador deste servidor" in each of those organizations, and agents
+without a computer start using it; admins stop it per organization there. `HOST_COMPUTER_TOKEN` can't
+be set with `ALLOW_SIGNUP=true`, and a new token retires the old one's connections when the server
+restarts.
 
 </details>
 

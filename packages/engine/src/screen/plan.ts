@@ -21,7 +21,7 @@ import { locateOnImage, resolveTarget, type TargetCache, type TargetUse } from "
  * left to settle and, when the step says what it expects, checked. The plan
  * stops at the first step that fails or doesn't show what it expected, and
  * says what the screen looks like then. Surface-agnostic: the browser is one
- * surface, the agent's desktop another (ADR 0060).
+ * surface, the agent's desktop another (ADR 0062).
  */
 
 export type ScreenVerb =

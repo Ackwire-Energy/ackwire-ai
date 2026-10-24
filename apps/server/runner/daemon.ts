@@ -220,7 +220,7 @@ interface Session {
   browser: BrowserManager;
   /** Desktop and terminal streams (ADR 0058): they end with the session. */
   streams: DataSockets;
-  /** The agents' use of their desktops (ADR 0060): its helpers end with the session, the desktops don't. */
+  /** The agents' use of their desktops (ADR 0062): its helpers end with the session, the desktops don't. */
   desktopUse: DesktopManager;
   connection: RunnerConnection;
   /** System mode: the agents' workers, where all their work runs. */
@@ -736,7 +736,7 @@ export class RunnerDaemon implements RequestObserver {
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
-    // Single-user: every agent works as this runner's own user, so no `uids` and desktop use stays off (ADR 0060
+    // Single-user: every agent works as this runner's own user, so no `uids` and desktop use stays off (ADR 0062
     // §3). System mode: each agent's worker serves it as the agent's own user.
     const desktopUse = new DesktopManager({
       desktops: this.desktops,
@@ -752,10 +752,13 @@ export class RunnerDaemon implements RequestObserver {
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
       agentUser = this.opts.workers?.user ?? ((agent) => users.ensure(agent));
-      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor.
-      const guard = this.opts.workers
-        ? undefined
-        : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
+      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
+      // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
+      // would replace the others' rules with its own.
+      const guard =
+        this.opts.workers || config.managedBy === "host"
+          ? undefined
+          : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
       supervisor = new Supervisor({
         home,
         user: agentUser,
@@ -777,6 +780,7 @@ export class RunnerDaemon implements RequestObserver {
         return daemon.access().tools.commands;
       },
       token: config.token,
+      server: config.server,
       secretsDir,
       gitDir: path.join(home, "git"),
       tasks,
@@ -1179,7 +1183,7 @@ export class RunnerDaemon implements RequestObserver {
       brainIdleMinutes: c.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes,
       brainMaxProcesses: c.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
       workspace: this.session?.workspaceReal ?? c.workspace,
-      ...(c.managedBy ? { managedBy: c.managedBy } : {}),
+      ...(c.managedBy === "desktop" ? { managedBy: c.managedBy } : {}),
     };
   }
 

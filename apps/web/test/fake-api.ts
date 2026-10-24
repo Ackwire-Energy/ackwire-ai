@@ -4,6 +4,7 @@ import type {
   AgentBrain,
   AgentQuestion,
   AgentSecret,
+  AiStatus,
   ApiClient,
   AppNotification,
   Approval,
@@ -116,6 +117,10 @@ export interface FakeState {
   waitlistError?: ApiError;
   /** Make `waitlist.confirm` fail with this error (invalid_token…). */
   waitlistConfirmError?: ApiError;
+  /** `agents.aiStatus`; unset = every agent ready. */
+  aiStatus?: AiStatus;
+  /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
+  answerNowError?: ApiError;
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
@@ -970,6 +975,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.credentials = state.credentials.filter((c) => c.id !== credentialId);
       },
       platformKeyAvailable: async () => state.platformKey,
+      aiStatus: async () =>
+        structuredClone(
+          state.aiStatus ?? {
+            any: true,
+            agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })),
+          },
+        ),
       importFromGithub: async (orgId, url) => {
         log("agents.importFromGithub", orgId, url);
         const files = state.githubFiles?.[url];
@@ -1191,6 +1203,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       correct: async (orgId, messageId, body) => {
         log("chat.correct", orgId, messageId, body);
+      },
+      answerNow: async (orgId, messageId) => {
+        log("chat.answerNow", orgId, messageId);
+        if (state.answerNowError) throw state.answerNowError;
+        return { runs: [] };
       },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>

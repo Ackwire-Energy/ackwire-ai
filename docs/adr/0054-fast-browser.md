@@ -4,7 +4,7 @@
 - Date: 2026-10-23
 - Builds on: ADR 0040 (the agent browser on `agent-browser`), ADR 0031 (computer use), ADR 0032 (one engine, the runner as a bridge), ADR 0053 (who is behind a run, the policy table)
 - Changes in ADR 0040: §5 (tools answer with what changed; targets in words) and the "later" row "Intent tools with Jev", done here in another shape
-- Desktop surface: ADR 0060, which also changes this one for the browser: boxes over half the screenshot's height or 80% of its width are refused (§2), words that can't be undone are never taken at a bare point and more words are costly (§2), and an unsure check is judged once more on the image (§4)
+- Desktop surface: ADR 0062, which also changes this one for the browser: boxes over half the screenshot's height or 80% of its width are refused (§2), words that can't be undone are never taken at a bare point and more words are costly (§2), and an unsure check is judged once more on the image (§4)
 - Code: `packages/engine/src/screen/*` (the layer), `browser/surface.ts`, `browser/tools.ts`, `judge.ts` (images, Box), runner `browser.ts` (`browser.batch`, `browser.capture`), protocol 17
 
 ## Context

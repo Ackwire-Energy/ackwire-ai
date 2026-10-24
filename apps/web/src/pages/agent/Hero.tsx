@@ -6,6 +6,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usd } from "@/components/AgentFields";
+import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AgentCover } from "@/components/Sky";
 import { thisMonth } from "@/lib/agent-edit";
@@ -202,6 +203,7 @@ export function AgentHero({
             @{agent.handle}
             {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
           </span>
+          <NoAiChip agentId={agent.id} />
         </div>
         {/* Narrow (the panel beside its DM, small screens): how it works stays up here, on every tab. Wide, it
             is the overview's side column (OverviewTab). In the panel the numbers stay on the full page. */}

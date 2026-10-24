@@ -406,6 +406,25 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     ]);
   });
 
+  test("the server's own computer: whether it works here (404: null), and turning it back on", async () => {
+    const state = { machineId: "m9", on: false };
+    const { fetch, calls } = fakeFetch({
+      [`GET ${org}/machines/host`]: { status: 200, body: state },
+      [`POST ${org}/machines/host`]: { status: 200, body: { ...state, on: true } },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.machines.host("o1")).toEqual(state);
+    expect(await api.machines.hostOn("o1")).toEqual({ machineId: "m9", on: true });
+    expect(calls.map((c) => `${c.init.method} ${c.url} ${c.init.body ?? ""}`)).toEqual([
+      `GET ${org}/machines/host `,
+      `POST ${org}/machines/host {}`,
+    ]);
+    const none = fakeFetch({
+      [`GET ${org}/machines/host`]: { status: 404, body: { error: { code: "machine.host_none", message: "no" } } },
+    });
+    expect(await createHttpApi({ fetch: none.fetch }).machines.host("o1")).toBeNull();
+  });
+
   test("storage: get, test, save, migrate and migration status", async () => {
     const config = { kind: "agentes", s3: null, migration: null };
     const s3 = { endpoint: "https://r2", region: "auto", bucket: "b", prefix: null, pathStyle: true };

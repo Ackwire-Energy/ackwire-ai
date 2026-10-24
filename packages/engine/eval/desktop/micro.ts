@@ -1,5 +1,5 @@
 /**
- * Desktop computer use against the real Jev (ADR 0060), on scenes recorded from an agent's desktop (XFCE at
+ * Desktop computer use against the real Jev (ADR 0062), on scenes recorded from an agent's desktop (XFCE at
  * 1280×800; the helper's own screenshots, JPEG q70, and the runner's looks with their marks): Jev's Box on
  * the screenshot, first pass and with the close-up of small targets; targets that aren't there; the judge's
  * Choice over the accessibility tree; checks on the text and with the image. Prints each against its bar
@@ -337,7 +337,7 @@ report.judge = {
 };
 
 /**
- * The bars a model must clear: a little under what `jev-1.14.0` measured here (ADR 0060: small targets with the
+ * The bars a model must clear: a little under what `jev-1.14.0` measured here (ADR 0062: small targets with the
  * close-up 35/39, the rest all right), so that noise alone doesn't fail a run and a worse model does.
  */
 const box = report.box as Record<string, Record<string, { share: number; right: string }>>;

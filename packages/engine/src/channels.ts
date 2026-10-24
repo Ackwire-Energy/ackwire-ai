@@ -405,14 +405,8 @@ export async function removeChannelMember(
   await publishChannelEvent(options.pubsub, removed);
 }
 
-/** Archives a channel (creator or admin). Live subscriptions to it end at once. `general` can't be archived. */
-export async function archiveChannel(
-  db: Database,
-  actorId: string,
-  orgId: string,
-  channelId: string,
-  options: { pubsub?: PubSub } = {},
-) {
+/** The channel, when `actorId` may archive it or bring it back: its creator or an admin. */
+async function archivableChannel(db: Database, actorId: string, orgId: string, channelId: string) {
   const membership = await getMembership(db, actorId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
   const [channel] = await db
@@ -423,8 +417,27 @@ export async function archiveChannel(
   if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
     throw new ForbiddenError("Only the channel's creator or an admin can archive it");
   }
+  return channel;
+}
+
+/** Archives a channel (creator or admin). Live subscriptions to it end at once. `general` can't be archived. */
+export async function archiveChannel(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  options: { pubsub?: PubSub } = {},
+) {
+  const channel = await archivableChannel(db, actorId, orgId, channelId);
   if (channel.name === "general") throw new ValidationError("#general can't be archived");
   await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
   caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
+}
+
+/** Brings an archived channel back as it was (creator or admin): "Refazer" after an agent's channel was undone. */
+export async function unarchiveChannel(db: Database, actorId: string, orgId: string, channelId: string) {
+  await archivableChannel(db, actorId, orgId, channelId);
+  await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, channelId));
+  caches.channels.delete(`${orgId}:${channelId}`);
 }

@@ -270,7 +270,7 @@ export const PLAN_USAGE_PROTOCOL = 19;
  */
 export const PLAN_KEYS_PROTOCOL = 20;
 /**
- * From this protocol on (ADR 0060): the agent uses its own desktop.
+ * From this protocol on (ADR 0062): the agent uses its own desktop.
  * `desktop.look` reads what it shows as screen text, `desktop.act` does one
  * action, waits for the screen to settle and looks again, `desktop.capture`
  * returns a JPEG with the look's elements boxed, `desktop.apps` lists the apps
@@ -1092,7 +1092,7 @@ export interface RunnerInfo {
   desktop?: RunnerDesktopInfo;
   /** Protocol 18: whether people can open a terminal here. */
   terminal?: RunnerTerminalInfo;
-  /** Protocol 21: whether agents can use their own desktops here (ADR 0060). */
+  /** Protocol 21: whether agents can use their own desktops here (ADR 0062). */
   desktopUse?: RunnerDesktopUseInfo;
   /**
    * Protocol 18: `system` when each agent works as its own OS user (ADR 0058 §10); absent, every agent

@@ -271,7 +271,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
 }
 
 /**
- * The agent may use apps on its desktop, and its Linux computer says what that still lacks there (ADR 0060):
+ * The agent may use apps on its desktop, and its Linux computer says what that still lacks there (ADR 0062):
  * the computer's own words, with the command in them to copy. Mac and Windows computers never have it, which
  * their own page says.
  */
@@ -415,6 +415,7 @@ function useRefresh() {
   return () => {
     for (const key of [
       keys.agentBrain(org.id, agent.id),
+      keys.aiStatus(org.id),
       keys.computer(org.id, agent.id),
       keys.agentBrowser(org.id, agent.id),
       keys.scopes(org.id, agent.id),

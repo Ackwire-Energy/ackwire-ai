@@ -14,7 +14,7 @@ import type { PlanReport, ScreenStep, ScreenVerb, StepReport } from "./plan";
  * stopped and why, and the screen at the end: what changed on it, or, on a
  * new page, what can be acted on. The agent rarely needs a separate read
  * after acting. A desktop's report says "screen" where a browser's says
- * "page" (ADR 0060).
+ * "page" (ADR 0062).
  */
 
 const DONE: Record<ScreenVerb, string> = {

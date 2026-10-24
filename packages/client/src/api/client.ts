@@ -23,6 +23,7 @@ import type {
   AgentSkill,
   AgentUsage,
   AiAccounts,
+  AiStatus,
   ApiRule,
   AppNotification,
   Approval,
@@ -70,6 +71,7 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  HostComputer,
   ImportInput,
   ImportPlan,
   Invitation,
@@ -272,6 +274,8 @@ export interface ApiClient {
     removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
+    /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
+    aiStatus(orgId: string): Promise<AiStatus>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,
@@ -360,6 +364,11 @@ export interface ApiClient {
     unreact(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
     /** Corrects an agent's reply: it becomes a lesson for that agent. */
     correct(orgId: string, messageId: string, body: string): Promise<void>;
+    /**
+     * "Responder agora" once an AI is connected: the agent answers what it couldn't. `messageId` is its
+     * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
+     */
+    answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
   };
 
   approvals: {
@@ -412,6 +421,10 @@ export interface ApiClient {
     rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
     /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
     remove(orgId: string, machineId: string): Promise<void>;
+    /** The server's own computer in this organization; null when the server has none or doesn't serve it. */
+    host(orgId: string): Promise<HostComputer | null>;
+    /** Uses the server's computer again (admins); `remove` is how it stops. */
+    hostOn(orgId: string): Promise<HostComputer>;
     /**
      * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
      * (`machine.device_not_found` once expired, used or unknown).

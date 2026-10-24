@@ -1,7 +1,7 @@
 /**
  * Where an agent browsed, after the run (`meta.browser` on its message): the browser calls the
  * server kept (tool, the site of an open, when), never anything of the page itself (ADR 0040 §7).
- * The same for its desktop (`meta.desktop`, ADR 0060): the app an open started instead of the site.
+ * The same for its desktop (`meta.desktop`, ADR 0062): the app an open started instead of the site.
  */
 
 import type { ScreenKind } from "../api/types";

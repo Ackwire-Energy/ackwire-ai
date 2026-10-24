@@ -3,6 +3,8 @@
  * apps/server/src/routes/machines.ts:
  * - `GET    …/machines` → `{ machines: Machine[] }`
  * - `PATCH  …/machines/{id}` `{ name }`, `DELETE …/machines/{id}`
+ * - `GET    …/machines/host` → `{ machineId, on }` (404 = `null`: no computer of the server's own here);
+ *   `POST …/machines/host` → `{ machineId, on: true }`
  * - `GET    /api/app/machines/device/{userCode}` → the computer that made the code (404 once gone)
  * - `POST   …/organizations/{orgId}/machines/device/{userCode}/confirm` `{ name? }` → 201, the machine
  *   (the same one when the code's `reconnect` names a machine of that organization)
@@ -28,6 +30,7 @@ import type {
   ApiClient,
   DesktopRelease,
   DeviceRequest,
+  HostComputer,
   Machine,
   MachineAccountKind,
   MachineOutages,
@@ -57,6 +60,8 @@ export interface FakeMachines {
   setOutages(outages: MachineOutages): void;
   /** What `moveAgents` answers (default: every agent moved, nothing else). */
   setMoveResult(result: MoveAgentsResult | null): void;
+  /** The server's own computer in the organization; `null` (default): it has none. */
+  setHost(state: HostComputer | null): void;
   /** The newest sign-in started (ADR 0041), with the code box sent for it, if any. */
   lastLogin(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean } | undefined;
   /** The computer finished (or gave up on) a sign-in. */
@@ -75,6 +80,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   let release: DesktopRelease | null = null;
   let outages: MachineOutages = { outages: [], targets: [] };
   let moveResult: MoveAgentsResult | null = null;
+  let host: HostComputer | null = null;
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
   let ai: AiAccounts = { accounts: [], computers: [] };
   const logins: Login[] = [];
@@ -126,10 +132,19 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       remove: async (orgId, machineId) => {
         log("machines.remove", orgId, machineId);
         find(machineId);
+        // The server's own computer is only stopped here: it can come back.
+        if (host?.machineId === machineId) host = { ...host, on: false };
         machines.splice(
           machines.findIndex((m) => m.id === machineId),
           1,
         );
+      },
+      host: async () => clone(host),
+      hostOn: async (orgId) => {
+        log("machines.hostOn", orgId);
+        if (!host) throw new MockNotFoundError("Sem computador deste servidor.");
+        host = { ...host, on: true };
+        return clone(host);
       },
       device: async (userCode) => {
         log("machines.device", userCode);
@@ -260,6 +275,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     },
     setMoveResult: (next) => {
       moveResult = next;
+    },
+    setHost: (next) => {
+      host = clone(next);
     },
     lastLogin: () => {
       const l = logins.at(-1);

@@ -1,10 +1,10 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gt, gte, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { actionsFor, actionView, describeAction, publishMessageActions, UNDO_WINDOW_MS } from "./agent-actions";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
-import { addChannelMember, removeChannelMember } from "./channels";
+import { addChannelMember, archiveChannel, removeChannelMember, unarchiveChannel } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { getIssue, type IssueView, setCriterion, updateIssue, type WorkActor } from "./issues";
 import { announceMessageMemories } from "./message-memories";
@@ -15,7 +15,7 @@ import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
 import { deleteWikiPage, getWikiPage, getWikiVersion, restoreWikiPage, updateWikiPage } from "./wiki";
 
-const { agentActions, contextItems, routines, channelMembers, issueActivity, messages, users } = schema;
+const { agentActions, contextItems, routines, channels, channelMembers, issueActivity, messages, users } = schema;
 
 type Row = typeof agentActions.$inferSelect;
 
@@ -370,6 +370,36 @@ const handlers: Record<string, Handler> = {
         { pubsub: deps.pubsub },
       );
     }
+    return undefined;
+  },
+
+  async "channel.created"(deps, a, userId, direction) {
+    const [channel] = await deps.db
+      .select({ createdAt: channels.createdAt, archivedAt: channels.archivedAt })
+      .from(channels)
+      .where(and(eq(channels.orgId, a.orgId), eq(channels.id, a.targetId)));
+    if (!channel) throw new NotFoundError("The channel is gone", "action.target_gone");
+    if (direction === "redo") {
+      if (!channel.archivedAt) throw changedSince();
+      await unarchiveChannel(deps.db, userId, a.orgId, a.targetId);
+      return undefined;
+    }
+    if (channel.archivedAt) throw changedSince();
+    // Someone already wrote there: archiving would hide their messages.
+    const [written] = await deps.db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, a.orgId),
+          eq(messages.channelId, a.targetId),
+          gte(messages.createdAt, channel.createdAt),
+          isNull(messages.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (written) throw changedSince();
+    await archiveChannel(deps.db, userId, a.orgId, a.targetId, { pubsub: deps.pubsub });
     return undefined;
   },
 

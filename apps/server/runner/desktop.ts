@@ -51,7 +51,7 @@ import { isAbsoluteRequest, resolveInRoots, resolveInWorkspace } from "./paths";
 import { KeyedQueue } from "./queue";
 
 /**
- * Desktop use (ADR 0060): the agent drives its own desktop (ADR 0058)
+ * Desktop use (ADR 0062): the agent drives its own desktop (ADR 0058)
  * through a helper (`desktop-helper.py`), one per agent, started on its first
  * use and stopped after `DESKTOP_IDLE_MS` without one.
  *
@@ -241,7 +241,7 @@ export interface AgentUids {
 }
 
 /**
- * Why an agent can't use its desktop here, or null when it can (ADR 0060 §3). The helper runs as `own` (this
+ * Why an agent can't use its desktop here, or null when it can (ADR 0062 §3). The helper runs as `own` (this
  * process's uid, or its launcher's), which must be the agent's own user: neither the runner's nor any other agent's. A
  * desktop has a terminal, and whoever drives it reads everything its user can; the runner's user holds every
  * agent's delivered secrets and the computer's token. `agentId` null: whether this process could serve any.
@@ -562,7 +562,7 @@ class Helper {
   }
 }
 
-/** Each agent's use of its own desktop (ADR 0060): `desktop.look`, `desktop.act`, `desktop.capture`, `desktop.apps`. */
+/** Each agent's use of its own desktop (ADR 0062): `desktop.look`, `desktop.act`, `desktop.capture`, `desktop.apps`. */
 export class DesktopManager {
   private readonly uses = new Map<string, Use>();
   private readonly queue = new KeyedQueue();

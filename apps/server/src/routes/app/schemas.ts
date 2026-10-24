@@ -185,6 +185,7 @@ export const AgentAction = z
         "routine.updated",
         "routine.deleted",
         "channel.agent_added",
+        "channel.created",
         "wiki.page_created",
         "wiki.page_edited",
         "thread.renamed",
@@ -249,6 +250,10 @@ const MessageBase = z.object({
           agentId: z.uuid(),
           runId: z.uuid(),
           status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed", "canceled"]),
+          reason: z
+            .literal("no_ai")
+            .optional()
+            .openapi({ description: "It couldn't answer: the agent has no AI connected." }),
         }),
       ),
       blocked: z
@@ -258,6 +263,10 @@ const MessageBase = z.object({
         .array(z.uuid())
         .optional()
         .openapi({ description: "Agents it only references as part of the request to another agent: no run." }),
+      noAi: z
+        .literal(true)
+        .optional()
+        .openapi({ description: "Routed to nobody: the organization had no AI connected." }),
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),

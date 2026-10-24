@@ -11,7 +11,7 @@ import {
 } from "../screen";
 
 /**
- * The agent's desktop as a screen (ADR 0060): each action of a plan is one
+ * The agent's desktop as a screen (ADR 0062): each action of a plan is one
  * `desktop.act`, which acts, waits for the screen to settle and looks again
  * in one round trip; a look is `desktop.look`, an image `desktop.capture`
  * (of a region too, for close-ups of small targets). Apps are named in words

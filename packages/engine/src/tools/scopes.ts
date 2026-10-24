@@ -81,15 +81,21 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     description:
       "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
   },
+  "setup:write": {
+    label: "Set up the workspace",
+    description:
+      "Offer to connect an AI with a card a person clicks, and create channels for the person who asked, with Undo.",
+  },
 };
 
 /**
  * Granted to every new agent: reading context, keeping its own notes,
  * reading and writing Drive files, and reading issues (so any agent can check
- * the org's issues before answering about them; low risk), and its computer
- * (running commands, its own browser and desktop): on a connected computer
- * each still needs the switch the person at that computer turned on. Admins
- * and owners can revoke them.
+ * the org's issues before answering about them; low risk), setting up the
+ * workspace for whoever asks (cards a person clicks, channels with Undo), and
+ * its computer (running commands, its own browser and desktop): on a connected
+ * computer each still needs the switch the person at that computer turned on.
+ * Admins and owners can revoke them.
  */
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
@@ -102,6 +108,7 @@ export const DEFAULT_AGENT_SCOPES = [
   "forum:write",
   "wiki:read",
   "wiki:write",
+  "setup:write",
   "sandbox:run",
   "browser:use",
   "desktop:use",

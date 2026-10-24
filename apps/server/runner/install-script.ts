@@ -79,6 +79,13 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * SHA-256: whoever runs the installer for a fleet pins the runner it vouches
  * for, so a root runner never runs whatever the server happens to serve.
  *
+ * `--server URL` is where this computer reaches the server, when that isn't
+ * the address the script names (the server's own machine, say, reaching it at
+ * `http://127.0.0.1:3000` while people use a tailnet name). With `--system`,
+ * `--host-token-file PATH` makes this the server's own computer: the service
+ * runs `agentes-runner host` with the server's `HOST_COMPUTER_TOKEN` from that
+ * file instead of pairing.
+ *
  * `--enroll-file FILE` (any mode) connects with a code issued for this
  * computer instead (`agentes-runner pair --enroll-file`, ADR 0056 §10),
  * connected before or not.
@@ -110,6 +117,8 @@ NO_PAIR=0
 NO_START=0
 UID_RANGE=""
 RUNNER_SHA256=""
+HOST_TOKEN_FILE=""
+SERVER_FLAG=""
 ENROLL_FILE=""
 
 say() { printf '%s\\n' "$*"; }
@@ -130,6 +139,8 @@ usage() {
   say "  --no-start         with --system: install or update without starting or restarting the service"
   say "  --agent-uid-range  with --system: the uids agent users get (default ${uids})"
   say "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)"
+  say "  --server           where this computer reaches the server, if not at $SERVER"
+  say "  --host-token-file  with --system: this server's own computer, with HOST_COMPUTER_TOKEN from this file"
   say "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
 }
 
@@ -271,8 +282,16 @@ install_system() {
   set -- service install --system --no-start
   if [ -n "$UID_RANGE" ]; then set -- "$@" --agent-uid-range "$UID_RANGE"; fi
   "$LAUNCHER" "$@" || die "installing the service failed"
-  connect
-  if [ "$NO_START" -eq 0 ]; then "$LAUNCHER" service install --system || die "starting the service failed"; fi
+  if [ -n "$HOST_TOKEN_FILE" ]; then
+    # Only root reads the token.
+    chmod 600 "$HOST_TOKEN_FILE"
+    set -- service install --host --server "$SERVER" --token-file "$HOST_TOKEN_FILE"
+    if [ "$NO_START" -eq 1 ]; then set -- "$@" --no-start; fi
+    "$LAUNCHER" "$@" || die "installing this server's computer failed"
+  else
+    connect
+    if [ "$NO_START" -eq 0 ]; then "$LAUNCHER" service install --system || die "starting the service failed"; fi
+  fi
   say "The agentes-runner command is $LAUNCHER (for example: agentes-runner status)."
 }
 
@@ -358,6 +377,10 @@ main() {
       --agent-uid-range) need_value "$1" $#; UID_RANGE="$2"; shift 2 ;;
       --agent-uid-range=*) UID_RANGE="\${1#--agent-uid-range=}"; shift ;;
       --runner-sha256) need_value "$1" $#; RUNNER_SHA256="$2"; shift 2 ;;
+      --server) need_value "$1" $#; SERVER_FLAG="$2"; shift 2 ;;
+      --server=*) SERVER_FLAG="\${1#--server=}"; shift ;;
+      --host-token-file) need_value "$1" $#; HOST_TOKEN_FILE="$2"; shift 2 ;;
+      --host-token-file=*) HOST_TOKEN_FILE="\${1#--host-token-file=}"; shift ;;
       --runner-sha256=*) RUNNER_SHA256="\${1#--runner-sha256=}"; shift ;;
       --enroll-file) need_value "$1" $#; ENROLL_FILE="$2"; shift 2 ;;
       --enroll-file=*) ENROLL_FILE="\${1#--enroll-file=}"; shift ;;
@@ -371,13 +394,23 @@ main() {
   esac
   [ -z "$RUNNER_SHA256" ] || [ \${#RUNNER_SHA256} -eq 64 ] ||
     die "--runner-sha256 takes the bundle's SHA-256 as 64 lowercase hex digits"
+  if [ -n "$SERVER_FLAG" ]; then
+    SERVER=$(printf '%s' "$SERVER_FLAG" | sed 's:/*$::')
+    case "$SERVER" in
+      http://*|https://*) ;;
+      *) die "--server takes the server's address, like http://127.0.0.1:3000" ;;
+    esac
+  fi
+  [ -z "$HOST_TOKEN_FILE" ] || [ -r "$HOST_TOKEN_FILE" ] || die "--host-token-file: can't read $HOST_TOKEN_FILE"
   [ -z "$ENROLL_FILE" ] || [ "$NO_PAIR" -eq 0 ] || die "--enroll-file connects this computer, so it doesn't go with --no-pair"
+  [ -z "$ENROLL_FILE" ] || [ -z "$HOST_TOKEN_FILE" ] ||
+    die "--enroll-file doesn't go with --host-token-file: this server's own computer connects with its token"
   if [ "$SYSTEM" -eq 1 ]; then
     [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service; to leave it stopped, use --no-start"
     [ -z "$DIR" ] || die "--dir doesn't go with --system: each agent works in its own user's home"
     install_system
-  elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ]; then
-    die "--desktop, --no-pair, --no-start and --agent-uid-range go with --system"
+  elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ] || [ -n "$HOST_TOKEN_FILE" ]; then
+    die "--desktop, --no-pair, --no-start, --agent-uid-range and --host-token-file go with --system"
   else
     install_user
   fi

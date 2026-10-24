@@ -122,6 +122,8 @@ export interface HandlerContext {
   exec: boolean;
   /** The machine token (authenticates `push` uploads). */
   token: string;
+  /** The server this computer is paired with: `push` uploads go there (`uploadUrl`). */
+  server?: string;
   fetch?: FetchLike;
   /** Where each agent's secrets live (ADR 0027); without it the machine keeps none. */
   secretsDir?: string;
@@ -181,7 +183,7 @@ export interface HandlerContext {
   terminals?: Terminals;
   /** Protocol 18: where `stream.open` dials its data socket; without it the runner refuses streams. */
   streams?: DataSockets;
-  /** Protocol 21: the agents' use of their own desktops (ADR 0060); without it the runner refuses `desktop.look`… */
+  /** Protocol 21: the agents' use of their own desktops (ADR 0062); without it the runner refuses `desktop.look`… */
   desktopUse?: DesktopManager;
 }
 
@@ -465,6 +467,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       return pushPath({
         workspaceReal: ctx.workspaceReal,
         token: ctx.token,
+        ...(ctx.server ? { server: ctx.server } : {}),
         path: requireString(req.path, "path"),
         url: requireString(req.url, "url"),
         uploadId: requireString(req.uploadId, "uploadId"),
@@ -503,7 +506,7 @@ function handleDesktop(
 }
 
 /**
- * Protocol 21: the agent uses its own desktop (ADR 0060). That runs commands
+ * Protocol 21: the agent uses its own desktop (ADR 0062). That runs commands
  * as the agent (its desktop has a terminal), so it needs the machine's
  * desktop switch and its commands switch.
  */

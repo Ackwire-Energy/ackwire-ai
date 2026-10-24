@@ -12,6 +12,7 @@ import {
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
+import { agentAiState, type NoAiReason, noAiReasonOf } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { runAuthority } from "./authority";
 import {
@@ -33,6 +34,7 @@ import type { ComputerTurn } from "./brains/prompt";
 import {
   type BrainPlan,
   mayFallBack,
+  NO_AI_CODES,
   notePlanLimit,
   recordRunBrain,
   resolveBrain,
@@ -76,6 +78,7 @@ import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import type { MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
@@ -117,6 +120,7 @@ import {
   type AgentRun,
   addRunStep,
   isTerminal,
+  NO_AI,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
@@ -526,6 +530,7 @@ async function executeRunInner(
       agentId: run.agentId,
       runId: run.id,
       status,
+      ...(error === NO_AI ? { reason: NO_AI } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
@@ -584,6 +589,19 @@ async function executeRunInner(
     // waiting messages a run of their own.
     if (reason !== "agent_archived" && !standingErrorDetail(reason)) await redispatchPending("failed");
   };
+  /**
+   * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
+   * card with Connect. Background work only fails (its routine says why).
+   */
+  const failNoAi = async (why: NoAiReason) => {
+    if (!run.background) {
+      const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
+      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why)
+        .catch((error) => addRunStep(db, run, "error", { reason: "no_ai_card", message: String(error) }))
+        .catch(() => {});
+    }
+    await fail(NO_AI);
+  };
 
   // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
   // before it starts anything.
@@ -622,6 +640,12 @@ async function executeRunInner(
   if (fresh && trigger)
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
   if (!agent || agent.archivedAt) return fail("agent_archived");
+  // A new run that can't think (no key, a computer brain signed out or missing, and no fallback) fails here,
+  // before the judges below, any context or a model call.
+  if (needsContext) {
+    const ai = await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, agent, run);
+    if (ai.state === "no_ai") return failNoAi(ai.reason ?? "no_key");
+  }
   await publishChannelEvent(deps.pubsub, event("running"));
   // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
@@ -1224,12 +1248,15 @@ async function executeRunInner(
     await redispatchPending("done");
   };
 
-  /** The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the computer. */
+  /**
+   * The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the
+   * computer, or (nothing to think with) it fails with `no_ai`.
+   */
   const brainUnavailable = async (u: {
     code: string;
     message: string;
     resetsAt?: string;
-  }): Promise<"fallback" | "waited" | "no"> => {
+  }): Promise<"fallback" | "waited" | "failed" | "no"> => {
     const from = plan.kind;
     if (from === "model") return "no";
     const t = transcript as Transcript;
@@ -1256,6 +1283,12 @@ async function executeRunInner(
       run = { ...run, brain: "model" };
       await addRunStep(db, run, "context", { brainFallback: { from, code: u.code, message: u.message } });
       return "fallback";
+    }
+    // Signed out, the command-line tool missing, no computer: nothing signals that it's fixed (only the
+    // computer coming back online would), so a wait would never end.
+    if (!onlyThisComputer && NO_AI_CODES.has(u.code)) {
+      await failNoAi(noAiReasonOf(u.code));
+      return "failed";
     }
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
@@ -1481,7 +1514,7 @@ async function executeRunInner(
 
   if (plan.unavailable) {
     const handled = await brainUnavailable(plan.unavailable);
-    if (handled === "waited") return;
+    if (handled === "waited" || handled === "failed") return;
     if (handled === "no") {
       return fail(`brain_unavailable: ${plan.unavailable.message}`, {
         code: plan.unavailable.code,
@@ -1728,7 +1761,7 @@ async function executeRunInner(
             ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
           });
           if (handled === "fallback") continue;
-          if (handled === "waited") return;
+          if (handled === "waited" || handled === "failed") return;
         }
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
         const paused = await standingRefusal(db, run.orgId, run.agentId);

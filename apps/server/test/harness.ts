@@ -151,6 +151,7 @@ export async function createTestServer(
         appleRevoke: options.appleRevoke,
         desktopFetch: options.desktopFetch,
         browserLive: engine.browserLive,
+        router: engine.router,
         streams: engine.streams,
       },
     },

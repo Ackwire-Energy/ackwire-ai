@@ -3,6 +3,8 @@ import {
   useAgents,
   useDesktopLatest,
   useDesktopStatus,
+  useHostComputer,
+  useHostComputerOn,
   useMachineAction,
   useMachines,
   useReduceMachineAccess,
@@ -17,9 +19,11 @@ import {
   DESKTOP_TARGET,
   downloadHref,
   folderName,
+  hostDescKey,
   installCommand,
   isPaused,
   MACHINE_TOOLS,
+  machineTitle,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -291,8 +295,8 @@ function MachineMenu({
         {t("machines.rename")}
       </MenuItem>
       <MenuSeparator />
-      <MenuItem icon="trash" danger onSelect={onRemove}>
-        {t("machines.remove")}
+      <MenuItem icon={m.kind === "host" ? "block" : "trash"} danger onSelect={onRemove}>
+        {m.kind === "host" ? t("machines.host.stop") : t("machines.remove")}
       </MenuItem>
     </Menu>
   );
@@ -324,10 +328,11 @@ function MachineRow({
             to="/org/$orgId/settings/computers/$machineId"
             params={{ orgId: org.id, machineId: m.id }}
             className="machine-row__name"
-            aria-label={t("machines.open", { name: m.name })}
+            aria-label={t("machines.open", { name: machineTitle(m, t("machines.host.label")) })}
           >
-            {m.name}
+            {machineTitle(m, t("machines.host.label"))}
           </Link>
+          {m.kind === "host" && m.name && <Chip icon="computer">{t("machines.host.label")}</Chip>}
           <MachineChip online={m.online} />
           <PausedChip paused={m.paused} />
           {!m.execAllowed && <Chip icon="block">{t("machines.execOff")}</Chip>}
@@ -355,6 +360,38 @@ function MachineRow({
         )}
       </span>
       {m.canManage && <MachineMenu machine={m} onRename={onRename} onRemove={onRemove} />}
+    </div>
+  );
+}
+
+/** The server's computer an admin stopped in this organization, and the way back. */
+function HostOffRow() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const turnOn = useHostComputerOn(org.id);
+  return (
+    <div className="ac-list__row machine-row">
+      <ComputerPortrait className="machine-row__icon" kind="linux" state="offline" />
+      <span className="list-col machine-row__main">
+        <span className="machine-row__name">{t("machines.host.label")}</span>
+        <span className="small muted">{t("machines.host.offText")}</span>
+      </span>
+      {can(org.role, "configure") && (
+        <Button
+          size="sm"
+          loading={turnOn.isPending}
+          disabled={turnOn.isPending}
+          onClick={() =>
+            turnOn.mutate(undefined, {
+              onSuccess: () => toast.show(t("machines.host.used")),
+              onError: (err) => toast.show(errorText(t, err), "error"),
+            })
+          }
+        >
+          {t("machines.host.use")}
+        </Button>
+      )}
     </div>
   );
 }
@@ -426,12 +463,13 @@ function RemoveDialog({
   const { org } = useOrg();
   const toast = useToast();
   const action = useMachineAction(org.id);
+  const host = machine?.kind === "host";
   return (
     <Dialog
       open={machine !== null}
       onOpenChange={(o) => !o && onClose()}
-      title={t("machines.removeTitle", { name: machine?.name ?? "" })}
-      description={t("machines.removeText")}
+      title={host ? t("machines.host.stopTitle") : t("machines.removeTitle", { name: machine?.name ?? "" })}
+      description={host ? t("machines.host.stopText") : t("machines.removeText")}
       closeLabel={t("common.close")}
       width={460}
     >
@@ -448,7 +486,7 @@ function RemoveDialog({
               { machineId: machine.id, action: "remove" },
               {
                 onSuccess: () => {
-                  toast.show(t("machines.removed", { name }));
+                  toast.show(host ? t("machines.host.stopped") : t("machines.removed", { name }));
                   onClose();
                   onRemoved?.();
                 },
@@ -457,7 +495,7 @@ function RemoveDialog({
             );
           }}
         >
-          {t("machines.remove")}
+          {host ? t("machines.host.stop") : t("machines.remove")}
         </Button>
       </DialogFooter>
     </Dialog>
@@ -472,10 +510,12 @@ export function MachinesSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const machines = useMachines(org.id);
+  const host = useHostComputer(org.id);
   const canPair = can(org.role, "post");
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
   const list = machines.data ?? [];
+  const hostOff = host.data?.on === false;
   return (
     <>
       <Card aria-labelledby="sec-machines">
@@ -492,7 +532,7 @@ export function MachinesSection() {
         {machines.isError && !machines.data && (
           <ErrorState error={machines.error} onRetry={() => void machines.refetch()} />
         )}
-        {machines.isSuccess && list.length === 0 && (
+        {machines.isSuccess && list.length === 0 && !hostOff && (
           <div className="computers-empty">
             <ComputerPortrait kind="mac" state="offline" size={96} />
             <span className="computers-empty__text">
@@ -503,11 +543,12 @@ export function MachinesSection() {
             </span>
           </div>
         )}
-        {list.length > 0 && (
+        {(list.length > 0 || hostOff) && (
           <List aria-label={t("computers.mine.listTitle")}>
             {list.map((m) => (
               <MachineRow key={m.id} machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />
             ))}
+            {hostOff && <HostOffRow />}
           </List>
         )}
       </Card>
@@ -866,9 +907,10 @@ export function MachinePage({ machineId }: { machineId: string }) {
           />
           <span className="list-col machine-page__title">
             <h2 id="sec-machine" className="ac-card__title">
-              {m.name}
+              {machineTitle(m, t("machines.host.label"))}
             </h2>
             <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {m.kind === "host" && m.name && <Chip icon="computer">{t("machines.host.label")}</Chip>}
               <MachineChip online={m.online} />
               <PausedChip paused={m.paused} />
               {m.pairedBy && <Chip icon="person">{t("machines.pairedBy", { name: m.pairedBy.name })}</Chip>}
@@ -877,6 +919,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
           {m.canManage && <MachineMenu machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />}
         </div>
         <div className="machine-page__facts">
+          {m.kind === "host" && <span className="small">{t(`machines.host.${hostDescKey(m.os)}`)}</span>}
           <span className="small muted">
             {t("machines.details", {
               os: t(`machines.os.${osOf(m.os)}`),

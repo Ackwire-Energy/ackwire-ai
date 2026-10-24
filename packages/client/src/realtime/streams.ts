@@ -1,4 +1,5 @@
 import type { ActiveRun, ChannelEvent, RunStatus } from "../api/types";
+import { NO_AI } from "../lib/no-ai";
 
 /**
  * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
@@ -563,6 +564,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         const settled = settleProvisional(s, event.agentId, event.threadId);
         return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
       }
+      // No AI to think with: nothing ran, and its card (or the receipt under the message) says why.
+      if (event.status === "failed" && event.error === NO_AI) return finish(settleAfterRun(s, event), event.runId);
       // Started but nothing written yet: thinking.
       const current = s.runs[event.runId];
       const status: LiveStatus =
@@ -596,6 +599,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return finish(settleAfterRun(state, event), event.runId);
     case "run.finished": {
       const settled = settleAfterRun(state, event);
+      if (event.status === "failed" && event.error === NO_AI) return finish(settled, event.runId);
       if (event.status === "failed") return upsert(settled, event, { status: "failed", error: event.error });
       // done: the message replaces the row; waiting_approval: the approval card does.
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;

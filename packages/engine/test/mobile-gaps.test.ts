@@ -144,6 +144,8 @@ describe("channel list: unread and last message", () => {
     f = await setup();
     await post(f.owner.id, f.general.id, "before bia");
     const bia = await withBia();
+    // PGlite's clock counts whole milliseconds: posted in the join's millisecond, the message would tie with it.
+    await Bun.sleep(2);
     await post(f.owner.id, f.general.id, "after bia");
     expect((await general(bia.id)).unreadCount).toBe(1);
   });

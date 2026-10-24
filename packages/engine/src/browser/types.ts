@@ -68,7 +68,7 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
 
 /**
  * The tools under `desktop:use`: asking a person for help on the desktop (ADR 0058) and the agent's own
- * use of it (ADR 0060). Labels and descriptions in English; the app translates them by tool name.
+ * use of it (ADR 0062). Labels and descriptions in English; the app translates them by tool name.
  */
 export const DESKTOP_TOOL_INFO = {
   desktop_do: {

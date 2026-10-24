@@ -437,7 +437,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
         // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
         // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0058);
-        // protocol 21: whether agents can use their desktops (ADR 0060).
+        // protocol 21: whether agents can use their desktops (ADR 0062).
         ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
           ? {
               executors: {

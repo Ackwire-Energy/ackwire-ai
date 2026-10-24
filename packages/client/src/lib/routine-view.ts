@@ -85,6 +85,7 @@ export const RUN_CODES = [
   "credential_wrong_provider",
   "agent_archived",
   "interrupted",
+  "no_ai",
   "org_paused",
   "org_suspended",
   "agent_paused",

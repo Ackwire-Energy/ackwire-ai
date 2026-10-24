@@ -7,6 +7,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { type AgentScope, MACHINE_PROTOCOL_VERSION, type RunnerTools } from "@agenteschat/adapters/machine-protocol";
@@ -36,15 +37,18 @@ import {
   updateConfig,
   writeConfig,
 } from "./config";
+import { TOKEN_REFUSED_EXIT } from "./connection";
 import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
 import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
+import { HostComputer, readTokenFile, runnerChild } from "./host";
 import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
+import { LoopbackGuard } from "./loopback-guard";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import {
   type DeviceGrant,
@@ -82,6 +86,14 @@ Usage:
   agentes-runner service install --system [--agent-uid-range <first-last>] [--no-start]
       Linux, as root: the runner for the whole computer, each agent as its own user
       (uids 20000-29999 unless given). install.sh --system runs it.
+  agentes-runner host --server <url> --token-file <path> | --token-env <NAME> [--state <dir>] [--name <name>] [--no-exec]
+      This server's own computer (HOST_COMPUTER_TOKEN on the server, the same token here): one
+      connection per organization of the person who installed the server, each agent as its own
+      user on Linux (run it as root). Organizations come and go with the server, checked every minute.
+      --state    where it keeps each organization's connection (default: the home)
+      --no-exec  agents can't run commands here (files and uploads only)
+  agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
+      Runs host as this computer's service (Linux: the root unit, from boot; macOS: at login).
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
@@ -130,6 +142,9 @@ const VALUE_FLAGS = new Set([
   "agent",
   "code",
   "agent-uid-range",
+  "token-env",
+  "token-file",
+  "state",
   "enroll-file",
 ]);
 const LIST_FLAGS = new Set(["agent"]);
@@ -168,6 +183,12 @@ const flagString = (p: Parsed, key: string) => {
 
 const DESKTOP_MANAGED =
   "This computer's connection is managed by the agentes app. Use the app (it ships the runner and keeps it running).";
+const HOST_MANAGED =
+  "This connection is one organization's on this server's own computer: agentes-runner host keeps it (and its service). Turn it off for the organization on the site, in Settings > Computers.";
+
+/** Why a command can't change this home: something else keeps it. Null when nothing does. */
+const managedMessage = (stored: StoredConfig | null) =>
+  stored?.managedBy === "desktop" ? DESKTOP_MANAGED : stored?.managedBy === "host" ? HOST_MANAGED : null;
 
 function storedOrNull(home = runnerHome()): StoredConfig | null {
   try {
@@ -208,8 +229,9 @@ async function pair(p: Parsed): Promise<number> {
   const server = normalizeServerUrl(serverRaw);
   const home = runnerHome();
   const prev = storedOrNull(home);
-  if (prev?.managedBy === "desktop") {
-    console.error(DESKTOP_MANAGED);
+  const managed = managedMessage(prev);
+  if (managed) {
+    console.error(managed);
     return 1;
   }
   // Created only once the connection worked.
@@ -306,7 +328,7 @@ async function start(): Promise<number> {
         return serviceSafe(3);
       default:
         log("Connect this computer again: agentes-runner pair --server <url>");
-        return serviceSafe(2);
+        return serviceSafe(TOKEN_REFUSED_EXIT);
     }
   } finally {
     await daemon.stop();
@@ -397,11 +419,120 @@ async function worker(p: Parsed): Promise<number> {
   });
 }
 
+const HOST_USAGE =
+  "Usage: agentes-runner host --server <url> --token-file <path> | --token-env <NAME> [--state <dir>] [--name <name>] [--no-exec]";
+
+/** `host`'s own flags, checked, for the command and for its service. */
+function hostFlags(p: Parsed) {
+  const server = flagString(p, "server");
+  const tokenFile = flagString(p, "token-file");
+  const tokenEnv = flagString(p, "token-env");
+  if (!server || (tokenFile === undefined) === (tokenEnv === undefined)) return null;
+  return {
+    server: normalizeServerUrl(server),
+    tokenFile: tokenFile === undefined ? undefined : path.resolve(expandHome(tokenFile)),
+    tokenEnv,
+    state: path.resolve(expandHome(flagString(p, "state") ?? runnerHome())),
+    name: flagString(p, "name"),
+    exec: !p.flags.has("no-exec"),
+  };
+}
+
+/** Whether this computer can be the server's computer, and why not. */
+function hostRefusal(): string | null {
+  if (process.platform === "win32") return "The server's computer runs on Linux or macOS.";
+  if (process.platform === "linux" && process.getuid?.() !== 0) {
+    return "On Linux the server's computer runs each agent as its own user: run it as root (its service does).";
+  }
+  return null;
+}
+
+/** `agentes-runner host`: this server's own computer (`host.ts`). */
+async function host(p: Parsed): Promise<number> {
+  const flags = hostFlags(p);
+  if (!flags) {
+    console.error(HOST_USAGE);
+    return 1;
+  }
+  const refusal = hostRefusal();
+  if (refusal) {
+    console.error(refusal);
+    return 1;
+  }
+  // Read once, then out of the environment: the organizations' runners (and their agents) never see it.
+  const envToken = flags.tokenEnv ? process.env[flags.tokenEnv]?.trim() || null : null;
+  if (flags.tokenEnv) delete process.env[flags.tokenEnv];
+  const lock = acquireLock(flags.state, "host");
+  if (!lock.ok) {
+    console.error(lockedMessage(flags.state, lock.holder));
+    return 4;
+  }
+  const system = process.platform === "linux";
+  const computer = new HostComputer({
+    server: flags.server,
+    token: () => (flags.tokenFile ? readTokenFile(flags.tokenFile) : envToken),
+    state: flags.state,
+    name: flags.name ?? os.hostname(),
+    system,
+    exec: flags.exec,
+    log,
+    start: runnerChild(thisRunner(), (line) => console.log(line)),
+  });
+  const guard = system ? new LoopbackGuard({ home: flags.state, agentUids: () => computer.agentUids(), log }) : null;
+  const stop = () => void computer.stop();
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+  log(`agentes-runner ${RUNNER_VERSION}: this server's computer for ${flags.server} (${flags.state})`);
+  guard?.start();
+  try {
+    await computer.run();
+    log("stopped");
+    return 0;
+  } finally {
+    guard?.stop();
+    lock.release();
+  }
+}
+
+/** `service install --host`: `agentes-runner host` as this computer's service (the token from a file). */
+function installHost(p: Parsed): number {
+  const flags = hostFlags(p);
+  if (!flags?.tokenFile) {
+    console.error(
+      "Usage: agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]",
+    );
+    return 1;
+  }
+  const refusal = hostRefusal();
+  if (refusal) {
+    console.error(refusal);
+    return 1;
+  }
+  const args = [
+    "host",
+    "--server",
+    flags.server,
+    "--token-file",
+    flags.tokenFile,
+    "--state",
+    flags.state,
+    ...(flags.name ? ["--name", flags.name] : []),
+    ...(flags.exec ? [] : ["--no-exec"]),
+  ];
+  const print = (l: string) => console.log(l);
+  if (process.platform === "linux") return installSystemService({ print, args, start: !p.flags.has("no-start") });
+  return installService({ print, args });
+}
+
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
 async function update(): Promise<number> {
   const stored = storedOrNull();
   if (stored?.managedBy === "desktop") {
     console.error(`${DESKTOP_MANAGED} To update, install the new version of the app.`);
+    return 1;
+  }
+  if (stored?.managedBy === "host") {
+    console.error(HOST_MANAGED);
     return 1;
   }
   // A root runner never replaces itself with whatever the server sends.
@@ -758,7 +889,7 @@ async function checkDesktop(
 }
 
 /**
- * Desktop use on that desktop through the runner's own code (ADR 0060), with how long each part takes: a
+ * Desktop use on that desktop through the runner's own code (ADR 0062), with how long each part takes: a
  * look, an action that settles and looks again, a screenshot and a close-up, the apps. It runs as this
  * command's user, the person at this computer, or in system mode as the agent's own (`launcher`); whether
  * agents may use their desktops here is said first.
@@ -925,6 +1056,8 @@ async function main(argv: string[]): Promise<number> {
     }
     case "worker":
       return worker(p);
+    case "host":
+      return host(p);
     case "task-wrapper": {
       // A compiled runner's background task wrapper (tasks.ts); it exits on its own when the task ends.
       if (!sub) return 1;
@@ -935,12 +1068,16 @@ async function main(argv: string[]): Promise<number> {
       return update();
     case "service": {
       const stored = storedOrNull();
-      const system = p.flags.has("system") || stored?.mode === "system";
+      const hostService = p.flags.has("host");
+      const system =
+        p.flags.has("system") || stored?.mode === "system" || (hostService && process.platform === "linux");
       if (sub === "install") {
-        if (stored?.managedBy === "desktop") {
-          console.error(DESKTOP_MANAGED);
+        const managed = managedMessage(stored);
+        if (managed) {
+          console.error(managed);
           return 1;
         }
+        if (hostService) return installHost(p);
         if (!system) return installService({ print: (l) => console.log(l) });
         const range = flagString(p, "agent-uid-range");
         const agentUidRange = range === undefined ? undefined : parseUidRange(range);

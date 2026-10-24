@@ -32,7 +32,7 @@ const lower = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
  * page (never a picture of the real one, ADR 0040 §7), where it browsed, its steps as pixel columns
  * in the agent's tones (as a routine's runs) and how long. Opening it lists the steps by page,
  * repeats folded into one line, each site openable in the person's own browser. On the desktop
- * (`screen`, ADR 0060) the same card tells the apps it opened instead of the sites.
+ * (`screen`, ADR 0062) the same card tells the apps it opened instead of the sites.
  */
 export function BrowserTrailCard({
   agentId,

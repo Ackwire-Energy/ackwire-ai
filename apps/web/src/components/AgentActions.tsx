@@ -49,6 +49,7 @@ const ICONS: Record<AgentAction["kind"], IconName> = {
   "routine.created": "routines",
   "routine.updated": "routines",
   "channel.agent_added": "channel",
+  "channel.created": "channel",
   "wiki.page_created": "page",
   "wiki.page_edited": "page",
   "thread.renamed": "thread",
