@@ -36,6 +36,8 @@ export interface DitherProps {
   animated?: boolean;
   /** Fade out to the bottom from this height share (2 = none). */
   fade?: number;
+  /** The first tone is see-through (a drawing over glass). */
+  clear?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -44,7 +46,7 @@ export interface DitherProps {
  * thread nothing; with reduced motion it is drawn once at t = 0. If the shader can't compile, the first
  * tone fills the box.
  */
-export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, style }: DitherProps) {
+export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, clear = false, style }: DitherProps) {
   const reduced = useReducedMotion();
   // Off screen (LivePause): drawn still, so Skia stops redrawing.
   const paused = useLivePaused();
@@ -57,10 +59,13 @@ export function Dither({ kind, tones, pixel, extra, animated = true, fade = 2, s
   const { pal, last } = paletteUniform(tones);
   const moving = animated && !reduced && !paused;
   const clock = useClock();
-  const base = { size: [size.width, size.height], px: pixel, last, fade, pal, ...(extra ?? {}) };
+  const base = { size: [size.width, size.height], px: pixel, last, fade, clear: clear ? 1 : 0, pal, ...(extra ?? {}) };
   const uniforms = useDerivedValue(() => ({ ...base, t: moving ? clock.value / 1000 : 0 }));
 
-  if (!effect) return <View style={[{ backgroundColor: tones[0] ?? "transparent" }, style]} onLayout={onLayout} />;
+  if (!effect)
+    return (
+      <View style={[{ backgroundColor: clear ? "transparent" : (tones[0] ?? "transparent") }, style]} onLayout={onLayout} />
+    );
   return (
     <View
       style={style}

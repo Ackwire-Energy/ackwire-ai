@@ -28,7 +28,7 @@ import {
   useThreadMessages,
   useThreadMission,
 } from "@agenteschat/client";
-import { listNames } from "@agenteschat/client/lib/activity";
+import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { issueTakenOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { isEventLine } from "@agenteschat/client/lib/notices";
@@ -38,10 +38,12 @@ import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendap
 import type { LegendListRef } from "@legendapp/list/react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, type LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
+import { AppState, type LayoutChangeEvent, Platform, Pressable, StyleSheet, View } from "react-native";
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -77,15 +79,26 @@ import { isOpenMission } from "../missions/logic";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
+import { HeaderPill } from "./HeaderPill";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
 import { browsingRuns, TurnRow, WorkingLine } from "./LiveRows";
 import { useChatLive } from "./live";
-import { buildRows, type ChatRow, mayStopRun, mergeTimeline, parseSlash, pinTarget, stoppableInLine } from "./logic";
+import {
+  buildRows,
+  type ChatRow,
+  mayStopRun,
+  mergeTimeline,
+  parseSlash,
+  pinTarget,
+  stoppableInLine,
+  workingEntries,
+} from "./logic";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
 import { insertMention, mentionQuery } from "./mentions";
@@ -767,6 +780,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
 
   // ── Header ──
+  // The header is glass over the conversation (telas/CabecalhoVidro.html, B · Céu na pílula): the system's
+  // back and "…" circles, and in the middle a pill with who or where, its sky and what the agent is doing.
   const info = thread.data;
   const title = isThread ? (info ? threadTitle(info) : "") : dm ? dm.with.name : channel ? `#${channel.name}` : "";
   const agentsHere = (roster.data ?? []).filter((r) => r.type === "agent").length;
@@ -788,64 +803,91 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       : channel && roster.data
         ? t("mobile.chat.members", { count: roster.data.length, agents: agentsHere })
         : undefined;
-  const right = isThread ? (
-    info ? (
-      <IconButton
-        icon="more"
-        label={t("mobile.chat.options")}
-        onPress={() =>
-          sheet.open(
-            <ThreadOptions
-              thread={info}
-              mission={mission}
-              onMission={() => openNewMission("", info.id)}
-              onPins={openPins}
-            />,
+  // An agent's DM while it works: the pill's quiet line says what it does ("Consultando o GitHub").
+  const dmDoing = useMemo(() => {
+    if (!dmAgentId || isThread) return null;
+    const entry = workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? "").find(
+      (e) => e.type === "agent" && e.id === dmAgentId,
+    );
+    if (!entry) return null;
+    const verb = activityVerb(t, entry.activity);
+    return verb.charAt(0).toUpperCase() + verb.slice(1);
+  }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
+  const openOptions = () =>
+    info && isThread
+      ? sheet.open(
+          <ThreadOptions
+            thread={info}
+            mission={mission}
+            onMission={() => openNewMission("", info.id)}
+            onPins={openPins}
+          />,
+        )
+      : sheet.open(
+          <ChannelOptions
+            channelId={channelId}
+            title={title}
+            {...(subtitle ? { subtitle } : {})}
+            leading={
+              dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
+            }
+            agentId={dmAgentId}
+            onPins={openPins}
+          />,
+        );
+  const pill =
+    isThread && info ? (
+      <HeaderPill
+        lead={<Icon name="reply" size={18} color={c.muted} />}
+        title={title}
+        subtitle={subtitle}
+        onPress={openOptions}
+        label={t("mobile.chat.headerChannel", { name: title, status: subtitle ?? "" })}
+      />
+    ) : dm ? (
+      <HeaderPill
+        lead={
+          dmAgentId ? (
+            <AgentFace agentId={dmAgentId} size={26} framed={false} mode={dmDoing ? "run" : "idle"} />
+          ) : (
+            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} />
           )
         }
+        title={dm.with.name}
+        subtitle={dmDoing ?? subtitle}
+        color={dmAgentId ? agentLook(dmAgent).color : undefined}
+        working={Boolean(dmDoing)}
+        onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
+        label={
+          dmAgentId
+            ? t("mobile.chat.headerAgent", { name: dm.with.name, status: dmDoing ?? subtitle ?? "" })
+            : t("mobile.chat.headerChannel", { name: dm.with.name, status: "" })
+        }
       />
-    ) : null
-  ) : dm || channel ? (
-    <View style={styles.side}>
-      {dmAgentId ? (
-        <Pressable
-          onPress={() => router.push(`/agent/${dmAgentId}`)}
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.chat.profile")}
-          hitSlop={8}
-        >
-          {/* In the header's glass pill the agent stands on its own: a square tile fights the round glass. */}
-          <AgentFace agentId={dmAgentId} size={28} framed={false} />
-        </Pressable>
-      ) : channel && roster.data ? (
-        <View style={styles.faces} accessible accessibilityLabel={subtitle}>
-          {roster.data.slice(0, 3).map((r, i) => (
-            <View key={`${r.type}:${r.id}`} style={i > 0 ? styles.overlap : undefined}>
-              <Face who={r} size={22} live={false} framed={false} />
+    ) : channel ? (
+      <HeaderPill
+        lead={<Icon name="hash" size={18} color={c.muted} />}
+        title={channel.name}
+        subtitle={roster.data ? t("mobile.chat.here", { count: roster.data.length }) : undefined}
+        trailing={
+          roster.data && roster.data.length > 0 ? (
+            <View style={styles.faces}>
+              {roster.data.slice(0, 3).map((r, i) => (
+                <View key={`${r.type}:${r.id}`} style={i > 0 ? styles.overlap : undefined}>
+                  <Face who={r} size={20} live={false} framed={false} />
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      ) : null}
-      <IconButton
-        icon="more"
-        label={t("mobile.chat.options")}
-        onPress={() =>
-          sheet.open(
-            <ChannelOptions
-              channelId={channelId}
-              title={title}
-              {...(subtitle ? { subtitle } : {})}
-              leading={
-                dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
-              }
-              agentId={dmAgentId}
-              onPins={openPins}
-            />,
-          )
+          ) : undefined
         }
+        onPress={openOptions}
+        label={t("mobile.chat.headerChannel", { name: title, status: subtitle ?? "" })}
       />
-    </View>
-  ) : null;
+    ) : null;
+  const right =
+    (isThread && info) || dm || channel ? (
+      <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
+    ) : null;
 
   const placeholder = isThread
     ? t("mobile.chat.reply")
@@ -981,6 +1023,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     setComposerHeight(e.nativeEvent.layout.height);
   };
   const bottomPad = Math.max(insets.bottom, 10);
+  // iOS draws the header over the conversation (glass on iOS 26, a blur before); Android keeps it opaque.
+  const headerHeight = useHeaderHeight();
+  const barOver = Platform.OS === "ios";
   const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
 
@@ -997,9 +1042,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      <PushedHeader title={title} {...(subtitle ? { subtitle } : {})} right={right} />
+      <PushedHeader title={pill ?? title} solid={false} right={right} />
       {pinned ? (
-        <View style={[styles.pin, { backgroundColor: c.bg }]}>
+        // The bar is see-through on iOS (the conversation runs under it): the pinned card starts below it.
+        <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: barOver ? headerHeight : 0 }]}>
           <MissionCardView mission={pinned} pinned />
         </View>
       ) : null}
@@ -1041,6 +1087,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
             // Older pages above and rows changing size keep what is on screen still.
             maintainVisibleContentPosition
+            // Under the glass header on iOS: the system insets the top by the bar (and draws its scroll edge).
+            contentInsetAdjustmentBehavior="automatic"
             onStartReached={loadOlder}
             onStartReachedThreshold={0.5}
             keyboardDismissMode="interactive"
@@ -1067,8 +1115,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           <View
             ref={composerRef}
             onLayout={onComposerBoxLayout}
-            style={[styles.composer, { paddingBottom: bottomPad, backgroundColor: c.bg }]}
+            style={[styles.composer, { paddingBottom: bottomPad }]}
           >
+            {/* The conversation fades under the box (telas/CabecalhoVidro.html): no hard edge above it. */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
+              locations={[0, 0.3, 1]}
+              style={StyleSheet.absoluteFill}
+            />
             <Connection status={realtime} />
             {/* Who is working, right above the composer (as on the web), while they work. */}
             {member ? (
@@ -1304,7 +1359,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 3,
   },
   connText: { flexShrink: 1, fontWeight: "600" },
-  side: { flexDirection: "row", alignItems: "center", gap: 2 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },
 });
