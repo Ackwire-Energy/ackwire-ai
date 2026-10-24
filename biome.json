@@ -13,7 +13,8 @@
       "!docs/design",
       "!**/routeTree.gen.ts",
       "!**/src-tauri/target",
-      "!**/src-tauri/gen"
+      "!**/src-tauri/gen",
+      "!packages/engine/eval/out"
     ]
   },
   "formatter": {

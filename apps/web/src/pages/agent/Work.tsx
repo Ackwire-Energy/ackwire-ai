@@ -8,6 +8,7 @@ import type {
 } from "@agenteschat/client";
 import {
   BROWSER_TOOL_SCOPE,
+  DESKTOP_TOOL_SCOPE,
   keys,
   useAgentBrain,
   useAgentBrowserSettings,
@@ -24,7 +25,7 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { computerKind, computerState } from "@agenteschat/client/lib/machines";
+import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
@@ -67,6 +68,7 @@ import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/compon
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
 import { cleanSite, SITE } from "@/components/browser/sites";
+import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
 import { inDesktopApp } from "@/lib/desktop";
@@ -209,6 +211,10 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const reason = work.browser.data?.reason;
   const steps =
     !member && work.browserWord === "waiting" && machine && (reason === "switched_off" || reason === "not_reported");
+  const machineRow = machine ? work.machines.data?.find((m) => m.id === machine.machineId) : undefined;
+  const desktopGranted = (work.scopes.data ?? []).some(
+    (s) => s.connectionId === null && s.scope === DESKTOP_TOOL_SCOPE,
+  );
   return (
     <div className="agp-work">
       <section className="agp-workcard" aria-label={t("agentPage.work.cell.label")}>
@@ -259,6 +265,30 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         </SettingNote>
       )}
       {steps && <BrowserSteps computer={machine.name} machineId={machine.machineId} />}
+      {!member && desktopGranted && machineRow && <DesktopUseNote machine={machineRow} />}
+    </div>
+  );
+}
+
+/**
+ * The agent may use apps on its desktop, and its Linux computer says what that still lacks there (ADR 0062):
+ * the computer's own words, with the command in them to copy. Mac and Windows computers never have it, which
+ * their own page says.
+ */
+function DesktopUseNote({ machine: m }: { machine: Machine }) {
+  const { t } = useTranslation();
+  const { g } = useAgentEdit();
+  const use = m.desktopUse;
+  if (m.os !== "linux" || !use || use.available || !use.reason) return null;
+  const command = commandInReason(use.reason);
+  return (
+    <div className="brw-note">
+      <Icon name="computer" size={16} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block" }}>{t("desktop.use.agent", { ...g, computer: m.name })}</span>
+        <span className="small muted">{use.reason}</span>
+        {command && <CommandBlock command={command} />}
+      </div>
     </div>
   );
 }

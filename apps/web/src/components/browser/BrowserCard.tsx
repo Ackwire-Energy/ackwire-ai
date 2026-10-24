@@ -1,4 +1,11 @@
-import type { BrowserFrame, BrowserHandoff, BrowserInputEvent, BrowserStep, LiveRun } from "@agenteschat/client";
+import type {
+  BrowserFrame,
+  BrowserHandoff,
+  BrowserInputEvent,
+  BrowserStep,
+  LiveRun,
+  ScreenKind,
+} from "@agenteschat/client";
 import {
   browserSiteUrl,
   browserSteps,
@@ -83,8 +90,37 @@ type StepTool = keyof typeof STEP_ICON;
 const isStepTool = (tool: string): tool is StepTool => Object.hasOwn(STEP_ICON, tool);
 export const iconOf = (tool: string): IconName => (isStepTool(tool) ? STEP_ICON[tool] : "globe");
 
-/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"). */
-export function stepText(t: TFunction, s: BrowserStep): string {
+/** The desktop's steps on its trail (`meta.desktop.steps`) with words of their own. */
+const DESKTOP_STEPS = [
+  "desktop_open_file",
+  "desktop_read",
+  "desktop_click",
+  "desktop_double_click",
+  "desktop_right_click",
+  "desktop_focus",
+  "desktop_fill",
+  "desktop_type",
+  "desktop_select",
+  "desktop_check",
+  "desktop_press",
+  "desktop_scroll",
+  "desktop_drag",
+  "desktop_wait",
+  "desktop_screenshot",
+  "desktop_ask_person",
+] as const;
+const isDesktopStep = (tool: string): tool is (typeof DESKTOP_STEPS)[number] =>
+  (DESKTOP_STEPS as readonly string[]).includes(tool);
+
+/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"); the desktop's too. */
+export function stepText(t: TFunction, s: BrowserStep, screen: ScreenKind = "browser"): string {
+  if (screen === "desktop") {
+    if (s.tool === "desktop_open")
+      return s.detail
+        ? t("desktop.watch.step.desktop_open", { detail: s.detail })
+        : t("desktop.watch.step.desktop_open_plain");
+    return isDesktopStep(s.tool) ? t(`desktop.watch.step.${s.tool}`) : t("desktop.watch.step.other");
+  }
   if (s.tool === "browser_open")
     return s.detail
       ? t("browser.watch.step.browser_open", { detail: s.detail })

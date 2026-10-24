@@ -14,6 +14,7 @@ import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
+import { DesktopManager, type DesktopManagerOptions } from "./desktop";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { type HandlerContext, handleRequest } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
@@ -22,7 +23,7 @@ import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { agentSecrets, secretValue } from "./secrets";
-import { UPLOAD_CHUNK_BYTES, type WorkerLinkFrame, type WorkerState } from "./supervisor";
+import { UPLOAD_CHUNK_BYTES, type WorkerDesktop, type WorkerLinkFrame, type WorkerState } from "./supervisor";
 import { TaskManager } from "./tasks";
 
 /**
@@ -48,6 +49,8 @@ export interface WorkerOptions {
   log: (line: string) => void;
   /** How this runner starts itself (default: this process). */
   self?: { command: string[]; compiled: boolean };
+  /** Tests: the computer desktop use sees, and how its helper starts. */
+  desktop?: Pick<DesktopManagerOptions, "system" | "command">;
 }
 
 /** Until the supervisor says otherwise, nothing is allowed. */
@@ -73,6 +76,8 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
 export class WorkerLink {
   private session: SocketHandlers | null = null;
   private readonly uploads = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "upload.reply" }>) => void>();
+  private readonly desktops = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "desktop.ensured" }>) => void>();
+  private nextEnsure = 0;
   onState: (state: WorkerState) => void = () => {};
   /** The supervisor is gone (stdin closed). */
   onEnd: () => void = () => {};
@@ -87,8 +92,20 @@ export class WorkerLink {
       (line) => this.line(line),
       () => {},
     );
-    input.once("end", () => this.onEnd());
-    input.once("close", () => this.onEnd());
+    input.once("end", () => this.ended());
+    input.once("close", () => this.ended());
+  }
+
+  private ended() {
+    this.unanswered("The runner is stopping; try again in a minute");
+    this.onEnd();
+  }
+
+  /** Desktops asked for get no answer once the session or the link is gone (the supervisor drops them). */
+  private unanswered(message: string) {
+    for (const answer of [...this.desktops.values()]) {
+      answer({ type: "desktop.ensured", ensureId: "", error: { code: "internal", message } });
+    }
   }
 
   readonly dial: Dial = (_url, handlers) => {
@@ -103,6 +120,7 @@ export class WorkerLink {
   private end(handlers: SocketHandlers | null) {
     if (!handlers || this.session !== handlers) return;
     this.session = null;
+    this.unanswered("The computer lost its connection to agentes.chat");
     queueMicrotask(() => handlers.onClose(1000, ""));
   }
 
@@ -129,9 +147,28 @@ export class WorkerLink {
       case "upload.reply":
         if (typeof f.uploadId === "string") this.uploads.get(f.uploadId)?.(f as never);
         return;
+      case "desktop.ensured":
+        if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
+        return;
       default:
         this.session?.onMessage(line);
     }
+  }
+
+  /**
+   * The agent's desktop (root's, ADR 0058 §10), started when it isn't running: the supervisor answers only
+   * while this worker serves a desktop use request.
+   */
+  desktop(): Promise<WorkerDesktop> {
+    const ensureId = String(++this.nextEnsure);
+    return new Promise((resolve, reject) => {
+      this.desktops.set(ensureId, (reply) => {
+        this.desktops.delete(ensureId);
+        if (reply.desktop) resolve(reply.desktop);
+        else reject(new RunnerError(reply.error?.code ?? "internal", reply.error?.message ?? "No desktop"));
+      });
+      this.write(JSON.stringify({ type: "desktop.ensure", ensureId } satisfies WorkerLinkFrame));
+    });
   }
 
   /**
@@ -230,6 +267,25 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     secret: (agent, name) => secretValue(secretsDir, agent, name),
   });
   void browser.closeAll();
+  // The helper runs as this worker's user, the agent's own; the desktop and where it runs come from root.
+  let desktop: WorkerDesktop | null = null;
+  const own = process.getuid?.() ?? null;
+  const desktopUse = new DesktopManager({
+    desktops: {
+      // Root's hello says whether the computer can; a worker reports nothing.
+      info: () => ({ available: true }),
+      ensure: async () => {
+        desktop = await link.desktop();
+        return desktop;
+      },
+      session: () => desktop,
+    },
+    uids: () => (own === null ? null : { runner: 0, agents: new Map([[o.agentId, own]]) }),
+    secrets: (agent) => agentSecrets(secretsDir, agent),
+    browserPid: (agentId) => browser.chromePid(agentId),
+    log,
+    ...o.desktop,
+  });
   const context: HandlerContext = {
     workspaceReal,
     get exec() {
@@ -245,6 +301,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     paused: () => state.paused.paused,
     access: () => state.access,
     browser,
+    desktopUse,
   };
   const connection = new RunnerConnection({
     url: "supervisor",
@@ -276,6 +333,9 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   live = connection;
   link.onState = (next) => {
     const browserOff = state.access.tools.browser === true && next.access.tools.browser !== true;
+    // Desktop use needs both switches: its helpers stop with either.
+    const use = (s: WorkerState) => s.access.tools.desktop === true && s.access.tools.commands;
+    if (use(state) && !use(next)) desktopUse.stopAll();
     state = next;
     tasks.setLimits({ maxConcurrent: next.limits.maxConcurrentTasks, defaultMaxSeconds: next.limits.taskMaxSeconds });
     brains.setLimits(brainLimits());
@@ -286,6 +346,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   link.onEnd = () => connection.stop();
   log(`agentes-runner ${RUNNER_VERSION}: worker of agent ${o.agentId} (folder ${workspaceReal})`);
   await connection.run();
+  desktopUse.stopAll();
   tasks.close();
   brains.close();
   codexApp.close();

@@ -34,7 +34,7 @@ export interface MachinePlanUsage {
 
 /**
  * What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7), its browser (protocol 12),
- * its desktops and its terminal (protocol 18).
+ * its desktops and its terminal (protocol 18), and the agents' use of their desktops (protocol 21).
  */
 export interface MachineExecutors {
   /** `loggedIn`/`authMethod`/`plan`: from `claude auth status` (protocol 8; absent = unknown). */
@@ -46,6 +46,8 @@ export interface MachineExecutors {
   desktop?: { available: boolean; reason?: string; width?: number; height?: number };
   /** `hello.terminal` (ADR 0058): whether people can open a terminal there; absent = not reported. */
   terminal?: { available: boolean; reason?: string };
+  /** `hello.desktopUse` (ADR 0062): whether agents can use their desktops there; absent = not reported. */
+  desktopUse?: { available: boolean; reason?: string };
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
   /** The usage of the computer's own sign-ins (protocol 19), by brain; kept across reconnects. */

@@ -362,6 +362,18 @@ test("a hidden file field is reached by a CSS selector", async () => {
   expect(sent()).toMatchObject([{ command: "upload", args: ["input[type=file]", "reports/q3.pdf"] }]);
 });
 
+test("a scroll step that names a target scrolls the page as before: the target isn't looked for", async () => {
+  const judge = createFakeJudge();
+  const b = await browserSetup({ judge });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  b.s.respond = () => page('- heading "Shop"');
+  const sent = b.since();
+  const out = await b.call("browser_do", { steps: [{ do: "scroll", target: "the results list", direction: "down" }] });
+  expect(out.isError).toBeUndefined();
+  expect(sent()[0]).toMatchObject({ command: "scroll", args: ["down", "800"] });
+  expect(judge.calls).toHaveLength(0);
+});
+
 test("a box found only on the image isn't ticked by a click there (a click would only flip it)", () => {
   expect(() => actionCommands({ kind: "check", at: { x: 10, y: 20 } }, () => null)).toThrow("ticked by its element");
   expect(actionCommands({ kind: "check", at: { ref: "e3" } }, () => null)).toMatchObject([

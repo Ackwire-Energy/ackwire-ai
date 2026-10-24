@@ -226,6 +226,8 @@ export interface Transcript {
   consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
   /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
   browser?: BrowserTrailStep[];
+  /** Its desktop calls since the last post, for the card of what it did there (`meta.desktop`). */
+  desktop?: BrowserTrailStep[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
@@ -2488,9 +2490,9 @@ function createDeltaPublisher(
 
 /**
  * Moves pending memory updates, artifacts, a proposed mission's link, the
- * agents it consulted and where it browsed onto the message being posted (the
- * "memory updated", file preview, mission link, "message from @agent" and
- * browser cards).
+ * agents it consulted, where it browsed and what it did on its desktop onto the
+ * message being posted (the "memory updated", file preview, mission link,
+ * "message from @agent", browser and desktop cards).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
@@ -2498,19 +2500,29 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const link = t.missionLink ?? null;
   const consulted = t.consulted ?? [];
   const browser = t.browser ?? [];
-  if (updates.length === 0 && files.length === 0 && !link && consulted.length === 0 && browser.length === 0)
+  const desktop = t.desktop ?? [];
+  if (
+    updates.length === 0 &&
+    files.length === 0 &&
+    !link &&
+    consulted.length === 0 &&
+    browser.length === 0 &&
+    desktop.length === 0
+  )
     return undefined;
   t.memoryUpdates = [];
   t.artifacts = [];
   t.missionLink = null;
   t.consulted = [];
   t.browser = [];
+  t.desktop = [];
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
   if (link) meta.missionLink = link;
   if (consulted.length > 0) meta.consulted = consulted;
   if (browser.length > 0) meta.browser = { steps: browser };
+  if (desktop.length > 0) meta.desktop = { steps: desktop };
   return meta;
 }
 

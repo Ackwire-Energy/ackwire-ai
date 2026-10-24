@@ -23,6 +23,7 @@ import {
   createContextToolSource,
   createDatabaseToolSource,
   createDesktopControl,
+  createDesktopToolSource,
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
@@ -275,6 +276,13 @@ export function buildEngine(o: EngineOptions) {
       // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
       // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
       createBrowserToolSource({
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+      }),
+      // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
+      createDesktopToolSource({
         machines: { hub: machineHub },
         pubsub: adapters.pubsub,
         judge: context.judge,

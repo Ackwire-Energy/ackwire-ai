@@ -1763,6 +1763,11 @@ export class BrowserManager {
     this.changed();
   }
 
+  /** The agent's Chrome process while it runs: its window on the agent's desktop is the browser's, not the desktop's. */
+  chromePid(agentId: string): number | null {
+    return this.sessions.get(agentId)?.chrome?.pid ?? null;
+  }
+
   /** The server connection dropped: what it told about handoffs is stale (it says again on reconnect). */
   clearHandoffs() {
     if (this.handoffs.size === 0) return;

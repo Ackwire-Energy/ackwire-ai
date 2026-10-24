@@ -1,31 +1,37 @@
 /**
  * Where an agent browsed, after the run (`meta.browser` on its message): the browser calls the
  * server kept (tool, the site of an open, when), never anything of the page itself (ADR 0040 §7).
+ * The same for its desktop (`meta.desktop`, ADR 0062): the app an open started instead of the site.
  */
 
-/** One call in the agent's browser, as the message keeps it. */
+import type { ScreenKind } from "../api/types";
+
+/** One call in the agent's browser (or on its desktop), as the message keeps it. */
 export interface BrowserTrailStep {
   tool: string;
-  /** The site of an open: host and path, no query string ("airbnb.com.br/rooms/48213"). */
+  /** The site of an open: host and path, no query string ("airbnb.com.br/rooms/48213"); an app on the desktop. */
   detail: string | null;
   at: string;
   failed: boolean;
 }
 
-/** The calls made on one page: from an open (or a new tab) to the next one. */
+/** The calls made on one page (or in one app): from an open (or a new tab) to the next one. */
 export interface BrowserTrailPage {
-  /** The page's address without the scheme; null before the first open. */
+  /** The page's address without the scheme, or the app's name; null before the first open. */
   site: string | null;
   host: string | null;
   path: string;
   steps: BrowserTrailStep[];
+  /** A web address (it opens in the person's own browser), not an app. */
+  link: boolean;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 
-/** The steps on a message (`meta.browser.steps`), checked; empty when it didn't browse. */
-export function browserTrailOf(meta: unknown): BrowserTrailStep[] {
-  const steps = isObject(meta) && isObject(meta.browser) ? meta.browser.steps : null;
+/** The steps on a message (`meta.browser.steps`, `meta.desktop.steps`), checked; empty when it didn't use that screen. */
+export function screenTrailOf(meta: unknown, screen: ScreenKind): BrowserTrailStep[] {
+  const kept = isObject(meta) ? meta[screen] : null;
+  const steps = isObject(kept) ? kept.steps : null;
   if (!Array.isArray(steps)) return [];
   return steps.flatMap((s) =>
     isObject(s) && typeof s.tool === "string" && typeof s.at === "string" && !Number.isNaN(Date.parse(s.at))
@@ -41,8 +47,15 @@ export function browserTrailOf(meta: unknown): BrowserTrailStep[] {
   );
 }
 
-/** The opens that start a new page in the trail. */
-const OPENS = new Set(["browser_open", "browser_tabs"]);
+export const browserTrailOf = (meta: unknown) => screenTrailOf(meta, "browser");
+export const desktopTrailOf = (meta: unknown) => screenTrailOf(meta, "desktop");
+
+/** The opens that start a new page in the trail, and whether what they open is a web address. */
+const OPENS: Record<string, { link: boolean }> = {
+  browser_open: { link: true },
+  browser_tabs: { link: true },
+  desktop_open: { link: false },
+};
 
 /** "airbnb.com.br/rooms/1" → ["airbnb.com.br", "/rooms/1"]. */
 export function splitSite(site: string): [string, string] {
@@ -50,21 +63,22 @@ export function splitSite(site: string): [string, string] {
   return i < 0 ? [site, ""] : [site.slice(0, i), site.slice(i)];
 }
 
-/** The trail by page: an open with a site starts a page, the calls after it belong to it. */
+/** The trail by page: an open with a site (or an app) starts a page, the calls after it belong to it. */
 export function browserTrailPages(steps: BrowserTrailStep[]): BrowserTrailPage[] {
   const pages: BrowserTrailPage[] = [];
   for (const s of steps) {
-    const opens = OPENS.has(s.tool) && s.detail !== null;
+    const open = s.detail !== null && Object.hasOwn(OPENS, s.tool) ? OPENS[s.tool] : undefined;
     const last = pages.at(-1);
-    if (!last || opens) {
-      const [host, path] = opens && s.detail ? splitSite(s.detail) : [null, ""];
-      pages.push({ site: opens ? s.detail : null, host, path, steps: [s] });
+    if (!last || open) {
+      // An app's name is whole ("Text Editor"), never a host and a path.
+      const [host, path] = !open || !s.detail ? [null, ""] : open.link ? splitSite(s.detail) : [s.detail, ""];
+      pages.push({ site: open ? s.detail : null, host, path, steps: [s], link: open?.link ?? false });
     } else last.steps.push(s);
   }
   return pages;
 }
 
-/** The sites it visited, in order of first visit ("airbnb.com.br", "google.com"). */
+/** The sites (or apps) it visited, in order of first visit ("airbnb.com.br", "google.com"). */
 export function browserTrailHosts(steps: BrowserTrailStep[]): string[] {
   const hosts: string[] = [];
   for (const p of browserTrailPages(steps)) if (p.host && !hosts.includes(p.host)) hosts.push(p.host);
@@ -92,9 +106,9 @@ export type BrowserTrailKind = "open" | "read" | "act" | "shot" | "failed";
 
 export function browserTrailKind(s: Pick<BrowserTrailStep, "tool" | "failed">): BrowserTrailKind {
   if (s.failed) return "failed";
-  if (OPENS.has(s.tool)) return "open";
-  if (s.tool === "browser_read") return "read";
-  if (s.tool === "browser_screenshot") return "shot";
+  if (Object.hasOwn(OPENS, s.tool) || s.tool === "desktop_open_file") return "open";
+  if (s.tool === "browser_read" || s.tool === "desktop_read") return "read";
+  if (s.tool === "browser_screenshot" || s.tool === "desktop_screenshot") return "shot";
   return "act";
 }
 
