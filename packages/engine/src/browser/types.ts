@@ -10,6 +10,7 @@ export const BROWSER_SCOPE = "browser:use";
 
 /** The tools agents get with `browser:use`, the same for every brain. */
 export const BROWSER_TOOLS = [
+  "browser_do",
   "browser_open",
   "browser_back",
   "browser_tabs",
@@ -32,6 +33,10 @@ export type BrowserToolName = (typeof BROWSER_TOOLS)[number];
 
 /** Labels and descriptions (English); the app translates them by tool name. */
 export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; description: string }> = {
+  browser_do: {
+    label: "Do steps in the browser",
+    description: "Does several steps in the browser in one go (open, fill, click, wait), checking each one.",
+  },
   browser_open: { label: "Open a page", description: "Opens a website in the agent's own browser." },
   browser_back: { label: "Go back", description: "Goes back to the previous page." },
   browser_tabs: { label: "Browser tabs", description: "Lists, opens, switches or closes tabs." },

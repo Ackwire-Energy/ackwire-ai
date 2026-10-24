@@ -16,6 +16,7 @@
     "allow-notch-set",
     "allow-autostart-get",
     "allow-autostart-set",
-    "allow-update-install"
+    "allow-update-install",
+    "allow-dock-set"
   ]
 }

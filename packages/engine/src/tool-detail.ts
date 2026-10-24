@@ -95,6 +95,22 @@ const SECRET =
 
 export const maskSecrets = (text: string) => text.replace(SECRET, "••••");
 
+/** A private key, by its first line. */
+const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
+
+/**
+ * Whether a value carries a credential by its format (an API key, a token, a private key): what a run
+ * nobody is behind never sends anywhere (ADR 0053 §3).
+ */
+export function carriesCredential(value: unknown): boolean {
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+  return PRIVATE_KEY.test(text) || text.replace(SECRET, "") !== text;
+}
+
+/** `maskSecrets`, private keys too (from their first line on): text people read that must hold none. */
+export const maskCredentials = (text: string) =>
+  maskSecrets(text).replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, "••••");
+
 export const PREVIEW_CODE_CHARS = 4096;
 
 /** `run_code`'s code for the activity bar (≤ 4 KB, secrets masked). File tools show their path in `detail`. */

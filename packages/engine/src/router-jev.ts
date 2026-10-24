@@ -19,8 +19,11 @@ export interface JevUsage {
   outputTokens: number;
 }
 
-/** Jev price: $0.042 per million input tokens; output tokens are free (docs.typesafe.ai/models, 2026-10). */
-export const JEV_NANO_USD_PER_INPUT_TOKEN = 0.042;
+/**
+ * Jev price: $0.042 per million input tokens ($42 per billion); output tokens are free
+ * (docs.typesafe.ai/models, 2026-10). In nano-USD per token like the catalog (USD per million × 1000): 42.
+ */
+export const JEV_NANO_USD_PER_INPUT_TOKEN = 42;
 export const jevCostNanoUsd = (inputTokens: number) => Math.round(inputTokens * JEV_NANO_USD_PER_INPUT_TOKEN);
 
 const NONE = "none";

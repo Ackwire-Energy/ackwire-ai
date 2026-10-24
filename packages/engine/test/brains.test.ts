@@ -164,7 +164,16 @@ test("a gated tool call from a fake brain pauses the run; approving resumes it o
   const { brain, seen } = scriptedBrain((n) =>
     n === 0
       ? [
-          { type: "tool_call", id: "call-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 42 } },
+          {
+            type: "tool_call",
+            id: "call-1",
+            name: "github_merge_pr",
+            input: {
+              repo: "acme/app",
+              pr: 42,
+              why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+            },
+          },
           { type: "done", text: "" },
         ]
       : [{ type: "done", text: "Merged." }],
@@ -194,7 +203,11 @@ test("a gated tool call from a fake brain pauses the run; approving resumes it o
   const gated = await executeToolForRun(f.jobDeps, id, {
     id: "call-x",
     name: "github_merge_pr",
-    input: { repo: "acme/app", pr: 7 },
+    input: {
+      repo: "acme/app",
+      pr: 7,
+      why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+    },
   });
   expect(gated.isError).toBe(true);
   expect(gated.pause).toBeUndefined();

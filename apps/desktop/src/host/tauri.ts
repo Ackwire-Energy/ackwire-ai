@@ -7,6 +7,7 @@ import type { TrayState } from "../control/tray";
 import {
   type AppInfo,
   type Host,
+  type MenuAction,
   type NotchInfo,
   type RunnerInfo,
   type RunnerStateChange,
@@ -63,5 +64,9 @@ export function createTauriHost(): Host {
     onThisMac: (cb) =>
       subscribe<{ id: number; request: ThisMacRequest }>("this-mac://request", (p) => cb(p.id, p.request)),
     thisMacReply: (id, ok, data) => invoke<void>("this_mac_reply", { id, ok, data }),
+    setAppMenu: (labels) => invoke<void>("app_menu_set", { labels }),
+    onMenuAction: (cb) => subscribe<MenuAction>("menu://action", cb),
+    thisMacListening: () => invoke<void>("this_mac_listening"),
+    setDock: (show) => invoke<void>("dock_set", { show }),
   };
 }

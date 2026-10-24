@@ -52,7 +52,7 @@ export function ActivityTab() {
   const [filter, setFilter] = useState<RunFilter>("all");
   const [shown, setShown] = useState(RUNS_PAGE);
   const prompts = useMemo(
-    () => (routines.data ?? []).filter((r) => r.agentId === agent.id).map((r) => r.prompt),
+    () => (routines.data ?? []).flatMap((r) => (r.agentId === agent.id && r.prompt ? [r.prompt] : [])),
     [routines.data, agent.id],
   );
   const month = formatMonth(locale, new Date());

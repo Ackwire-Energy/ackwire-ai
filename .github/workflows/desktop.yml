@@ -195,6 +195,12 @@ jobs:
           bun scripts/icons.ts
           bun run tauri icon app-icon.png
 
+      # The cached target may keep an older build's .app, .dmg and updater bundle (another name, another
+      # version): the steps below pick the first one they find, so only this build's may be there.
+      - name: Clear older bundles
+        shell: bash
+        run: rm -rf apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle
+
       - name: Build the app (universal, signed, notarized)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -222,6 +228,13 @@ jobs:
           test -s "$APP/Contents/Resources/licenses/bun/LICENSE.md"
           test -s "$APP/Contents/Resources/LICENSE"
           test -s "$APP/Contents/Resources/NOTICE"
+          # Apple may take a moment to hand out the ticket after accepting the notarization, and the build's
+          # own stapling then gives up quietly (0.5.4): staple again for a few minutes before checking. The
+          # .dmg and the update keep the app as built; without a ticket, the Mac checks it online.
+          for attempt in 1 2 3 4 5 6; do
+            if xcrun stapler validate "$APP" > /dev/null 2>&1; then break; fi
+            xcrun stapler staple "$APP" || sleep 30
+          done
           xcrun stapler validate "$APP"
           spctl --assess --type execute --verbose=4 "$APP"
 

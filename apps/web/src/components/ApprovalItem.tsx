@@ -1,5 +1,6 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
 import { useDecideApproval } from "@agenteschat/client";
+import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { ApprovalCard, Button } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -162,6 +163,8 @@ export function InlineApproval({
     );
   }
   const left = timeLeft(t, approval.expiresAt);
+  const origin = approvalOriginWords(approval);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <ApprovalCard
       status="waiting"
@@ -169,6 +172,8 @@ export function InlineApproval({
       sky={<CardSky color={colorOf(agent)} />}
       who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} />}
       statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
+      origin={origin ? tt(origin.key, origin.values) : undefined}
+      why={approvalWhy(approval) ?? undefined}
       title={approvalTitle(t, approval)}
       detail={`${approval.detail}${left ? ` · ${t("approval.expiresDetail", { time: left })}` : ""}`}
       actions={approval.canDecide && <Actions approval={approval} />}

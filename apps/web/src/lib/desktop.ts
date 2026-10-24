@@ -1,4 +1,5 @@
 import type { SignInProvider } from "@agenteschat/client";
+import { useEffect } from "react";
 
 /**
  * The site inside agentes for Mac (D79): the app's main window loads it and
@@ -70,6 +71,16 @@ const invoke = <T>(request: Record<string, unknown>): Promise<T> => {
   return tauri.invoke("this_mac", { request }) as Promise<T>;
 };
 
+/**
+ * The site painted its first screen: the app's cover over the window goes (apps/desktop cover.rs). Older apps
+ * don't have it; nothing happens there.
+ */
+export function pageReady() {
+  const tauri = (window as { __TAURI_INTERNALS__?: { invoke?: Invoke } }).__TAURI_INTERNALS__;
+  if (!inDesktopApp() || typeof tauri?.invoke !== "function") return;
+  void tauri.invoke("page_ready", {}).catch(() => {});
+}
+
 export const thisMac = {
   status: () => invoke<ThisMacStatus>({ kind: "status" }),
   /** The runner's code for the site to confirm; null when this Mac is already in `orgId`. */
@@ -79,4 +90,20 @@ export const thisMac = {
   openPrefs: (tab: "folders" | "tools" | "updates") => invoke<unknown>({ kind: "prefs", tab }),
   /** The menu bar's popover, where access requests are answered. */
   showRequests: () => invoke<unknown>({ kind: "requests" }),
+  /** The Dock's badge: how many wait on the person, and unread (a dot when nothing waits). */
+  badge: (waiting: number, unread: number) => invoke<unknown>({ kind: "badge", waiting, unread }),
+  /** The Mac's Go menu: the person's organizations (⌘⌥1–9). */
+  orgs: (orgs: { id: string; name: string }[]) => invoke<unknown>({ kind: "orgs", orgs }),
 };
+
+/** The window's title in the app (and the tab's in a browser) while a screen shows; back when it goes. */
+export function useDocumentTitle(title: string | undefined) {
+  useEffect(() => {
+    if (!title) return;
+    const before = document.title;
+    document.title = title;
+    return () => {
+      document.title = before;
+    };
+  }, [title]);
+}

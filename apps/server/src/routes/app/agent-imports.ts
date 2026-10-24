@@ -3,6 +3,7 @@ import {
   attachmentDisposition,
   exportBundle,
   IMPORT_LIMITS,
+  NEW_AGENT_DEFAULTS,
   NOTE_KINDS,
   readGithubImport,
 } from "@agenteschat/engine";
@@ -50,7 +51,7 @@ const BundleRule = z.object({
 });
 
 /**
- * `MigrationBundle` (ADR 0053). Text may be longer than our limits (the
+ * `MigrationBundle` (ADR 0055). Text may be longer than our limits (the
  * import cuts it and reports `trimmed`); these caps only bound the request.
  */
 const Bundle = z
@@ -261,7 +262,7 @@ export function agentImportRoutes(deps: AppDeps) {
         c.get("user").id,
         c.req.valid("param").orgId,
         c.req.valid("json"),
-        { model: deps.config.AGENT_DEFAULT_MODEL },
+        NEW_AGENT_DEFAULTS,
       );
       return c.json(plan, 200);
     },

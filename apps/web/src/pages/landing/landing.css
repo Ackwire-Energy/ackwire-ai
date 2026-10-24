@@ -5,6 +5,9 @@
  * on `.ac-*` here only tune them to the prototype inside the landing page.
  */
 .lp {
+  /* The landing keeps the face it was approved with; the app reads in Source Sans 3. */
+  --font-sans: "Onest Variable", Onest, "Segoe UI", system-ui, sans-serif;
+  font-size-adjust: none;
   --raised2: #1f1f1d;
   --dots: rgba(255, 255, 255, 0.07);
   /* The sky is the agents' color: same in both themes */
@@ -912,15 +915,17 @@
 .lp .lp-footer {
   padding-block: 28px 40px;
 }
-.lp .lp-footer__by a {
-  color: var(--ink);
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--line2, currentColor);
-  text-underline-offset: 3px;
+.lp .lp-footer__legal {
+  display: flex;
+  gap: 16px;
 }
-.lp .lp-footer__by a:hover {
-  text-decoration-color: currentColor;
+.lp .lp-footer__legal a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.lp .lp-footer__legal a:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }
 .lp .lp-footer .lp-wrap {
   display: flex;

@@ -1,5 +1,5 @@
 import type { Me, OrgSummary } from "@agenteschat/client";
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 interface OrgContextValue {
   org: OrgSummary;
@@ -9,7 +9,9 @@ interface OrgContextValue {
 const OrgContext = createContext<OrgContextValue | null>(null);
 
 export function OrgProvider({ org, me, children }: OrgContextValue & { children: ReactNode }) {
-  return <OrgContext.Provider value={{ org, me }}>{children}</OrgContext.Provider>;
+  // Stable across the layout's re-renders (every navigation): every row and avatar reads it.
+  const value = useMemo(() => ({ org, me }), [org, me]);
+  return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
 }
 
 /** The current organization and the signed-in person, inside `/org/$orgId/*`. */

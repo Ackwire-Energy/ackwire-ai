@@ -3,7 +3,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * What an import made (ADR 0053): one row per item of a source package, so
+ * What an import made (ADR 0055): one row per item of a source package, so
  * importing the same package again updates or keeps what it made instead of
  * duplicating it, and never touches what it didn't make. Matching by name
  * alone would break once a taken handle got a suffix (`scout` → `scout2`).

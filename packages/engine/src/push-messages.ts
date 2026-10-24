@@ -35,6 +35,8 @@ export interface PushTextInput {
   text?: string | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;
+  /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
+  routine?: string | null;
 }
 
 interface Strings {
@@ -43,6 +45,7 @@ interface Strings {
   approvalTitle: (actor: string) => string;
   approvalBody: string;
   approvalHighRisk: (what: string) => string;
+  approvalFromRoutine: (routine: string) => string;
   questionTitle: (actor: string) => string;
   questionBody: string;
   forumTitle: string;
@@ -51,6 +54,10 @@ interface Strings {
   missionStoppedTitle: string;
   routineFailedTitle: string;
   routineFailedBody: string;
+  routinePausedTitle: string;
+  routinePausedBody: string;
+  routineStalledTitle: string;
+  routineStalledBody: (computer: string) => string;
   machineConnectedTitle: string;
   browserHandoffTitle: (actor: string) => string;
   browserHandoffBody: string;
@@ -65,6 +72,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     approvalTitle: (a) => `${a} precisa da sua aprovação`,
     approvalBody: "Toque para ver o pedido.",
     approvalHighRisk: (what) => `${what}. Abra o app para revisar com calma.`,
+    approvalFromRoutine: (routine) => `Rotina «${routine}»`,
     questionTitle: (a) => `${a} tem uma pergunta para você`,
     questionBody: "Toque para responder.",
     forumTitle: "Sua vez de opinar",
@@ -73,6 +81,10 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "Uma missão parou",
     routineFailedTitle: "Uma rotina não terminou",
     routineFailedBody: "Toque para ver o que aconteceu.",
+    routinePausedTitle: "Uma rotina foi pausada",
+    routinePausedBody: "Toque para ver o motivo.",
+    routineStalledTitle: "Uma rotina está esperando o computador",
+    routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
     machineConnectedTitle: "Um computador novo entrou na organização",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
     browserHandoffBody: "Toque para abrir a tela.",
@@ -85,6 +97,7 @@ const STRINGS: Record<PushLocale, Strings> = {
     approvalTitle: (a) => `${a} needs your approval`,
     approvalBody: "Tap to see the request.",
     approvalHighRisk: (what) => `${what}. Open the app to review it.`,
+    approvalFromRoutine: (routine) => `Routine «${routine}»`,
     questionTitle: (a) => `${a} has a question for you`,
     questionBody: "Tap to answer.",
     forumTitle: "Your turn to weigh in",
@@ -93,6 +106,10 @@ const STRINGS: Record<PushLocale, Strings> = {
     missionStoppedTitle: "A mission stopped",
     routineFailedTitle: "A routine didn't finish",
     routineFailedBody: "Tap to see what happened.",
+    routinePausedTitle: "A routine was paused",
+    routinePausedBody: "Tap to see why.",
+    routineStalledTitle: "A routine is waiting for its computer",
+    routineStalledBody: (c) => `It runs when ${c} is back.`,
     machineConnectedTitle: "A new computer joined the organization",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
     browserHandoffBody: "Tap to open the screen.",
@@ -117,9 +134,14 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     body: clip(body, PUSH_BODY_MAX),
   });
   switch (input.kind) {
-    case "approval":
-      if (input.highRisk) return out(s.approvalTitle(actor), s.approvalHighRisk(clip(what || s.approvalBody, 120)));
-      return out(s.approvalTitle(actor), what || s.approvalBody);
+    case "approval": {
+      // Asked by a routine while nobody watched: its name leads, so the person knows where it comes from.
+      const routine = input.routine?.trim();
+      const from = (body: string) => (routine ? `${s.approvalFromRoutine(routine)}: ${body}` : body);
+      if (input.highRisk)
+        return out(s.approvalTitle(actor), from(s.approvalHighRisk(clip(what || s.approvalBody, 120))));
+      return out(s.approvalTitle(actor), from(what || s.approvalBody));
+    }
     case "agent_question":
       return out(s.questionTitle(actor), text || s.questionBody);
     case "forum_turn":
@@ -133,6 +155,12 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       return out(s.missionStoppedTitle, what || s.openBody);
     case "routine_failed":
       return out(s.routineFailedTitle, what || s.routineFailedBody);
+    case "routine_paused":
+      // Its name only: the app says why, in the person's words.
+      return out(s.routinePausedTitle, what || s.routinePausedBody);
+    case "routine_stalled":
+      // The computer's name (what the person calls it), else the routine's.
+      return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);

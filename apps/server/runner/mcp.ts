@@ -6,10 +6,13 @@ import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import {
+  type CommandProfile,
   type CommandScope,
-  deniedInMissions,
+  INLINE_CODE_DENY_RULES,
+  localVerdict,
   MISSION_DENY_RULES,
-  readOnlyCall,
+  SECRET_BASH_DENY_RULES,
+  SECRET_READ_DENY_RULES,
 } from "@agenteschat/adapters/command-policy";
 import {
   isSafeRule,
@@ -547,6 +550,8 @@ export async function handleMcpMessage(
   scope?: CommandScope,
   /** Protocol 8: the run's tools from the server (cached); without it, the fixed mission tools. */
   list?: ToolLister,
+  /** The turn's permission profile (ADR 0053 §3): a `plan` turn's prompts are answered here, never asked. */
+  profile: CommandProfile = "work",
 ): Promise<Record<string, unknown> | null> {
   if (typeof message !== "object" || message === null || Array.isArray(message)) {
     return rpcError(null, -32600, "Invalid request");
@@ -596,7 +601,7 @@ export async function handleMcpMessage(
           : {};
       // Claude Code's permission prompt: always an answer it understands (allow or deny JSON), never an error.
       if (name === PERMISSION_TOOL) {
-        const answer = await permissionPrompt(args, call, { ...(scope ? { scope } : {}) });
+        const answer = await permissionPrompt(args, call, { ...(scope ? { scope } : {}), profile });
         return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(answer) }] } };
       }
       const reply = await call(name, args);
@@ -619,18 +624,18 @@ export type PermissionAnswer =
   | { behavior: "allow"; updatedInput: Record<string, unknown> }
   | { behavior: "deny"; message: string };
 
-const NEVER_MESSAGE =
-  "This command is never allowed in a mission (merges, pushes to the default branch, deploys): ask with request_approval and wait.";
-
 /**
  * Claude Code asks (`--permission-prompt-tool mcp__agentes__permission_prompt`)
- * when a command isn't on the task's allow list. Deny-list commands are
- * refused here at once (never shown to anyone); plain reads (`readOnlyCall`:
- * `ls` of any folder, read-only git, a GET with curl) are allowed at once,
- * with no card and nothing posted; the rest go to the server,
- * which allows it by a mission rule or posts the command card in the thread.
- * Then we ask the server every `pollMs` (short calls; no request stays open)
- * until someone answers or `waitMs` passes: then it is denied.
+ * when a command isn't on the task's allow list, and the runner asks the same
+ * for each of Codex's command and file approvals (ADR 0053 §3): one decision
+ * for both. First what the computer decides by itself (`localVerdict`):
+ * deny-list commands and secrets are refused at once (never shown to anyone);
+ * plain reads (`ls` of any folder, read-only git, a GET with curl in a work
+ * turn) are allowed at once, with no card and nothing posted; in a `plan` turn
+ * everything else is refused. The rest goes to the server, which allows it by
+ * a mission rule or code's rules for a run, or posts the command card in the
+ * thread. Then we ask the server every `pollMs` (short calls; no request stays
+ * open) until someone answers or `waitMs` passes: then it is denied.
  */
 export async function permissionPrompt(
   args: Record<string, unknown>,
@@ -642,6 +647,8 @@ export async function permissionPrompt(
     now?: () => number;
     /** Where the task runs: plain reads are allowed here without asking. */
     scope?: CommandScope;
+    /** The turn's permission profile (default `work`). */
+    profile?: CommandProfile;
   } = {},
 ): Promise<PermissionAnswer> {
   const toolName = typeof args.tool_name === "string" ? args.tool_name : "";
@@ -650,8 +657,9 @@ export async function permissionPrompt(
       ? (args.input as Record<string, unknown>)
       : {};
   if (!toolName) return { behavior: "deny", message: "Unknown tool." };
-  if (deniedInMissions(toolName, input)) return { behavior: "deny", message: NEVER_MESSAGE };
-  if (opts.scope && readOnlyCall(toolName, input, opts.scope)) return { behavior: "allow", updatedInput: input };
+  const verdict = localVerdict(toolName, input, opts.scope, opts.profile ?? "work");
+  if (verdict?.behavior === "deny") return verdict;
+  if (verdict?.behavior === "allow") return { behavior: "allow", updatedInput: input };
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const deadline = now() + (opts.waitMs ?? PERMISSION_WAIT_MS);
@@ -701,6 +709,8 @@ export async function runMcpServer(options: {
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
   scope?: CommandScope;
+  /** The turn's permission profile (default: `AGENTES_MCP_PROFILE`, else `work`). */
+  profile?: CommandProfile;
   refreshMs?: number;
 }): Promise<number> {
   const token =
@@ -729,6 +739,7 @@ export async function runMcpServer(options: {
   }, options.refreshMs ?? TOOLS_REFRESH_MS);
   refresher.unref?.();
   const scope = options.scope ?? mcpScopeFromEnv(process.env);
+  const profile = options.profile ?? mcpProfileFromEnv(process.env);
   const rl = createInterface({ input: options.input ?? process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
   const inflight = new Set<Promise<void>>();
   for await (const line of rl) {
@@ -740,7 +751,7 @@ export async function runMcpServer(options: {
       write(rpcError(null, -32700, "Parse error"));
       continue;
     }
-    const p = handleMcpMessage(message, call, scope, list)
+    const p = handleMcpMessage(message, call, scope, list, profile)
       .then((res) => {
         if (res) write(res);
       })
@@ -781,6 +792,10 @@ export function mcpScopeFromEnv(env: NodeJS.ProcessEnv): CommandScope | undefine
   return { cwd, folders: folders.length ? folders : [cwd], ...(env.HOME ? { home: env.HOME } : {}) };
 }
 
+/** The turn's permission profile for our MCP process (`AGENTES_MCP_PROFILE`): anything but `plan` is `work`. */
+export const mcpProfileFromEnv = (env: NodeJS.ProcessEnv): CommandProfile =>
+  env.AGENTES_MCP_PROFILE === "plan" ? "plan" : "work";
+
 /** The MCP config Claude Code reads (`--mcp-config <file>`): our server, bound to the task. */
 export function claudeMcpConfig(input: {
   command: string[];
@@ -792,6 +807,8 @@ export function claudeMcpConfig(input: {
   folders?: string[];
   /** D60: Claude Code lists our tools up front instead of behind its ToolSearch. */
   alwaysLoad?: boolean;
+  /** A `plan` turn: its permission prompts are answered by the computer alone (reads only). */
+  profile?: CommandProfile;
 }) {
   const [command, ...args] = input.command;
   return {
@@ -806,6 +823,7 @@ export function claudeMcpConfig(input: {
           AGENTES_MCP_SOCKET: input.socketPath,
           ...(input.cwd ? { AGENTES_MCP_CWD: input.cwd } : {}),
           ...(input.folders?.length ? { AGENTES_MCP_FOLDERS: input.folders.join(path.delimiter) } : {}),
+          ...(input.profile === "plan" ? { AGENTES_MCP_PROFILE: "plan" } : {}),
         },
       },
     },
@@ -908,13 +926,37 @@ export function missionFolderRules(missionFolder: string | undefined, tools: rea
   return tools.map((tool) => `${tool}(/${dir}/**)`);
 }
 
+/**
+ * Denied in every profile (Claude Code checks deny rules before allow rules):
+ * the deny list, credential stores (shell and read tools) and code given
+ * inline to an interpreter, which `Bash(node *)`, `Bash(python3 *)` would
+ * otherwise allow (ADR 0053 §3).
+ */
+export const ALWAYS_DENY_RULES: readonly string[] = [
+  ...MISSION_DENY_RULES,
+  ...SECRET_BASH_DENY_RULES,
+  ...SECRET_READ_DENY_RULES,
+  ...INLINE_CODE_DENY_RULES,
+];
+
+/** What a `plan` turn never gets: edits and the web. */
+const PLAN_DENY = ["Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"];
+
 export function claudePermissionSettings(
   mode: "plan" | "work",
   branchPrefix: string,
   missionAllow: string[] = [],
   /** An item's mission folder when it runs elsewhere (its worktree or subfolder). */
   missionFolder?: string,
+  opts: {
+    /**
+     * Brain turns (ADR 0053 §3): shell reads aren't allow rules (`Bash(cat *)` would read a key); every
+     * command reaches our prompt tool, where `localVerdict` allows plain reads at once and refuses secrets.
+     */
+    promptReads?: boolean;
+  } = {},
 ) {
+  const shellReads = opts.promptReads ? [] : readOnlyShell();
   if (mode === "plan") {
     return {
       permissions: {
@@ -924,11 +966,11 @@ export function claudePermissionSettings(
           "Glob",
           "Grep",
           "LS",
-          ...readOnlyShell(),
-          ...gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
+          ...shellReads,
+          ...(opts.promptReads ? [] : gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`]))),
           ...missionFolderRules(missionFolder, ["Read"]),
         ],
-        deny: ["Edit", "Write", "NotebookEdit", ...MISSION_DENY_RULES],
+        deny: [...PLAN_DENY, ...ALWAYS_DENY_RULES],
       },
     };
   }
@@ -937,7 +979,7 @@ export function claudePermissionSettings(
     permissions: {
       allow: [
         "mcp__agentes",
-        ...readOnlyShell(),
+        ...shellReads,
         ...FILE_WORK.map((c) => `Bash(${c} *)`),
         ...gitC(GIT_WORK.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
         `Bash(git push origin ${prefix}*)`,
@@ -955,7 +997,7 @@ export function claudePermissionSettings(
         // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
         ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
-      deny: [...MISSION_DENY_RULES],
+      deny: [...ALWAYS_DENY_RULES],
     },
   };
 }

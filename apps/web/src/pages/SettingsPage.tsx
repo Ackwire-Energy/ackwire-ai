@@ -1,4 +1,4 @@
-import type { Credential, OrgSettings, Role } from "@agenteschat/client";
+import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
   useConnections,
@@ -36,7 +36,6 @@ import {
   DialogFooter,
   Field,
   Icon,
-  type IconName,
   Input,
   List,
   Meter,
@@ -60,59 +59,7 @@ import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
-
-export type SettingsSection =
-  | "general"
-  | "members"
-  | "access"
-  | "connectors"
-  | "skills"
-  | "keys"
-  | "storage"
-  | "computers"
-  | "usage"
-  | "import";
-
-type SettingsGroup = "org" | "agents" | "costs";
-
-/** The settings sub-nav (telas/Configuracoes.html), in order and in groups, with who can open each. */
-export const SETTINGS_SECTIONS: {
-  id: SettingsSection;
-  icon: IconName;
-  group: SettingsGroup;
-  allowed: (role: Role) => boolean;
-}[] = [
-  { id: "general", icon: "settings", group: "org", allowed: () => true },
-  { id: "members", icon: "members", group: "org", allowed: () => true },
-  { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
-  { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
-  { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
-  // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
-  { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
-  { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
-  { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "manage_credentials") },
-  { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
-  { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
-];
-
-const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
-
-export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
-
-/** Old section ids and where they live now ("sandbox" joined Computadores). */
-export const MOVED_SETTINGS = new Map<string, SettingsSection>([["sandbox", "computers"]]);
-
-/**
- * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to
- * classify) and `?mail=connected|failed` (back from Gmail/Outlook).
- */
-export const settingsSearch = (
-  search: Record<string, unknown>,
-): { connected?: string; review?: string; mail?: string } => ({
-  connected: typeof search.connected === "string" ? search.connected : undefined,
-  review: search.review === undefined ? undefined : String(search.review),
-  mail: typeof search.mail === "string" ? search.mail : undefined,
-});
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./settings-sections";
 
 /**
  * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).

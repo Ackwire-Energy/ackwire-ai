@@ -8,6 +8,7 @@ import type {
   ResolveHost,
   SandboxDeps,
   StorageDeps,
+  Talker,
 } from "@agenteschat/engine";
 import type { AppleTokenRevoker } from "../../auth";
 
@@ -40,4 +41,6 @@ export interface AppExtras {
   desktopFetch?: typeof fetch;
   /** The agent browser's live view (ADR 0040): handoff changes switch its stream; absent = handoffs only. */
   browserLive?: BrowserLive;
+  /** Agents' conversation layer: fast replies while their task works or waits; absent = none. */
+  talker?: Talker;
 }

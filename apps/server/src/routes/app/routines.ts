@@ -6,13 +6,16 @@ import {
   describeRule,
   describeWhen,
   duplicateRoutine,
+  getRoutineView,
   listMyReminders,
   listRoutineRuns,
   listRoutines,
   localDateTimeOf,
   normalizeRule,
   parseScheduleForOrg,
+  ROUTINE_ACCESS,
   ROUTINE_EVENTS,
+  ROUTINE_REPORT,
   type RoutineDeps,
   readSchedule,
   requirePermission,
@@ -22,6 +25,8 @@ import {
   runRoutineNow,
   type ScheduleRule,
   schedulesOf,
+  stopRoutineRun,
+  takeOverRoutine,
   updateRoutine,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -122,20 +127,57 @@ const ScheduleRuleSchema = z
   })
   .openapi("ScheduleRule");
 
+const Access = z.enum(ROUTINE_ACCESS).openapi({
+  description: "What it may do while nobody watches: `read` (look and report) or `act` (also change things).",
+});
+const Report = z.enum(ROUTINE_REPORT).openapi({
+  description: "When it speaks: `when_new` (only when there is something new) or `always` (a report every run).",
+});
+
 const RoutineRun = z
   .object({
     id: z.uuid(),
     at: z.string(),
     status: z
-      .enum(["ok", "silent", "failed", "skipped"])
-      .openapi({ description: "`silent`: nothing new, the agent stayed quiet (NO_REPLY)." }),
-    summary: z.string(),
+      .enum([
+        "queued",
+        "running",
+        "waiting",
+        "reported",
+        "silent",
+        "failed",
+        "canceled",
+        "superseded",
+        "missed",
+        "skipped",
+      ])
+      .openapi({
+        description:
+          "`reported`: it handed off a report; `silent`: nothing new, nothing posted; `canceled`: a person stopped it; `superseded`: the next slot replaced it while it waited; `missed`: it couldn't run in time; `skipped`: the slot never started.",
+      }),
+    code: z.string().nullable().openapi({
+      description:
+        "Why it was skipped, missed, failed or stopped (`previous_running`, `waiting_computer`, `stopped`, `budget_exceeded`…): the app translates it.",
+    }),
+    codeParams: z.record(z.string(), z.string()).optional().openapi({ description: "`stopped`: `by` (a name)." }),
+    summary: z.string().openapi({ description: "Its record or report, cut; empty when you may not read it." }),
     weight: z
       .number()
       .min(0)
       .max(1)
       .optional()
-      .openapi({ description: "Recent runs only: cost as a share of the priciest recent run (no money)." }),
+      .openapi({ description: "Recent runs only: cost (tokens on a plan) as a share of the priciest recent run." }),
+    brain: z.string().nullable().openapi({ description: "The brain that ran it: `model`, `claude_code` or `codex`." }),
+    link: z
+      .object({ channelId: z.uuid(), threadId: z.uuid().nullable(), messageId: z.uuid() })
+      .nullable()
+      .openapi({ description: "The agent's message people saw (its report)." }),
+    approvalId: z
+      .uuid()
+      .nullable()
+      .optional()
+      .openapi({ description: "While `waiting`: the approval it waits on, if any." }),
+    finishedAt: z.string().nullable(),
   })
   .openapi("RoutineRun");
 const Routine = z
@@ -143,7 +185,9 @@ const Routine = z
     id: z.uuid(),
     name: z.string(),
     agentId: z.uuid(),
-    prompt: z.string(),
+    prompt: z.string().nullable().openapi({
+      description: "Null when you may not see it (a DM, Drive or private-channel routine you don't read).",
+    }),
     target: TargetView,
     trigger: z.union([
       z.object({
@@ -174,10 +218,48 @@ const Routine = z
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
     nextRunAt: z.string().nullable(),
-    running: z.boolean(),
+    createdAt: z.string(),
+    access: Access,
+    report: Report,
+    pausedReason: z.string().nullable().openapi({
+      description:
+        "Why it paused itself (`creator_left`, `creator_no_access`, `agent_archived`, `agent_not_in_channel`, `audience`, `failing`); null when a person paused it.",
+    }),
+    failuresInRow: z.number().int(),
+    state: z.enum(["active", "paused", "running", "waiting_computer", "waiting_person", "failing"]),
+    waitingFor: z
+      .object({ machineId: z.uuid(), machineName: z.string(), since: z.string() })
+      .nullable()
+      .openapi({ description: "Its run waits for the agent's computer since then." }),
+    brain: z.object({
+      kind: z.enum(["model", "claude_code", "codex"]),
+      machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),
+    }),
+    health: z
+      .object({
+        ok: z.number().int(),
+        silent: z.number().int(),
+        failed: z.number().int(),
+        skipped: z.number().int(),
+        missed: z.number().int(),
+        total: z.number().int(),
+      })
+      .openapi({
+        description:
+          "The last 7 days by outcome (`ok`: reported; `skipped`: slots that didn't run, replaced ones too; `total`: their sum, without runs a person stopped).",
+      }),
+    canSeeDetails: z.boolean().openapi({ description: "You read its prompt, records and reports." }),
+    canManage: z.boolean().openapi({ description: "You may change, pause, stop or delete it." }),
     lastRun: RoutineRun.nullable(),
     recentRuns: z.array(RoutineRun).openapi({ description: "The last runs, newest first (at most 14)." }),
-    createdAt: z.string(),
+    usage: z
+      .object({
+        runs: z.number().int(),
+        tokens: z.number(),
+        costNanoUsd: z.number(),
+        billedTo: z.enum(["api", "plan", "mixed"]),
+      })
+      .openapi({ description: "The last 7 days: runs that started the agent, tokens and cost (zero on a plan)." }),
   })
   .openapi("Routine");
 
@@ -428,6 +510,8 @@ export function routineRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Create a routine (admins or the agent's owner)",
+      description:
+        "Refused: `routine.too_frequent` (a routine that starts the agent runs at most every 15 minutes), `routine.too_many` (20 active routines per agent), `routine.creator_cannot_post` (you must be able to post where it reports).",
       request: {
         params: OrgParams,
         body: body(
@@ -437,6 +521,8 @@ export function routineRoutes(deps: AppDeps) {
             prompt: z.string().min(1).max(10_000),
             target: Target,
             trigger: TriggerInput,
+            access: Access.optional().openapi({ description: "Default `read`." }),
+            report: Report.optional().openapi({ description: "Default `when_new`." }),
           }),
         ),
       },
@@ -457,7 +543,7 @@ export function routineRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Edit a routine (its creator, admins or the agent's owner): name, prompt, agent, trigger, target, pause/resume",
+        "Edit a routine (its creator, admins or the agent's owner): what, when, where, access, report, pause/resume",
       request: {
         params: RoutineParams,
         body: body(
@@ -467,10 +553,14 @@ export function routineRoutes(deps: AppDeps) {
             agentId: z.uuid().optional(),
             trigger: TriggerInput.optional().openapi({
               description:
-                "A schedule phrase is parsed again (in `timezone`, else the person's); `nextRunAt` is recomputed.",
+                "A schedule phrase is parsed again (in `timezone`, else the routine's own zone); `nextRunAt` is recomputed.",
             }),
             target: TargetView.optional(),
-            active: z.boolean().optional(),
+            active: z.boolean().optional().openapi({
+              description: "`true` resumes it and clears `pausedReason` and `failuresInRow`.",
+            }),
+            access: Access.optional(),
+            report: Report.optional(),
           }),
         ),
       },
@@ -547,6 +637,46 @@ export function routineRoutes(deps: AppDeps) {
       const routine = await runRoutineNow(routines, actor, orgId, routineId);
       deps.wakeWorkers?.();
       return c.json(routine, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/stop",
+      tags,
+      security,
+      summary: "Stop the routine's run in progress (its creator, admins or the agent's owner)",
+      description:
+        "The background run is canceled quietly (nothing is posted) and the run ends `canceled` with code `stopped` and who stopped it. The routine keeps its schedule.",
+      request: { params: RoutineParams },
+      responses: { 200: json(Routine), ...errors },
+    }),
+    async (c) => {
+      const { orgId, routineId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      await stopRoutineRun(routines, actor, orgId, routineId);
+      return c.json(await getRoutineView(db, actor, orgId, routineId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/take-over",
+      tags,
+      security,
+      summary: "Take a routine over (admins or the agent's owner): you become its creator",
+      description:
+        "For a routine whose creator left or can no longer post where it reports: you become accountable for it (its approvals and notifications come to you).",
+      request: { params: RoutineParams },
+      responses: { 200: json(Routine), ...errors },
+    }),
+    async (c) => {
+      const { orgId, routineId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      await takeOverRoutine(routines, actor, orgId, routineId);
+      return c.json(await getRoutineView(db, actor, orgId, routineId), 200);
     },
   );
 

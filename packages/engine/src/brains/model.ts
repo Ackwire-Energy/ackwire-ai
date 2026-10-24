@@ -1,3 +1,4 @@
+import type { BrainEffort } from "@agenteschat/adapters";
 import type { ModelMessage, SystemBlock, ToolSpec } from "@agenteschat/providers";
 import type { Agent } from "../agents";
 import type { GatewayResult, ModelGateway } from "../gateway";
@@ -75,6 +76,8 @@ export class ModelBrain implements Brain {
         messages,
         maxTokens: maxOutputTokens,
         tools: specs.length > 0 ? specs : undefined,
+        // Only "Automático" sets an effort for the API (D83); the API takes low, medium and high.
+        ...(turn.effort ? { effort: apiEffort(turn.effort) } : {}),
         onDelta: (text) => deltas.push({ type: "text_delta", text }),
         signal: io.signal,
       })
@@ -106,6 +109,10 @@ export class ModelBrain implements Brain {
     yield { type: "done", text: result.text };
   }
 }
+
+/** A brain effort as the providers take it (`ModelRequest.effort`): `xhigh` and `max` are `high`. */
+export const apiEffort = (effort: BrainEffort): "low" | "medium" | "high" =>
+  effort === "low" || effort === "medium" ? effort : "high";
 
 /**
  * Callback → async iterator bridge: pushed items are yielded in order; after

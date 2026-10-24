@@ -1,4 +1,4 @@
-import { zonedParts, zonedTime } from "./cron";
+import { zonedParts, zonedTimeForward } from "./cron";
 import { ValidationError } from "./errors";
 
 /**
@@ -214,20 +214,17 @@ function dayInstants(rule: ScheduleRule, n: number, startN: number): Date[] {
     for (let h = 0; h < 24; h++) {
       const index = (n - startN) * 24 + h - h0;
       if (index < 0 || index % interval !== 0) continue;
-      const at = zonedTime(y, m, d, h, minute, rule.timezone);
-      if (at) out.push(at);
+      // A slot skipped by DST moves forward, as every schedule does; one that lands on the next slot merges.
+      const at = zonedTimeForward(y, m, d, h, minute, rule.timezone);
+      if (at && !out.some((o) => o.getTime() === at.getTime())) out.push(at);
     }
     return out;
   }
   for (const [h, mi] of times) {
-    // A time skipped by DST runs at the first valid minute after it (the same day).
-    let at = zonedTime(y, m, d, h, mi, rule.timezone);
-    for (let shift = 1; !at && shift <= 120; shift++) {
-      const total = h * 60 + mi + shift;
-      if (total >= 24 * 60) break;
-      at = zonedTime(y, m, d, Math.floor(total / 60), total % 60, rule.timezone);
-    }
-    if (at) out.push(at);
+    // A time skipped by DST runs at the first valid minute after it (the same day), as in cron.
+    const at = zonedTimeForward(y, m, d, h, mi, rule.timezone);
+    // Two times inside one gap land on the same instant: it runs once.
+    if (at && !out.some((o) => o.getTime() === at.getTime())) out.push(at);
   }
   return out.sort((a, b) => a.getTime() - b.getTime());
 }

@@ -12,6 +12,7 @@ import {
   useNotifications,
   useThreadMessages,
 } from "@agenteschat/client";
+import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
@@ -27,6 +28,7 @@ import {
   sortWaiting,
   stepCells,
 } from "@agenteschat/client/lib/notifications";
+import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import {
   Button,
   Chip,
@@ -92,6 +94,12 @@ function durationText(t: TFunction, ms: number) {
   if (ms < 3_600_000) return t("format.inMinutes", { count: Math.max(1, Math.floor(ms / 60_000)) });
   if (ms < 2 * 86_400_000) return t("format.inHours", { count: Math.floor(ms / 3_600_000) });
   return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
+}
+
+/** Words from the client's rules (a key and its values) in the person's language; `otherwise` for an unknown key. */
+function sayWords(t: TFunction, w: Words, otherwise = "") {
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
 }
 
 const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
@@ -169,8 +177,7 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
     [icon, label] = ["issues", t("notifications.source.issue", { number: s.issueNumber })];
   else if (n.kind === "mission_finished" || n.kind === "mission_stopped")
     [icon, label] = ["flag", t("notifications.source.mission")];
-  else if (n.kind === "routine_finished" || n.kind === "routine_failed")
-    [icon, label] = ["routines", t("notifications.source.routine")];
+  else if (n.kind.startsWith("routine_")) [icon, label] = ["routines", t("notifications.source.routine")];
   else if (n.kind === "dm" || s.dmId) [icon, label] = ["person", t("notifications.source.dm")];
   else if (s.threadId) {
     const name = channel ? channelName(channel) : "";
@@ -202,6 +209,8 @@ type WhatKey =
   | "missionStopped"
   | "routineFinished"
   | "routineFailed"
+  | "routinePaused"
+  | "routineStalled"
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
@@ -253,6 +262,10 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
+    case "routine_paused":
+      return k("routinePaused", { name });
+    case "routine_stalled":
+      return k("routineStalled", { name });
     case "machine_connected":
       return n.source.label
         ? k("machineConnected", { name, label: n.source.label })
@@ -566,21 +579,28 @@ function Row({
     <Face actor={first} dir={dir} className="nt-av28" />
   );
   const l = n.latest;
+  // Asked while nobody watched (ADR 0053 §8): who asked leads an approval's line, its why follows.
+  const origin = n.kind === "approval" ? approvalOriginWords({ origin: l.origin }) : null;
   const lead =
     n.source.issueNumber != null && l.title && (n.kind === "issue_assigned" || n.kind === "issue_status")
       ? `#${n.source.issueNumber} ${l.title}`
       : (n.kind === "mission_finished" ||
             n.kind === "mission_stopped" ||
-            n.kind === "routine_finished" ||
-            n.kind === "routine_failed" ||
+            n.kind.startsWith("routine_") ||
             n.kind === "forum_synthesis") &&
           n.source.label
         ? n.source.label
-        : null;
+        : origin
+          ? sayWords(t, origin)
+          : null;
   const speaker = n.count > 1 && (n.kind === "thread_reply" || n.kind === "issue_comment") ? name : null;
   const expandable = isExpandable(n);
   const steps = l.steps && l.steps.total > 0 ? l.steps : null;
   const failed = n.kind === "mission_stopped" || n.kind === "routine_failed" || l.steps?.failedAt != null;
+  // A routine's trouble says why in the person's language (`latest.reason`): a pause its reason, a failed
+  // run what went wrong (never the server's English).
+  const why = routineNotificationWords(n);
+  const text = why ? sayWords(t, why, l.text ?? "") : l.text;
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -653,11 +673,11 @@ function Row({
           </>
         ) : (
           <>
-            {(l.text || lead) && (
+            {(text || lead) && (
               <p className="nt-snip">
                 {lead && <b>{t("notifications.lead", { text: lead })} </b>}
                 {speaker && <b>{t("notifications.speaker", { name: speaker })} </b>}
-                {l.text && <Snippet text={l.text} mine={mine} />}
+                {text && <Snippet text={text} mine={mine} />}
               </p>
             )}
             {steps && (
@@ -1033,6 +1053,9 @@ function WaitCard({
   } else {
     const leftMs = l.expiresAt ? new Date(l.expiresAt).getTime() - Date.now() : null;
     const left = l.expiresAt ? timeLeft(t, l.expiresAt) : null;
+    // An approval says who asked while nobody watched, then the agent's why (ADR 0053 §8).
+    const origin = n.kind === "approval" ? approvalOriginWords({ origin: l.origin }) : null;
+    const why = n.kind === "approval" && l.title ? l.text : undefined;
     meta = (
       <>
         {n.kind === "approval" ? (
@@ -1055,7 +1078,17 @@ function WaitCard({
         )}
       </>
     );
-    head = <h3>{l.title ?? l.text ?? ""}</h3>;
+    head = (
+      <>
+        <h3>{l.title ?? l.text ?? ""}</h3>
+        {(origin || why) && (
+          <p className="nt-ctx">
+            {origin && <b>{t("notifications.lead", { text: sayWords(t, origin) })} </b>}
+            {why && <Snippet text={why} mine={mine} />}
+          </p>
+        )}
+      </>
+    );
     body = (
       <>
         {n.kind === "approval" && n.source.approvalId && <ApprovalBody approvalId={n.source.approvalId} />}
@@ -1301,6 +1334,9 @@ export function NotificationsPage() {
         return void navigate({ to: target.to, params: { orgId, ...target.params } });
       case "/org/$orgId/settings/$section":
         return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {} });
+      case "/org/$orgId/routines":
+        // A routine's trouble opens it in Rotinas, its state and fix in view.
+        return void navigate({ to: target.to, params: { orgId }, search: target.search ?? {} });
       default:
         return void navigate({ to: target.to, params: { orgId } });
     }

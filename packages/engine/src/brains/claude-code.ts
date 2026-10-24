@@ -2,19 +2,22 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   ACCOUNTS_PROTOCOL,
   type AgentScope,
+  BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
   type PubSub,
   parseBrainEvent,
+  STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters";
-import { type Database, schema } from "@agenteschat/db";
+import { type Database, type Executor, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { type RunAuthority, runAuthorityById } from "../authority";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
-import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn } from "./types";
+import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
 /**
  * The Claude Code brain (ADR 0032): an agent thinks with Claude Code on its
@@ -36,22 +39,56 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn } from "./type
  *   with an `error` whose `retryable: true` tells the engine it may fall back
  *   to the model brain (ADR 0032 §5).
  *
+ * - Live steering (runner protocol 15): once the turn is sent, the brain
+ *   hands the engine `steer` (`BrainIO.steerable`): a person's messages go to
+ *   the turn in progress (`brain.steer`), Claude Code reads them at its next
+ *   tool boundary, and `steer_read` events say which it read.
+ *
  * Error codes (`retryable` = the turn may run on another brain):
  * `no_session`, `machine_offline`, `exec_disabled`, `runner_outdated`,
  * `cli_missing`, `not_logged_in`, `plan_limit`, `busy` (all retryable);
  * `claude_failed`, `canceled`, `timeout`, `runner_error`, `bad_request` (not).
  */
 
+/**
+ * The permission profile of a computer turn (ADR 0053 §3), from who is behind
+ * its run: a person's run works (`work`: edits, commands by the command policy
+ * and a person); a routine works only with access `act`; a routine that only
+ * reads (`read`, the default, also a legacy brief-less one) and every
+ * unattended run read (`plan`: no edits, read-only shell, no web, our tools
+ * only). Missions keep their own profile (`missionTurnPermissions`).
+ */
+export function computerProfile(authority: RunAuthority): "plan" | "work" {
+  if (authority.kind === "person") return "work";
+  if (authority.kind === "routine") return authority.brief?.access === "act" ? "work" : "plan";
+  return "plan";
+}
+
+/**
+ * A turn's profile, read again for every turn: a person who writes into an
+ * unattended run while it works puts them behind it (`steeredBy`) from then on.
+ */
+export async function computerTurnProfile(
+  db: Executor,
+  turn: Pick<BrainTurn, "orgId" | "runId">,
+): Promise<"plan" | "work"> {
+  return computerProfile(await runAuthorityById(db, turn.orgId, turn.runId));
+}
+
 export interface ClaudeCodeBrainDeps {
   hub: Pick<MachineCaller, "call" | "status">;
   pubsub: PubSub;
   /** The agent as the runner names its folder (`agentScopeFromDb`). */
   agentScope: (turn: BrainTurn) => Promise<AgentScope>;
-  /** Keep one Claude Code process per thread alive between turns (default true). */
+  /** Keep one Claude Code process per thread alive between turns (default true; false for a background run). */
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: only our bridge). */
   personalMcp?: (turn: BrainTurn) => boolean | Promise<boolean>;
-  /** Command policy for the turn (missions pass plan/work, branch prefix, allowed rules). */
+  /**
+   * The turn's permission profile (missions: their own plan/work, branch prefix and allowed rules; other
+   * runs: `computerTurnProfile`). A `plan` turn needs `BRAIN_PROFILES_PROTOCOL` (an older runner's plan
+   * reads secrets and loads project settings): below it the turn fails with `runner_outdated`.
+   */
   permissions?: (
     turn: BrainTurn,
   ) => BrainTurnRequest["permissions"] | undefined | Promise<BrainTurnRequest["permissions"] | undefined>;
@@ -67,6 +104,41 @@ export interface ClaudeCodeBrainDeps {
   timeoutMs?: number;
   /** After the request's result, how long to wait for the stream's last events (default 1.5 s). */
   finalGraceMs?: number;
+  /** How long a `brain.steer` may take (default `STEER_CALL_MS`). */
+  steerTimeoutMs?: number;
+}
+
+/** A `brain.steer` answers at once (it only writes to the CLI's stdin): longer means the computer is in trouble. */
+export const STEER_CALL_MS = 2000;
+
+/** Hands messages to the turn of `runId` on its computer (`brain.steer`); a failed call is `no_turn` (they wait). */
+export async function steerOnMachine(
+  hub: Pick<MachineCaller, "call">,
+  input: { machineId: string; runId: string; session: string; agent: AgentScope; timeoutMs?: number },
+  messages: SteerMessage[],
+): Promise<SteerReply> {
+  try {
+    const reply = await hub.call<"brain.steer">(
+      input.machineId,
+      {
+        op: "brain.steer",
+        runId: input.runId,
+        session: input.session,
+        messages: messages.map((m) => ({ uuid: m.uuid, text: m.text, ...(m.urgent ? { urgent: true } : {}) })),
+        agent: input.agent,
+      },
+      { timeoutMs: input.timeoutMs ?? STEER_CALL_MS },
+    );
+    if (reply?.status === "accepted" && Array.isArray(reply.accepted)) {
+      const sent = new Set(messages.map((m) => m.uuid));
+      return { status: "accepted", accepted: reply.accepted.filter((u) => typeof u === "string" && sent.has(u)) };
+    }
+    if (reply?.status === "unsupported")
+      return { status: "unsupported", ...(reply.reason ? { reason: reply.reason } : {}) };
+    return { status: "no_turn", ...(reply && "reason" in reply && reply.reason ? { reason: reply.reason } : {}) };
+  } catch (error) {
+    return { status: "no_turn", reason: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** The agent's id and handle, as the runner names its folder (and its name, for the machine's activity log). */
@@ -269,6 +341,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
         return;
       }
       const queue = new Queue();
+      let steering = false;
       const off = deps.pubsub.subscribe(brainTopic(turn.runId), (e) => {
         // Only the agent's own computer speaks for this run.
         if (e.machineId !== session.machineId) return;
@@ -283,6 +356,16 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           Promise.resolve(deps.personalMcp?.(turn) ?? false),
         ]);
         const permissions = await deps.permissions?.(turn);
+        // An older runner's `plan` lets the CLI read secrets and loads the project's settings files: the
+        // turn waits for an updated runner instead of reading with more power than asked for (§3).
+        if (permissions?.mode === "plan" && (status?.protocol ?? 0) < BRAIN_PROFILES_PROTOCOL) {
+          yield err(
+            "runner_outdated",
+            "The runner on the computer is too old to keep Claude Code within this agent's permissions; update it.",
+            true,
+          );
+          return;
+        }
         const code = await deps.prepare?.(turn, io.signal).catch(() => null);
         const request: BrainTurnRequest = {
           runId: turn.runId,
@@ -317,6 +400,18 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
             },
             (error: unknown) => queue.push({ kind: "reply", final: claudeCodeCallError(error) }),
           );
+        // The turn is on its way: a person's messages can reach it mid-turn (an older runner reads them at the end).
+        if (io.steerable && (status?.protocol ?? 0) >= STEER_PROTOCOL) {
+          const target = {
+            machineId: session.machineId,
+            runId: turn.runId,
+            session: session.id,
+            agent,
+            ...(deps.steerTimeoutMs ? { timeoutMs: deps.steerTimeoutMs } : {}),
+          };
+          io.steerable((messages) => steerOnMachine(deps.hub, target, messages));
+          steering = true;
+        }
         let streamEnded = false;
         let replyFinal: BrainEvent | null = null;
         for (;;) {
@@ -335,6 +430,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           }
         }
       } finally {
+        if (steering) io.steerable?.(null);
         off();
       }
     },

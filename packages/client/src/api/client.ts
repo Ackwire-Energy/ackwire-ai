@@ -302,7 +302,7 @@ export interface ApiClient {
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };
-  /** Bringing agents and what's around them from another app or another agentes.chat (ADR 0053); admins. */
+  /** Bringing agents and what's around them from another app or another agentes.chat (ADR 0055); admins. */
   imports: {
     /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
@@ -707,6 +707,10 @@ export interface ApiClient {
     create(orgId: string, input: RoutineInput): Promise<Routine>;
     setActive(orgId: string, id: string, active: boolean): Promise<Routine>;
     runNow(orgId: string, id: string): Promise<Routine>;
+    /** Stops the run in progress quietly (it ends `canceled`, `stopped` by me). */
+    stop(orgId: string, id: string): Promise<Routine>;
+    /** An admin or the agent's owner becomes its creator (a routine paused because its creator left). */
+    takeOver(orgId: string, id: string): Promise<Routine>;
     runs(orgId: string, id: string): Promise<RoutineRun[]>;
     /** A phrase → rule, its description, cron and next 5 runs. */
     parseRule(orgId: string, phrase: string, timezone?: string): Promise<RuleInfo>;

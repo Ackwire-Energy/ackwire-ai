@@ -1,5 +1,5 @@
 import type { Machine, Model, Role } from "@agenteschat/client";
-import { keys, useConfirmDevice, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
+import { keys, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind } from "@agenteschat/client/lib/machines";
@@ -10,13 +10,7 @@ import {
   type OnboardingStepId,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
-import {
-  keyLooksValid,
-  PROVIDERS,
-  type ProviderId,
-  providerLabel,
-  suggestModel,
-} from "@agenteschat/client/lib/providers";
+import { AUTO, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@agenteschat/client/lib/providers";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
@@ -59,6 +53,7 @@ import { importedModel } from "@/lib/import";
 import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
+import "./onboarding.css";
 
 export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;
 export type Preset = (typeof PRESETS)[number];
@@ -143,7 +138,6 @@ export function OnboardingPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
-  const models = useModels();
   const guide = useGuideMood();
 
   const [index, setIndex] = useState(0);
@@ -287,18 +281,17 @@ export function OnboardingPage() {
 
   /**
    * The import picked in its step, in one apply: each agent keeps its own
-   * model when the chosen key runs it, else gets the suggestion; the agents it
-   * brings join #general.
+   * model when the chosen key runs it, else starts on "Automático"; the agents
+   * it brings join #general.
    */
-  const applyImported = async (list: { models: Model[]; defaultModel: string }, provider: string) => {
+  const applyImported = async (list: { models: Model[] }, provider: string) => {
     const crewSoFar = [...importedCrew];
     const bundle = flow.planned?.bundle;
     if (!created || !bundle) return crewSoFar;
-    const suggested = suggestModel(list.models, provider, list.defaultModel);
     const runnable = list.models.filter((m) => m.provider === provider).map((m) => m.id);
     const items = await flow.apply((b) => ({
       ...b,
-      agents: b.agents.map((a) => ({ ...a, model: importedModel(a, runnable, suggested) ?? null })),
+      agents: b.agents.map((a) => ({ ...a, model: importedModel(a, runnable, AUTO) ?? null })),
     }));
     // The report waits for the last step.
     flow.focus.current = null;
@@ -331,7 +324,6 @@ export function OnboardingPage() {
   const saveAgents = useMutation({
     mutationFn: async () => {
       if (!created) return;
-      const provider = key === "platform" ? "anthropic" : key;
       // No key needed when the agents think on the connected computer; one pasted is still saved.
       if (key !== "platform" && !keySaved && apiKey.trim()) {
         const cred = await api.agents.addCredential(created.orgId, {
@@ -360,7 +352,8 @@ export function OnboardingPage() {
           handle: handleFrom(info.name),
           role: info.role,
           instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
-          model: suggestModel(list.models, provider, list.defaultModel),
+          // "Automático" (D83): each task gets its model and effort.
+          model: AUTO,
           // null = the workspace default key.
           credentialId: null,
           appearance: PRESET_LOOK[p],
@@ -370,7 +363,7 @@ export function OnboardingPage() {
         setAgentIds({ ...ids });
       }
       // Imported: one apply after the presets (a handle a preset took gets the next free one).
-      const crewSoFar = await applyImported(list, provider);
+      const crewSoFar = await applyImported(list, key === "platform" ? "anthropic" : key);
       // The connected computer chosen a step before: every agent works there, and thinks with its
       // Claude Code when that was picked (the person confirmed the plan warning).
       if (computer !== "machine" || !machine) return;
@@ -948,19 +941,7 @@ export function OnboardingPage() {
                 </>
               )}
               <p className="onb__help">
-                {models.data &&
-                  t("onboarding.suggestedModel", {
-                    model:
-                      models.data.models.find(
-                        (m) =>
-                          m.id ===
-                          suggestModel(
-                            models.data.models,
-                            key === "platform" ? "anthropic" : key,
-                            models.data.defaultModel,
-                          ),
-                      )?.label ?? "",
-                  })}{" "}
+                {t("onboarding.suggestedAuto")}{" "}
                 <button
                   type="button"
                   className="onb__link"

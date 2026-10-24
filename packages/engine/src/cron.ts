@@ -5,9 +5,10 @@
  * When both day fields are restricted, a day matches either (as in Vixie
  * cron).
  *
- * Daylight saving time: a local time that doesn't exist (the hour skipped
- * in spring) is skipped; a local time that happens twice (autumn) runs once,
- * at its first occurrence.
+ * Daylight saving time, the same as recurrence rules (`rrule.ts`): a local
+ * time that doesn't exist (the hour skipped in spring) moves forward to the
+ * first valid minute after it, the same day; a local time that happens twice
+ * (autumn) runs once, at its first occurrence.
  */
 export interface CronSpec {
   minutes: Set<number>;
@@ -127,6 +128,28 @@ export function zonedTime(y: number, mo: number, d: number, h: number, mi: numbe
   return null;
 }
 
+/**
+ * The instant of a local wall time, a time skipped by DST moved forward to the first valid minute after
+ * it (the same day): the one semantics schedules use. Null only when nothing is left of that day.
+ */
+export function zonedTimeForward(
+  y: number,
+  mo: number,
+  d: number,
+  h: number,
+  mi: number,
+  timeZone: string,
+): Date | null {
+  let at = zonedTime(y, mo, d, h, mi, timeZone);
+  // DST gaps are at most two hours.
+  for (let shift = 1; !at && shift <= 120; shift++) {
+    const total = h * 60 + mi + shift;
+    if (total >= 24 * 60) break;
+    at = zonedTime(y, mo, d, Math.floor(total / 60), total % 60, timeZone);
+  }
+  return at;
+}
+
 const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
 /** The next instant strictly after `after` that matches, in `timeZone` (searches up to ~4 years). */
@@ -148,7 +171,8 @@ export function nextCronTime(expression: string | CronSpec, timeZone: string, af
       if (dayOk) {
         for (const h of hours) {
           for (const mi of minutes) {
-            const at = zonedTime(y, mo, d, h, mi, timeZone);
+            // Several slots inside a DST gap move to the same instant: "strictly after" runs it once.
+            const at = zonedTimeForward(y, mo, d, h, mi, timeZone);
             if (at && at.getTime() > after.getTime()) return at;
           }
         }
