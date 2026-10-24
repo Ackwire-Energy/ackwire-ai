@@ -236,7 +236,8 @@ export async function pollDeviceToken(deps: DeviceDeps, deviceCode: string): Pro
   if (!issued) return { ok: false, error: "expired_token" };
   await recordAudit(deps.db, {
     orgId: issued.machine.orgId,
-    actor: { type: "person", id: row.confirmedByUserId },
+    // Nobody confirmed a code the operator's provisioner issued (ADR 0056 §10).
+    actor: row.confirmedByUserId ? { type: "person", id: row.confirmedByUserId } : { type: "system", id: null },
     action: "machine.paired",
     target: { type: "machine", id: issued.machine.id },
     details: { name: issued.machine.name, hostname: issued.machine.hostname, os: issued.machine.os },
@@ -318,7 +319,8 @@ async function reconnectTarget(
     .select()
     .from(machines)
     .where(and(eq(machines.id, machineId), ...(orgId ? [eq(machines.orgId, orgId)] : [])));
-  if (!machine) return null;
+  // The workspace's own computer comes back only through its provisioner's code, never as someone's computer.
+  if (!machine || machine.kind === "managed") return null;
   const member = await getMembership(db, actorId, machine.orgId);
   if (!member || !can(member.role, "post")) return null;
   if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;

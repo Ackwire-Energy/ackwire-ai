@@ -123,6 +123,25 @@ describe("Entrar (e-mail primeiro)", () => {
     await press(/^Continuar(?! com)/);
     expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
+
+  test("a blocked account is told so; another refusal keeps the server's words", async () => {
+    for (const [signIn, says] of [
+      [
+        { ok: false, status: 403, message: "This account can't sign in.", code: "ACCOUNT_BLOCKED" },
+        "Esta conta não pode entrar.",
+      ],
+      [{ ok: false, status: 403, message: "Invalid origin" }, "Invalid origin"],
+    ] as const) {
+      const { api } = authApi(ACCOUNT);
+      await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(screen().getByRole("alert").textContent).toContain(says);
+      cleanup();
+    }
+  });
 });
 
 describe("Criar conta (e-mail novo)", () => {

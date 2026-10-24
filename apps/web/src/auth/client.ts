@@ -3,7 +3,7 @@
  * session cookie: nothing auth-related is stored in JavaScript). Pages use
  * this interface; `better-auth.ts` implements it and tests pass a fake.
  */
-export type AuthResult = { ok: true } | { ok: false; status: number; message: string };
+export type AuthResult = { ok: true } | { ok: false; status: number; message: string; code?: string };
 
 export interface AuthClient {
   signIn(input: { email: string; password: string }): Promise<AuthResult>;

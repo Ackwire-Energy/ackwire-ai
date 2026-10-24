@@ -60,6 +60,7 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  standingJudge,
   type ToolSource,
   withJudgeFallback,
 } from "@agenteschat/engine";
@@ -155,6 +156,8 @@ export function buildEngine(o: EngineOptions) {
         )
       : llmJudge;
   }
+  // Nothing is judged for a workspace on hold or suspended: Jev bills the server, not the workspace.
+  context.judge = standingJudge(db, context.judge);
   // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
   const talker = createTalker({
     db,

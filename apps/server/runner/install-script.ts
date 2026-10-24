@@ -15,12 +15,15 @@ export function shQuote(value: string): string {
  * confirm it on the site, ADR 0036 §5) and installs the service. A home
  * that is already connected keeps its connection (running it again updates
  * the runner).
+ *
+ * `--enroll-file FILE` connects with a code issued for this computer instead
+ * (`agentes-runner pair --enroll-file`, ADR 0056 §10), connected before or not.
  */
 export function installScript(publicUrl: string): string {
   const server = shQuote(publicUrl.trim().replace(/\/+$/, ""));
   return `#!/bin/sh
 # agentes.chat runner installer: connects this computer to your organization.
-# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service]
+# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]
 set -eu
 
 SERVER=${server}
@@ -32,6 +35,7 @@ DIR=""
 NAME=""
 NO_EXEC=0
 NO_SERVICE=0
+ENROLL_FILE=""
 
 say() { printf '%s\\n' "$*"; }
 die() { printf 'agentes-runner: %s\\n' "$*" >&2; exit 1; }
@@ -46,8 +50,10 @@ while [ $# -gt 0 ]; do
     --name=*) NAME="\${1#--name=}"; shift ;;
     --no-exec) NO_EXEC=1; shift ;;
     --no-service) NO_SERVICE=1; shift ;;
+    --enroll-file) need_value "$1" $#; ENROLL_FILE="$2"; shift 2 ;;
+    --enroll-file=*) ENROLL_FILE="\${1#--enroll-file=}"; shift ;;
     -h|--help)
-      say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service]"
+      say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]"
       exit 0 ;;
     *) die "unknown option: $1" ;;
   esac
@@ -96,11 +102,12 @@ mv "$TMP" "$BUNDLE"
 } > "$LAUNCHER"
 chmod 755 "$LAUNCHER"
 
-if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
+if [ -z "$ENROLL_FILE" ] && [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
   say "This computer is already connected (runner updated). To connect it again: $LAUNCHER pair --server $SERVER"
 else
-  # Prints a code and a link, and waits until someone confirms it on the site.
+  # Prints a code and a link, and waits until someone confirms it on the site (an issued code needs nobody).
   set -- pair --server "$SERVER"
+  if [ -n "$ENROLL_FILE" ]; then set -- "$@" --enroll-file "$ENROLL_FILE"; fi
   if [ -n "$DIR" ]; then set -- "$@" --dir "$DIR"; fi
   if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
   if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
