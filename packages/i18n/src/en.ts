@@ -63,6 +63,7 @@ export const en: Translations = {
     hidePassword: "Hide password",
     capsLock: "Caps Lock is on",
     tooManyTries: "Too many tries. Wait a few minutes and try again.",
+    accountBlocked: "This account can't sign in.",
     passwordHelp: "At least 8 characters.",
     passwordOk: "Password ok.",
     passwordMissing_one: "{{count}} more character needed (minimum 8).",
@@ -491,7 +492,7 @@ export const en: Translations = {
       noteKey:
         "This amount is charged by the key's provider for API usage, not by agentes.chat. When an agent hits the limit, it stops and tells you. Claude Code on a connected computer doesn't count here.",
       notePlatform:
-        "With the platform credits, API usage is charged by agentes.chat. The limit only covers that usage: when an agent hits it, it stops and tells you.",
+        "With the agentes.chat key, the limit covers API usage: when an agent hits it, it stops and tells you.",
     },
     provider: "Provider",
     keyFor: "{{provider}} API key",
@@ -505,8 +506,8 @@ export const en: Translations = {
     openaiOrg: "OpenAI organization ID",
     openaiProject: "OpenAI project ID",
     optional: "Optional.",
-    platformChoice: "Use platform credits",
-    platformKeyDesc: "No key: the platform charges per use, with US$ 5 free to try. You see each agent's cost.",
+    platformChoice: "Use the agentes.chat key",
+    platformKeyDesc: "No key of your own: agents use the agentes.chat key. You see each agent's cost.",
     suggestedAuto: "Starts on Automatic: it picks the model and effort for each task. You can change it later.",
     computer: {
       title: "Where will we work?",
@@ -1836,6 +1837,9 @@ export const en: Translations = {
         missing_credential: "The workspace has no {{provider}} key.",
         credential_revoked: "This agent's key was revoked.",
         credential_wrong_provider: "The model is from {{modelProvider}}, but the key is from {{keyProvider}}.",
+        org_paused: "The workspace's agents are paused.",
+        org_suspended: "The workspace is unavailable.",
+        agent_paused: "The agent is paused.",
         unknown: "Failed.",
       },
     },
@@ -2965,6 +2969,9 @@ export const en: Translations = {
       credential_wrong_provider: "The API key is from another provider",
       agent_archived: "The agent was archived",
       interrupted: "Interrupted by an update",
+      org_paused: "Didn't run: the workspace's agents were paused",
+      org_suspended: "Didn't run: the workspace was unavailable",
+      agent_paused: "Didn't run: the agent was paused",
     },
     openInChat: "Open in the conversation",
     stop: "Stop",
@@ -7737,6 +7744,23 @@ export const en: Translations = {
         browser_close: "Closed the browser",
         other: "Used the browser",
       },
+    },
+  },
+  standing: {
+    paused: "Agents in this workspace are paused for now.",
+    suspended: "This workspace is unavailable for now.",
+    createRefused: "You can't create a workspace right now.",
+    agentPaused: "This agent is paused for now.",
+    notification: {
+      hold: "The workspace is on hold: its agents are paused",
+      suspended: "The workspace was suspended",
+      active: "The workspace is working again",
+    },
+  },
+  computerSetup: {
+    managedNotRemovable: "This is the workspace's own computer: it can't be removed.",
+    notification: {
+      ready: "Your workspace's computer is ready",
     },
   },
 };

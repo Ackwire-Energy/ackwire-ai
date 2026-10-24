@@ -17,6 +17,7 @@ import {
   type RunnerPause,
   type RunnerTools,
 } from "@agenteschat/adapters/machine-protocol";
+import { redactCommon } from "@agenteschat/adapters/redact";
 import {
   type ActivityEntry,
   CONTROL_PROTOCOL_VERSION,
@@ -70,7 +71,7 @@ import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
-import { redactCommon, tailLines } from "./logfile";
+import { tailLines } from "./logfile";
 import { LoopbackGuard } from "./loopback-guard";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";

@@ -638,6 +638,34 @@
       "when": 1792800091667,
       "tag": "0090_import_items",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1792813616839,
+      "tag": "0091_operator_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1792816161896,
+      "tag": "0092_org_standing",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792818524301,
+      "tag": "0093_user_block_agent_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792820665374,
+      "tag": "0094_managed_machines",
+      "breakpoints": true
     }
   ]
 }

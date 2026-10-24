@@ -20,8 +20,10 @@ import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { BrowserNow } from "./BrowserNow";
 import { CardHead, useAgentEdit } from "./context";
+import { Numbers } from "./Hero";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
+import { WorkCard } from "./Work";
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
 export function OverviewTab() {
@@ -29,7 +31,7 @@ export function OverviewTab() {
   const locale = i18n.language;
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const { agent, g, viewer, saved, goTo, can, resources, ownerFirst } = useAgentEdit();
+  const { agent, g, viewer, saved, goTo, can, resources, ownerFirst, openWork, workInAside } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
@@ -253,7 +255,17 @@ export function OverviewTab() {
           </Card>
         </div>
 
-        <div className="agp-col">
+        {/* The quiet side column: how it works and its numbers, then who and where. */}
+        <div className="agp-col agp-aside">
+          {workInAside && (
+            // The card inside is the "Como trabalha" region; this only gives it its quiet heading.
+            <div className="agp-aside__work">
+              <p className="agp-aside__h" aria-hidden="true">
+                {t("agentPage.work.cell.label")}
+              </p>
+              <WorkCard onOpen={openWork} footer={<Numbers />} />
+            </div>
+          )}
           <Card as="section" className="agp-card" aria-labelledby="ov-who">
             <CardHead
               id="ov-who"

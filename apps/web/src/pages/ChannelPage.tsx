@@ -318,13 +318,16 @@ const FOCUS_MAX_PAGES = 10;
 const HIGHLIGHT_MS = 2400;
 /** A scroll within this long after a wheel/touch/key/pointer counts as the person's. */
 const GESTURE_MS = 1500;
+/**
+ * Scrolled up but idle this long (no wheel/touch/key/pointer on the list), or away from the window:
+ * a new message brings the list to it instead of waiting behind the pill.
+ */
+const IDLE_CATCH_UP_MS = 20_000;
 /** Older messages per scroll-up page. */
 const OLDER_PAGE = 50;
-/** Per channel, for this session: older pages already loaded, channels with no more, and scroll positions. */
+/** Per channel, for this session: older pages already loaded, and channels with no more. */
 const olderPages = new Map<string, MessageType[]>();
 const olderDone = new Set<string>();
-/** Where the person left a conversation: the first row in view and how far it sat from the top. */
-const scrollPositions = new Map<string, { id: string | null; offset: number; top: number }>();
 /** Same limit as the server (`MAX_MESSAGE_ATTACHMENTS`). */
 const MAX_ATTACHMENTS = 10;
 
@@ -852,12 +855,9 @@ function ChannelView({
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
-  // Coming back to a channel scrolled up: restore that position (else the bottom).
-  // A thread view (page or panel) keeps its own place, apart from its channel's.
-  const scrollKey = thread ? `${channel.id}:${thread.id}` : channel.id;
-  const savedScroll = useRef(scrollPositions.get(scrollKey));
+  // Every conversation opens at its last message (coming back to one included).
   // Opened at a message: not pinned to the bottom until the person scrolls down.
-  const stick = useRef(savedScroll.current === undefined && !focusMessageId);
+  const stick = useRef(!focusMessageId);
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
@@ -943,6 +943,16 @@ function ChannelView({
     ];
   };
   const openedAt = useRef(Date.now());
+  // A new message came while the person was scrolled up and idle: go to it once the divider is drawn.
+  const catchUp = useRef(false);
+  /** Scrolled up but not reading: no gesture on the list for a while, or the window elsewhere; never mid-selection. */
+  const idleAway = () => {
+    const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
+    if (selection && !selection.isCollapsed && scroller.current?.contains(selection.anchorNode)) return false;
+    if (document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus())) return true;
+    // Right after opening, the same grace as a fresh scroll.
+    return Date.now() - Math.max(lastGesture.current, openedAt.current) > IDLE_CATCH_UP_MS;
+  };
   /**
    * At the bottom: follow it, unless the newest row is an agent's answer taller than the list. That
    * one lands once with its first line at the top (and a brief highlight); then nothing pulls the list.
@@ -1047,7 +1057,15 @@ function ChannelView({
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
       const first = newRow ? firstNewKey(timeline, before) : null;
-      if (first) markUnseen(first);
+      if (first) {
+        const drawn = unseenFromRef.current !== null;
+        markUnseen(first);
+        // Nobody reading up there: go to what is new (as the pill would), once its divider is drawn.
+        if (settled && idleAway()) {
+          if (drawn) openUnseen();
+          else catchUp.current = true;
+        }
+      }
       if (newBlock) setUnseenRun(true);
     }
   }, [lastKey, slotsKey]);
@@ -1064,36 +1082,6 @@ function ChannelView({
     row?.scrollIntoView?.({ block: "end", behavior: reducedMotion ? "auto" : "smooth" });
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the rows are there
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    const saved = savedScroll.current;
-    if (!el || saved === undefined || timeline.length === 0) return;
-    savedScroll.current = undefined;
-    // Back to the same row (rows off screen have estimated heights, so a raw scrollTop would drift).
-    const row = saved.id ? el.querySelector<HTMLElement>(`[data-message-id="${saved.id}"]`) : null;
-    if (row) el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - saved.offset;
-    else el.scrollTop = saved.top;
-  }, [timeline.length > 0]);
-  // Leaving: remember where they were (only when scrolled up). A layout effect: the rows are still there.
-  useLayoutEffect(
-    () => () => {
-      const el = scroller.current;
-      if (stick.current || lastScrollTop.current === null || !el) {
-        scrollPositions.delete(scrollKey);
-        return;
-      }
-      const top = el.getBoundingClientRect().top;
-      const rows = el.querySelectorAll<HTMLElement>("[data-message-id]");
-      const first = Array.from(rows).find((r) => r.getBoundingClientRect().bottom > top);
-      scrollPositions.set(scrollKey, {
-        id: first?.dataset.messageId ?? null,
-        offset: first ? first.getBoundingClientRect().top - top : 0,
-        top: lastScrollTop.current,
-      });
-    },
-    [scrollKey],
-  );
   // Dev only: "click → first paint of messages".
   const fromCache = useRef(messages.data !== undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reports once the rows (or an empty channel) are on screen
@@ -1450,6 +1438,12 @@ function ChannelView({
     }
     toBottom(true);
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once the divider a catch-up asked for is drawn
+  useEffect(() => {
+    if (!catchUp.current || unseenFrom === null) return;
+    catchUp.current = false;
+    openUnseen();
+  }, [unseenFrom]);
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions;
     const first = channelAgents[0];

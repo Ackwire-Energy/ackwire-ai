@@ -1,7 +1,6 @@
 import { type AgentState, Avatar, CountBadge, cx, Icon, type IconName, Kbd } from "@agenteschat/ui";
-import { type ReactNode, useRef } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { SidebarOrgSky } from "@/components/Sky";
 import { CAST, type CastKey, type ChannelKey, ORGS, type OrgKey, PEOPLE } from "../cast";
 import { LpAvatar } from "../LpAvatar";
 import { OrgLogo } from "./OrgLogo";
@@ -58,14 +57,12 @@ export function MockSidebar({
   className,
 }: MockSidebarProps) {
   const { t } = useTranslation();
-  const orgRef = useRef<HTMLDivElement>(null);
   const company = ORGS[org];
   const count = (tool: Tool) => (tool === "notifications" ? notifications : tool === "approvals" ? approvals : 0);
   return (
     <aside className={cx("sidebar lp-mock-side", className)} aria-label={label}>
       <div className="sidebar__top">
-        <div className="sidebar__org" ref={orgRef}>
-          <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
+        <div className="sidebar__org">
           <span className="sidebar__org-button">
             <OrgLogo org={org} className="sidebar__org-mark" />
             <span className="sidebar__org-text">

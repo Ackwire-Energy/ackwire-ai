@@ -69,6 +69,7 @@ export const ptBR = {
     hidePassword: "Esconder senha",
     capsLock: "Caps Lock ligado",
     tooManyTries: "Muitas tentativas. Espere alguns minutos e tente de novo.",
+    accountBlocked: "Esta conta não pode entrar.",
     passwordHelp: "Pelo menos 8 caracteres.",
     passwordOk: "Senha ok.",
     passwordMissing_one: "Falta {{count}} caractere (mínimo de 8).",
@@ -499,7 +500,7 @@ export const ptBR = {
       noteKey:
         "Esse valor é cobrado pelo provedor da chave pelo uso da API, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Quem usa o Claude Code de um computador conectado não conta aqui.",
       notePlatform:
-        "Com os créditos da plataforma, o uso da API é cobrado pelo agentes.chat. O limite vale só para esse uso: quando um agente chega nele, ele para e te avisa.",
+        "Com a chave do agentes.chat, o limite vale para o uso da API: quando um agente chega nele, ele para e te avisa.",
     },
     provider: "Provedor",
     keyFor: "Chave da API da {{provider}}",
@@ -513,9 +514,8 @@ export const ptBR = {
     openaiOrg: "ID da organização na OpenAI",
     openaiProject: "ID do projeto na OpenAI",
     optional: "Opcional.",
-    platformChoice: "Usar créditos da plataforma",
-    platformKeyDesc:
-      "Sem chave: a plataforma cobra por uso, com US$ 5 grátis para testar. Você vê o custo de cada agente.",
+    platformChoice: "Usar a chave do agentes.chat",
+    platformKeyDesc: "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
@@ -1844,6 +1844,9 @@ export const ptBR = {
         missing_credential: "Falta uma chave da {{provider}} no workspace.",
         credential_revoked: "A chave deste agente foi revogada.",
         credential_wrong_provider: "O modelo é da {{modelProvider}}, mas a chave é da {{keyProvider}}.",
+        org_paused: "Os agentes do workspace estão pausados.",
+        org_suspended: "O workspace está indisponível.",
+        agent_paused: "O agente está pausado.",
         unknown: "Falhou.",
       },
     },
@@ -2978,6 +2981,9 @@ export const ptBR = {
       credential_wrong_provider: "A chave de API é de outro provedor",
       agent_archived: "O agente foi arquivado",
       interrupted: "Interrompida por uma atualização",
+      org_paused: "Não rodou: os agentes do workspace estavam pausados",
+      org_suspended: "Não rodou: o workspace estava indisponível",
+      agent_paused: "Não rodou: o agente estava pausado",
     },
     openInChat: "Abrir na conversa",
     stop: "Parar",
@@ -7759,6 +7765,23 @@ export const ptBR = {
         browser_close: "Fechou o navegador",
         other: "Usou o navegador",
       },
+    },
+  },
+  standing: {
+    paused: "Os agentes deste workspace estão pausados por enquanto.",
+    suspended: "Este workspace está indisponível por enquanto.",
+    createRefused: "Você não pode criar um workspace agora.",
+    agentPaused: "Este agente está pausado por enquanto.",
+    notification: {
+      hold: "O workspace está em espera: os agentes estão pausados",
+      suspended: "O workspace foi suspenso",
+      active: "O workspace voltou a funcionar",
+    },
+  },
+  computerSetup: {
+    managedNotRemovable: "Este é o computador do próprio workspace: ele não pode ser removido.",
+    notification: {
+      ready: "O computador do seu workspace está pronto",
     },
   },
 };

@@ -124,6 +124,7 @@ import {
 } from "./runs";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
+import { standingErrorDetail, standingRefusal } from "./standing";
 import { FIND_AGENT_TOOL } from "./team";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
@@ -577,9 +578,15 @@ async function executeRunInner(
     if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
-    // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
-    if (reason !== "agent_archived") await redispatchPending("failed");
+    // An archived agent answers nobody, nor does a paused workspace or agent; any other failure leaves the
+    // waiting messages a run of their own.
+    if (reason !== "agent_archived" && !standingErrorDetail(reason)) await redispatchPending("failed");
   };
+
+  // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
+  // before it starts anything.
+  const refusal = await standingRefusal(db, run.orgId, run.agentId);
+  if (refusal) return fail(refusal.message);
 
   const ctx: ToolContext = {
     db,
@@ -970,8 +977,9 @@ async function executeRunInner(
       const { restartAfterStopAndSend } = await import("./continue-run");
       await restartAfterStopAndSend(deps, run.id, { id: message.id, threadId: message.threadId }, t).catch(() => null);
     }
-    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`).
-    await redispatchPending("canceled");
+    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`),
+    // unless its workspace stopped it.
+    if (!standingErrorDetail(row?.error ?? "")) await redispatchPending("canceled");
   };
 
   /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */
@@ -1720,6 +1728,9 @@ async function executeRunInner(
           if (handled === "fallback") continue;
           if (handled === "waited") return;
         }
+        // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
+        const paused = await standingRefusal(db, run.orgId, run.agentId);
+        if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) return fail(reason);
         if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);

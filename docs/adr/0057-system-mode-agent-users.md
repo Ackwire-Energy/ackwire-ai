@@ -1,8 +1,8 @@
-# 0056. System mode: each agent works as its own OS user
+# 0057. System mode: each agent works as its own OS user
 
 - Status: Accepted (2026-10-24)
 - Date: 2026-10-24
-- Extends: ADR 0025 (connected computers), ADR 0027 (secrets to agent computers), ADR 0029 (background tasks), ADR 0030 (isolation)
+- Extends: ADR 0025 (connected computers), ADR 0027 (secrets to agent computers), ADR 0029 (background tasks), ADR 0030 (isolation), ADR 0056 (external provisioning)
 - Code: `apps/server/runner/install-script.ts`, `service.ts`, `agent-users.ts`, `supervisor.ts`, `worker.ts`, `loopback-guard.ts`, `OP_ROUTES` in `handlers.ts`, `uploadUrl` in `push.ts`; `AGENT_WORKER_HOMES` in `packages/adapters/src/command-policy.ts`
 
 ## Context
@@ -13,7 +13,7 @@ A connected computer runs every agent's work as the OS user that runs the runner
 
 ### 1. Install and service (Linux, root)
 
-- `install.sh --system` installs the runner for the whole computer: a pinned Bun checked against its SHA-256 (never a `bun` from the `PATH`, which root would then run), the bundle in `/opt/agentes-runner`, the launcher `/usr/local/bin/agentes-runner`, the home `/var/lib/agentes-runner` (0700) and the root unit `agentes-runner.service` (`KillMode=process`, so a restart leaves background tasks running). Flags: `--agent-uid-range FIRST-LAST` (default 20000–29999), `--desktop`, `--no-pair`, `--no-start`.
+- `install.sh --system` installs the runner for the whole computer: a pinned Bun checked against its SHA-256 (never a `bun` from the `PATH`, which root would then run), the bundle in `/opt/agentes-runner`, the launcher `/usr/local/bin/agentes-runner`, the home `/var/lib/agentes-runner` (0700) and the root unit `agentes-runner.service` (`KillMode=process`, so a restart leaves background tasks running). Flags: `--agent-uid-range FIRST-LAST` (default 20000–29999), `--desktop`, `--no-pair`, `--no-start`, and `--enroll-file FILE` to connect with a code an external provisioner issued for this computer (ADR 0056 §10).
 - `config.json` gets `mode: "system"`; pairing again keeps it. A system-mode runner never replaces itself with what the server sends: the installer updates it. `--runner-sha256 HEX` installs the bundle only when it has that hash, so whoever installs a fleet's computers can pin the runner they vouch for instead of trusting what the server serves at that moment.
 
 ### 2. One OS user per agent

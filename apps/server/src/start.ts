@@ -35,9 +35,11 @@ import {
   MigrationMismatchError,
 } from "@agenteschat/db";
 import {
+  adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
   drainLocalRuns,
   enableCaches,
+  enableOperatorEvents,
   isBlockedAddress,
   resolveHostDns,
 } from "@agenteschat/engine";
@@ -48,6 +50,7 @@ import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger, type Logger } from "./logger";
+import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
@@ -130,6 +133,13 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // The operator API's events feed records only while that API is on (ADR 0056).
+  if (config.OPERATOR_API_TOKEN) {
+    enableOperatorEvents();
+    // Before the API serves a page: a caller restarting after a restore must find these rows first.
+    const adopted = await adoptRestoredOperatorEvents(database.db);
+    if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
+  }
   const engine = buildEngine({
     db: database.db,
     config,
@@ -200,6 +210,17 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
+  const operator = serveOperatorApi({
+    db: database.db,
+    config,
+    version,
+    log,
+    pubsub: adapters.pubsub,
+    hub: engine.machineHub,
+  });
+  if (operator) {
+    log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
+  }
 
   for (const module of modules) await module.onStart?.(ctx);
 
@@ -212,6 +233,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
     void server.stop();
+    void operator?.stop();
     // Runners reconnect to the next instance.
     await engine.machineHub.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
