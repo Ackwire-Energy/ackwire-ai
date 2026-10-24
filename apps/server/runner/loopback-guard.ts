@@ -169,7 +169,13 @@ export class LoopbackGuard {
   reconcile() {
     if (this.off) return;
     const uids = new Set(this.opts.agentUids());
-    const listeners = uids.size ? parseListeners(this.run("ss", ["-Htln", "-e"]).output, uids) : [];
+    const ss = uids.size ? this.run("ss", ["-Htln", "-e"]) : { code: 0, output: "" };
+    if (ss.code !== 0) {
+      // No listing is not "no listeners": an empty set would unguard every port, so what is applied stays.
+      this.warnOnce(`couldn't list local ports (${ss.output.slice(0, 200)}); the loopback guard keeps its last rules`);
+      return;
+    }
+    const listeners = parseListeners(ss.output, uids);
     const text = renderRuleset(listeners, this.verb);
     if (text === this.applied) return;
     if (this.apply(text)) {
@@ -187,10 +193,13 @@ export class LoopbackGuard {
         return;
       }
     }
-    if (!this.warned) {
-      this.warned = true;
-      this.opts.log("couldn't apply the loopback guard (is NET_ADMIN available?); local ports are not isolated");
-    }
+    this.warnOnce("couldn't apply the loopback guard (is NET_ADMIN available?); local ports are not isolated");
+  }
+
+  private warnOnce(line: string) {
+    if (this.warned) return;
+    this.warned = true;
+    this.opts.log(line);
   }
 
   /** Writes the script and applies it (checked first). True when it took. */

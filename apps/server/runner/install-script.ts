@@ -64,6 +64,10 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * `--desktop` adds `DESKTOP_APT_PACKAGES`, and `--agent-uid-range` sets the
  * agents' uids (default `DEFAULT_AGENT_UID_RANGE`). Everything runs from
  * `main`, so a download cut short runs nothing.
+ *
+ * `--runner-sha256 HEX` (any mode) installs the bundle only when it has that
+ * SHA-256: whoever runs the installer for a fleet pins the runner it vouches
+ * for, so a root runner never runs whatever the server happens to serve.
  */
 export function installScript(publicUrl: string): string {
   const server = shQuote(publicUrl.trim().replace(/\/+$/, ""));
@@ -91,11 +95,15 @@ DESKTOP=0
 NO_PAIR=0
 NO_START=0
 UID_RANGE=""
+RUNNER_SHA256=""
 
 say() { printf '%s\\n' "$*"; }
 die() { printf 'agentes-runner: %s\\n' "$*" >&2; exit 1; }
 need_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\\\\\''/g")"; }
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d ' ' -f 1
+}
 
 usage() {
   say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service]"
@@ -106,6 +114,7 @@ usage() {
   say "  --no-pair          with --system: don't connect it to the server now"
   say "  --no-start         with --system: install or update without starting or restarting the service"
   say "  --agent-uid-range  with --system: the uids agent users get (default ${uids})"
+  say "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)"
 }
 
 download() {
@@ -122,6 +131,10 @@ download() {
 get_runner() {
   say "Downloading the runner from $SERVER ..."
   download "$SERVER/runner/agentes-runner.mjs" "$BUNDLE.download" || die "download failed"
+  if [ -n "$RUNNER_SHA256" ] && [ "$(sha256 "$BUNDLE.download")" != "$RUNNER_SHA256" ]; then
+    rm -f "$BUNDLE.download"
+    die "the runner download didn't match --runner-sha256; it was not installed"
+  fi
   chmod 644 "$BUNDLE.download"
   mv -f "$BUNDLE.download" "$BUNDLE"
   {
@@ -188,7 +201,7 @@ ${shaCases}
   trap 'rm -rf "$WORK"' EXIT
   download "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-$BUN_TARGET.zip" "$WORK/bun.zip" ||
     die "downloading Bun failed"
-  [ "$(sha256sum "$WORK/bun.zip" | cut -d ' ' -f 1)" = "$BUN_SHA256" ] ||
+  [ "$(sha256 "$WORK/bun.zip")" = "$BUN_SHA256" ] ||
     die "the Bun download didn't match its checksum; it was not installed"
   unpack "$WORK/bun.zip" "$WORK"
   install -m 755 "$WORK/bun-$BUN_TARGET/bun" "$RUNTIME.new"
@@ -215,6 +228,8 @@ install_system() {
   BUNDLE="$SYSTEM_DIR/agentes-runner.mjs"
   LAUNCHER=${shQuote(SYSTEM_LAUNCHER)}
   mkdir -p "$SYSTEM_DIR/bin" "$RUNNER_HOME" "$(dirname "$LAUNCHER")"
+  # Folders someone else made earlier would let them swap what root runs.
+  chown 0:0 "$SYSTEM_DIR" "$SYSTEM_DIR/bin" "$RUNNER_HOME"
   chmod 755 "$SYSTEM_DIR" "$SYSTEM_DIR/bin"
   chmod 700 "$RUNNER_HOME"
   get_bun
@@ -296,12 +311,21 @@ main() {
       --no-start) NO_START=1; shift ;;
       --agent-uid-range) need_value "$1" $#; UID_RANGE="$2"; shift 2 ;;
       --agent-uid-range=*) UID_RANGE="\${1#--agent-uid-range=}"; shift ;;
+      --runner-sha256) need_value "$1" $#; RUNNER_SHA256="$2"; shift 2 ;;
+      --runner-sha256=*) RUNNER_SHA256="\${1#--runner-sha256=}"; shift ;;
       -h|--help) usage; exit 0 ;;
       *) die "unknown option: $1" ;;
     esac
   done
+  # Listed, not a range: shells may sort ranges by locale, letting capitals in.
+  case "$RUNNER_SHA256" in
+    *[!0123456789abcdef]*) die "--runner-sha256 takes the bundle's SHA-256 as 64 lowercase hex digits" ;;
+  esac
+  [ -z "$RUNNER_SHA256" ] || [ \${#RUNNER_SHA256} -eq 64 ] ||
+    die "--runner-sha256 takes the bundle's SHA-256 as 64 lowercase hex digits"
   if [ "$SYSTEM" -eq 1 ]; then
     [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service; to leave it stopped, use --no-start"
+    [ -z "$DIR" ] || die "--dir doesn't go with --system: each agent works in its own user's home"
     install_system
   elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ]; then
     die "--desktop, --no-pair, --no-start and --agent-uid-range go with --system"

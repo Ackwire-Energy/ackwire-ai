@@ -14,7 +14,7 @@ A connected computer runs every agent's work as the OS user that runs the runner
 ### 1. Install and service (Linux, root)
 
 - `install.sh --system` installs the runner for the whole computer: a pinned Bun checked against its SHA-256 (never a `bun` from the `PATH`, which root would then run), the bundle in `/opt/agentes-runner`, the launcher `/usr/local/bin/agentes-runner`, the home `/var/lib/agentes-runner` (0700) and the root unit `agentes-runner.service` (`KillMode=process`, so a restart leaves background tasks running). Flags: `--agent-uid-range FIRST-LAST` (default 20000–29999), `--desktop`, `--no-pair`, `--no-start`.
-- `config.json` gets `mode: "system"`; pairing again keeps it. A system-mode runner never replaces itself with what the server sends: the installer updates it.
+- `config.json` gets `mode: "system"`; pairing again keeps it. A system-mode runner never replaces itself with what the server sends: the installer updates it. `--runner-sha256 HEX` installs the bundle only when it has that hash, so whoever installs a fleet's computers can pin the runner they vouch for instead of trusting what the server serves at that moment.
 
 ### 2. One OS user per agent
 
@@ -38,7 +38,7 @@ A worker runs as the uid the agent's own code runs as, so the supervisor takes e
 - `brain.event` and `brain.done` only for its turns in flight;
 - `task.event` and `task.done` only for its own tasks: `worker-tasks.json`, in root's home, records whose each task is from its `task.start` until the server acknowledges its end;
 - browser frames only for its own agent;
-- `mcp.call` and `mcp.list` go up (the server checks the run's token) and their answers go back to that worker only;
+- `mcp.call` and `mcp.list` go up only with the run's token, which the server checks, and their answers go back to that worker only. A call without a token is refused here: for those, the server takes the task id as proof of whose call it is, and other agents' task ids aren't secret on a shared computer;
 - never the computer's own frames (`runner.state`, `access.*`, `accounts.changed`).
 
 A worker that sends a line longer than a frame, or leaves 64 MB of what it was sent unread, is stopped.
@@ -59,4 +59,5 @@ No worker holds the machine token. For `push`, the worker reads or zips the file
 - A worker costs tens of MB, and only agents that work have one.
 - The limits in `config.json` (tasks, brains) apply to each agent.
 - Accounts (ADR 0041) stay in root's home: in a worker, a turn that names an account fails with `account_missing` until that account's folder belongs to the agent's user.
-- Local ports without authentication of their own (Chrome's debugging port, the browser stream) are OS-assigned and guarded on `lo` by `table inet agentes_runner`: the supervisor learns each agent's loopback listeners and their owner uid from `ss` and limits each port to its owner's uid and to root, so one agent can't reach another's. The guard needs `nftables` (and `nft_reject_inet`, or it falls back to dropping); without `nft` it is off with a warning, which is the single-user self-host where every agent is one OS user anyway.
+- Local ports without authentication of their own (Chrome's debugging port, the browser stream) are OS-assigned and guarded on `lo` by `table inet agentes_runner`: the supervisor learns each agent's loopback listeners and their owner uid from `ss` and limits each port to its owner's uid and to root, so one agent can't reach another's. The guard needs `nftables` (and `nft_reject_inet`, or it falls back to dropping); without `nft` it is off with a warning, which is the single-user self-host where every agent is one OS user anyway. A listing that fails keeps the rules already applied.
+- The guard finds ports by scanning every 2 s, so a port that just opened is reachable by other local users until the next scan. Until that gap is closed (a check when a connection starts, or the port reserved before Chrome or the stream opens it), local ports are not a hard boundary between agents of different people.

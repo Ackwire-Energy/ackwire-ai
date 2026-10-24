@@ -92,13 +92,14 @@ test("deduplicates a port/uid seen twice (IPv4 and IPv6 rows) and ignores non-LI
 // ── reconcile ────────────────────────────────────────────────────────────────
 
 /** A fake root toolbox: records calls and lets a test read back the applied ruleset. */
-function fakeNft(opts: { hasNft?: boolean; listeners?: string; failReject?: boolean } = {}) {
+function fakeNft(opts: { hasNft?: boolean; listeners?: string; failReject?: boolean; ssFails?: boolean } = {}) {
   const calls: string[] = [];
   let appliedFile = "";
   const run: RunCommand = (file, args) => {
     calls.push([file, ...args].join(" "));
     if (file === "nft" && args[0] === "--version") return { code: opts.hasNft === false ? 127 : 0, output: "" };
-    if (file === "ss") return { code: 0, output: opts.listeners ?? "" };
+    if (file === "ss")
+      return opts.ssFails ? { code: 127, output: "spawnSync ss ENOENT" } : { code: 0, output: opts.listeners ?? "" };
     if (file === "modprobe") return { code: 0, output: "" };
     if (file === "nft") {
       const f = args.at(-1) ?? "";
@@ -148,6 +149,29 @@ test("reconcile reapplies only when the listener set changed", () => {
   expect(first).toBe(1);
   g.reconcile(); // same ss output → no new apply
   expect(applies()).toBe(first);
+});
+
+test("a listing that fails keeps the rules applied, with one warning, instead of unguarding every port", () => {
+  const opts = { listeners: ssOutput([{ port: 45891, uid: 21000 }]), ssFails: false };
+  const nft = fakeNft(opts);
+  const { g, logs } = guard(nft.run, [21000]);
+  g.start();
+  const applies = () => nft.calls.filter((c) => c.startsWith("nft -f")).length;
+  expect(applies()).toBe(1);
+  opts.ssFails = true;
+  g.reconcile();
+  g.reconcile();
+  expect(applies()).toBe(1);
+  expect(nft.applied()).toContain("45891 . 21000");
+  expect(logs).toHaveLength(1);
+  expect(logs[0]).toContain("keeps its last rules");
+  // Back: a changed listing applies again.
+  opts.ssFails = false;
+  opts.listeners = ssOutput([{ port: 45900, uid: 21000 }]);
+  g.reconcile();
+  expect(applies()).toBe(2);
+  expect(nft.applied()).toContain("45900 . 21000");
+  g.stop();
 });
 
 test("falls back to drop when the kernel refuses the reject rule", () => {

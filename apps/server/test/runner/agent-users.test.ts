@@ -67,7 +67,7 @@ const listed = (home: string) => JSON.parse(readFileSync(path.join(home, AGENT_U
 test("an agent's first request makes its user with the lowest free uid, listed in agents.json", () => {
   const { home, os, users } = setup([
     { name: "root", uid: 0, comment: "root" },
-    { name: "heitor", uid: 1000, comment: "Heitor" },
+    { name: "maria", uid: 1000, comment: "Maria" },
     { name: "someone", uid: 21000, comment: "" },
     { name: "other", uid: 21001, comment: "" },
   ]);

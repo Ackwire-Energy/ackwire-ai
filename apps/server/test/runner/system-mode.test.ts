@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MACHINE_OPS, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -236,6 +237,10 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     [["--agent-uid-range", "21000-21099"], "go with --system"],
     [["--system", "--agent-uid-range"], "--agent-uid-range needs a value"],
     [["--system", "--no-service"], "use --no-start"],
+    [["--system", "--dir", "/srv/agents"], "--dir doesn't go with --system"],
+    [["--runner-sha256"], "--runner-sha256 needs a value"],
+    [["--runner-sha256", "abc"], "64 lowercase hex digits"],
+    [["--runner-sha256", "A".repeat(64)], "64 lowercase hex digits"],
     [["--bogus"], "unknown option: --bogus"],
   ] as const) {
     const r = runScript(...args);
@@ -248,6 +253,35 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
   for (const flag of ["--system", "--desktop", "--no-pair", "--no-start", "--agent-uid-range", "20000-29999"]) {
     expect(help.stdout).toContain(flag);
   }
+  expect(help.stdout).toContain("--runner-sha256");
+});
+
+test.if(posix)("install.sh --runner-sha256: a bundle with another SHA-256 is never installed", () => {
+  const h = home();
+  const served = path.join(h, "served");
+  mkdirSync(path.join(served, "runner"), { recursive: true });
+  // Stands in for the runner: `pair` fails, so the installer stops right after installing it.
+  const bundle = "process.exit(1);\n";
+  writeFileSync(path.join(served, "runner", "agentes-runner.mjs"), bundle);
+  const sha = createHash("sha256").update(bundle).digest("hex");
+  const runnerHome = path.join(h, "runner-home");
+  const install = (pin: string) =>
+    spawnSync("sh", ["-s", "--", "--runner-sha256", pin, "--no-service"], {
+      input: installScript(`file://${served}`),
+      encoding: "utf8",
+      env: { ...process.env, HOME: h, AGENTES_RUNNER_HOME: runnerHome },
+    });
+  const installed = path.join(runnerHome, "agentes-runner.mjs");
+
+  const wrong = install("0".repeat(64));
+  expect(wrong.status).toBe(1);
+  expect(wrong.stderr).toContain("didn't match --runner-sha256");
+  expect(existsSync(installed)).toBe(false);
+  expect(existsSync(`${installed}.download`)).toBe(false);
+
+  const right = install(sha);
+  expect(right.stderr).toContain("connecting this computer failed");
+  expect(readFileSync(installed, "utf8")).toBe(bundle);
 });
 
 test("install.sh --system: the pinned Bun with its SHA-256, packages without recommends, nothing runs until the end", () => {
@@ -257,7 +291,8 @@ test("install.sh --system: the pinned Bun with its SHA-256, packages without rec
     expect(sha).toMatch(/^[0-9a-f]{64}$/);
     expect(script).toContain(`${target}) BUN_SHA256='${sha}' ;;`);
   }
-  expect(script).toContain('sha256sum "$WORK/bun.zip"');
+  expect(script).toContain('sha256 "$WORK/bun.zip"');
+  expect(script).toContain('chown 0:0 "$SYSTEM_DIR" "$SYSTEM_DIR/bin" "$RUNNER_HOME"');
   expect(script).toContain("--no-install-recommends");
   expect(script).toContain("elementary-xfce-icon-theme");
   expect(script).toContain("RUNNER_HOME='/var/lib/agentes-runner'");

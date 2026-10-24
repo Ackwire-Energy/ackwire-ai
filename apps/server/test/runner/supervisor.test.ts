@@ -367,13 +367,21 @@ test("frames from a worker go up only when they are its agent's", async () => {
   ana.send(event);
   ana.send(taskEvent);
   ana.send(ended);
-  ana.send({ type: "mcp.call", callId: "call-0001", taskId: "task-ana-0001", tool: "report", args: { summary: "x" } });
+  const call = {
+    type: "mcp.call",
+    callId: "call-0001",
+    taskId: "task-ana-0001",
+    tool: "report",
+    args: { summary: "x" },
+  };
+  ana.send({ ...call, token: "agr_ana-token-0000000000" });
   await waitFor(() => t.up.length === 3);
-  expect(t.up).toEqual([
-    taskEvent,
-    ended,
-    { type: "mcp.call", callId: "call-0001", taskId: "task-ana-0001", tool: "report", args: { summary: "x" } },
-  ]);
+  expect(t.up).toEqual([taskEvent, ended, { ...call, token: "agr_ana-token-0000000000" }]);
+  // Without the run's token the server would take the task id's word: refused here, nothing goes up.
+  bia.send({ ...call, callId: "call-0009" });
+  await waitFor(() => bia.of("mcp.result").length === 1);
+  expect(bia.of("mcp.result")[0]).toMatchObject({ callId: "call-0009", ok: false, error: { code: "not_allowed" } });
+  expect(t.up).toHaveLength(3);
   // A turn's events go out with its request (the server's id), and only Ana's.
   await waitFor(() => turn.emitted.length === 1);
   expect(turn.emitted).toEqual([event as RunnerFrame]);
@@ -383,7 +391,7 @@ test("frames from a worker go up only when they are its agent's", async () => {
   t.sup.mcp.result({ type: "mcp.result", callId: "call-0001", ok: true, text: "noted" });
   await waitFor(() => ana.of("mcp.result").length === 1);
   expect(ana.of("mcp.result")).toEqual([{ type: "mcp.result", callId: "call-0001", ok: true, text: "noted" }]);
-  expect(bia.of("mcp.result")).toEqual([]);
+  expect(bia.of("mcp.result").map((f) => f.callId)).toEqual(["call-0009"]);
   expect(t.up).toHaveLength(3);
 
   ana.send({ type: "brain.done", runId: "run-ana-0001" });
@@ -508,7 +516,7 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   const handoff: Extract<ServerFrame, { type: "browser.handoff" }> = {
     type: "browser.handoff",
     agentId: ANA.id,
-    handoff: { status: "active", controller: "Heitor" },
+    handoff: { status: "active", controller: "Maria" },
   };
   t.sup.handoff(handoff);
   await waitFor(() => ana.of("browser.handoff").length === 1);

@@ -495,6 +495,17 @@ export class Supervisor {
         return;
       case "mcp.call":
       case "mcp.list": {
+        // Without the run's token the server takes the frame's task id as proof of whose call it is; here only
+        // the token can be, since a worker speaks for its own agent and task ids on a shared computer aren't secret.
+        if (f.type === "mcp.call" && !f.token) {
+          this.send(w, {
+            type: "mcp.result",
+            callId: f.callId,
+            ok: false,
+            error: { code: "not_allowed", message: "This computer runs agentes tools only with the server's token" },
+          });
+          return;
+        }
         const caller = this.calls.get(f.callId);
         if (caller && caller !== w) return;
         if (this.opts.send(f)) this.calls.set(f.callId, w);
