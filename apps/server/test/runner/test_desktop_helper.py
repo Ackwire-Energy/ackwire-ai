@@ -262,6 +262,113 @@ class Screen(unittest.TestCase):
         self.assertEqual(h.cap_text("abc", "entry", 3), "abc")
 
 
+def node(path, parent, box=None, states=(SHOWING, 0)):
+    n = {"path": path, "parent": parent, "index": 0, "children": 0, "role": 43, "name": "", "states": list(states), "ifaces": []}
+    if box is not None:
+        n["box"] = list(box)
+    return n
+
+
+class Gtk4Boxes(unittest.TestCase):
+    """GTK4 says (0, 0) for every screen position; its boxes are then asked from the window."""
+
+    window = {"xid": 7, "pid": 40, "box": [200, 100, 640, 480]}
+
+    def test_every_box_at_the_corner_of_a_window_elsewhere(self):
+        nodes = [
+            node(ROOT, None),
+            node("/f", ROOT, (0, 0, 600, 440)),
+            node("/b", "/f", (0, 0, 80, 30)),
+            node("/hidden", "/f", states=(0, 0)),
+            node("/t", "/b", (0, 0, 60, 20)),
+        ]
+        other = {"xid": 8, "pid": 40, "box": [0, 0, 300, 200]}
+        [(win, members)] = h.misplaced(nodes, 40, [other, self.window])
+        self.assertEqual(win["xid"], 7)
+        self.assertEqual(sorted(m["path"] for m in members), ["/b", "/f", "/t"])
+
+    def test_gtk3_and_lone_windows_stay_as_they_are(self):
+        gtk3 = [node(ROOT, None), node("/f", ROOT, (0, 0, 1280, 800)), node("/b", "/f", (12, 40, 80, 30))]
+        self.assertEqual(h.misplaced(gtk3, 40, [dict(self.window, box=[0, 0, 1280, 800])]), [])
+        lone = [node(ROOT, None), node("/f", ROOT, (0, 0, 1280, 800))]
+        self.assertEqual(h.misplaced(lone, 40, [dict(self.window, box=[0, 0, 1280, 800])]), [])
+        # A lone frame at the corner, on a window that isn't: still GTK4's.
+        self.assertEqual(len(h.misplaced(lone, 40, [self.window])), 1)
+        self.assertEqual(h.misplaced(gtk3, None, [self.window]), [])
+        self.assertEqual(h.misplaced(gtk3, 41, [self.window]), [])
+
+
+class Walk(unittest.TestCase):
+    """Qt keeps no cache: its tree is read node by node, below showing nodes only, capped."""
+
+    TREE = {
+        ROOT: (75, [0, 0], "app", ["Accessible", "Application"], ["/w", "/hidden"]),
+        "/w": (23, [SHOWING, 0], "Main", ["Accessible", "Component"], ["/b", "/p", ROOT]),
+        "/hidden": (23, [0, 0], "Settings", ["Accessible", "Component"], ["/x"]),
+        "/b": (43, [SHOWING, 0], "OK", ["Accessible", "Component", "Action"], []),
+        "/p": (39, [0, 0], "", ["Accessible"], ["/deep"]),
+        "/x": (43, [SHOWING, 0], "never asked", [], []),
+        "/deep": (43, [SHOWING, 0], "never asked", [], []),
+    }
+
+    def asker(self, tree=None, asked=None):
+        tree = self.TREE if tree is None else tree
+
+        def ask(paths):
+            if asked is not None:
+                asked.append(list(paths))
+            return [tree.get(p) for p in paths]
+
+        return ask
+
+    def test_breadth_first_below_showing_nodes(self):
+        asked = []
+        nodes = h.walk_tree(self.asker(asked=asked))
+        self.assertEqual([n["path"] for n in nodes], [ROOT, "/w", "/hidden", "/b", "/p"])
+        self.assertEqual(asked, [[ROOT], ["/w", "/hidden"], ["/b", "/p"]])
+        by = {n["path"]: n for n in nodes}
+        self.assertEqual((by["/b"]["parent"], by["/b"]["index"], by["/b"]["name"]), ("/w", 0, "OK"))
+        self.assertEqual((by["/p"]["index"], by["/w"]["children"]), (1, 3))
+        self.assertEqual(by["/b"]["ifaces"], ["Accessible", "Component", "Action"])
+        self.assertIsNone(by[ROOT]["parent"])
+
+    def test_capped_by_nodes_and_by_time(self):
+        self.assertEqual(len(h.walk_tree(self.asker(), max_nodes=2)), 2)
+        ticks = iter([0, 0, 0, 1])
+        self.assertEqual([n["path"] for n in h.walk_tree(self.asker(), clock=lambda: next(ticks))], [ROOT, "/w", "/hidden"])
+
+    def test_gone_nodes_are_left_out(self):
+        tree = dict(self.TREE)
+        del tree["/w"]
+        self.assertEqual([n["path"] for n in h.walk_tree(self.asker(tree))], [ROOT, "/hidden"])
+
+    def test_what_a_cache_left_out_is_read_below_where_it_is_missing(self):
+        # GTK4 caches the focused button and its ancestors: the box has 3 children, 1 of them cached.
+        cached = [
+            dict(node(ROOT, None), children=1),
+            dict(node("/w", ROOT), children=1),
+            dict(node("/box", "/w"), children=3),
+            dict(node("/b", "/box"), index=0),
+            dict(node("/list", "/w", states=(SHOWING | h.MANAGES_DESCENDANTS, 0)), children=9000),
+            dict(node("/off", "/w", states=(0, 0)), children=4),
+        ]
+        start = h.incomplete(cached)
+        self.assertEqual(start, [("/box", "/w", 0)])
+        tree = {
+            "/box": (39, [SHOWING, 0], "", ["Accessible", "Component"], ["/b", "/c", "/d"]),
+            "/b": (43, [SHOWING, 0], "Alpha", ["Accessible"], ["/never"]),
+            "/c": (43, [SHOWING, 0], "Bravo", ["Accessible"], ["/c/label"]),
+            "/d": (43, [SHOWING, 0], "Charlie", ["Accessible"], []),
+            "/c/label": (29, [SHOWING, 0], "Bravo", ["Accessible"], []),
+        }
+        asked = []
+        walked = h.walk_tree(self.asker(tree, asked), start, known={n["path"] for n in cached})
+        self.assertEqual([n["path"] for n in walked], ["/box", "/c", "/d", "/c/label"])
+        self.assertEqual([(n["parent"], n["index"]) for n in walked[1:3]], [("/box", 1), ("/box", 2)])
+        # The cached button isn't asked again, nor anything below it.
+        self.assertNotIn("/b", sum(asked, []))
+
+
 class Protocol(unittest.TestCase):
     def test_lines_come_whole(self):
         lines = h.Lines()

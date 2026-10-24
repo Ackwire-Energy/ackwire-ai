@@ -28,6 +28,12 @@ export function helperCommand(python = "python3"): string[] {
  */
 export const HELPER_ENV = { LANG: "C.UTF-8", LC_ALL: "C.UTF-8" } as const;
 
+/** The most text the helper reads of one element (`textMax`'s default and cap; `TEXT_MAX` in the `.py`). */
+export const HELPER_TEXT_MAX = 4000;
+
+/** An app's root on the accessibility bus: its windows are its children. */
+export const HELPER_ROOT_PATH = "/org/a11y/atspi/accessible/root";
+
 /** An element: its app's connection on the accessibility bus, and its object path. */
 export type HelperNodeRef = [bus: string, path: string];
 /** Screen pixels. */

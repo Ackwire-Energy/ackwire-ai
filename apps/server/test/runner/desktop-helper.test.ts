@@ -75,7 +75,15 @@ test.skipIf(!python)("with no desktop, the helper still answers each line, and w
 
 test("the snapshots recorded on a real desktop have the shape of the types", () => {
   const names = readdirSync(FIXTURES);
-  expect(names.sort()).toEqual(["chromium-skipped.json", "dialog.json", "menu.json", "terminal.json", "thunar.json"]);
+  expect(names.sort()).toEqual([
+    "chromium-skipped.json",
+    "dialog.json",
+    "gtk4.json",
+    "menu.json",
+    "qt.json",
+    "terminal.json",
+    "thunar.json",
+  ]);
   const isBox = (b: unknown) => Array.isArray(b) && b.length === 4 && b.every(Number.isInteger);
   for (const name of names) {
     const snap = JSON.parse(readFileSync(path.join(FIXTURES, name), "utf8")) as HelperSnapshot;

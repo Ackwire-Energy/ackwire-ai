@@ -30,8 +30,9 @@ import sys
 import tempfile
 import time
 
-# AT-SPI's SHOWING state (in the low word of a node's states).
+# AT-SPI states (in the low word of a node's states).
 SHOWING = 1 << 25
+MANAGES_DESCENDANTS = 1 << 31
 TEXT_MAX = 4000
 KEY_MAX = 64
 PATH_MAX = 1024
@@ -41,6 +42,12 @@ PAUSE_MAX_MS = 10000
 SCROLL_MAX = 50
 # One app's answer on the accessibility bus; an app slower than this is left out of the look.
 CALL_MS = 2000
+# What an app's cache doesn't give (Qt's is empty by design; GTK's holds what a client asked about) is
+# read node by node, up to this much per app.
+WALK_NODES = 500
+WALK_S = 0.3
+# AT-SPI coordinate types: on the screen, or from the element's window.
+SCREEN_COORDS, WINDOW_COORDS = 0, 1
 # Damage is tracked per tile of this many pixels. Tiles that changed in the BUSY_S before an action
 # (a clock, a spinner) are already changing on their own: their damage isn't the action's effect.
 TILE = 32
@@ -145,6 +152,97 @@ def front_pids(windows):
 def on_screen(box, screen):
     x, y, w, h = box
     return w > 0 and h > 0 and x < screen[0] and y < screen[1] and x + w > 0 and y + h > 0
+
+
+def misplaced(nodes, pid, windows):
+    """
+    GTK4 answers every screen position as (0, 0), with sizes right: a top-level whose box and every box
+    under it start at (0, 0), while its window doesn't or it holds more than one element. For each,
+    its X window (the app's own closest in size) and its nodes that have a box, itself included: their
+    boxes then come from window coordinates plus that window's origin.
+    """
+    mine = [w for w in windows if pid is not None and w["pid"] == pid]
+    kids = {}
+    for n in nodes:
+        kids.setdefault(n["parent"], []).append(n)
+    out = []
+    for top in kids.get(ROOT_PATH, []) if mine else []:
+        box = top.get("box")
+        if not box or box[0] or box[1]:
+            continue
+        members, todo, seen = [], [top], set()
+        while todo:
+            n = todo.pop()
+            if n["path"] in seen:
+                continue
+            seen.add(n["path"])
+            if "box" in n:
+                members.append(n)
+            todo.extend(kids.get(n["path"], []))
+        if any(m["box"][0] or m["box"][1] for m in members):
+            continue
+        win = min(mine, key=lambda w: abs(w["box"][2] - box[2]) + abs(w["box"][3] - box[3]))
+        if len(members) > 1 or win["box"][0] or win["box"][1]:
+            out.append((win, members))
+    return out
+
+
+def incomplete(nodes):
+    """
+    Where an app's cache left elements out: showing nodes with fewer cached children than they have,
+    as walk_tree's starts. GTK caches only elements some client asked about (GTK4: the focused one
+    and its ancestors), so their siblings are read node by node. Lists that make their children on
+    demand (MANAGES_DESCENDANTS) stay as they are: they can hold thousands.
+    """
+    cached = {}
+    for n in nodes:
+        cached[n["parent"]] = cached.get(n["parent"], 0) + 1
+    out = []
+    for n in nodes:
+        states = (n["states"] or [0])[0]
+        if n["children"] > cached.get(n["path"], 0) and states & SHOWING and not states & MANAGES_DESCENDANTS:
+            out.append((n["path"], n["parent"], n["index"]))
+    return out
+
+
+def walk_tree(ask, start=((ROOT_PATH, None, -1),), known=(), max_nodes=WALK_NODES, max_s=WALK_S, clock=time.monotonic):
+    """
+    An app's tree read node by node, for what its cache doesn't give (Qt's is empty): breadth first
+    from `start` ((path, parent, index), its root by default), each level's questions sent together,
+    below showing nodes only, never into `known` paths, at most `max_nodes` nodes or `max_s` seconds
+    (past that the app is found on the screen image). `ask(paths)` answers per path (role, states,
+    name, ifaces, child paths), or None for one that's gone.
+    """
+    t0 = clock()
+    nodes, level = [], list(start)
+    seen = set(known) | {path for path, _, _ in level}
+    while level and len(nodes) < max_nodes and clock() - t0 < max_s:
+        level = level[: max_nodes - len(nodes)]
+        below = []
+        for (path, parent, index), got in zip(level, ask([p for p, _, _ in level])):
+            if got is None:
+                continue
+            role, states, name, ifaces, children = got
+            nodes.append(
+                {
+                    "path": path,
+                    "parent": parent,
+                    "index": index,
+                    "children": len(children),
+                    "role": role,
+                    "name": name[:NAME_MAX],
+                    "states": list(states[:2]),
+                    "ifaces": ifaces,
+                }
+            )
+            if path != ROOT_PATH and not (states and states[0] & SHOWING):
+                continue
+            for i, child in enumerate(children):
+                if child not in seen:
+                    seen.add(child)
+                    below.append((child, path, i))
+        level = below
+    return nodes
 
 
 def tiles(x, y, w, h):
@@ -489,6 +587,21 @@ class XDisplay:
             "types": [self.atom_name(t).replace("_NET_WM_WINDOW_TYPE_", "").lower() for t in types],
         }
 
+    def origin(self, xid):
+        """
+        Where a client window's content starts on the screen: its own corner, past the invisible
+        shadow GTK draws around a window that decorates itself (_GTK_FRAME_EXTENTS: left, right, top,
+        bottom).
+        """
+        w = self.d.create_resource_object("window", xid)
+        try:
+            at = self.root.translate_coords(w, 0, 0)
+            shadow = self.prop(w, "_GTK_FRAME_EXTENTS")
+        except self.error.XError:
+            return None
+        left, top = (int(shadow[0]), int(shadow[2])) if shadow is not None and len(shadow) == 4 else (0, 0)
+        return at.x + left, at.y + top
+
     def title(self, w):
         v = self.prop(w, "_NET_WM_NAME", self.atom("UTF8_STRING"))
         if v is None:
@@ -634,14 +747,42 @@ class A11y:
     def trees(self, buses):
         """Each app's nodes, or the reason there are none ("no tree", "didn't answer")."""
         out = []
-        for r in self.batch([(b, "/org/a11y/atspi/cache", ATSPI + "Cache", "GetItems", None) for b in buses]):
-            if isinstance(r, self.GLib.Variant):
-                out.append(normalize_items(r.unpack()[0]))
-            elif r is not None and "UnknownMethod" in str(r):
-                out.append("no tree")
+        for bus, r in zip(buses, self.batch([(b, "/org/a11y/atspi/cache", ATSPI + "Cache", "GetItems", None) for b in buses])):
+            got = normalize_items(r.unpack()[0]) if isinstance(r, self.GLib.Variant) else None
+            if got:
+                missing = incomplete(got)
+                if missing:
+                    have = {n["path"] for n in got}
+                    got += [n for n in self.walk(bus, missing, have) if n["path"] not in have]
+                out.append(got)
+            elif got is not None or "UnknownMethod" in str(r) or "UnknownInterface" in str(r):
+                # No cache to give (Qt's is always empty): node by node, capped.
+                out.append(self.walk(bus) or "no tree")
             else:
                 out.append("didn't answer")
         return out
+
+    def walk(self, bus, start=None, known=()):
+        """One app's tree node by node (walk_tree): from its root, or from where its cache left elements out."""
+        V = self.GLib.Variant
+        acc = ATSPI + "Accessible"
+        name = ("org.freedesktop.DBus.Properties", "Get", V("(ss)", (acc, "Name")))
+        asks = [(acc, "GetRole", None), (acc, "GetState", None), name, (acc, "GetInterfaces", None), (acc, "GetChildren", None)]
+
+        def ask(paths):
+            got = self.answers([(bus, p) + a for p in paths for a in asks])
+            out = []
+            for i in range(len(paths)):
+                role, states, label, ifaces, children = got[5 * i : 5 * i + 5]
+                if role is None or states is None:
+                    out.append(None)
+                    continue
+                kids = [p for b, p in (children[0] if children else []) if b == bus and p != NULL_PATH]
+                faces = [f.rsplit(".", 1)[-1] for f in (ifaces[0] if ifaces else [])]
+                out.append((role[0], list(states[0]), (label[0] if label else "") or "", faces, kids))
+            return out
+
+        return walk_tree(ask, start, known) if start else walk_tree(ask)
 
     def role_names(self, wanted):
         """Role numbers' names ({number: (bus, path) of a node with it}), asked once per number."""
@@ -652,10 +793,10 @@ class A11y:
                 self.roles[role] = answer[0]
         return self.roles
 
-    def extents(self, nodes):
-        """Screen boxes of [bus, path] nodes: [x, y, w, h], or None for one that's gone."""
+    def extents(self, nodes, coords=SCREEN_COORDS):
+        """Boxes of [bus, path] nodes, [x, y, w, h], on the screen or from their window; None for one that's gone."""
         V = self.GLib.Variant
-        calls = [(bus, path, ATSPI + "Component", "GetExtents", V("(u)", (0,))) for bus, path in nodes]
+        calls = [(bus, path, ATSPI + "Component", "GetExtents", V("(u)", (coords,))) for bus, path in nodes]
         return [list(a[0]) if a else None for a in self.answers(calls)]
 
     def texts(self, nodes, limit):
@@ -799,6 +940,16 @@ class Desktop:
         for (_, n), box in zip(boxed, a11y.extents([(b, n["path"]) for b, n in boxed])):
             if box is not None:
                 n["box"] = box
+        for app in apps:
+            for win, members in misplaced(app.get("nodes") or [], app["pid"], windows):
+                origin = x.origin(win["xid"])
+                if origin is None:
+                    continue
+                ox, oy = origin
+                boxes = a11y.extents([(app["bus"], n["path"]) for n in members], WINDOW_COORDS)
+                for n, box in zip(members, boxes):
+                    if box is not None:
+                        n["box"] = [box[0] + ox, box[1] + oy, box[2], box[3]]
         for (_, n), text in zip(texted, a11y.texts([(b, n["path"], n["role"]) for b, n in texted], limit)):
             if text is not None:
                 n["text"] = text

@@ -67,9 +67,15 @@ export interface ScreenMark {
   box: ScreenRegion;
 }
 
-const REF = /\bref=(e\d+)\b/;
-const ROLE = /^-\s+([A-Za-z][\w-]*)/;
-const NAME = /"((?:[^"\\]|\\.)*)"/;
+/**
+ * A line's head: its role, its quoted name and the attribute brackets right
+ * after them (`button "Save" [focused, ref=e3]`, `heading "Title" [ref=e1]
+ * [level=1]`). A ref is read there only, as an attribute of its own: a name
+ * or a text that says `ref=e9` (a page's title, a terminal's output) can't
+ * pass for an element.
+ */
+const HEAD = /^-\s+([A-Za-z][\w-]*)(?:\s+"((?:[^"\\]|\\.)*)")?((?:\s*\[[^\]]*\])*)/;
+const REF_ATTR = /(?:^|[[,])\s*ref=(e\d+)\s*(?=[,\]])/;
 /** Containers worth naming as an element's place ("the Delete in the row for invoice 42"). */
 const PLACES = new Set([
   "dialog",
@@ -106,6 +112,17 @@ const ROWS = new Set(["row"]);
 const CELLS = new Set(["cell", "gridcell", "rowheader", "columnheader"]);
 
 const unquote = (s: string) => s.replace(/\\(.)/g, "$1");
+
+/** A line's role, name and ref (see `HEAD`). */
+function headOf(body: string): { role: string; name: string | null; ref: string | null } {
+  const m = HEAD.exec(body);
+  if (!m) return { role: "", name: null, ref: null };
+  return {
+    role: m[1] as string,
+    name: m[2] !== undefined ? unquote(m[2]) : null,
+    ref: REF_ATTR.exec(m[3] ?? "")?.[1] ?? null,
+  };
+}
 
 /** `e7`, `@e7` or `[ref=e7]` → `e7`; anything else → null. */
 export function screenRef(target: string): string | null {
@@ -149,14 +166,7 @@ export function observeSnapshot(input: {
     const body = line.trim();
     while (open.length > 0 && (open[open.length - 1] as { depth: number }).depth >= depth) open.pop();
     const parent = open.length > 0 ? (open[open.length - 1] as { index: number }).index : -1;
-    const quoted = NAME.exec(body)?.[1];
-    nodes.push({
-      role: ROLE.exec(body)?.[1] ?? "",
-      name: quoted !== undefined ? unquote(quoted) : null,
-      ref: REF.exec(body)?.[1] ?? null,
-      line: body,
-      parent,
-    });
+    nodes.push({ ...headOf(body), line: body, parent });
     children.push([]);
     if (parent >= 0) (children[parent] as number[]).push(index);
     open.push({ depth, index });
@@ -288,7 +298,10 @@ const STRUCTURE = new Set(["heading", "dialog", "alertdialog", "alert", "status"
  * characters (the rest counted).
  */
 export function screenOverview(o: ScreenObservation, max = 6000): { text: string; omitted: number } {
-  const keep = o.lines.filter((l) => REF.test(l) || STRUCTURE.has(ROLE.exec(l.trim())?.[1] ?? ""));
+  const keep = o.lines.filter((l) => {
+    const head = headOf(l.trim());
+    return head.ref !== null || STRUCTURE.has(head.role);
+  });
   return clipLines(keep, max);
 }
 
