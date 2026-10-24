@@ -23,7 +23,11 @@ test("Android: the package and every signing fingerprint, upper-cased; nothing w
   ).toEqual([
     {
       relation: ["delegate_permission/common.handle_all_urls"],
-      target: { namespace: "android_app", package_name: "chat.agentes.app", sha256_cert_fingerprints: ["AA:BB", "CC:DD"] },
+      target: {
+        namespace: "android_app",
+        package_name: "chat.agentes.app",
+        sha256_cert_fingerprints: ["AA:BB", "CC:DD"],
+      },
     },
   ]);
 });
