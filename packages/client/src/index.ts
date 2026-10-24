@@ -18,6 +18,7 @@ export * from "./api/queries";
 export * from "./api/snapshot";
 export * from "./api/types";
 export * from "./browser";
+export * from "./desktop";
 export * from "./realtime/connection";
 export * from "./realtime/consults";
 export * from "./realtime/machines";

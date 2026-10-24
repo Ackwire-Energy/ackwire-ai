@@ -28,15 +28,22 @@ export const isAgentSection = (v: unknown): v is AgentSection => AGENT_SECTIONS.
 
 /**
  * `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa").
- * `?browser=1` opens the agent's browser (the desktop tray's and the notifications' link).
+ * `?browser=1` opens the agent's browser (the desktop tray's and the notifications' link), `?desktop=1` its
+ * desktop (a notification's, the browser card's "Ver a tela inteira", a computer's page).
  */
-export function agentSearch(search: Record<string, unknown>): { tab?: AgentTab; sec?: AgentSection; browser?: 1 } {
+export function agentSearch(search: Record<string, unknown>): {
+  tab?: AgentTab;
+  sec?: AgentSection;
+  browser?: 1;
+  desktop?: 1;
+} {
   const sec = search.sec === "model" ? "brain" : search.sec;
-  const browser = search.browser === 1 || search.browser === "1" || search.browser === true;
+  const on = (v: unknown) => v === 1 || v === "1" || v === true;
   return {
     tab: isAgentTab(search.tab) ? search.tab : undefined,
     sec: isAgentSection(sec) ? sec : undefined,
-    ...(browser ? { browser: 1 as const } : {}),
+    ...(on(search.browser) ? { browser: 1 as const } : {}),
+    ...(on(search.desktop) ? { desktop: 1 as const } : {}),
   };
 }
 

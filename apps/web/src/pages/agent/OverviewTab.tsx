@@ -20,6 +20,7 @@ import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { BrowserNow } from "./BrowserNow";
 import { CardHead, useAgentEdit } from "./context";
+import { DesktopNow } from "./DesktopNow";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
 
@@ -62,6 +63,7 @@ export function OverviewTab() {
       <div className="agp-cols">
         <div className="agp-col">
           <BrowserNow />
+          <DesktopNow />
           {(approvals > 0 || pending.length > 0) && (
             <div className="agp-attns">
               {approvals > 0 && (

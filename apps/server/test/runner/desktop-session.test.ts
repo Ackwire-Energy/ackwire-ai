@@ -304,6 +304,24 @@ test("system mode: every process as the agent, and the password file root's (rea
   expect(existsSync(passwd)).toBe(false);
 });
 
+test("the controller's keyboard: setxkbmap as the agent on its display; a variant only when the layout has one", async () => {
+  const t = setup();
+  await t.desktops.setKeyboard(dev, "br");
+  expect(t.fake.procs).toHaveLength(0);
+  await t.desktops.ensure(dev);
+  await t.desktops.setKeyboard(dev, "us-intl");
+  await t.desktops.setKeyboard(dev, "br");
+  const runs = t.fake.procs.filter((p) => p.argv[0] === "/usr/bin/setxkbmap");
+  expect(runs.map((p) => p.argv.slice(1))).toEqual([
+    ["-layout", "us", "-variant", "intl"],
+    ["-layout", "br"],
+  ]);
+  expect(runs[0]?.opts.env).toMatchObject({
+    DISPLAY: ":20",
+    XAUTHORITY: path.join(t.home, "desktop", "01a142cb", "Xauthority"),
+  });
+});
+
 test("slots: an agent keeps its display; one held by another process is skipped, a stale lock is cleared", async () => {
   const t = setup();
   // :20 is held by a live X server that isn't ours; :21's server is gone.

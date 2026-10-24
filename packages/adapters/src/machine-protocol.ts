@@ -168,6 +168,26 @@ export const DESKTOP_PROTOCOL = 18;
  */
 export const DESKTOP_SIZE = { width: 1280, height: 900 } as const;
 
+/**
+ * The keyboard layouts a person in control can give the agent's desktop (ADR 0056 §5), as XKB layout and
+ * variant: noVNC sends key codes, and the desktop's layout turns them into characters, so it must be the
+ * person's own. A closed list: the value ends up in `setxkbmap`'s arguments.
+ */
+export const DESKTOP_KEYBOARDS = {
+  br: ["br"],
+  us: ["us"],
+  "us-intl": ["us", "intl"],
+  gb: ["gb"],
+  pt: ["pt"],
+  es: ["es"],
+  fr: ["fr"],
+  de: ["de"],
+  it: ["it"],
+} as const satisfies Record<string, readonly [string] | readonly [string, string]>;
+export type DesktopKeyboard = keyof typeof DESKTOP_KEYBOARDS;
+export const isDesktopKeyboard = (v: unknown): v is DesktopKeyboard =>
+  typeof v === "string" && Object.hasOwn(DESKTOP_KEYBOARDS, v);
+
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export const SCREEN_KINDS = ["browser", "desktop"] as const;
 export type ScreenKind = (typeof SCREEN_KINDS)[number];
@@ -351,7 +371,8 @@ export const STREAM_CLOSE = {
 
 /** What a stream shows: one viewer of the agent's desktop, or one terminal as the agent with its size. */
 export type StreamRequest =
-  | { kind: "desktop"; mode: "watch" | "control" }
+  /** `keyboard` (control only): the desktop takes the person's layout as their control starts. */
+  | { kind: "desktop"; mode: "watch" | "control"; keyboard?: DesktopKeyboard }
   | { kind: "terminal"; cols: number; rows: number };
 
 /**

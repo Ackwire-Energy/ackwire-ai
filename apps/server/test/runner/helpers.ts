@@ -164,9 +164,10 @@ export async function fakeXvnc(dir: string) {
   return { socketPath, logins, desktop, close };
 }
 
-/** An agent's desktop as `openDesktopStream` sees it: running on that socket, counting its viewers. */
+/** An agent's desktop as `openDesktopStream` sees it: running on that socket, counting its viewers and the layouts it got. */
 export function desktopOn(socketPath: string, over: { running?: boolean } = {}) {
   const holds = { taken: 0, released: 0 };
+  const keyboards: string[] = [];
   const desktops = {
     status: () => ({ running: over.running ?? true, streams: holds.taken - holds.released }),
     session: () => ({ display: 20, socket: socketPath, xauthority: "", home: "", passwords: VNC_PASSWORDS }),
@@ -178,6 +179,9 @@ export function desktopOn(socketPath: string, over: { running?: boolean } = {}) 
         held = false;
       };
     },
+    setKeyboard: async (_agent: unknown, keyboard: string) => {
+      keyboards.push(keyboard);
+    },
   };
-  return { desktops, holds };
+  return { desktops, holds, keyboards };
 }

@@ -70,10 +70,12 @@ test("connectVnc logs in with the password it is given; a wrong one is refused w
 
 test("a watcher: RFB 3.8 with security None, its ClientInit passed on as shared, the view-only login; its pointer is ignored", async () => {
   const x = await fakeXvnc();
-  const { desktops, holds } = desktopOn(x.socketPath);
+  const { desktops, holds, keyboards } = desktopOn(x.socketPath);
   const data = memoryDataSocket();
-  await openDesktopStream(desktops, dev, "watch", async () => data.socket);
+  // A watcher never changes the desktop's keyboard.
+  await openDesktopStream(desktops, dev, "watch", async () => data.socket, "br");
   expect(holds).toEqual({ taken: 1, released: 0 });
+  expect(keyboards).toEqual([]);
   const init = await viewerHandshake(data, 0);
   expect(init.readUInt16BE(0)).toBe(1280);
   expect(init.readUInt16BE(2)).toBe(800);
@@ -85,11 +87,12 @@ test("a watcher: RFB 3.8 with security None, its ClientInit passed on as shared,
   expect(x.desktop.pointer).toEqual([640, 400]);
 });
 
-test("the person in control logs in with the full password; bytes go both ways as they are", async () => {
+test("the person in control logs in with the full password, their layout on the desktop; bytes go both ways as they are", async () => {
   const x = await fakeXvnc();
-  const { desktops } = desktopOn(x.socketPath);
+  const { desktops, keyboards } = desktopOn(x.socketPath);
   const data = memoryDataSocket();
-  await openDesktopStream(desktops, dev, "control", async () => data.socket);
+  await openDesktopStream(desktops, dev, "control", async () => data.socket, "us-intl");
+  expect(keyboards).toEqual(["us-intl"]);
   await viewerHandshake(data, 1);
   expect(x.logins[0]).toMatchObject({ password: "full", shared: 1 });
 

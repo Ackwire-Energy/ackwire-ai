@@ -379,6 +379,20 @@ test("the desktop's REST: its state for who may watch it, Ligar and Desligar, ta
     controllerUserId: taken.controllerUserId,
     handoff: { id: taken.id, screen: "desktop" },
   });
+  // In control, the stream carries the person's keyboard layout; one that isn't on the list never reaches the computer.
+  const control = (keyboard: string) =>
+    openViewer(
+      `${base()}/api/desktop?orgId=${org.orgId}&agentId=${org.agentId}&mode=control&keyboard=${keyboard}`,
+      owner,
+    );
+  const mine = control("br");
+  await until(() => runner.opened.length === 1, "the control stream");
+  expect(runner.opened[0]).toMatchObject({ kind: "desktop", mode: "control", keyboard: "br" });
+  mine.socket.close();
+  control("dvorak");
+  await until(() => runner.opened.length === 2, "another control stream");
+  expect(runner.opened[1]).toMatchObject({ kind: "desktop", mode: "control" });
+  expect(runner.opened[1]).not.toHaveProperty("keyboard");
   expect((await api("/desktop/stop", { json: {} })).status).toBe(204);
   expect(runner.requests).toEqual(
     expect.arrayContaining(["desktop.session.status", "desktop.session.start", "desktop.session.stop"]),

@@ -616,7 +616,8 @@ type FakedParts =
   | "customConnectors"
   | "mail"
   | "databases"
-  | "browser";
+  | "browser"
+  | "desktop";
 
 /** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
@@ -1673,6 +1674,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     mail: mail.client,
     databases: databases.client,
     browser: browser.client,
+    desktop: browser.desktop,
   };
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);

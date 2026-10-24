@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   type AgentScope,
   type FileEntry,
+  isDesktopKeyboard,
   isStreamId,
   isTerminalSize,
   MAX_INLINE_FILE_BYTES,
@@ -434,7 +435,8 @@ async function handleStream(
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
     if (req.mode !== "watch" && req.mode !== "control") throw new RunnerError("bad_request", "watch or control");
-    await openDesktopStream(ctx.desktops, agent, req.mode, dial);
+    const keyboard = req.mode === "control" && isDesktopKeyboard(req.keyboard) ? req.keyboard : undefined;
+    await openDesktopStream(ctx.desktops, agent, req.mode, dial, keyboard);
   } else if (req.kind === "terminal") {
     requireTool(ctx, "terminal");
     if (!ctx.terminals) throw new RunnerError("terminal_unavailable", "This runner opens no terminals");
