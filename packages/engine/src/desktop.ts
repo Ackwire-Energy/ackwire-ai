@@ -381,6 +381,7 @@ export function createDesktopControl(deps: DesktopControlDeps) {
           agentId: browserHandoffs.agentId,
           machineId: browserHandoffs.machineId,
           handle: agents.handle,
+          name: agents.name,
         })
         .from(browserHandoffs)
         .innerJoin(agents, eq(agents.id, browserHandoffs.agentId))
@@ -397,7 +398,7 @@ export function createDesktopControl(deps: DesktopControlDeps) {
           deps.hub
             .call(
               h.machineId,
-              { op: "desktop.session.start", agent: { id: h.agentId, handle: h.handle } },
+              { op: "desktop.session.start", agent: { id: h.agentId, handle: h.handle, name: h.name } },
               { timeoutMs: 30_000 },
             )
             .catch(() => {}),

@@ -640,6 +640,7 @@ export class RunnerDaemon implements RequestObserver {
       send: (frame) => live?.send(frame) ?? false,
       secret: (agent, name) => secretValue(secretsDir, agent, name),
       onChange: () => queueMicrotask(() => this.browsersChanged()),
+      desktops: this.desktops,
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();

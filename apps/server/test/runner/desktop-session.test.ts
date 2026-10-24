@@ -49,6 +49,7 @@ function fakeComputer(lockDir: string) {
     platform: "linux",
     pty: true,
     runtime: "Bun 1.4.4",
+    uid: 1000,
     which: (command) => `/usr/bin/${command}`,
     spawn(argv, opts) {
       let settle: (code: number | null) => void = () => undefined;
@@ -165,6 +166,27 @@ test("info: Linux, the runner on Bun 1.3.5 or newer, and the packages (installed
   );
   expect(missing.reason).toContain("(missing: tigervnc-standalone-server, dbus-x11)");
   expect(missing.reason?.length).toBeLessThanOrEqual(500);
+  expect(ask({ uid: 0 }).reason).toContain("never run as root");
+});
+
+test("a runner running as root starts a desktop only through a launcher that runs it as the agent", async () => {
+  const t = setup();
+  const root = { ...t.fake.system, uid: 0 };
+  expect(await errorCode(() => new DesktopSessions({ ...t.opts, system: root }).ensure(dev))).toBe(
+    "desktop_unavailable",
+  );
+  // Said to run agents as their own users, yet given no launcher: still never as root.
+  const unlaunched = new DesktopSessions({ ...t.opts, system: root, agentUsers: true });
+  expect(unlaunched.info().available).toBe(true);
+  expect(await errorCode(() => unlaunched.ensure(dev))).toBe("desktop_unavailable");
+  expect(t.fake.procs).toHaveLength(0);
+  const prefix = ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"];
+  const user = async (agent: AgentScope) => ({ ...(await t.opts.user(agent)), prefix });
+  const launched = new DesktopSessions({ ...t.opts, system: root, agentUsers: true, user });
+  await launched.ensure(dev);
+  expect(t.fake.procs.length).toBeGreaterThan(0);
+  for (const p of t.fake.procs) expect(p.argv.slice(0, prefix.length)).toEqual(prefix);
+  launched.close();
 });
 
 test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and passwords never in an argument", async () => {
@@ -378,10 +400,17 @@ test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer
   t.clock.now += DESKTOP_IDLE_MS - 1;
   await t.desktops.sweep();
   expect(t.desktops.status(dev).running).toBe(true);
+  // Its browser in use there keeps it too.
+  t.desktops.touch(dev.id);
+  t.clock.now += DESKTOP_IDLE_MS - 1;
+  await t.desktops.sweep();
+  const { display, xauthority } = t.desktops.session(dev.id) ?? { display: 0, xauthority: "" };
+  expect(t.desktops.running(dev.id)).toEqual({ display, xauthority });
 
   t.clock.now += 2;
   await t.desktops.sweep();
   expect(t.desktops.status(dev).running).toBe(false);
+  expect(t.desktops.running(dev.id)).toBeNull();
   const [xvnc] = t.fake.of("Xtigervnc");
   const [session] = t.fake.of("dbus-launch");
   expect(t.fake.kills).toContainEqual([xvnc?.pid ?? 0, "SIGTERM"]);

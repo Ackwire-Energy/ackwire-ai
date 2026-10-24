@@ -122,6 +122,12 @@ const XFCE_SESSION_SETTINGS = `<?xml version="1.0" encoding="UTF-8"?>
 </channel>
 `;
 
+/**
+ * A desktop or a terminal is a shell for whoever drives it: as root that is the whole computer, every agent's
+ * files and the runner's token. Only a launcher that runs it as the agent's own user may start one from root.
+ */
+export const NOT_AS_ROOT = "The agents' desktops and terminals never run as root: run the runner as a normal user";
+
 /** VNC's fixed key for password files, each byte's bits reversed as DES wants them. */
 const VNC_FILE_KEY = Buffer.from("e84ad660c4721ae0", "hex");
 const PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -219,6 +225,8 @@ export interface DesktopSystem {
   pty: boolean;
   /** The runner's runtime, for people ("Node 22.12.0"). */
   runtime: string;
+  /** The runner's own uid (null where there is none). */
+  uid: number | null;
   /** A command's full path on `pathList` (default: the runner's PATH); null when it isn't there. */
   which(command: string, pathList?: string): string | null;
   spawn(argv: string[], opts: DesktopSpawnOptions): DesktopProcess;
@@ -252,6 +260,7 @@ const hostSystem = (): DesktopSystem => ({
   platform: process.platform,
   pty: hasBunTerminal(),
   runtime: runtimeName(),
+  uid: process.getuid?.() ?? null,
   which(command, pathList) {
     const found = resolveCommand(command, pathList);
     return path.isAbsolute(found) ? found : null;
@@ -281,6 +290,8 @@ export interface DesktopSessionsOptions {
   log: (line: string) => void;
   /** Where and as whom the agent's desktop runs (single-user: `runnerUser`). */
   user: (agent: AgentScope) => Promise<DesktopUser>;
+  /** System mode: `user` runs each agent as its own OS user (its launcher), so a runner running as root may serve. */
+  agentUsers?: boolean;
   /** Tests: the computer. */
   system?: DesktopSystem;
   /** Tests: where X keeps display locks (`/tmp`), and system mode's password folders (`/run/agentes-desktop`). */
@@ -360,6 +371,7 @@ export class DesktopSessions {
     if (this.sys.platform !== "linux") {
       return { available: false, reason: "The agents' desktops run on Linux computers only" };
     }
+    if (this.sys.uid === 0 && !this.opts.agentUsers) return { available: false, reason: NOT_AS_ROOT };
     if (!this.sys.pty) {
       return {
         available: false,
@@ -410,6 +422,18 @@ export class DesktopSessions {
     if (!d) return null;
     const { display, socket, xauthority, home, passwords } = d;
     return { display, socket, xauthority, home, passwords };
+  }
+
+  /** The agent's desktop while it runs, where its Chrome goes (ADR 0056 §7): its display and cookie. */
+  running(agentId: string): { display: number; xauthority: string } | null {
+    const d = this.desktops.get(agentId);
+    return d && !d.ending && this.alive(d) ? { display: d.display, xauthority: d.xauthority } : null;
+  }
+
+  /** The agent used what runs on its desktop (its browser there): it isn't idle. */
+  touch(agentId: string) {
+    const d = this.desktops.get(agentId);
+    if (d) d.lastUsed = this.now();
   }
 
   /** A viewer on the agent's desktop: it doesn't stop as idle until the returned release is called. */
@@ -514,6 +538,7 @@ export class DesktopSessions {
     let display: number | null = null;
     try {
       const user = await this.opts.user(agent);
+      if (this.sys.uid === 0 && user.prefix.length === 0) throw new RunnerError("desktop_unavailable", NOT_AS_ROOT);
       const xvnc = this.sys.which("Xtigervnc", user.env.PATH);
       const dbus = this.sys.which("dbus-launch", user.env.PATH);
       if (!xvnc || !dbus) {

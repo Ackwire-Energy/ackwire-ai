@@ -300,7 +300,7 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
         user: async () => ({ prefix: [], env: { PATH: "/usr/bin:/bin" }, cwd: dir }),
         log: () => undefined,
         spawn,
-        system: { platform: "linux", pty: true, runtime: "Bun 1.4.4" },
+        system: { platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 1000 },
       }),
       streams: new DataSockets({ url: connectUrl(http, "stream"), token: machine.token }),
     },
