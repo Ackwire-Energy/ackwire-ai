@@ -55,7 +55,13 @@ describe("permissions", () => {
 
   test("the creator is owner and lands in #general", async () => {
     expect(await listMemberships(f.db, f.owner.id)).toEqual([
-      { orgId: f.org.id, orgName: "Acme", role: "owner", orgLogo: null },
+      {
+        orgId: f.org.id,
+        orgName: "Acme",
+        role: "owner",
+        orgLogo: null,
+        standing: { state: "active", reason: null, notice: "shown" },
+      },
     ]);
     const members = await f.db
       .select()
