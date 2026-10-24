@@ -7779,6 +7779,12 @@ export const ptBR = {
       active: "O workspace voltou a funcionar",
     },
   },
+  computerSetup: {
+    managedNotRemovable: "Este é o computador do próprio workspace: ele não pode ser removido.",
+    notification: {
+      ready: "O computador do seu workspace está pronto",
+    },
+  },
 };
 
 export type Translations = Widen<typeof ptBR>;

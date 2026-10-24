@@ -452,6 +452,10 @@ credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/
 workspace on hold (its agents stop) or suspends it (nobody can use it, and what its agents are doing
 stops), and brings it back; `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
 `PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
+`MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
+from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
+far each one is, and asks for a single-use code that the computer connects with
+(`POST /orgs/{orgId}/machines`). Leave it `off` and people connect their own computers.
 
 </details>
 

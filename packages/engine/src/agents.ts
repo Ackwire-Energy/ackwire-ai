@@ -1,4 +1,4 @@
-import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
 import { caches } from "./cache";
@@ -8,7 +8,7 @@ import { getMembership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 
-const { agents, providerCredentials } = schema;
+const { agents, machines, providerCredentials } = schema;
 
 export type Agent = typeof agents.$inferSelect;
 
@@ -76,12 +76,28 @@ export async function createAgent(
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
   // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
+  // The workspace's own computer (managed, else the server's own) once it has connected (ADR 0056 §10); one
+  // still being prepared gives itself to the agents with none when it is ready.
+  const [home] = await db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(
+      and(
+        eq(machines.orgId, orgId),
+        inArray(machines.kind, ["managed", "host"]),
+        isNotNull(machines.tokenHash),
+        isNull(machines.deletedAt),
+      ),
+    )
+    .orderBy(sql`${machines.kind} = 'managed' desc`, asc(machines.createdAt))
+    .limit(1);
   try {
     const [agent] = await db
       .insert(agents)
       .values({
         ...values,
         ...brainAuto,
+        machineId: home?.id ?? null,
         orgId,
         ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId,
       })

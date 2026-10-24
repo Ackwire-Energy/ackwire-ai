@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -403,6 +403,155 @@
           }
         },
         "required": ["kind", "id", "orgId", "agentId", "text"]
+      },
+      "OperatorMachineRequestPage": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorMachineRequest"
+            }
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`cursor` for the next page; null on the last one."
+          }
+        },
+        "required": ["requests", "next"]
+      },
+      "OperatorMachineRequest": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orgName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "owner": {
+            "type": ["object", "null"],
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["userId", "email"],
+            "description": "Its first owner."
+          },
+          "provisioning": {
+            "$ref": "#/components/schemas/OperatorProvisioning"
+          }
+        },
+        "required": ["orgId", "orgName", "createdAt", "owner", "provisioning"]
+      },
+      "OperatorProvisioning": {
+        "type": ["object", "null"],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["preparing", "waiting", "problem", "ready"]
+          },
+          "step": {
+            "type": ["string", "null"],
+            "enum": ["reserving", "starting", "installing", "connecting", null]
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": ["approval", "capacity", null]
+          },
+          "since": {
+            "type": ["string", "null"],
+            "description": "When this state (and step or reason) began."
+          },
+          "etaSeconds": {
+            "type": ["integer", "null"]
+          },
+          "specs": {
+            "$ref": "#/components/schemas/OperatorMachineSpecs"
+          }
+        },
+        "required": ["state", "step", "reason", "since", "etaSeconds", "specs"],
+        "description": "What you last said about it; null: nothing yet."
+      },
+      "OperatorMachineSpecs": {
+        "type": ["object", "null"],
+        "properties": {
+          "cpus": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1024
+          },
+          "memoryGb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 65536
+          },
+          "diskGb": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "required": ["cpus", "memoryGb", "diskGb"],
+        "description": "What the workspace is told it gets."
+      },
+      "OperatorIssuedMachine": {
+        "type": "object",
+        "properties": {
+          "machineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enrollCode": {
+            "type": "string",
+            "description": "Single use. The computer redeems it at `POST /api/machines/device/token` (`{ deviceCode }`) on the public address, like a confirmed connection code. Never log it."
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": ["machineId", "enrollCode", "expiresAt"]
+      },
+      "OperatorMachine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["connected", "host", "managed"]
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "The workspace's own computer, the one you issue."
+          },
+          "name": {
+            "type": "string"
+          },
+          "online": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": ["string", "null"]
+          },
+          "runnerVersion": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "kind", "managed", "name", "online", "lastSeenAt", "runnerVersion", "protocol"]
       }
     },
     "parameters": {}
@@ -1034,6 +1183,387 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/machine-requests": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "Workspaces waiting for their computer, oldest first",
+        "description": "Active workspaces whose computer isn't ready (one on hold or suspended is never listed). Empty unless `MACHINE_PROVISIONING=external`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorMachineRequestPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/provisioning": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Say how far the workspace's computer is",
+        "description": "Its people see it live. The time `since` restarts only when the state, step or reason change. Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": ["preparing", "waiting", "problem"],
+                    "description": "`ready` is not yours to set: it comes with the computer's first hello."
+                  },
+                  "step": {
+                    "type": "string",
+                    "enum": ["reserving", "starting", "installing", "connecting"],
+                    "description": "With `preparing`: reserving, starting, installing or connecting; ignored otherwise."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": ["approval", "capacity"],
+                    "description": "With `waiting`: approval or capacity; ignored otherwise."
+                  },
+                  "etaSeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 604800
+                  },
+                  "specs": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/OperatorMachineSpecs"
+                      },
+                      {
+                        "description": "Kept from before when absent."
+                      }
+                    ]
+                  }
+                },
+                "required": ["state"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The computer is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/machines": {
+      "post": {
+        "tags": ["Operator"],
+        "summary": "The workspace's computer, and a code for it to connect with",
+        "description": "One per workspace: the first call makes it, every later one issues a new code for the same computer (an earlier unused code stops working), and one removed comes back. The code lives 10 minutes; once redeemed, the computer's first hello makes it ready and gives it the workspace's agents that have no computer. Refused (403 `org.paused`, `org.suspended`) unless the workspace is active.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorIssuedMachine"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The workspace isn't active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The workspace's computers, its own and the ones its people connected",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "machines": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OperatorMachine"
+                      }
+                    }
+                  },
+                  "required": ["machines"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/machines/{machineId}": {
+      "delete": {
+        "tags": ["Operator"],
+        "summary": "Take the workspace's computer away",
+        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "machineId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
           },
           "400": {
             "description": "Invalid request",

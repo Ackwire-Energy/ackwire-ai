@@ -73,6 +73,7 @@ const KNOWN = {
   "org.suspended": "standing.suspended",
   "org.create_refused": "standing.createRefused",
   "agent.paused": "standing.agentPaused",
+  "machine.managed": "computerSetup.managedNotRemovable",
 } as const;
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */

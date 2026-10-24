@@ -632,6 +632,12 @@ export const envVars = {
       "Port of the operator API's listener, on the same `HOST`; only with `OPERATOR_API_TOKEN`. The compose file doesn't publish it: containers on the same Docker network reach it as `agentes:3001`.",
     section: "Operator",
   },
+  MACHINE_PROVISIONING: {
+    schema: z.enum(["off", "external"]).default("off"),
+    description:
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. Needs `OPERATOR_API_TOKEN`.",
+    section: "Operator",
+  },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
     description: "Minimum log level written to stdout.",

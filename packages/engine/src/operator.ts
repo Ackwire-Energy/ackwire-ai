@@ -22,10 +22,11 @@ const agentCount = sql<number>`(select count(*) from ${agents}
   where ${agents.orgId} = ${ORG_ID} and ${agents.archivedAt} is null)`.mapWith(Number);
 
 // Cut to milliseconds (what a JS Date and the cursor carry), so paging compares exactly what it returned.
-const createdAtMs = sql<Date>`date_trunc('milliseconds', ${organizations.createdAt})`.mapWith(
+export const orgCreatedAtMs = sql<Date>`date_trunc('milliseconds', ${organizations.createdAt})`.mapWith(
   (v: string | Date) => new Date(v),
 );
-const OrgCursor = z.tuple([z.iso.datetime(), z.uuid()]);
+/** A page of workspaces ends at this key: `[createdAt (ms), id]`. */
+export const OrgCursor = z.tuple([z.iso.datetime(), z.uuid()]);
 
 export interface OperatorOrgQuery {
   /** An org id, part of its name, or part of a member's email; any case. */
@@ -45,7 +46,7 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
     .select({
       id: organizations.id,
       name: organizations.name,
-      createdAt: createdAtMs,
+      createdAt: orgCreatedAtMs,
       standing: organizations.standing,
       members: memberCount,
       agents: agentCount,
@@ -65,10 +66,12 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
             )
           : undefined,
         query.createdAfter ? gt(organizations.createdAt, query.createdAfter) : undefined,
-        after ? sql`(${createdAtMs}, ${organizations.id}) < (${after[0]}::timestamptz, ${after[1]}::uuid)` : undefined,
+        after
+          ? sql`(${orgCreatedAtMs}, ${organizations.id}) < (${after[0]}::timestamptz, ${after[1]}::uuid)`
+          : undefined,
       ),
     )
-    .orderBy(desc(createdAtMs), desc(organizations.id))
+    .orderBy(desc(orgCreatedAtMs), desc(organizations.id))
     .limit(query.limit + 1);
   const orgs = rows.slice(0, query.limit);
   const last = orgs.at(-1);

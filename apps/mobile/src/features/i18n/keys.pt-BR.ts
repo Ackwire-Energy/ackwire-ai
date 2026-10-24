@@ -674,6 +674,8 @@ export const featureKeysPtBR = {
       browser_handoff_other: "{{names}} precisam de você no navegador",
       org_standing_one: "O status do workspace mudou",
       org_standing_other: "O status do workspace mudou",
+      computer_ready_one: "O computador do seu workspace está pronto",
+      computer_ready_other: "O computador do seu workspace está pronto",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",

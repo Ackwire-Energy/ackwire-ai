@@ -96,6 +96,7 @@ export * from "./machine-device";
 export * from "./machine-hub";
 export * from "./machine-outages";
 export * from "./machine-provider";
+export * from "./machine-provisioning";
 export * from "./machine-tasks";
 export * from "./machines";
 export * from "./mail/accounts";

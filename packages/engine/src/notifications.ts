@@ -64,6 +64,8 @@ export const NOTIFICATION_KINDS = [
   "browser_handoff",
   /** The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8). */
   "org_standing",
+  /** The workspace's own computer is ready (owners, ADR 0056 §10). */
+  "computer_ready",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

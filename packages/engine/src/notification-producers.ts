@@ -10,6 +10,7 @@ import {
   notify,
   resolveNotifications,
 } from "./notifications";
+import type { MemberRole } from "./organizations";
 
 /**
  * Where notifications come from: each flow calls one of these after
@@ -677,13 +678,13 @@ export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
-/** The organization's owners and admins. */
-const adminsOf = async (deps: NotificationDeps, orgId: string) =>
+/** The organization's owners and admins (or only the roles given). */
+const adminsOf = async (deps: NotificationDeps, orgId: string, roles: MemberRole[] = ["owner", "admin"]) =>
   (
     await deps.db
       .select({ userId: organizationMembers.userId })
       .from(organizationMembers)
-      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, ["owner", "admin"])))
+      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, roles)))
   ).map((a) => a.userId);
 
 // ── Connected computers ───────────────────────────────────────────────────────
@@ -706,6 +707,25 @@ export async function notifyMachineConnected(
     actor: person(actorId),
     source: { machineId: machine.id, label: machine.name },
     latest: { title: machine.name, ...(machine.hostname ? { text: notificationSnippet(machine.hostname) } : {}) },
+  });
+}
+
+/**
+ * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
+ * from seconds to an approval hours later. One row each time it gets ready.
+ */
+export async function notifyComputerReady(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string },
+  readyAt: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: await adminsOf(deps, machine.orgId, ["owner"]),
+    kind: "computer_ready",
+    groupKey: `computer_ready:${machine.id}:${readyAt.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: { title: machine.name },
   });
 }
 

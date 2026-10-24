@@ -50,6 +50,7 @@ import {
   getSandboxSettings,
   NO_COMPUTER_MESSAGE,
   ownComputerStatus,
+  PREPARING_COMPUTER_MESSAGE,
   SANDBOX_LIMITS,
   SANDBOX_SCOPE,
   type SandboxDeps,
@@ -222,7 +223,7 @@ export function computerSentence(info: ComputerInfo, network: Network) {
     return "Your connected computer was removed; ask an admin or your owner to choose another one (calls fail until then).";
   }
   if (info.kind === "cloud") {
-    if (!info.available) return NO_COMPUTER_MESSAGE;
+    if (!info.available) return info.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE;
     return `Runs on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)}`;
   }
   const os = info.os === "darwin" ? "macOS" : info.os === "windows" ? "Windows" : info.os === "linux" ? "Linux" : "";
@@ -731,7 +732,9 @@ export function createSandboxToolSource(
               },
             };
           }
-          if (!target.available) return { content: NO_COMPUTER_MESSAGE, isError: true };
+          if (!target.available) {
+            return { content: target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
+          }
           const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
           return {
             content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; network: ${s.network ?? "none yet"}.`,

@@ -7757,4 +7757,10 @@ export const en: Translations = {
       active: "The workspace is working again",
     },
   },
+  computerSetup: {
+    managedNotRemovable: "This is the workspace's own computer: it can't be removed.",
+    notification: {
+      ready: "Your workspace's computer is ready",
+    },
+  },
 };

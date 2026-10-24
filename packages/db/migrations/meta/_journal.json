@@ -659,6 +659,13 @@
       "when": 1792818524301,
       "tag": "0093_user_block_agent_hold",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792820665374,
+      "tag": "0094_managed_machines",
+      "breakpoints": true
     }
   ]
 }

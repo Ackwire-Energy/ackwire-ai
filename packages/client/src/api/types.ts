@@ -1976,10 +1976,15 @@ export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: s
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
+/** `connected`: a person paired it; `host`: the server's own; `managed`: the workspace's own (ADR 0056 §10). */
+export type MachineKind = "connected" | "host" | "managed";
+
 /** `GET …/machines`: a computer connected with `agentes-runner`. */
 export interface Machine {
   id: string;
   name: string;
+  /** A `managed` one can't be removed, and its hostname, OS and arch are blank. Absent from older servers. */
+  kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
   lastSeenAt: string | null;
@@ -3524,7 +3529,9 @@ export type NotificationKind =
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
   /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
-  | "org_standing";
+  | "org_standing"
+  /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
+  | "computer_ready";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {

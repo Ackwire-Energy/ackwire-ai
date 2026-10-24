@@ -6,9 +6,9 @@ import {
   MIN_RUNNER_PROTOCOL,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { recordAudit } from "./audit";
+import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -192,14 +192,18 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
   return rows.map(({ machine: m, pairedByName }) => {
     const mine = m.pairedByUserId === actorId;
     const pause = machinePause(m, now);
+    // The workspace's own computer (ADR 0056 §10) is a service people use, not a box they look into.
+    const managed = m.kind === "managed";
     return {
       id: m.id,
       name: m.name,
+      /** `connected` (a person paired it), `host` (the server's own) or `managed` (the workspace's, never removed here). */
+      kind: m.kind,
       online: machineOnline(m, now),
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
-      hostname: m.hostname,
-      os: m.os,
-      arch: m.arch,
+      hostname: managed ? "" : m.hostname,
+      os: managed ? "other" : m.os,
+      arch: managed ? "" : m.arch,
       runnerVersion: m.runnerVersion,
       /** The runner's machine protocol (9+: pause; 10+: access on the machine). */
       protocol: m.protocol,
@@ -209,7 +213,7 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       pairedBy: m.pairedByUserId ? { id: m.pairedByUserId, name: pairedByName ?? "" } : null,
       agents: using.filter((a) => a.machineId === m.id).map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
       /** Shown to admins and the person who paired it only. */
-      workspace: admin || mine ? m.workspace : null,
+      workspace: (admin || mine) && !managed ? m.workspace : null,
       /** Folders and tools allowed on the machine (protocol 10); admins and the pairer only, null otherwise or unknown. */
       access: admin || mine ? (m.access ?? null) : null,
       /** Whether the agent browser can run there (protocol 12, ADR 0040); null when its runner doesn't say. */
@@ -318,12 +322,7 @@ export async function renameMachine(
   return { id: machine.id, name };
 }
 
-/**
- * Removes a machine: its token stops working, its socket is closed
- * (`refused: revoked`, on whichever replica holds it), and agents that used
- * it go back to the cloud computer (remembered in `previous_agent_ids`, so
- * reconnecting the same computer gives them back). Soft delete, audited.
- */
+/** A person removes a computer (the person who paired it or an admin); the workspace's own computer only goes with its provisioner. */
 export async function deleteMachine(
   deps: Pick<MachineDeps, "db" | "pubsub">,
   actorId: string,
@@ -331,6 +330,26 @@ export async function deleteMachine(
   machineId: string,
 ) {
   const machine = await requireMachineManager(deps.db, actorId, orgId, machineId);
+  if (machine.kind === "managed") {
+    throw new ForbiddenError("This is the workspace's own computer: it can't be removed here", "machine.managed");
+  }
+  await removeMachine(deps, machine, { type: "person", id: actorId });
+}
+
+/**
+ * Removes a machine: its token stops working, its socket is closed
+ * (`refused: revoked`, on whichever replica holds it), and agents that used
+ * it go back to the cloud computer (remembered in `previous_agent_ids`, so
+ * reconnecting the same computer gives them back). Soft delete, audited.
+ * `also` runs in the same transaction.
+ */
+export async function removeMachine(
+  deps: Pick<MachineDeps, "db" | "pubsub">,
+  machine: MachineRow,
+  actor: AuditEntry["actor"],
+  also?: (tx: Executor) => Promise<unknown>,
+) {
+  const orgId = machine.orgId;
   const now = new Date();
   const freed = await deps.db.transaction(async (tx) => {
     const rows = await tx
@@ -352,12 +371,13 @@ export async function deleteMachine(
         updatedAt: now,
       })
       .where(eq(machines.id, machine.id));
+    await also?.(tx);
     return ids;
   });
   for (const agentId of freed) caches.agents.delete(`${orgId}:${agentId}`);
   await recordAudit(deps.db, {
     orgId,
-    actor: { type: "person", id: actorId },
+    actor,
     action: "machine.deleted",
     target: { type: "machine", id: machine.id },
     details: { name: machine.name, agents: freed },
@@ -393,7 +413,8 @@ export async function computerTarget(db: Database, orgId: string, agentId: strin
 /**
  * Points an agent at a connected machine (or back to the cloud computer with
  * null). An admin (`manage_agents`) may; so may the agent's owner when they
- * paired that machine (going back to the cloud only needs the owner).
+ * paired that machine or it is the workspace's own (going back to the cloud
+ * only needs the owner).
  */
 export async function setAgentComputerTarget(
   deps: Pick<MachineDeps, "db" | "pubsub">,
@@ -412,7 +433,8 @@ export async function setAgentComputerTarget(
     if (agent.ownerUserId !== actorId) {
       throw new ForbiddenError("Only an admin or the agent's owner can choose its computer", "machine.forbidden");
     }
-    if (machine && machine.pairedByUserId !== actorId) {
+    // The workspace's own computers (managed, host) are nobody's: any agent of the workspace may use them.
+    if (machine && machine.kind === "connected" && machine.pairedByUserId !== actorId) {
       throw new ForbiddenError(
         "You can only give your agent a computer you connected yourself; ask an admin for this one",
         "machine.forbidden",

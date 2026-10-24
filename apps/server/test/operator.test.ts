@@ -391,6 +391,100 @@ test("user block: refused at once even with a cached session, signed out, no sig
   expect(await body(await op(`/users/${biaId}`))).toMatchObject({ blockedAt: null, blockedReason: null });
 });
 
+test("external provisioning: requests, progress, the workspace's computer and its single-use code", async () => {
+  const { orgId } = acme;
+  const call = (method: string, path: string, json?: unknown) =>
+    createOperatorApp(deps, TOKEN).request(`/api/operator/v1${path}`, {
+      method,
+      headers: { authorization: BEARER, ...(json === undefined ? {} : { "content-type": "application/json" }) },
+      body: json === undefined ? undefined : JSON.stringify(json),
+    });
+  const external = createOperatorApp({ ...deps, config: { ...deps.config, MACHINE_PROVISIONING: "external" } }, TOKEN);
+  type Requests = { requests: { orgId: string; [key: string]: unknown }[]; next: string | null };
+
+  // This server provisions nothing; one that does lists every active workspace without a ready computer.
+  expect(await body(await op("/machine-requests"))).toEqual({ requests: [], next: null });
+  const listed = await body<Requests>(
+    await external.request("/api/operator/v1/machine-requests?limit=200", { headers: { authorization: BEARER } }),
+  );
+  expect(listed.requests.find((r) => r.orgId === orgId)).toEqual({
+    orgId,
+    orgName: "Acme",
+    createdAt: expect.any(String),
+    owner: { userId: acme.ownerId, email: "owner@acme.test" },
+    provisioning: null,
+  });
+
+  for (const bad of [
+    { state: "ready" },
+    { state: "preparing", step: "flying" },
+    { state: "waiting", reason: "bored" },
+    { state: "problem", etaSeconds: -1 },
+    { state: "preparing", specs: { cpus: 0, memoryGb: 8, diskGb: 75 } },
+  ]) {
+    expect({ bad, status: (await put(`/orgs/${orgId}/provisioning`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/provisioning", { state: "problem" })).status).toBe(404);
+  const specs = { cpus: 4, memoryGb: 8, diskGb: 75 };
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "preparing", step: "connecting", specs })).status).toBe(
+    204,
+  );
+  expect(await body(await owner(`/api/app/organizations/${orgId}/computer-setup`))).toEqual({
+    mode: "pair",
+    state: null,
+    step: null,
+    reason: null,
+    since: null,
+    etaSeconds: null,
+    specs: null,
+    machineId: null,
+  });
+
+  type Issued = { machineId: string; enrollCode: string; expiresAt: string };
+  const issued = await body<Issued>(await call("POST", `/orgs/${orgId}/machines`, { name: "Computador da Acme" }));
+  const again = await body<Issued>(await call("POST", `/orgs/${orgId}/machines`, {}));
+  expect(again.machineId).toBe(issued.machineId);
+  expect((await call("POST", "/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/machines", {})).status).toBe(404);
+  // The computer redeems it on the public address like any confirmed code, once.
+  const redeem = (deviceCode: string) =>
+    t.app.request("/api/machines/device/token", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ deviceCode }),
+    });
+  expect((await redeem(issued.enrollCode)).status).toBe(400);
+  expect(await body(await redeem(again.enrollCode))).toMatchObject({
+    machineId: issued.machineId,
+    name: "Computador da Acme",
+    org: { id: orgId, name: "Acme" },
+  });
+  expect((await redeem(again.enrollCode)).status).toBe(400);
+
+  const machines = await call("GET", `/orgs/${orgId}/machines`);
+  const text = await machines.text();
+  expect((JSON.parse(text) as { machines: unknown[] }).machines).toContainEqual({
+    id: issued.machineId,
+    kind: "managed",
+    managed: true,
+    name: "Computador da Acme",
+    online: false,
+    lastSeenAt: null,
+    runnerVersion: "",
+    protocol: 1,
+  });
+  expect(text).not.toMatch(/token|hash/i);
+
+  const refused = await owner(`/api/app/organizations/${orgId}/machines/${issued.machineId}`, { method: "DELETE" });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("machine.managed");
+
+  expect((await call("DELETE", `/orgs/${orgId}/machines/${issued.machineId}`)).status).toBe(204);
+  expect((await call("DELETE", `/orgs/${orgId}/machines/${issued.machineId}`)).status).toBe(404);
+  const after = await body<{ machines: { id: string }[] }>(await call("GET", `/orgs/${orgId}/machines`));
+  expect(after.machines.map((m) => m.id)).not.toContain(issued.machineId);
+  expect((await call("GET", "/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/machines")).status).toBe(404);
+});
+
 test("no answer carries a secret or a field named like one", async () => {
   const secrets = [
     "sk-ant-api-secret-9876",

@@ -27,6 +27,7 @@ import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
 import { syncMachineAccounts } from "./machine-accounts";
+import { onManagedMachineHello } from "./machine-provisioning";
 import {
   applyTaskDone,
   applyTaskEvent,
@@ -446,6 +447,10 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
+    // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
+    await onManagedMachineHello({ db, pubsub }, machine).catch((error) =>
+      deps.log?.warn("managed machine hello failed", { machineId: machine.id, error: String(error) }),
+    );
     // Protocol 9: the agents that use this computer, for the desktop app.
     if (frame.protocol >= PAUSE_PROTOCOL) await sendAgents(conn);
     if (frame.protocol >= BROWSER_PROTOCOL) browserHooks.connected?.(machine.id);
