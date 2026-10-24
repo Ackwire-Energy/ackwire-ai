@@ -34,7 +34,7 @@ import { effectiveAgentBudget, monthStartUtc } from "./usage";
 
 const { sandboxes, orgSandboxSettings, sandboxUsageDays, usageRecords, agentBudgetPeriods } = schema;
 
-/** The scope of the sandbox tools: on by default (D61), and not covered by "all tools" (D30). */
+/** The scope of the sandbox tools: on by default, and not covered by "all tools" (ADR 0021). */
 export const SANDBOX_SCOPE = "sandbox:run";
 
 export const SANDBOX_LIMITS = {
@@ -67,7 +67,7 @@ export interface SandboxDeps {
   archiveAfterDays: number;
   now?: () => Date;
   /**
-   * The git proxy (D35): computers get our credential helper and
+   * The git proxy (ADR 0024): computers get our credential helper and
    * `insteadOf` so `git clone https://github.com/…` goes through
    * `{publicUrl}/api/git/…`, and our host stays reachable even when the
    * computer's network is blocked.
@@ -379,7 +379,7 @@ async function applyNetwork(
 }
 
 /**
- * Git through our proxy (D35), when the org has GitHub connected and the
+ * Git through our proxy (ADR 0024), when the org has GitHub connected and the
  * agent may use git: our short-lived credential, the helper and `insteadOf`,
  * written on each start and refreshed every few hours. Never a GitHub token.
  */

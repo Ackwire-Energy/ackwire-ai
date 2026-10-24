@@ -11,10 +11,10 @@ import { useMachineOutages } from "./queries";
 export const openSwitchComputer = (machineId: string) => router.push(`/switch-computer/${machineId}`);
 
 /**
- * Under the greeting on Conversas (ComputadorOffline.html, Celular `.pnotice`): one neutral card per computer
+ * Under the greeting on Conversas: one neutral card per computer
  * that went offline with agents waiting for it, the attention color only on its icon. "O MacBook Air
  * desconectou", "Ada e Theo esperam por ele · 3 tarefas", and "Trocar computador". The app has no computer
- * screen yet, so the prototype's "Ver computador" is left out. Shows only for who can manage the agents
+ * screen yet, so the design's "Ver computador" is left out. Shows only for who can manage the agents
  * (the endpoint refuses the others); nothing while none is offline.
  */
 export function OutageNotices() {

@@ -105,7 +105,7 @@ function scriptedComputerBrain(script: (n: number, turn: BrainTurn) => AsyncIter
 const post = (fx: Fixture, body: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body });
 
-/** The channel's main timeline: a run asked there answers there (D67). */
+/** The channel's main timeline: a run asked there answers there. */
 const timeline = (fx: Fixture) => listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
 
 test("brainFor: the mission's brain first, then the agent's; unknown values are the model brain", () => {
@@ -200,7 +200,7 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(seen[0]?.model).toBe("sonnet");
   const [run] = await f.db.select().from(schema.agentRuns);
   // A new session for this run, kept on it (a pause resumes the same one). Asked in the channel, its
-  // conversation is the channel's main timeline (D67).
+  // conversation is the channel's main timeline.
   expect(seen[0]?.session).toEqual({
     id: brainSessionId(f.agent.id, `${f.general.id}:${run?.id}`, "claude_code"),
     resume: false,

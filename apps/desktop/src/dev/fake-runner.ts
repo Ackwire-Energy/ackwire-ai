@@ -49,7 +49,7 @@ export const ACME_AGENTS = [
   agent("ag_bento", "Bento", "amber", "round", "cap"),
   agent("ag_ada", "Ada", "green", "happy", "none"),
 ];
-export const HIMETRICA_AGENTS = [
+export const HORIZONTE_AGENTS = [
   agent("ag_lia", "Lia", "rose", "round", "flower"),
   agent("ag_nino", "Nino", "teal", "dots", "beanie"),
 ];
@@ -146,16 +146,16 @@ export function acmeSeed(): FakeOrgSeed {
 }
 
 /** A 24×24 PNG: a white "H" on coral. */
-const HIMETRICA_LOGO =
+const HORIZONTE_LOGO =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAALElEQVR42mP4n+1FFcQwatDAGgQHpEiNGkShQXjAABk0Gmu0N2i0PBrsBgEAgBRBMV74eN0AAAAASUVORK5CYII=";
 
-export function himetricaSeed(): FakeOrgSeed {
-  const [lia, nino] = HIMETRICA_AGENTS;
+export function horizonteSeed(): FakeOrgSeed {
+  const [lia, nino] = HORIZONTE_AGENTS;
   return {
-    org: { id: "org_himetrica", name: "Himetrica" },
-    slug: "himetrica",
-    logo: HIMETRICA_LOGO,
-    agents: HIMETRICA_AGENTS,
+    org: { id: "org_horizonte", name: "Horizonte" },
+    slug: "horizonte",
+    logo: HORIZONTE_LOGO,
+    agents: HORIZONTE_AGENTS,
     jobs: [
       {
         id: "j3",
@@ -169,7 +169,7 @@ export function himetricaSeed(): FakeOrgSeed {
       },
     ],
     access: {
-      folders: [{ path: "/Users/voce/Projects/Himetrica/site", agents: ["ag_lia", "ag_nino"] }],
+      folders: [{ path: "/Users/voce/Projects/Horizonte/site", agents: ["ag_lia", "ag_nino"] }],
       tools: { claude: true, codex: false, commands: true },
     },
     activity: [
@@ -191,7 +191,7 @@ export function himetricaSeed(): FakeOrgSeed {
         where: "site",
         result: "failed",
       },
-      { at: minutesAgo(60 * 23), kind: "pair", summary: "connected to Himetrica", result: "ok" },
+      { at: minutesAgo(60 * 23), kind: "pair", summary: "connected to Horizonte", result: "ok" },
     ],
     requests: [],
   };
@@ -200,7 +200,7 @@ export function himetricaSeed(): FakeOrgSeed {
 /** Organizations a fake sign-in can land in, in order. */
 const SIGN_IN_POOL: (() => FakeOrgSeed)[] = [
   acmeSeed,
-  himetricaSeed,
+  horizonteSeed,
   () => ({
     org: { id: `org_${rid()}`, name: "Estúdio Norte" },
     slug: "estudio-norte",

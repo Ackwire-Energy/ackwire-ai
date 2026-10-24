@@ -51,7 +51,7 @@ export const isAsyncConsultation = (c: Pick<AgentConsultationRow, "waitId">) => 
 
 /**
  * Who an agent may ask or tell something: an active agent of the org, not
- * itself, one the person behind the run can talk to (D31), and not after
+ * itself, one the person behind the run can talk to, and not after
  * agents went back and forth long enough (`NOTICE_WAKE_MAX_HOP`).
  */
 async function reachableAgent(ctx: ToolContext, input: unknown) {
@@ -94,7 +94,7 @@ const TOO_DEEP = refuse(
  * from before that still resume their paused runs (`onConsultedRunFinished`).
  *
  * Code decides who may be asked: an active agent of the org, not the asker,
- * one the person behind the run can talk to (D31), and not already in this
+ * one the person behind the run can talk to, and not already in this
  * chain (no cycles, at most `MAX_CONSULTATION_CHAIN` agents deep).
  *
  * `tell_agent`: a note to another agent, fire and forget (`createTellAgentTool`).
@@ -639,7 +639,7 @@ export async function consultationOrigin(
   return origin;
 }
 
-/** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline (D67). */
+/** Where a consulted run's cards go: the thread of whoever asked, or null for its main timeline. */
 export async function consultationCardThread(db: Executor, orgId: string, runId: string, fallback: string) {
   const origin = await consultationOrigin(db, orgId, runId);
   return origin ? origin.threadId : fallback;

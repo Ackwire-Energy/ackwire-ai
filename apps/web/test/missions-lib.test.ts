@@ -246,7 +246,7 @@ describe("what waits for you", () => {
 });
 
 describe("time and sessions", () => {
-  test("spans read like the prototype", () => {
+  test("spans read as designed", () => {
     expect(formatSpan(t, 40)).toBe("40 s");
     expect(formatSpan(t, 14 * 60)).toBe("14 min");
     expect(formatSpan(t, 85 * 60)).toBe("1 h 25");

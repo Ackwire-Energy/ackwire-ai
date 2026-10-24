@@ -2,11 +2,11 @@ name: Desktop
 
 # The macOS app (ADR 0036): compile the runner for both architectures, fetch the pinned agent-browser
 # (ADR 0040), build a universal .app + .dmg
-# with Tauri, signed with a Developer ID and notarized, plus the updater bundle
+# with Tauri, signed with our Developer ID and notarized, plus the updater bundle
 # signed with the updater key. Started by hand on a `desktop-v*` tag, it publishes a GitHub Release with
 # `agentes_<version>_universal.dmg`, its `.sha256`, `…universal.app.tar.gz` and its `.sig`
 # (the server reads those names).
-# Nothing runs on a developer's machine: testing means installing this build.
+# Testing means installing this build.
 # macOS runners cost about 10x Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
 # Run by hand on main with `release` = fix/feature/major: bumps the version (patch/minor/major) in
 # tauri.conf.json, package.json, Cargo.toml and Cargo.lock, commits and tags `desktop-v<version>` on main,

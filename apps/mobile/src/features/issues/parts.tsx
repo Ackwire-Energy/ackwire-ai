@@ -130,7 +130,7 @@ export function AssigneeFace({ issue, size, live }: { issue: Issue; size: number
 }
 
 /**
- * One task in the list (MobileDriveIssues.html `.irow`): who has it, "#134 · Alta · até sex", the title in
+ * One task in the list: who has it, "#134 · Alta · até sex", the title in
  * two lines, then its state, the agent's current step while it works, and the criteria.
  */
 export const IssueRow = memo(function IssueRow({

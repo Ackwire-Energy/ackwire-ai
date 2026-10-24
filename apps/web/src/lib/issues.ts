@@ -27,7 +27,7 @@ export function useStepText() {
   };
 }
 
-// ── The board (D55): one per org, custom columns, each in a fixed stage ─────
+// ── The board: one per org, custom columns, each in a fixed stage ───────────
 
 /** A column's title: its own name, or the stage's ("A fazer"; "Canceladas" for the canceled one). */
 export function columnTitle(col: Pick<IssueColumn, "name" | "stage">, stageName: (stage: IssueStatus) => string) {

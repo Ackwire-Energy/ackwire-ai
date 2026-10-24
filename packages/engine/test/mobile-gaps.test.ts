@@ -305,7 +305,7 @@ describe("working now (any member)", () => {
       channelId: f.general.id,
       channelKind: "channel",
       channelName: "general",
-      // Asked in the channel: it answers there (D67).
+      // Asked in the channel: it answers there.
       threadId: null,
       status: "running",
       label: "Dev, can you check the deploy?",

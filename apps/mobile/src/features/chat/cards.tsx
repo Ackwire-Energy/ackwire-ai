@@ -187,7 +187,7 @@ export function ConsultationCard({
 // ── Approval ─────────────────────────────────────────────────────────────────
 
 /**
- * "Pede sua aprovação" in the conversation (MobileConversas.html): the exact action, its values, the
+ * "Pede sua aprovação" in the conversation: the exact action, its values, the
  * fuse until it expires, Recusar and Aprovar (held for a second when the risk is high). After, one line
  * with what happened. Someone who can't decide sees the request and opens it.
  */

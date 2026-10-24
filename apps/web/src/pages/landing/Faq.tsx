@@ -3,7 +3,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./faq.css";
 
-/** The questions, in the prototype's order (`landing.faq.items.<key>`). */
+/** The questions, in the order they appear (`landing.faq.items.<key>`). */
 const QUESTIONS = ["opens", "code", "models", "alone", "where", "data", "tools", "price"] as const;
 type Question = (typeof QUESTIONS)[number];
 

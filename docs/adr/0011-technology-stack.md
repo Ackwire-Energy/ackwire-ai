@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D20. Supersedes the Next.js + Redis/BullMQ stack listed in the original CLAUDE.md and the "Infra" section of planejamento.
+- Supersedes an earlier plan for Next.js with Redis/BullMQ.
 
 ## Decision
 
@@ -17,7 +17,7 @@
 | Models | Anthropic SDK behind a provider interface (ADR 0007) |
 | Lint / format | Biome |
 | Tests | `bun test` on PGlite (ADR 0003) |
-| Web app | Vite SPA served by this server from `WEB_DIR` (built by the frontend workstream; not part of the backend) |
+| Web app | Vite SPA served by this server from `WEB_DIR` (built from `apps/web`) |
 
 ## Packages
 

@@ -41,7 +41,7 @@ const FORMAT = {
 /**
  * Forum tools (scope `forum:write`, on by default):
  * - `suggest_forum_topic`: a "Worth a forum?" card in this conversation; a
- *   person opens it (D45). What agents use when nobody asked for a forum.
+ *   person opens it. What agents use when nobody asked for a forum.
  * - `open_forum_topic`: only when a person asked ("@Theo take this to the
  *   forum" / "@Theo leva isso pro fórum"): the topic is that person's.
  * - `post_in_forum` and `read_forum_topic`.

@@ -150,7 +150,7 @@ export function registerReindexSource(kind: SearchKind, list: (db: Database, org
   extraSources.set(kind, list);
 }
 
-/** Channels an agent can see: the ones it belongs to (resolved at query time, D11). */
+/** Channels an agent can see: the ones it belongs to (resolved at query time, ADR 0017). */
 export async function agentVisibleChannels(db: Database, orgId: string, agentId: string): Promise<string[]> {
   return caches.scopes.getOrLoad(`${orgId}:${agentId}:visible`, () => loadAgentChannels(db, orgId, agentId)) as Promise<
     string[]

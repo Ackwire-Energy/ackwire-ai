@@ -22,7 +22,7 @@ export function useMentionMembers(channelId: string, enabled: boolean): Readonly
 }
 
 /**
- * The "@" picker (MobileRefinos.html, `.mpick`): a floating card above the composer with "Neste canal" and
+ * The "@" picker: a floating card above the composer with "Neste canal" and
  * "Fora do canal", faces, the matched part underlined, "@handle · role". Tapping a row inserts "@handle ";
  * an agent outside the channel offers "Adicionar" (adds it, then inserts). Nothing when nobody matches.
  */

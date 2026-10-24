@@ -213,7 +213,7 @@ test("the agent list says who thinks: the brain, its model's label, the computer
   expect(edited.brain).toEqual({ kind: "claude_code", model: "Opus", computer: "mac" });
 });
 
-test("a new agent starts on Automático on every brain (D83); one with a fixed model keeps the brain's default", async () => {
+test("a new agent starts on Automático on every brain; one with a fixed model keeps the brain's default", async () => {
   // The deployment's AGENT_DEFAULT_MODEL doesn't decide it any more.
   const { api, owner, agentId: fixedId } = await workspace({ AGENT_DEFAULT_MODEL: "claude-haiku-5-5" });
   expect(await (await owner("/api/app/models")).json()).toMatchObject({ defaultModel: "auto" });
@@ -253,7 +253,7 @@ test("a new agent starts on Automático on every brain (D83); one with a fixed m
   const again = await brain(eva.id, { brain: "claude_code", acceptPlanTerms: true });
   expect(await again.json()).toMatchObject({ model: null, effectiveModel: "sonnet" });
 
-  // An agent on a fixed model (chosen, or made before D83): Claude Code starts on its default, as before.
+  // An agent on a fixed model (chosen, or made before Automático): Claude Code starts on its default, as before.
   const fixed = await brain(fixedId, { brain: "claude_code", acceptPlanTerms: true });
   expect(await fixed.json()).toMatchObject({
     brain: "claude_code",

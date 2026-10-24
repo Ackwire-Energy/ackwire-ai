@@ -2,7 +2,6 @@
 
 - Status: Proposed (to build after missions, ADR 0029)
 - Date: 2026-10-16
-- Planning: D43
 - Extends: ADR 0025 (connected computers), ADR 0024 (git proxy), ADR 0027 (secrets to agent computers)
 
 ## Context

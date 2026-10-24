@@ -130,7 +130,7 @@ export async function getOrganization(db: Database, orgId: string) {
   return row ?? null;
 }
 
-// ── Sign-up policy (same model as Tierbird, ADR 0011 there) ──────────────────
+// ── Sign-up policy (ADR 0006) ────────────────────────────────────────────────
 
 export async function countUsers(db: Database): Promise<number> {
   const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(users);

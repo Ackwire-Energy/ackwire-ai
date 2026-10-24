@@ -1,6 +1,6 @@
 /*
- * Missions in the thread (telas/ThreadContexto.html, "App mobile") and on
- * the Missões tab (telas/Threads.html): the plan card, the pinned card with
+ * Missions in the thread and on
+ * the Missões tab: the plan card, the pinned card with
  * the plan strip, one row per session, the decision and review cards, the
  * plan-change and computer lines, the files panel and the mission cards.
  * Neutral surfaces (ink and gray); blue only for the agent (avatar, the
@@ -244,7 +244,7 @@ button.mi-pill--need:hover {
   align-items: center;
   gap: 10px;
 }
-/* Proposed already investigated (FazerDesfazer.html, "mission"): the findings, the plan under a label, Ajustar / Começar, the note. */
+/* Proposed already investigated: the findings, the plan under a label, Ajustar / Começar, the note. */
 .mi-findings {
   display: flex;
   flex-direction: column;
@@ -1721,7 +1721,7 @@ a.mi-pr:hover {
   }
 }
 
-/* ---------- Configurações da missão (MissionSettings.tsx; telas/MissaoConfig.html) ---------- */
+/* ---------- Configurações da missão (MissionSettings.tsx) ---------- */
 .mi-cfg__sub {
   display: inline-flex;
   align-items: center;

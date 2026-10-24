@@ -42,7 +42,7 @@ const input = {
   tools: true,
 };
 
-describe("chooseAutoModel (D83)", () => {
+describe("chooseAutoModel", () => {
   test("one judge request with two choices: the tier and the effort, with a one-line reason", async () => {
     const judge = createFakeJudge((kind, id) =>
       kind === "auto_model" ? (id === "tier" ? "large" : "high") : undefined,
@@ -86,7 +86,7 @@ describe("chooseAutoModel (D83)", () => {
   });
 });
 
-describe("one decision, mapped per brain (D83)", () => {
+describe("one decision, mapped per brain", () => {
   const agent = { model: AUTO_MODEL, brain: "model", brainModel: null, brainEffort: null };
   const choice = { tier: "small" as const, effort: "low" as const };
 
@@ -179,7 +179,7 @@ describe("one decision, mapped per brain (D83)", () => {
   });
 });
 
-describe("new agents start on Automático (D83)", () => {
+describe("new agents start on Automático", () => {
   test("no model chosen: auto for the API and for any computer brain; a fixed model leaves the brain's default", async () => {
     f = await setup();
     const born = await createAgent(f.db, f.owner.id, f.org.id, { name: "Eva", handle: "eva" }, NEW_AGENT_DEFAULTS);
@@ -204,7 +204,7 @@ describe("new agents start on Automático (D83)", () => {
   });
 });
 
-describe("a run of an agent on Automático (D83)", () => {
+describe("a run of an agent on Automático", () => {
   const judgeAnswers = (tier: { current: string }) => (kind: string, id: string) =>
     kind === "auto_model" ? (id === "tier" ? tier.current : "high") : undefined;
 

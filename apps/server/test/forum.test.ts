@@ -151,7 +151,7 @@ test("forum API: an agent's suggestion card is accepted or dismissed by a person
   for (const body of ["@dev vale um fórum?", "@dev vale um fórum de novo?"]) {
     await api(`/channels/${channelId}/messages`, { json: { body } });
     await t.drain();
-    // Asked in the channel: the card is in the main timeline (D67), the newest one is this ask's.
+    // Asked in the channel: the card is in the main timeline, the newest one is this ask's.
     const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
       messages: { id: string; meta?: Record<string, unknown> }[];
     };

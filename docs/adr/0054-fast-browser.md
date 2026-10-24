@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-23
-- Planning: D84
 - Builds on: ADR 0040 (the agent browser on `agent-browser`), ADR 0031 (computer use), ADR 0032 (one engine, the runner as a bridge), ADR 0053 (who is behind a run, the policy table)
 - Changes in ADR 0040: §5 (tools answer with what changed; targets in words) and the "later" row "Intent tools with Jev", done here in another shape
 - Code: `packages/engine/src/screen/*` (the layer), `browser/surface.ts`, `browser/tools.ts`, `judge.ts` (images, Box), runner `browser.ts` (`browser.batch`, `browser.capture`), protocol 17

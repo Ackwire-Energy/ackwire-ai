@@ -1,8 +1,8 @@
 /**
  * Living computers: one shared loop draws every computer portrait on screen
- * from the portrait engine (portrait.js), about 11 times a second like the
- * prototype. Only visible portraits are drawn; with reduced motion each one is
- * drawn once, still (and again when its kind or state changes).
+ * from the portrait engine (portrait.js), about 11 times a second. Only
+ * visible portraits are drawn; with reduced motion each one is drawn once,
+ * still (and again when its kind or state changes).
  */
 import { type ComputerKind, type ComputerState, drawComputer } from "./portrait.js";
 

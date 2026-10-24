@@ -19,7 +19,7 @@ export interface PasswordFieldProps {
   label: string;
 }
 
-/** A password with "show" beside it; a new one also gets the 8-pixel meter (telas/EntrarCadastro.html). */
+/** A password with "show" beside it; a new one also gets the 8-pixel meter. */
 export const PasswordField = forwardRef<ComponentRef<typeof TextInput>, PasswordFieldProps>(function PasswordField(
   { value, onChangeText, fresh, onSecretChange, onShow, onSubmitEditing, label },
   ref,

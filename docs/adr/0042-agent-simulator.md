@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-20. Revised 2026-10-20: Android first, self-host first (an optional compose profile), Cloud next (KVM hosts only), iOS on Macs (see "Revision")
-- Planning: D64; D85 (open source with a docker-compose self-host)
 - Extends: ADR 0025 (connected computers), ADR 0031 §5 and §13 (computer use: simulator, explorations become tests), ADR 0040 (agent browser: tools, handoff, live view)
 - Out of scope for now: real phones over USB, protected mode (ADR 0030), Cloud iOS for anything but developing and testing the customer's own app (§12)
 
@@ -10,7 +9,7 @@
 
 The first version (the same day) put iOS first on a rented Mac, Android after it, and left the Android live view open. Two things changed the order:
 
-- The code opened with a docker-compose self-host (D85), so the machines self-hosters already run come first. Those are Linux servers: Android runs there with KVM, and iOS can't run there at all (it needs Apple hardware).
+- The code is open source with a docker-compose self-host, so the machines self-hosters already run come first. Those are Linux servers: Android runs there with KVM, and iOS can't run there at all (it needs Apple hardware).
 - Android also runs on bare-metal Macs (HVF) and Windows (WHPX), and CI can test it (GitHub's Linux runners have KVM). iOS depends on Xcode's private frameworks: Xcode 27 broke Orca's iOS simulator from 2026-07-29 to 2026-10-01 (Orca #11388 to #17587), and Orca's issue about Device Hub dropping input is still open (#23997).
 
 Kept: two layers (§1), the iOS driver choice (§2), one screen shared with the browser (§4), the tools (§5), one device per agent locked lazily (§6). Changed: Android is the first driver, with a readiness guard (§3); the live view is decided (§7); testing (§8); the order. New: the self-host recipe (§9), Cloud (§10), Mac hosts (§11), iOS hosting (§12).
@@ -147,9 +146,8 @@ Most of ADR 0040 is reused. The browser-only names become a **screen** with a ki
 - **Phone app:** still frames first (a device screenshot about once a second, only while someone watches). Then a WebView (`react-native-webview` is already in the app) decoding the same H.264 with WebCodecs (iOS 16.4+, Android's WebView), with still frames as the fallback. No video transcoding in the runner.
 - **iOS:** serve-sim's MJPEG frames through the same relay (about 1 fps watching, 10–15 fps in control); its H.264 (`/stream.avcc`) can take the Android path later.
 
-### 8. Testing: CI for Android, a rented Mac for iOS, never the developer's Mac
+### 8. Testing: CI for Android, a rented Mac for iOS
 
-- The developer's Mac doesn't have the memory to run simulators or emulators for this work.
 - Android: unit tests with fakes (adb, a recorded scrcpy stream), and one manual CI job on a GitHub Linux runner with KVM that builds an image with Google's scripts, passes the readiness guard and does a read, tap and read round trip.
 - iOS: the spike (serve-sim vs Baguette on Xcode 27 / iOS 27: headless boot, frames, touch, typing, tree, two simulators at once, Device Hub repair) runs on a **rented Mac paired as a connected computer** (already our test case for the desktop, ADR 0031), or a one-off manual macOS CI job if the rented Mac isn't ready. Nothing from the spike is committed.
 
@@ -171,7 +169,7 @@ Most of ADR 0040 is reused. The browser-only names become a **screen** with a ki
 - `nested=0` (`kvm_intel`, `kvm_amd`) on every KVM host we run: emulator guests never need to nest, and Januscape escapes through nesting. Bare metal for a fleet, host kernels kept patched.
 - Metered like the cloud computer (ADR 0021): device time as usage records with `org_id` and `agent_id`, counted in the agent's budget and the organization's daily minutes.
 - **Stopgap:** a managed vendor (Limrun about $0.04–0.05 per Android minute, Genymotion $0.06) behind a Cloud adapter that hands our Cloud-side runner an adb endpoint. Video still comes from scrcpy through that tunnel and our relay. A provider interface only when a second provider is real.
-- Before we host SDK emulators for customers, a legal read of the SDK license (§3.1, "solely to develop applications for compatible implementations of Android", and §3.4). redroid and Cuttlefish (AOSP) avoid it, without Google services.
+- Hosting SDK emulators for others depends on the SDK license (§3.1, "solely to develop applications for compatible implementations of Android", and §3.4). redroid and Cuttlefish (AOSP) avoid it, without Google services.
 
 ### 11. Mac hosts
 
@@ -202,7 +200,7 @@ Most of ADR 0040 is reused. The browser-only names become a **screen** with a ki
 - Phone app testing reuses the browser's live view and handoff instead of building a second set.
 - Android works on the hosts self-hosters already run, and CI can test it. A host without KVM gets a clear reason, never a gray screen.
 - We ship no Google binaries: self-hosters build the emulator image on their own machine, one step more than `docker compose up`.
-- Cloud Android needs a new kind of host (KVM), outside Daytona, and a legal read of the SDK license first.
+- Cloud Android needs a new kind of host (KVM), outside Daytona, and SDK emulators there must fit the SDK license (§10).
 - We depend on Apple's private simulator APIs through a third-party driver; two drivers behind one interface and pinned versions limit the damage of an Xcode update.
 - iOS needs a Mac with Xcode and enough memory; agents without one don't get the iOS tools.
 - Commands run as the OS user, and Seatbelt (protected mode) likely breaks `simctl`; isolation for a QA agent stays a dedicated OS user, a rented Mac or a macOS VM (ADR 0031 §5).

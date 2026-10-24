@@ -80,7 +80,7 @@ const Counts = z.object({
 const NotificationParams = OrgParams.extend({ notificationId: z.uuid() });
 
 /**
- * The person's inbox (D46): mentions, thread replies, DMs, agents' questions,
+ * The person's inbox: mentions, thread replies, DMs, agents' questions,
  * issues, forum turns, approvals, missions, routines, reactions. Live
  * updates arrive on the WebSocket as user events (`notification.upserted`,
  * `notification.removed`, `notification.counts`).

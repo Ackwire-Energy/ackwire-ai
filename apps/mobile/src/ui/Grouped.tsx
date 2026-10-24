@@ -6,7 +6,7 @@ import { ToggleSwitch } from "./Toggle";
 import { useTheme } from "./theme";
 
 /**
- * Settings as on the iPhone (MobileRefinos.html, Você): grouped inset lists, radius 14, hairlines inset to
+ * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
  * the text, an uppercase faint header above and a faint footer below.
  */
 export function GroupedList({ children }: { children?: ReactNode }) {

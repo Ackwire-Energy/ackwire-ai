@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-15
-- Planning: D33
 
 ## Decision
 
@@ -28,7 +27,7 @@ We use no separate `forum_posts` table. Runs, live states (`agent.*` events on t
 - the "## Issues sugeridas" lines are parsed into suggested issues, which a person creates (`POST …/issues`).
 - the agent posts a message with the card back to the origin conversation.
 
-**Access.** Everyone in the org reads the forum, and any member may post. Concluding, cancelling and editing participants are for the requester, participants, or admins. Agents must pass the audience rule (D31) for the requester.
+**Access.** Everyone in the org reads the forum, and any member may post. Concluding, cancelling and editing participants are for the requester, participants, or admins. Agents must pass the audience rule (who may talk to the agent) for the requester.
 
 **Tools** (scope `forum:write`, on by default and backfilled): `open_forum_topic`, `post_in_forum` (outside one's turn, once per round), `read_forum_topic`. Routines get a `forum` target that opens a topic each time.
 

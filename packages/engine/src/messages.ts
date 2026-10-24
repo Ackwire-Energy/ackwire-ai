@@ -249,7 +249,7 @@ export function parseMentionHandles(body: string): string[] {
   return [...found];
 }
 
-/** An agent's message may bring in one more agent only up to this hop (D49); `router.ts` enforces it too. */
+/** An agent's message may bring in one more agent only up to this hop (ADR 0034); `router.ts` enforces it too. */
 export const AGENT_CHIME_IN_MAX_HOP = 2;
 /** A reply waits this long before its thread is assessed (`threads.assess`); a newer reply's job takes over. */
 export const THREAD_ASSESS_DELAY_MS = 2 * 60_000;
@@ -322,7 +322,7 @@ interface RawMessage {
   edited_at: Date | string | null;
   deleted_at: Date | string | null;
   runs: { id: string; agentId: string }[] | string | null;
-  /** Agents the sender addressed but can't talk to (D31). */
+  /** Agents the sender addressed but can't talk to. */
   blocked?: string[] | string | null;
   /** Active runs this message was delivered to (no new run). */
   steered?: { id: string; agentId: string }[] | string | null;
@@ -452,7 +452,7 @@ export async function insertMessageWithRuns(
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
               and oq.thread_id is not distinct from ${threadId}::uuid
-              -- In a channel's main timeline (D67) many talk at once: who asked the agent answers it, or
+              -- In a channel's main timeline many talk at once: who asked the agent answers it, or
               -- whoever addresses it.
               and (${threadId}::uuid is not null
                 or not exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
@@ -479,7 +479,7 @@ export async function insertMessageWithRuns(
             or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), answering as (
-        -- Who can talk to the agent (D31): the others get no run, only a notice for the sender.
+        -- Who can talk to the agent: the others get no run, only a notice for the sender.
         select agent_id, trig from addressed where allowed and agent_id not in (select agent_id from muted)
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
@@ -577,11 +577,11 @@ export async function insertMessageWithRuns(
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
           'message.posted:' || m.id, 8 from m
-          -- An agent's message without a mention goes to the router too: another agent may chime in (D49).
+          -- An agent's message without a mention goes to the router too: another agent may chime in (ADR 0034).
           where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
             or m.hop < ${AGENT_CHIME_IN_MAX_HOP}
         union all
-        -- In-app notifications (D46): people mentioned, a reply in a thread, a person's DM.
+        -- In-app notifications: people mentioned, a reply in a thread, a person's DM.
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
           'notifications.message:' || m.id, 4 from m
           where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
@@ -644,7 +644,7 @@ export async function insertMessageWithRuns(
     editedAt: asDate(row.edited_at),
     deletedAt: asDate(row.deleted_at),
   };
-  // `[[…]]` links become backlinks of the pages they name (D34).
+  // `[[…]]` links become backlinks of the pages they name (ADR 0023).
   if (body.includes("[[")) {
     await syncWikiLinks(tx, input.orgId, { type: "message", id: message.id, channelId: input.channelId }, body);
   }
@@ -753,7 +753,7 @@ export async function postPersonMessage(
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership.role, "post")) throw new ForbiddenError();
-  // A forum topic is written through the forum (its turns), never as a plain chat (D33).
+  // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
   const clientId = normalizeClientId(input.clientId);
@@ -836,7 +836,7 @@ export async function postPersonMessage(
   }
   const answers = message.meta.answersQuestionId;
   if (typeof answers === "string") await afterReplyAnswered(deps, orgId, answers);
-  // Agents this person can't talk to (D31): no run; only they hear why ("Theo only replies to …").
+  // Agents this person can't talk to: no run; only they hear why ("Theo only replies to …").
   if (blocked.length > 0) {
     view.notices = await notifyBlocked(deps, orgId, userId, {
       agentIds: blocked,
@@ -857,7 +857,7 @@ export async function postPersonMessage(
     });
   }
   // Receipts: who answers it — new runs, the task in progress it was steered into, the run its
-  // answer resumes — and the mentioned agents that won't (D31). Nothing else routes this message.
+  // answer resumes — and the mentioned agents that won't. Nothing else routes this message.
   const answering = [
     ...runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
     ...steered.map((s) => ({ agentId: s.agentId, runId: s.id })),
@@ -883,7 +883,7 @@ export async function postPersonMessage(
     });
   }
   if (runs.length > 0) {
-    // The runs answer where the message is (D67).
+    // The runs answer where the message is.
     const threadId = message.threadId;
     for (const run of runs) {
       await publishChannelEvent(deps.pubsub, {

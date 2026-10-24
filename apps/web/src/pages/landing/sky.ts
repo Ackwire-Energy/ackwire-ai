@@ -2,8 +2,7 @@
  * The pixel sky: an ordered-dither (Bayer 4×4) field in an 8-tone sky palette,
  * with pixel-art agents drifting up and blinking, a light that follows the
  * pointer, and calm zones behind the text (the field settles on palette level
- * 6/7 there and the sprites pass behind). Ported from the approved prototype
- * (docs/design/telas/Landing.html). Every canvas call is guarded: without a 2D
+ * 6/7 there and the sprites pass behind). Every canvas call is guarded: without a 2D
  * context (tests, old browsers) nothing is drawn and the CSS background shows.
  */
 import { type AgentColor, SPRITE, spriteTone } from "@agenteschat/ui";

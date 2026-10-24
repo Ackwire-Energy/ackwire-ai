@@ -19,7 +19,7 @@ export type SettingsSection =
 
 export type SettingsGroup = "org" | "agents" | "costs";
 
-/** The settings sub-nav (telas/Configuracoes.html), in order and in groups, with who can open each. */
+/** The settings sub-nav, in order and in groups, with who can open each. */
 export const SETTINGS_SECTIONS: {
   id: SettingsSection;
   icon: IconName;

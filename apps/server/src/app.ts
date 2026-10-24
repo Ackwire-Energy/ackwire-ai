@@ -72,7 +72,7 @@ export interface AppOptions {
  * - `/api/app/*`          private API of the web and phone apps (cookie session + CSRF, ADR 0035)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/github-app/webhook` our GitHub App's events (installs, suspensions), signature-checked
- * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
+ * - `/api/git/*`          git proxy for agents' computers (their own credential, ADR 0024)
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)

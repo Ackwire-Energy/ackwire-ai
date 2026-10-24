@@ -242,7 +242,7 @@ test("command line: stream-json both ways, opus falls back to sonnet, strict MCP
   expect(resumed).not.toContain("--strict-mcp-config");
   expect(resumed).not.toContain("--model");
   expect(resumed.slice(-2)).toEqual(["--resume", SESSION(1)]);
-  // D60: only the project's settings and the built-in tools agents use, when asked.
+  // Only the project's settings and the built-in tools agents use, when asked.
   expect(args).not.toContain("--setting-sources");
   const lean = claudeBrainArgs({ ...base, settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS });
   expect(lean.join(" ")).toContain("--setting-sources project");
@@ -280,7 +280,7 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   expect(at(work, "--setting-sources")).toBe("project");
   expect(at(work, "--tools")).toBe(BRAIN_BUILTIN_TOOLS.join(","));
   expect(work).toContain("--permission-prompt-tool");
-  // With the owner's servers (work): their settings and every tool, as D60 had it.
+  // With the owner's servers (work): their settings and every tool, as before.
   const personal = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", true) });
   expect(personal).not.toContain("--strict-mcp-config");
   expect(personal).not.toContain("--setting-sources");

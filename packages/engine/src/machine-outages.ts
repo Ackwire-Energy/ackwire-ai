@@ -14,7 +14,7 @@ import { missStaleRoutineRun } from "./routine-firing";
 const { machines, agents, agentRuns, routineRuns } = schema;
 
 /*
- * "Computador desconectado" (docs/design/telas/ComputadorOffline.html): the
+ * "Computador desconectado": the
  * computers that run some agents' brain (Claude Code, Codex) and are offline,
  * who is waiting for them, where those agents could go instead, and the move
  * itself ("Trocar computador"): the agents point at another computer and the

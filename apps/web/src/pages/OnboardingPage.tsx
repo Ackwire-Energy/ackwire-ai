@@ -127,7 +127,7 @@ function useGuideMood() {
 }
 
 /**
- * docs/design/telas/OnboardingEtapas.html — the steps on a rail (the pixel sky
+ * The onboarding: the steps on a rail (the pixel sky
  * on top fills as they get done); each step is one calm screen hosted by an
  * agent of the team, who asks in a speech bubble (introducing itself the first
  * time); one big action under the answer, "Pular esta etapa" on optional steps.
@@ -352,7 +352,7 @@ export function OnboardingPage() {
           handle: handleFrom(info.name),
           role: info.role,
           instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
-          // "Automático" (D83): each task gets its model and effort.
+          // "Automático": each task gets its model and effort.
           model: AUTO,
           // null = the workspace default key.
           credentialId: null,
@@ -1145,7 +1145,7 @@ function ChoiceCard({
 /**
  * Where the agents work: the workspace's cloud computer, or this computer / a
  * server (the Mac app or the terminal; the computer shows a code to confirm, live until it connects).
- * In agentes for Mac (D79) the second choice is "Este Mac", and choosing it connects it.
+ * In agentes for Mac (ADR 0036) the second choice is "Este Mac", and choosing it connects it.
  */
 function ComputerStep({
   orgId,

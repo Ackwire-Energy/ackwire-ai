@@ -229,7 +229,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         runs: AgentRun[],
         reason?: string,
       ) => {
-        // The runs answer where the message is (D67).
+        // The runs answer where the message is.
         const threadId = message.threadId;
         await publishChannelEvent(deps.pubsub, {
           type: "message.routed",
@@ -252,7 +252,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
       };
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
-      // The forum moves by its own turns (D33): no mentions, router or DMs there.
+      // The forum moves by its own turns (ADR 0022): no mentions, router or DMs there.
       if (where?.kind === "forum") return;
       // Addressed a mission's agent without the right to act there (ADR 0029): a suggestion, no run.
       if (message.meta.missionSuggestion) return routed("none", message.mentionedAgentIds, [], "mission_suggestion");
@@ -295,7 +295,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           await routed("mention", message.mentionedAgentIds, res.runs, allowed.length ? undefined : "reference_only");
           return;
         }
-        // No mention: another agent may chime in when it clearly should (D5, revised). Only in
+        // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
         // channels, never in a mission's thread (the mission's own turns run it).
         if (!router.enabled || where?.kind !== "channel") return;
         if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
@@ -463,7 +463,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "machine.tasks_offline": async (job) => {
       await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
     },
-    // In-app notifications of a message (D46): mentions, thread replies, DMs.
+    // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
     },

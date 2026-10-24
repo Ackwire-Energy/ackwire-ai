@@ -30,7 +30,7 @@ export function useCollapsedSections<K extends string = HomeSection>(
 }
 
 /**
- * A section of Conversas (MobileHomeAgentes.html `.sec`): the title, its count (medium, faint) and a chevron that
+ * A section of Conversas: the title, its count (medium, faint) and a chevron that
  * turns when collapsed; tapping the header collapses or opens it.
  */
 export function CollapsibleSection({

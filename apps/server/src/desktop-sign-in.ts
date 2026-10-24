@@ -5,7 +5,7 @@ import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 
 /**
- * Social sign-in for the Mac app's window (D79). Google and Apple refuse
+ * Social sign-in for the Mac app's window (ADR 0036). Google and Apple refuse
  * embedded web views, so the window opens the sign-in in the person's
  * browser and waits. The window keeps a random verifier and sends only its
  * SHA-256 (the challenge) along; once signed in, the browser registers that

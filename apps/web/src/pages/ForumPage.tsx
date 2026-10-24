@@ -51,7 +51,7 @@ export { filterTopics } from "@agenteschat/client/lib/forum";
 
 const FILTERS: ForumFilter[] = ["open", "done", "mine"];
 
-/** Fórum (telas/Forum.html): who is discussing now, what needs me, and every topic in aligned rows. */
+/** Fórum: who is discussing now, what needs me, and every topic in aligned rows. */
 export function ForumPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();

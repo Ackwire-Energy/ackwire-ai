@@ -58,7 +58,7 @@ const openWaitingActivity = () =>
   router.navigate({ pathname: "/activity", params: { filter: "waiting", at: String(Date.now()) } });
 
 /**
- * "Esperando você" (MobileRefinos.html, B + C) on top of Conversas and Threads. Closed: a dark ink strip, full
+ * "Esperando você" on top of Conversas and Threads. Closed: a dark ink strip, full
  * width, like a live activity: the first item's agent (moving), "Theo precisa do seu ok · expira em 46 min" and
  * the count, with two copies of the strip peeking out under it while more wait. Tapped, it springs
  * open into the card: who asks and the kind, the title, the fuse, Revisar, and "e mais N esperando você"

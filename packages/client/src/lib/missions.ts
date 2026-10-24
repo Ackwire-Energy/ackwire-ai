@@ -17,7 +17,7 @@ import type {
 } from "../api/types";
 
 /**
- * Missions (ADR 0029, telas/ThreadContexto.html "App mobile"): the pure
+ * Missions (ADR 0029): the pure
  * pieces the thread, the pinned card and the Missões tab share. The plan is a
  * living checklist (no phases, no gates), drawn as one pixel cell per item.
  */

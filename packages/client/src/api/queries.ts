@@ -191,7 +191,7 @@ export const useAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
-/** The team screen (D54): refetched every 30 s and on focus, so new consultations show up. */
+/** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();
   return useQuery({
@@ -1398,7 +1398,7 @@ export function useIssueAction(orgId: string) {
   });
 }
 
-/** The board's columns (D55); they live under the issues key, so any issue change refreshes them too. */
+/** The board's columns; they live under the issues key, so any issue change refreshes them too. */
 export const useIssueColumns = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.issueColumns(orgId), queryFn: () => api.issues.columns(orgId) });

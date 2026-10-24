@@ -16,7 +16,7 @@ import { computerIcon, type MachineOutage, moveToast, sheetDesc, targetText, wai
 import { useMachineOutages, useMoveAgents } from "./queries";
 
 /**
- * "Trocar o computador" (ComputadorOffline.html, Celular `.sheet`), a native form sheet: "Para onde" (only the
+ * "Trocar o computador", a native form sheet: "Para onde" (only the
  * targets that can run the waiting agents' brains; one that can't take them now is disabled with the reason),
  * "Quem troca" (a check per agent with what it has waiting), the plain hint that a task that already changed
  * files on the old computer waits for it, then "Trocar N agentes" and "Agora não". The result is a toast.

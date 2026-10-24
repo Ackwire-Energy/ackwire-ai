@@ -805,7 +805,7 @@ export function claudeMcpConfig(input: {
   /** Where the task runs and the mission folder (plain reads there need no card). */
   cwd?: string;
   folders?: string[];
-  /** D60: Claude Code lists our tools up front instead of behind its ToolSearch. */
+  /** Claude Code lists our tools up front instead of behind its ToolSearch. */
   alwaysLoad?: boolean;
   /** A `plan` turn: its permission prompts are answered by the computer alone (reads only). */
   profile?: CommandProfile;

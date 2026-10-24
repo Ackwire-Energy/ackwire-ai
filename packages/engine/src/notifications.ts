@@ -23,7 +23,7 @@ import type { ApprovalOrigin } from "./tools/run-policy";
 const { notifications, organizationMembers } = schema;
 
 /**
- * In-app notifications (D46): one inbox per person per organization.
+ * In-app notifications: one inbox per person per organization.
  *
  * - People only: agents are never recipients, and nobody is notified of
  *   their own action.

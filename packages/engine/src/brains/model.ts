@@ -76,7 +76,7 @@ export class ModelBrain implements Brain {
         messages,
         maxTokens: maxOutputTokens,
         tools: specs.length > 0 ? specs : undefined,
-        // Only "Automático" sets an effort for the API (D83); the API takes low, medium and high.
+        // Only "Automático" sets an effort for the API; the API takes low, medium and high.
         ...(turn.effort ? { effort: apiEffort(turn.effort) } : {}),
         onDelta: (text) => deltas.push({ type: "text_delta", text }),
         signal: io.signal,

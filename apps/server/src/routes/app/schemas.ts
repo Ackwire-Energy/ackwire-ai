@@ -61,7 +61,7 @@ export const Credential = z
   })
   .openapi("Credential");
 
-/** Who can talk to an agent (D31). `userIds` only for `people`; the owner always can. */
+/** Who can talk to an agent. `userIds` only for `people`; the owner always can. */
 export const AgentAudience = z
   .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
   .openapi("AgentAudience");
@@ -372,9 +372,9 @@ export const BrainEffort = z.enum(BRAIN_EFFORTS).openapi("BrainEffort", {
   description: "How hard a computer brain thinks (Claude Code `--effort`; Codex maps `xhigh` and `max` to `high`).",
 });
 
-/** The effort setting: a level, or `auto` (picked per run with the model tier, D83). */
+/** The effort setting: a level, or `auto` (picked per run with the model tier). */
 export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("BrainEffortSetting", {
-  description: "A `BrainEffort`, or `auto`: the judge picks low, medium or high for each run (D83).",
+  description: "A `BrainEffort`, or `auto`: the judge picks low, medium or high for each run.",
 });
 
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
@@ -415,7 +415,7 @@ export const AgentBrain = z
       .uuid()
       .nullable()
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
-    effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run (D83); null = the CLI's default." }),
+    effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run; null = the CLI's default." }),
     accounts: z.array(MachineAccount).openapi({ description: "The accounts on the agent's computer, both kinds." }),
     accountsOwner: z
       .object({ id: z.string(), name: z.string() })

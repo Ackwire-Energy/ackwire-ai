@@ -26,8 +26,7 @@ const said = (t: TFunction, s: BrowserTrailStep) =>
 const lower = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /**
- * Where the agent browsed, on its message after the run (telas/NavegadorDepois.html, A with
- * "Página em silhueta"; telas/NavegadorResumo.html, B): the closed card stays, still, with a drawn
+ * Where the agent browsed, on its message after the run: the closed card stays, still, with a drawn
  * page (never a picture of the real one, ADR 0040 §7), where it browsed, its steps as pixel columns
  * in the agent's tones (as a routine's runs) and how long. Opening it lists the steps by page,
  * repeats folded into one line, each site openable in the person's own browser.

@@ -1,8 +1,8 @@
 # agentes (phone app)
 
-Expo + React Native app for agentes.chat (ADR 0035, D50). Flows and look: `docs/design/telas/Mobile.html`.
+Expo + React Native app for agentes.chat (ADR 0035).
 
-**Nothing runs on a developer's machine.** Code is checked in CI (`.github/workflows/ci.yml`: lint, typecheck,
+Code is checked in CI (`.github/workflows/ci.yml`: lint, typecheck,
 unit tests of the pure logic in `apps/mobile/test`). Builds and installs go through EAS
 (`.github/workflows/mobile.yml`).
 

@@ -1,4 +1,4 @@
-/* ---------- Drive (docs/design/telas/Drive.html) ----------
+/* ---------- Drive ----------
  * A grid of real previews (or a list), quick filters, groups, a details panel
  * beside it (a sheet on phones), multi-select with a glass bar, drop to upload.
  * In layout.css: `.drive` itself (`.page` overrides it on phones), the previews

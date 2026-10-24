@@ -15,7 +15,7 @@ import { computerKind } from "@agenteschat/client/lib/machines";
 import type { TFunction } from "i18next";
 
 /**
- * "Computador desconectado" on the phone (ComputadorOffline.html, Celular): the words of the notice under
+ * "Computador desconectado" on the phone: the words of the notice under
  * the greeting, the agents' rows, the "Trocar o computador" sheet, its toast and the chat's waiting card.
  * Pure: the screens turn these into views; the counts and the targets come from
  * `@agenteschat/client/lib/machine-outages`.

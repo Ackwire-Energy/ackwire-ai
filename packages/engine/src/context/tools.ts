@@ -27,11 +27,11 @@ export function itemLabel(item: Pick<ContextItem, "kind" | "verified" | "trust">
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /**
- * Built-in tools over the organization's context (D9 layers 2–4, D13), all
+ * Built-in tools over the organization's context (ADR 0017), all
  * through the Tool Gateway: `search_context`, `get_summary`, `expand`
  * (`context:read`), `remember`, `forget` (`memory:write`). Search and
  * expand only see the run's channel and the agent's public channels,
- * resolved at call time (D11): other private channels and DMs stay out.
+ * resolved at call time (ADR 0017): other private channels and DMs stay out.
  */
 export function createContextToolSource(deps: ContextDeps): ToolSource {
   const visible = (ctx: { db: Database; orgId: string; agentId: string; channelId: string }) =>
@@ -477,7 +477,7 @@ async function withLinked(db: Database, base: SQL | undefined, hits: ContextItem
 }
 
 /**
- * What goes into a run's prompt from memory (D9 layers 3–4), within a
+ * What goes into a run's prompt from memory (ADR 0017), within a
  * character budget: pinned items always, then the agent's own lessons and
  * notes, shared lessons, and items retrieved for the trigger message
  * (hybrid search + relevance + recency), each top hit followed by the
@@ -566,7 +566,7 @@ export async function retrieveForRun(
   const lines: string[] = [];
   let used = 0;
   for (const item of picked) {
-    // Context on demand (D65): a long item goes in cut short; `expand` opens it in full by its id.
+    // Context on demand (ADR 0043): a long item goes in cut short; `expand` opens it in full by its id.
     const room = item.pinned ? 600 : MEMORY_ITEM_CHARS;
     const content = item.content.replace(/\s+/g, " ");
     const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${content.length > room ? `${content.slice(0, room)}… [more with expand]` : content} (id ${item.id})`;

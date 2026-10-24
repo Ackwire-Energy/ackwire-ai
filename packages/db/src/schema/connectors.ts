@@ -4,7 +4,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * An organization's connection to an MCP server (layer 1 of D7: the org
+ * An organization's connection to an MCP server (layer 1 of ADR 0016: the org
  * connects once; agents get subsets of its scopes in `agent_scopes`).
  * `connector` is a key of the catalog in `@agenteschat/engine`
  * (`CONNECTOR_CATALOG`), which maps each tool to one of our scopes.

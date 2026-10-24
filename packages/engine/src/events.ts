@@ -270,7 +270,7 @@ export type ChannelEvent =
       pickedBy: string[];
       /** The run each picked agent answers with (new, steered into, or resumed by an answer). */
       runs?: { agentId: string; runId: string }[];
-      /** Agents it mentions that won't answer (they don't reply to this person, D31). */
+      /** Agents it mentions that won't answer (they don't reply to this person). */
       blocked?: string[];
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];

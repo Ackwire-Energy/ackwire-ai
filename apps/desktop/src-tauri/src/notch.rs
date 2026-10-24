@@ -1,4 +1,4 @@
-//! The notch (telas/NotchAgente.html, "A · Asas"): a borderless window over the MacBook's camera
+//! The notch: a borderless window over the MacBook's camera
 //! housing that shows what the agents are doing on this Mac. Off by default (Preferências → Geral):
 //! the window only exists while it's on. Rust finds the notch and places the window; the web view
 //! draws the island and asks for its size.

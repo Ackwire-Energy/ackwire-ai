@@ -6,7 +6,7 @@ import { useFrameTime } from "./live";
 import { inkOrbitCells, orbitHead, RING, stopBreath } from "./orbit";
 
 /**
- * The pixel marks next to the agent's orbit (Mensagens.html): the neutral orbit ("enviando", "lê na próxima
+ * The pixel marks next to the agent's orbit: the neutral orbit ("enviando", "lê na próxima
  * pausa"), a finished step's one green pixel, a stopped step's dim block and the composer's rounded stop
  * square. Same grid and gaps as `PixelOrbit`; nothing moves with reduced motion.
  */

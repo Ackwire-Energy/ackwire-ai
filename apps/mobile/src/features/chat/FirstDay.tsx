@@ -10,7 +10,7 @@ import { tapHaptic, useSurface } from "../shared/parts";
 import { agentIntro, firstAsks, isNewAgent } from "./intent";
 
 /**
- * The first conversation with an agent (MobileIntencional.html, "Primeiro dia"): under its sky, it says
+ * The first conversation with an agent: under its sky, it says
  * who it is in plain words (what it does, else its role), then three first requests tied to what it
  * does. Tapping one sends it; the composer stays the other way in.
  */

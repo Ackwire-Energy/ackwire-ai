@@ -3,7 +3,7 @@ import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
 const { threadFollows, messages } = schema;
 
 /**
- * Who follows a thread (D46 and the phone app's "Seguir"). A person's
+ * Who follows a thread (the inbox and the phone app's "Seguir"). A person's
  * explicit choice (`thread_follows`) wins: following adds them, unfollowing
  * mutes them even where they wrote. Without one, they follow the threads
  * they started (not a routine's or the forum's root) or wrote in.

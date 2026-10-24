@@ -8,7 +8,7 @@ import { DownloadMacButton, MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 
 /**
- * Configurações → Computadores (telas/Computadores.html): one section for the
+ * Configurações → Computadores: one section for the
  * two places agents work. The two kinds side by side, the cloud computer's
  * settings (admins), your own computers, and which computer each agent uses.
  */

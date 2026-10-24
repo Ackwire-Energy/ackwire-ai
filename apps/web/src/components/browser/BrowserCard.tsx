@@ -157,7 +157,7 @@ export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
 /**
  * A take over held after its run's live block went (the run paused for the person, or ended): the
  * same card, on the run's last saved message or at the end of its conversation, until the browser
- * is handed back (telas/NavegadorNoChat.html: "Assumir pausa o agente e abre a tela ao vivo").
+ * is handed back.
  * Nothing while the run's live block is there (it draws the card) or when no take over holds it.
  */
 export function HeldBrowserCard({
@@ -224,8 +224,8 @@ function Cover({
 }
 
 /**
- * An agent's browser in its card (telas/NavegadorNoChat.html, A with the "Céu" header; ADR 0040
- * §6–7): in the conversation, on the agent's page, in its own dialog and on its computer's page.
+ * An agent's browser in its card, under a "Céu" header (ADR 0040 §6–7): in the conversation, on the
+ * agent's page, in its own dialog and on its computer's page.
  * Closed: one line with the agent's sky edge, the site and what it does now. Open: the same line
  * over the live page and its steps, full screen on request. In control (Assumir, or a help request
  * opened here) the same card takes the person's clicks, the app's own text field and an address

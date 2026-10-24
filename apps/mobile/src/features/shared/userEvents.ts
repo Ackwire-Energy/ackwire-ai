@@ -16,7 +16,7 @@ import { useConnection, useOrgId } from "./hooks";
 
 /**
  * Events for the signed-in person, whatever screen is open: requests they
- * can decide, the inbox and its badge (D46), missions waiting on them, computers going offline or back. Keeps
+ * can decide, the inbox and its badge, missions waiting on them, computers going offline or back. Keeps
  * Início, Atividade and the tab badges live, and "Seguir" in step across
  * devices.
  */
@@ -49,7 +49,7 @@ export function useUserEvents() {
       }
       // Org events: a computer went offline or came back, agents moved off one ("Computador desconectado").
       if (isOutageEvent(event)) void qc.invalidateQueries({ queryKey: outagesKey(orgId) });
-      // Org event: someone changed the task board's columns (D55). Deleting one moves its tasks, so the
+      // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
       // tasks refresh too (the columns live under the same key).
       if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")

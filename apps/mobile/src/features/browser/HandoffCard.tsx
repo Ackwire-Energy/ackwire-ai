@@ -9,9 +9,9 @@ import { cardStateOf } from "./logic";
 import { useOpenHandoffId } from "./open";
 
 /**
- * An agent's request for help in its browser, in the conversation (NavegadorNoChat.html, A with the
- * "Céu" header): while it is open it is the agent's browser card, so Abrir takes the control right
- * here (no other screen); once it ends, one line with how. The state comes from the message
+ * An agent's request for help in its browser, in the conversation, under a "Céu" header: while it is
+ * open it is the agent's browser card, so Abrir takes the control right here (no other screen); once it
+ * ends, one line with how. The state comes from the message
  * (`meta.browserHandoff`) and is refreshed from the server. A push or the inbox opens this card.
  */
 export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff }) {

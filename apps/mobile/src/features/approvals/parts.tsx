@@ -9,7 +9,7 @@ import { fuseRemaining, minutesLeft } from "../shared/logic";
 import { approvalSaid, approvalTable, approvalTraits } from "./logic";
 
 /**
- * The exact request, in reading order (MobileIntencional.html, "A aprovação exata"): what it affects as
+ * The exact request, in reading order: what it affects as
  * chips, the details table (Por onde, then the values it runs with), what the agent said before, and the
  * amber fuse until it expires. The chat's card and the sheet draw the same pieces.
  */

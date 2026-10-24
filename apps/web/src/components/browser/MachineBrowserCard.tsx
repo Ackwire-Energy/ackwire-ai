@@ -29,8 +29,7 @@ function commandIn(reason: string | null | undefined): string | null {
 }
 
 /**
- * "Navegador" on a computer's page (ADR 0040, telas/NavegadorAgente.html
- * "Computador"): whether the browser is ready here, which agents are in it
+ * "Navegador" on a computer's page (ADR 0040): whether the browser is ready here, which agents are in it
  * now (Ver, Parar), and which agents may use it. Turning it on happens on
  * the computer; the owner can only turn it off here.
  */
@@ -41,7 +40,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (D79).
+  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);

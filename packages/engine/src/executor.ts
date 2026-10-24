@@ -158,7 +158,7 @@ export interface EngineDeps {
   tools?: ToolGateway;
   /** Model calls one run may make (tool loops). */
   maxToolTurns?: number;
-  /** Memory and summaries (D9 layers 3–4). Without it the context is the recent conversation only. */
+  /** Memory and summaries (ADR 0017). Without it the context is the recent conversation only. */
   context?: ContextDeps;
   /** Latency measurements (`trigger_to_claim_ms`, `claim_to_first_delta_ms`, `run_ms`), for logs. */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
@@ -176,7 +176,7 @@ export interface EngineDeps {
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
   /**
-   * Tools on demand (D65): each run lists the core tools and the groups the
+   * Tools on demand (ADR 0043): each run lists the core tools and the groups the
    * judge (`context.judge`) expects it to need; the rest go behind
    * `find_tools` / `use_tool`. Off: every granted tool is listed (tests).
    */
@@ -202,9 +202,9 @@ export type RunExecutorDeps = EngineDeps;
 export interface Transcript {
   system: SystemBlock[];
   messages: ModelMessage[];
-  /** Tools on demand (D65): the tool groups this run listed up front; absent = every tool. */
+  /** Tools on demand (ADR 0043): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
-  /** "Automático" (D83): the model tier and effort chosen for this run; a resume thinks with the same. */
+  /** "Automático": the model tier and effort chosen for this run; a resume thinks with the same. */
   autoModel?: AutoModelRecord;
   /** Assistant text before this index was already posted to the chat (or was history). */
   postedUpTo: number;
@@ -459,7 +459,7 @@ async function executeRunInner(
   // status is `running` here.
   prof.mark("claim");
   const claimedAt = Date.now();
-  // Asked in the main timeline, the run answers there; asked in a thread, in that thread (D67).
+  // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
   const [channelRow, topTrigger] = await Promise.all([
@@ -525,8 +525,8 @@ async function executeRunInner(
       status,
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
-    // A forum turn ended: announce the post and move the topic on (D33). A question to people
-    // (`waiting_input`) doesn't hold the discussion either (D45).
+    // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
+    // (`waiting_input`) doesn't hold the discussion either.
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
@@ -614,7 +614,7 @@ async function executeRunInner(
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
   if (!agent || agent.archivedAt) return fail("agent_archived");
   await publishChannelEvent(deps.pubsub, event("running"));
-  // Tools on demand (D65): a new run lists the core tools and the groups the judge expects it to need.
+  // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
   const judge = deps.context?.judge;
   /** The latest messages where the run answers, read once for every judge that needs them. */
@@ -623,7 +623,7 @@ async function executeRunInner(
     recentRead ??= recentForJudge(db, run).catch(() => [] as string[]);
     return recentRead;
   };
-  // "Automático" (D83): the judge picks the run's model tier and effort while the context is built; the
+  // "Automático": the judge picks the run's model tier and effort while the context is built; the
   // choice is applied once the brain is known, before the first model call. Never blocks: no answer in time
   // is medium/medium.
   const askAuto = (): Promise<AutoChoice> => {
@@ -669,7 +669,7 @@ async function executeRunInner(
   // agent's message, since the routine's own call isn't shown), and it may end in silence.
   const triggerMessage = trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId));
   // The routine that called it (`viaRoutine`) and whether the router brought it in after another agent
-  // spoke (`joined`, D49): every message it posts says so, cards included (`runMessageMeta`).
+  // spoke (`joined`, ADR 0034): every message it posts says so, cards included (`runMessageMeta`).
   const runMeta = runMessageMeta(run, triggerMessage);
   const viaRoutine = (runMeta.viaRoutine as { id: string; name: string } | undefined) ?? null;
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
@@ -1080,7 +1080,7 @@ async function executeRunInner(
         .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.orgId, run.orgId)));
     }
   }
-  // "Automático" (D83): the model and effort this run thinks with, the same decision mapped onto its brain (the
+  // "Automático": the model and effort this run thinks with, the same decision mapped onto its brain (the
   // brain itself never changes). A resumed run keeps its choice; a run that couldn't ask is medium/medium.
   /** The agent as this run's model brain sees it: its `auto` model replaced by the one chosen. */
   let thinker: Agent = agent;
@@ -1233,7 +1233,7 @@ async function executeRunInner(
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
       t.fallback = { from, code: u.code, message: u.message };
-      // On "Automático" the API answers with the model and effort chosen for this run (D83).
+      // On "Automático" the API answers with the model and effort chosen for this run.
       const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
       plan = {
         kind: "model",

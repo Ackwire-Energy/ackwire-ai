@@ -74,7 +74,7 @@ export const agents = pgTable(
     /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = the organization's default (`organization_settings.default_agent_budget_nano_usd`). */
     monthlyBudgetNanoUsd: bigint({ mode: "number" }),
     /**
-     * Who can talk to it (D31): `everyone`, `people` (`audience_user_ids`,
+     * Who can talk to it: `everyone`, `people` (`audience_user_ids`,
      * plus the owner) or `owner`. Enforced wherever a person's message can
      * start a run; nothing else is restricted (it still reads the channel).
      */

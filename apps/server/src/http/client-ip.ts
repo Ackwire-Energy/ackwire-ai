@@ -1,10 +1,10 @@
 /**
- * The client's address behind our proxies (Railway appends its own hops to
- * `x-forwarded-for`, and its last hop is internal). Shared by every route
+ * The client's address behind our proxies (a hosting proxy may append its own
+ * hops to `x-forwarded-for`, the last one internal). Shared by every route
  * that rate limits or records where a request came from.
  */
 
-/** Loopback, private, CGNAT (Railway's internal network) and link-local addresses: proxies, never a client. */
+/** Loopback, private, CGNAT (hosting networks) and link-local addresses: proxies, never a client. */
 export function isInternal(ip: string): boolean {
   const v4 = ip.replace(/^::ffff:/, "").match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
   if (v4) {

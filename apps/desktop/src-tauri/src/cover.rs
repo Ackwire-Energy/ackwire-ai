@@ -1,4 +1,4 @@
-//! The main window's cover (telas/CapaApp.html): a page of the app itself (`cover.html`, local, no network)
+//! The main window's cover: a page of the app itself (`cover.html`, local, no network)
 //! over the site, so the window is never blank. It shows when the app opens (at least 1 s), whenever the site
 //! loads a whole page again (⌘R, macOS ending the page) and while the site can't be reached; it goes when the
 //! site says it painted (`page_ready`). The cover only sees the network to tell offline from down, and may

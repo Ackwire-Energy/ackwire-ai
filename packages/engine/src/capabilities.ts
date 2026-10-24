@@ -75,7 +75,7 @@ export function summarizeGrants(rows: { scope: string; connectionLabel: string |
  * The "what you can do" section of an agent's system prompt, built from the
  * tools it was actually granted for this run (so it can't drift from its
  * permissions): tool names grouped by purpose (each tool's description is
- * already in its schema), the groups loaded on demand (D65), what needs a
+ * already in its schema), the groups loaded on demand (ADR 0043), what needs a
  * person's approval, and how to behave about anything else.
  */
 export function describeCapabilities(
@@ -89,7 +89,7 @@ export function describeCapabilities(
     );
   } else {
     lines.push("You can:");
-    // Tools on demand (D65): the run's other tools, behind `find_tools` / `use_tool`.
+    // Tools on demand (ADR 0043): the run's other tools, behind `find_tools` / `use_tool`.
     const findTool = tools.find((t) => t.name === ON_DEMAND_FIND);
     const onDemand = findTool ? directoryRole(findTool as ToolDefinition) : undefined;
     const groups = new Map<string, string[]>();
@@ -109,7 +109,7 @@ export function describeCapabilities(
         connectors.set(t.connectionId, entry);
         continue;
       }
-      // Tools on demand (D65): their directory gets a line of its own below.
+      // Tools on demand (ADR 0043): their directory gets a line of its own below.
       if (onDemand && (t.name === ON_DEMAND_FIND || t.name === ON_DEMAND_USE)) continue;
       const group = groupOf(t);
       const items = groups.get(group) ?? [];

@@ -70,7 +70,7 @@ const TTL_MS = 24 * 3_600_000;
 const LATE_MS = 20 * 60_000;
 /** An approval this close to expiring is urgent. */
 const URGENT_MS = 3 * 3_600_000;
-/** The exit: slide out, then fold the space (approvals and the prototype use the same timing). */
+/** The exit: slide out, then fold the space (approvals use the same timing). */
 const LEAVE_MS = 450;
 
 type Dir = ReturnType<typeof useDirectory>;
@@ -1190,7 +1190,7 @@ function useArrivals(items: AppNotification[], filter: NotificationFilter, ready
   return { fresh, pulse };
 }
 
-/** Notificações (telas/Notificacoes.html): what waits on me on top, the rest by day, grouped by conversation. */
+/** Notificações: what waits on me on top, the rest by day, grouped by conversation. */
 export function NotificationsPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -1229,7 +1229,7 @@ export function NotificationsPage() {
   const waitingTotal = counts?.waiting ?? 0;
   const nothing = list.isSuccess && (counts?.all ?? 0) === 0 && items.length === 0;
 
-  // The tab says how many are unread, like the prototype.
+  // The tab says how many are unread.
   useEffect(() => {
     const previous = document.title;
     document.title = unreadTotal ? t("notifications.docTitleUnread", { count: unreadTotal }) : t("notifications.title");

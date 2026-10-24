@@ -1,5 +1,5 @@
 /**
- * The main window's cover (cover.rs, telas/CapaApp.html): the boot sky with the agent, over the site while it
+ * The main window's cover (cover.rs): the boot sky with the agent, over the site while it
  * loads, so the window is never blank. Rust shows it and hides it (the site says when it painted); this page
  * only tells, while it shows, whether the site can be reached: "Sem conexão…" / "O agentes.chat não
  * respondeu…", and when it is back it asks to load the site again.

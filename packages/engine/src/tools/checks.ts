@@ -9,7 +9,7 @@ type ScopedCheck = (input: Record<string, unknown>, ctx: ToolContext) => Promise
  * MCP, our git tools), so a new tool can't forget it.
  */
 const SCOPE_CHECKS: Record<string, ScopedCheck> = {
-  // GitHub: only the agent's repositories (D48), reads included.
+  // GitHub: only the agent's repositories (ADR 0024), reads included.
   "github:": async (input, ctx) => {
     const r = await checkGithubCall(ctx.db, ctx.orgId, ctx.agentId, input);
     if (r.ok) return { ok: true, ...(r.repo ? { data: { repo: r.repo } } : {}) };

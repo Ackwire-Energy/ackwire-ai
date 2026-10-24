@@ -50,7 +50,7 @@ import {
 import { StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
- * One task (MobileDriveIssues.html, "Issue aberta"; called "tarefa" in the app): where it came from, the big title, its state, priority
+ * One task (called "tarefa" in the app): where it came from, the big title, its state, priority
  * and who has it; the agent's card with its live steps; the description, the acceptance criteria (checked
  * here too), what is linked (the source message, Drive files, PRs) and its sub-issues. Conversar and Concluir
  * at the bottom; "…" moves it to another board column, changes priority and who does it, as the web allows.

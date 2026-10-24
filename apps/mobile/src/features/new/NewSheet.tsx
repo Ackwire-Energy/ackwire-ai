@@ -16,7 +16,7 @@ import { SheetHeader } from "./parts";
 import { useOpenDm } from "./useOpenDm";
 
 /**
- * "Novo" (the "+" of the tabs, MobileIntencional.html variant A): request first. "O que você precisa?",
+ * "Novo" (the "+" of the tabs): request first. "O que você precisa?",
  * for whom (the agent you talked to last comes picked; a tap changes it), and one button, "Pedir ao
  * Theo", that posts the request in that agent's conversation and opens it. Starting something new (an
  * agent, a channel, a conversation with a person) sits below, smaller.

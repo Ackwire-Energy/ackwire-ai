@@ -591,7 +591,7 @@ export const en: Translations = {
     home: "Go to the home page",
   },
   shell: {
-    // The Mac app's own title bar (D79).
+    // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
@@ -6511,7 +6511,7 @@ export const en: Translations = {
     nameHelp: "How people and agents see it.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Other system" },
     commandCopied: "Command copied. Paste it in the computer's Terminal.",
-    // agentes for Mac (D79): this Mac, from the site inside the app.
+    // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
       text: "This Mac can work with your agents. They only use the folders you allow, and you can pause anytime.",
       connect: "Use this Mac",
@@ -6957,7 +6957,7 @@ export const en: Translations = {
     doing_other: "{{names}} are {{doing}}",
     /** "Theo, Iris and 2 more" (3 or more names in the working line). */
     namesMore: "{{first}}, {{second}} and {{count}} more",
-    /** The card above the box turns its phrase (telas/CardTrabalhando.html, A). */
+    /** The card above the box turns its phrase. */
     phrase: {
       thinking: {
         l0: "Thinking about your request",

@@ -1,5 +1,5 @@
 /**
- * The forum's shared pieces (telas/Forum.html, D45), for the forum pages, the
+ * The forum's shared pieces, for the forum pages, the
  * chat (topic and suggestion cards) and issues ("Avaliar no fórum").
  */
 export {

@@ -19,7 +19,7 @@ const HOVER_CLOSE_MS = 220;
 const short = (text: string, n = 90) => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
 
 /**
- * "O agente estudando" (telas/ReacoesAgente.html): what an agent saved to its
+ * "O agente estudando": what an agent saved to its
  * memory from this person's message, as a mark at the end of the reaction
  * row: the agent reading an open pixel book. Not an emoji anyone can add:
  * squarer, raised and outlined, after a small divider. Hover: a glass card

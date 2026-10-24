@@ -86,7 +86,7 @@ describe("agent page: tabs and the URL", () => {
     await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
     const cover = hero.querySelector(".agp-cover") as HTMLElement;
-    // No status pill (telas/AgenteTopo.html, D).
+    // No status pill.
     expect(hero.textContent).not.toContain("Esperando aprovação");
     expect(hero.querySelector(".agp-face")).toBeTruthy();
     const work = within(hero).getByRole("region", { name: "Como trabalha" });

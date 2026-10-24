@@ -18,7 +18,7 @@ import { useOrg } from "@/components/org-context";
 import { useNow } from "./MissionBits";
 
 /**
- * One row per executor session (ThreadContexto.html, A4): status icon,
+ * One row per executor session: status icon,
  * title, ONE human line (the live last line with the agent's cursor while it
  * runs), time and the PR; opened: "O que mudou · N arquivos" and the output.
  * The sessions don't talk to people: our agent reviews and speaks once.

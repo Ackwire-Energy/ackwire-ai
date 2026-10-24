@@ -112,7 +112,7 @@ describe("👎 becomes a private question", () => {
     await settle(4);
     const post = state.calls.find((c) => c.method === "chat.post")?.args[2] as Record<string, unknown>;
     expect(post).toMatchObject({ body: "@ada faltou o teste de regressão", replyTo: "m-2" });
-    // Ada answered in the channel (D67): the correction goes there too, not into a thread.
+    // Ada answered in the channel: the correction goes there too, not into a thread.
     expect(post.threadId ?? null).toBeNull();
     expect(askCard()).toBeNull();
     expect(localStorage.getItem("agentes:correction-ask:m-2")).toBe("1");

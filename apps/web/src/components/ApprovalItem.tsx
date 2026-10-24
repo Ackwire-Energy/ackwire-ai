@@ -24,7 +24,7 @@ export function approvalAction(approval: Pick<Approval, "tool" | "scope">): Appr
 
 /**
  * High risk (production, can't be undone, leaves the company): approving
- * takes a hold, not a click (telas/Aprovacoes.html).
+ * takes a hold, not a click.
  */
 export function approvalRisk(approval: Pick<Approval, "tool" | "scope">): "high" | "normal" {
   const action = approvalAction(approval);
@@ -130,7 +130,7 @@ function Actions({ approval, secondary }: { approval: Approval; secondary?: Reac
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
-/** The approval card inside the channel (telas/Main): full while waiting, one line once decided. */
+/** The approval card inside the channel: full while waiting, one line once decided. */
 export function InlineApproval({
   approval,
   agent,

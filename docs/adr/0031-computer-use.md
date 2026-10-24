@@ -2,7 +2,6 @@
 
 - Status: Proposed (after missions, ADR 0029, and runner isolation level 1, ADR 0030)
 - Date: 2026-10-16, revised 2026-10-18 (model-agnostic layers, intent tools, simulator, take over, several agents per machine)
-- Planning: D44
 - First slice: ADR 0040 (the agent browser on connected computers, on `agent-browser`), which supersedes §4 and the browser parts of §8, §9 and §14
 - Extends: ADR 0021 (code sandbox), ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0030 (runner isolation), ADR 0036 (desktop app)
 
@@ -20,7 +19,7 @@ What exists today:
 - On a connected machine, a Claude Code task can already browse with Playwright through its shell, drive an iOS simulator with `xcrun simctl` and `idb`, and read the screenshots it saves. Personal MCP servers (Playwright MCP, Claude in Chrome) are off by default: the brain runs with `--strict-mcp-config` unless `personalMcp` is on (`apps/server/runner/brain.ts`).
 - The same task could improvise control of the owner's real desktop (`screencapture`, `osascript`), without any of the safeguards below and only if macOS permissions were granted to whatever launched it. We don't rely on it (§15).
 
-Reference product: Grok Bot gives each bot a cloud computer (browser, files, terminal), uses connectors where they exist and computer use otherwise, lets the person watch and take over to log in, and keeps working with the person's laptop off. That is our virtual desktop on Daytona plus take over (§6, §8).
+Comparable products give each bot a cloud computer (browser, files, terminal), use connectors where they exist and computer use otherwise, let the person watch and take over to log in, and keep working with the person's laptop off. That is our virtual desktop on Daytona plus take over (§6, §8).
 
 Model side (checked 2026-10-16/18):
 

@@ -7,7 +7,7 @@ export { softTones } from "@agenteschat/ui/sky/math";
 export { BAYER, bayerAt };
 
 /**
- * The pixel/dither drawings (sky, fuse, spend bar, plan track) as pure math, ported from Mobile.html
+ * The pixel/dither drawings (sky, fuse, spend bar, plan track) as pure math
  * (`fromSurface`, `addSky`, `addFuse`, `addBar`, `addTrack`, `drawDithers`). The app draws them with a
  * Skia shader (./shaders.ts) that does the same steps; the `shader*` functions below mirror the SkSL line
  * by line, and test/sky-math.test.ts checks they pick the same tone as the web's loop.
@@ -33,7 +33,7 @@ export function hash2(a: number, b: number): number {
   return s - Math.floor(s);
 }
 
-/** Seven tones from a surface color into an agent color (Mobile.html `fromSurface`). */
+/** Seven tones from a surface color into an agent color. */
 export function fromSurface(surface: string, depth = 1, color: AgentColorName = "sky"): string[] {
   const [top, bot] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
   return [
@@ -106,7 +106,7 @@ export const sweepField: Field = (u, _v, t) => {
   return 0.08 + 0.5 * Math.exp(-(d * d) / 0.035);
 };
 
-/** The grid of a drawing `width`×`height` (points) at `pixel` points per cell (Mobile.html `drawDithers`). */
+/** The grid of a drawing `width`×`height` (points) at `pixel` points per cell. */
 export const gridOf = (width: number, height: number, pixel: number) => ({
   w: Math.max(2, Math.ceil(width / pixel)),
   h: Math.max(2, Math.ceil(height / pixel)),

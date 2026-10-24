@@ -8,7 +8,7 @@ import { Chip, ORBIT_RING, orbitShades, PixelSpinner, Spinner } from "../src";
 
 afterEach(cleanup);
 
-describe("PixelSpinner (Carregando.html, option A)", () => {
+describe("PixelSpinner", () => {
   test("one lit cell walks the 8-cell ring with a two-cell fading trail", () => {
     expect(ORBIT_RING).toHaveLength(8);
     // Lit at the top-left: the trail is the two cells before it (counter-clockwise), the rest dim.

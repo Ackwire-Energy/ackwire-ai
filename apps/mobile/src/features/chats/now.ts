@@ -5,7 +5,7 @@ import type { ConversationRow } from "./logic";
 import type { WaitingItem, WaitingKind } from "./waiting";
 
 /**
- * What changed, said on Conversas (MobileIntencional.html, A): the greeting's second line ("Theo terminou
+ * What changed, said on Conversas: the greeting's second line ("Theo terminou
  * “Corrige o login” · 2 trabalhando", each part opens where it happened) and what an agent's row says (it
  * waits on your ok, or what it is doing). Pure: built from what the app already loads (who is working, what
  * waits on you, the conversations and the inbox).

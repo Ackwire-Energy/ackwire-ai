@@ -82,7 +82,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
  * Granted to every new agent: reading context, keeping its own notes,
  * reading and writing Drive files, and reading issues (so any agent can check
  * the org's issues before answering about them; low risk), and its computer
- * (running commands, its own browser; D61): on a connected computer each
+ * (running commands, its own browser): on a connected computer each
  * still needs the switch the person at that computer turned on. Admins and
  * owners can revoke them.
  */
@@ -149,7 +149,7 @@ export function toolAccess(
   // Write implies read for built-ins (`issues:write` ⇒ `list_issues`, `drive:write` ⇒ `read_artifact`…).
   const writeScope = impliedByWrite(tool.scope);
   if (!conn && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
-  // "All tools" never includes running code (D30), the agent browser (ADR 0040), anyone's mailbox (ADR 0038)
+  // "All tools" never includes running code (ADR 0021), the agent browser (ADR 0040), anyone's mailbox (ADR 0038)
   // nor a database (ADR 0039):
   // always separate, explicit grants.
   if (

@@ -32,7 +32,7 @@ export function openDriveItem(a: Pick<Artifact, "id" | "kind" | "title" | "versi
 }
 
 /**
- * A Drive card (MobileDriveIssues.html `.dcard`): the real preview at the item's version (a document's
+ * A Drive card: the real preview at the item's version (a document's
  * first lines under its title, a table's first rows, a diff's first changed lines, the picture itself, a
  * file's type tile) with the kind on a small chip, then the name and who made it, when.
  */

@@ -752,7 +752,7 @@ test.if(posix)(
       type: "browser.frame",
       agentId: dev.id,
       seq: 0,
-      data: expect.stringMatching(/^\/9j\//), // the JPEG the fake writes (FF D8 FF)
+      data: expect.stringMatching(/^\/9j\//), // the JPEG the fake writes for a .jpg
       metadata: { deviceWidth: 1280, deviceHeight: 720, url: "https://shop.example.com/", title: "Loja" },
     });
     const shot = t.logged().find((c) => c.args.includes("screenshot"));

@@ -1,8 +1,8 @@
 import type { Judge, JudgeQuestion } from "../judge";
 
 /**
- * How a connector's tools come classified before a person looks at them
- * (telas/ConectorFerramentas.html). Most people just click Continuar, so the
+ * How a connector's tools come classified before a person looks at them.
+ * Most people just click Continuar, so the
  * suggestion must be right on its own:
  *
  * 1. The server's annotations: `readOnlyHint` → read; `destructiveHint` →

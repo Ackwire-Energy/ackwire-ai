@@ -28,7 +28,7 @@ export function General() {
   const [notify, setNotify] = usePref("notify", true);
   // Off by default: the request already comes by push and in the site's "Esperando você".
   const [notifyBrowser, setNotifyBrowser] = usePref(BROWSER_NOTIFY_PREF, false);
-  // Off by default (telas/NotchAgente.html): the window only exists while it's on.
+  // Off by default: the window only exists while it's on.
   const [notch, setNotch] = usePref(NOTCH_PREF, false);
   const [dock, setDock] = usePref(DOCK_PREF, true);
   const [leaving, setLeaving] = useState<Home | null>(null);

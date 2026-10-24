@@ -116,7 +116,7 @@ export interface FakeState {
   waitlistConfirmError?: ApiError;
 }
 
-/** A small in-memory backend with the data of the approved screens ("Acme"). */
+/** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   const walter: Member = {
     userId: "u-walter",
@@ -191,7 +191,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       {
         id: "m-2",
         channelId: ENG_ID,
-        // Asked in the channel, answered in the channel (D67).
+        // Asked in the channel, answered in the channel.
         threadId: null,
         author: { type: "agent", id: ADA_ID },
         body: "Achei a causa: o refresh compara `expires_at` em segundos com milissegundos.",
@@ -232,7 +232,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
           2,
           "msg-card",
         ),
-        // Its card is in the channel itself (D67).
+        // Its card is in the channel itself.
         threadId: null,
       },
       approval(
@@ -1703,7 +1703,7 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     account: null,
     effort: null,
     accounts: [],
-    accountsOwner: { id: "u-walter", name: "Walter Caldas" },
+    accountsOwner: { id: "u-walter", name: "Walter Nogueira" },
     canManageAccounts: true,
     accountsSupported: true,
     ...patch,

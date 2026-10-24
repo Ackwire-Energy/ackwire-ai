@@ -1,5 +1,5 @@
 /**
- * Registers the agents' computer image as a Daytona snapshot (D30), then
+ * Registers the agents' computer image as a Daytona snapshot (ADR 0021), then
  * checks it: `bun apps/server/scripts/sandbox-snapshot.ts [name]` (reads
  * `.env`: DAYTONA_API_KEY, optional DAYTONA_API_URL / DAYTONA_TARGET).
  *

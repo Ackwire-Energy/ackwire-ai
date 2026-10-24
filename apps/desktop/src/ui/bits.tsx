@@ -77,7 +77,7 @@ export function BrandFace({ size = "sm", state }: { size?: "xs" | "sm" | "md" | 
   return <Avatar kind="agent" name="agentes" size={size} appearance={{ color: "sky" }} state={state} />;
 }
 
-/** This Mac's portrait (telas/IconesComputador.html): the screen lit, dimmed (paused) or dark (offline). */
+/** This Mac's portrait: the screen lit, dimmed (paused) or dark (offline). */
 export function MacPortrait({ state, size = 48 }: { state: ComputerState; size?: 48 | 96 | 144 }) {
   return <ComputerPortrait kind="mac" state={state} size={size} />;
 }

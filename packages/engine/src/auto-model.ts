@@ -9,7 +9,7 @@ import { missionOfThread } from "./missions";
 import { orgModelProvider } from "./router";
 
 /**
- * "Automático" (D83): an agent whose model (or effort) is `auto` gets them
+ * "Automático": an agent whose model (or effort) is `auto` gets them
  * picked per run. Before the first model call the judge reads the task and
  * answers two choices, the model tier (small, medium, large) and the effort
  * (low, medium, high); this module maps that one decision onto the brain the

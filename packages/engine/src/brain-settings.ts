@@ -32,7 +32,7 @@ import { can, getMembership, requirePermission } from "./organizations";
 export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex"];
 export const isBrainKind = (v: unknown): v is BrainKind =>
   typeof v === "string" && (BRAIN_KINDS as readonly string[]).includes(v);
-/** An effort as stored: a level, or `auto` (the judge picks it per run, D83). */
+/** An effort as stored: a level, or `auto` (the judge picks it per run). */
 export type BrainEffortSetting = BrainEffort | typeof AUTO_MODEL;
 export const isBrainEffortSetting = (v: unknown): v is BrainEffortSetting =>
   isBrainEffort(v) || isAutoModel(v as string);
@@ -99,7 +99,7 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
   if (kind === "model") {
     throw new ValidationError("The API brain uses the agent's model", "brain.invalid_model");
   }
-  // "Automático" (D83): each run picks the tier (`auto-model.ts`).
+  // "Automático": each run picks the tier (`auto-model.ts`).
   if (v.toLowerCase() === AUTO_MODEL) return AUTO_MODEL;
   if (kind === "claude_code") {
     const alias = CLAUDE_CODE_MODELS.find((o) => o.value === v.toLowerCase() || o.modelId === v);
@@ -191,7 +191,7 @@ export interface AgentBrainView {
   canEdit: boolean;
   /** The account its computer brain runs with (ADR 0041); null = the computer's own sign-in. */
   account: string | null;
-  /** How hard its computer brain thinks; `auto` = picked per run (D83); null = the CLI's default. */
+  /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
   /** The accounts on the agent's computer, both kinds ([] without a computer). */
   accounts: MachineAccountView[];
@@ -360,7 +360,7 @@ export interface AgentBrainInput {
    * keep it (cleared when the brain kind changes).
    */
   account?: unknown;
-  /** `low`…`max`, `auto` (picked per run, D83), or null for the CLI's default. Omitted = keep it. */
+  /** `low`…`max`, `auto` (picked per run), or null for the CLI's default. Omitted = keep it. */
   effort?: unknown;
 }
 
@@ -405,7 +405,7 @@ export async function setAgentBrain(
       );
     }
   }
-  // "Automático" (D83) is one choice for every brain: it stays through a switch (and while on the API brain, for
+  // "Automático" is one choice for every brain: it stays through a switch (and while on the API brain, for
   // the next one), so an agent born automatic is automatic on Claude Code or Codex too. A fixed model belongs to
   // its brain: another brain starts on its default.
   const carried = isAutoModel(agent.brainModel) ? AUTO_MODEL : null;
@@ -618,7 +618,7 @@ export async function setMissionBrain(
       : brainChanged
         ? null
         : mission.brainModel;
-  // A mission names its model; "Automático" is the agent's own setting (D83), which a mission without one follows.
+  // A mission names its model; "Automático" is the agent's own setting, which a mission without one follows.
   if (isAutoModel(model) && model !== mission.brainModel) {
     throw new ValidationError("Choose a model for the mission", "brain.invalid_model", { brain: effective });
   }

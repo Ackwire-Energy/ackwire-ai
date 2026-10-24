@@ -26,7 +26,7 @@ async function browsing(api = createFakeApi(seedState())) {
   return { r, socket, ev, api };
 }
 
-describe("Assumir: the card stays the control while the agent waits (NavegadorNoChat A)", () => {
+describe("Assumir: the card stays the control while the agent waits", () => {
   test("the run pauses for the person and posts its line: the card stays on that message, in control, until Pronto", async () => {
     const state = seedState();
     const api = createFakeApi(state);

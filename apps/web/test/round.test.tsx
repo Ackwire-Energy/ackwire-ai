@@ -246,7 +246,7 @@ describe("models by provider and the default key", () => {
     await proceed(4);
     const models = screen().getByRole("group", { name: "Modelo" });
     const cards = within(models).getAllByRole("button");
-    // "Automático" first and chosen (D83), then the models by provider.
+    // "Automático" first and chosen, then the models by provider.
     expect(cards[0]?.querySelector(".newag__model-head b")?.textContent).toBe("Automático");
     expect(cards[0]?.getAttribute("aria-pressed")).toBe("true");
     expect(cards.slice(1).map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
@@ -289,7 +289,7 @@ describe("agent questions (ask_user)", () => {
       meta: { question },
       createdAt: new Date().toISOString(),
     });
-    // Asked in the channel (D67): the question has no thread, so the receipt follows the run that answers m-1.
+    // Asked in the channel: the question has no thread, so the receipt follows the run that answers m-1.
     const asked = state.messages.find((m) => m.id === "m-1");
     if (asked)
       asked.receipts = { seenBy: [], pickedBy: [], handled: [{ agentId: ADA_ID, runId: "r-q", status: "running" }] };

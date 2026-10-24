@@ -87,7 +87,7 @@ test("admins see and set the budgets: the workspace default and each agent's", a
   expect(detail).not.toHaveProperty("defaultBudgetUsd");
 });
 
-test("a forum topic has no spend cap of its own and shows no money (D45)", async () => {
+test("a forum topic has no spend cap of its own and shows no money", async () => {
   const w = await workspace();
   const res = await w.member("/forum/topics", {
     json: { title: "Pricing", goal: "Pick a plan", agentIds: [w.agentId], budgetUsd: 5 },

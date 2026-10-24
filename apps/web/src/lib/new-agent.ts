@@ -5,7 +5,7 @@ import type { AgentAppearance, IconName } from "@agenteschat/ui";
 export * from "@agenteschat/client/lib/new-agent";
 
 /**
- * "Criar agente" in steps (docs/design/telas/NovoAgente.html): the role
+ * "Criar agente" in steps: the role
  * presets with their icon and look (the rest is shared:
  * `@agenteschat/client/lib/new-agent`).
  */

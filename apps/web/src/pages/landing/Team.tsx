@@ -118,7 +118,7 @@ const MK_ACC: AgentAccessory[] = ["party", "hat", "crown", "antenna", "bow", "be
 /** Marina's group keeps at most this many agents (the oldest one you added leaves). */
 const MAX_GROUP = 4;
 
-/** Light on top, deeper at the bottom, a soft glow in the middle (prototype's `teamField`). */
+/** Light on top, deeper at the bottom, a soft glow in the middle. */
 const TEAM_SKY: SkyOptions = {
   pixel: 4,
   sprites: true,

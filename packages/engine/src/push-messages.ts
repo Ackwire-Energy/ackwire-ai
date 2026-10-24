@@ -20,7 +20,7 @@ export function pushLocale(locale: string | null | undefined): PushLocale {
 }
 
 export interface PushTextInput {
-  /** Notification kind (D46). */
+  /** Notification kind. */
   kind: string;
   /** In "Esperando você". */
   waiting: boolean;

@@ -378,7 +378,7 @@ export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: M
 /** The bar's sentence as plain text (see `activitySentence`). */
 export const activityText = (t: TFunction, entries: ActivityEntry[]) => activitySentence(t, entries);
 
-/** How often the card's phrase turns (telas/CardTrabalhando.html, A). */
+/** How often the card's phrase turns. */
 export const PHRASE_TURN_MS = 2600;
 /** A step running this long gets an aside in turn ("Isso leva um minutinho…"). */
 export const LONG_STEP_MS = 4000;

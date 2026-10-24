@@ -2,9 +2,8 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D76
 - Revises: prompt assembly in `buildRunContext` (`packages/engine/src/context.ts`) and the extras added in `executor.ts`
-- Related: D60 (Claude Code token floor), D65 / ADR 0043 (tools and context on demand), ADR 0051 (compaction)
+- Related: ADR 0043 (tools and context on demand), ADR 0051 (compaction)
 
 ## Context
 
@@ -12,8 +11,8 @@ Within one run, caching works: system blocks marked `cache` get a breakpoint and
 
 - **History is a sliding window** of the last `AGENT_CONTEXT_MESSAGES` (30). Every new message shifts the start, so the conversation prefix differs on every run.
 - **Per-run blocks sit in the middle:** "# Where you are", "# Your team", capabilities and skills are rebuilt each run; "# What you know (memory)", "# Organization wiki" and "# Earlier in this thread (summary)" are pushed by the executor after "# Now", which changes every run.
-- Measured: cache reads were 0 on Ada's runs (D60).
-- Claude Code and Codex sessions are resumed with their original system prompt, so memory, "Where you are" and "Now" go stale (D60).
+- Measured: cache reads were 0 on one agent's runs.
+- Claude Code and Codex sessions are resumed with their original system prompt, so memory, "Where you are" and "Now" go stale.
 
 ## Decision
 
@@ -28,7 +27,7 @@ Within one run, caching works: system blocks marked `cache` get a breakpoint and
 - Each run re-renders the sections and compares hashes with the snapshot.
 - A changed section produces an `# Update` block appended at the end of the conversation, before the trigger message: "Memory, new since earlier: …", "Team: @iris joined.", "Where you are: this thread is now in #ops." Only the difference: new or removed lines, at most 2,000 chars, else "Memory changed: use search_context".
 - The snapshot isn't rewritten until the next epoch, so the next run sends the same prefix and the same update (marked "Already told: …" so the model doesn't react twice).
-- **Claude Code / Codex:** the same update block is prepended to the prompt of a resumed session. This replaces the stale system prompt problem of D60 without restarting the session.
+- **Claude Code / Codex:** the same update block is prepended to the prompt of a resumed session. This fixes the stale system prompt of a resumed session without restarting it.
 
 ### Anchored history
 

@@ -7,7 +7,7 @@ import { pushLocale, renderPush } from "./push-messages";
 const { pushDevices, notifications, agents, users, approvals } = schema;
 
 /**
- * Push to the phone app (ADR 0035). A notification (D46) that should reach
+ * Push to the phone app (ADR 0035). A notification that should reach
  * the person's phone enqueues one `push.send` job; the job renders the text
  * per device language and sends through the `PushSender` adapter.
  *

@@ -42,7 +42,7 @@ export function priceTier(model: Model, models: Model[]) {
   return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
 }
 
-/** Model descriptions of the approved screen, by model family. */
+/** Model descriptions, by model family. */
 export function modelDescription(t: TFunction, locale: string, model: Model) {
   const id = model.id.toLowerCase();
   if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");
@@ -215,7 +215,7 @@ function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel
 }
 
 /**
- * The look right on the agent's settings (telas/PerfilAgente.html): the colors, then the eyes and what it
+ * The look right on the agent's settings: the colors, then the eyes and what it
  * wears as one sliding row each, so the section stays short. Each pick shows at once.
  */
 export function LookRows({
@@ -414,7 +414,7 @@ export function ModelCards({
 }) {
   const { t } = useTranslation();
   const all = choices.flatMap(([, list]) => list.map((c) => c.model));
-  // "Automático" (D83) picks from the line of the agent's key: usable once any model is.
+  // "Automático" picks from the line of the agent's key: usable once any model is.
   const autoAvailable = choices.some(([, list]) => list.some((c) => c.available));
   return (
     // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset

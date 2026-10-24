@@ -26,7 +26,7 @@ import {
 } from "./actions";
 
 /**
- * What the agent changed with this reply (ADR 0037 round 2, FazerDesfazer.html, MobileIntencional.html):
+ * What the agent changed with this reply (ADR 0037 round 2):
  * one change is a sunken row with a raised Desfazer and the time left under the sentence (system font) (A); two or more are a group with "N mudanças · há X" and
  * Desfazer tudo (B). Undone rows are struck through with "Desfeito por …" and Refazer; past the window
  * they stay as plain history. Optimistic, rolled back with a toast when the server refuses.

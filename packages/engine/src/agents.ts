@@ -28,7 +28,7 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
-  // "auto" (D83): each run picks the model from the line of the agent's key (any provider).
+  // "auto": each run picks the model from the line of the agent's key (any provider).
   if (input.model !== undefined && !isAutoModel(input.model) && !isKnownModel(input.model)) {
     throw new ValidationError(`model must be ${AUTO_MODEL} or one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
   }
@@ -59,7 +59,7 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   }
 }
 
-/** What a person's new agent thinks with when nobody picks a model: "Automático" (D83). */
+/** What a person's new agent thinks with when nobody picks a model: "Automático". */
 export const NEW_AGENT_DEFAULTS = { model: AUTO_MODEL } as const;
 
 export async function createAgent(
@@ -73,7 +73,7 @@ export async function createAgent(
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validate(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
-  // starts with the model and effort picked per run (written here, so agents made before D83 keep theirs).
+  // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
   try {
     const [agent] = await db

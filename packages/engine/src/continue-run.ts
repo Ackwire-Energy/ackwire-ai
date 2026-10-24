@@ -51,7 +51,7 @@ export async function continueRun(
 
   const stopped = row.run;
   const notContinuable = () => new ConflictError("This task can't be continued", "run.not_continuable");
-  // A forum turn belongs to the topic's order (D33): it is never picked up by hand.
+  // A forum turn belongs to the topic's order (ADR 0022): it is never picked up by hand.
   const byPerson = stopped.status === "canceled" && Boolean(canceledBy(stopped.error));
   if (!byPerson || row.channelKind === "forum" || !stopped.transcript) throw notContinuable();
   if (!stopped.replyMessageId) throw notContinuable();

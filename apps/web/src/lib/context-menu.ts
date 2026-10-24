@@ -4,7 +4,7 @@ import { inDesktopApp } from "./desktop";
 import { STORAGE_KEYS, storage } from "./storage";
 
 /**
- * The right click in the desktop app (telas/MenusDesktop.html): each screen says what its menu has, once,
+ * The right click in the desktop app: each screen says what its menu has, once,
  * and this draws it either as our menu (`MenuAt`, the default) or as the system's own (`context_menu` in
  * apps/desktop/src-tauri/src/menus.rs), as the person chose. In the browser the browser's menu stays.
  */

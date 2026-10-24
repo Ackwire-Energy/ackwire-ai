@@ -48,7 +48,7 @@ const isFresh = (p: WikiPageSummary) =>
 type View = "home" | "graph";
 
 /**
- * The org wiki (prototype: docs/design/telas/Wiki.html): pages on the left
+ * The org wiki: pages on the left
  * (pinned, folders, tags, Obsidian import); the home, a page or the graph in
  * the middle. A vault dropped anywhere opens the import.
  */

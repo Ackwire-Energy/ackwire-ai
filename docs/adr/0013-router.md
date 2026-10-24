@@ -2,11 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D5 and roadmap step 2. Extends 0008.
+- Extends 0008.
 
 ## Decision
 
-A person's message without mentions enqueues `message.posted`; the handler calls `routeMessage` when `ROUTER_ENABLED`. Agent messages never go through the router (D5 default).
+A person's message without mentions enqueues `message.posted`; the handler calls `routeMessage` when `ROUTER_ENABLED`. Agent messages never go through the router (changed by ADR 0034).
 
 1. **Candidates are chosen by code**: active agents that are members of the channel with `channel_members.auto_reply = true`. Nothing else can be picked.
 2. **A `RouterStrategy` only scores them**: `decide({ orgId, channel, message, thread, candidates }) → { agents: [{ agentId, score }], needsAgent?, reason?, usageRecordId? }`. It never adds candidates or grants anything.

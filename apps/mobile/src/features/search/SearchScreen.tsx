@@ -14,7 +14,7 @@ const RECENT = 8;
 const FOCUS_DELAY_MS = 350;
 
 /**
- * Buscar, its own tab (MobileRefinos.html `sTab`, `sOpen`; on iOS 26 the round button apart in the tab bar,
+ * Buscar, its own tab (on iOS 26 the round button apart in the tab bar,
  * like Music's): the large title, the search field on top (focused when the tab opens, "Cancelar" while
  * searching), the recent conversations while empty, and the results in place (grouped, with chips) once
  * there are words.

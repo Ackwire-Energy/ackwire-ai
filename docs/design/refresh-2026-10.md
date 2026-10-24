@@ -1,6 +1,6 @@
 # Design system 2026-10: mais viva, mais em camadas
 
-Fonte de verdade: `docs/design/telas/Componentes.dc.html` (aprovada). `Componentes-proposta1.dc.html` foi substituída; dela só continuam valendo as animações de checkbox, switch e abas. Tokens em `design-system/tokens.css` (cópia em `packages/ui/src/styles/tokens.css`, um teste mantém as duas iguais) e `design-system/tokens.json`.
+Tokens em `design-system/tokens.css` (cópia em `packages/ui/src/styles/tokens.css`, um teste mantém as duas iguais) e `design-system/tokens.json`.
 
 As regras não mudam: cards neutros (estado em chip com ícone, nunca card tingido nem borda da mesma cor), azul só na identidade dos agentes, âmbar só no que espera um humano, mono só em código, controles sempre próprios, sem exclamações.
 
@@ -30,7 +30,7 @@ As regras não mudam: cards neutros (estado em chip com ícone, nunca card tingi
 | `danger` | `#b42a20` | `#f08a80` | Erro, destrutivo (sempre com palavra) |
 | `plate` / `plate-soft` | cinza 10% / 6% | 14% / 8% | Placas de hover |
 
-`faint` diverge do protótipo (`#8b8b86` / `#76766f`) para passar AA (4,5:1) em texto pequeno nos dois temas. Os nomes da v1 (`surface`, `surface-raised`, `surface-sunken`, `ink-muted`, `action`, `on-action`, `attention*`, `success`, `focus-ring`, `overlay`) continuam como aliases.
+`faint` difere da proposta inicial (`#8b8b86` / `#76766f`) para passar AA (4,5:1) em texto pequeno nos dois temas. Os nomes da v1 (`surface`, `surface-raised`, `surface-sunken`, `ink-muted`, `action`, `on-action`, `attention*`, `success`, `focus-ring`, `overlay`) continuam como aliases.
 
 ### Elevação
 
@@ -68,7 +68,7 @@ Onest com `font-feature-settings: "ss01", "tnum"`. Escala: 12 (meta) · 13 (pequ
 - **Checkbox / switch / abas**: o check desenha o traço (`stroke-dashoffset`), o switch desliza o polegar com mola, as abas e o segmentado usam a pílula deslizante.
 - **Cards e seções**: `raised` + e1 + top, raio 14 (seções 20); interativos sobem para e2 no hover. Esqueletos usam `sunken`.
 
-## Refino 2026-10-18 (telas/RefinoUI.html)
+## Refino 2026-10-18
 
 - **Light menos cinza:** área de trabalho branca (`--pane`), menu lateral em papel quase branco (`--side`), campos brancos com contorno fino. Cinza só no trilho de campos/segmentado e no estado escolhido. Dark igual.
 - **Régua de controles:** tudo que se clica ou digita tem uma de três alturas, 32 (compacto), 40 (padrão) e 48 (só a ação principal de uma tela inteira), com raio de 30% da altura (10/12/14), lado 12/14/16, texto 13/14/15 e ícone 16/18/20 (`--control-*`). Pílula só para etiqueta que não se clica (status, contador, menção). Segmentado: itens 4px para dentro (3px no 32), raio de dentro = raio de fora − recuo.

@@ -29,7 +29,7 @@ import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
 
 /*
- * The pixel sky inside the app (prototype: docs/design/telas/CeuNoApp.html). The sky is the
+ * The pixel sky inside the app. The sky is the
  * agents' world: it shows only where the subject is the agents, in the sky
  * blue or in one agent's own color. Everything around it stays neutral.
  */
@@ -138,7 +138,7 @@ export function ChannelWelcome({
 /* ---------- Agent page: the cover in the agent's color ---------- */
 
 /**
- * The agent page's cover (docs/design/telas/AgentePerfil.html): a sky in the
+ * The agent page's cover: a sky in the
  * agent's own color, lighter behind the agent (at `at`, 0..1 across) so its
  * body reads; faster and busier while it works.
  */
@@ -170,7 +170,7 @@ export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy:
 /* ---------- Sign in and sign up ---------- */
 
 /**
- * The sign-in screen's horizon (telas/EntrarCadastro.html, C): soft tones rising from the page
+ * The sign-in screen's horizon: soft tones rising from the page
  * at the bottom, a few agents passing. Calm, so the one question above stays the subject.
  */
 export function AuthHorizon() {
@@ -490,7 +490,7 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
 }
 
 /**
- * The onboarding's progress at the top of the rail (telas/OnboardingEtapas.html): a strip of pixel
+ * The onboarding's progress at the top of the rail: a strip of pixel
  * sky that fills as steps get done, with a pixel agent walking at its front. `progress` is 0..1.
  */
 export function OnboardingProgress({ progress }: { progress: number }) {

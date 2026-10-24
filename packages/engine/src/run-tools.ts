@@ -419,14 +419,14 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       threadRootId: run.threadRootId,
       triggerMessageId: run.triggerMessageId,
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
-      // Tools on demand (D65): the same list the run's turns see.
+      // Tools on demand (ADR 0043): the same list the run's turns see.
       loadedGroups: loadedGroupsOf(run.transcript),
       ...(run.background ? { background: true } : {}),
     },
   };
 }
 
-/** The tool groups a run listed up front (`Transcript.toolGroups`, D65); null = every tool. */
+/** The tool groups a run listed up front (`Transcript.toolGroups`, ADR 0043); null = every tool. */
 const loadedGroupsOf = (transcript: unknown): string[] | null => {
   const groups = (transcript as { toolGroups?: unknown } | null)?.toolGroups;
   return Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : null;
@@ -559,7 +559,7 @@ export async function runTriggerOf(
 /**
  * What every message a run posts carries, on every brain: the routine that called it (`viaRoutine`, a
  * small tag, since the routine's own call isn't shown) and whether the router brought it in after another
- * agent spoke (`joined`, D49). Only a person-authored trigger is a routine's call.
+ * agent spoke (`joined`, ADR 0034). Only a person-authored trigger is a routine's call.
  */
 export function runMessageMeta(
   run: Pick<AgentRun, "trigger">,

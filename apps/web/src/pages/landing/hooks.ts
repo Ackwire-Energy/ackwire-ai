@@ -16,7 +16,7 @@ export function readReducedMotion(): boolean {
 export interface Run {
   /** False once a newer run started or the component unmounted. */
   alive(): boolean;
-  /** Waits (at most 60 ms with reduced motion, like the prototype). */
+  /** Waits (at most 60 ms with reduced motion). */
   sleep(ms: number): Promise<void>;
 }
 

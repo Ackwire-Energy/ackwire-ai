@@ -37,7 +37,7 @@ export function BrainWait({ message, fallback }: { message: Pick<Message, "meta"
 }
 
 /**
- * The agent's one card while it waits (ComputadorOffline.html `.waitcard`): "Esperando o MacBook Air voltar",
+ * The agent's one card while it waits: "Esperando o MacBook Air voltar",
  * "O Claude Code roda nele. Sigo daqui assim que ele voltar · 2 rotinas esperando" and "Trocar computador";
  * by itself it turns into "O MacBook Air voltou" (or "Troquei de computador") with no button.
  */

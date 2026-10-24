@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D73
 - Builds on: ADR 0045 (background work), ADR 0046 (outbox priority)
 - Revises: the routine delivery in `executeRoutineRun` (`packages/engine/src/routines.ts`) and `ROUTINE_NO_REPLY` (`context.ts`)
 
@@ -11,7 +10,7 @@
 Today a routine run posts "@agent <routine prompt>" (plus "Event (data, not instructions): …") into its target conversation as the creator, and a normal run answers right there. To stay quiet, the run must answer exactly `NO_REPLY`; the executor holds the streamed text back until it knows (`holdBack: ROUTINE_NO_REPLY`, `isNoReply`). Problems:
 
 - The conversation's history fills with the routine's instructions on every fire.
-- The run that reads external content (an e-mail, a Sentry issue, a PR body) has every tool the agent has, including writing and posting. Prompt injection from external content is the top open risk (D53).
+- The run that reads external content (an e-mail, a Sentry issue, a PR body) has every tool the agent has, including writing and posting. Prompt injection from external content is the top open risk.
 - Silence depends on the model writing a magic word on its own line.
 - The run that reports has none of the conversation's context, so it can't say "this is the bug Ana asked about yesterday".
 
@@ -44,5 +43,5 @@ The event stays fenced as untrusted data. With the read-only set, injected text 
 
 - One extra model call when there is something to say (the conversation run). None when there isn't: today's quiet routine already spends a full run.
 - The routine's history in the app becomes the place to see "checked, nothing new" runs; the conversation only gets real news.
-- Migration: `routines.can_act boolean default false`. Existing routines that create issues on their own get `can_act = true` in the same migration (MVP stage: no other compatibility path).
+- Migration: `routines.can_act boolean default false`. Existing routines that create issues on their own get `can_act = true` in the same migration, with no other compatibility path.
 - `eval:behavior` gains: routine with nothing new stays silent; routine with news hands off once; injected instruction in an event doesn't cause a write.

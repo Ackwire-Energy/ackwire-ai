@@ -1,5 +1,5 @@
 /**
- * First run and "Adicionar organização" (AppBandeja.html, view "welcome"): sign in with a code the
+ * First run and "Adicionar organização": sign in with a code the
  * computer shows and the person confirms in the browser (ADR 0036 §5), then, the first time only,
  * folders, tools and "open when the Mac starts". One simple question per screen. Also "Reconectar
  * este Mac" from the popover: the same code screen on the refused organization's home, which comes
@@ -25,7 +25,7 @@ type Failure = Extract<ControlEvent, { kind: "pair.failed" }>["code"];
 
 const STEP_INDEX: Record<Step, number> = { hello: 0, code: 1, folders: 2, tools: 3, done: 4 };
 
-/** The sky as a horizon at the bottom of the first screen (OnboardingV2: the surface, then the sky). */
+/** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
 const HORIZON: SkyOptions = {
   pixel: 4,
   palette: (bg) => glowTones("sky", bg),

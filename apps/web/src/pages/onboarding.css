@@ -1,5 +1,5 @@
 /*
- * Onboarding (telas/OnboardingEtapas.html), the parts only that screen draws: the
+ * Onboarding, the parts only that screen draws: the
  * progress, each step's column, the host and the answer, the import, the welcome.
  * The rail, its steps and the step headings stay in layout.css (Criar agente and
  * the landing use them too).
@@ -312,7 +312,7 @@ textarea.onb__big.ac-input {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-/* The computer step's portraits (IconesComputador.html), on the card. */
+/* The computer step's portraits, on the card. */
 .onb__art {
   display: block;
   margin-bottom: 4px;

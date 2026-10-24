@@ -2,13 +2,12 @@
 
 - Status: Accepted (2026-10-21)
 - Date: 2026-10-21
-- Planning: D37 (extends "what comes along" beyond the agent persona)
 - Extends: ADR 0020 (skills), ADR 0016 (connectors), ADR 0017 (context items), ADR 0019 (SSRF guard)
 - Out of scope for now: chat history, a CLI, a scan of `~/.openclaw` / `~/.hermes` on a connected computer, the Manus API, rollback
 
 ## Context
 
-D37 brought only the agent persona from OpenMausBot and OpenBot, in onboarding: the browser parsed the files and the page called `POST …/agents` once per agent. Everything else the files carry (skills, rooms, routines, memory) was listed as "left out", and re-running after a reload hit "@x is already taken".
+The first import brought only the agent persona from OpenMausBot and OpenBot, in onboarding: the browser parsed the files and the page called `POST …/agents` once per agent. Everything else the files carry (skills, rooms, routines, memory) was listed as "left out", and re-running after a reload hit "@x is already taken".
 
 The people we want to bring in keep their agents in files: OpenClaw and Hermes workspaces (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, `memory/*.md`, `skills/*/SKILL.md`, `cron/jobs.json`), Claw packages (`CLAW.md`), Hermes distributions (`distribution.yaml`), Paperclip companies (`COMPANY.md`, `agents/*/AGENTS.md`), OpenMausBot packages and OpenBot tenant packages. A move between our own editions (self-host ↔ Cloud) needs the same thing in the other direction.
 

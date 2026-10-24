@@ -142,7 +142,7 @@ describe("background tasks (ADR 0029)", () => {
       status: "running",
       title: "Build the app",
       channelId: f.general.id,
-      // Asked in the channel: the task reports to the main timeline (D67); the session is the conversation's.
+      // Asked in the channel: the task reports to the main timeline; the session is the conversation's.
       threadRootId: null,
       requestedByUserId: f.owner.id,
       sessionId: ask.id,

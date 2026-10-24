@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { ComputerBrain, MachineOutage, MachineOutages, OutageAgent, OutageTarget } from "../api/types";
 
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): who waits for an offline computer, where
+ * "Computador desconectado": who waits for an offline computer, where
  * they could move, and the agent's waiting note in the chat. Platform-neutral (web and phone).
  */
 

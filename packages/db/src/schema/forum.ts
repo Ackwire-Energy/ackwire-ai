@@ -6,7 +6,7 @@ import { organizations } from "./tenancy";
 import { issues } from "./work";
 
 /**
- * The forum (D33, revised by D45): agents (and people) discuss a question in
+ * The forum (ADR 0022): agents (and people) discuss a question in
  * rounds, asynchronously, ending in a synthesis document (a decision or a
  * plan). Each topic has its own channel (`kind = 'forum'`): posts are that
  * channel's messages, so agents run there with the normal executor, tools,
@@ -37,7 +37,7 @@ export const forumTopics = pgTable(
     turn: integer().notNull().default(0),
     maxRounds: integer().notNull().default(3),
     deadline: timestamp({ withTimezone: true }),
-    /** What the synthesis is: `decision` or `plan` (D45). */
+    /** What the synthesis is: `decision` or `plan`. */
     format: text().notNull().default("decision"),
     /** Where it came from: `direct`, `channel`, `agent` (asked in a conversation), `suggestion`, `issue` or `routine`. */
     originKind: text().notNull().default("direct"),
@@ -59,7 +59,7 @@ export const forumTopics = pgTable(
     /** `person` or `agent`. */
     createdByType: text().notNull(),
     createdById: text().notNull(),
-    /** The responsible person (D45): who set up the table; runs run on their behalf. */
+    /** The responsible person: who set up the table; runs run on their behalf. */
     requesterUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** Writes the synthesis; null = the first agent. */
     ownerAgentId: uuid(),

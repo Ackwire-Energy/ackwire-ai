@@ -84,8 +84,7 @@ import { BlockedCommands } from "./MissionCommandCard";
 import { SessionRows } from "./MissionSessions";
 
 /**
- * The mission's cards and lines inside the thread (ThreadContexto.html,
- * "App mobile"): the plan card (Começar / Mudar algo), the decision card,
+ * The mission's cards and lines inside the thread: the plan card (Começar / Mudar algo), the decision card,
  * the review card ("Pronto para você ver"), the plan-change line, the
  * computer and task lines, a report's "via Claude Code no …", the
  * suggestion bar on a person's message, and the `/summary` and `/plan`
@@ -362,8 +361,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
 const FINDING_ICONS: Record<MissionFinding["kind"], IconName> = { read: "search", data: "chart", decision: "question" };
 
 /**
- * What the agent found before proposing (telas/FazerDesfazer.html,
- * "mission"): what it read (files and lines), what the numbers say, and
+ * What the agent found before proposing: what it read (files and lines), what the numbers say, and
  * the one decision left, highlighted. Refs are code chips; a file opens in
  * the repository when the agent's repository is known.
  */
@@ -1112,7 +1110,7 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const notice = taskNoticeOf(message.meta);
-  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (D79).
+  // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (ADR 0036).
   const asked = (message.meta as { machineAccess?: { machineId?: unknown } } | null)?.machineAccess?.machineId;
   const here = useIsThisMac(org.id, typeof asked === "string" ? asked : "");
   if (!notice) return null;

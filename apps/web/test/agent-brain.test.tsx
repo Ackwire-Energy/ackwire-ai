@@ -25,7 +25,7 @@ async function open(state = seedState(), api = createFakeApi(state)) {
   await settle(8);
   return { state, api };
 }
-/** "Como trabalha" under the name: where, who thinks, the browser (telas/AgenteTopo.html, D). */
+/** "Como trabalha" under the name: where, who thinks, the browser. */
 const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
 const dialog = async (word: string, title: string) => {
   await click(screen().getByRole("button", { name: word }));
@@ -378,7 +378,7 @@ describe("Quem pensa: the draft", () => {
   });
 });
 
-describe("Quem pensa: Automático (D83)", () => {
+describe("Quem pensa: Automático", () => {
   /** Ada thinks with Claude Code on the MacBook (as given). */
   async function onClaude(patch: Partial<AgentBrain> = {}) {
     const state = seedState();
@@ -424,7 +424,7 @@ describe("Quem pensa: Automático (D83)", () => {
     const api = createFakeApi(state);
     pairMac(api, true);
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
-    // New agents are created with the effort on auto too (D83); the API brain doesn't show it.
+    // New agents are created with the effort on auto too; the API brain doesn't show it.
     api.agents.brain = async () => fakeAgentBrain(ADA_ID, { effort: "auto" });
     await open(state, api);
     const d = await brainDialog();

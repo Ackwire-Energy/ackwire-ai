@@ -1,5 +1,5 @@
 /**
- * The menu bar popover (AppBandeja.html, views "tray" and "ask"): what the agents are doing now on
+ * The menu bar popover: what the agents are doing now on
  * this Mac, grouped by organization, folder requests on top, pause for the whole computer, and the
  * way to Preferences, the site and Quit. This window also owns the tray icon's state and raises the
  * macOS notification for folder requests (it lives, hidden, for as long as the app runs).
@@ -119,7 +119,7 @@ export function Popover() {
     return () => ro.disconnect();
   }, [host, confirmQuit]);
 
-  // The site in the main window asking this Mac (D79): the popover owns the runners, so it answers.
+  // The site in the main window asking this Mac (ADR 0036): the popover owns the runners, so it answers.
   useEffect(() => {
     const off = host.onThisMac((id, request) => {
       const openPrefsOn = async (tab: PrefsTab) => {
@@ -549,7 +549,7 @@ function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: 
 }
 
 /**
- * An agent in its browser (BandejaNavegador.html, option 2 · Ponto): "Theo no navegador" with the
+ * An agent in its browser: "Theo no navegador" with the
  * site and what it does, Ver and Parar; "Walter está no controle" while a person drives; "Theo
  * precisa de você" with Abrir when it asked for help.
  */

@@ -5,7 +5,7 @@ import type { AgentColor } from "./AgentLook";
 import { BAYER, column, reduced, spriteOf, token, useCanvas } from "./RunPixels";
 
 /**
- * The forum's pixel pieces (telas/Forum.html), on the same grid and helpers
+ * The forum's pixel pieces, on the same grid and helpers
  * as the routines' runs: the round track (rounds × seats), the stance lane of
  * one agent and the convergence blocks. The canvases are decorative: the
  * caller gives the words (`label`) and, for the big track, what a column is

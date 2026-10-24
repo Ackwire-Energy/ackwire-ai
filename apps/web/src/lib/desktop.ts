@@ -2,7 +2,7 @@ import type { SignInProvider } from "@agenteschat/client";
 import { useEffect } from "react";
 
 /**
- * The site inside agentes for Mac (D79): the app's main window loads it and
+ * The site inside agentes for Mac (ADR 0036): the app's main window loads it and
  * sets `window.__agentesDesktop` before it starts. The site gets nothing of
  * the Mac; it only draws its own title bar and sends Google/Apple sign-in to
  * the browser (`apps/desktop/src-tauri/src/main_window.rs`).
@@ -56,7 +56,7 @@ export const browserChallenge = {
 };
 
 /**
- * What the site may ask of this Mac (D79, `this_mac` in main_window.rs): which organizations it is
+ * What the site may ask of this Mac (ADR 0036, `this_mac` in main_window.rs): which organizations it is
  * connected to, connecting it to one (the site confirms the runner's code with its own session), reconnecting
  * it, the app's Preferences on a tab and its access requests. Nothing else reaches the Mac.
  */

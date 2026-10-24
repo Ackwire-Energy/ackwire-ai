@@ -1,5 +1,5 @@
 /**
- * The site in the app's main window asks this Mac a few things (D79), relayed by Rust (`this_mac` in
+ * The site in the app's main window asks this Mac a few things (ADR 0036), relayed by Rust (`this_mac` in
  * main_window.rs, which already checked the request): which organizations it is connected to, connecting it
  * to one, reconnecting it, Preferences on a tab, and the access requests (the popover). The popover answers,
  * since it owns the runners. Connecting starts the

@@ -3,7 +3,7 @@ import type { CustomServer, CustomTool, ToolAccess, ToolDecision } from "../api/
 import { humanize } from "./custom-tools";
 
 /**
- * The connector tool review (telas/ConectorFerramentas.html): every tool
+ * The connector tool review: every tool
  * comes classified (the server's hints, the verb in its name, the judge for
  * names that don't say), grouped by subject. People see readable names in
  * their language; the technical name only on hover or when a search matches it.
@@ -160,7 +160,7 @@ function noun(t: TFunction, word: string): [string, string, string] | null {
  * A readable name: the verb in the person's language, then the words. When
  * every word is known, they're ordered as the language wants
  * ("Ver orçamento da campanha" / "Get campaign budget"); otherwise the words
- * stay as the server wrote them, as the prototype does.
+ * stay as the server wrote them.
  */
 export function toolName(t: TFunction, parts: { verb: string | null; words: string[] }, name: string) {
   const ws = parts.words;

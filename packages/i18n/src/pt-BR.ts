@@ -4,7 +4,7 @@ import type { Widen } from "./widen";
 /**
  * Português do Brasil — the source locale. Every key exists here first;
  * other locales are typed against this object, so a missing translation is
- * a compile error. Copy follows docs/design/telas exactly.
+ * a compile error.
  * Rules (docs/design/design-system/README.md): short sentences, active voice,
  * no exclamation marks, buttons start with a verb, "agentes" in lower case.
  */
@@ -600,7 +600,7 @@ export const ptBR = {
     home: "Ir para o início",
   },
   shell: {
-    // The Mac app's own title bar (D79).
+    // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
@@ -6527,7 +6527,7 @@ export const ptBR = {
     nameHelp: "Como ele aparece para as pessoas e os agentes.",
     os: { linux: "Linux", darwin: "macOS", windows: "Windows", other: "Outro sistema" },
     commandCopied: "Comando copiado. Cole no Terminal do computador.",
-    // agentes for Mac (D79): this Mac, from the site inside the app.
+    // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
       text: "Este Mac pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
       connect: "Usar este Mac",
@@ -6978,7 +6978,7 @@ export const ptBR = {
     doing_other: "{{names}} estão {{doing}}",
     /** "Theo, Iris e mais 2" (3 or more names in the working line). */
     namesMore: "{{first}}, {{second}} e mais {{count}}",
-    /** The card above the box turns its phrase (telas/CardTrabalhando.html, A). */
+    /** The card above the box turns its phrase. */
     phrase: {
       thinking: {
         l0: "Pensando no seu pedido",

@@ -45,7 +45,7 @@ export interface ModelInfo {
   cheap?: boolean;
   /** Suggested for new agents of that provider. */
   recommended?: boolean;
-  /** Its size in the provider's line, for "Automático" (D83): each run picks a tier, mapped back to a model. */
+  /** Its size in the provider's line, for "Automático": each run picks a tier, mapped back to a model. */
   tier?: ModelTier;
   /** Context window in tokens (prompt + output); absent = `DEFAULT_CONTEXT_WINDOW`. */
   contextWindow?: number;
@@ -57,7 +57,7 @@ export const MODEL_TIERS: readonly ModelTier[] = ["small", "medium", "large"];
 
 /**
  * An agent's model setting that is no model: each run picks the tier and the
- * effort (D83, `packages/engine/src/auto-model.ts`). Never sent to a provider.
+ * effort (`packages/engine/src/auto-model.ts`). Never sent to a provider.
  */
 export const AUTO_MODEL = "auto";
 export const isAutoModel = (model: string | null | undefined) => model === AUTO_MODEL;

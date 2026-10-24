@@ -59,7 +59,7 @@ describe("canceling a run", () => {
     const run = await runOf();
     expect(run?.status).toBe("canceled");
     expect(f.provider.calls).toHaveLength(1);
-    // Asked in the channel: the stopped reply is in the main timeline (D67).
+    // Asked in the channel: the stopped reply is in the main timeline.
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.body).toBe("Começando a análise.\n\n_Stopped by ana._");
     expect(main.at(-1)?.meta).toMatchObject({ canceled: { byUserId: f.owner.id } });

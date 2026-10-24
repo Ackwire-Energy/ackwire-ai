@@ -43,7 +43,7 @@ import { useTheme } from "@/lib/theme";
 
 /*
  * Development-only gallery (`/dev/gallery`). The sample content below is
- * the demo copy of the approved screens and is not shipped: the route is
+ * the design's demo copy and is not shipped: the route is
  * unreachable in production builds.
  */
 

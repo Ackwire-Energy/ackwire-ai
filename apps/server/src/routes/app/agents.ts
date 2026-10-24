@@ -84,7 +84,7 @@ const AgentFields = z.object({
   role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
   model: z.string().optional().openapi({
-    description: "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to `auto`.",
+    description: "A catalog model id, or `auto` (each run picks the model tier and effort). Defaults to `auto`.",
   }),
   credentialId: z
     .uuid()
@@ -125,9 +125,7 @@ export function agentRoutes(deps: AppDeps) {
         200: json(
           z.object({
             models: z.array(Model),
-            defaultModel: z
-              .string()
-              .openapi({ description: "What a new agent gets when no model is chosen: `auto` (D83)." }),
+            defaultModel: z.string().openapi({ description: "What a new agent gets when no model is chosen: `auto`." }),
           }),
         ),
         401: errors[401],
@@ -337,7 +335,7 @@ export function agentRoutes(deps: AppDeps) {
         c.get("user").id,
         orgId,
         { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
-        // New agents start on "Automático" (D83).
+        // New agents start on "Automático".
         NEW_AGENT_DEFAULTS,
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
@@ -456,7 +454,7 @@ export function agentRoutes(deps: AppDeps) {
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
-                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier, D83). Null = the brain's default; omitted = keep (reset when the brain changes).",
+                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
             acceptPlanTerms: z.boolean().optional(),
@@ -466,7 +464,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             effort: BrainEffortSetting.nullable()
               .optional()
-              .openapi({ description: "`auto` = picked per run (D83); null = the CLI's default; omitted = keep." }),
+              .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
           }),
         ),
       },

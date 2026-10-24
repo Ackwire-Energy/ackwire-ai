@@ -2,8 +2,6 @@
 
 Short records of decisions that shape the backend. One file per decision, numbered, never deleted: when a decision changes, add a new ADR and mark the old one "Superseded by".
 
-The product-level decision log (in Portuguese) is `docs/planejamento.md`; these ADRs record how those decisions were implemented. The structure mirrors Tierbird's core (`tierbird-cloud/core/docs/adr`).
-
 | # | Decision |
 | --- | --- |
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions |
@@ -39,7 +37,7 @@ The product-level decision log (in Portuguese) is `docs/planejamento.md`; these 
 | [0031](0031-computer-use.md) | Computer use: one provider-neutral action set mapped to Anthropic's computer/browser toolsets; an agent browser (profile per agent, works at every isolation level), a virtual desktop (Daytona or the owner's VM), and the owner's real desktop as a per-agent opt-in that excludes protected mode for that agent; screenshots in file storage with short retention, live view, Stop/Take over, caps (accepted, read-only first) |
 | [0032](0032-agent-engine-brains.md) | One agent engine with swappable brains (model, Claude Code, Codex): tools only in the Tool Gateway (the runner MCP is a bridge), shared approvals/context/streaming/usage, per-agent brain and model, warning without blocking for plan brains, fallback to the model brain, missions run on the same engine |
 | [0033](0033-public-github-app.md) | Public GitHub App: installations bound to the org that installed them from the app (state + user authorization + `/user/installations` check), tokens only for bound, unsuspended installations, webhook for uninstall/suspend/repositories |
-| [0034](0034-agents-consult-each-other.md) | Agents talk to each other: `ask_agent` (private DM between two agents, the asker waits, no cycles, 2 deep, 15 min), a clear router pick beats a low need-any-agent score, up to 4 agents per message, an agent's message may bring in one more agent (D5 revised) |
+| [0034](0034-agents-consult-each-other.md) | Agents talk to each other: `ask_agent` (private DM between two agents, the asker waits, no cycles, 2 deep, 15 min), a clear router pick beats a low need-any-agent score, up to 4 agents per message, an agent's message may bring in one more agent (revises 0013) |
 | [0035](0035-mobile-app.md) | Mobile app: Expo + React Native in `apps/mobile`, logic shared with the web (`@agenteschat/client`, `i18n`, `tokens`, the agent engine through Skia), app sessions via the Better Auth Expo plugin with `X-Agentes-Client` instead of `Origin`, push through the outbox, account deletion and Sign in with Apple |
 | [0036](0036-desktop-app.md) | Desktop app: Tauri 2 in the menu bar (`apps/desktop`, React DOM on the shared packages), the runner compiled and run as the app's child process (no OS service in desktop mode), stdio control channel and `config.json` as the single source, one runner per organization, device-code sign-in started by the computer, pause (protocol 9), local activity log, updates signed with our key and served by our server from the private release; macOS first, unsigned for now |
 | [0037](0037-agents-investigate-before-answering.md) | Agents investigate before answering: a "How you work" block (look first, cite, reads never need an ok, ask only for decisions), `ask_user` only after looking, computer brains told their own tools are allowed, routines dig instead of restating status, evidence-first role presets (migration 0069 updates unedited agents) |

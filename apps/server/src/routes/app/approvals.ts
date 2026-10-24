@@ -58,7 +58,7 @@ const ApprovalParams = OrgParams.extend({ approvalId: z.uuid() });
 const Decision = z.object({ reason: z.string().max(1000).optional() });
 
 /**
- * Sensitive actions agents asked for (D4). Decisions resume the run; events
+ * Sensitive actions agents asked for (ADR 0015). Decisions resume the run; events
  * `approval.created` / `approval.decided` go to the channel and to approvers
  * over the WebSocket.
  */

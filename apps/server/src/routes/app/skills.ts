@@ -62,7 +62,7 @@ const SkillListItem = Skill.extend({
 }).openapi("SkillListItem");
 
 /**
- * Skills in Markdown (`SKILL.md`, D29): install by zip, GitHub URL or by
+ * Skills in Markdown (`SKILL.md`, ADR 0020): install by zip, GitHub URL or by
  * hand (admins, `manage_agents`), and turn them on per agent. No code runs:
  * scripts are listed as ignored.
  */

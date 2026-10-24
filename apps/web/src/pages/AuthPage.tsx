@@ -14,12 +14,12 @@ import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/
 import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH } from "@/lib/desktop";
 
 /**
- * Sign in and sign up in one flow (telas/EntrarCadastro.html, C): the e-mail
+ * Sign in and sign up in one flow: the e-mail
  * first, then the one next step the server says it needs (the password, the
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.
  * In the Mac app, Google/GitHub/Apple open in the browser and the window
- * waits for the sign-in to come back ("browser", D79).
+ * waits for the sign-in to come back ("browser", ADR 0036).
  */
 type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent" | "browser";
 

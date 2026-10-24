@@ -2,7 +2,6 @@
 
 - Status: Accepted (2026-10-19)
 - Date: 2026-10-19. Revised 2026-10-21: an honest closed state and a first frame (§7), a person opening a site, facts in the hand back, the page hidden from others while a person is in control (§6), the browser always reachable from the agent (§9)
-- Planning: D57
 - First slice of: ADR 0031 (computer use). Where the two disagree, this ADR wins for the browser.
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0032 (one engine, the runner MCP as a bridge), ADR 0036 (desktop app, access on the machine), ADR 0010 (realtime)
 - Out of scope for now: Daytona computers, the simulator (Maestro, its own ADR), the virtual desktop, the owner's desktop, video streaming (H.264/WebRTC), DOM replay (rrweb), several server replicas, intent tools with Jev, protected mode (ADR 0030)
@@ -43,7 +42,7 @@ Lessons from OpenMausBot's code (`server/browser-relay.ts`, `server/browser-live
 ### Alternatives considered
 
 - **Our own CDP code:** weeks of work `agent-browser` already did; kept as the fallback behind our tools.
-- **Video (H.264 through ffmpeg's WHIP output to LiveKit or Cloudflare, or WebRTC):** lighter on the wire, but an extra binary, an experimental muxer, a media service (Railway has no inbound UDP) and players on web and phone. For a login of a few minutes, JPEG at 10–15 fps is close enough.
+- **Video (H.264 through ffmpeg's WHIP output to LiveKit or Cloudflare, or WebRTC):** lighter on the wire, but an extra binary, an experimental muxer, a media service (inbound UDP, which not every host offers) and players on web and phone. For a login of a few minutes, JPEG at 10–15 fps is close enough.
 - **DOM replay (rrweb):** very light and sharp for watching, but logins live in cross-origin iframes (Stripe, Google, captchas), OAuth opens popups, assets load from the viewer's browser without the agent's cookies, and clicks on a replica are fragile. Not for take over.
 - **A visible window on the computer for logins:** dropped; one path everywhere (the stream).
 
@@ -136,12 +135,12 @@ A person watching can also **take over** on their own, while the agent may use i
 
 - Not stored: frames (the relay holds only the newest frame of a running stream, in memory; the first-frame screenshot is deleted on the computer once sent), screenshots (they stay in the agent's folder), the profile and cookies (on the computer), what a person types, the pages of a person's turn (in memory until the agent reads the page again).
 - Stored: the run's transcript as for any tool (the `browser_*` calls and results), model usage and cost as for any model call, and one record per handoff or take over (who, when, result). No per-action audit table.
-- After the run, the agent's message keeps where it browsed (`meta.browser.steps`: each `browser_*` call's tool, the site of an open without its query string, the time, whether it failed) for the card that stays in the chat (telas/NavegadorDepois.html). It shows a drawn page, never a picture of the real one.
+- After the run, the agent's message keeps where it browsed (`meta.browser.steps`: each `browser_*` call's tool, the site of an open without its query string, the time, whether it failed) for the card that stays in the chat. It shows a drawn page, never a picture of the real one.
 
 ### 9. Watching and stopping
 
 - Live view on the run and on the machine page ("Dev is in the browser · shop.example/checkout"), with Watch and Stop.
-- Always there, run or not (status, preview, take over, as Grok Bot and OpenMausBot do; the card in the chat stays the default): a "Navegador" entry on the agent's page and its side panel, in the agent's DM header, and on the phone's agent profile, for the agent's owner and admins once it has `browser:use` and its computer serves the browser (the others who may watch, §6, get it where the request or the run is; the phone's profile also shows them a waiting request and a person's turn). It opens the same live view: Watch, Take over, Stop, and while in control an address field and Hand back with a note. The phone has no address field yet, so it offers Take over and Stop only while a page shows. The tray's Ver opens it too (`?browser=1` on the agent's web page).
+- Always there, run or not (status, preview, take over; the card in the chat stays the default): a "Navegador" entry on the agent's page and its side panel, in the agent's DM header, and on the phone's agent profile, for the agent's owner and admins once it has `browser:use` and its computer serves the browser (the others who may watch, §6, get it where the request or the run is; the phone's profile also shows them a waiting request and a person's turn). It opens the same live view: Watch, Take over, Stop, and while in control an address field and Hand back with a note. The phone has no address field yet, so it offers Take over and Stop only while a page shows. The tray's Ver opens it too (`?browser=1` on the agent's web page).
 - Stop closes the session at once.
 - Checkout only in test mode; a real payment or any sensitive action the agent recognizes becomes an approval card as usual. Page text never grants permissions or skips an approval.
 

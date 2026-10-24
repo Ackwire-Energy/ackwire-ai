@@ -1,5 +1,5 @@
 /**
- * The inbox's pure rules (telas/Notificacoes.html): which filter an item is
+ * The inbox's pure rules: which filter an item is
  * in, what is visible, how live events and my own actions change a loaded
  * page (and its counts), the day groups, where an item opens, how I answer
  * it, and the "Lembrar depois" times. No React, no i18n: the page turns these

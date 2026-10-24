@@ -326,7 +326,7 @@ function catalogReviewTools(t: TFunction, item: ConnectedItem): ReviewTool[] {
 }
 
 /**
- * Step 2: "Revise o que o agente pode fazer sozinho" (telas/ConectorFerramentas.html).
+ * Step 2: "Revise o que o agente pode fazer sozinho".
  * Servers by address: every tool comes classified; the person settles the
  * ones the name can't decide and changes what they want. Ours: read-only, by scope.
  */

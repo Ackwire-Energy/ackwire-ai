@@ -74,7 +74,7 @@ export function executorOptions(t: TFunction, executors: MissionExecutor[], agen
   }));
 }
 
-/** Autonomia, from asking the most to asking nothing (telas/MissaoConfig.html); the middle one is recommended. */
+/** Autonomia, from asking the most to asking nothing; the middle one is recommended. */
 export const COMMAND_APPROVALS: readonly CommandApproval[] = ["always", "low_risk_auto", "never"];
 
 export function commandApprovalOptions(t: TFunction) {

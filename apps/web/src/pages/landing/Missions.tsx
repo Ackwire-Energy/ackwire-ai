@@ -9,7 +9,7 @@ import { LpAvatar } from "./LpAvatar";
 import "./missions.css";
 
 /**
- * "03 · Missões" (telas/LandingNova.html): a mission of days, its plan with
+ * "03 · Missões": a mission of days, its plan with
  * the agent on each step, what they report along the way and the decision
  * that waits for Rafael. The slider (or "Tocar") moves the mission through
  * its three days.

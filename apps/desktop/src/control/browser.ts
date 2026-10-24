@@ -3,7 +3,7 @@ import type { ControlBrowser, ControlStatus } from "@agenteschat/adapters/runner
 /** Preference: a macOS notification when an agent asks for help in its browser (off by default). */
 export const BROWSER_NOTIFY_PREF = "notifyBrowser";
 
-/** How an agent's browser shows in the tray's "Agora" (BandejaNavegador.html, option 2 · Ponto). */
+/** How an agent's browser shows in the tray's "Agora". */
 export type BrowserRowState =
   /** The agent asked a person for help (sign in, a code…): Abrir. */
   | { kind: "needs"; request?: string; link?: string }

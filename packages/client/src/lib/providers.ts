@@ -43,7 +43,7 @@ export function modelChoices(models: Model[], credentials: Credential[], platfor
 }
 
 /**
- * "Automático" (D83): the value an agent's model, a computer brain's model or
+ * "Automático": the value an agent's model, a computer brain's model or
  * its effort holds when each run picks them (the server's `auto-model.ts`).
  */
 export const AUTO = "auto";

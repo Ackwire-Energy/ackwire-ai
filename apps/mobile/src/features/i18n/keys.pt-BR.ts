@@ -3,7 +3,7 @@
  * to the foundation's (`src/i18n/keys.pt-BR.ts`: `common`, `auth`, `account`,
  * `theme`, `push`, `a11y`, `composer`, `search`), which these never repeat.
  * They merge into the same `mobile` object; `keys.en.ts` has exactly this
- * shape (typed below). Copy as in docs/design/telas/Mobile.html.
+ * shape (typed below).
  */
 export const featureKeysPtBR = {
   app: {
@@ -1127,7 +1127,7 @@ export const featureKeysPtBR = {
       movedBody: "O que esperava o {{computer}} segue no novo computador.",
     },
   },
-  // The agent's browser (ADR 0040, NavegadorAgente.html).
+  // The agent's browser (ADR 0040).
   browser: {
     card: {
       needs: "{{name}} precisa de ajuda",

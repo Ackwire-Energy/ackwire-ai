@@ -2,11 +2,10 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D9–D13, D15, D18a, D18c, and the "context that evolves and improves itself" requirement.
 
 ## Search
 
-`search_documents` is the core index: one row per message, context item, issue, forum post or file, fed by outbox jobs (`search.index`, `search.reindex`). Full-text uses a generated `tsvector` with the `simple` configuration (Portuguese and English alike); vectors (`vector(1024)`, HNSW cosine) are optional. A query runs both rankings and fuses them with reciprocal-rank fusion plus a small recency bonus; vector hits beyond cosine distance 0.75 are dropped. Visibility travels with each document: `channel_ids` must ALL be visible to the reader (most restrictive of the sources; empty = whole org), enforced in SQL. Readers: a person's channels; an agent's channels, resolved at query time (D11). `SearchIndexResolver.forOrg` lets the Cloud swap the backend per org.
+`search_documents` is the core index: one row per message, context item, issue, forum post or file, fed by outbox jobs (`search.index`, `search.reindex`). Full-text uses a generated `tsvector` with the `simple` configuration (Portuguese and English alike); vectors (`vector(1024)`, HNSW cosine) are optional. A query runs both rankings and fuses them with reciprocal-rank fusion plus a small recency bonus; vector hits beyond cosine distance 0.75 are dropped. Visibility travels with each document: `channel_ids` must ALL be visible to the reader (most restrictive of the sources; empty = whole org), enforced in SQL. Readers: a person's channels; an agent's channels, resolved at query time. `SearchIndexResolver.forOrg` lets the Cloud swap the backend per org.
 
 Embeddings go through the Model Gateway (`gateway.embed`, usage kind `embedding`, no agent). Providers: `EmbeddingProvider` (Voyage adapter via REST, optional by env; a deterministic fake for tests). Without one, search is full-text only.
 

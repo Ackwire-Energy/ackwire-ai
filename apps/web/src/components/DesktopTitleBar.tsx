@@ -7,7 +7,7 @@ import { useMediaQuery } from "./NavDrawer";
 import { TABLET_QUERY, useSidebarCollapsed } from "./Sidebar";
 
 /**
- * The Mac app's title bar (D79, telas/AppDesktop.html B): room for the
+ * The Mac app's title bar (ADR 0036): room for the
  * window's own buttons, the sidebar toggle, back and forward, and ⌘K in the
  * middle (the sidebar's own ⌘K row goes, desktop.css). Anywhere
  * that isn't a button drags the window (`data-tauri-drag-region`, the only

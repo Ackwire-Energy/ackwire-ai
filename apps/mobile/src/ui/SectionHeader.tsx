@@ -9,7 +9,7 @@ export interface SectionHeaderProps {
   count?: number;
 }
 
-/** The header over a full-width list (MobileConversas.html `.sec-h`): 15 semibold faint, the count beside it (medium, faint). */
+/** The header over a full-width list: 15 semibold faint, the count beside it (medium, faint). */
 export function SectionHeader({ title, count }: SectionHeaderProps) {
   const { colors } = useTheme();
   return (

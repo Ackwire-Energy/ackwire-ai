@@ -68,7 +68,7 @@ export function FrameView({
 const KEYCAP: Record<LiveKey, string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
 
 /**
- * Typing into the page (NavegadorCardScroll.html, 4): one quiet field like the composer, whole text into
+ * Typing into the page: one quiet field like the composer, whole text into
  * the page's focused field (tap it on the page first). The lock hides it and makes it a password field,
  * so the phone offers the saved passwords; the keyboard button shows the special keys; send is round.
  */

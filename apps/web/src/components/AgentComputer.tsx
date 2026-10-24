@@ -292,7 +292,7 @@ export const targetOf = (pc: AgentComputer | undefined): ComputerTarget => pc?.t
 function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind: "machine" }> }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  // In agentes for Mac, offline on this very Mac: reconnect from here (D79).
+  // In agentes for Mac, offline on this very Mac: reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, target.machineId);
   return (
     <span className="stack-4" style={{ gap: 4 }}>
@@ -343,7 +343,7 @@ function ComputerTargetSelect({
   );
   if (machines.isLoading) return <LoadingLine width={200} />;
   if (list.length === 0 && target.kind === "cloud" && value === CLOUD) {
-    // agentes for Mac: connect this Mac right here and pick it (D79).
+    // agentes for Mac: connect this Mac right here and pick it (ADR 0036).
     if (inDesktopApp() && can(org.role, "post")) {
       return <ThisMacButton orgId={org.id} canPair folders={false} onConnected={onChange} />;
     }
@@ -400,7 +400,7 @@ function ComputerTargetSelect({
 }
 
 /**
- * The computer the agent uses, as its portrait (IconesComputador.html): the
+ * The computer the agent uses, as its portrait: the
  * cloud computer (lit while running or starting) or the connected machine,
  * its kind and pause from the computers list.
  */
@@ -503,7 +503,7 @@ export function AgentComputerPanel({
 }
 
 /**
- * "Pastas no computador" (PastasComputador.html, view "agent"): the folders of
+ * "Pastas no computador": the folders of
  * its computer this agent may use beyond its own, as the machine reported them.
  * Read-only here: granting happens on the computer.
  */
@@ -562,7 +562,7 @@ const draftOf = (s: SandboxSettings): Draft => ({
 });
 
 /**
- * Configurações → Computadores, "Computador na nuvem" (admins, telas/Computadores.html):
+ * Configurações → Computadores, "Computador na nuvem" (admins):
  * the card holds the on/off switch (saved at once) and a one-line summary;
  * internet, limits and approval are set in a dialog ("Ajustar"). They apply only
  * to the cloud computer; the person's own computers follow what is allowed on them.
@@ -847,7 +847,7 @@ function CloudComputerDialog({
 }
 
 /**
- * "Qual computador cada agente usa" (telas/Computadores.html): every agent and
+ * "Qual computador cada agente usa": every agent and
  * its computer, changed here at once. The current one comes from the computers
  * list (each says which agents use it); no computer there means the cloud.
  * Admins pick any computer; an agent's owner, the ones they connected (the

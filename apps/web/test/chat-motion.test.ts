@@ -76,7 +76,7 @@ describe("smooth reveal of streamed text", () => {
   });
 });
 
-describe("the card's turning phrase (CardTrabalhando.html, A)", () => {
+describe("the card's turning phrase", () => {
   const name = () => "Theo";
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "theo", lastSeq: 0 } as const;
   const call = (since: number, running = true): LiveWork => ({

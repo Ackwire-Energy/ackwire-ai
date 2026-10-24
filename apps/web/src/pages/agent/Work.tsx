@@ -66,7 +66,7 @@ import { useAgentEdit } from "./context";
 import "@/components/browser/browser.css";
 
 /*
- * What the agent works with, under its name (telas/AgenteTopo.html, D): where
+ * What the agent works with, under its name: where
  * it works, who thinks and the browser, each opening its dialog. A choice brings what it depends on
  * along (Claude Code moves the agent to a computer that has it) and says so
  * before; "Usar" saves at once, in the right order (computer, then brain).
@@ -143,7 +143,7 @@ function Cell({
 }
 
 /**
- * Como trabalha (telas/AgenteTopo.html, D): where it works, who thinks (with the effort) and the browser
+ * Como trabalha: where it works, who thinks (with the effort) and the browser
  * side by side, each opening its dialog; the numbers in the footer. Where comes first: who thinks depends on it.
  */
 export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
@@ -163,7 +163,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       ? (view.options.find((o) => o.kind === kind)?.models.find((m) => m.value === view.effectiveModel)?.label ??
         view.effectiveModel)
       : shownPlanModel;
-  // The account only when the computer has more than one of that kind (telas/ContaClaude.html).
+  // The account only when the computer has more than one of that kind.
   const kindAccounts = view?.accountsSupported ? view.accounts.filter((a) => a.kind === kind) : [];
   const accountWord =
     kind === "model" || kindAccounts.length === 0
@@ -231,7 +231,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   );
 }
 
-/** In agentes for Mac, when the offline computer is this very Mac: "Reconectar" right there (D79). */
+/** In agentes for Mac, when the offline computer is this very Mac: "Reconectar" right there (ADR 0036). */
 function ThisMacReconnect({ machineId }: { machineId: string }) {
   const { org } = useOrg();
   const here = useIsThisMac(org.id, machineId);
@@ -244,7 +244,7 @@ function ThisMacReconnect({ machineId }: { machineId: string }) {
 
 /**
  * The three clicks on the computer that turn its browser on, drawn small; the page notices by itself.
- * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (D79).
+ * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (ADR 0036).
  */
 export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
@@ -412,18 +412,18 @@ function Footer({
 // ── Quem pensa ──────────────────────────────────────────────────────────────
 
 /*
- * telas/QuemPensa.html ("C"): the brains as a list; the chosen one opens into
- * one card with its settings full width under a hairline, each with a small
- * label above it: the model one click away, the effort as a pixel ramp, the
- * account on that computer (ADR 0041, only its owner), and at the card's foot
- * a switch for answering through the API while the computer is off.
+ * The brains as a list; the chosen one opens into one card with its settings
+ * full width under a hairline, each with a small label above it: the model one
+ * click away, the effort as a pixel ramp, the account on that computer
+ * (ADR 0041, only its owner), and at the card's foot a switch for answering
+ * through the API while the computer is off.
  */
 
 /** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */
 const HERE = "__computer";
 const ADD = "__add";
 /**
- * The effort's four levels. Automático (D83) is the model's choice, not a level: an automatic model picks the
+ * The effort's four levels. Automático is the model's choice, not a level: an automatic model picks the
  * effort too, and the ramp goes away.
  */
 const EFFORTS = ["low", "medium", "high", "max"] as const;
@@ -490,7 +490,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const offId = useId();
-  // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (D79).
+  // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (ADR 0036).
   const toolOffHere =
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
   const machines = view.machines;
@@ -506,7 +506,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     setAccount(k === view.brain ? view.account : null);
     if (k === "model") return;
     const opt = homeOf(k)?.options.find((o) => o.kind === k);
-    // An agent on "Automático" (new agents start there, D83) stays automatic on another brain.
+    // An agent on "Automático" (new agents start there) stays automatic on another brain.
     setPlanModel(k === view.brain ? view.effectiveModel : isAuto(view.effort) ? AUTO : (opt?.defaultModel ?? null));
   };
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
@@ -739,7 +739,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           onValueChange={setModel}
           renderValue={pickerValue}
           options={[
-            // "Automático" first (D83): each task gets its model and effort, from the line of the agent's key.
+            // "Automático" first: each task gets its model and effort, from the line of the agent's key.
             {
               value: AUTO,
               label: t("brain.auto.label"),
@@ -1138,7 +1138,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
   const [choice, setChoice] = useState(work.machineId);
-  // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (D79).
+  // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
   const thisMacFree = inDesktopApp() && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
   const [busy, setBusy] = useState(false);

@@ -38,8 +38,7 @@ const SECTIONS = [
 ] as const;
 const hash = (id: string) => `#${id}`;
 /**
- * The public landing page (signed-out `/`), ported from the approved
- * prototype docs/design/telas/LandingNova.html. Dark by default; the only call to
+ * The public landing page (signed-out `/`). Dark by default; the only call to
  * action is the waiting list. Everything is scoped under `.lp`.
  */
 export function LandingPage() {

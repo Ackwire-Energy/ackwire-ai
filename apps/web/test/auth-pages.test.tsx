@@ -313,7 +313,7 @@ describe("Onboarding", () => {
     expect(screen().queryByRole("button", { name: /Usar créditos da plataforma/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
     expect(save().hasAttribute("disabled")).toBe(true);
-    // New agents start on "Automático" (D83).
+    // New agents start on "Automático".
     expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
     await type("Chave da API da Anthropic", "sk-errado");
     await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Anthropic")));

@@ -156,7 +156,7 @@ export async function setup(
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;
-    /** Tools on demand (D65): the judge picks the tool groups each run lists. */
+    /** Tools on demand (ADR 0043): the judge picks the tool groups each run lists. */
     toolsOnDemand?: boolean;
   } = {},
 ) {
@@ -186,7 +186,7 @@ export async function setup(
     },
     { model: "claude-sonnet-5-5" },
   );
-  // New agents get their computer by default (D61); tests that use it grant it themselves.
+  // New agents get their computer by default; tests that use it grant it themselves.
   await db
     .delete(schema.agentScopes)
     .where(

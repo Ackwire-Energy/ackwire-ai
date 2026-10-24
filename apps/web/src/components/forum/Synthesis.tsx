@@ -329,7 +329,7 @@ function SuggestedIssues({ topic }: { topic: ForumTopicDetail }) {
 }
 
 /**
- * The synthesis as a card (telas/Forum.html), decision or plan: who wrote it,
+ * The synthesis as a card, decision or plan: who wrote it,
  * what changed in version 2+ (with the previous version a click away), the
  * headline, the format's sections, suggested issues to approve, where it went
  * (the Drive document, back to the origin) and "Salvar na wiki".

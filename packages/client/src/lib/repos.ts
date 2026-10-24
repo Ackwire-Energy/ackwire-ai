@@ -3,7 +3,7 @@ import type { GitHubRepositories } from "../api/types";
 import { joinNames } from "./format";
 
 /*
- * An agent's GitHub repositories (docs/design/telas/RepositoriosAgente.html):
+ * An agent's GitHub repositories:
  * "Todos" (no list) or "Só alguns" (an ordered list of `owner/name` and
  * `owner/*`, a whole account). The first is where the agent starts when
  * nobody names a repository.

@@ -1215,7 +1215,7 @@
   {
     "id": "pm-morning-reviews-routine",
     "title": "Rotina da manhã: avaliações e infra (estilo de conversa)",
-    "source": "2026-10-19: how a good daily report reads (the person's reference: a colleague's chat message, with names, places and the pattern so far)",
+    "source": "how a good daily report reads: names, places and the pattern so far",
     "agent": {
       "preset": "pm"
     },
@@ -1246,7 +1246,7 @@
           "result": "review_negative and review_positive by trigger · since Oct 14\n- after pdf_exported: 4 reviews (3 negative, 1 positive)\n- after subscription_completed: 5 reviews (5 negative)\n- after trip_finished: 6 reviews (1 negative, 5 positive)"
         },
         {
-          "result": "review_negative · since yesterday 22:00 BRT (1)\n- 03:55 BRT · Marta Sousa · Porto, Portugal · trigger: pdf_exported · plan: Pro"
+          "result": "review_negative · since yesterday 22:00 BRT (1)\n- 03:55 BRT · Inês Moreira · Braga, Portugal · trigger: pdf_exported · plan: Pro"
         }
       ],
       "himetrica_get_event_timeseries": [
@@ -1277,12 +1277,12 @@
         "railway_list_deployments|railway_get_logs",
         "hand_off"
       ],
-      "evidence": ["Marta"],
+      "evidence": ["Inês"],
       "ask": "never",
       "skipJudge": ["next_step"],
-      "behavior": "Reads the reviews and the infra, then writes a short chat message: the one negative review overnight named as the data has it (Marta Sousa, Porto, 03:55 BRT, right after exporting the PDF), put against the pattern (since Oct 14, 3 of the 4 reviews after the PDF were negative), and the infra in a line or two (d34c007 went out fine on api and worker; the usual EMAXCONNSESSION burst at 23:10 during the container swap, not repeated; Sentry quiet). Plain prose, no headings or bullet lists, no ritual closing.",
+      "behavior": "Reads the reviews and the infra, then writes a short chat message: the one negative review overnight named as the data has it (Inês Moreira, Braga, 03:55 BRT, right after exporting the PDF), put against the pattern (since Oct 14, 3 of the 4 reviews after the PDF were negative), and the infra in a line or two (d34c007 went out fine on api and worker; the usual EMAXCONNSESSION burst at 23:10 during the container swap, not repeated; Sentry quiet). Plain prose, no headings or bullet lists, no ritual closing.",
       "rubric": [
-        "Names the reviewer, where and when (Marta Sousa, Porto, 03:55 BRT) and ties it to the PDF export pattern since Oct 14.",
+        "Names the reviewer, where and when (Inês Moreira, Braga, 03:55 BRT) and ties it to the PDF export pattern since Oct 14.",
         "Says the 23:10 EMAXCONNSESSION burst is the usual one during the deploy and did not repeat, and that the rest is fine, in a line or two."
       ]
     }

@@ -80,7 +80,7 @@ const CatalogEntry = z
 const Grant = z.object({ connectionId: z.uuid().nullable(), scope: z.string() }).openapi("ScopeGrant");
 
 /**
- * Connectors in two layers (D7): the organization connects an MCP server once
+ * Connectors in two layers (ADR 0016): the organization connects an MCP server once
  * (OAuth or API key, stored encrypted); each agent gets a subset of its
  * scopes. Also lists the built-in scopes.
  */

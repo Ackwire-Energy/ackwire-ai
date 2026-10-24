@@ -6,7 +6,7 @@ import {
 } from "@agenteschat/client";
 
 /**
- * The agent's browser on the phone (ADR 0040, NavegadorAgente.html): what only the app decides. The
+ * The agent's browser on the phone (ADR 0040): what only the app decides. The
  * request, the live connection and the input events are shared with the web (`@agenteschat/client`,
  * `browser/*`). Pure, so it is unit-tested.
  */

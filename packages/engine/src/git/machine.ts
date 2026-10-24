@@ -17,7 +17,7 @@ import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
 
 /**
- * Git on a connected machine through our proxy (ADR 0024 addendum, D35):
+ * Git on a connected machine through our proxy (ADR 0024 addendum):
  * the server issues the proxy credential for that machine and agent, and the
  * runner clones or updates the agent's checkouts in its own folder
  * (`repos/<owner>/<name>`) with `git.sync` (protocol 11). Only our

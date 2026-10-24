@@ -201,7 +201,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const top = useMessages(orgId, channelId, member && !isThread);
   const threadMessages = useThreadMessages(orgId, isThread && member ? channelId : undefined, threadId ?? "");
   const channelThreads = useChannelThreads(orgId, channelId, "all", member && !isThread);
-  // Every thread with replies is a link under its root (as on the web, D67): agents asked in the
+  // Every thread with replies is a link under its root (as on the web): agents asked in the
   // channel answer in the channel, so a thread is always a conversation of its own.
   const linkThreads = useMemo(
     () =>
@@ -281,7 +281,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
 
   // ── Agents' blocks ──
-  // An agent at work in its browser: its card in the conversation (NavegadorNoChat A), open on demand.
+  // An agent at work in its browser: its card in the conversation, open on demand.
   const browsing = useMemo(() => browsingRuns(runs), [runs]);
   // A take over held here after its run's live row went (the run paused for the person, or ended): the
   // same card stays, at the end, until the browser is handed back. Its runs: recent ones of this
@@ -311,7 +311,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const heldKey = heldNow.map((h) => `${h.id}:${h.runId}:${h.controllerUserId ?? ""}`).join(" ");
   // biome-ignore lint/correctness/useExhaustiveDependencies: the rows change only when what is held changes
   const held = useMemo(() => heldNow, [heldKey]);
-  // Every agent at work is one block, the last thing in the conversation (Mensagens.html): "pensando",
+  // Every agent at work is one block, the last thing in the conversation: "pensando",
   // its steps, its words. A finished one keeps its block (last words) until its saved message is listed: no
   // empty frame between them.
   const heldRef = useRef(new Map<string, HeldRun<LiveRun>>());
@@ -424,7 +424,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
   // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
-  // marks the first of it, and the pill lands there when it is far (Mensagens.html).
+  // marks the first of it, and the pill lands there when it is far.
   const listRef = useRef<LegendListRef>(null);
   const scrollRows = useMemo<ScrollRow[]>(
     () =>
@@ -852,7 +852,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     : dm
       ? t("mobile.chat.messageTo", { name: dm.with.name })
       : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
-  // What to say next comes from the latest card (MobileIntencional.html): a code change, a file; none
+  // What to say next comes from the latest card: a code change, a file; none
   // while the agent works, asks or waits for an approval.
   const people = useMemo(
     () => [...dir.memberById.values()].map((p) => ({ id: p.userId, name: p.name })),
@@ -1137,7 +1137,7 @@ function ToLatest({ onPress }: { onPress: () => void }) {
 }
 
 /**
- * "↓ 2 novas · Marina e Ada · Theo escrevendo" (Mensagens.html): who spoke below, not just a count, with
+ * "↓ 2 novas · Marina e Ada · Theo escrevendo": who spoke below, not just a count, with
  * their stacked faces; it lands on the "Novas" line (or at the end when that is close).
  */
 function NewPill({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
@@ -1216,7 +1216,7 @@ function UnseenLine({ fading }: { fading: boolean }) {
 }
 
 /**
- * The connection, above the composer (Mensagens.html): "Sem internet. O que você mandar sai sozinho quando
+ * The connection, above the composer: "Sem internet. O que você mandar sai sozinho quando
  * voltar." while it is down (a quick reconnect says nothing), then "Conectado de novo" for a moment.
  */
 function Connection({ status }: { status: ConnectionStatus }) {
@@ -1273,7 +1273,7 @@ const styles = StyleSheet.create({
   jumpEnd: { alignSelf: "flex-end" },
   jump: { width: 40, height: 40, borderRadius: 20 },
   jumpIcon: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // The "↓ novas" pill: centered, the "tato com canto" corner (Cards.html I).
+  // The "↓ novas" pill: centered, the "tato com canto" corner.
   pillWrap: { alignSelf: "center", maxWidth: "100%" },
   pill: {
     minHeight: 36,

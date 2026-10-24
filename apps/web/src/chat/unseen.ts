@@ -4,7 +4,7 @@ import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
 
 /**
- * Scrolled up while things arrive (telas/Mensagens.html, "A rolagem nunca é roubada"): a "Novas"
+ * Scrolled up while things arrive: a "Novas"
  * divider before the first unseen message, and the pill says who spoke ("↓ 2 novas · Marina e Ada ·
  * Theo escrevendo"). A click lands on the divider when it is far, else at the end.
  */
