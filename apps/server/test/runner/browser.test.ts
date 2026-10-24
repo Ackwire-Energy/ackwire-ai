@@ -683,6 +683,25 @@ test.if(posix)(
   },
 );
 
+test.if(posix)("a command while the browsers close (a runner that just started) starts its Chrome after", async () => {
+  const chromes = fakeChromes();
+  let closing = true;
+  const startedWhileClosing: boolean[] = [];
+  const t = setup({
+    startChrome: (exe, args, profile) => {
+      startedWhileClosing.push(closing);
+      return chromes.start(exe, args, profile);
+    },
+  });
+  const closed = t.manager.closeAll().then(() => {
+    closing = false;
+  });
+  expect(await t.act("open", ["https://a.example/"])).toMatchObject({ success: true });
+  await closed;
+  expect(startedWhileClosing).toEqual([false]);
+  expect(t.logged().map((l) => l.args.at(-1))).toEqual(["--all", "https://a.example/"]);
+});
+
 // ── Live view ────────────────────────────────────────────────────────────────
 
 test.if(posix)("the stream relays frames with the page's URL, changes mode, and ends with a frame", async () => {

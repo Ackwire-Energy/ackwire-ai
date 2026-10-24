@@ -896,6 +896,8 @@ export class BrowserManager {
   private ready: Promise<string> | null = null;
   private failure: { reason: string; at: number } | null = null;
   private closed = false;
+  /** Every `closeAll` still running; a new session starts only after them. */
+  private closing: Promise<void> = Promise.resolve();
   /** `<runner home>/browser/chromes.json`: the Chromes this runner home started (pid and profile). */
   private readonly pidFile: string;
   /** Writes to the pid file, one at a time. */
@@ -1288,6 +1290,9 @@ export class BrowserManager {
 
   /** The agent's session (created on first use, within the per-machine cap). */
   private async session(agent: AgentScope, folder: string): Promise<Session> {
+    // A runner or worker that just started closes what an earlier run left: its `close --all` would let go of a
+    // session opened meanwhile, and a leftover Chrome still holds the profile until it is killed.
+    await this.closing;
     if (this.closed) throw new RunnerError("browser_unavailable", "The runner is stopping");
     const agentId = String(agent.id ?? "");
     const existing = this.sessions.get(agentId);
@@ -1830,16 +1835,20 @@ export class BrowserManager {
     for (const s of sessions) this.endStream(s, "closed");
     this.sessions.clear();
     this.changed();
-    const command = this.presentCommand();
-    if (command) {
-      // The daemons let go first (and any Chrome an older runner had `agent-browser` launch closes).
-      await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
-        timeoutMs: QUICK_TIMEOUT_MS,
-        cwd: this.opts.home,
-      }).catch(() => undefined);
-    }
-    await Promise.all(sessions.map((s) => this.stopChrome(s).catch(() => undefined)));
-    await this.killLeftovers().catch(() => undefined);
+    const run = (async () => {
+      const command = this.presentCommand();
+      if (command) {
+        // The daemons let go first (and any Chrome an older runner had `agent-browser` launch closes).
+        await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
+          timeoutMs: QUICK_TIMEOUT_MS,
+          cwd: this.opts.home,
+        }).catch(() => undefined);
+      }
+      await Promise.all(sessions.map((s) => this.stopChrome(s).catch(() => undefined)));
+      await this.killLeftovers().catch(() => undefined);
+    })();
+    this.closing = Promise.all([this.closing, run.catch(() => undefined)]).then(() => undefined);
+    await run;
   }
 
   /** The runner stops: streams end, browsers close, nothing new starts. */
