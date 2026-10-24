@@ -17,9 +17,11 @@ interface OrgGate {
   /** Signed in but in no organization yet. */
   none: boolean;
   state: OrgState | null;
+  /** Makes an organization the current one (an invitation accepted, a workspace created in the first run). */
+  choose: (orgId: string) => void;
 }
 
-const OrgContext = createContext<OrgGate>({ loading: true, none: false, state: null });
+const OrgContext = createContext<OrgGate>({ loading: true, none: false, state: null, choose: () => {} });
 
 /** The current organization: remembered in SecureStore, switched by `setOrgId` (and by a push's `orgId`). */
 export function OrgProvider({ children }: { children: ReactNode }) {
@@ -45,12 +47,13 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const orgId = remembered === undefined ? null : chooseOrg(orgs, remembered);
   const value = useMemo<OrgGate>(() => {
     const loading = me.isPending || remembered === undefined;
-    if (loading) return { loading, none: false, state: null };
-    if (!orgId) return { loading: false, none: true, state: null };
+    if (loading) return { loading, none: false, state: null, choose: setOrgId };
+    if (!orgId) return { loading: false, none: true, state: null, choose: setOrgId };
     return {
       loading: false,
       none: false,
       state: { orgId, org: orgs.find((o) => o.id === orgId) ?? null, orgs, setOrgId },
+      choose: setOrgId,
     };
   }, [me.isPending, remembered, orgId, orgs, setOrgId]);
 
