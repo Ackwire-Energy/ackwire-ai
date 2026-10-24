@@ -668,6 +668,8 @@ export interface Approval {
   /** The connector it goes through ("github") and its account. */
   connector?: string | null;
   connectorAccount?: string | null;
+  /** The email itself, for mail drafts and sends; null for every other action. */
+  email?: ApprovalEmail | null;
   /** Why it asks (ADR 0053 §8): what the agent found and why this action. Shown above the action. */
   why?: string | null;
   /** Asked while nobody watched: by a routine (its name) or by an unattended run. Null: a person was there. */
@@ -675,6 +677,23 @@ export interface Approval {
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
+}
+
+/** The email a mail approval writes (draft, send, reply, forward), as its card shows it. */
+export interface ApprovalEmail {
+  verb: "draft" | "send" | "reply" | "forward";
+  /** The mailbox it goes through and its provider ("iCloud", "Gmail"; null: unknown). */
+  mailbox: string;
+  provider: string | null;
+  from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  /** The text, cut after 1500 characters. */
+  body: string;
+  /** The message it answers or forwards (its sender may be unknown). */
+  original: { subject: string; from: string | null } | null;
 }
 
 /** Who asked when nobody was watching (`approvals.origin`). */
