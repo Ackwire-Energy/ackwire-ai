@@ -63,7 +63,7 @@
 .wiki-nav__head b {
   flex: 1;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 24px;
   letter-spacing: -0.02em;
 }
@@ -253,7 +253,7 @@
 .wiki-home__title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(32px, 4vw, 44px);
   letter-spacing: -0.03em;
   line-height: 1.05;
@@ -588,7 +588,7 @@
 .wiki-title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(34px, 4.4vw, 50px);
   letter-spacing: -0.035em;
   line-height: 1.04;
@@ -603,7 +603,7 @@
   background: transparent;
   color: var(--ink);
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: clamp(34px, 4.4vw, 50px);
   letter-spacing: -0.035em;
   line-height: 1.1;
@@ -694,7 +694,7 @@ button.wiki-chip:hover {
 .wiki-prose .md h2 {
   margin: 34px 0 10px;
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: var(--font-display-weight, 400);
   font-size: 26px;
   letter-spacing: -0.02em;
   line-height: 1.2;

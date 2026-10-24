@@ -208,13 +208,12 @@ describe("who can talk to the agent", () => {
       .returning();
     await executeRoutineRun(routineDeps, run?.id ?? "");
     const [after] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
-    expect(after?.active).toBe(false);
+    expect(after).toMatchObject({ active: false, pausedReason: "audience" });
     const [done] = await f.db
       .select()
       .from(schema.routineRuns)
       .where(eq(schema.routineRuns.id, run?.id ?? ""));
-    expect(done?.status).toBe("skipped");
-    expect(done?.summary).toStartWith("Paused: ");
-    expect((await f.db.select().from(schema.messages)).some((m) => m.meta.routineId === routine.id)).toBe(false);
+    expect(done).toMatchObject({ status: "skipped", code: "audience" });
+    expect((await f.db.select().from(schema.messages)).some((m) => m.meta.routineBrief !== undefined)).toBe(false);
   });
 });

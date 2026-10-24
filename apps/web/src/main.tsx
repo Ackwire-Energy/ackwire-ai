@@ -3,16 +3,25 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { createApiClient, createSnapshot, meQuery } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
-import { createI18n, savedLocale } from "./i18n";
+import { loadI18n, savedLocale } from "./i18n";
+import {
+  checkAppVersion,
+  createVersionWatch,
+  fetchIndexHtml,
+  loadedEntry,
+  startVersionWatch,
+  VERSION_CHECK_MS,
+} from "./lib/app-version";
 import { inDesktopApp } from "./lib/desktop";
 import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
-const i18n = createI18n(savedLocale());
+const i18n = await loadI18n(savedLocale());
 document.documentElement.lang = i18n.language;
 // In agentes for Mac (ADR 0036): the site draws the window's title bar (desktop.css).
 if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";
@@ -32,6 +41,7 @@ const queryClient = createQueryClient({
   onUnauthorized,
   onMutationError: (message) => toasts.show(message, "error"),
   unknownError: () => i18n.t("common.unknownError"),
+  describeError: (error) => knownErrorText(i18n.t, error),
 });
 
 // The last lists and chats saved on this device show at once; everything revalidates as usual.
@@ -58,6 +68,29 @@ declare module "@tanstack/react-router" {
     router: typeof router;
   }
 }
+
+// A deploy while this tab is open: say so, and the next page change loads the new app.
+const versionWatch = startVersionWatch(
+  createVersionWatch({
+    loaded: loadedEntry(),
+    fetchHtml: fetchIndexHtml,
+    onStale: () =>
+      toasts.show(i18n.t("common.newVersion"), "info", {
+        label: i18n.t("common.reload"),
+        run: () => window.location.reload(),
+      }),
+  }),
+);
+router.subscribe("onBeforeNavigate", ({ toLocation, fromLocation }) => {
+  if (versionWatch.stale && fromLocation && toLocation.href !== fromLocation.href) {
+    window.location.assign(toLocation.href);
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void checkAppVersion();
+});
+window.addEventListener("online", () => void checkAppVersion());
+setInterval(() => void checkAppVersion(), VERSION_CHECK_MS);
 
 // The connector OAuth callback reports failures as `/?connector_error=…`.
 const connectorError = new URLSearchParams(window.location.search).get("connector_error");

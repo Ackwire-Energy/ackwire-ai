@@ -175,6 +175,10 @@
   font-size: 13.5px;
   color: var(--muted);
 }
+.nt-ctx b {
+  font-weight: 600;
+  color: var(--ink2);
+}
 .nt-body {
   grid-column: 2;
   display: flex;
@@ -778,7 +782,7 @@
 }
 .nt-calm > b {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: var(--font-display-weight, 300);
   font-size: 28px;
   letter-spacing: -0.03em;
 }

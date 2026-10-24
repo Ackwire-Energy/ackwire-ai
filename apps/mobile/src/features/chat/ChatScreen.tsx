@@ -31,6 +31,7 @@ import {
 import { listNames } from "@agenteschat/client/lib/activity";
 import { issueTakenOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
+import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
@@ -78,6 +79,7 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
@@ -913,6 +915,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           );
         }
         case "message":
+          // What reached an agent's conversation (a routine's report, another agent's answer) and a routine
+          // that ran in the background: quiet lines, never a person's or the agent's own voice.
+          if (isEventLine(item.message.meta)) return <EventLine message={item.message} />;
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
           return (

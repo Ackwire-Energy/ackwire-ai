@@ -18,6 +18,7 @@ import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
+import type { ApprovalOrigin } from "./tools/run-policy";
 
 const { notifications, organizationMembers } = schema;
 
@@ -53,6 +54,10 @@ export const NOTIFICATION_KINDS = [
   "mission_stopped",
   "routine_finished",
   "routine_failed",
+  /** A routine paused itself (its reason in `latest.reason`), ADR 0053. */
+  "routine_paused",
+  /** A routine waits for its computer (once per outage), ADR 0053. */
+  "routine_stalled",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
@@ -89,7 +94,7 @@ export interface NotificationSource {
 }
 
 export interface NotificationLatest {
-  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars). */
+  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars); an approval's why. */
   text?: string;
   title?: string;
   emojis?: string[];
@@ -101,6 +106,13 @@ export interface NotificationLatest {
   expiresAt?: string;
   round?: number;
   rounds?: number;
+  /**
+   * `routine_paused`: why it paused itself; `routine_failed`: its failed run's code (coded reasons the app
+   * translates).
+   */
+  reason?: string;
+  /** `approval`: asked while nobody watched, by a routine (its name) or an unattended run (ADR 0053 §8). */
+  origin?: ApprovalOrigin;
 }
 
 export interface NotificationView {

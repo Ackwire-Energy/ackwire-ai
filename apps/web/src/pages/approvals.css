@@ -265,6 +265,20 @@
   border-radius: 3px;
   background: var(--line2);
 }
+/* Asked while nobody watched (a routine, or no one behind the run): one quiet line with its icon. */
+.ap-origin {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.ap-origin > svg {
+  flex: none;
+  margin-top: 2px;
+}
 .ap-traits {
   display: flex;
   flex-wrap: wrap;

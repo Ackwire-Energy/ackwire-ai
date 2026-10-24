@@ -4,7 +4,7 @@ import { IMPORT_SOURCES, ImportError, type ImportSource, type PickedFile, SOURCE
 import { filesFromDrop } from "@/lib/obsidian";
 
 /**
- * The import screen around the server's plan (ADR 0053): where a bundle came
+ * The import screen around the server's plan (ADR 0055): where a bundle came
  * from, what can be picked, what a picked item needs that was unchecked, and
  * the apply in chunks the server takes. Pure, except `applyInChunks` and
  * `droppedFiles`.

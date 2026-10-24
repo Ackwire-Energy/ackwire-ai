@@ -445,6 +445,8 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
       [`POST ${org}/routines/parse-schedule`]: { status: 200, body: { ok: false, error: "?" } },
       [`PATCH ${org}/routines/r1`]: { status: 200, body: { id: "r1" } },
       [`POST ${org}/routines/r1/run`]: { status: 200, body: { id: "r1" } },
+      [`POST ${org}/routines/r1/stop`]: { status: 200, body: { id: "r1" } },
+      [`POST ${org}/routines/r1/take-over`]: { status: 200, body: { id: "r1" } },
       [`${org}/routines/r1/runs`]: { status: 200, body: { runs: [{ id: "run" }] } },
     });
     const api = createHttpApi({ fetch });
@@ -459,6 +461,9 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     expect(await api.routines.parseSchedule("o1", "quando der")).toEqual({ ok: false, error: "?" });
     await api.routines.setActive("o1", "r1", false);
     await api.routines.runNow("o1", "r1");
+    // ADR 0053: Parar, and "Assumir rotina".
+    await api.routines.stop("o1", "r1");
+    await api.routines.takeOver("o1", "r1");
     expect((await api.routines.runs("o1", "r1"))[0]?.id).toBe("run");
     const bodies = calls.filter((c) => c.init.method !== "GET").map((c) => c.init.body);
     expect(bodies).toEqual([
@@ -469,6 +474,12 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
       '{"phrase":"quando der"}',
       '{"active":false}',
       "{}",
+      "{}",
+      "{}",
+    ]);
+    expect(calls.map((c) => c.url).filter((u) => /stop|take-over/.test(u))).toEqual([
+      `${org}/routines/r1/stop`,
+      `${org}/routines/r1/take-over`,
     ]);
   });
 

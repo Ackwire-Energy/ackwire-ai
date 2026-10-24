@@ -98,6 +98,8 @@ const STREAM_OPEN_MS = 5000;
 const FIRST_FRAME_MS = 1000;
 /** A session that answered this long before its idle timeout is checked again before a read. */
 const ALIVE_MARGIN_MS = 60_000;
+/** A capture's file older than this is a leftover (its command timed out): removed by the next capture. */
+const CAPTURE_LEFTOVER_MS = 60_000;
 
 /** What the server may ask for: everything else (vault, plugins, chat, dashboard, sessions, installs) is refused. */
 const COMMANDS = new Set([
@@ -681,6 +683,8 @@ const DOING: Record<string, ControlBrowserDoing> = {
   uncheck: "choosing",
   scroll: "scrolling",
   wait: "waiting",
+  mouse: "clicking",
+  keyboard: "typing",
   upload: "uploading",
   screenshot: "capturing",
   pdf: "capturing",
@@ -702,6 +706,58 @@ const isLink = (v: unknown): v is string =>
   typeof v === "string" && v.length <= 500 && /^\/org\/[\w-]+\//.test(v) && !v.includes("//");
 
 type ActRequest = Extract<MachineRequest, { op: "browser.act" }>;
+type BatchRequest = Extract<MachineRequest, { op: "browser.batch" }>;
+
+/** A command that passed the checks, ready to run. */
+interface Prepared {
+  command: string;
+  args: string[];
+  timeoutMs: number;
+  tolerate?: boolean;
+}
+
+const allowedDomainsOf = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((d): d is string => typeof d === "string" && d.trim() !== "") : [];
+
+/** A JPEG's size from its frame header (SOF0–SOF15, not DHT/JPG/DAC), or null. */
+export function jpegSize(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 9 < bytes.length) {
+    if (bytes[i] !== 0xff) {
+      i++;
+      continue;
+    }
+    const marker = bytes[i + 1] as number;
+    const length = ((bytes[i + 2] as number) << 8) | (bytes[i + 3] as number);
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      const height = ((bytes[i + 5] as number) << 8) | (bytes[i + 6] as number);
+      const width = ((bytes[i + 7] as number) << 8) | (bytes[i + 8] as number);
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    i += 2 + length;
+  }
+  return null;
+}
+
+/** `screenshot --annotate`'s numbered elements, as the protocol carries them. */
+export function captureMarks(v: unknown): MachineReplies["browser.capture"]["marks"] {
+  if (!Array.isArray(v)) return [];
+  const out: MachineReplies["browser.capture"]["marks"] = [];
+  for (const a of v.slice(0, 500)) {
+    if (!isRecord(a) || typeof a.ref !== "string" || !/^@?e\d{1,6}$/.test(a.ref) || !isRecord(a.box)) continue;
+    const box = a.box;
+    const n = (k: string) => (typeof box[k] === "number" ? (box[k] as number) : 0);
+    out.push({
+      ref: a.ref.replace(/^@/, ""),
+      number: typeof a.number === "number" ? a.number : 0,
+      role: typeof a.role === "string" ? a.role.slice(0, 64) : "",
+      ...(typeof a.name === "string" ? { name: a.name.slice(0, 200) } : {}),
+      box: { x: n("x"), y: n("y"), width: n("width"), height: n("height") },
+    });
+  }
+  return out;
+}
 
 const exeName = (platform: string = process.platform) => `agent-browser${platform === "win32" ? ".exe" : ""}`;
 
@@ -900,70 +956,201 @@ export class BrowserManager {
 
   /** `browser.act`: one command in the agent's session, after the checks. */
   async act(agent: AgentScope, folder: string, req: ActRequest, signal?: AbortSignal): Promise<BrowserAnswer> {
-    const command = typeof req.command === "string" ? req.command : "";
-    const args = Array.isArray(req.args) ? req.args : [];
+    const allowed = allowedDomainsOf(req.allowedDomains);
+    const prepared = this.checkCommand(req.command, req.args, req.timeoutSeconds, folder, allowed);
+    const session = await this.session(agent, folder);
+    return this.enqueue(session, () => this.perform(agent, session, prepared, allowed, req.link, signal));
+  }
+
+  /**
+   * `browser.batch` (protocol 17): several commands in one round trip, back to
+   * back in the agent's session (nothing else runs in between), each checked
+   * as `browser.act` checks it. Any command that wouldn't pass refuses the
+   * whole batch before anything runs; a failure stops it unless that command
+   * tolerates failing.
+   */
+  async batch(agent: AgentScope, folder: string, req: BatchRequest, signal?: AbortSignal) {
+    const list = Array.isArray(req.commands) ? req.commands : [];
+    if (list.length === 0 || list.length > BROWSER_LIMITS.batchCommands) {
+      throw new RunnerError("bad_request", `A batch takes 1 to ${BROWSER_LIMITS.batchCommands} commands`);
+    }
+    const allowed = allowedDomainsOf(req.allowedDomains);
+    const prepared = list.map((c) => ({
+      ...this.checkCommand(c?.command, c?.args, c?.timeoutSeconds, folder, allowed),
+      tolerate: c?.tolerate === true,
+    }));
+    const session = await this.session(agent, folder);
+    return this.enqueue(session, async (): Promise<MachineReplies["browser.batch"]> => {
+      const answers: BrowserAnswer[] = [];
+      for (const p of prepared) {
+        if (signal?.aborted) break;
+        let answer: BrowserAnswer;
+        try {
+          answer = await this.perform(agent, session, p, allowed, req.link, signal);
+        } catch (err) {
+          // Nothing ran yet: refused as a whole (its error code reaches the server).
+          if (answers.length === 0) throw err;
+          // Something already ran: its answers are kept; this command failed and the batch stops.
+          answers.push({
+            success: false,
+            data: null,
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
+          });
+          break;
+        }
+        answers.push(answer);
+        if (!answer.success && !p.tolerate) break;
+      }
+      return { answers };
+    });
+  }
+
+  /**
+   * `browser.capture` (protocol 17): the page as a JPEG with its elements
+   * numbered and boxed (`screenshot --annotate`), for a judge that sees
+   * images. Only a page on the agent's allowed sites is captured. The file is
+   * read and removed at once; one a timed-out capture left is removed later.
+   */
+  async capture(
+    agent: AgentScope,
+    folder: string,
+    allowedDomains?: unknown,
+    signal?: AbortSignal,
+  ): Promise<MachineReplies["browser.capture"]> {
+    const allowed = allowedDomainsOf(allowedDomains);
+    const session = await this.session(agent, folder);
+    return this.enqueue(session, async () => {
+      if (!(await this.browserOpen(session, signal))) {
+        throw new RunnerError("bad_request", "The browser isn't open: open a page first");
+      }
+      // Like every read: a page that moved off the allowed sites by itself isn't looked at.
+      if (allowed.length > 0) {
+        const left = await this.leftAllowedSites(session, allowed, signal);
+        if (left) throw new RunnerError("not_allowed", left);
+      }
+      const dir = path.join(session.folder, ".agentes", "captures");
+      await mkdir(dir, { recursive: true });
+      // A screenshot whose command timed out may still be written after its capture ended: cleared here.
+      for (const name of readdirSync(dir)) {
+        const old = path.join(dir, name);
+        try {
+          if (this.now() - statSync(old).mtimeMs > CAPTURE_LEFTOVER_MS) await rm(old, { force: true });
+        } catch {
+          // gone already
+        }
+      }
+      const file = path.join(dir, `${randomUUID()}.jpg`);
+      try {
+        const shot = await this.run(
+          session,
+          ["screenshot", file, "--annotate", "--screenshot-format", "jpeg", "--screenshot-quality", "70"],
+          { timeoutMs: QUICK_TIMEOUT_MS, ...(signal ? { signal } : {}) },
+        );
+        if (!shot.success) throw new RunnerError("internal", (shot.error ?? "Couldn't take the picture").slice(0, 400));
+        const bytes = await readFile(file);
+        const size = jpegSize(bytes);
+        if (!size) throw new RunnerError("internal", "The picture isn't a JPEG");
+        const sized = await this.run(session, ["eval", "[innerWidth, innerHeight]"], {
+          timeoutMs: QUICK_TIMEOUT_MS,
+          ...(signal ? { signal } : {}),
+        });
+        const inner = isRecord(sized.data) && Array.isArray(sized.data.result) ? sized.data.result : [];
+        const viewport =
+          typeof inner[0] === "number" && typeof inner[1] === "number" && inner[0] > 0 && inner[1] > 0
+            ? { width: Math.round(inner[0]), height: Math.round(inner[1]) }
+            : size;
+        const url = await this.pageUrl(session, signal);
+        return {
+          data: bytes.toString("base64"),
+          width: size.width,
+          height: size.height,
+          viewport,
+          marks: captureMarks(isRecord(shot.data) ? shot.data.annotations : null),
+          ...(url ? { url } : {}),
+        };
+      } finally {
+        await rm(file, { force: true }).catch(() => undefined);
+      }
+    });
+  }
+
+  /** One command checked before it runs: known, no flag the runner sets, paths in the folder, URLs allowed. */
+  private checkCommand(
+    rawCommand: unknown,
+    rawArgs: unknown,
+    timeoutSeconds: unknown,
+    folder: string,
+    allowed: string[],
+  ): Prepared {
+    const command = typeof rawCommand === "string" ? rawCommand : "";
+    const args = Array.isArray(rawArgs) ? rawArgs : [];
     if (!command || command.length > BROWSER_LIMITS.command) throw new RunnerError("bad_request", "Missing command");
     if (!args.every((a) => typeof a === "string") || JSON.stringify(args).length > BROWSER_LIMITS.args) {
       throw new RunnerError("bad_request", "args must be a short list of strings");
     }
-    const allowed = Array.isArray(req.allowedDomains)
-      ? req.allowedDomains.filter((d): d is string => typeof d === "string" && d.trim() !== "")
-      : [];
-    const timeoutMs = Math.max(1, Math.min(600, Number(req.timeoutSeconds) || 60)) * 1000;
-    if (command === "agentes:type_secret") {
-      const session = await this.session(agent, folder);
-      return this.enqueue(session, async () => {
-        const answer = await this.typeSecret(agent, session, args, timeoutMs, signal);
-        this.noteAct(session, command, [], answer, req.link);
-        return answer;
-      });
-    }
+    const timeoutMs = Math.max(1, Math.min(600, Number(timeoutSeconds) || 60)) * 1000;
+    // Checked when it runs (the secret, the site, the field).
+    if (command === "agentes:type_secret") return { command, args, timeoutMs };
     if (!COMMANDS.has(command)) throw new RunnerError("bad_request", `The browser doesn't take ${command}`);
     for (const a of args) {
       const flag = a.split("=")[0] as string;
       if (FORBIDDEN_FLAGS.has(flag)) throw new RunnerError("bad_request", `${flag} is set by the runner`);
     }
-    const checked = this.checkArgs(command, args, folder, allowed);
-    const session = await this.session(agent, folder);
+    return { command, args: this.checkArgs(command, args, folder, allowed), timeoutMs };
+  }
+
+  /** Runs one prepared command in the session's queue (the caller holds it). */
+  private async perform(
+    agent: AgentScope,
+    session: Session,
+    p: Prepared,
+    allowed: string[],
+    link: unknown,
+    signal?: AbortSignal,
+  ): Promise<BrowserAnswer> {
+    const { command, args, timeoutMs } = p;
+    if (command === "agentes:type_secret") {
+      const answer = await this.typeSecret(agent, session, args, timeoutMs, signal);
+      this.noteAct(session, command, [], answer, link);
+      return answer;
+    }
     // A screenshot or PDF into a folder that isn't there yet (`screenshots/…`): made first.
     if (FILE_OUTPUTS.has(command)) {
-      for (const a of checked) {
-        if (path.isAbsolute(a) && isInside(folder, a)) await mkdir(path.dirname(a), { recursive: true });
+      for (const a of args) {
+        if (path.isAbsolute(a) && isInside(session.folder, a)) await mkdir(path.dirname(a), { recursive: true });
       }
     }
-    return this.enqueue(session, async () => {
-      if (command === "close") {
-        // The agent closes its browser: the daemon lets go of it, then its Chrome stops (the profile stays).
-        const answer: BrowserAnswer = session.chrome
-          ? await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS })
-          : { success: true, data: { closed: true } };
-        await this.stopChrome(session);
-        session.aliveAt = null;
-        this.noteAct(session, command, checked, answer, req.link);
-        return answer;
+    if (command === "close") {
+      // The agent closes its browser: the daemon lets go of it, then its Chrome stops (the profile stays).
+      const answer: BrowserAnswer = session.chrome
+        ? await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS })
+        : { success: true, data: { closed: true } };
+      await this.stopChrome(session);
+      session.aliveAt = null;
+      this.noteAct(session, command, args, answer, link);
+      return answer;
+    }
+    if (!READS.has(command)) await this.ensureOwnChrome(session);
+    if (READS.has(command)) {
+      if (!(await this.browserOpen(session, signal))) {
+        return { success: false, data: null, error: "The browser isn't open: open a page first" };
       }
-      if (!READS.has(command)) await this.ensureOwnChrome(session);
-      if (READS.has(command)) {
-        if (!(await this.browserOpen(session, signal))) {
-          return { success: false, data: null, error: "The browser isn't open: open a page first" };
-        }
-        // A page can move off the allowed sites by itself (a script redirect): checked before it is read.
-        if (allowed.length > 0) {
-          const left = await this.leftAllowedSites(session, allowed, signal);
-          if (left) return { success: false, data: null, error: left };
-        }
-      }
-      const answer = await this.run(session, [command, ...checked], { timeoutMs, signal });
-      // Up when it just answered (the next read skips the check); unknown after an error.
-      session.aliveAt = answer.success ? this.now() : null;
-      this.noteAct(session, command, checked, answer, req.link);
-      // After anything that may move the page (a click, a tab switch, a new tab…): still on an allowed site?
-      if (allowed.length > 0 && !READS.has(command)) {
+      // A page can move off the allowed sites by itself (a script redirect): checked before it is read.
+      if (allowed.length > 0) {
         const left = await this.leftAllowedSites(session, allowed, signal);
         if (left) return { success: false, data: null, error: left };
       }
-      return answer;
-    });
+    }
+    const answer = await this.run(session, [command, ...args], { timeoutMs, signal });
+    // Up when it just answered (the next read skips the check); unknown after an error.
+    session.aliveAt = answer.success ? this.now() : null;
+    this.noteAct(session, command, args, answer, link);
+    // After anything that may move the page (a click, a tab switch, a new tab…): still on an allowed site?
+    if (allowed.length > 0 && !READS.has(command)) {
+      const left = await this.leftAllowedSites(session, allowed, signal);
+      if (left) return { success: false, data: null, error: left };
+    }
+    return answer;
   }
 
   /** Paths stay in the agent's folder; URLs go only to allowed sites. Returns the args to run. */

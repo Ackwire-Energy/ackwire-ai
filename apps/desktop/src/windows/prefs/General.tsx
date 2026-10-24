@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { BROWSER_NOTIFY_PREF } from "../../control/browser";
+import { DOCK_PREF } from "../../control/dock";
 import { NOTCH_PREF } from "../../control/notch";
 import { siteOf } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
@@ -29,6 +30,7 @@ export function General() {
   const [notifyBrowser, setNotifyBrowser] = usePref(BROWSER_NOTIFY_PREF, false);
   // Off by default: the window only exists while it's on.
   const [notch, setNotch] = usePref(NOTCH_PREF, false);
+  const [dock, setDock] = usePref(DOCK_PREF, true);
   const [leaving, setLeaving] = useState<Home | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -202,6 +204,24 @@ export function General() {
           desc={t("desktop.prefs.general.notifyBrowserDesc")}
           htmlFor="notify-browser"
           end={<Switch id="notify-browser" checked={notifyBrowser} onCheckedChange={setNotifyBrowser} />}
+        />
+        <PrefRow
+          title={t("desktop.prefs.general.dockTitle")}
+          desc={t("desktop.prefs.general.dockDesc")}
+          htmlFor="dock"
+          end={
+            <Switch
+              id="dock"
+              checked={dock}
+              onCheckedChange={(on) => {
+                setDock(on);
+                host.setDock(on).catch(() => {
+                  setDock(!on);
+                  toast(t("desktop.common.error"), "alert");
+                });
+              }}
+            />
+          }
         />
         <PrefRow
           title={t("desktop.prefs.general.notchTitle")}

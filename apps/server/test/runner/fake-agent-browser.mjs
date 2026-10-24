@@ -27,6 +27,8 @@ const VALUED = new Set([
   "--executable-path",
   "--args",
   "--cdp",
+  "--screenshot-format",
+  "--screenshot-quality",
 ]);
 const rest = [];
 for (let i = 0; i < argv.length; i++) {
@@ -89,14 +91,37 @@ switch (command) {
     state.open = false;
     out({ success: true, data: { closed: true } });
     break;
-  case "screenshot":
-    // Like the real one: it writes the file and fails when its folder isn't there.
+  case "screenshot": {
+    // Like the real one: it writes the file and fails when its folder isn't there. A `.jpg`
+    // is a real JPEG header (1280×800); `--annotate` numbers the page's one button.
+    const annotate = argv.includes("--annotate");
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x20, 0x05, 0x00, 0x03, 0, 0, 0, 0]);
     try {
-      writeFileSync(args[0], "png");
-      out({ success: true, data: { path: args[0] } });
+      writeFileSync(args[0], args[0].endsWith(".jpg") ? jpeg : "png");
+      out({
+        success: true,
+        data: {
+          path: args[0],
+          ...(annotate
+            ? {
+                annotations: [
+                  { ref: "e1", number: 1, role: "button", name: "Go", box: { x: 10, y: 20, width: 100, height: 40 } },
+                ],
+              }
+            : {}),
+        },
+      });
     } catch {
       out({ success: false, data: null, error: `Failed to save screenshot to ${args[0]}: No such file or directory` });
     }
+    break;
+  }
+  case "eval":
+    // The page's size, or a settle check (true).
+    out({
+      success: true,
+      data: { result: args.join(" ").includes("innerWidth") ? [1280, 800] : true, origin: state.url },
+    });
     break;
   case "upload":
     out({ success: true, data: { files: args.slice(1) } });

@@ -114,7 +114,7 @@ type ReadInput = { files: PickedFile[] | Promise<PickedFile[]> } | { url: string
 type Focus = "preview" | "report" | "drop" | null;
 
 /**
- * Bringing a workspace from another app (ADR 0053), the same in onboarding
+ * Bringing a workspace from another app (ADR 0055), the same in onboarding
  * and in Configurações → Importar e exportar: read what was dropped, picked,
  * linked or pasted into a bundle; plan it on the server (dry run); the person
  * picks; apply. Nothing is written before `apply`.

@@ -1,6 +1,6 @@
 {
-  "id": "32e013fc-8776-4c39-8bc5-4f24b04f2722",
-  "prevId": "ab0bfaa3-1eaa-4600-8381-6a8efdc1ffc9",
+  "id": "a8d4306c-c68b-4c6c-adf3-e99772f4a72c",
+  "prevId": "4e274d40-2232-424c-ba61-50df08b17a88",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5262,135 +5262,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.import_items": {
-      "name": "import_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_app": {
-          "name": "source_app",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_ref": {
-          "name": "source_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_id": {
-          "name": "target_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hash": {
-          "name": "hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "adopted": {
-          "name": "adopted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_by_user_id": {
-          "name": "created_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "import_items_org_id_organizations_id_fk": {
-          "name": "import_items_org_id_organizations_id_fk",
-          "tableFrom": "import_items",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "import_items_created_by_user_id_users_id_fk": {
-          "name": "import_items_created_by_user_id_users_id_fk",
-          "tableFrom": "import_items",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "import_items_source_item": {
-          "name": "import_items_source_item",
-          "nullsNotDistinct": false,
-          "columns": [
-            "org_id",
-            "created_by_user_id",
-            "source_app",
-            "source_ref",
-            "kind",
-            "key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.machine_accounts": {
       "name": "machine_accounts",
       "schema": "",
@@ -9600,6 +9471,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "background": {
+          "name": "background",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "brain": {
+          "name": "brain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -9949,6 +9833,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "''"
+        },
+        "why": {
+          "name": "why",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "origin": {
+          "name": "origin",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -13069,7 +12966,7 @@
           "name": "org_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "content_type": {
           "name": "content_type",
@@ -15675,9 +15572,39 @@
           "notNull": true,
           "default": "''"
         },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brain": {
+          "name": "brain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "event": {
           "name": "event",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dedupe_key": {
+          "name": "dedupe_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "message_id": {
+          "name": "message_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -15735,6 +15662,14 @@
           "columns": [
             "routine_id",
             "at"
+          ]
+        },
+        "routine_runs_routineId_dedupeKey_unique": {
+          "name": "routine_runs_routineId_dedupeKey_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "routine_id",
+            "dedupe_key"
           ]
         }
       },
@@ -15830,6 +15765,33 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "access": {
+          "name": "access",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'read'"
+        },
+        "report": {
+          "name": "report",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'when_new'"
+        },
+        "paused_reason": {
+          "name": "paused_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failures_in_row": {
+          "name": "failures_in_row",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "next_run_at": {
           "name": "next_run_at",

@@ -9,6 +9,7 @@ import {
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
+import { runAuthorityById } from "../authority";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
@@ -32,7 +33,7 @@ import {
   wrapUntrusted,
 } from "./text";
 
-const { mailSends, routineRuns, agentRuns } = schema;
+const { mailSends } = schema;
 
 export interface MailToolDeps extends Omit<MailDeps, "db"> {
   /** Drive files, for `attachment` (absent = that tool is off). */
@@ -90,25 +91,13 @@ const MESSAGE_ID = { type: "string", minLength: 1, maxLength: 500, description: 
 const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
 /**
- * Whether this run was started by mail (an `email.received` routine), or
- * continues that conversation: then a send always asks a person, whatever
- * the policy says (ADR 0038: inbound mail can't approve its own sends).
+ * Whether nobody watches this run (ADR 0053): a routine's, or one no person started (a routine's
+ * report, another agent). Then a send always asks a person, whatever the mailbox policy says: what
+ * such a run read (inbound mail included) can't approve its own sends (ADR 0038).
  */
-async function startedByMail(db: Database, ctx: ToolContext) {
+async function unwatched(ctx: ToolContext) {
   if (!ctx.runId) return false;
-  const rows = await db
-    .select({ id: routineRuns.id })
-    .from(routineRuns)
-    .innerJoin(agentRuns, eq(agentRuns.id, routineRuns.agentRunId))
-    .where(
-      and(
-        eq(routineRuns.orgId, ctx.orgId),
-        sql`${routineRuns.event}->>'type' = 'email.received'`,
-        sql`(${agentRuns.id} = ${ctx.runId} or (${agentRuns.channelId} = ${ctx.channelId} and ${agentRuns.threadRootId} = ${ctx.threadRootId}))`,
-      ),
-    )
-    .limit(1);
-  return rows.length > 0;
+  return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind !== "person";
 }
 
 /** Why a message is outside what the agent may read; null = inside. */
@@ -809,11 +798,11 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         ctx.agentId,
         usable.map((a) => a.id),
       );
-      const fromMail = await startedByMail(ctx.db, ctx);
+      const tainted = await unwatched(ctx);
       return usable.flatMap((a) => {
         const policy = policies.get(a.id);
         if (!policy) return [];
-        const askToSend = fromMail || !(policy.sendWithoutAsking && policy.allowedRecipients.length > 0);
+        const askToSend = tainted || !(policy.sendWithoutAsking && policy.allowedRecipients.length > 0);
         return toolsFor(a, slugs.get(a.id) ?? "mailbox", policy, askToSend);
       });
     },

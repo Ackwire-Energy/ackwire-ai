@@ -315,7 +315,8 @@ describe('"Continuar" after a stop', () => {
     // A model brain read it mid-task already: nothing to restart.
     expect(await restartAfterStopAndSend(deps(), stopped.id, reply, transcript)).toBeNull();
 
-    await f.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, f.agent.id));
+    // The run thought with Claude Code (its own brain, ADR 0053 §10: the run's, not the agent's setting).
+    await f.db.update(schema.agentRuns).set({ brain: "claude_code" }).where(eq(schema.agentRuns.id, stopped.id));
     const events = f.listen(f.general.id);
     const runId = await restartAfterStopAndSend(deps(), stopped.id, reply, transcript);
     expect(runId).toBeString();

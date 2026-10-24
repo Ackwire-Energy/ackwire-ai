@@ -34,6 +34,27 @@ export function brainFor(
   return mission?.brain ?? kindOf(agent.brain);
 }
 
+/**
+ * The brain a run thinks with (ADR 0053 §10): its own (`agent_runs.brain`, stored when the engine resolves
+ * it and when a conversation run falls back), else the agent's until its first turn. Shared code (steering,
+ * the talker, "Continuar", the forum budget) reads this, never the agent's stored brain alone.
+ */
+export const runBrainOf = (run: { brain?: string | null }, agent?: { brain?: string | null } | null): BrainKind =>
+  kindOf(run.brain ?? agent?.brain);
+
+/** Stores the brain a run thinks with now (`agent_runs.brain`). */
+export async function recordRunBrain(db: Executor, runId: string, kind: BrainKind) {
+  await db.update(schema.agentRuns).set({ brain: kind }).where(eq(schema.agentRuns.id, runId));
+}
+
+/**
+ * Whether a run whose computer brain can't answer may hand the turn to the model brain (ADR 0032 §5).
+ * Never a background run (ADR 0053 §6.4): a routine thinks with its agent's own brain and waits quietly
+ * for its computer instead; the agent's owner may also turn the fallback off.
+ */
+export const mayFallBack = (agent: Pick<Agent, "brainFallback">, run: Pick<AgentRun, "background">) =>
+  !run.background && agent.brainFallback !== false;
+
 /** Plan limits seen on this process (`limit` events), by machine, brain and account: until when they hold. */
 const planLimits = new Map<string, number>();
 /** No account: the computer's own sign-in. Each account (ADR 0041) has its own plan, so its own limit. */
@@ -241,8 +262,9 @@ async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, session
 /**
  * The computer brain's session for a run (stored on the run, so a pause
  * resumes the same one): the conversation's previous session while it is
- * recent and small, else a fresh one. A routine run always starts fresh
- * (each firing is its own task; resuming made one routine re-read 700k tokens).
+ * recent and small, else a fresh one. A routine or background run always starts fresh
+ * (each firing is its own task; resuming made one routine re-read 700k tokens), and its
+ * session is never carried to a conversation run.
  */
 async function sessionFor(
   db: Executor,
@@ -257,8 +279,8 @@ async function sessionFor(
     return { id: run.brainSessionId, resume: await sessionUsed(db, run, kind, run.brainSessionId) };
   }
   let id: string | null = null;
-  if (!options.fresh) {
-    const { agentRuns, usageRecords } = schema;
+  if (!options.fresh && !run.background) {
+    const { agentRuns, usageRecords, messages } = schema;
     const [last] = await db
       .select({
         id: agentRuns.id,
@@ -280,6 +302,13 @@ async function sessionFor(
           ...(conversation === run.channelId ? [] : [eq(agentRuns.threadRootId, conversation)]),
           isNotNull(agentRuns.brainSessionId),
           ne(agentRuns.id, run.id),
+          // Never a session background work thought in (a routine's: it was told to answer NO_REPLY, and a
+          // conversation that picked it up answered that). Any run that shared it counts, older rows too.
+          sql`not exists (select 1 from ${agentRuns} r2
+            where r2.org_id = "agent_runs"."org_id" and r2.agent_id = "agent_runs"."agent_id"
+              and r2.brain_session_id = "agent_runs"."brain_session_id"
+              and (r2.background or exists (select 1 from ${messages} m
+                where m.org_id = r2.org_id and m.id = r2.trigger_message_id and m.meta->'routine' is not null)))`,
         ),
       )
       .orderBy(desc(agentRuns.createdAt))

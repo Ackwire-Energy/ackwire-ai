@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
+import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -14,10 +14,10 @@ import { renderApp, screen, settle } from "./render";
  * through the browser; the browser page hands the fresh sign-in back.
  */
 
-const app = domWindow() as unknown as { __agentesDesktop?: unknown };
+const app = () => window as { __agentesDesktop?: unknown };
 afterEach(() => {
   cleanup();
-  delete app.__agentesDesktop;
+  delete app().__agentesDesktop;
   sessionStorage.clear();
 });
 
@@ -36,7 +36,7 @@ function recordAssign() {
 
 describe("in the Mac app's window", () => {
   test("GitHub opens in the browser and the window waits, then enters", async () => {
-    app.__agentesDesktop = { version: "0.6.0" };
+    app().__agentesDesktop = { version: "0.6.0" };
     const assign = recordAssign();
     let redeemed = false;
     const { auth, calls } = createFakeAuth();

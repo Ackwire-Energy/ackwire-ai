@@ -13,13 +13,14 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
-import { createAgentRuns, eligibleChannelAgents, requesterOf } from "./dispatch";
+import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { getMachineById, MachineOfflineError, MachinePausedError, machineOnline } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueue } from "./outbox";
+import { personBehindCall } from "./requester";
 import { issueRunToolToken } from "./run-tool-tokens";
 import { replyThreadOf } from "./runs";
 import type { ToolContext } from "./tools/types";
@@ -1112,8 +1113,8 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
 }
 
 /**
- * Who a task works for: the person behind the run (author of its trigger,
- * up a chain of agents), or, for a run woken by a task, that task's person.
+ * Who a task works for: the person behind the run (`authority.ts`: nobody for
+ * a routine's or unattended run), or, for a run woken by a task, that task's person.
  */
 export async function taskRequester(ctx: ToolContext): Promise<string | null> {
   const trigger = await getMessage(ctx.db, ctx.orgId, ctx.triggerMessageId);
@@ -1124,5 +1125,5 @@ export async function taskRequester(ctx: ToolContext): Promise<string | null> {
   const inbox = trigger.meta?.missionInbox as { requestedBy?: unknown } | undefined;
   if (inbox && trigger.authorAgentId === ctx.agentId)
     return typeof inbox.requestedBy === "string" ? inbox.requestedBy : null;
-  return requesterOf(ctx.db, trigger);
+  return personBehindCall(ctx);
 }
