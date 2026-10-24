@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MACHINE_OPS, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -14,7 +14,13 @@ import {
 } from "../../runner/config";
 import { configFromGrant } from "../../runner/daemon";
 import { type HandlerContext, handleRequest, OP_ROUTES } from "../../runner/handlers";
-import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION } from "../../runner/install-script";
+import {
+  BROWSER_APT_PACKAGES,
+  DESKTOP_APT_PACKAGES,
+  installScript,
+  RUNNER_BUN_SHA256,
+  RUNNER_BUN_VERSION,
+} from "../../runner/install-script";
 import {
   AGENT_SLICE_LIMITS,
   agentSlice,
@@ -341,6 +347,81 @@ test("install.sh --system: the pinned Bun with its SHA-256, packages without rec
   expect(script).toContain("service install --system --no-start");
   expect(script.trimEnd().endsWith('main "$@"')).toBe(true);
 });
+
+test.if(posix)(
+  "install.sh --system: the libraries Chrome for Testing loads, by their t64 names where apt has them; with --desktop the screens' too",
+  () => {
+    const fake = home();
+    const tools = home();
+    for (const tool of ["xargs", "sed", "grep"]) symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
+    // apt-get notes its calls; apt-cache knows the packages in $KNOWN once apt-get update has fetched the lists.
+    writeFileSync(
+      path.join(fake, "apt-get"),
+      '#!/bin/sh\necho "apt-get $*" >> "$LOG"\ncase "$*" in *update*) : > "$LISTS" ;; esac\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      path.join(fake, "apt-cache"),
+      `#!/bin/sh\n[ -f "$LISTS" ] || exit 100\nshift\nfor p in "$@"; do case " $KNOWN " in *" $p "*) printf 'Package: %s\\nVersion: 1\\n\\n' "$p" ;; esac; done\n`,
+      { mode: 0o755 },
+    );
+    // Only the package step: everything after it writes to the computer's own folders.
+    const step = (desktop: boolean, opts: { known?: string[]; apt?: boolean } = {}) => {
+      const d = home();
+      const r = spawnSync("/bin/sh", ["-s"], {
+        input: installScript("https://agentes.test").replace(
+          /main "\$@"\n$/,
+          `DESKTOP=${desktop ? 1 : 0}\nsystem_packages\n`,
+        ),
+        encoding: "utf8",
+        env: {
+          PATH: opts.apt === false ? tools : `${fake}:${tools}`,
+          LOG: path.join(d, "log"),
+          LISTS: path.join(d, "lists"),
+          KNOWN: (opts.known ?? []).join(" "),
+        },
+      });
+      const log = path.join(d, "log");
+      return {
+        status: r.status,
+        out: `${r.stdout}${r.stderr}`,
+        calls: existsSync(log) ? readFileSync(log, "utf8") : "",
+      };
+    };
+    const update = "apt-get -qq -o DPkg::Lock::Timeout=600 update\n";
+    const install = (packages: readonly string[]) =>
+      `apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends ${packages.join(" ")}\n`;
+
+    // Debian 12, Ubuntu 22.04: the names as they are.
+    let r = step(false);
+    expect(r.status).toBe(0);
+    expect(r.out).toBe("Installing the packages for the agents' browser ...\n");
+    expect(r.calls).toBe(update + install(BROWSER_APT_PACKAGES));
+    // What a computer with the desktops' packages still lacks: they bring every other library Chrome links.
+    expect(BROWSER_APT_PACKAGES).toEqual(expect.arrayContaining(["libnss3", "libnspr4", "libasound2"]));
+
+    // Debian 13, Ubuntu 24.04: the renamed ones by their new names (Ubuntu's apt won't pick libasound2t64 itself).
+    const renamed = ["libasound2", "libatk-bridge2.0-0", "libatk1.0-0", "libatspi2.0-0", "libcups2", "libglib2.0-0"];
+    const t64 = BROWSER_APT_PACKAGES.map((p) => (renamed.includes(p) ? `${p}t64` : p));
+    r = step(false, { known: t64 });
+    expect(r.calls).toBe(update + install(t64));
+    expect(r.calls).toContain(" libasound2t64 ");
+
+    // With --desktop: one install with the screens' packages too.
+    r = step(true, { known: t64 });
+    expect(r.out).toBe("Installing the packages for the agents' browser and screens ...\n");
+    expect(r.calls).toBe(update + install([...t64, ...DESKTOP_APT_PACKAGES]));
+
+    // No apt: what to install, by name.
+    r = step(true, { apt: false });
+    expect(r.status).toBe(0);
+    expect(r.calls).toBe("");
+    expect(r.out).toBe(
+      "For the agents' browser and screens, install these packages (Debian names) with this computer's package manager:\n" +
+        `  ${[...BROWSER_APT_PACKAGES, ...DESKTOP_APT_PACKAGES].join(" ")}\n`,
+    );
+  },
+);
 
 test("one Bun for the repo, its image and system-mode computers (1.3.5 or newer)", () => {
   const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as { packageManager: string };

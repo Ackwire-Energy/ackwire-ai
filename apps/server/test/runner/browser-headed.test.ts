@@ -5,6 +5,7 @@ import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adap
 import {
   BrowserManager,
   type BrowserManagerOptions,
+  ChromeStartError,
   chromeEnv,
   chromeLaunchArgs,
   type OwnChrome,
@@ -61,12 +62,17 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const log: string[] = [];
   const chromes: FakeChrome[] = [];
   const desk = fakeDesktops(log);
-  /** Headed starts still to fail, as a Chrome does when its display goes away under it. */
-  const fails = { headed: 0 };
+  /**
+   * Headed starts still to fail, as a Chrome does when its display goes away under it; and whether every start
+   * fails as one missing a library does.
+   */
+  const fails = { headed: 0, libraries: false };
   let clock = 1_000_000;
   const manager = new BrowserManager({
     home,
-    log: () => {},
+    log: (line) => {
+      if (line.includes("didn't start")) log.push(line);
+    },
     send: () => true,
     secret: async () => null,
     command: [process.execPath, FAKE],
@@ -76,6 +82,14 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
     now: () => clock,
     idleMs: 60_000,
     async startChrome(_exe, args, _profile, env): Promise<OwnChrome> {
+      if (fails.libraries) {
+        log.push("chrome failed");
+        throw new ChromeStartError(
+          "this computer is missing system libraries it needs (libnspr4.so); install them there, then try again",
+          `missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+          ["libnspr4.so"],
+        );
+      }
       if (fails.headed > 0 && !args.includes("--headless=new")) {
         fails.headed--;
         log.push("chrome failed");
@@ -282,6 +296,30 @@ test.if(posix)(
     t.tick(5 * 60_000);
     await t.act("click", ["@e1"], true);
     expect(t.log).toEqual(["desktop dev", "chrome failed", "chrome", "desktop dev", "chrome"]);
+    expect(headed(last(t))).toBe(true);
+  },
+);
+
+test.if(posix)(
+  "a Chrome missing libraries says so, isn't tried headless, and its desktop isn't blamed for it",
+  async () => {
+    const t = setup();
+    t.fails.libraries = true;
+    const failed = await t.act("open", ["https://shop.example/"], true).then(
+      () => null,
+      (e: unknown) => e as RunnerError,
+    );
+    expect(failed?.message).toBe(
+      "Couldn't start the agent's browser: this computer is missing system libraries it needs (libnspr4.so); install them there, then try again",
+    );
+    expect(t.log).toEqual([
+      "desktop dev",
+      "chrome failed",
+      `the browser of dev didn't start: missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+    ]);
+    // Once they're installed, the next command starts it on its desktop.
+    t.fails.libraries = false;
+    expect(await t.act("open", ["https://shop.example/"], true)).toMatchObject({ success: true });
     expect(headed(last(t))).toBe(true);
   },
 );

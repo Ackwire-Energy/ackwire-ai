@@ -18,6 +18,7 @@ import {
   BrowserManager,
   type BrowserManagerOptions,
   CHROME_ARGS,
+  ChromeStartError,
   captureMarks,
   chromeLabel,
   chromeLaunchArgs,
@@ -28,6 +29,7 @@ import {
   type InputState,
   isWebPage,
   jpegSize,
+  launchChrome,
   type OwnChrome,
   relayCommands,
   type StreamSocket,
@@ -367,6 +369,62 @@ test("a normal Chrome user agent for the platform, and the whole launch line", (
     false,
   );
 });
+
+/** Starts a fake Chrome that runs `body` (sh) and exits; what `launchChrome` threw. */
+async function failedStart(body: string): Promise<ChromeStartError> {
+  const dir = tempDir("chrome-");
+  dirs.push(dir);
+  const exe = path.join(dir, "chrome");
+  writeFileSync(exe, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+  const err = await launchChrome(exe, ["--headless=new"], dir).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(ChromeStartError);
+  return err as ChromeStartError;
+}
+
+test.if(posix)(
+  "a Chrome that can't load its libraries says which, in words for people, never that its profile is in use",
+  async () => {
+    const loader = `echo "$0: error while loading shared libraries: libnspr4.so: cannot open shared object file: No such file or directory" >&2; exit 127`;
+    let err = await failedStart(loader);
+    expect(err.missing).toEqual(["libnspr4.so"]);
+    expect(err.message).toBe(
+      "this computer is missing system libraries it needs (libnspr4.so); install them there, then try again",
+    );
+    expect(err.detail).toMatch(
+      /^missing libnspr4\.so: \/.+\/chrome: error while loading shared libraries: libnspr4\.so:/,
+    );
+
+    // The loader stops at the first one: ldd lists them all, and people read the first few.
+    const bin = tempDir("ldd-");
+    dirs.push(bin);
+    const libs = ["libglib-2.0.so.0", "libnss3.so", "libnssutil3.so", "libsmime3.so", "libnspr4.so", "libX11.so.6"];
+    const all = [...libs, "libasound.so.2"];
+    writeFileSync(
+      path.join(bin, "ldd"),
+      `#!/bin/sh\nprintf '\\tlibc.so.6 => /lib/libc.so.6 (0x7f00)\\n'\nfor l in ${all.join(" ")}; do printf '\\t%s => not found\\n' "$l"; done\n`,
+      { mode: 0o755 },
+    );
+    const PATH = process.env.PATH;
+    process.env.PATH = `${bin}:${PATH}`;
+    try {
+      err = await failedStart(loader);
+    } finally {
+      process.env.PATH = PATH;
+    }
+    expect(err.missing).toEqual(all);
+    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more); install them there`);
+    expect(err.detail).toStartWith(`missing ${all.join(", ")}: `);
+
+    // Any other exit keeps its message, and what Chrome said goes to the logs.
+    err = await failedStart(`echo "Opening in existing browser session." >&2; exit 0`);
+    expect(err.missing).toEqual([]);
+    expect(err.message).toBe("Chrome closed while starting (another Chrome may be using this profile)");
+    expect(err.detail).toBe("Opening in existing browser session.");
+  },
+);
 
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
   const t = setup();
