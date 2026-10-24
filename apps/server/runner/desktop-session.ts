@@ -579,6 +579,12 @@ export class DesktopSessions {
       };
       mkdirSync(this.dir, { recursive: true, mode: 0o700 });
       const logFile = path.join(this.dir, `${id8(agent)}.log`);
+      // A desktop that ended by itself starts again at once: the log of the start that ended stays (`.log.1`).
+      try {
+        renameSync(logFile, `${logFile}.1`);
+      } catch {
+        // no earlier start
+      }
       const log = openSync(logFile, "w", 0o600);
       try {
         const script = [...user.prefix, "/bin/sh", "-c", PREPARE, "sh", user.dir, user.home, XFCE_SESSION_SETTINGS];

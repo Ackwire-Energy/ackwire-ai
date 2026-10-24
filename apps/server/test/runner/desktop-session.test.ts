@@ -511,6 +511,8 @@ test("limits and failures: the memory cap, Xvnc that doesn't start, a computer w
   expect(t.desktops.status(ops).running).toBe(false);
   t.fake.failXvnc(null);
   expect((await t.desktops.ensure(ops)).started).toBe(true);
+  // The failed start's log is kept beside the new one's.
+  expect(readFileSync(path.join(t.home, "desktop", "9f00aa11.log.1"), "utf8")).toContain("Failed to bind socket");
   await t.desktops.stop(ops);
 
   const bare = new DesktopSessions({ ...t.opts, system: { ...t.fake.system, which: () => null } });

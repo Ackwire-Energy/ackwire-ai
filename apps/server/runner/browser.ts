@@ -532,6 +532,9 @@ export async function launchChrome(
     await new Promise((r) => setTimeout(r, 100));
   }
   kill();
+  // Gone before anyone starts another Chrome on this profile (the headless retry of a headed start that hung):
+  // one still running would hold the profile.
+  await exited;
   throw new Error("Chrome didn't open its debugging port in time");
 }
 
@@ -1367,7 +1370,8 @@ export class BrowserManager {
       try {
         chrome = await launch(where).catch((err: unknown) => {
           if (!where) throw err;
-          // Its desktop went away while it started there: headless for now, like a desktop that can't start.
+          // A headed start failed (its desktop went away or hung under it): headless for now, like a desktop that
+          // can't start.
           session.desktopFailedAt = this.now();
           this.opts.log(
             `the browser of ${agent.handle} runs headless: ${err instanceof Error ? err.message : String(err)}`,
