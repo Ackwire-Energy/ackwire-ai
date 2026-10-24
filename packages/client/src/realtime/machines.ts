@@ -134,6 +134,8 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       qc.setQueryData<Machine[]>(list, (old) => old?.filter((m) => m.id !== machineId));
       // Its agents went back to the cloud (`agent.computer` events follow; refetch anyway).
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+      // The server's own computer, stopped here, offers to come back.
+      void qc.invalidateQueries({ queryKey: keys.hostComputer(orgId) });
       break;
   }
   return true;

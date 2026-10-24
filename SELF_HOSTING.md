@@ -533,6 +533,23 @@ Use HTTPS with a certificate from a public authority (Tailscale and the Caddy pr
 plain http the computer's token travels unencrypted, and the runner's background service doesn't
 load extra CA certificates.
 
+**This server as the agents' computer (Linux).** The machine agentes.chat runs on can be a computer
+too, for the organizations where the installation's first account is an owner or an admin, with each
+agent as its own user on it. Set a token in `.env` and give the same one to the runner, as root:
+
+```sh
+openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token
+echo "HOST_COMPUTER_TOKEN=$(cat /root/host-computer-token)" >> .env
+docker compose up -d
+curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system \
+  --server http://127.0.0.1:3000 --host-token-file /root/host-computer-token
+```
+
+Within a minute it shows as "Computador deste servidor" in each of those organizations, and agents
+without a computer start using it; admins stop it per organization there. `HOST_COMPUTER_TOKEN` can't
+be set with `ALLOW_SIGNUP=true`, and a new token retires the old one's connections when the server
+restarts.
+
 </details>
 
 <details>

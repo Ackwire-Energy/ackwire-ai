@@ -195,6 +195,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
     return {
       id: m.id,
       name: m.name,
+      /** `connected` (a person paired it), `host` (the server's own) or `managed` (the workspace's). */
+      kind: m.kind,
       online: machineOnline(m, now),
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
       hostname: m.hostname,

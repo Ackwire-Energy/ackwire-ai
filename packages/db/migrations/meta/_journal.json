@@ -645,6 +645,13 @@
       "when": 1792822806675,
       "tag": "0091_setup_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1792826510612,
+      "tag": "0092_host_computer",
+      "breakpoints": true
     }
   ]
 }

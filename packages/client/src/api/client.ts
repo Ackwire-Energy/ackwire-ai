@@ -69,6 +69,7 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  HostComputer,
   ImportInput,
   ImportPlan,
   Invitation,
@@ -416,6 +417,10 @@ export interface ApiClient {
     rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
     /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
     remove(orgId: string, machineId: string): Promise<void>;
+    /** The server's own computer in this organization; null when the server has none or doesn't serve it. */
+    host(orgId: string): Promise<HostComputer | null>;
+    /** Uses the server's computer again (admins); `remove` is how it stops. */
+    hostOn(orgId: string): Promise<HostComputer>;
     /**
      * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
      * (`machine.device_not_found` once expired, used or unknown).

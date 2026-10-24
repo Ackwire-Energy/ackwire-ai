@@ -53,6 +53,7 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  HostComputer,
   ImportPlan,
   Invitation,
   InvitationPreview,
@@ -547,6 +548,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           json: { name },
         }),
       remove: (orgId, machineId) => request<void>(`${org(orgId)}/machines/${enc(machineId)}`, { method: "DELETE" }),
+      host: (orgId) => nullOn(404, () => request<HostComputer>(`${org(orgId)}/machines/host`)),
+      hostOn: (orgId) => request<HostComputer>(`${org(orgId)}/machines/host`, { json: {} }),
       device: (userCode) => request<DeviceRequest>(`/api/app/machines/device/${enc(userCode)}`),
       confirmDevice: (orgId, userCode, input) =>
         request<Machine>(`${org(orgId)}/machines/device/${enc(userCode)}/confirm`, { json: input }),

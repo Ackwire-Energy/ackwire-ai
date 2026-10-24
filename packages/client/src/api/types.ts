@@ -2009,9 +2009,14 @@ export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: s
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
 /** `GET …/machines`: a computer connected with `agentes-runner`. */
+/** Where a computer came from: a person paired it, it is the server's own, or the workspace's own. */
+export type MachineKind = "connected" | "host" | "managed";
+
 export interface Machine {
   id: string;
   name: string;
+  /** Absent from a server that doesn't say: `connected`. */
+  kind?: MachineKind;
   /** Runner connected now (`machine.status` events). */
   online: boolean;
   lastSeenAt: string | null;
@@ -2035,6 +2040,13 @@ export interface Machine {
   access?: MachineAccess | null;
   /** ADR 0040 (protocol 12): whether the agent browser can run there; null or absent when its runner doesn't say. */
   browser?: MachineBrowser | null;
+}
+
+/** Whether the organization uses the server's own computer (`GET …/machines/host`). */
+export interface HostComputer {
+  machineId: string;
+  /** false: an admin stopped it in this organization. */
+  on: boolean;
 }
 
 /** The agent browser on a computer, as its runner reports it. Turned on at the computer (`access.tools.browser`). */

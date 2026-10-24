@@ -435,6 +435,34 @@ describe("Configurações → Computadores", () => {
     expect(document.querySelector(".machine-row")).toBeNull();
   });
 
+  test("this server's own computer: labelled, stopped here with its own words, and turned back on", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    const m = machines?.pair({ name: "srv-1", kind: "host" }) as Machine;
+    machines?.setHost({ machineId: m.id, on: true });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    const row = document.querySelector(".machine-row") as HTMLElement;
+    expect(row.textContent).toContain("srv-1");
+    expect(row.textContent).toContain("Computador deste servidor");
+
+    const menu = await openMenu(within(row).getByRole("button", { name: "Ações de srv-1" }));
+    await click(within(menu).getByRole("menuitem", { name: "Parar de usar nesta organização" }));
+    const confirm = screen().getByRole("dialog", { name: "Parar de usar o computador deste servidor?" });
+    expect(confirm.textContent).toContain("Dá para voltar a usar quando quiser");
+    await click(within(confirm).getByRole("button", { name: "Parar de usar nesta organização" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);
+
+    const off = document.querySelector(".machine-row") as HTMLElement;
+    expect(off.textContent).toContain("Esta organização não usa o computador deste servidor.");
+    await click(within(off).getByRole("button", { name: "Usar o computador deste servidor" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "machines.hostOn")?.args).toEqual([ORG_ID]);
+    expect(document.body.textContent).toContain("Pronto. Ele conecta em até um minuto.");
+  });
+
   test("someone else's machine: no actions", async () => {
     const api = createFakeApi(seedState());
     fakeMachinesOf.get(api)?.pair({ name: "Servidor do João", canManage: false, workspace: null });

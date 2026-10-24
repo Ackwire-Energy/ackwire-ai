@@ -84,6 +84,7 @@ export * from "./git/repo-listing";
 export * from "./git/repos";
 export * from "./git/tools";
 export * from "./hand-off";
+export * from "./host-computer";
 export * from "./imports";
 export * from "./invite-requests";
 export * from "./issue-columns";

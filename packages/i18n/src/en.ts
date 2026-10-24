@@ -525,6 +525,8 @@ export const en: Translations = {
       thisMacFolders: "Choose folders",
       otherComputer: "Connect another computer",
       connected: "{{name}} connected · {{os}}. The chosen agents will use this computer.",
+      hostReady: "The chosen agents will work on this server's computer.",
+      hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
     },
     team: {
       title: "Who else works with you?",
@@ -6614,6 +6616,20 @@ export const en: Translations = {
       browserText: "One click in the app's Preferences, under Tools. This page notices by itself.",
       noReport: "This Mac hasn't reported what it allows yet. Update the app.",
       update: "Update the app",
+    },
+    // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
+    host: {
+      label: "This server's computer",
+      desc: "The computer agentes.chat is installed on. Nothing to install.",
+      descUsers: "The computer agentes.chat is installed on, with one user for each agent.",
+      descShared: "The computer agentes.chat is installed on. Agents work as the person who installed it.",
+      stop: "Stop using it in this organization",
+      stopTitle: "Stop using this server's computer?",
+      stopText: "This organization's agents stop using this computer now. You can use it again whenever you want.",
+      stopped: "This organization no longer uses this server's computer.",
+      offText: "This organization doesn't use this server's computer.",
+      use: "Use this server's computer",
+      used: "Done. It connects within a minute.",
     },
     download: {
       title: "Connect a computer",

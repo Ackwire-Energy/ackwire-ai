@@ -86,3 +86,17 @@ export function computerState(m: Pick<Machine, "online" | "paused">, now = Date.
   if (isPaused(m, now)) return "paused";
   return m.online ? "online" : "offline";
 }
+
+/**
+ * Which `machines.host.*` line says what the server's own computer is: one
+ * user per agent on Linux (the runner's system mode there), the installer's
+ * own user on a Mac, neither said until it first connects.
+ */
+export function hostDescKey(os: string): "descUsers" | "descShared" | "desc" {
+  if (os === "linux") return "descUsers";
+  return os === "darwin" ? "descShared" : "desc";
+}
+
+/** What a computer is called on screen: its name, or `hostLabel` for the server's own until its runner names it. */
+export const machineTitle = (m: Pick<Machine, "name" | "kind">, hostLabel: string) =>
+  m.name || (m.kind === "host" ? hostLabel : "");

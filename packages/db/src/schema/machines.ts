@@ -37,6 +37,13 @@ export interface MachineAccess {
 }
 
 /**
+ * Where a computer came from: `connected` (a person paired it), `host` (the
+ * server's own computer, one row per organization it serves) or `managed`
+ * (the workspace's own computer, from the operator's provisioner).
+ */
+export type MachineKind = "connected" | "host" | "managed";
+
+/**
  * Connected computers (ADR 0025): machines people paired, where our runner
  * keeps one outbound WebSocket open. The token is stored as SHA-256 only;
  * deleting a machine (soft) clears it, so the runner is refused at once.
@@ -51,9 +58,15 @@ export const machines = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    kind: text().$type<MachineKind>().notNull().default("connected"),
     pairedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** SHA-256 (hex) of `agm_…`; null once deleted. */
     tokenHash: text().unique(),
+    /**
+     * `host` rows: SHA-256 of the `HOST_COMPUTER_TOKEN` their token was
+     * issued under; a server started with another one retires that token.
+     */
+    hostKey: text(),
     hostname: text().notNull().default(""),
     /** `linux`, `darwin`, `windows` or `other`. */
     os: text().notNull().default("other"),
@@ -96,7 +109,12 @@ export const machines = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [unique().on(t.orgId, t.id), index().on(t.orgId)],
+  (t) => [
+    unique().on(t.orgId, t.id),
+    index().on(t.orgId),
+    // Removed ones too: turning the server's computer back on brings the same row back.
+    uniqueIndex("machines_host_org").on(t.orgId).where(sql`${t.kind} = 'host'`),
+  ],
 );
 
 /**

@@ -2,7 +2,7 @@ import type { Machine, Model, Role } from "@agenteschat/client";
 import { keys, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { computerKind } from "@agenteschat/client/lib/machines";
+import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
 import {
   addInvites,
   type InviteDraft,
@@ -83,7 +83,8 @@ const HOST: Record<OnboardingStepId, Preset> = {
 const TYPING_MS = 900;
 const HAPPY_MS = 1600;
 
-type Computer = "cloud" | "machine" | null;
+/** `host`: the server's own computer. */
+type Computer = "cloud" | "machine" | "host" | null;
 /** An agent created here (a preset or an imported one), for the later steps. */
 interface CrewMember {
   key: string;
@@ -367,7 +368,7 @@ export function OnboardingPage() {
       const crewSoFar = await applyImported(list, key === "platform" ? "anthropic" : key);
       // The connected computer chosen a step before: every agent works there, and thinks with its
       // Claude Code when that was picked (the person confirmed the plan warning).
-      if (computer !== "machine" || !machine) return;
+      if ((computer !== "machine" && computer !== "host") || !machine) return;
       const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
       for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
       if (brain !== "claude_code") return;
@@ -506,9 +507,11 @@ export function OnboardingPage() {
     computer:
       computer === "cloud"
         ? t("onboarding.done.computerCloud")
-        : computer === "machine" && machine
-          ? machine.name
-          : t("onboarding.railValue.skipped"),
+        : computer === "host"
+          ? t("machines.host.label")
+          : computer === "machine" && machine
+            ? machine.name
+            : t("onboarding.railValue.skipped"),
     agents: crew.length
       ? joinNames(
           crew.map((c) => c.name),
@@ -756,11 +759,17 @@ export function OnboardingPage() {
                 cloudAvailable={cloudAvailable}
                 machine={machine}
                 onChoose={(c) => {
-                  setComputer(c);
-                  if (c !== "machine") {
+                  // Leaving the server's computer for "this computer": the pairing starts from nothing.
+                  if (c !== "machine" || computer === "host") {
                     setMachine(null);
                     setBrain("model");
                   }
+                  setComputer(c);
+                }}
+                onHost={(m) => {
+                  setComputer("host");
+                  setMachine(m);
+                  setBrain("model");
                 }}
                 onPaired={(m) => {
                   setMachine(m);
@@ -974,7 +983,15 @@ export function OnboardingPage() {
             <DoneStep
               orgName={orgName}
               agents={crew}
-              computer={computer === "cloud" ? "cloud" : computer === "machine" ? (machine?.name ?? null) : undefined}
+              computer={
+                computer === "cloud"
+                  ? "cloud"
+                  : computer === "host"
+                    ? t("machines.host.label")
+                    : computer === "machine"
+                      ? (machine?.name ?? null)
+                      : undefined
+              }
               invites={sent.size}
               wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
             />
@@ -1167,6 +1184,7 @@ function ComputerStep({
   machine,
   onChoose,
   onPaired,
+  onHost,
 }: {
   orgId: string;
   computer: Computer;
@@ -1174,9 +1192,16 @@ function ComputerStep({
   machine: Machine | null;
   onChoose: (c: Computer) => void;
   onPaired: (m: Machine) => void;
+  /** The server's own computer, picked (first in the list, and picked already once it's connected). */
+  onHost: (m: Machine) => void;
 }) {
   const { t } = useTranslation();
   const api = useApi();
+  const host = useMachines(orgId).data?.find((m) => m.kind === "host");
+  // Picked by itself only once it's connected: a server whose computer never came up would leave agents waiting.
+  useEffect(() => {
+    if (host?.online && computer === null) onHost(host);
+  }, [host, computer, onHost]);
   // The computers already there when "this computer" was picked: a new one is the one being connected.
   const [known, setKnown] = useState<Set<string> | null>(null);
   const waiting = computer === "machine" && known !== null && machine === null;
@@ -1227,6 +1252,15 @@ function ComputerStep({
     <>
       {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
       <div className="onb__choices" role="group" aria-label={t("onboarding.computer.title")}>
+        {host && (
+          <ChoiceCard
+            art={<ComputerPortrait kind={computerKind(host.os)} state={host.online ? "online" : "offline"} />}
+            title={t("machines.host.label")}
+            desc={t(`machines.host.${hostDescKey(host.os)}`)}
+            pressed={computer === "host"}
+            onClick={() => onHost(host)}
+          />
+        )}
         <ChoiceCard
           art={<ComputerPortrait kind="cloud" state={cloudAvailable ? "online" : "offline"} />}
           title={t("onboarding.computer.cloud")}
@@ -1248,6 +1282,13 @@ function ComputerStep({
         <p className="onb__status" role="status">
           <Icon name="check" />
           <span>{t("onboarding.computer.cloudReady")}</span>
+        </p>
+      )}
+
+      {computer === "host" && (
+        <p className="onb__status" role="status">
+          <Icon name="check" />
+          <span>{host?.online ? t("onboarding.computer.hostReady") : t("onboarding.computer.hostConnecting")}</span>
         </p>
       )}
 

@@ -32,6 +32,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     );
   }
   const config = result.data;
+  if (config.HOST_COMPUTER_TOKEN && config.ALLOW_SIGNUP) {
+    throw new ConfigError([
+      "HOST_COMPUTER_TOKEN can't be set with ALLOW_SIGNUP=true: this server's computer runs agents on the machine itself, so people join only by invitation",
+    ]);
+  }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;

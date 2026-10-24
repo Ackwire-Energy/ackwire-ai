@@ -93,6 +93,8 @@ export interface HandlerContext {
   exec: boolean;
   /** The machine token (authenticates `push` uploads). */
   token: string;
+  /** The server this computer is paired with: `push` uploads go there (`uploadUrl`). */
+  server?: string;
   fetch?: FetchLike;
   /** Where each agent's secrets live (ADR 0027); without it the machine keeps none. */
   secretsDir?: string;
@@ -405,6 +407,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       return pushPath({
         workspaceReal: ctx.workspaceReal,
         token: ctx.token,
+        ...(ctx.server ? { server: ctx.server } : {}),
         path: requireString(req.path, "path"),
         url: requireString(req.url, "url"),
         uploadId: requireString(req.uploadId, "uploadId"),

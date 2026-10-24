@@ -533,6 +533,8 @@ export const ptBR = {
       thisMacFolders: "Escolher pastas",
       otherComputer: "Conectar outro computador",
       connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
+      hostReady: "Os agentes escolhidos vão trabalhar no computador deste servidor.",
+      hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
     },
     team: {
       title: "Quem mais trabalha com você?",
@@ -6634,6 +6636,21 @@ export const ptBR = {
       browserText: "Um clique nas Preferências do app, em Ferramentas. A página percebe sozinha.",
       noReport: "Este Mac ainda não informou o que libera. Atualize o app.",
       update: "Atualizar o app",
+    },
+    // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
+    host: {
+      label: "Computador deste servidor",
+      desc: "O computador onde o agentes.chat está instalado. Nada para instalar.",
+      descUsers: "O computador onde o agentes.chat está instalado, com um usuário para cada agente.",
+      descShared: "O computador onde o agentes.chat está instalado. Os agentes trabalham como a pessoa que o instalou.",
+      stop: "Parar de usar nesta organização",
+      stopTitle: "Parar de usar o computador deste servidor?",
+      stopText:
+        "Os agentes desta organização deixam de usar este computador agora. Dá para voltar a usar quando quiser.",
+      stopped: "Esta organização não usa mais o computador deste servidor.",
+      offText: "Esta organização não usa o computador deste servidor.",
+      use: "Usar o computador deste servidor",
+      used: "Pronto. Ele conecta em até um minuto.",
     },
     download: {
       title: "Conectar um computador",

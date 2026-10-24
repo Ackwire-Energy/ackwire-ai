@@ -23,8 +23,12 @@ export interface RunnerConfig {
   brainIdleMinutes?: number;
   /** Brain turns: at most this many Claude Code processes kept alive (default 3). */
   brainMaxProcesses?: number;
-  /** ADR 0036: a home the desktop app created; `update` and `service install` refuse here. */
-  managedBy?: "desktop";
+  /**
+   * A home something else keeps: `desktop`, the desktop app's (ADR 0036);
+   * `host`, one organization's on the server's own computer (`agentes-runner
+   * host`). `pair`, `update` and `service install` refuse here.
+   */
+  managedBy?: "desktop" | "host";
   /** Protocol 9: paused by the owner; `until` null means until resumed. Absent: not paused. */
   paused?: { until: string | null };
   /** Protocol 10: folders and tools allowed on this machine (absent: derived from `exec`). */
@@ -42,8 +46,7 @@ export interface RunnerConfig {
   agentUidRange?: [number, number];
 }
 
-/** System mode's home (`install.sh --system`). */
-export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
+export { SYSTEM_RUNNER_HOME } from "@agenteschat/adapters/command-policy";
 export const DEFAULT_AGENT_UID_RANGE: [number, number] = [20000, 29999];
 
 /** A uid an agent user may have (1000–59999): never a system account's, and below the ranges systemd hands out itself. */
@@ -138,7 +141,7 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(positive(raw.taskMaxSeconds) ? { taskMaxSeconds: positive(raw.taskMaxSeconds) } : {}),
     ...(positive(raw.brainIdleMinutes) ? { brainIdleMinutes: positive(raw.brainIdleMinutes) } : {}),
     ...(positive(raw.brainMaxProcesses) ? { brainMaxProcesses: positive(raw.brainMaxProcesses) } : {}),
-    ...(raw.managedBy === "desktop" ? { managedBy: "desktop" as const } : {}),
+    ...(raw.managedBy === "desktop" || raw.managedBy === "host" ? { managedBy: raw.managedBy } : {}),
     ...(paused ? { paused } : {}),
     ...(access ? { access } : {}),
     ...(text(raw.orgId, 100) ? { orgId: text(raw.orgId, 100) } : {}),

@@ -643,10 +643,13 @@ export class RunnerDaemon implements RequestObserver {
     let supervisor: Supervisor | null = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
-      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor.
-      const guard = this.opts.workers
-        ? undefined
-        : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
+      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
+      // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
+      // would replace the others' rules with its own.
+      const guard =
+        this.opts.workers || config.managedBy === "host"
+          ? undefined
+          : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
       supervisor = new Supervisor({
         home,
         user: (agent) => users.ensure(agent),
@@ -666,6 +669,7 @@ export class RunnerDaemon implements RequestObserver {
         return daemon.access().tools.commands;
       },
       token: config.token,
+      server: config.server,
       secretsDir,
       gitDir: path.join(home, "git"),
       tasks,
@@ -1023,7 +1027,7 @@ export class RunnerDaemon implements RequestObserver {
       brainIdleMinutes: c.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes,
       brainMaxProcesses: c.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
       workspace: this.session?.workspaceReal ?? c.workspace,
-      ...(c.managedBy ? { managedBy: c.managedBy } : {}),
+      ...(c.managedBy === "desktop" ? { managedBy: c.managedBy } : {}),
     };
   }
 

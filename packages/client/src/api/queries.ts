@@ -1902,6 +1902,32 @@ export function useMachineAction(orgId: string) {
   });
 }
 
+/** The server's own computer in this organization; null when the server has none or doesn't serve it. */
+export const useHostComputer = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.hostComputer(orgId),
+    queryFn: () => api.machines.host(orgId),
+    enabled,
+    retry: false,
+    meta: { quiet: true },
+  });
+};
+
+/** "Usar o computador deste servidor": it comes back in the list and connects at its next sync. */
+export function useHostComputerOn(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.machines.hostOn(orgId),
+    meta: { silent: true },
+    onSuccess: (state) => {
+      qc.setQueryData(keys.hostComputer(orgId), state);
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+    },
+  });
+}
+
 // ── Forum ────────────────────────────────────────────────────────────────────
 
 export const useForumTopics = (orgId: string, enabled = true) => {

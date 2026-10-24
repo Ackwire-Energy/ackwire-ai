@@ -228,6 +228,15 @@ const insideOrTmp = (scope: CommandScope, p: string) => {
 export const AGENT_WORKER_HOMES = "/var/lib/agentes-runner-agents";
 
 /**
+ * System mode's runner home (`install.sh --system`), and the state of the server's own computer
+ * (`agentes-runner host`): every organization's machine token is in it.
+ */
+export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
+
+/** In the person's home only: the native install (the app, its `.env`, its database). Agents' own folders have a `.agentes` of theirs. */
+const HOME_SECRET_DIRS = [".agentes"] as const;
+
+/**
  * Folders that hold keys and tokens, anywhere (the runner's own home and its agents' workers' too): nothing
  * under them is read. One list for the server's checks (`SECRET_PATH`) and Claude Code's own rules
  * (`SECRET_READ_DENY_RULES`).
@@ -244,6 +253,7 @@ const SECRET_DIRS = [
   "Keychains",
   ".agentes-runner",
   path.basename(AGENT_WORKER_HOMES),
+  SYSTEM_RUNNER_HOME.slice(1),
   ".config/gh",
   ".config/gcloud",
 ] as const;
@@ -289,13 +299,19 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
  * and the like, which hold none), the runner's own home.
  */
 const SECRET_PATH = new RegExp(
-  `(^|/)(${SECRET_DIRS.map(escapeRe).join("|")})(/|$)|(^|/)(${SECRET_FILES.map(escapeRe).join("|")}|\\.env(\\.(?!(example|sample|template|dist|defaults)$)[\\w.-]+)?|id_[a-z0-9]+(\\.pub)?|.*\\.pem|.*\\.key)$`,
+  `(^|/)(${SECRET_DIRS.map(escapeRe).join("|")})(/|$)|^~/(${HOME_SECRET_DIRS.map(escapeRe).join("|")})(/|$)|(^|/)(${SECRET_FILES.map(escapeRe).join("|")}|\\.env(\\.(?!(example|sample|template|dist|defaults)$)[\\w.-]+)?|id_[a-z0-9]+(\\.pub)?|.*\\.pem|.*\\.key)$`,
   "i",
 );
 
 function secretPath(scope: CommandScope, p: string) {
   const r = resolveIn(scope, p);
-  return r === null || SECRET_PATH.test(r) || SECRET_PATH.test(p);
+  const home = scope.home;
+  return (
+    r === null ||
+    SECRET_PATH.test(r) ||
+    SECRET_PATH.test(p) ||
+    (home !== undefined && HOME_SECRET_DIRS.some((d) => under(r, path.join(home, d))))
+  );
 }
 
 /** A word of a line that can't be parsed plainly, without the quotes and substitution marks around it (`$(cat`, `x)`). */
@@ -880,11 +896,14 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
   ".config/gcloud",
   ".agentes-runner",
   path.basename(AGENT_WORKER_HOMES),
+  SYSTEM_RUNNER_HOME.slice(1),
   ".git-credentials",
   ".netrc",
   ".pgpass",
   "Library/Keychains",
-].flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`]);
+]
+  .flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`])
+  .concat(HOME_SECRET_DIRS.map((p) => `Bash(*~/${p}*)`));
 
 /**
  * The same secrets for Claude Code's own read tools (Read, and best effort Glob and Grep), from the
@@ -893,6 +912,7 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
  */
 export const SECRET_READ_DENY_RULES: readonly string[] = [
   ...SECRET_DIRS.flatMap((p) => [`Read(~/${p}/**)`, `Read(**/${p}/**)`]),
+  ...HOME_SECRET_DIRS.map((p) => `Read(~/${p}/**)`),
   "Read(~/Library/Keychains/**)",
   ...[...SECRET_FILES, ...SECRET_ENV_FILES, ...SECRET_KEY_FILES].flatMap((p) => [`Read(~/${p})`, `Read(**/${p})`]),
 ];

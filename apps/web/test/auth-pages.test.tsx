@@ -405,6 +405,37 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
   });
 
+  test("this server's own computer comes first and already picked; the agents go to it", async () => {
+    const { state, api } = await start();
+    const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    await throughImport(state);
+    const card = button(/Computador deste servidor/);
+    expect(card.getAttribute("aria-pressed")).toBe("true");
+    expect(card.textContent).toContain("com um usuário para cada agente");
+    expect(document.body.textContent).toContain("Os agentes escolhidos vão trabalhar no computador deste servidor.");
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+    await next();
+
+    // Its Claude Code isn't signed in yet: the agents think through a model, so the key screen comes as usual.
+    expect(screen().queryByRole("heading", { name: "Quem pensa" })).toBeNull();
+    await keepOnly("Theo · PM");
+    await next();
+    await click(button("Conectar depois"), 8);
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+    expect(calls(state, "agents.setBrain")).toHaveLength(0);
+  });
+
+  test("this server's computer not connected yet: offered, but not picked for you", async () => {
+    const { state, api } = await start();
+    fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host", online: false });
+    await throughImport(state);
+    expect(button(/Computador deste servidor/).getAttribute("aria-pressed")).toBe("false");
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await click(button(/Computador deste servidor/), 4);
+    expect(document.body.textContent).toContain("Ele conecta em até um minuto.");
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+  });
+
   test("computer before the agents: it connects live, its Claude Code thinks for them (no key); team invites go out", async () => {
     const { state, api, services, router } = await start();
     await throughImport(state);
