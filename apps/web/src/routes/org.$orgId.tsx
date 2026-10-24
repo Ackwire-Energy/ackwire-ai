@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
+import { ConnectAiProvider } from "@/components/ConnectAi";
 import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
@@ -86,7 +87,9 @@ function OrgLayout() {
               <div className="shell__work">
                 {!focused && <OutageNotices />}
                 <div className="shell__pages">
-                  <Outlet />
+                  <ConnectAiProvider>
+                    <Outlet />
+                  </ConnectAiProvider>
                 </div>
               </div>
             </div>

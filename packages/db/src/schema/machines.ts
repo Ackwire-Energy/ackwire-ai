@@ -72,8 +72,9 @@ export interface MachineAccess {
 
 /**
  * Where a computer came from: `connected` (a person paired it, ADR 0036 §5),
- * `host` (the server's own computer) or `managed` (the workspace's computer,
- * given by the operator's provisioner: ADR 0056 §10; one per organization).
+ * `host` (the server's own computer, one row per organization it serves) or
+ * `managed` (the workspace's computer, given by the operator's provisioner:
+ * ADR 0056 §10; one per organization).
  */
 export type MachineKind = "connected" | "host" | "managed";
 
@@ -96,6 +97,11 @@ export const machines = pgTable(
     pairedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** SHA-256 (hex) of `agm_…`; null once deleted. */
     tokenHash: text().unique(),
+    /**
+     * `host` rows: SHA-256 of the `HOST_COMPUTER_TOKEN` their token was
+     * issued under; a server started with another one retires that token.
+     */
+    hostKey: text(),
     hostname: text().notNull().default(""),
     /** `linux`, `darwin`, `windows` or `other`. */
     os: text().notNull().default("other"),
@@ -141,7 +147,9 @@ export const machines = pgTable(
   (t) => [
     unique().on(t.orgId, t.id),
     index().on(t.orgId),
-    // Removed ones too: issuing a computer again brings the same row back.
+    // Removed ones too: turning the server's computer back on, or issuing a
+    // managed computer again, brings the same row back.
+    uniqueIndex("machines_host_org").on(t.orgId).where(sql`${t.kind} = 'host'`),
     uniqueIndex("machines_managed_org").on(t.orgId).where(sql`${t.kind} = 'managed'`),
   ],
 );

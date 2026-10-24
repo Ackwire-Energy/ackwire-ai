@@ -1,5 +1,7 @@
 import type { EmailSender, PushSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
+import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
+import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -9,7 +11,7 @@ import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { sendQueuedEmail } from "./email";
-import { publishChannelEvent } from "./events";
+import { publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
 import { mentionHandoffs } from "./judge";
@@ -27,13 +29,14 @@ import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
+  type RouterDeps,
   type RouterStrategy,
   resolveRouterModel,
   routeMessage,
 } from "./router";
 import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
 import { executeRoutineRun } from "./routines";
-import type { AgentRun } from "./runs";
+import { type AgentRun, NO_AI } from "./runs";
 import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
@@ -96,9 +99,14 @@ const orgOf = (job: OutboxJob) => {
   return job.orgId;
 };
 
-/** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
-export function createJobHandlers(deps: JobDeps): JobHandlers {
-  const router = deps.router ?? { enabled: false, model: "" };
+/**
+ * The router of messages nobody mentioned (`message.posted`, and "Responder agora" routing one again):
+ * Jev when configured, with the LLM strategy as its fallback, and the organization's AI checked first.
+ * Null when routing is off.
+ */
+export function messageRouter(deps: JobDeps): RouterDeps | null {
+  const router = deps.router;
+  if (!router?.enabled) return null;
   const llm = createLlmRouterStrategy({
     gateway: deps.gateway,
     resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model, router.cheapModels),
@@ -128,14 +136,24 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           llm,
         )
       : llm);
-  const policy = {
-    ...DEFAULT_ROUTER_POLICY,
-    minScore: router.minScore ?? DEFAULT_ROUTER_POLICY.minScore,
-    maxHops: deps.maxHops,
+  return {
+    db: deps.db,
+    strategy,
+    policy: {
+      ...DEFAULT_ROUTER_POLICY,
+      minScore: router.minScore ?? DEFAULT_ROUTER_POLICY.minScore,
+      maxHops: deps.maxHops,
+    },
+    hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
   };
+}
+
+/** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
+export function createJobHandlers(deps: JobDeps): JobHandlers {
+  const routing = messageRouter(deps);
 
   // An agent's @mention starts the other agent only when it asks it to act now (the judge decides).
-  const mentionThreshold = router.mentionThreshold ?? 0.6;
+  const mentionThreshold = deps.router?.mentionThreshold ?? 0.6;
   /**
    * Which agents an agent's @mentions actually hand off to: the judge asks,
    * per mentioned agent, "is this asking it to act now?" (any language)
@@ -223,34 +241,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.meta.talker) return;
       // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
       if (message.meta.background) return;
-      const routed = async (
+      const routed = (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],
         runs: AgentRun[],
         reason?: string,
-      ) => {
-        // The runs answer where the message is.
-        const threadId = message.threadId;
-        await publishChannelEvent(deps.pubsub, {
-          type: "message.routed",
-          channelId: message.channelId,
-          messageId: message.id,
-          seenBy,
-          pickedBy: runs.map((r) => r.agentId),
-          runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
-          strategy,
-          ...(reason ? { reason } : {}),
-        });
-        for (const run of runs) {
-          await publishChannelEvent(deps.pubsub, {
-            type: "agent.thinking",
-            channelId: message.channelId,
-            threadId,
-            agentId: run.agentId,
-            runId: run.id,
-          });
-        }
-      };
+        intent?: ConnectIntent,
+      ) => publishRouted(deps.pubsub, message, { strategy, seenBy, runs, ...(reason ? { reason } : {}), ...intent });
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
       // The forum moves by its own turns (ADR 0022): no mentions, router or DMs there.
       if (where?.kind === "forum") return;
@@ -267,8 +264,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.authorType !== "person") {
         // Between agents only (`ask_agent`, ADR 0034): the consultation runs are started by the tool.
         if (where && isAgentOnlyDm(where)) return;
-        // A notice is for its own agent (`deliverNotice` starts or joins its run): nobody else chimes in.
-        if (message.meta.notice) return;
+        // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
+        // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
+        if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {
@@ -297,9 +295,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
         // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
         // channels, never in a mission's thread (the mission's own turns run it).
-        if (!router.enabled || where?.kind !== "channel") return;
+        if (!routing || where?.kind !== "channel") return;
         if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
-        const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+        const res = await routeMessage(routing, input, ctx);
         // Receipts only when someone answers: an agent's message isn't waiting for anyone.
         if (res.runs.length > 0) await routed("router", res.seenBy ?? [], res.runs, res.reason);
         return;
@@ -337,7 +335,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
         return;
       }
-      if (!router.enabled) return routed("none", [], []);
+      if (!routing) return routed("none", [], []);
       // In a mission's thread only its owner and deciders make the agent work (the router included).
       if (message.threadId && message.authorUserId) {
         const mission = await missionOfThread(deps.db, message.orgId, message.threadId);
@@ -346,8 +344,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           if (role !== "owner" && role !== "decide") return routed("none", [], [], "mission_read_only");
         }
       }
-      const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+      const res = await routeMessage(routing, input, ctx);
       if (res.skipped === "already_routed") return;
+      // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
+      if (res.reason === NO_AI) {
+        const intent = await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });
+        return routed("none", [], [], NO_AI, intent);
+      }
       await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason);
     },
     "agent_run.execute": async (job, ctx) => {

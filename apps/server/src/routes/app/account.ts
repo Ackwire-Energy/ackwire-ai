@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  addHostComputer,
   appleSignInTokens,
   avatarFile,
   changeMemberRole,
@@ -473,6 +474,7 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
       const { organization, general } = await createOrganization(db, c.get("user").id, input);
+      if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
       if (teamSize || (timezone && isValidTimeZone(timezone))) {
         await updateOrgSettings(db, c.get("user").id, organization.id, {
           ...(teamSize ? { teamSize } : {}),

@@ -35,7 +35,7 @@ import "./team.css";
  * consultation lights its line for a moment. Tap an agent for its card.
  */
 
-/** Capability keys shown as chips (context, memory and skills are on every agent: no news). */
+/** Capability keys shown as chips (context, memory, skills and workspace setup are on every agent: no news). */
 const CAPS = {
   drive: "drive",
   issues: "issues",
@@ -52,7 +52,7 @@ const CAPS = {
   custom: "plug",
 } as const satisfies Record<string, IconName>;
 type CapKey = keyof typeof CAPS;
-const HIDDEN_CAPS = new Set(["context", "memory", "skills"]);
+const HIDDEN_CAPS = new Set(["context", "memory", "skills", "setup"]);
 const isCap = (k: string): k is CapKey => k in CAPS;
 
 /** How long a new consultation's line stays lit, in ms. */

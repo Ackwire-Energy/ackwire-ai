@@ -530,7 +530,7 @@ export const ptBR = {
       title: "Onde a gente vai trabalhar?",
       lead: "Para rodar código e mexer em arquivos, a gente precisa de um computador. Ações sensíveis continuam pedindo aprovação.",
       cloud: "Computador na nuvem",
-      cloudDesc: "Um Linux só do workspace, nada para instalar. Precisa de uma chave de API.",
+      cloudDesc: "Um computador só do workspace, nada para instalar. Precisa de uma chave de API.",
       cloudUnavailable: "Ainda não disponível neste servidor. Conecte um computador seu.",
       cloudReady: "Computador na nuvem ligado. Fica pronto quando o primeiro agente precisar.",
       mine: "Este computador ou um servidor",
@@ -542,6 +542,8 @@ export const ptBR = {
       thisMacFolders: "Escolher pastas",
       otherComputer: "Conectar outro computador",
       connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
+      hostReady: "Os agentes escolhidos vão trabalhar no computador deste servidor.",
+      hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
     },
     team: {
       title: "Quem mais trabalha com você?",
@@ -888,6 +890,70 @@ export const ptBR = {
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
   },
+  /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
+  noAi: {
+    banner: {
+      org: "Os agentes ainda não têm uma IA para pensar.",
+      orgHint: "Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
+      orgAction: "Conectar uma IA",
+    },
+    agent: "{{name}} não vai responder porque não tem uma IA conectada.",
+    card: {
+      line: "Depois de conectar, {{name}} responde a sua mensagem.",
+      connected: "Pronto: {{name}} já tem uma IA.",
+      answerNow: "Responder agora",
+      answering: "{{name}} está respondendo…",
+      stillMissing: "Ainda falta conectar uma IA para {{name}}.",
+    },
+    action: "Conectar",
+    locked: "Quem conecta a IA de {{name}}: um admin, com uma chave de API, ou {{owner}}, com o próprio plano.",
+    lockedAdmins: "Só um admin pode conectar uma IA.",
+    receipt: "Ninguém vai responder: falta uma IA",
+    chip: "Sem IA",
+  },
+  /** The Connect dialog: its first step and the plan sign-in around the existing flows. */
+  connectAi: {
+    title: {
+      any: "Conectar uma IA",
+      claude: "Conectar o seu plano do Claude",
+      chatgpt: "Conectar o seu plano do ChatGPT",
+      api_key: "Adicionar uma chave de API",
+    },
+    option: {
+      claude: "Plano do Claude",
+      claudeDesc: "Pro, Max ou Team, pelo Claude Code",
+      chatgpt: "Plano do ChatGPT",
+      chatgptDesc: "Plus, Pro ou Team, pelo Codex",
+      api_key: "Chave de API",
+      api_keyDesc: "Anthropic, OpenAI e outros; paga pelo uso",
+    },
+    waitComputer: "Disponível quando o computador ficar pronto (alguns minutos). Dá para usar uma chave de API agora.",
+    agent: "Para qual agente",
+    keyLocked: "Uma chave de API, só um admin adiciona.",
+    accountsLocked: "Só {{name}} conecta um plano no {{computer}}.",
+    later: "Conectar depois",
+    laterNote: "Os agentes começam a responder quando uma IA estiver conectada.",
+  },
+  /** An API key pasted in a message, before it goes out. */
+  keyGuard: {
+    title: "Isso parece uma chave de API",
+    text: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Salve como chave da organização: ela fica cifrada e ninguém vê.",
+    textMember: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Uma chave é como uma senha.",
+    save: "Salvar como chave",
+    remove: "Tirar do texto",
+    send: "Enviar mesmo assim",
+  },
+  /** An agent's card whose button opens the app's own dialog, filled in (`meta.actionCard`). */
+  actionCard: {
+    connect_ai: {
+      title: "Conectar uma IA para {{agents}}",
+      title_claude: "Conectar o plano do Claude para {{agents}}",
+      title_chatgpt: "Conectar o plano do ChatGPT para {{agents}}",
+      title_api_key: "Adicionar uma chave de API para {{agents}}",
+    },
+    connect: "Conectar",
+    connected: "Conectado",
+  },
   dm: {
     subtitle: "{{role}} · responde a {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
@@ -933,6 +999,7 @@ export const ptBR = {
     },
     channel: {
       agent_added: "Chamei {{agentName}} para <b>#{{channel}}</b>",
+      created: "Criei o canal <b>#{{name}}</b>",
     },
     wiki: {
       page_created: "Criei a página <b>{{title}}</b> na wiki",
@@ -1854,6 +1921,7 @@ export const ptBR = {
         missing_credential: "Falta uma chave da {{provider}} no workspace.",
         credential_revoked: "A chave deste agente foi revogada.",
         credential_wrong_provider: "O modelo é da {{modelProvider}}, mas a chave é da {{keyProvider}}.",
+        no_ai: "O agente não tem uma IA conectada.",
         org_paused: "Os agentes do workspace estão pausados.",
         org_suspended: "O workspace está indisponível.",
         agent_paused: "O agente está pausado.",
@@ -2460,6 +2528,11 @@ export const ptBR = {
       description:
         "Usar qualquer app na tela própria do agente, no computador dele; as pessoas podem assistir e assumir o controle. Ali ele pode rodar qualquer coisa, então também precisa de Rodar código e da tela ligada nesse computador.",
     },
+    setup_write: {
+      label: "Configurar o workspace",
+      description:
+        "Oferecer conectar uma IA com um card que uma pessoa clica, e criar canais para quem pediu, com Desfazer.",
+    },
     github_git_read: {
       label: "Clonar repositórios (git)",
       description:
@@ -2996,6 +3069,7 @@ export const ptBR = {
       credential_wrong_provider: "A chave de API é de outro provedor",
       agent_archived: "O agente foi arquivado",
       interrupted: "Interrompida por uma atualização",
+      no_ai: "O agente não tem uma IA conectada",
       org_paused: "Não rodou: os agentes do workspace estavam pausados",
       org_suspended: "Não rodou: o workspace estava indisponível",
       agent_paused: "Não rodou: o agente estava pausado",
@@ -5460,6 +5534,7 @@ export const ptBR = {
       forum: "Fórum",
       sandbox: "Rodar código",
       browser: "Navegador",
+      setup: "Configurar o workspace",
       desktop: "Tela",
     },
     areaText: {
@@ -5478,6 +5553,7 @@ export const ptBR = {
       browser: {
         write: "Navega em sites com o próprio navegador no computador conectado; os logins ficam por agente.",
       },
+      setup: { write: "Oferece conectar uma IA e cria canais para quem pediu." },
       desktop: {
         write:
           "Usa qualquer app na própria tela, no computador dele, enquanto as pessoas assistem ou assumem o controle. Também precisa de Rodar código.",
@@ -6645,6 +6721,7 @@ export const ptBR = {
       notContinuable: "Esta resposta não pode mais ser continuada.",
       agentBusy: "O agente já está trabalhando nesta conversa. Espere ele terminar para continuar.",
       continueForbidden: "Só quem pediu, o dono do agente ou um admin pode continuar.",
+      notRestartable: "Esta resposta já tinha começado, então não dá para recomeçar. Mande a mensagem de novo.",
     },
     artifact: {
       fileTooLarge: "O arquivo passa de {{max}} MB, o limite por arquivo.",
@@ -6718,6 +6795,21 @@ export const ptBR = {
       browserText: "Um clique nas Preferências do app, em Ferramentas. A página percebe sozinha.",
       noReport: "Este Mac ainda não informou o que libera. Atualize o app.",
       update: "Atualizar o app",
+    },
+    // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
+    host: {
+      label: "Computador deste servidor",
+      desc: "O computador onde o agentes.chat está instalado. Nada para instalar.",
+      descUsers: "O computador onde o agentes.chat está instalado, com um usuário para cada agente.",
+      descShared: "O computador onde o agentes.chat está instalado. Os agentes trabalham como a pessoa que o instalou.",
+      stop: "Parar de usar nesta organização",
+      stopTitle: "Parar de usar o computador deste servidor?",
+      stopText:
+        "Os agentes desta organização deixam de usar este computador agora. Dá para voltar a usar quando quiser.",
+      stopped: "Esta organização não usa mais o computador deste servidor.",
+      offText: "Esta organização não usa o computador deste servidor.",
+      use: "Usar o computador deste servidor",
+      used: "Pronto. Ele conecta em até um minuto.",
     },
     download: {
       title: "Conectar um computador",
@@ -7262,6 +7354,8 @@ export const ptBR = {
         readingWiki: "Leu a wiki",
         linkingWiki: "Ligou a uma página da wiki",
         readingForum: "Leu o fórum",
+        creatingChannel: "Criou um canal",
+        offeringConnectAi: "Ofereceu conectar uma IA",
         usingTool: "Usou a ferramenta {{tool}}",
         thinking: "Pensou",
         typing: "Escreveu",
@@ -7322,6 +7416,8 @@ export const ptBR = {
       readingWiki: "lendo a wiki",
       linkingWiki: "ligando a uma página da wiki",
       readingForum: "lendo o fórum",
+      creatingChannel: "criando um canal",
+      offeringConnectAi: "preparando a conexão de uma IA",
       usingTool: "usando uma ferramenta",
     },
     tokens: "{{value}} tokens",
@@ -7381,6 +7477,8 @@ export const ptBR = {
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora; respondo quando ele voltar.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
+      no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
+      action_connect_ai: "Conectar uma IA",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
@@ -7551,6 +7649,14 @@ export const ptBR = {
     link_to_wiki: {
       label: "Ligar páginas da wiki",
       description: "Liga uma página a outras quando alguém pede.",
+    },
+    offer_connect_ai: {
+      label: "Oferecer conectar uma IA",
+      description: "Posta um card cujo botão abre a conexão de um plano ou de uma chave de API.",
+    },
+    create_channel: {
+      label: "Criar canal",
+      description: "Cria um canal com pessoas e agentes para quem pediu, com Desfazer.",
     },
     run_code: {
       label: "Rodar código",

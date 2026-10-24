@@ -258,6 +258,14 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     [["--runner-sha256"], "--runner-sha256 needs a value"],
     [["--runner-sha256", "abc"], "64 lowercase hex digits"],
     [["--runner-sha256", "A".repeat(64)], "64 lowercase hex digits"],
+    [["--host-token-file", "/bin/sh"], "go with --system"],
+    [["--system", "--host-token-file", "/nonexistent/host-token"], "can't read /nonexistent/host-token"],
+    [
+      ["--system", "--host-token-file", "/bin/sh", "--enroll-file", "/run/agentes/enroll-code"],
+      "doesn't go with --host-token-file",
+    ],
+    [["--server", "ftp://box"], "--server takes the server's address"],
+    [["--server"], "--server needs a value"],
     [["--bogus"], "unknown option: --bogus"],
   ] as const) {
     const r = runScript(...args);
@@ -271,7 +279,16 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     expect(help.stdout).toContain(flag);
   }
   expect(help.stdout).toContain("--runner-sha256");
+  expect(help.stdout).toContain("--host-token-file");
   expect(help.stdout).toContain("--enroll-file");
+  // Where this computer reaches the server, when the script's address isn't reachable from here.
+  const h = home();
+  const elsewhere = spawnSync("sh", ["-s", "--", "--server", "http://127.0.0.1:9/", "--no-service"], {
+    input: installScript("https://agentes.test"),
+    encoding: "utf8",
+    env: { ...process.env, HOME: h, AGENTES_RUNNER_HOME: path.join(h, "runner-home") },
+  });
+  expect(elsewhere.stdout).toContain("Downloading the runner from http://127.0.0.1:9 ...");
 });
 
 test.if(posix)("install.sh --runner-sha256: a bundle with another SHA-256 is never installed", () => {

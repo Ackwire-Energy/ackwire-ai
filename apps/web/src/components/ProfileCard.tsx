@@ -11,6 +11,7 @@ import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
@@ -205,6 +206,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           <span className="small muted">
             {agent.role ? t("issues.agentRole", { role: agent.role }) : t("profile.agent")}
           </span>
+          <NoAiChip agentId={agent.id} />
         </div>
       </div>
       <dl className="profile-card__facts">

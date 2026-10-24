@@ -77,6 +77,7 @@ const ELSEWHERE = new Set([
   "open_forum_topic",
   "post_in_forum",
   "add_agent_to_channel",
+  "create_channel",
   "request_secret",
   "request_permission",
   "request_folder_access",
@@ -93,6 +94,7 @@ const HERE = new Set([
   "browser_ask_person",
   "desktop_ask_person",
   "update_thread",
+  "offer_connect_ai",
 ]);
 
 /** Reads under a scope that also writes, by name. */

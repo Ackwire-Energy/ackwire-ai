@@ -1,6 +1,7 @@
 import {
   activeRunsIn,
   addChannelMember,
+  answerNow,
   createChannel,
   joinChannel,
   listChannelMembers,
@@ -14,6 +15,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
+  aiStatusDeps,
   body,
   createAppRouter,
   errors,
@@ -368,6 +370,39 @@ export function chatRoutes(deps: AppDeps) {
       // post → `message.created` published (the commit and the event happen inside postPersonMessage).
       c.header("server-timing", `created;dur=${(performance.now() - started).toFixed(1)}`);
       return c.json(message, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/messages/{messageId}/answer-now",
+      tags,
+      security,
+      summary: "Once an AI is connected, the agent answers what it couldn't (Responder agora)",
+      description:
+        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (a personal plan answers only its owner). Pressed again, it returns the runs that answer it.",
+      request: { params: OrgParams.extend({ messageId: z.uuid() }) },
+      responses: {
+        200: json(z.object({ runs: z.array(z.object({ agentId: z.uuid(), runId: z.uuid() })) })),
+        429: errorResponse("Too many requests"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const user = c.get("user");
+      // It sends the message again, in effect: the same limit as posting.
+      const limit = await adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      const result = await answerNow(
+        { ...aiStatusDeps(deps), db, pubsub: adapters.pubsub, router: deps.extras?.router ?? null },
+        user.id,
+        orgId,
+        messageId,
+      );
+      deps.wakeWorkers?.();
+      return c.json(result, 200);
     },
   );
 

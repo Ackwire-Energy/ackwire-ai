@@ -37,13 +37,16 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test packages/setup
       - run: bun run --filter '@agenteschat/setup' typecheck
-      # The bundle as npx runs it: under Node, in a directory of its own, touching nothing.
-      - name: Build, then run the bundle under Node
+      # The bundle as npx runs it (Node) and as install.sh runs it (bun x --bun), in a directory of its
+      # own, touching nothing.
+      - name: Build, then run the bundle under Node and Bun
         run: |
           bun run --filter '@agenteschat/setup' build
           node packages/setup/dist/index.js --help
+          bun packages/setup/dist/index.js --help
           cd "$(mktemp -d)"
           node "$GITHUB_WORKSPACE/packages/setup/dist/index.js" --dry-run --json | jq -e '.ok and .dryRun'
+          bun "$GITHUB_WORKSPACE/packages/setup/dist/index.js" --dry-run --json | jq -e '.ok and .dryRun'
       # npm ≥ 11.5.1 exchanges the OIDC token itself; publish runs prepublishOnly (the build) again.
       - run: npm install -g npm@11.8.0
       - run: npm publish

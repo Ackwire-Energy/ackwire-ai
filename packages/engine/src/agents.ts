@@ -1,4 +1,4 @@
-import { and, asc, type Database, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
 import { recordAudit } from "./audit";
@@ -243,6 +243,22 @@ export const agentView = (a: Agent) => ({
   appearance: (a.appearance ?? null) as AgentAppearance | null,
   createdAt: a.createdAt,
 });
+
+/** `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. */
+export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
+  const handles = [
+    ...new Set((Array.isArray(raw) ? raw : []).map((h) => String(h).replace(/^@/, "").trim().toLowerCase())),
+  ];
+  const rows =
+    handles.length === 0
+      ? []
+      : await db
+          .select({ id: agents.id, handle: agents.handle, name: agents.name })
+          .from(agents)
+          .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
+  const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
+  return { handles, rows, missing };
+}
 
 /** `getAgent` through the per-process cache (run path). */
 export function getAgentCached(db: Database, orgId: string, agentId: string): Promise<Agent | null> {

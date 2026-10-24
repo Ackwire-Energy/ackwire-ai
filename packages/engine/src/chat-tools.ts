@@ -41,7 +41,7 @@ const plain = (v: string) =>
  * Who in the organization `who` names: their @handle, email, full name, or a first name only one person
  * has. Several: the agent asks which one.
  */
-async function findMember(ctx: ToolContext, who: string) {
+export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: string) {
   const people = await ctx.db
     .select({
       userId: schema.organizationMembers.userId,

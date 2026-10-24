@@ -521,7 +521,7 @@ export const en: Translations = {
       title: "Where will we work?",
       lead: "To run code and work with files, we need a computer. Sensitive actions still ask for approval.",
       cloud: "Cloud computer",
-      cloudDesc: "A Linux machine just for the workspace, nothing to install. Needs an API key.",
+      cloudDesc: "A computer just for the workspace, nothing to install. Needs an API key.",
       cloudUnavailable: "Not available on this server yet. Connect a computer of yours.",
       cloudReady: "Cloud computer on. It gets ready when the first agent needs it.",
       mine: "This computer or a server",
@@ -534,6 +534,8 @@ export const en: Translations = {
       thisMacFolders: "Choose folders",
       otherComputer: "Connect another computer",
       connected: "{{name}} connected · {{os}}. The chosen agents will use this computer.",
+      hostReady: "The chosen agents will work on this server's computer.",
+      hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
     },
     team: {
       title: "Who else works with you?",
@@ -879,6 +881,66 @@ export const en: Translations = {
     seenBy: "Seen by {{names}}",
     retry: "Try again",
   },
+  noAi: {
+    banner: {
+      org: "Your agents don't have an AI to think with yet.",
+      orgHint: "Connect yours, or just type what you want, like “use my Claude plan”.",
+      orgAction: "Connect an AI",
+    },
+    agent: "{{name}} won't reply because it has no AI connected.",
+    card: {
+      line: "Once it's connected, {{name}} answers your message.",
+      connected: "Done: {{name}} has an AI now.",
+      answerNow: "Answer now",
+      answering: "{{name}} is answering…",
+      stillMissing: "{{name}} still has no AI connected.",
+    },
+    action: "Connect",
+    locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
+    lockedAdmins: "Only an admin can connect an AI.",
+    receipt: "Nobody will answer: no AI connected",
+    chip: "No AI",
+  },
+  connectAi: {
+    title: {
+      any: "Connect an AI",
+      claude: "Connect your Claude plan",
+      chatgpt: "Connect your ChatGPT plan",
+      api_key: "Add an API key",
+    },
+    option: {
+      claude: "Claude plan",
+      claudeDesc: "Pro, Max or Team, through Claude Code",
+      chatgpt: "ChatGPT plan",
+      chatgptDesc: "Plus, Pro or Team, through Codex",
+      api_key: "API key",
+      api_keyDesc: "Anthropic, OpenAI and others; pay as you go",
+    },
+    waitComputer: "Available once the computer is ready (a few minutes). You can use an API key now.",
+    agent: "For which agent",
+    keyLocked: "Only an admin adds an API key.",
+    accountsLocked: "Only {{name}} connects a plan on {{computer}}.",
+    later: "Connect later",
+    laterNote: "Agents start answering once an AI is connected.",
+  },
+  keyGuard: {
+    title: "This looks like an API key",
+    text: "Everything in the chat is visible to people and agents. Save it as an organization key instead: it's encrypted and nobody sees it.",
+    textMember: "Everything in the chat is visible to people and agents. A key is like a password.",
+    save: "Save as a key",
+    remove: "Remove it",
+    send: "Send anyway",
+  },
+  actionCard: {
+    connect_ai: {
+      title: "Connect an AI for {{agents}}",
+      title_claude: "Connect a Claude plan for {{agents}}",
+      title_chatgpt: "Connect a ChatGPT plan for {{agents}}",
+      title_api_key: "Add an API key for {{agents}}",
+    },
+    connect: "Connect",
+    connected: "Connected",
+  },
   dm: {
     subtitle: "{{role}} · answers to {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
@@ -924,6 +986,7 @@ export const en: Translations = {
     },
     channel: {
       agent_added: "Brought {{agentName}} into <b>#{{channel}}</b>",
+      created: "Created the channel <b>#{{name}}</b>",
     },
     wiki: {
       page_created: "Created the wiki page <b>{{title}}</b>",
@@ -1847,6 +1910,7 @@ export const en: Translations = {
         missing_credential: "The workspace has no {{provider}} key.",
         credential_revoked: "This agent's key was revoked.",
         credential_wrong_provider: "The model is from {{modelProvider}}, but the key is from {{keyProvider}}.",
+        no_ai: "The agent has no AI connected.",
         org_paused: "The workspace's agents are paused.",
         org_suspended: "The workspace is unavailable.",
         agent_paused: "The agent is paused.",
@@ -2447,6 +2511,11 @@ export const en: Translations = {
       description:
         "Use any app on its own desktop on the agent's computer; people can watch and take control. It can run anything there, so it also needs Run code, and the desktop turned on on that computer.",
     },
+    setup_write: {
+      label: "Set up the workspace",
+      description:
+        "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo.",
+    },
     github_git_read: {
       label: "Clone repositories (git)",
       description:
@@ -2984,6 +3053,7 @@ export const en: Translations = {
       credential_wrong_provider: "The API key is from another provider",
       agent_archived: "The agent was archived",
       interrupted: "Interrupted by an update",
+      no_ai: "The agent has no AI connected",
       org_paused: "Didn't run: the workspace's agents were paused",
       org_suspended: "Didn't run: the workspace was unavailable",
       agent_paused: "Didn't run: the agent was paused",
@@ -5446,6 +5516,7 @@ export const en: Translations = {
       forum: "Forum",
       sandbox: "Run code",
       browser: "Browser",
+      setup: "Workspace setup",
       desktop: "Desktop",
     },
     areaText: {
@@ -5465,6 +5536,7 @@ export const en: Translations = {
       forum: { write: "Opens topics, reads and posts in the forum." },
       sandbox: { write: "Runs code on the agent's PC; machine time costs money." },
       browser: { write: "Browses websites in its own browser on its connected computer; logins stay per agent." },
+      setup: { write: "Offers to connect an AI and creates channels for whoever asked." },
       desktop: {
         write:
           "Uses any app on its own desktop on its computer, while people watch or take control. Needs Run code too.",
@@ -6628,6 +6700,7 @@ export const en: Translations = {
       notContinuable: "This answer can't be continued anymore.",
       agentBusy: "The agent is already working in this conversation. Wait for it to finish to continue.",
       continueForbidden: "Only who asked, the agent's owner or an admin can continue it.",
+      notRestartable: "This answer had already started, so it can't start over. Send your message again.",
     },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",
@@ -6702,6 +6775,20 @@ export const en: Translations = {
       browserText: "One click in the app's Preferences, under Tools. This page notices by itself.",
       noReport: "This Mac hasn't reported what it allows yet. Update the app.",
       update: "Update the app",
+    },
+    // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
+    host: {
+      label: "This server's computer",
+      desc: "The computer agentes.chat is installed on. Nothing to install.",
+      descUsers: "The computer agentes.chat is installed on, with one user for each agent.",
+      descShared: "The computer agentes.chat is installed on. Agents work as the person who installed it.",
+      stop: "Stop using it in this organization",
+      stopTitle: "Stop using this server's computer?",
+      stopText: "This organization's agents stop using this computer now. You can use it again whenever you want.",
+      stopped: "This organization no longer uses this server's computer.",
+      offText: "This organization doesn't use this server's computer.",
+      use: "Use this server's computer",
+      used: "Done. It connects within a minute.",
     },
     download: {
       title: "Connect a computer",
@@ -7241,6 +7328,8 @@ export const en: Translations = {
         readingWiki: "Read the wiki",
         linkingWiki: "Linked a wiki page",
         readingForum: "Read the forum",
+        creatingChannel: "Created a channel",
+        offeringConnectAi: "Offered to connect an AI",
         usingTool: "Used the {{tool}} tool",
         thinking: "Thought",
         typing: "Wrote",
@@ -7301,6 +7390,8 @@ export const en: Translations = {
       readingWiki: "reading the wiki",
       linkingWiki: "linking a wiki page",
       readingForum: "reading the forum",
+      creatingChannel: "creating a channel",
+      offeringConnectAi: "getting an AI ready to connect",
       usingTool: "using a tool",
     },
     tokens: "{{value}} tokens",
@@ -7360,6 +7451,8 @@ export const en: Translations = {
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
+      no_ai: "I can't answer yet: I have no AI connected.",
+      action_connect_ai: "Connect an AI",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       browser_handoff: "I need help in my browser.",
@@ -7531,6 +7624,14 @@ export const en: Translations = {
     link_to_wiki: {
       label: "Link wiki pages",
       description: "Links a page to others when someone asks.",
+    },
+    offer_connect_ai: {
+      label: "Offer to connect an AI",
+      description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+    },
+    create_channel: {
+      label: "Create channel",
+      description: "Creates a channel with people and agents for the person asking, with Undo.",
     },
     run_code: {
       label: "Run code",

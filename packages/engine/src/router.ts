@@ -1,13 +1,14 @@
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
+import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
 import { quotedLine } from "./context";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage } from "./messages";
-import type { AgentRun } from "./runs";
+import { type AgentRun, NO_AI } from "./runs";
 import { standingRefusal } from "./standing";
 
 const {
@@ -293,31 +294,36 @@ export async function cheapModelForOrg(db: Database, orgId: string, perProvider:
 /**
  * The provider of an organization's own model calls: its default key's, else
  * its newest key's, else Anthropic (the platform key). Also the line an agent
- * on "Automático" without a key of its own picks from.
+ * on "Automático" without a key of its own picks from. Cached with the org's
+ * default keys (`invalidateDefaults` drops both on any key or settings change).
  */
 export async function orgModelProvider(db: Executor, orgId: string): Promise<string> {
-  const [settings] = await db
-    .select({ provider: schema.providerCredentials.provider })
-    .from(organizationSettings)
-    .innerJoin(schema.providerCredentials, eq(schema.providerCredentials.id, organizationSettings.defaultCredentialId))
-    .where(and(eq(organizationSettings.orgId, orgId), isNull(schema.providerCredentials.revokedAt)));
-  let provider = settings?.provider;
-  if (!provider) {
+  return (await caches.credentials.getOrLoad(`${orgId}:default:@provider`, async () => {
+    const [settings] = await db
+      .select({ provider: schema.providerCredentials.provider })
+      .from(organizationSettings)
+      .innerJoin(
+        schema.providerCredentials,
+        eq(schema.providerCredentials.id, organizationSettings.defaultCredentialId),
+      )
+      .where(and(eq(organizationSettings.orgId, orgId), isNull(schema.providerCredentials.revokedAt)));
+    if (settings?.provider) return settings.provider;
     const [newest] = await db
       .select({ provider: schema.providerCredentials.provider })
       .from(schema.providerCredentials)
       .where(and(eq(schema.providerCredentials.orgId, orgId), isNull(schema.providerCredentials.revokedAt)))
       .orderBy(desc(schema.providerCredentials.createdAt))
       .limit(1);
-    provider = newest?.provider ?? "anthropic";
-  }
-  return provider;
+    return newest?.provider ?? "anthropic";
+  })) as string;
 }
 
 export interface RouterDeps {
   db: Database;
   strategy: RouterStrategy;
   policy: RouterPolicy;
+  /** Whether the organization has any AI (`orgHasAi`); without it the strategy is always asked. */
+  hasAi?(orgId: string): Promise<boolean>;
 }
 
 export interface RouteResult {
@@ -358,7 +364,8 @@ export { AGENT_CHIME_IN_MAX_HOP };
  *
  * Transient strategy failures rethrow (the outbox retries); on the final
  * attempt, or for permanent ones (no credential, invalid output), the
- * decision is stored with the error and nobody answers.
+ * decision is stored with the error and nobody answers. With no AI in the
+ * organization (`hasAi`) the strategy isn't asked: the decision is `no_ai`.
  */
 export async function routeMessage(
   deps: RouterDeps,
@@ -427,6 +434,23 @@ export async function routeMessage(
     about: r.instructions.slice(0, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
+  // No AI anywhere in the organization: nobody could answer, whatever the strategy (Jev only scores, so it
+  // never misses a key). Stored as `no_ai`, which "Responder agora" routes again once an AI is connected.
+  if (deps.hasAi && !(await deps.hasAi(message.orgId))) {
+    const stored = await db
+      .insert(routingDecisions)
+      .values({
+        orgId: message.orgId,
+        channelId: message.channelId,
+        messageId: message.id,
+        strategy: deps.strategy.name,
+        candidates: [],
+        error: NO_AI,
+      })
+      .onConflictDoNothing()
+      .returning({ id: routingDecisions.id });
+    return stored.length > 0 ? { runs: [], selected: [], reason: NO_AI } : { runs: [], skipped: "already_routed" };
+  }
   // What each one can reach, by name ("Sentry"): a question about an app goes to who has it.
   const [granted, connections] = await Promise.all([
     db
@@ -596,7 +620,13 @@ export async function routeMessage(
         error: error instanceof Error ? error.message.slice(0, 500) : String(error),
       })
       .onConflictDoNothing();
-    return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId) };
+    return {
+      runs: [],
+      selected: [],
+      seenBy: candidates.map((c) => c.agentId),
+      // No key the router can use while the organization has AI (only plans, on computers): mentions answer.
+      ...(error instanceof MissingCredentialError ? { reason: "mention_needed" } : {}),
+    };
   }
 
   // The router's own pick; when it picks several agents, the message speaks to several.

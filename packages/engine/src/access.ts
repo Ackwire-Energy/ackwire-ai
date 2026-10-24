@@ -53,6 +53,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
+  "setup:write": ["offer_connect_ai", "create_channel"],
   "sandbox:run": [
     "run_code",
     "write_file",
@@ -164,6 +165,14 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     description: "Adds or rewrites a section when someone asks.",
   },
   link_to_wiki: { label: "Link wiki pages", description: "Links a page to others when someone asks." },
+  offer_connect_ai: {
+    label: "Offer to connect an AI",
+    description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+  },
+  create_channel: {
+    label: "Create channel",
+    description: "Creates a channel with people and agents for the person asking, with Undo.",
+  },
   run_code: { label: "Run code", description: "Runs Python, Node or bash in the conversation's isolated environment." },
   write_file: { label: "Write to environment", description: "Writes a file in the code environment." },
   read_file: { label: "Read from environment", description: "Reads a file from the code environment." },

@@ -17,6 +17,7 @@ const GROUPS: Record<string, string> = {
   wiki: "Organization wiki",
   sandbox: "Code",
   browser: "Browser",
+  setup: "Workspace setup",
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",

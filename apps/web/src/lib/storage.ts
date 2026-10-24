@@ -1,27 +1,31 @@
-/** localStorage that never throws (private mode, blocked storage). */
-export const storage = {
+const safe = (area: () => Storage) => ({
   get(key: string): string | null {
     try {
-      return localStorage.getItem(key);
+      return area().getItem(key);
     } catch {
       return null;
     }
   },
   set(key: string, value: string) {
     try {
-      localStorage.setItem(key, value);
+      area().setItem(key, value);
     } catch {
       // Not persisted.
     }
   },
   remove(key: string) {
     try {
-      localStorage.removeItem(key);
+      area().removeItem(key);
     } catch {
       // Ignore.
     }
   },
-};
+});
+
+/** localStorage that never throws (private mode, blocked storage). */
+export const storage = safe(() => localStorage);
+/** sessionStorage (this tab only), the same way. */
+export const sessionStore = safe(() => sessionStorage);
 
 export const STORAGE_KEYS = {
   theme: "agentes.theme",
@@ -42,6 +46,8 @@ export const STORAGE_KEYS = {
   outagesDismissed: "agentes.outages.dismissed",
   /** The desktop app's right click: "ours" (default) or "system" (lib/context-menu.ts). */
   menuLook: "agentes.desktop.menu",
+  /** Prefix (`.<message id>`, in `sessionStore`): the Connect dialog already opened by itself for that message. */
+  noAiOpened: "agentes.noAi.opened",
   /** The keyboard layout the person chose for agents' screens they control (`DESKTOP_KEYBOARDS`). */
   screenKeyboard: "agentes.screen.keyboard",
 } as const;

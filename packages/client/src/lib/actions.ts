@@ -123,6 +123,8 @@ export function actionTextValues(
     }
     case "channel.agent_added":
       return { agentName: str(p.agentName), channel: str(p.channel) || a.target.title || "" };
+    case "channel.created":
+      return { name: str(p.name) || a.target.title || "" };
     case "wiki.page_created":
     case "wiki.page_edited":
       return { title };

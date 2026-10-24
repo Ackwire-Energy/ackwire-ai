@@ -687,6 +687,20 @@
       "when": 1792848909133,
       "tag": "0097_ai_accounts_people",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792851366514,
+      "tag": "0098_setup_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1792851370991,
+      "tag": "0099_host_computer",
+      "breakpoints": true
     }
   ]
 }

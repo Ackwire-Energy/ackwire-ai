@@ -385,6 +385,7 @@ function useRefresh() {
   return () => {
     for (const key of [
       keys.agentBrain(org.id, agent.id),
+      keys.aiStatus(org.id),
       keys.computer(org.id, agent.id),
       keys.agentBrowser(org.id, agent.id),
       keys.scopes(org.id, agent.id),

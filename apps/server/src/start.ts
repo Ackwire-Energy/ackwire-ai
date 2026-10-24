@@ -42,6 +42,7 @@ import {
   enableOperatorEvents,
   isBlockedAddress,
   resolveHostDns,
+  retireHostTokens,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
@@ -93,6 +94,12 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
 
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
   await prepareDatabase(database, log, config.RUN_MIGRATIONS_ON_BOOT);
+  // Best effort: a replica that boots before the migrations ran (RUN_MIGRATIONS_ON_BOOT=false) still starts.
+  await retireHostTokens(database.db, config.HOST_COMPUTER_TOKEN).then(
+    (retired) =>
+      retired > 0 && log.info("this server's computer: tokens of an earlier HOST_COMPUTER_TOKEN retired", { retired }),
+    (error: unknown) => log.warn("couldn't check this server's computer's tokens", { error: String(error) }),
+  );
 
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
@@ -186,6 +193,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         browserLive: engine.browserLive,
         streams: engine.streams,
         talker: engine.talker,
+        router: engine.router,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
         appleRevoke: appleTokenRevoker(config),
       },

@@ -14,6 +14,7 @@ import {
   SECRET_BASH_DENY_RULES,
   SECRET_MESSAGE,
   SECRET_READ_DENY_RULES,
+  SYSTEM_RUNNER_HOME,
   secretRead,
   shellWords,
   simpleCommands,
@@ -428,6 +429,24 @@ describe("secrets are refused to every read tool", () => {
     // Claude Code refuses it itself, also in a mission whose settings allow `cat`.
     expect(SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: `cat ${store}` }))).toBe(true);
     expect(secretRead("Bash", { command: "cat /var/lib/dpkg/status" }, scope)).toBe(false);
+  });
+
+  test("the server's own computer: every organization's tokens and the native install stay out of reads", () => {
+    const tokens = `${SYSTEM_RUNNER_HOME}/orgs/0192a6b0-0000-7000-8000-00000000000a/config.json`;
+    expect(secretRead("Read", { file_path: tokens }, scope)).toBe(true);
+    expect(secretRead("Bash", { command: `cat ${tokens}` }, scope)).toBe(true);
+    expect(SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: `cat ${tokens}` }))).toBe(true);
+    // The native install's folder in the person's home (its database and `.env`), however it is spelled.
+    for (const file of ["~/.agentes/data/base/1", "/Users/w/.agentes/data/base/1"]) {
+      expect([file, secretRead("Read", { file_path: file }, scope)]).toEqual([file, true]);
+    }
+    expect(SECRET_READ_DENY_RULES).toContain("Read(~/.agentes/**)");
+    expect(SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: "ls ~/.agentes/data" }))).toBe(true);
+    // An agent's own `.agentes` (its mission files) is not that one.
+    const mission = "/Users/w/agentes/ada/mission-1/.agentes/mission.md";
+    expect(secretRead("Read", { file_path: mission }, scope)).toBe(false);
+    expect(bash(`cat ${mission}`)).toBe(true);
+    expect(SECRET_READ_DENY_RULES.some((r) => r.startsWith("Read(**/.agentes/"))).toBe(false);
   });
 });
 

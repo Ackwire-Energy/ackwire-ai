@@ -2,6 +2,7 @@ import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
+import installScript from "../../../install.sh" with { type: "text" };
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accessRoutes } from "./routes/app/access";
@@ -81,6 +82,7 @@ export interface AppOptions {
  * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
+ * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -187,6 +189,11 @@ export function createApp(options: AppOptions) {
   app.notFound((c) =>
     c.req.path.startsWith("/api/") ? apiError(c, 404, "not_found", "Route not found") : c.text("Not found", 404),
   );
+  for (const path of ["/install", "/install.sh"]) {
+    app.get(path, (c) =>
+      c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
+    );
+  }
 
   if (options.webDir) {
     const assets = serveStatic({ root: options.webDir });
