@@ -7276,9 +7276,8 @@ a.machine-row__name:hover {
   display: flex;
   flex-direction: column;
 }
-/* How it works lives in the overview's side column; up here only where that column is gone (responsive.css). */
+/* How it works under the name, where the overview's side column is gone (AgentPage: workInAside). */
 .agp-hero__work {
-  display: none;
   padding: 18px var(--agp-gutter) 0;
 }
 .agp-ident {

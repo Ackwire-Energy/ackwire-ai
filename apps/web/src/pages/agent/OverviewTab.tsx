@@ -31,7 +31,7 @@ export function OverviewTab() {
   const locale = i18n.language;
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const { agent, g, viewer, saved, goTo, can, resources, ownerFirst, openWork } = useAgentEdit();
+  const { agent, g, viewer, saved, goTo, can, resources, ownerFirst, openWork, workInAside } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
@@ -257,12 +257,14 @@ export function OverviewTab() {
 
         {/* The quiet side column: how it works and its numbers, then who and where. */}
         <div className="agp-col agp-aside">
-          <section className="agp-aside__work" aria-labelledby="ov-work">
-            <h2 id="ov-work" className="agp-aside__h">
-              {t("agentPage.work.cell.label")}
-            </h2>
-            <WorkCard onOpen={openWork} footer={<Numbers />} />
-          </section>
+          {workInAside && (
+            <section className="agp-aside__work" aria-labelledby="ov-work">
+              <h2 id="ov-work" className="agp-aside__h">
+                {t("agentPage.work.cell.label")}
+              </h2>
+              <WorkCard onOpen={openWork} footer={<Numbers />} />
+            </section>
+          )}
           <Card as="section" className="agp-card" aria-labelledby="ov-who">
             <CardHead
               id="ov-who"

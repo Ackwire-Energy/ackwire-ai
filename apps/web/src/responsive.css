@@ -248,16 +248,10 @@
     white-space: nowrap;
   }
 }
-/* Agent page: one column below the desktop; how it works moves up under the name (on every tab). */
+/* Agent page: one column below the desktop (AgentPage moves "Como trabalha" under the name there). */
 @media (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .agp-aside__work {
-    display: none;
-  }
-  .agp-hero__work {
-    display: block;
   }
 }
 @media (max-width: 900px) {
@@ -377,12 +371,6 @@
 @container agp-side (max-width: 1100px) {
   .agp-cols {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .agp-aside__work {
-    display: none;
-  }
-  .agp-hero__work {
-    display: block;
   }
 }
 @container agp-side (max-width: 900px) {

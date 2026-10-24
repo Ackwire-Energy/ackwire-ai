@@ -94,7 +94,7 @@ export function AgentHero({
   const { org } = useOrg();
   const navigate = useNavigate();
   const toast = useToast();
-  const { agent, draft, viewer, goTo, saved, openWork } = useAgentEdit();
+  const { agent, draft, viewer, goTo, saved, openWork, workInAside } = useAgentEdit();
   const detail = useAgentDetail(org.id, agent.id);
   const live = useLiveRun(agent.id);
   const busy = Boolean(live && live.status !== "waiting_approval");
@@ -205,9 +205,11 @@ export function AgentHero({
         </div>
         {/* Narrow (the panel beside its DM, small screens): how it works stays up here, on every tab. Wide, it
             is the overview's side column (OverviewTab). In the panel the numbers stay on the full page. */}
-        <div className="agp-hero__work">
-          <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
-        </div>
+        {!workInAside && (
+          <div className="agp-hero__work">
+            <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+          </div>
+        )}
       </section>
     </header>
   );

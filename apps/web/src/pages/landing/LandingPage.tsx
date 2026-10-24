@@ -324,6 +324,7 @@ export function LandingPage() {
                 𝕏
               </a>
             </nav>
+            <p className="lp-footer__company">{t("landing.footerCompany")}</p>
           </div>
         </footer>
       </div>
