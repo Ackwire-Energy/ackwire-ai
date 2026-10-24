@@ -1,4 +1,4 @@
-import type { BrowserHandoffInfo, MachineReplies, PubSub } from "@agenteschat/adapters";
+import type { AgentScope, BrowserHandoffInfo, MachineReplies, PubSub, ScreenKind } from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -33,7 +33,7 @@ import { bodyCode, runWhere } from "../run-tools";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { agentBrowserStatus, browserUnavailableText } from "./status";
-import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserHandoffResult, type BrowserPage } from "./types";
+import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserHandoffResult, type BrowserPage, DESKTOP_SCOPE } from "./types";
 
 const { browserHandoffs, agentRuns, agents, messages, users } = schema;
 
@@ -52,6 +52,43 @@ export const CONTROL_GRACE_MS = 2 * 60_000;
 /** While the person in control watches, their grace is pushed at most this often (one write, not one per frame). */
 const CONTROL_TOUCH_EVERY_MS = 30_000;
 export const ASK_PERSON_TOOL = "browser_ask_person";
+
+/** What a handoff needs of each screen. */
+interface Screen {
+  /** What the agent reads: the screen, what it shows, and the tool that reads it again. */
+  what: string;
+  thing: string;
+  read: string;
+  /** People may drive the screen only while the agent may use this tool itself. */
+  tool: { name: string; scope: string };
+  /** The computer it runs on while no open handoff holds one. */
+  machine(agent: { machineId: string | null; browserMachineId: string | null }): string | null;
+  /** "Parar" on the computer. */
+  stop(hub: MachineCaller, machineId: string, agent: AgentScope): Promise<unknown>;
+}
+const SCREENS: Record<ScreenKind, Screen> = {
+  browser: {
+    what: "browser",
+    thing: "page",
+    read: "browser_read",
+    tool: { name: "browser_open", scope: BROWSER_SCOPE },
+    // The one its browser tools last used: a mission's or its own, whichever run used it.
+    machine: (agent) => agent.browserMachineId ?? agent.machineId,
+    stop: (hub, machineId, agent) =>
+      hub.call<"browser.stop">(machineId, { op: "browser.stop", agent }, { timeoutMs: 30_000 }),
+  },
+  desktop: {
+    what: "desktop",
+    thing: "screen",
+    read: "desktop_read",
+    tool: { name: "desktop_do", scope: DESKTOP_SCOPE },
+    machine: (agent) => agent.machineId,
+    stop: async () => {
+      throw new ValidationError("This agent has no desktop to stop");
+    },
+  },
+};
+
 /**
  * Server-side topic of handoff changes (never sent to clients): every
  * replica's live view hears them, so the one holding the computer's socket
@@ -79,6 +116,7 @@ export interface BrowserHandoffView {
   agentId: string;
   runId: string | null;
   machineId: string;
+  screen: ScreenKind;
   kind: "ask" | "takeover";
   instructions: string;
   status: BrowserHandoffStatus;
@@ -97,6 +135,7 @@ export function handoffView(h: BrowserHandoffRow): BrowserHandoffView {
     agentId: h.agentId,
     runId: h.runId,
     machineId: h.machineId,
+    screen: h.screen,
     kind: h.kind,
     instructions: h.instructions,
     status: h.status,
@@ -140,37 +179,39 @@ export function handoffResultText(
   result: BrowserHandoffResult,
   kind: "ask" | "takeover" = "ask",
   facts?: HandoffFacts,
+  screen: ScreenKind = "browser",
 ): string {
-  return `${outcomeText(result, kind)}${factsText(result, facts)}`;
+  return `${outcomeText(result, kind, screen)}${factsText(result, facts, screen)}`;
 }
 
-function outcomeText(result: BrowserHandoffResult, kind: "ask" | "takeover"): string {
+function outcomeText(result: BrowserHandoffResult, kind: "ask" | "takeover", screen: ScreenKind): string {
+  const { what, thing, read } = SCREENS[screen];
   if (kind === "takeover") {
     if (result.result === "expired") {
-      return "A person took control of your browser and left without handing it back. The page may be anywhere now: read it again (browser_read) and check where things are before assuming anything.";
+      return `A person took control of your ${what} and left without handing it back. The ${thing} may be anywhere now: read it again (${read}) and check where things are before assuming anything.`;
     }
     if (result.result !== "done") {
-      return "A person had control of your browser and ended it without handing it back as done. Read the page again (browser_read) and check where things are before assuming anything.";
+      return `A person had control of your ${what} and ended it without handing it back as done. Read the ${thing} again (${read}) and check where things are before assuming anything.`;
     }
-    return "A person used your browser and handed it back. The page may have changed: read it again (browser_read) before acting.";
+    return `A person used your ${what} and handed it back. The ${thing} may have changed: read it again (${read}) before acting.`;
   }
   if (result.result === "done") {
-    return "The person says it's done. Read the page again (browser_read) and check it worked before going on; if it didn't, say so instead of carrying on.";
+    return `The person says it's done. Read the ${thing} again (${read}) and check it worked before going on; if it didn't, say so instead of carrying on.`;
   }
   if (result.result === "failed") {
-    return "The person couldn't do it. Read the page again and decide what to do; if you are stuck, say what you need in your reply.";
+    return `The person couldn't do it. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
   if (result.result === "cancelled") {
-    return "A person canceled the request. Read the page again and decide what to do; if you are stuck, say what you need in your reply.";
+    return `A person canceled the request. Read the ${thing} again and decide what to do; if you are stuck, say what you need in your reply.`;
   }
-  return "No one did it in time. Read the page again; if it still needs a person, say so in your reply instead of asking again right away.";
+  return `No one did it in time. Read the ${thing} again; if it still needs a person, say so in your reply instead of asking again right away.`;
 }
 
 /** A page as the agent reads it: the title (the site's words, quoted) and the address. */
 const pageText = (p: BrowserPage) => (p.title ? `${JSON.stringify(p.title.slice(0, 120))} at ${p.url}` : p.url);
 
 /** The facts of a person's turn, on their own line; their note quoted as their own words. */
-function factsText(result: BrowserHandoffResult, facts?: HandoffFacts): string {
+function factsText(result: BrowserHandoffResult, facts?: HandoffFacts, screen: ScreenKind = "browser"): string {
   const said: string[] = [];
   const who = facts?.person?.trim() || "The person";
   if (typeof facts?.forMs === "number") {
@@ -179,7 +220,7 @@ function factsText(result: BrowserHandoffResult, facts?: HandoffFacts): string {
     // When they took control isn't known here (they answered from the card, or on another server).
     said.push(`${who} answered.`);
   }
-  if (facts?.taken) said.push(`When they took it, the page was ${pageText(facts.taken)}.`);
+  if (facts?.taken) said.push(`When they took it, the ${SCREENS[screen].thing} was ${pageText(facts.taken)}.`);
   if (facts?.returned) {
     said.push(
       `${result.result === "done" ? "When they handed it back" : "When their control ended"}, it was ${pageText(facts.returned)}.`,
@@ -252,11 +293,11 @@ async function handoffFacts(db: Executor, row: BrowserHandoffRow): Promise<Hando
 // ── Access ────────────────────────────────────────────────────────────────────
 
 /**
- * Who may watch an agent's browser, and take part in its handoffs: org admins,
+ * Who may watch an agent's screen, and take part in its handoffs: org admins,
  * the agent's responsible person, the person a handoff was asked of, and the
  * person behind the work (who asked for the run waiting on it, or for one of
  * the agent's runs going on now). Not everyone who can read a channel: the
- * browser shows all of the agent's work, DMs included.
+ * screen shows all of the agent's work, DMs included.
  */
 export async function requireBrowserAccess(
   db: Database,
@@ -264,6 +305,7 @@ export async function requireBrowserAccess(
   orgId: string,
   agentId: string,
   handoff?: BrowserHandoffRow | null,
+  screen: ScreenKind = "browser",
 ) {
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
@@ -275,7 +317,7 @@ export async function requireBrowserAccess(
   const admin = can(membership.role, "manage_agents");
   const access = { ...agent, admin };
   if (admin || agent.owner === userId) return access;
-  const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId) : handoff;
+  const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId, screen) : handoff;
   if (open?.requestedForUserId === userId) return access;
   const runs = open?.runId
     ? [open.runId]
@@ -296,22 +338,27 @@ export async function requireBrowserAccess(
   for (const runId of runs) {
     if ((await humanBehindRun({ db }, orgId, runId)) === userId) return access;
   }
-  throw new ForbiddenError("You can't use this agent's browser");
+  throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
 }
 
 /**
- * The computer an agent's browser runs on now: an open handoff's, else the
- * one its browser tools last used (`agents.browser_machine_id`: a mission's
- * or its own, whichever run used it), else the agent's own computer.
+ * The computer an agent's screen runs on now: an open handoff's, else the
+ * screen's own choice (for the browser `agents.browser_machine_id`, else the
+ * agent's own computer).
  */
-export async function browserMachineOf(db: Database, orgId: string, agentId: string): Promise<string | null> {
-  const open = await openHandoffOf(db, orgId, agentId);
+export async function browserMachineOf(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  screen: ScreenKind = "browser",
+): Promise<string | null> {
+  const open = await openHandoffOf(db, orgId, agentId, screen);
   if (open) return open.machineId;
   const [agent] = await db
     .select({ machineId: agents.machineId, browserMachineId: agents.browserMachineId })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-  return agent?.browserMachineId ?? agent?.machineId ?? null;
+  return agent ? SCREENS[screen].machine(agent) : null;
 }
 
 async function loadHandoff(db: Executor, orgId: string, handoffId: string) {
@@ -323,8 +370,8 @@ async function loadHandoff(db: Executor, orgId: string, handoffId: string) {
   return row;
 }
 
-/** The handoff open on an agent's browser (a person in control, or asked to be), if any. */
-export async function openHandoffOf(db: Executor, orgId: string, agentId: string) {
+/** The handoff open on one of an agent's screens (a person in control, or asked to be), if any. */
+export async function openHandoffOf(db: Executor, orgId: string, agentId: string, screen: ScreenKind = "browser") {
   const [row] = await db
     .select()
     .from(browserHandoffs)
@@ -332,6 +379,7 @@ export async function openHandoffOf(db: Executor, orgId: string, agentId: string
       and(
         eq(browserHandoffs.orgId, orgId),
         eq(browserHandoffs.agentId, agentId),
+        eq(browserHandoffs.screen, screen),
         inArray(browserHandoffs.status, OPEN),
       ),
     )
@@ -342,7 +390,7 @@ export async function openHandoffOf(db: Executor, orgId: string, agentId: string
 
 export async function getHandoff(db: Database, userId: string, orgId: string, handoffId: string) {
   const row = await loadHandoff(db, orgId, handoffId);
-  await requireBrowserAccess(db, userId, orgId, row.agentId, row);
+  await requireBrowserAccess(db, userId, orgId, row.agentId, row, row.screen);
   return handoffView(row);
 }
 
@@ -405,8 +453,9 @@ export function openHandoffsOfMachine(db: Executor, machineId: string) {
     .where(and(eq(browserHandoffs.machineId, machineId), inArray(browserHandoffs.status, OPEN)));
 }
 
-/** The agent's page with its browser open (the app reads `?browser=1`). */
-export const agentBrowserLink = (orgId: string, agentId: string) => `/org/${orgId}/agents/${agentId}?browser=1`;
+/** The agent's page with that screen open (the app reads `?browser=1`, `?desktop=1`). */
+export const agentBrowserLink = (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
+  `/org/${orgId}/agents/${agentId}?${screen}=1`;
 
 /**
  * An open handoff as the computer's desktop app shows it (`browser.handoff`):
@@ -425,7 +474,7 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
       : row.kind === "ask"
         ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
         : `/org/${row.orgId}/c/${where.channelId}`
-    : agentBrowserLink(row.orgId, row.agentId);
+    : agentBrowserLink(row.orgId, row.agentId, row.screen);
   return {
     status: row.status === "active" && row.controllerUserId ? "active" : "pending",
     ...(person?.name ? { controller: person.name } : {}),
@@ -449,6 +498,7 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow, movedFrom?
       agentId: row.agentId,
       handoffId: row.id,
       machineId: row.machineId,
+      screen: row.screen,
     })
     .catch(() => {});
   const places = [await handoffPlace(deps.db, row)];
@@ -620,7 +670,7 @@ async function resumeWaitingRun(deps: HandoffDeps, row: BrowserHandoffRow, resul
   await resumeRunWithResult(deps.db, {
     runId: row.runId,
     waitId: row.id,
-    result: { content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row)) },
+    result: { content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row), row.screen) },
     pubsub: deps.pubsub,
   });
 }
@@ -652,7 +702,7 @@ async function settle(deps: HandoffDeps, row: BrowserHandoffRow) {
  */
 export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: string, handoffId: string) {
   const current = await loadHandoff(deps.db, orgId, handoffId);
-  await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current);
+  await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current, current.screen);
   if (!OPEN.includes(current.status)) throw new ConflictError("This is already over");
   if (current.status === "active" && current.controllerUserId === actorId) return handoffView(current);
   const now = Date.now();
@@ -693,7 +743,7 @@ export async function finishHandoff(
   input: { result: "done" | "failed"; note?: string },
 ) {
   const current = await loadHandoff(deps.db, orgId, handoffId);
-  await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current);
+  await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current, current.screen);
   if (current.controllerUserId && current.controllerUserId !== actorId && current.status === "active") {
     throw new ConflictError("Someone else is in control");
   }
@@ -731,7 +781,7 @@ export async function finishHandoff(
 /** A person cancels a handoff (the agent no longer needs it, or they won't do it): the run resumes as failed. */
 export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: string, handoffId: string) {
   const current = await loadHandoff(deps.db, orgId, handoffId);
-  const access = await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current);
+  const access = await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current, current.screen);
   // Only the person in control, the one it was asked of, the agent's owner or an admin.
   const mayCancel =
     access.admin ||
@@ -754,13 +804,13 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
 }
 
 /**
- * A person watching takes over the agent's browser. An open handoff of that
- * agent is claimed instead (one person in control at a time); otherwise a
- * `takeover` starts, and the agent's browser tools wait until it is handed
- * back (`waitIfPersonInControl`). `runId`: the run whose card it was taken
- * from (the agent's, still going): the take over is bound to it at once, so
- * its card keeps a place in that conversation. A run that already ended
- * binds nothing (the next run that needs the browser waits on it).
+ * A person watching takes over one of the agent's screens. An open handoff of
+ * that screen is claimed instead (one person in control at a time); otherwise
+ * a `takeover` starts, and the agent's tools of that screen wait until it is
+ * handed back (`waitIfPersonInControl`). `runId`: the run whose card it was
+ * taken from (the agent's, still going): the take over is bound to it at once,
+ * so its card keeps a place in that conversation. A run that already ended
+ * binds nothing (the next run that needs the screen waits on it).
  */
 export async function startTakeover(
   deps: HandoffDeps,
@@ -768,9 +818,10 @@ export async function startTakeover(
   orgId: string,
   agentId: string,
   runId?: string | null,
+  screen: ScreenKind = "browser",
 ) {
-  await requireBrowserAccess(deps.db, actorId, orgId, agentId);
-  await requireAgentBrowserSwitch(deps.db, orgId, agentId);
+  await requireBrowserAccess(deps.db, actorId, orgId, agentId, undefined, screen);
+  await requireAgentBrowserSwitch(deps.db, orgId, agentId, screen);
   let boundRun: string | null = null;
   if (runId) {
     const [run] = await deps.db
@@ -780,9 +831,9 @@ export async function startTakeover(
     if (!run || run.agentId !== agentId) throw new ValidationError("That run isn't this agent's");
     if (LIVE_RUN.includes(run.status)) boundRun = runId;
   }
-  const open = await openHandoffOf(deps.db, orgId, agentId);
+  const open = await openHandoffOf(deps.db, orgId, agentId, screen);
   if (open) return claimHandoff(deps, actorId, orgId, open.id);
-  const machineId = await browserMachineOf(deps.db, orgId, agentId);
+  const machineId = await browserMachineOf(deps.db, orgId, agentId, screen);
   if (!machineId) throw new ValidationError("This agent has no computer");
   const now = Date.now();
   let row: BrowserHandoffRow | undefined;
@@ -794,6 +845,7 @@ export async function startTakeover(
         agentId,
         runId: boundRun,
         machineId,
+        screen,
         kind: "takeover",
         status: "active",
         controllerUserId: actorId,
@@ -803,7 +855,7 @@ export async function startTakeover(
   } catch (error) {
     // Opened meanwhile (another person, or the agent asked): that one is claimed instead, or it says who has it.
     if (!isUniqueViolation(error)) throw error;
-    const raced = await openHandoffOf(deps.db, orgId, agentId);
+    const raced = await openHandoffOf(deps.db, orgId, agentId, screen);
     if (!raced) throw new ConflictError("Someone else just took control");
     return claimHandoff(deps, actorId, orgId, raced.id);
   }
@@ -827,10 +879,11 @@ export async function waitIfPersonInControl(
   db: Database,
   ctx: { orgId: string; agentId: string; runId: string },
   pubsub?: PubSub,
+  screen: ScreenKind = "browser",
 ): Promise<ToolOutput | null> {
-  const open = await openHandoffOf(db, ctx.orgId, ctx.agentId);
+  const open = await openHandoffOf(db, ctx.orgId, ctx.agentId, screen);
   if (!open) return null;
-  const busy = "A person has control of your browser, or has been asked to take it.";
+  const busy = `A person has control of your ${SCREENS[screen].what}, or has been asked to take it.`;
   if (open.runId !== ctx.runId) {
     const from = open.runId;
     if (from && (await runIsLive(db, ctx.orgId, from))) {
@@ -874,6 +927,7 @@ async function runIsLive(db: Executor, orgId: string, runId: string) {
 export async function requirePageRead(
   db: Database,
   ctx: { orgId: string; agentId: string },
+  screen: ScreenKind = "browser",
 ): Promise<ToolOutput | null> {
   const [changed] = await db
     .select()
@@ -882,6 +936,7 @@ export async function requirePageRead(
       and(
         eq(browserHandoffs.orgId, ctx.orgId),
         eq(browserHandoffs.agentId, ctx.agentId),
+        eq(browserHandoffs.screen, screen),
         isNotNull(browserHandoffs.resolvedAt),
         isNotNull(browserHandoffs.controllerUserId),
         isNull(browserHandoffs.pageReadAt),
@@ -890,20 +945,27 @@ export async function requirePageRead(
     .orderBy(desc(browserHandoffs.resolvedAt))
     .limit(1);
   if (!changed) return null;
+  const { thing, read } = SCREENS[screen];
   return {
-    content: `Read the page again first (a person changed it): call browser_read, then act on what it shows.${factsText(
+    content: `Read the ${thing} again first (a person changed it): call ${read}, then act on what it shows.${factsText(
       endedResult(changed),
       await handoffFacts(db, changed),
+      screen,
     )}`,
     isError: true,
   };
 }
 
 /**
- * A person had the agent's browser and gave it back after `since` (a take over that began and
+ * A person had the agent's screen and gave it back after `since` (a take over that began and
  * ended within one step of a plan): the page may not be what the plan's next steps expect.
  */
-export async function handedBackSince(db: Database, ctx: { orgId: string; agentId: string }, since: Date) {
+export async function handedBackSince(
+  db: Database,
+  ctx: { orgId: string; agentId: string },
+  since: Date,
+  screen: ScreenKind = "browser",
+) {
   const [row] = await db
     .select({ id: browserHandoffs.id })
     .from(browserHandoffs)
@@ -911,6 +973,7 @@ export async function handedBackSince(db: Database, ctx: { orgId: string; agentI
       and(
         eq(browserHandoffs.orgId, ctx.orgId),
         eq(browserHandoffs.agentId, ctx.agentId),
+        eq(browserHandoffs.screen, screen),
         isNotNull(browserHandoffs.controllerUserId),
         gt(browserHandoffs.resolvedAt, since),
       ),
@@ -919,8 +982,12 @@ export async function handedBackSince(db: Database, ctx: { orgId: string; agentI
   return Boolean(row);
 }
 
-/** The agent read its page: whatever a person changed before is now seen. */
-export async function markPageRead(db: Database, ctx: { orgId: string; agentId: string }) {
+/** The agent read its screen: whatever a person changed before is now seen. */
+export async function markPageRead(
+  db: Database,
+  ctx: { orgId: string; agentId: string },
+  screen: ScreenKind = "browser",
+) {
   const seen = await db
     .update(browserHandoffs)
     .set({ pageReadAt: new Date() })
@@ -928,6 +995,7 @@ export async function markPageRead(db: Database, ctx: { orgId: string; agentId: 
       and(
         eq(browserHandoffs.orgId, ctx.orgId),
         eq(browserHandoffs.agentId, ctx.agentId),
+        eq(browserHandoffs.screen, screen),
         isNotNull(browserHandoffs.resolvedAt),
         isNull(browserHandoffs.pageReadAt),
       ),
@@ -1038,10 +1106,11 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
 }
 
 /**
- * "Parar" on the live view or the computer page: closes the agent's browser
- * now (its logins stay in its profile). Whoever may watch it may stop it; the
- * agent's next browser call opens a fresh one. Everyone watching hears it
- * (`browser.stopped` on every replica: their card says it was stopped, by whom).
+ * "Parar" on the live view or the computer page: stops one of the agent's
+ * screens now (a browser closes; its logins stay in its profile). Whoever may
+ * watch it may stop it; the agent's next browser call opens a fresh one.
+ * Everyone watching hears it (`browser.stopped` on every replica: their card
+ * says it was stopped, by whom).
  */
 export async function stopAgentBrowser(
   db: Database,
@@ -1050,23 +1119,25 @@ export async function stopAgentBrowser(
   orgId: string,
   agentId: string,
   pubsub?: PubSub,
+  screen: ScreenKind = "browser",
 ) {
-  await requireBrowserAccess(db, actorId, orgId, agentId);
+  await requireBrowserAccess(db, actorId, orgId, agentId, undefined, screen);
   if (!hub) throw new ValidationError("Connected computers are not available on this server");
-  const machineId = await browserMachineOf(db, orgId, agentId);
+  const machineId = await browserMachineOf(db, orgId, agentId, screen);
   if (!machineId) throw new ValidationError("This agent has no computer");
   const agent = await getAgentCached(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  await hub.call<"browser.stop">(
-    machineId,
-    { op: "browser.stop", agent: { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) } },
-    { timeoutMs: 30_000 },
-  );
+  await SCREENS[screen].stop(hub, machineId, {
+    id: agentId,
+    handle: agent.handle,
+    ...(agent.name ? { name: agent.name } : {}),
+  });
   await pubsub
     ?.publish(BROWSER_HANDOFF_TOPIC, {
       type: "browser.stopped",
       orgId,
       agentId,
+      screen,
       byUserId: actorId,
       at: new Date().toISOString(),
     })
@@ -1088,11 +1159,11 @@ export function webAddress(typed: string): string | null {
 /** How long a person's open may take on the computer (a slow page, or Chrome starting). */
 const OPEN_PAGE_SECONDS = 60;
 
-/** People drive an agent's browser only while the agent itself may use it (`browser:use`, ADR 0040 §3). */
-async function requireAgentBrowserSwitch(db: Database, orgId: string, agentId: string) {
+/** People drive an agent's screen only while the agent itself may use it (`browser:use`, ADR 0040 §3). */
+async function requireAgentBrowserSwitch(db: Database, orgId: string, agentId: string, screen: ScreenKind = "browser") {
   const granted = await grantedScopeKeys(db, orgId, agentId);
-  if (!isAllowed(toolAccess(granted, { name: "browser_open", scope: BROWSER_SCOPE }))) {
-    throw new ForbiddenError("This agent can't use its browser");
+  if (!isAllowed(toolAccess(granted, SCREENS[screen].tool))) {
+    throw new ForbiddenError(`This agent can't use its ${SCREENS[screen].what}`);
   }
 }
 

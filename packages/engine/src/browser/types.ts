@@ -7,6 +7,8 @@ import type { BrowserFrameMetadata } from "@agenteschat/adapters";
 
 /** The scope of the browser tools: on by default, and not covered by "all tools". */
 export const BROWSER_SCOPE = "browser:use";
+/** The scope of the agent's desktop: driving it runs anything on the computer, so "all tools" never covers it. */
+export const DESKTOP_SCOPE = "desktop:use";
 
 /** The tools agents get with `browser:use`, the same for every brain. */
 export const BROWSER_TOOLS = [

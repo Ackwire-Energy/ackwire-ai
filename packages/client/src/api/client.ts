@@ -144,6 +144,7 @@ import type {
   SandboxSettingsInput,
   ScheduleParse,
   ScopeGrant,
+  ScreenKind,
   SearchHit,
   SearchKind,
   SecretBox,
@@ -967,8 +968,8 @@ export interface ApiClient {
     settings(orgId: string, agentId: string): Promise<AgentBrowserSettings>;
     /** The sites (owner or admins); null or empty = any site. */
     setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
-    /** The agent's open request or take over, if any. */
-    agentHandoff(orgId: string, agentId: string): Promise<BrowserHandoff | null>;
+    /** The agent's open request or take over on that screen (the browser by default), if any. */
+    agentHandoff(orgId: string, agentId: string, screen?: ScreenKind): Promise<BrowserHandoff | null>;
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;
@@ -984,15 +985,15 @@ export interface ApiClient {
      * Take over while watching; the agent waits until handed back. `runId`: the run whose card it
      * was taken from (the take over is bound to it, so its card stays in that conversation).
      */
-    takeover(orgId: string, agentId: string, runId?: string): Promise<BrowserHandoff>;
+    takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind): Promise<BrowserHandoff>;
     /**
      * The person in control opens a site (a bare host gets https://); a closed browser opens. 409
      * `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
      * `browser.bad_address` or `browser.open_failed`.
      */
     open(orgId: string, agentId: string, url: string): Promise<void>;
-    /** "Parar": closes the agent's browser now (its logins stay). */
-    stop(orgId: string, agentId: string): Promise<void>;
+    /** "Parar": closes the agent's browser now (its logins stay), or stops that screen. */
+    stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

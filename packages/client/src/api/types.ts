@@ -3887,17 +3887,22 @@ export interface AgentDatabaseInput {
 
 export type BrowserHandoffStatus = "pending" | "active" | "done" | "failed" | "expired" | "cancelled";
 
+/** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
+export type ScreenKind = "browser" | "desktop";
+
 /**
- * A person's turn in an agent's browser: the agent asked (`ask`, with a chat
- * card `meta.browserHandoff` whose message id is this id) or someone watching
- * took over (`takeover`: no card of its own; its browser card stays with the
- * run it is bound to, `runId`).
+ * A person's turn on one of an agent's screens: the agent asked (`ask`, with a
+ * chat card `meta.browserHandoff` whose message id is this id) or someone
+ * watching took over (`takeover`: no card of its own; its browser card stays
+ * with the run it is bound to, `runId`).
  */
 export interface BrowserHandoff {
   id: string;
   agentId: string;
   runId: string | null;
   machineId: string;
+  /** Absent from servers older than screens: the browser (`handoffScreen`). */
+  screen?: ScreenKind;
   kind: "ask" | "takeover";
   instructions: string;
   status: BrowserHandoffStatus;

@@ -42,6 +42,11 @@ const KEEPALIVE_PARALLEL = 5;
 export const STREAM_STOP_DELAY_MS = 10_000;
 /** A person's input is gathered this long and sent to the computer as one batch. */
 export const INPUT_BATCH_MS = 25;
+/**
+ * This live view carries the browser alone: other screens' handoffs never switch its stream or
+ * hide it. An event naming no screen is the browser's (`browser.opened`, and servers older than screens).
+ */
+const ofBrowser = (screen: unknown) => (screen ?? "browser") === "browser";
 
 /**
  * One batch of a person's input, smaller: a run of plain mouse moves (no
@@ -333,11 +338,13 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
   const handoffHooks: HandoffLiveHooks = {
     changed(row) {
+      if (!ofBrowser(row.screen)) return;
       const state = live.get(row.agentId);
       if (state) handoffChanged(row.agentId, state, row);
     },
     /** The latest frame's page while the stream runs here; otherwise the computer is asked for the address. */
     async page(row) {
+      if (!ofBrowser(row.screen)) return null;
       const state = live.get(row.agentId);
       if (state && state.machineId === row.machineId && state.mode !== null && state.page) return state.page;
       const [agent] = await deps.db
@@ -378,7 +385,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
   // The computer's desktop app hears every change, from whichever replica made it.
   const unsubscribeComputers = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {
-    if (event.type === "browser.stopped") return;
+    if (event.type === "browser.stopped" || !ofBrowser(event.screen)) return;
     const { machineId, orgId, agentId } = event;
     if (typeof machineId !== "string" || typeof orgId !== "string" || typeof agentId !== "string") return;
     void tellComputer(machineId, orgId, agentId).catch((error) =>
@@ -389,6 +396,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   // A handoff changed on another replica (a person claimed it there, handed it back…): the state
   // here, where the computer's socket may be, is read again from the database.
   const unsubscribeHandoffs = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {
+    if (!ofBrowser(event.screen)) return;
     const agentId = typeof event.agentId === "string" ? event.agentId : null;
     const state = agentId ? live.get(agentId) : undefined;
     if (!agentId || !state || event.orgId !== state.orgId) return;
@@ -682,6 +690,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         void openHandoffsOfMachine(deps.db, machineId)
           .then(async (rows) => {
             for (const row of rows) {
+              if (!ofBrowser(row.screen)) continue;
               const info = await handoffInfo(deps.db, row);
               deps.hub.sendBrowserHandoff?.(machineId, row.agentId, info);
             }
@@ -714,7 +723,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         })
         .from(browserHandoffs)
         .innerJoin(agents, eq(agents.id, browserHandoffs.agentId))
-        .where(inArray(browserHandoffs.status, ["pending", "active"]));
+        .where(and(eq(browserHandoffs.screen, "browser"), inArray(browserHandoffs.status, ["pending", "active"])));
       const ids = new Set(open.map((h) => h.id));
       for (const id of touched.keys()) if (!ids.has(id)) touched.delete(id);
       // Only computers held here (each replica pings its own), a few at a time.

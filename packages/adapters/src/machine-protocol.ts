@@ -150,6 +150,10 @@ export const BRAIN_PROFILES_PROTOCOL = 16;
  */
 export const BROWSER_FAST_PROTOCOL = 17;
 
+/** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
+export const SCREEN_KINDS = ["browser", "desktop"] as const;
+export type ScreenKind = (typeof SCREEN_KINDS)[number];
+
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
 export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
