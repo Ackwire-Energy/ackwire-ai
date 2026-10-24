@@ -37,8 +37,12 @@ afterEach(async () => {
 });
 
 const deps = () => ({ db: f.db, pubsub: f.pubsub });
-const post = (userId: string, channelId: string, body: string, threadId?: string) =>
-  postPersonMessage(deps(), userId, f.org.id, channelId, { body, ...(threadId ? { threadId } : {}) });
+// PGlite's clock moves in whole milliseconds and unread counts are strictly after the last read or the
+// join, so each message waits for a later millisecond than the write before it.
+const post = async (userId: string, channelId: string, body: string, threadId?: string) => {
+  await Bun.sleep(2);
+  return postPersonMessage(deps(), userId, f.org.id, channelId, { body, ...(threadId ? { threadId } : {}) });
+};
 const general = async (userId: string) => {
   const list = await listChannels(f.db, userId, f.org.id);
   const found = list.find((c) => c.id === f.general.id);
