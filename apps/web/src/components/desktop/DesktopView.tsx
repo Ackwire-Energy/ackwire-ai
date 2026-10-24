@@ -149,7 +149,8 @@ export function DesktopView({
         // noVNC takes the socket's `on*` handlers: the close code comes through a listener of our own.
         socket.addEventListener("close", (e: CloseEvent) => {
           closed = true;
-          rfbRef.current = null;
+          // A close that arrives after the next connection took over (watching turned control) leaves that one be.
+          if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
           setCopied(null);
           const next = desktopCloseState(e.code, e.reason);
@@ -187,7 +188,7 @@ export function DesktopView({
     const end = () => {
       cancelled = true;
       clearTimeout(timer);
-      rfbRef.current = null;
+      if (rfbRef.current === rfb) rfbRef.current = null;
       if (closed) return;
       closed = true;
       if (rfb) rfb.disconnect();

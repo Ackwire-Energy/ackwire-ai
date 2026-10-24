@@ -248,6 +248,9 @@ describe("the agent's desktop panel", () => {
     await settle(4);
     await connected();
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=control");
+    // The watching socket's close can arrive after the control one opened: the paste still goes.
+    await act(async () => t.sockets.desktops[0]?.serverClose(1000));
+    await settle(2);
 
     const field = screen().getByRole("textbox", { name: "Texto para colar na tela da Ada" });
     await act(async () => fireEvent.change(field, { target: { value: "Olá, ação: êõú ç — 日本" } }));
