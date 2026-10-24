@@ -7832,4 +7832,21 @@ export const en: Translations = {
       notice: "While you're in control, programs on the agent's computer can see the screen and what you type.",
     },
   },
+  terminal: {
+    title: "{{name}}'s terminal",
+    now: "Commands on {{name}}'s computer, as {{name}}",
+    open: "Open the terminal",
+    close: "Close the terminal",
+    notice: "You're on {{name}}'s computer, as {{name}}. What you run here stays on its computer.",
+    reopen: "Open again",
+    state: {
+      connecting: "Opening the terminal…",
+      ended: "The session ended.",
+      dropped: "The connection to the computer dropped.",
+      busy: "Too many terminals are open right now. Close one or try again in a moment.",
+      forbidden: "You can't open this terminal.",
+      outdated: "Update the agentes app on {{name}}'s computer to open the terminal.",
+      unavailable: "The terminal isn't available on {{name}}'s computer.",
+    },
+  },
 };

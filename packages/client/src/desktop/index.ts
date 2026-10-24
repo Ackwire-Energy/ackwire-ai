@@ -77,8 +77,8 @@ export function desktopCloseState(code: number, reason = ""): { state: DesktopVi
   }
 }
 
-/** What `GET …/desktop`'s `reason` means for the panel. */
-export function desktopReasonState(reason: string | null): DesktopViewState {
+/** What `GET …/desktop`'s `reason` (or its terminal's) means for the panel. */
+export function desktopReasonState(reason: string | null): "offline" | "outdated" | "unavailable" {
   if (reason === "offline" || reason === "other_server") return "offline";
   if (reason === "runner_outdated") return "outdated";
   return "unavailable";
@@ -141,6 +141,71 @@ export function desktopSocketUrl(
 /** A person's terminal on the agent's computer, `cols` × `rows` to start with. */
 export function terminalSocketUrl(base: SocketBase, v: { orgId: string; agentId: string; cols: number; rows: number }) {
   return socketUrl(base, "/api/terminal", { orgId: v.orgId, agentId: v.agentId, cols: v.cols, rows: v.rows });
+}
+
+/** What the terminal panel shows. It never opens again by itself: a new socket is a new shell. */
+export type TerminalViewState =
+  | "connecting"
+  | "live"
+  /** The shell ended (its `exit` frame), or the stream did. */
+  | "ended"
+  /** The connection broke (the server restarted, the network, the computer didn't answer in time…). */
+  | "dropped"
+  | "offline"
+  /** As many terminals as the agent or its computer take, or too many opens in a minute. */
+  | "busy"
+  | "paused"
+  | "forbidden"
+  | "outdated"
+  /** Its switch is off on the computer, or the computer can't open terminals. */
+  | "unavailable";
+
+/** What a terminal socket's close means for the panel; `reason` is the server's (4502: the computer's error code). */
+export function terminalCloseState(code: number, reason = ""): TerminalViewState {
+  switch (code) {
+    case DESKTOP_CLOSE.normal:
+      return "ended";
+    case DESKTOP_CLOSE.forbidden:
+      return "forbidden";
+    case DESKTOP_CLOSE.notFound:
+      return "unavailable";
+    case DESKTOP_CLOSE.tooMany:
+      return "busy";
+    case DESKTOP_CLOSE.unreachable:
+      return "offline";
+    case DESKTOP_CLOSE.refused:
+      if (reason === "machine_paused") return "paused";
+      if (reason === "runner_outdated") return "outdated";
+      if (reason === "not_allowed" || reason === "terminal_unavailable") return "unavailable";
+      return "dropped";
+    default:
+      return "dropped";
+  }
+}
+
+/**
+ * A terminal's size, inclusive; mirrors `STREAM_LIMITS.cols`/`rows` in machine-protocol.ts. The server ends a
+ * stream asked or resized outside it.
+ */
+export const TERMINAL_SIZE = { cols: [20, 400], rows: [5, 200] } as const;
+
+/** The size that fits the panel, brought within `TERMINAL_SIZE`. */
+export function terminalSize(cols: number, rows: number) {
+  const [minCols, maxCols] = TERMINAL_SIZE.cols;
+  const [minRows, maxRows] = TERMINAL_SIZE.rows;
+  return {
+    cols: Math.min(maxCols, Math.max(minCols, Math.floor(cols))),
+    rows: Math.min(maxRows, Math.max(minRows, Math.floor(rows))),
+  };
+}
+
+/** Whether a terminal's text frame from the server says its shell ended (`{"type":"exit","code":…}`). */
+export function isTerminalExit(data: string) {
+  try {
+    return (JSON.parse(data) as { type?: unknown } | null)?.type === "exit";
+  } catch {
+    return false;
+  }
 }
 
 /** The agent's desktop as this person sees it; `poll`: ask again this often (nothing else says when it starts or is handed back). */

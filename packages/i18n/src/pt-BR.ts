@@ -7855,6 +7855,24 @@ export const ptBR = {
         "Enquanto você está no controle, os programas do computador do agente podem ver a tela e o que você digita.",
     },
   },
+  terminal: {
+    title: "Terminal {{of}} {{name}}",
+    now: "Comandos no computador {{of}} {{name}}, como {{article}} {{name}}",
+    open: "Abrir o terminal",
+    close: "Fechar o terminal",
+    notice:
+      "Você está no computador {{of}} {{name}}, como {{article}} {{name}}. O que você roda aqui fica no computador {{hers}}.",
+    reopen: "Abrir de novo",
+    state: {
+      connecting: "Abrindo o terminal…",
+      ended: "A sessão terminou.",
+      dropped: "A conexão com o computador caiu.",
+      busy: "Há terminais demais abertos agora. Feche um ou tente daqui a pouco.",
+      forbidden: "Você não pode abrir este terminal.",
+      outdated: "Atualize o app agentes no computador {{of}} {{name}} para abrir o terminal.",
+      unavailable: "O terminal não está disponível no computador {{of}} {{name}}.",
+    },
+  },
 };
 
 export type Translations = Widen<typeof ptBR>;

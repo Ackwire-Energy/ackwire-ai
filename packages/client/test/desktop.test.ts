@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { DESKTOP_KEYBOARDS as PROTOCOL_KEYBOARDS, STREAM_CLOSE } from "@agenteschat/adapters/machine-protocol";
+// By path: the client doesn't depend on the adapters, so the package isn't linked here.
+import {
+  DESKTOP_KEYBOARDS as PROTOCOL_KEYBOARDS,
+  STREAM_CLOSE,
+  STREAM_LIMITS,
+} from "../../adapters/src/machine-protocol";
 import type { BrowserHandoff, DesktopStatus } from "../src/index";
 import {
   DESKTOP_CLOSE,
@@ -10,7 +15,11 @@ import {
   desktopSocketUrl,
   desktopStatusState,
   desktopWithHandoff,
+  isTerminalExit,
   keyboardFor,
+  TERMINAL_SIZE,
+  terminalCloseState,
+  terminalSize,
   terminalSocketUrl,
 } from "../src/index";
 
@@ -137,5 +146,36 @@ describe("the desktop panel", () => {
     expect(keyboardFor("pt-PT")).toBe("pt");
     expect(keyboardFor("de")).toBe("de");
     expect(keyboardFor("ja-JP")).toBe("us");
+  });
+});
+
+describe("the terminal panel", () => {
+  test("close codes: what shows (it never opens again by itself)", () => {
+    expect(terminalCloseState(1000)).toBe("ended");
+    expect(terminalCloseState(4403)).toBe("forbidden");
+    expect(terminalCloseState(4404, "no_computer")).toBe("unavailable");
+    expect(terminalCloseState(4429, "rate_limited")).toBe("busy");
+    expect(terminalCloseState(4503, "offline")).toBe("offline");
+    expect(terminalCloseState(4502, "machine_paused")).toBe("paused");
+    expect(terminalCloseState(4502, "runner_outdated")).toBe("outdated");
+    expect(terminalCloseState(4502, "not_allowed")).toBe("unavailable");
+    expect(terminalCloseState(4502, "terminal_unavailable")).toBe("unavailable");
+    expect(terminalCloseState(4502, "internal")).toBe("dropped");
+    for (const code of [1001, 1006, 1011, 1013, 4400, 4408]) expect(terminalCloseState(code)).toBe("dropped");
+  });
+
+  test("its size: what fits the panel, within what the server takes", () => {
+    expect(TERMINAL_SIZE).toEqual({ cols: [...STREAM_LIMITS.cols], rows: [...STREAM_LIMITS.rows] });
+    expect(terminalSize(132.7, 40.2)).toEqual({ cols: 132, rows: 40 });
+    expect(terminalSize(3, 1)).toEqual({ cols: 20, rows: 5 });
+    expect(terminalSize(900, 900)).toEqual({ cols: 400, rows: 200 });
+  });
+
+  test("the shell's end comes as a text frame; anything else is not it", () => {
+    expect(isTerminalExit('{"type":"exit","code":0}')).toBe(true);
+    expect(isTerminalExit('{"type":"exit","code":null}')).toBe(true);
+    expect(isTerminalExit('{"type":"resize","cols":80,"rows":24}')).toBe(false);
+    expect(isTerminalExit("null")).toBe(false);
+    expect(isTerminalExit("not json")).toBe(false);
   });
 });

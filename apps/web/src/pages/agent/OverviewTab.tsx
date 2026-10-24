@@ -23,6 +23,7 @@ import { CardHead, useAgentEdit } from "./context";
 import { DesktopNow } from "./DesktopNow";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
+import { TerminalNow } from "./TerminalNow";
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
 export function OverviewTab() {
@@ -64,6 +65,7 @@ export function OverviewTab() {
         <div className="agp-col">
           <BrowserNow />
           <DesktopNow />
+          <TerminalNow />
           {(approvals > 0 || pending.length > 0) && (
             <div className="agp-attns">
               {approvals > 0 && (

@@ -1,6 +1,8 @@
 /* ---------- the agent's desktop, live (ADR 0056): the browser card's frame around noVNC's screen ---------- */
 .brw-ac.dsk {
   max-width: none;
+  /* Behind the desktop and the terminal; the terminal reads it for its own background. */
+  --screen-bg: #1f2128;
 }
 /* The desktop's own shape (1280×900, `DESKTOP_SIZE`): noVNC scales it inside, the panel never jumps. */
 .dsk-screen {
@@ -11,8 +13,25 @@
   margin: 0 auto;
   border-radius: 10px;
   overflow: hidden;
-  background: #1f2128;
+  background: var(--screen-bg);
   box-shadow: var(--e2);
+}
+/* A terminal on the agent's computer: xterm.js in the same frame. */
+.trm-screen {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--screen-bg);
+  box-shadow: var(--e2);
+}
+/* The box the terminal fits (the fit add-on reads its size, not its padding). */
+.trm-host {
+  height: 420px;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .trm-host {
+    height: 320px;
+  }
 }
 .dsk-screen canvas {
   cursor: default;

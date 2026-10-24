@@ -130,6 +130,8 @@
         "@novnc/novnc": "1.7.0",
         "@tanstack/react-query": "^5.104.1",
         "@tanstack/react-router": "^1.170.41",
+        "@xterm/addon-fit": "^0.11.0",
+        "@xterm/xterm": "^6.0.0",
         "better-auth": "^1.7.7",
         "i18next": "^26.4.2",
         "mermaid": "^11.17.2",
@@ -1121,6 +1123,10 @@
     "@webgpu/types": ["@webgpu/types@0.1.21", "", {}, "sha512-pUrWq3V5PiSGFLeLxoGqReTZmiiXwY3jRkIG5sLLKjyqNxrwm/04b4nw7LSmGWJcKk59XOM/YRTUwOzo4MMlow=="],
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.15", "", {}, "sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA=="],
+
+    "@xterm/addon-fit": ["@xterm/addon-fit@0.11.0", "", {}, "sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g=="],
+
+    "@xterm/xterm": ["@xterm/xterm@6.0.0", "", {}, "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg=="],
 
     "@zone-eu/mailsplit": ["@zone-eu/mailsplit@5.4.26", "", { "dependencies": { "libbase64": "1.4.1", "libmime": "5.5.1", "libqp": "3.0.1" } }, "sha512-yY8wRjvC5WVbjf4b+3Gms2J/XXS6kFpf9D+rl41s1/VAkk6DNN6hprEqVMQxgZJvsNRxxPdUY9J9bpI4Af7BoA=="],
 

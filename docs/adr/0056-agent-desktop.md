@@ -149,7 +149,8 @@ Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.contro
 
 ### 13. In the app
 
-- On the agent's page, "Tela" (the live screen; watch, take control, "Devolver") and "Terminal" (admins and the owner), opened by `?desktop=1` and `?terminal=1`; "Ver a tela inteira" on the browser card. noVNC 1.7.0 (ES modules) and `@xterm/xterm` 6.
+- On the agent's page, "Tela" (the live screen; watch, take control, "Devolver") and "Terminal" (only for whoever passes the control rule of §4), opened by `?desktop=1` and `?terminal=1`; "Ver a tela inteira" on the browser card. noVNC 1.7.0 (ES modules) and `@xterm/xterm` 6 with its fit add-on.
+- The terminal fits its panel (its size kept within 20–400 × 5–200) and tells each new size as a `resize`; keys go out as UTF-8 bytes. When the shell ends ("A sessão terminou") or the connection does, it waits for "Abrir de novo": a new socket is a new shell, so it never reopens by itself and a person never types into a shell they didn't see start.
 - Watchers ask quality 3, the person in control 6.
 - The person in control picks their keyboard layout (a guess from the browser's language and, where the browser tells, its keys; kept per browser); the control stream carries it (`keyboard`, one of `DESKTOP_KEYBOARDS`) and the runner sets it with `setxkbmap` as the agent.
 - "Colar texto" puts the text in the desktop's clipboard and presses Shift+Insert: typed keysyms lose some accents. Shift+Insert pastes in every window there, a terminal included (where Ctrl+V doesn't: it reads PRIMARY, which Xvnc sets with the clipboard; checked in xfce4-terminal). The person's own clipboard is never written from the desktop (a "Copiar" button instead).
