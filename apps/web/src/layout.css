@@ -519,9 +519,15 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The label grows from nothing (`flex: 1`), so a long agent role would take the whole row and hide the name: it gets
+   at most half, on one line (the row's title has it whole). */
 .sidebar__item-meta {
   font-size: 12px;
   color: var(--ink-muted);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar__channel-icon {
   color: var(--ink-muted);
