@@ -6,7 +6,11 @@ import {
   BRAIN_PROTOCOL,
   generateSecretKeyPair,
   type MachineRequest,
+  type OwnPlanUsage,
   openSecret,
+  orgTopic,
+  PLAN_USAGE_PROTOCOL,
+  type PlanUsage,
   type RunnerAccountInfo,
   type ServerFrame,
   sealSecret,
@@ -27,6 +31,7 @@ import {
   MachineOfflineError,
   type MachineStatus,
   NotFoundError,
+  refreshAiAccounts,
   removeMachineAccount,
   removeMember,
   renameMachineAccount,
@@ -36,7 +41,7 @@ import {
   syncMachineAccounts,
   ValidationError,
 } from "../src";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
@@ -206,6 +211,7 @@ async function signIn(
 /** A runner on a real hub (each hello on a new connection): it answers every request with `{}` and keeps them. */
 function connectedRunner(hub: MachineHub, token: string) {
   const requests: Extract<ServerFrame, { type: "request" }>[] = [];
+  let last: ReturnType<MachineHub["open"]> | null = null;
   const open = () => {
     const conn = hub.open({
       send(text: string) {
@@ -217,12 +223,21 @@ function connectedRunner(hub: MachineHub, token: string) {
       },
       close() {},
     });
+    last = conn;
     return conn;
   };
   return {
     removals: () => requests.flatMap((r) => (r.op === "account" && r.action === "remove" ? [r] : [])),
-    hello: (accounts: RunnerAccountInfo[], protocol = ACCOUNTS_PROTOCOL) =>
-      hub.message(open(), JSON.stringify({ type: "hello", token, ...RUNNER, protocol, exec: true, accounts })),
+    hello: (accounts: RunnerAccountInfo[], protocol = ACCOUNTS_PROTOCOL, extra: Record<string, unknown> = {}) =>
+      hub.message(
+        open(),
+        JSON.stringify({ type: "hello", token, ...RUNNER, protocol, exec: true, accounts, ...extra }),
+      ),
+    /** `accounts.changed` on the last connection. */
+    changed: (accounts: RunnerAccountInfo[], ownUsage?: OwnPlanUsage) =>
+      last
+        ? hub.message(last, JSON.stringify({ type: "accounts.changed", accounts, ...(ownUsage ? { ownUsage } : {}) }))
+        : Promise.resolve(),
   };
 }
 
@@ -313,6 +328,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
       ownerName: "ana",
       mine: true,
       usedBy: [],
+      usage: null,
     },
   });
   // Polled again: the same account, added once.
@@ -732,4 +748,100 @@ test("a runner older than accounts: the page says accounts aren't supported", as
     accountsSupported: false,
     ownSignIn: true,
   });
+});
+
+// ── Plan usage (protocol 18) ────────────────────────────────────────────────
+
+const usage = (used: number, at = "2030-01-01T10:00:00.000Z"): PlanUsage => ({
+  windows: [{ kind: "five_hour", usedPercent: used, resetsAt: "2030-01-01T15:00:00.000Z" }],
+  source: "turn",
+  at,
+});
+
+/** The `machine.updated` events with `accounts` the org's pages hear from now on. */
+function accountEvents() {
+  const events: Record<string, unknown>[] = [];
+  f.pubsub.subscribe(orgTopic(f.org.id), (e) => {
+    const event = (e as { event?: Record<string, unknown> }).event;
+    if (event?.type === "machine.updated" && event.accounts) events.push(event);
+  });
+  return events;
+}
+
+test("plan usage: stored with the account, kept when the runner doesn't know it yet, published only when it shows", async () => {
+  f = await setup();
+  const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+  hubs.push(hub);
+  const { machineId, token } = await ownedMachine(PLAN_USAGE_PROTOCOL);
+  const runner = connectedRunner(hub, token);
+  const account = (u?: PlanUsage): RunnerAccountInfo => ({
+    id: CLAUDE_ID,
+    kind: "claude_code",
+    loggedIn: true,
+    email: "ana@example.com",
+    plan: "max",
+    ...(u ? { usage: u } : {}),
+  });
+  await runner.hello([account(usage(40))], PLAN_USAGE_PROTOCOL);
+  expect((await accountRow(CLAUDE_ID))?.usage).toEqual(usage(40));
+  const events = accountEvents();
+
+  // The same numbers, newer: stored (the page says how old they are), nobody told.
+  await runner.changed([account(usage(40, "2030-01-01T10:05:00.000Z"))]);
+  expect((await accountRow(CLAUDE_ID))?.usage?.at).toBe("2030-01-01T10:05:00.000Z");
+  expect(events).toHaveLength(0);
+  // A point more: the pages refetch, once.
+  await runner.changed([account(usage(41, "2030-01-01T10:06:00.000Z"))]);
+  expect(events).toEqual([{ type: "machine.updated", machineId, accounts: true }]);
+  // A runner that started again knows nothing yet: the last stays.
+  await runner.hello([account()], PLAN_USAGE_PROTOCOL);
+  const [view] = await listMachineAccounts({ db: f.db }, f.org.id, machineId, f.owner.id);
+  expect(view?.usage).toEqual(usage(41, "2030-01-01T10:06:00.000Z"));
+});
+
+test("the computer's own sign-ins' usage: by brain, kept across hello, in the agent's brain view", async () => {
+  f = await setup();
+  const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+  hubs.push(hub);
+  const { machineId, token } = await ownedMachine(PLAN_USAGE_PROTOCOL);
+  await setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, machineId);
+  const runner = connectedRunner(hub, token);
+  const executors = { claude: { version: "2.1.310", loggedIn: true } };
+  await runner.hello([], PLAN_USAGE_PROTOCOL, { executors, ownUsage: { claude_code: usage(10) } });
+  const events = accountEvents();
+  await runner.changed([], { codex: usage(5) });
+  expect(events).toHaveLength(1);
+  // Nothing moved: nobody told.
+  await runner.changed([], { codex: usage(5, "2030-01-01T10:01:00.000Z") });
+  expect(events).toHaveLength(1);
+  // The runner came back knowing nothing: what it said before stays, with what hello says now.
+  await runner.hello([], PLAN_USAGE_PROTOCOL, { executors });
+  const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
+  expect(m?.executors.claude?.version).toBe("2.1.310");
+  expect(m?.executors.ownUsage).toEqual({ claude_code: usage(10), codex: usage(5, "2030-01-01T10:01:00.000Z") });
+  const brain = await getAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id);
+  expect(brain.ownUsage.claude_code).toEqual(usage(10));
+});
+
+test("refreshing usage: the caller's own accounts, and their computers' own sign-ins, on online runners that know it", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(PLAN_USAGE_PROTOCOL);
+  const member = await addMember(f.db, f.org.id, "member", "bea");
+  await addAccount(machineId, CLAUDE_ID, "claude_code");
+  await addAccount(machineId, CODEX_ID, "codex", { createdBy: member.id });
+  const live = fakeHub(machineId, () => ({ accounts: [] }), { protocol: PLAN_USAGE_PROTOCOL });
+  await refreshAiAccounts(live.deps, f.owner.id, f.org.id);
+  // The person who connected it: their account and the computer's own sign-ins.
+  expect(live.calls).toEqual([{ op: "account", action: "list", fresh: [CLAUDE_ID, "own:claude_code", "own:codex"] }]);
+  await refreshAiAccounts(live.deps, member.id, f.org.id);
+  expect(live.calls.at(-1)).toEqual({ op: "account", action: "list", fresh: [CODEX_ID] });
+  // Nothing goes to a runner that doesn't know usage, nor to one that's offline.
+  const old = fakeHub(machineId, () => ({ accounts: [] }));
+  await refreshAiAccounts(old.deps, f.owner.id, f.org.id);
+  const off = fakeHub(machineId, () => ({ accounts: [] }), { protocol: PLAN_USAGE_PROTOCOL, online: false });
+  await refreshAiAccounts(off.deps, f.owner.id, f.org.id);
+  expect([...old.calls, ...off.calls]).toEqual([]);
+  // Only members ask.
+  const stranger = await addUser(f.db, "zed");
+  expect(await refreshAiAccounts(live.deps, stranger.id, f.org.id).catch((e) => e)).toBeInstanceOf(ForbiddenError);
 });

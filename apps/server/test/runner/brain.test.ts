@@ -742,6 +742,37 @@ test.if(posix)(
   },
 );
 
+test.if(posix)(
+  "each rate_limit_event reaches the usage of the turn's account, or the computer's own; account turns see no stray key",
+  async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-stray";
+    try {
+      const accountDir = tempDir("claude-account-");
+      dirs.push(accountDir);
+      const noted: [string, unknown][] = [];
+      const { spawns, turn } = setup({
+        accounts: {
+          accountDir: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? accountDir : null),
+          noteRateLimit: (key, info) => noted.push([key, info]),
+        },
+      });
+      const info = { status: "allowed_warning", rateLimitType: "five_hour", utilization: 0.84, resetsAt: 1900000000 };
+      expect((await turn(1, "RATE", { account: ACCOUNT })).final).toMatchObject({ type: "done" });
+      expect((await turn(2, "RATE")).final).toMatchObject({ type: "done" });
+      expect(noted).toEqual([
+        [ACCOUNT, info],
+        ["own:claude_code", info],
+      ]);
+      // The account's turn thinks with its folder only; the computer's own keeps the person's env.
+      const runs = spawns() as unknown as { configDir: string | null; apiKey: string | null }[];
+      expect(runs.map((r) => r.apiKey)).toEqual([null, "sk-ant-stray"]);
+      expect(runs[0]?.configDir).toBe(accountDir);
+    } finally {
+      delete process.env.ANTHROPIC_API_KEY;
+    }
+  },
+);
+
 test.if(posix)("an account that isn't on the computer is account_missing, never another account", async () => {
   const { spawns, turn } = setup({ accounts: { accountDir: () => null } });
   const r = await turn(1, "hi", { account: ACCOUNT });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -190,6 +190,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     ownerName: "Walter Nogueira",
     mine: true,
     usedBy: [],
+    usage: null,
   };
   /** Ada thinks with Claude Code on the MacBook, which has the given accounts. */
   async function onMac(patch: Partial<AgentBrain> = {}) {
@@ -262,6 +263,62 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       ["Claude Team 2 · TeamDe Ana", true],
       ["Adicionar conta", false],
     ]);
+  });
+
+  test("plan usage: the chosen account's meter; at the limit, its owner's free accounts, never another agent's", async () => {
+    const now = new Date().toISOString();
+    const full: PlanUsage = {
+      windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: new Date(Date.now() + 2 * 3_600_000).toISOString() }],
+      limited: true,
+      source: "turn",
+      at: now,
+    };
+    const some = (usedPercent: number): PlanUsage => ({
+      windows: [{ kind: "five_hour", usedPercent }],
+      source: "probe",
+      at: now,
+    });
+    const roomy: MachineAccount = { ...work, id: "acct_roomy", label: "Claude Team 2", usage: some(12) };
+    const busy: MachineAccount = { ...work, id: "acct_busy", label: "Claude Team 3", usedBy: ["Theo"], usage: some(3) };
+    const { state } = await onMac({
+      account: "acct_work",
+      accounts: [{ ...work, usedBy: ["Ada"], usage: full }, roomy, busy],
+    });
+    // The work cell says it, where the account is.
+    expect(sentence().textContent).toContain("Trabalho · No limite até");
+    const d = await brainDialog();
+    // Opening it looks the plans up again.
+    expect(state.calls.some((c) => c.method === "machines.refreshAccountUsage")).toBe(true);
+    const meter = d.querySelector(".ac-planmeter") as HTMLElement;
+    expect(meter.textContent).toContain("No limite até");
+    expect(within(meter).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("100");
+    expect(within(d).queryByRole("button", { name: /Claude Team 3/ })).toBeNull();
+    expect(within(d).getByRole("button", { name: "Conectar outra conta" })).toBeTruthy();
+    await click(within(d).getByRole("button", { name: "Usar Claude Team 2 (12%)" }));
+    expect(within(d).getByRole("combobox", { name: "Conta do Claude" }).textContent).toContain("Claude Team 2");
+    expect(within(d).queryByRole("button", { name: /^Usar Claude/ })).toBeNull();
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", account: "acct_roomy" });
+  });
+
+  test("plan usage to someone who isn't the agent's owner: the meter, no offer", async () => {
+    const full: PlanUsage = {
+      windows: [{ kind: "seven_day", usedPercent: 100 }],
+      source: "turn",
+      at: new Date().toISOString(),
+    };
+    const spare: MachineAccount = { ...work, id: "acct_spare", label: "Claude Team 2", usage: null };
+    await onMac({
+      account: "acct_work",
+      accounts: [{ ...work, usedBy: ["Ada"], usage: full }, spare],
+      canUsePlans: false,
+      canManageAccounts: false,
+    });
+    const d = await brainDialog();
+    expect(d.querySelector(".ac-planmeter")?.textContent).toContain("No limite");
+    expect(within(d).queryByRole("button", { name: /^Usar Claude/ })).toBeNull();
+    expect(within(d).queryByRole("button", { name: "Conectar outra conta" })).toBeNull();
   });
 
   test("only the agent's owner changes the account; an old app on the computer shows nothing about it", async () => {

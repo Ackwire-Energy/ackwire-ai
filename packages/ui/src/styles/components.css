@@ -1679,6 +1679,53 @@ textarea.ac-input {
   border-radius: var(--radius-full);
 }
 
+/* Plan usage: a bar per window (ink, like every meter); the state in words above */
+.ac-planmeter {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-planmeter__state {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--attention);
+}
+.ac-planmeter__windows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ac-planmeter__window {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+.ac-planmeter__window .ac-meter {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+.ac-planmeter__pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+.ac-planmeter__reset,
+.ac-planmeter__at {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.ac-planmeter--compact {
+  gap: 4px;
+}
+.ac-planmeter--compact .ac-planmeter__window {
+  font-size: 12px;
+}
+
 /* Cards and sections */
 .ac-card {
   display: flex;

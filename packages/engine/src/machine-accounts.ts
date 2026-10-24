@@ -1,4 +1,5 @@
 import {
+  ACCOUNT_KINDS,
   ACCOUNT_LOGIN_TTL_MS,
   ACCOUNTS_PROTOCOL,
   type AccountKind,
@@ -9,6 +10,10 @@ import {
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
+  OWN_USAGE_ID,
+  type OwnPlanUsage,
+  PLAN_USAGE_PROTOCOL,
+  type PlanUsage,
   type PubSub,
   parseSecretBox,
   type RunnerAccountInfo,
@@ -45,6 +50,11 @@ const { machineAccounts, agents, machines, users } = schema;
  * accounts to a computer; on one nobody paired (the Cloud's, a server's own),
  * any member does. Removing leaves a tombstone (`removing`) until the runner
  * has signed the account out and deleted its folder, now or when it is back.
+ *
+ * Usage (protocol 18): what the runner says about each plan's limits, during
+ * turns or when someone looks (`refreshAiAccounts`), is stored with the row
+ * (the computer's own sign-ins' in `machines.executors.ownUsage`); pages hear
+ * of it only when they would show something else (`usageMoved`).
  */
 
 export type MachineAccountRow = typeof machineAccounts.$inferSelect;
@@ -68,6 +78,8 @@ export interface MachineAccountView {
   mine: boolean;
   /** Names of the agents that think with it. */
   usedBy: string[];
+  /** The plan's usage limits as last reported (protocol 18); null: not known yet. */
+  usage: PlanUsage | null;
 }
 
 /** An account on a computer, by what the runner needs to remove it. */
@@ -140,7 +152,18 @@ function accountView(
     ownerName,
     mine,
     usedBy,
+    usage: row.usage ?? null,
   };
+}
+
+/** People would see a difference: a window moved a point or more, its reset moved, one came or went, or the limit. */
+export function usageMoved(prev: PlanUsage | null | undefined, next: PlanUsage | null | undefined): boolean {
+  if (!prev || !next) return Boolean(prev) !== Boolean(next);
+  if (Boolean(prev.limited) !== Boolean(next.limited) || prev.windows.length !== next.windows.length) return true;
+  return next.windows.some((w) => {
+    const p = prev.windows.find((x) => x.kind === w.kind && x.label === w.label);
+    return !p || Math.abs(p.usedPercent - w.usedPercent) >= 1 || p.resetsAt !== w.resetsAt;
+  });
 }
 
 /**
@@ -350,11 +373,13 @@ async function settleAccount(
     const released = await releaseAgents(db, orgId, [row.id], now);
     return { row: gone ?? row, duplicate, released, changed: !signingIn };
   }
+  // The runner says it when it knows it; one that just started doesn't yet (the last stays).
+  const usage = info.usage ? { usage: info.usage } : {};
   if (signingIn) {
     const label = defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id));
     const [done] = await db
       .update(machineAccounts)
-      .set({ email, plan, status, label, updatedAt: now })
+      .set({ email, plan, status, label, ...usage, updatedAt: now })
       .where(
         and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id), eq(machineAccounts.status, "signing_in")),
       )
@@ -370,13 +395,14 @@ async function settleAccount(
     });
     return { row: done, released: [], changed: true };
   }
-  if (email === row.email && plan === row.plan && status === row.status) return { row, released: [], changed: false };
+  const same = email === row.email && plan === row.plan && status === row.status;
+  if (same && !info.usage) return { row, released: [], changed: false };
   const [fresh] = await db
     .update(machineAccounts)
-    .set({ email, plan, status, updatedAt: now })
+    .set({ email, plan, status, ...usage, updatedAt: now })
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
     .returning();
-  return { row: fresh ?? row, released: [], changed: true };
+  return { row: fresh ?? row, released: [], changed: !same || usageMoved(row.usage, info.usage) };
 }
 
 /**
@@ -465,6 +491,7 @@ export async function syncMachineAccounts(
             email: a.email ?? null,
             plan: a.plan ?? null,
             status: a.loggedIn ? "active" : "signed_out",
+            usage: a.usage ?? null,
           })
           .onConflictDoNothing()
           .returning({ id: machineAccounts.id });
@@ -482,6 +509,7 @@ export async function syncMachineAccounts(
                 email: a.email ?? elsewhere.email,
                 plan: a.plan ?? elsewhere.plan,
                 status: a.loggedIn ? "active" : "signed_out",
+                ...(a.usage ? { usage: a.usage } : {}),
                 updatedAt: now,
               },
         )
@@ -509,6 +537,59 @@ export async function syncMachineAccounts(
   forgetAgents(orgId, out.released);
   if (out.changed) await publishAccountsChanged(deps.pubsub, orgId, machineId);
   return out.remove;
+}
+
+/**
+ * The computer's own sign-ins' usage (protocol 18, `accounts.changed`), over the last known of each brain;
+ * the pages hear it when they would show something else.
+ */
+export async function storeOwnUsage(deps: MachineAccountDeps, orgId: string, machineId: string, own: OwnPlanUsage) {
+  if (!ACCOUNT_KINDS.some((k) => own[k])) return;
+  const where = and(eq(machines.orgId, orgId), eq(machines.id, machineId));
+  const [row] = await deps.db.select({ executors: machines.executors }).from(machines).where(where);
+  if (!row) return;
+  const prev = row.executors?.ownUsage ?? {};
+  const next = { ...prev, ...own };
+  // Only this key: what `hello` wrote meanwhile (the CLIs, the browser) stays.
+  await deps.db
+    .update(machines)
+    .set({ executors: sql`${machines.executors} || ${JSON.stringify({ ownUsage: next })}::jsonb` })
+    .where(where);
+  if (ACCOUNT_KINDS.some((k) => usageMoved(prev[k], next[k])))
+    await publishAccountsChanged(deps.pubsub, orgId, machineId);
+}
+
+/**
+ * `POST …/ai-accounts/refresh` (an accounts screen opened): the caller's accounts, and the own sign-ins of
+ * the computers they connected, look their usage up again on each online computer that can. The runner
+ * decides how often each really is (`list.fresh`); what it finds comes back as `accounts.changed`.
+ */
+export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: string, orgId: string) {
+  await requirePermission(deps.db, userId, orgId, "read");
+  const mine = await deps.db
+    .select({ id: machineAccounts.id, machineId: machineAccounts.machineId })
+    .from(machineAccounts)
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        eq(machineAccounts.createdBy, userId),
+        inArray(machineAccounts.status, LISTED),
+      ),
+    );
+  const paired = await deps.db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(and(eq(machines.orgId, orgId), eq(machines.pairedByUserId, userId), isNull(machines.deletedAt)));
+  const fresh = new Map<string, string[]>();
+  for (const a of mine) fresh.set(a.machineId, [...(fresh.get(a.machineId) ?? []), a.id]);
+  for (const m of paired) fresh.set(m.id, [...(fresh.get(m.id) ?? []), ...Object.values(OWN_USAGE_ID)]);
+  await Promise.all(
+    [...fresh].map(async ([machineId, ids]) => {
+      const status = await deps.hub.status(machineId);
+      if (!status?.online || status.protocol < PLAN_USAGE_PROTOCOL) return;
+      await deps.hub.call(machineId, { op: "account", action: "list", fresh: ids }).catch(() => undefined);
+    }),
+  );
 }
 
 /** A turn ran with it (best effort, after the turn). */

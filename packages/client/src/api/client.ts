@@ -438,6 +438,8 @@ export interface ApiClient {
     accountLogin(orgId: string, machineId: string, loginId: string): Promise<AccountLoginStatus>;
     /** Gives up on a sign-in (Voltar, the dialog closed): the computer stops it. */
     cancelAccountLogin(orgId: string, machineId: string, loginId: string): Promise<void>;
+    /** An accounts screen opened: the viewer's plans look their usage up again (it arrives as `machine.updated`). */
+    refreshAccountUsage(orgId: string): Promise<void>;
   };
   skills: {
     /** The org library. */

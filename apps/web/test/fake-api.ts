@@ -1730,6 +1730,7 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     onlyOwner: false,
     canUsePlans: true,
     ownSignIn: true,
+    ownUsage: {},
     ...patch,
   };
   // The computers the person may give the agent: the MacBook, with what it offers.

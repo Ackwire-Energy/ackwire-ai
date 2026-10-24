@@ -15,15 +15,17 @@ import {
   isAccountId,
   isBrainEffort,
   isRunToolToken,
+  OWN_USAGE_ID,
   PERMISSION_PROMPT_TOOL,
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
+import { resetIso } from "./plan-usage";
 import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
 
 /**
@@ -174,13 +176,6 @@ const readUuids = (ev: Record<string, unknown>): string[] => {
   return typeof ev.user_message_uuid === "string" ? [ev.user_message_uuid] : [];
 };
 
-const secondsToIso = (v: unknown) => {
-  const n = num(v);
-  if (n <= 0) return undefined;
-  // Seconds (Claude Code's `resetsAt`); a value in milliseconds is taken as is.
-  return new Date(n < 1e12 ? n * 1000 : n).toISOString();
-};
-
 /** What one line meant for the turn: events to send now, and the turn's end. */
 export interface ParsedBrainLine {
   events: WireBrainEvent[];
@@ -190,6 +185,8 @@ export interface ParsedBrainLine {
   task?: ParsedTask;
   /** `system` `init`: a turn starts. */
   turnStart?: boolean;
+  /** A `rate_limit_event`'s `rate_limit_info` (plan usage, protocol 18), whatever its status. */
+  rateLimit?: Record<string, unknown>;
   /** Tool results went back to the model (a tool boundary: queued messages and task notices are read there). */
   boundary?: boolean;
 }
@@ -340,12 +337,12 @@ export class ClaudeStreamParser {
       }
       case "rate_limit_event": {
         const info = isObj(ev.rate_limit_info) ? ev.rate_limit_info : {};
-        if (info.status !== "rejected") return { events: [] };
+        if (info.status !== "rejected") return { events: [], rateLimit: info };
         this.limited = true;
-        this.resetsAt = secondsToIso(info.resetsAt);
-        if (this.limitSent) return { events: [] };
+        this.resetsAt = resetIso(info.resetsAt);
+        if (this.limitSent) return { events: [], rateLimit: info };
         this.limitSent = true;
-        return { events: [{ type: "limit", ...(this.resetsAt ? { resetsAt: this.resetsAt } : {}) }] };
+        return { events: [{ type: "limit", ...(this.resetsAt ? { resetsAt: this.resetsAt } : {}) }], rateLimit: info };
       }
       case "result":
         return this.result(ev);
@@ -387,7 +384,7 @@ export class ClaudeStreamParser {
     if (ev.is_error === true || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
       if (this.limited || LIMIT_TEXT.test(text)) {
         const legacy = /\|(\d{10})\b/.exec(text)?.[1];
-        const resetsAt = this.resetsAt ?? (legacy ? secondsToIso(Number(legacy)) : undefined);
+        const resetsAt = this.resetsAt ?? (legacy ? resetIso(Number(legacy)) : undefined);
         if (!this.limitSent) events.push({ type: "limit", ...(resetsAt ? { resetsAt } : {}) });
         this.limitSent = true;
         return {
@@ -774,6 +771,8 @@ export function runTurnOnProcess(
     followUpMs?: number;
     /** How long work moved to the background may run on after a result (`STEER_BACKGROUND_WAIT_MS`). */
     backgroundWaitMs?: number;
+    /** Each `rate_limit_event` of the turn (`rate_limit_info`). */
+    onRateLimit?: (info: Record<string, unknown>) => void;
   },
 ): Promise<TurnOutcome> {
   const redact = opts.redact ?? ((s: string) => s);
@@ -887,6 +886,7 @@ export function runTurnOnProcess(
       }
       if (parsed.boundary) unheard = 0;
       if (parsed.task) noteTask(parsed.task);
+      if (parsed.rateLimit) opts.onRateLimit?.(parsed.rateLimit);
       // Past a result, the work moved aside is over: Claude Code answers it in a turn of its own, about to start.
       if (backgroundWait && !movedRunning()) {
         clearTimeout(backgroundWait);
@@ -961,8 +961,14 @@ export interface BrainManagerOptions {
   claudeCommand?: string[];
   /** Where Claude Code keeps sessions (default `$CLAUDE_CONFIG_DIR` or `~/.claude`). */
   claudeHome?: string;
-  /** Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`. */
-  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
+  /**
+   * Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`.
+   * Protocol 18: what each turn's `rate_limit_event` says, for its account (or `OWN_USAGE_ID`).
+   */
+  accounts?: {
+    accountDir(kind: AccountKind, id: string): string | null;
+    noteRateLimit?(key: string, info: unknown): void;
+  };
   /** The local MCP bridge (where the daemon listens and how to start `agentes-runner mcp`). */
   mcp?: { socketPath: string; command: string[] };
   /** The runner's home (its accounts among it): turns never read it. */
@@ -1282,6 +1288,8 @@ export class BrainManager {
       bridge.runToken = typeof req.mcp?.token === "string" ? req.mcp.token : null;
     }
     this.running.set(req.runId, live);
+    // Usage goes to the account the turn thinks with, or to the computer's own sign-in.
+    const usageKey = ctx.accountHome && typeof req.account === "string" ? req.account : OWN_USAGE_ID.claude_code;
     try {
       const out = await runTurnOnProcess(live.proc, req.prompt, {
         emit: ctx.emit,
@@ -1289,6 +1297,7 @@ export class BrainManager {
         deltaMs: this.opts.deltaMs,
         redact: ctx.secrets?.redact,
         endInput: !live.persistent,
+        onRateLimit: (info) => this.opts.accounts?.noteRateLimit?.(usageKey, info),
         ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
@@ -1368,12 +1377,9 @@ export class BrainManager {
     writeFileSync(systemFile, typeof req.system === "string" ? req.system : "", { mode: 0o600 });
     const mode = req.permissions?.mode === "plan" ? "plan" : "work";
     let mcpConfigFile: string | undefined;
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      ...(ctx.secrets?.env ?? {}),
-      // ADR 0041: the account's folder is this process's Claude Code home.
-      ...(ctx.accountHome ? { CLAUDE_CONFIG_DIR: ctx.accountHome } : {}),
-    };
+    const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
+    // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
+    const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     if (this.opts.mcp) {
       const token = newMcpToken();
       mcpConfigFile = path.join(dir, "mcp.json");

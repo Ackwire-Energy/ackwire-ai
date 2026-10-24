@@ -1,4 +1,10 @@
-import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
+import {
+  ACCOUNTS_PROTOCOL,
+  BRAIN_PROTOCOL,
+  type BrainEffort,
+  isBrainEffort,
+  type OwnPlanUsage,
+} from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { type Agent, getAgent } from "./agents";
@@ -214,6 +220,8 @@ export interface AgentBrainView {
   canUsePlans: boolean;
   /** The computer's own sign-in can think for it: the person who connected the computer owns the agent. */
   ownSignIn: boolean;
+  /** The computer's own sign-ins' plan usage, by brain (protocol 18; empty: not known). */
+  ownUsage: OwnPlanUsage;
 }
 
 /** The account part of the brain view. */
@@ -308,6 +316,7 @@ function view(
     onlyOwner: !answersOthers(audienceOf(agent), agent.ownerUserId),
     canUsePlans: agent.ownerUserId === userId,
     ownSignIn: Boolean(machine?.pairedByUserId) && machine?.pairedByUserId === agent.ownerUserId,
+    ownUsage: machine?.executors?.ownUsage ?? {},
   };
 }
 

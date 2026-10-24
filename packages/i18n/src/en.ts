@@ -4152,6 +4152,27 @@ export const en: Translations = {
       planOwnerOnly: "Only {{agentName}}'s owner can let more people talk to it: it thinks with their plan.",
       planTermsRequired: "Confirm the personal-plan warning before letting more people talk to it.",
     },
+    usage: {
+      window: {
+        five_hour: "5 hours",
+        seven_day: "Week",
+        seven_day_opus: "Week · Opus",
+        seven_day_sonnet: "Week · Sonnet",
+        monthly: "Month",
+        other: "Other limit",
+      },
+      resetsAt: "resets at {{time}}",
+      resetsOn: "resets {{day}} at {{time}}",
+      almost: "Almost at the limit",
+      limited: "At the limit",
+      limitedUntil: "At the limit until {{when}}",
+      updated: "Updated {{ago}}",
+      offer: {
+        use: "Use {{label}} ({{pct}}%)",
+        useUnknown: "Use {{label}}",
+        connect: "Connect another account",
+      },
+    },
   },
   audience: {
     section: "Who can talk",

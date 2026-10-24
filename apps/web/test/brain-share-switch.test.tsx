@@ -110,6 +110,7 @@ describe("Só responde a você (Quem pensa)", () => {
       ownerName: "Walter",
       mine: true,
       usedBy: ["Ada"],
+      usage: null,
     };
     await ada({ account: "acct_team", accounts: [seat] });
     d = await brainDialog();

@@ -3,6 +3,7 @@ import {
   beginAccountLogin,
   cancelAccountLogin,
   getMachineAccounts,
+  refreshAiAccounts,
   removeMachineAccount,
   renameMachineAccount,
   sendAccountLoginCode,
@@ -196,6 +197,24 @@ export function machineAccountRoutes(deps: AppDeps) {
       const { orgId, machineId, loginId } = c.req.valid("param");
       await cancelAccountLogin(withHub(), c.get("user").id, orgId, machineId, loginId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/ai-accounts/refresh",
+      tags,
+      security,
+      summary: "Look the caller's plans' usage up again (an accounts screen is open)",
+      description:
+        "The caller's accounts, and the own sign-ins of the computers they connected, on every online computer. Each computer looks at most every few minutes per account; what it finds comes as `machine.updated` org events with `accounts: true`.",
+      request: { params: OrgParams },
+      responses: { 202: { description: "Asked" }, ...errors },
+    }),
+    async (c) => {
+      await refreshAiAccounts(withHub(), c.get("user").id, c.req.valid("param").orgId);
+      return c.body(null, 202);
     },
   );
 

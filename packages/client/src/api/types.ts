@@ -3152,6 +3152,8 @@ export interface AgentBrain {
   canUsePlans: boolean;
   /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
   ownSignIn: boolean;
+  /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
+  ownUsage: Partial<Record<MachineAccountKind, PlanUsage>>;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -3178,6 +3180,26 @@ export interface MachineAccount {
   mine: boolean;
   /** Names of the agents that think with it (one at most). */
   usedBy: string[];
+  /** Its plan's usage limits; null: not known yet. */
+  usage: PlanUsage | null;
+}
+
+/** A plan's usage window: how much of it is used (0–100) and when it resets. */
+export interface PlanWindow {
+  kind: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+  /** `other`: the provider's name for it ("Extra usage", a model's name). */
+  label?: string;
+  usedPercent: number;
+  resetsAt?: string;
+}
+
+/** A plan's usage limits, as the CLI on its computer said them (`at`); no token is ever read. */
+export interface PlanUsage {
+  windows: PlanWindow[];
+  /** The plan refused a request for its limit (until a window resets). */
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
 }
 
 export interface AgentBrainInput {

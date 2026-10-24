@@ -11,6 +11,7 @@ import {
   type MachineOs,
   type MachineReplies,
   type MachineRequest,
+  OWN_USAGE_ID,
   type RunnerAccess,
   type RunnerFrame,
   type RunnerInfo,
@@ -289,9 +290,9 @@ export class RunnerDaemon implements RequestObserver {
       ...(opts.accountCommands ? { commands: opts.accountCommands } : {}),
       onChange: () => {
         this.queueStatus();
-        // The server learns at once (a sign-in or removal from the desktop app, a status that changed).
+        // The server learns at once (a sign-in or removal from the desktop app, a status or usage that changed).
         const accounts = this.accounts.snapshot();
-        if (accounts) this.send({ type: "accounts.changed", accounts });
+        if (accounts) this.send({ type: "accounts.changed", accounts, ...this.ownUsage() });
       },
     });
   }
@@ -591,6 +592,8 @@ export class RunnerDaemon implements RequestObserver {
       runs: codexRuns,
       idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
       maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+      onRateLimits: (account, rateLimits) =>
+        this.accounts.noteCodexRateLimits(account ?? OWN_USAGE_ID.codex, rateLimits),
       log,
     });
     const mcp = new McpBridge({
@@ -641,7 +644,12 @@ export class RunnerDaemon implements RequestObserver {
       token: config.token,
       info: () => {
         const accounts = this.accounts.snapshot();
-        return { ...this.info(workspaceReal), browser: browser.info(), ...(accounts ? { accounts } : {}) };
+        return {
+          ...this.info(workspaceReal),
+          browser: browser.info(),
+          ...(accounts ? { accounts } : {}),
+          ...this.ownUsage(),
+        };
       },
       executors: () => this.helloExecutors(),
       context,
@@ -718,6 +726,12 @@ export class RunnerDaemon implements RequestObserver {
       paused: this.pauseState(),
       access,
     };
+  }
+
+  /** The computer's own sign-ins' usage, when anything is known (`hello`, `accounts.changed`). */
+  private ownUsage(): Pick<RunnerInfo, "ownUsage"> {
+    const own = this.accounts.ownUsage();
+    return Object.keys(own).length > 0 ? { ownUsage: own } : {};
   }
 
   /** The coding CLIs for `hello`: the ones installed (whether each may run is `access.tools`). */

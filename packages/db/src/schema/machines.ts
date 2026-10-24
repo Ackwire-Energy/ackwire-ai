@@ -16,6 +16,22 @@ import {
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
+/**
+ * A plan's usage limits as the runner last reported them (protocol 18): the
+ * same shape as `PlanUsage` in the machine protocol.
+ */
+export interface MachinePlanUsage {
+  windows: {
+    kind: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+    label?: string;
+    usedPercent: number;
+    resetsAt?: string;
+  }[];
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
+}
+
 /** What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7) and its browser (protocol 12). */
 export interface MachineExecutors {
   /** `loggedIn`/`authMethod`/`plan`: from `claude auth status` (protocol 8; absent = unknown). */
@@ -23,6 +39,8 @@ export interface MachineExecutors {
   codex?: { version: string };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string };
+  /** The usage of the computer's own sign-ins (protocol 18), by brain; kept across reconnects. */
+  ownUsage?: { claude_code?: MachinePlanUsage; codex?: MachinePlanUsage };
   detectedAt?: string;
 }
 
@@ -143,7 +161,7 @@ export const machineAccounts = pgTable(
     /** The Claude Team or Enterprise organization of the seat, as the CLI reports it. */
     orgName: text(),
     /** The plan's usage limits, as the runner last reported them. */
-    usage: jsonb().$type<Record<string, unknown>>(),
+    usage: jsonb().$type<MachinePlanUsage>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp({ withTimezone: true }),

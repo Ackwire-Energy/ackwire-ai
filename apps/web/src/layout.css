@@ -7621,6 +7621,12 @@ a.machine-row__name:hover {
   align-items: center;
   gap: 16px;
 }
+/* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
+.agp-planoffer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 /* "Adicionar conta": the provider's own sign-in, in numbered steps. */
 .agp-addacct {
   display: flex;

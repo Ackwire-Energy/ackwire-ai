@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { existsSync, statSync } from "node:fs";
-import { chmod, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   ACCOUNT_KINDS,
@@ -14,6 +14,9 @@ import {
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
+  OWN_USAGE_ID,
+  type OwnPlanUsage,
+  type PlanUsage,
   type RunnerAccountInfo,
   type WireSecretBox,
 } from "@agenteschat/adapters/machine-protocol";
@@ -21,6 +24,14 @@ import { generateSecretKeyPair, openSecret } from "@agenteschat/adapters/secret-
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { resolveCommand } from "./executors";
+import {
+  codexUsage,
+  fetchPlanKeyUsage,
+  probeClaudeUsage,
+  probeCodexUsage,
+  usageCrossed,
+  withRateLimit,
+} from "./plan-usage";
 
 /**
  * The computer brains' accounts on this machine (ADR 0041). An account is a
@@ -40,10 +51,20 @@ import { resolveCommand } from "./executors";
  * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), `remove` signs
  *   out (best effort) and deletes the folder, `accountDir` is what a brain turn
  *   runs with.
+ * - Usage (protocol 18, `plan-usage.ts`): what the turns say comes in through
+ *   `noteRateLimit` / `noteCodexRateLimits`, and `probeUsage` looks it up on
+ *   demand; the list carries it, and the computer's own sign-ins' is `ownUsage`.
  */
 
 /** A fresh look at every account's status happens at most this often (each one runs the CLI). */
 export const ACCOUNTS_TTL_MS = 10 * 60_000;
+/** An account's usage is probed at most this often. */
+export const USAGE_TTL_MS = 5 * 60_000;
+/** A provider that answered 429 isn't asked again before this. */
+export const USAGE_BACKOFF_MS = 15 * 60_000;
+/** What the turns say about usage reaches the server at most this often (unless `usageCrossed`). */
+export const USAGE_NOTIFY_MS = 60_000;
+const USAGE_PROBES_AT_ONCE = 2;
 /** How long `begin` waits for the CLI to print its URL (and Codex its code). */
 export const ACCOUNT_BEGIN_WAIT_MS = 15_000;
 /** A finished sign-in still answers `status` this long (a late poll gets the result). */
@@ -76,8 +97,27 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
     "The Codex account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
-/** The env a CLI runs with for an account folder. */
-export const accountEnv = (kind: AccountKind, dir: string): Record<string, string> => ({ [ENV_VAR[kind]]: dir });
+/** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
+const STRAY_SIGN_IN =
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+)|OPENAI_API_KEY|CODEX_API_KEY)$/;
+
+/** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
+export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
+  env[ENV_VAR[kind]] = dir;
+  return env;
+}
+
+/** A coding plan's key account (`provider.json` in its folder, mode 600): the provider and the key. */
+async function planKeyOf(dir: string): Promise<{ provider: string; key: string } | null> {
+  try {
+    const o = JSON.parse(await readFile(path.join(dir, "provider.json"), "utf8")) as Record<string, unknown>;
+    return typeof o.provider === "string" && typeof o.key === "string" ? { provider: o.provider, key: o.key } : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Reading what the CLIs print ──────────────────────────────────────────────
 
@@ -150,7 +190,10 @@ export function parseCodexLogin(output: string, final = false): { url: string; u
   return m?.[1] ? { url: first.url, userCode: m[1] } : null;
 }
 
-/** `claude auth status --json` → signed in, email and plan (short words only). */
+/**
+ * `claude auth status --json` → signed in, email and plan (short words only). Signed in means through
+ * claude.ai: a folder that reports an API key isn't the account's own sign-in.
+ */
 export function parseClaudeStatus(status: number | null, stdout: string): Omit<RunnerAccountInfo, "id" | "kind"> {
   let json: unknown;
   try {
@@ -163,7 +206,7 @@ export function parseClaudeStatus(status: number | null, stdout: string): Omit<R
   const email = typeof o.email === "string" && o.email.length <= 254 && EMAIL.test(o.email) ? o.email : undefined;
   const plan = typeof o.subscriptionType === "string" && WORD.test(o.subscriptionType) ? o.subscriptionType : undefined;
   return {
-    loggedIn: o.loggedIn === true && status === 0,
+    loggedIn: o.loggedIn === true && status === 0 && o.authMethod === "claude.ai",
     ...(email ? { email } : {}),
     ...(plan ? { plan } : {}),
   };
@@ -246,8 +289,13 @@ export interface AccountManagerOptions {
   ttlMs?: number;
   finishedKeepMs?: number;
   listTtlMs?: number;
+  /** Tests: `USAGE_TTL_MS`, `USAGE_NOTIFY_MS`, how long a probe may take, and the HTTP client of the key probes. */
+  usageTtlMs?: number;
+  usageNotifyMs?: number;
+  usageTimeoutMs?: number;
+  fetch?: typeof fetch;
   log?: (line: string) => void;
-  /** An account was added or removed, or a fresh look changed the list (`hello`, the app's status). */
+  /** An account was added or removed, a fresh look changed the list (`hello`, the app's status), or usage moved. */
   onChange?: () => void;
 }
 
@@ -282,6 +330,15 @@ export class AccountManager {
   private announce = false;
   private closed = false;
   private readonly log: (line: string) => void;
+  /** Usage by account id, or `OWN_USAGE_ID` for the computer's own sign-ins. */
+  private readonly usage = new Map<string, PlanUsage>();
+  /** When each was last probed, and until when its provider asked us to wait. */
+  private readonly probed = new Map<string, number>();
+  private readonly backoff = new Map<string, number>();
+  private readonly probeQueue: string[] = [];
+  private readonly probing = new Set<string>();
+  private usageSent = 0;
+  private usageTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly opts: AccountManagerOptions) {
     this.log = opts.log ?? (() => {});
@@ -296,7 +353,7 @@ export class AccountManager {
   }
 
   private env(kind: AccountKind, dir: string): NodeJS.ProcessEnv {
-    return { ...process.env, ...accountEnv(kind, dir) };
+    return accountEnv(kind, dir);
   }
 
   /** An account's folder for a brain turn; null when it isn't here (or is still signing in). */
@@ -628,10 +685,12 @@ export class AccountManager {
     return Promise.all(found.slice(0, MAX_MACHINE_ACCOUNTS).map((a) => this.lookUp(a.kind, a.id)));
   }
 
-  /** Every account on this machine with its status (cached for `ACCOUNTS_TTL_MS`). */
+  /** Every account on this machine with its status and usage (cached for `ACCOUNTS_TTL_MS`). */
   async list(): Promise<RunnerAccountInfo[]> {
-    if (this.cache && Date.now() - this.cache.at <= (this.opts.listTtlMs ?? ACCOUNTS_TTL_MS)) return this.cache.value;
-    return this.refresh();
+    if (this.cache && Date.now() - this.cache.at <= (this.opts.listTtlMs ?? ACCOUNTS_TTL_MS)) {
+      return this.withUsage(this.cache.value);
+    }
+    return this.withUsage(await this.refresh());
   }
 
   /** A fresh look (one at a time). `announce`: tell the observer even when nothing changed (the server may think otherwise). */
@@ -660,7 +719,7 @@ export class AccountManager {
     if (!this.cache || Date.now() - this.cache.at > (this.opts.listTtlMs ?? ACCOUNTS_TTL_MS)) {
       this.refresh().catch(() => undefined);
     }
-    return this.cache?.value;
+    return this.cache ? this.withUsage(this.cache.value) : undefined;
   }
 
   /** The next `list` asks the CLIs again (an account turned out signed out in a turn). */
@@ -686,6 +745,7 @@ export class AccountManager {
     if (r.status !== 0) this.log(`account ${id.slice(0, 8)} (${kind}): sign-out didn't finish; removing it anyway`);
     await rm(dir, { recursive: true, force: true });
     if (this.cache) this.cache = { ...this.cache, value: this.cache.value.filter((a) => a.id !== id) };
+    this.usage.delete(id);
     this.listing = null;
     this.log(`account ${id.slice(0, 8)} (${kind}) removed`);
     this.changed();
@@ -700,9 +760,121 @@ export class AccountManager {
     }
   }
 
+  // ── Usage (protocol 18) ────────────────────────────────────────────────────
+
+  private withUsage(list: RunnerAccountInfo[]): RunnerAccountInfo[] {
+    return list.map((a) => {
+      const usage = this.usage.get(a.id);
+      return usage ? { ...a, usage } : a;
+    });
+  }
+
+  /** The usage of the computer's own sign-ins, as far as known. */
+  ownUsage(): OwnPlanUsage {
+    const out: OwnPlanUsage = {};
+    for (const kind of ACCOUNT_KINDS) {
+      const usage = this.usage.get(OWN_USAGE_ID[kind]);
+      if (usage) out[kind] = usage;
+    }
+    return out;
+  }
+
+  /** A Claude Code turn's `rate_limit_event` (`rate_limit_info`), for an account id or `OWN_USAGE_ID.claude_code`. */
+  noteRateLimit(key: string, info: unknown) {
+    const prev = this.usage.get(key);
+    const next = withRateLimit(prev, info);
+    if (next) this.noted(key, prev, next);
+  }
+
+  /** Codex's `account/rateLimits/updated` during a turn (`rateLimits`), for an account id or `OWN_USAGE_ID.codex`. */
+  noteCodexRateLimits(key: string, rateLimits: unknown) {
+    const next = codexUsage(rateLimits, "turn");
+    if (next) this.noted(key, this.usage.get(key), next);
+  }
+
+  /** What a turn said: the server hears it at most every `USAGE_NOTIFY_MS`, at once when people should know. */
+  private noted(key: string, prev: PlanUsage | undefined, next: PlanUsage) {
+    this.usage.set(key, next);
+    const wait = (this.opts.usageNotifyMs ?? USAGE_NOTIFY_MS) - (Date.now() - this.usageSent);
+    if (usageCrossed(prev, next) || wait <= 0) return this.usageChanged();
+    this.usageTimer ??= setTimeout(() => this.usageChanged(), wait);
+    this.usageTimer.unref?.();
+  }
+
+  private usageChanged() {
+    if (this.usageTimer) clearTimeout(this.usageTimer);
+    this.usageTimer = null;
+    this.usageSent = Date.now();
+    this.changed();
+  }
+
+  /**
+   * `list.fresh`: these accounts' (ids or `OWN_USAGE_ID`s) usage is looked up now, in the background, at most
+   * `USAGE_PROBES_AT_ONCE` at a time; one known for less than `USAGE_TTL_MS`, or whose provider asked us to
+   * wait, isn't. Each result reaches the server at once (a person is looking).
+   */
+  probeUsage(ids: readonly string[]) {
+    const now = Date.now();
+    const own = Object.values(OWN_USAGE_ID);
+    for (const id of ids.slice(0, MAX_MACHINE_ACCOUNTS + own.length)) {
+      if (!isAccountId(id) && !own.includes(id)) continue;
+      if (this.probeQueue.includes(id) || this.probing.has(id) || (this.backoff.get(id) ?? 0) > now) continue;
+      const known = Math.max(Date.parse(this.usage.get(id)?.at ?? "") || 0, this.probed.get(id) ?? 0);
+      if (now - known < (this.opts.usageTtlMs ?? USAGE_TTL_MS)) continue;
+      this.probeQueue.push(id);
+    }
+    this.nextProbes();
+  }
+
+  private nextProbes() {
+    while (!this.closed && this.probing.size < USAGE_PROBES_AT_ONCE && this.probeQueue.length > 0) {
+      const id = this.probeQueue.shift() as string;
+      this.probing.add(id);
+      this.probed.set(id, Date.now());
+      void this.probeOne(id)
+        .catch(() => null)
+        .then((found) => {
+          if (found === "backoff") this.backoff.set(id, Date.now() + USAGE_BACKOFF_MS);
+          else if (found && !this.closed) {
+            this.usage.set(id, found);
+            this.usageChanged();
+          }
+        })
+        .finally(() => {
+          this.probing.delete(id);
+          this.nextProbes();
+        });
+    }
+  }
+
+  private async probeOne(id: string): Promise<PlanUsage | "backoff" | null> {
+    const timeoutMs = this.opts.usageTimeoutMs;
+    const own = ACCOUNT_KINDS.find((k) => OWN_USAGE_ID[k] === id);
+    // The computer's own sign-in runs from the runner's home, never a project of the person's.
+    const target = own
+      ? { kind: own, cwd: path.dirname(this.opts.root), env: process.env }
+      : ACCOUNT_KINDS.flatMap((k) => {
+          const dir = this.accountDir(k, id);
+          return dir ? [{ kind: k, cwd: dir, env: this.env(k, dir) }] : [];
+        })[0];
+    if (!target) return null;
+    const limits = timeoutMs ? { timeoutMs } : {};
+    const plan = own ? null : await planKeyOf(target.cwd);
+    if (plan) {
+      return fetchPlanKeyUsage(plan.provider, plan.key, {
+        ...limits,
+        ...(this.opts.fetch ? { fetch: this.opts.fetch } : {}),
+      });
+    }
+    const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
+    return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
+  }
+
   /** The runner is exiting: sign-ins in progress stop and their folders go. */
   async close() {
     this.closed = true;
+    if (this.usageTimer) clearTimeout(this.usageTimer);
+    this.probeQueue.length = 0;
     const waiting = [...this.logins.values()].filter((l) => l.state === "waiting");
     for (const l of waiting) this.settle(l, "failed", "The runner stopped");
     await Promise.all(waiting.map((l) => this.drop(l)));

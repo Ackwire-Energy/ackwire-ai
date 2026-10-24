@@ -449,6 +449,8 @@ async function handleAccount(
       await accounts.cancel(requireString(req.loginId, "loginId"));
       return {};
     case "list":
+      // Protocol 18: usage looked up in the background; what it finds comes as `accounts.changed`.
+      if (Array.isArray(req.fresh)) accounts.probeUsage(req.fresh.filter((id) => typeof id === "string"));
       return { accounts: await accounts.list() };
     case "remove":
       await accounts.remove(req.kind, requireString(req.accountId, "accountId"));

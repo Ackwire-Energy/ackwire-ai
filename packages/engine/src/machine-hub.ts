@@ -30,6 +30,7 @@ import {
   accountsToRemove,
   forgetRemovedAccount,
   type MachineAccountRef,
+  storeOwnUsage,
   syncMachineAccounts,
 } from "./machine-accounts";
 import {
@@ -402,6 +403,8 @@ export function createMachineHub(deps: MachineHubDeps) {
       await closeConn(old);
     }
     const now = new Date();
+    // Protocol 18: the own sign-ins' usage it knows, over the last known (a runner that just started knows none).
+    const ownUsage = { ...(machine.executors?.ownUsage ?? {}), ...(frame.ownUsage ?? {}) };
     await db
       .update(machines)
       .set({
@@ -422,6 +425,7 @@ export function createMachineHub(deps: MachineHubDeps) {
               executors: {
                 ...(frame.executors ?? {}),
                 ...(frame.browser ? { browser: frame.browser } : {}),
+                ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
                 detectedAt: now.toISOString(),
               },
             }
@@ -966,6 +970,11 @@ export function createMachineHub(deps: MachineHubDeps) {
             return [];
           });
           removeAccounts(conn, remove);
+          if (frame.ownUsage) {
+            await storeOwnUsage({ db, pubsub }, orgId, machineId, frame.ownUsage).catch((error) =>
+              deps.log?.warn("own usage failed", { machineId, error: String(error) }),
+            );
+          }
         }
       } else if (frame.type === "access.changed") {
         const machineId = conn.machineId;

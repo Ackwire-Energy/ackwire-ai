@@ -509,7 +509,8 @@ model call goes through the server, which records its usage and cost per agent.
 computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder
 on that computer, `<runner home>/accounts/<kind>/<id>` (`~/.agentes-runner/accounts/…` for a runner
 installed with the command), and its sign-in never leaves it. The server keeps only the account's
-name, email, plan and status. The code pasted when signing in from a browser is encrypted there to a
+name, email, plan, status and usage (how much of each limit is used, and when it resets, as the CLI
+there says it). The code pasted when signing in from a browser is encrypted there to a
 key made on the computer and relayed without being stored, so the server can't read it. A personal
 plan is meant for its owner: answering other people with it may go against the provider's terms.
 

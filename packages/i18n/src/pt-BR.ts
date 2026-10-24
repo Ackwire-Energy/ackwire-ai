@@ -4163,6 +4163,27 @@ export const ptBR = {
       planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
       planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
     },
+    usage: {
+      window: {
+        five_hour: "5 horas",
+        seven_day: "Semana",
+        seven_day_opus: "Semana · Opus",
+        seven_day_sonnet: "Semana · Sonnet",
+        monthly: "Mês",
+        other: "Outro limite",
+      },
+      resetsAt: "volta às {{time}}",
+      resetsOn: "volta {{day}} às {{time}}",
+      almost: "Quase no limite",
+      limited: "No limite",
+      limitedUntil: "No limite até {{when}}",
+      updated: "Atualizado {{ago}}",
+      offer: {
+        use: "Usar {{label}} ({{pct}}%)",
+        useUnknown: "Usar {{label}}",
+        connect: "Conectar outra conta",
+      },
+    },
   },
   audience: {
     section: "Quem pode falar",

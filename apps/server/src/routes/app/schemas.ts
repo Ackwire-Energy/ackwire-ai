@@ -382,6 +382,24 @@ export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("Br
 
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
+export const PlanUsage = z
+  .object({
+    windows: z.array(
+      z.object({
+        kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
+        label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
+        usedPercent: z.number().openapi({ description: "0–100." }),
+        resetsAt: z.string().optional(),
+      }),
+    ),
+    limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
+    source: z.enum(["turn", "probe"]),
+    at: z.string().openapi({ description: "When the computer learned it." }),
+  })
+  .openapi("PlanUsage", {
+    description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
+  });
+
 export const MachineAccount = z
   .object({
     id: z.uuid(),
@@ -394,6 +412,7 @@ export const MachineAccount = z
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
     usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it (one at most)." }),
+    usage: PlanUsage.nullable().openapi({ description: "Its plan's usage limits; null: not known yet." }),
   })
   .openapi("MachineAccount", {
     description:
@@ -438,6 +457,9 @@ export const AgentBrain = z
     ownSignIn: z.boolean().openapi({
       description: "The computer's own sign-in can think for it: the person who connected the computer owns the agent.",
     }),
+    ownUsage: z
+      .object({ claude_code: PlanUsage.optional(), codex: PlanUsage.optional() })
+      .openapi({ description: "The computer's own sign-ins' usage limits, by brain (absent: not known)." }),
   })
   .openapi("AgentBrain");
 

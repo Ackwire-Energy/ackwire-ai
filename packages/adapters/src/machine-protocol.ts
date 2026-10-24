@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 17;
+export const MACHINE_PROTOCOL_VERSION = 18;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -149,6 +149,15 @@ export const BRAIN_PROFILES_PROTOCOL = 16;
  * page's text only.
  */
 export const BROWSER_FAST_PROTOCOL = 17;
+/**
+ * From this protocol on: plan usage, read by the CLIs without touching any
+ * token. Accounts carry `usage` (`RunnerAccountInfo.usage`); `hello` and
+ * `accounts.changed` carry the computer's own sign-ins' (`ownUsage`). It comes
+ * from the turns (`rate_limit_event`, Codex's `account/rateLimits/updated`)
+ * and from probes `list` asks for (`fresh`). The server never sends `fresh`
+ * to an older runner.
+ */
+export const PLAN_USAGE_PROTOCOL = 18;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -173,7 +182,44 @@ export interface RunnerAccountInfo {
   email?: string;
   /** `pro`, `max`, `team`, `plus`… as the CLI says. */
   plan?: string;
+  /** Protocol 18: the plan's usage limits, as last seen. */
+  usage?: PlanUsage;
 }
+
+/** A plan's usage window: how much of it is used (0–100) and when it resets. */
+export interface PlanWindow {
+  kind: PlanWindowKind;
+  /** `other`: what the provider calls it ("Extra usage", a model's name). */
+  label?: string;
+  usedPercent: number;
+  resetsAt?: string;
+}
+export type PlanWindowKind = "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "monthly" | "other";
+export const PLAN_WINDOW_KINDS: readonly PlanWindowKind[] = [
+  "five_hour",
+  "seven_day",
+  "seven_day_opus",
+  "seven_day_sonnet",
+  "monthly",
+  "other",
+];
+
+/** Protocol 18: a plan's usage limits as the CLI or the provider said them (`at`), during a turn or by a probe. */
+export interface PlanUsage {
+  windows: PlanWindow[];
+  /** The plan refused a request for its limit (cleared when it allows one again). */
+  limited?: boolean;
+  source: "turn" | "probe";
+  at: string;
+}
+
+/** The computer's own sign-ins' usage (protocol 18), by brain. */
+export type OwnPlanUsage = Partial<Record<AccountKind, PlanUsage>>;
+
+/** `list.fresh` ids for the computer's own sign-ins (the rest are account ids). */
+export const OWN_USAGE_ID: Record<AccountKind, string> = { claude_code: "own:claude_code", codex: "own:codex" };
+
+export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
 
 /** Where a sign-in is: waiting for the person, done (signed in), failed or expired (folder removed). */
 export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
@@ -196,7 +242,11 @@ export type AccountRequest =
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
-  | { action: "list" }
+  /**
+   * Protocol 18: `fresh`, accounts (ids, or `OWN_USAGE_ID`s) whose usage to look up now: the runner
+   * answers at once, probes in the background and sends `accounts.changed` when it knows more.
+   */
+  | { action: "list"; fresh?: string[] }
   | { action: "remove"; kind: AccountKind; accountId: string };
 
 export const ACCOUNT_LOGIN_TTL_MS = 15 * 60_000;
@@ -788,6 +838,8 @@ export interface RunnerInfo {
   browser?: RunnerBrowserInfo;
   /** Protocol 13: the accounts on the machine (ADR 0041). */
   accounts?: RunnerAccountInfo[];
+  /** Protocol 18: the usage of the computer's own sign-ins (no account folder). */
+  ownUsage?: OwnPlanUsage;
 }
 
 export interface FileEntry {
@@ -1124,8 +1176,11 @@ export type RunnerFrame =
   | { type: "runner.state"; paused: RunnerPause }
   /** Protocol 10: what the machine allows changed (the person granted, removed, or turned a tool on or off). */
   | { type: "access.changed"; access: RunnerAccess }
-  /** Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in done, a status changed). */
-  | { type: "accounts.changed"; accounts: RunnerAccountInfo[] }
+  /**
+   * Protocol 13: the accounts on the machine changed (signed in or removed from the desktop app, a sign-in
+   * done, a status changed). Protocol 18: or their usage did (`ownUsage`: the computer's own sign-ins').
+   */
+  | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -1238,13 +1293,62 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     if (!isObject(a) || !isAccountId(a.id) || !isAccountKind(a.kind)) continue;
     const email = isString(a.email) && a.email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(a.email) ? a.email : undefined;
     const plan = isString(a.plan) && /^[\w.-]{1,40}$/.test(a.plan) ? a.plan : undefined;
+    const usage = parsePlanUsage(a.usage);
     out.push({
       id: a.id,
       kind: a.kind,
       loggedIn: a.loggedIn === true,
       ...(email ? { email } : {}),
       ...(plan ? { plan } : {}),
+      ...(usage ? { usage } : {}),
     });
+  }
+  return out;
+}
+
+const isoOf = (v: unknown) =>
+  isString(v) && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined;
+
+/** A usage snapshot (protocol 18), checked: known window kinds only, percentages 0–100, short labels. */
+export function parsePlanUsage(v: unknown): PlanUsage | undefined {
+  if (!isObject(v) || !Array.isArray(v.windows)) return undefined;
+  const at = isoOf(v.at);
+  if (!at) return undefined;
+  const windows: PlanWindow[] = [];
+  for (const w of v.windows.slice(0, PLAN_USAGE_LIMITS.windows)) {
+    const kind = isObject(w) ? PLAN_WINDOW_KINDS.find((k) => k === w.kind) : undefined;
+    const used = isObject(w) ? finite(w.usedPercent) : undefined;
+    if (!isObject(w) || !kind || used === undefined) continue;
+    const label = isString(w.label)
+      ? w.label
+          .replace(/\p{Cc}/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, PLAN_USAGE_LIMITS.label)
+      : "";
+    const resetsAt = isoOf(w.resetsAt);
+    windows.push({
+      kind,
+      ...(label ? { label } : {}),
+      usedPercent: Math.round(Math.min(100, Math.max(0, used))),
+      ...(resetsAt ? { resetsAt } : {}),
+    });
+  }
+  return {
+    windows,
+    ...(v.limited === true ? { limited: true } : {}),
+    source: v.source === "probe" ? "probe" : "turn",
+    at,
+  };
+}
+
+/** `ownUsage` (protocol 18): one snapshot per brain at most. */
+export function parseOwnUsage(v: unknown): OwnPlanUsage | undefined {
+  if (!isObject(v)) return undefined;
+  const out: OwnPlanUsage = {};
+  for (const kind of ACCOUNT_KINDS) {
+    const usage = parsePlanUsage(v[kind]);
+    if (usage) out[kind] = usage;
   }
   return out;
 }
@@ -1380,6 +1484,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(access ? { access } : {}),
         ...(isObject(f.browser) ? { browser: parseBrowserInfo(f.browser) } : {}),
         ...(Array.isArray(f.accounts) ? { accounts: parseAccounts(f.accounts) } : {}),
+        ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
       };
     }
     case "browser.frame": {
@@ -1426,8 +1531,11 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const access = parseAccess(f.access);
       return access ? { type: "access.changed", access } : null;
     }
-    case "accounts.changed":
-      return Array.isArray(f.accounts) ? { type: "accounts.changed", accounts: parseAccounts(f.accounts) } : null;
+    case "accounts.changed": {
+      if (!Array.isArray(f.accounts)) return null;
+      const ownUsage = parseOwnUsage(f.ownUsage);
+      return { type: "accounts.changed", accounts: parseAccounts(f.accounts), ...(ownUsage ? { ownUsage } : {}) };
+    }
     case "access.decided": {
       if (!isString(f.requestId)) return null;
       const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);

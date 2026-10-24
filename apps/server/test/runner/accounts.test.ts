@@ -6,6 +6,7 @@ import { sealSecret } from "@agenteschat/adapters/secret-box";
 import {
   AccountManager,
   type AccountManagerOptions,
+  accountEnv,
   parseClaudeLoginUrl,
   parseClaudeStatus,
   parseCodexLogin,
@@ -70,11 +71,27 @@ test("Codex's device sign-in: the link and the one-time code, colors stripped, t
   expect(parseCodexLogin("ABCD-EFGH\nhttps://example.com/device\n", true)).toBeNull();
 });
 
-test("status commands: signed in with email and plan (short words only), anything else is signed out", () => {
-  const good = JSON.stringify({ loggedIn: true, email: "dev@acme.test", subscriptionType: "max" });
+test("status commands: signed in through claude.ai with email and plan (short words only), anything else is signed out", () => {
+  const good = JSON.stringify({
+    loggedIn: true,
+    authMethod: "claude.ai",
+    email: "dev@acme.test",
+    subscriptionType: "max",
+  });
   expect(parseClaudeStatus(0, good)).toEqual({ loggedIn: true, email: "dev@acme.test", plan: "max" });
-  const odd = JSON.stringify({ loggedIn: true, email: "not an email", subscriptionType: "a b" });
+  const odd = JSON.stringify({
+    loggedIn: true,
+    authMethod: "claude.ai",
+    email: "not an email",
+    subscriptionType: "a b",
+  });
   expect(parseClaudeStatus(0, odd)).toEqual({ loggedIn: true });
+  // An API key (in the env, or the folder's) isn't the account's own sign-in; nor is an unknown method.
+  expect(parseClaudeStatus(0, JSON.stringify({ loggedIn: true, authMethod: "api_key" }))).toEqual({ loggedIn: false });
+  expect(parseClaudeStatus(0, JSON.stringify({ loggedIn: true, subscriptionType: "max" }))).toEqual({
+    loggedIn: false,
+    plan: "max",
+  });
   expect(parseClaudeStatus(1, JSON.stringify({ loggedIn: false }))).toEqual({ loggedIn: false });
   expect(parseClaudeStatus(0, "garbage")).toEqual({ loggedIn: false });
   expect(parseCodexStatus(0, `${ESC}[32mLogged in using ChatGPT${ESC}[0m\n`)).toEqual({ loggedIn: true });
@@ -163,6 +180,35 @@ test.if(posix)(
     expect(await errorCode(() => m.code(id, aad, box))).toBe("bad_request");
   },
   15_000,
+);
+
+test.if(posix)(
+  "a key, token or other endpoint in the runner's env never reaches an account: its CLI sees only the folder's sign-in",
+  async () => {
+    const stray = {
+      ANTHROPIC_API_KEY: "sk-ant-stray",
+      ANTHROPIC_BASE_URL: "https://proxy.test",
+      OPENAI_API_KEY: "sk-x",
+    };
+    Object.assign(process.env, stray);
+    try {
+      const { m, root } = setup();
+      const id = LOGIN(9);
+      const dir = path.join(root, "claude_code", id);
+      mkdirSync(dir, { recursive: true });
+      // Signed out there: the key in the runner's env would have made it "signed in" (and billed the key).
+      expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false }]);
+      const env = accountEnv("claude_code", dir);
+      expect(env.CLAUDE_CONFIG_DIR).toBe(dir);
+      for (const k of Object.keys(stray)) expect(env[k]).toBeUndefined();
+      expect(accountEnv("codex", dir, { PATH: "/bin", CODEX_API_KEY: "x", CLAUDE_CODE_USE_BEDROCK: "1" })).toEqual({
+        PATH: "/bin",
+        CODEX_HOME: dir,
+      });
+    } finally {
+      for (const k of Object.keys(stray)) delete process.env[k];
+    }
+  },
 );
 
 test.if(posix)(

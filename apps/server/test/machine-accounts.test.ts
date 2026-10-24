@@ -148,6 +148,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
         ownerName: "owner",
         mine: true,
         usedBy: [],
+        usage: null,
       },
     ],
     canManage: true,
@@ -326,7 +327,26 @@ test("the OpenAPI document lists the account routes", async () => {
     "/app/organizations/{orgId}/machines/{machineId}/account-logins",
     "/app/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}",
     "/app/organizations/{orgId}/machines/{machineId}/account-logins/{loginId}/code",
+    "/app/organizations/{orgId}/ai-accounts/refresh",
   ]) {
     expect(Object.keys(doc.paths)).toContain(path);
   }
+});
+
+test("refreshing plan usage: 202, the computer is asked to look the caller's accounts up again; the usage it reports shows", async () => {
+  const { api, ownerId } = await workspace();
+  const mac = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "mac" });
+  const runner = fakeRunner();
+  await runner.hello(mac.token, [{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true }]);
+  const res = await api("/ai-accounts/refresh", { json: {} });
+  expect(res.status).toBe(202);
+  await settle();
+  expect(runner.accountRequests("list")).toEqual([
+    expect.objectContaining({ fresh: [OLD_ACCOUNT, "own:claude_code", "own:codex"] }),
+  ]);
+  // What the computer found comes back with the list.
+  const usage = { windows: [{ kind: "five_hour", usedPercent: 12 }], source: "probe", at: "2030-01-01T10:00:00.000Z" };
+  await runner.changed([{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true, usage } as RunnerAccountInfo]);
+  const listed = (await (await api(`/machines/${mac.machineId}/accounts`)).json()) as { accounts: Account[] };
+  expect(listed.accounts[0]).toMatchObject({ id: OLD_ACCOUNT, ownerId, usage });
 });

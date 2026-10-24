@@ -14,6 +14,7 @@
  * - `POST   …/machines/{id}/account-logins` `{ kind }` → 201 `{ loginId, kind, url, publicKey? | userCode?, expiresAt }`
  * - `POST   …/account-logins/{loginId}/code` `{ box }` → 204; `GET …/account-logins/{loginId}` → `{ state, account? }`
  * - `DELETE …/account-logins/{loginId}` → 204
+ * - `POST   …/ai-accounts/refresh` → 202 (the usage arrives later as `machine.updated`; nothing here)
  * Sign-ins wait until a test calls `endLogin()`.
  * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
  * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
@@ -204,6 +205,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.cancelAccountLogin", orgId, machineId, loginId);
         const l = logins.find((x) => x.loginId === loginId);
         if (l) l.cancelled = true;
+      },
+      refreshAccountUsage: async (orgId) => {
+        log("machines.refreshAccountUsage", orgId);
       },
     },
     pair,

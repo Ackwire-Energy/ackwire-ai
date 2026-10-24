@@ -45,7 +45,9 @@ import {
   Input,
   LogoMark,
   OptionList,
+  PlanMeter,
   ProviderLogo,
+  planState,
   Segmented,
   Select,
   type SelectOption,
@@ -63,6 +65,7 @@ import { cleanSite, SITE } from "@/components/browser/sites";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
 import { inDesktopApp } from "@/lib/desktop";
+import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { useAgentEdit } from "./context";
 import "@/components/browser/browser.css";
@@ -149,7 +152,7 @@ function Cell({
  * side by side, each opening its dialog; the numbers in the footer. Where comes first: who thinks depends on it.
  */
 export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { agent, viewer, saved, can, g } = useAgentEdit();
   const models = useModels();
   const work = useWork();
@@ -173,6 +176,14 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       : view?.account
         ? (kindAccounts.find((a) => a.id === view.account)?.label ?? null)
         : t("agentPage.work.brain.thisComputer", { computer: view?.computer?.name ?? "" });
+  // Near or at its plan's limit: said where the account is.
+  const usage =
+    !view || (kind !== "claude_code" && kind !== "codex")
+      ? null
+      : view.account
+        ? view.accounts.find((a) => a.id === view.account)?.usage
+        : view.ownUsage[kind];
+  const sub = [accountWord, planWord(t, i18n.language, usage)].filter(Boolean).join(" · ") || null;
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
@@ -205,7 +216,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
             label={t("agentPage.work.cell.brain")}
             value={kind === "model" ? orgModel : t(`brain.card.${kind}`)}
             more={kind === "model" ? null : [planModel, effort].filter(Boolean).join(" · ") || null}
-            sub={kind === "model" ? t("agentPage.work.orgModel") : accountWord}
+            sub={kind === "model" ? t("agentPage.work.orgModel") : sub}
             openLabel={t("agentPage.work.open.brain")}
             onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
           />
@@ -488,6 +499,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [asking, setAsking] = useState(false);
   const offId = useId();
   const shareId = useId();
+  // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
+  useEffect(() => {
+    void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
+  }, [api, org.id]);
+  const meterText = planMeterText(t, i18n.language);
   // A brain switched off in this very Mac's Ferramentas (agentes for Mac): one click to turn it on (ADR 0036).
   const toolOffHere =
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
@@ -518,6 +534,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
   ].filter((a) => a.kind === accountKind && (a.mine || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
+  // The chosen account's plan usage; the computer's own sign-in's only where it can think for this agent.
+  const usage = accountKind
+    ? account === null
+      ? view.ownSignIn
+        ? view.ownUsage[accountKind]
+        : undefined
+      : current?.usage
+    : undefined;
+  const limited = usage ? planState(usage).state === "limited" : false;
+  const offers =
+    limited && accountKind && view.canUsePlans ? limitOffers(accounts, accountKind, account).slice(0, 2) : [];
   // Signing in to it again is its owner's.
   const signedOut = current?.status === "signed_out" && current.mine;
   const accountChanged = accountsOn && account !== view.account;
@@ -652,17 +679,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...accounts.map((a) => {
       // One account thinks for one agent.
       const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
+      const about = !a.mine
+        ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
+        : a.status === "signed_out"
+          ? t("agentPage.work.brain.accountSignedOut")
+          : others
+            ? t("agentPage.work.brain.accountInUse", { agents: others })
+            : a.email;
       return {
         value: a.id,
         label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
         disabled: !a.mine || others !== "",
-        description: !a.mine
-          ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
-          : a.status === "signed_out"
-            ? t("agentPage.work.brain.accountSignedOut")
-            : others
-              ? t("agentPage.work.brain.accountInUse", { agents: others })
-              : (a.email ?? undefined),
+        description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
         leading: accountIcon,
       };
     }),
@@ -698,6 +726,30 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         renderValue={pickerValue}
       />
       {accountNote && <SettingNote icon={signedOut ? "alert" : "lock"}>{accountNote}</SettingNote>}
+      {usage && <PlanMeter usage={usage} text={meterText} />}
+      {limited && view.canUsePlans && (offers.length > 0 || view.canManageAccounts) && (
+        <div className="agp-planoffer">
+          {offers.map(({ account: a, used }) => (
+            <Button
+              key={a.id}
+              size="sm"
+              onClick={() => {
+                setArrived(null);
+                setAccount(a.id);
+              }}
+            >
+              {used === null
+                ? t("aiAccounts.usage.offer.useUnknown", { label: a.label })
+                : t("aiAccounts.usage.offer.use", { label: a.label, pct: used })}
+            </Button>
+          ))}
+          {view.canManageAccounts && (
+            <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>
+              {t("aiAccounts.usage.offer.connect")}
+            </Button>
+          )}
+        </div>
+      )}
       {arrived && (
         <SettingNote icon="check" live>
           {t("agentPage.work.brain.add.done", { account: arrived.label, computer: computerName })}
