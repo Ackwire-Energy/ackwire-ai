@@ -30,6 +30,8 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 | Capture | scrot JPEG q70: the whole screen 33–49 ms (about 140 KB), a region 11–21 ms |
 | Input | xdotool 6–13 ms a call. `xdotool type` lost capitals and letters of pt-BR text at `--delay 3` (`ÁÉÍÓÚ` came out lowercase with letters dropped), and every non-ASCII letter without a UTF-8 locale |
 | The helper's start | Python with Gio, Xlib and the bus: 186 ms, 28 MB |
+| The helper on Xtigervnc at 1280×800 (`--self-check`) | a look with a native app in front 62–88 ms (p50), with Chromium's whole tree (950 items) 296 ms; capture 29–49 ms, a region 12–21 ms; act and settle 409–650 ms; a 2,000-character fill 130 ms; the pt-BR and symbol strings above typed and filled exactly |
+| Apps' caches | at-spi2-core 2.56's apps answer `GetItems` only once some client listens for an event; until then the method doesn't exist |
 
 ### Alternatives considered
 
@@ -103,7 +105,9 @@ The browser closes a covering banner once (ADR 0054 §5). On a desktop what cove
 ### 9. The helper
 
 - A small Python program per agent desktop, run as the agent's OS user with `python3 -I -c <source>`: no file to read from a home that is 0700, and `-I` keeps the agent's own site-packages and `.pth` files out. It uses `python3-gi` (Gio's D-Bus for AT-SPI), `python3-xlib` (the window stack, XDamage, XTEST), `xdotool` and `scrot`: distro packages, nothing added to the compiled runner.
-- It finds the accessibility bus from the root window's `AT_SPI_BUS`, takes both `GetItems` signatures (at-spi2 2.56's and the older one), speaks JSON lines on stdin and stdout and never logs what it is sent. Apps start with the session's environment (read from the session's process), so they show in the tree like apps opened from the menu.
+- It finds the accessibility bus from the root window's `AT_SPI_BUS`, takes both `GetItems` signatures (at-spi2 2.56's and the older one), speaks JSON lines on stdin and stdout and never logs what it is sent. Apps start with the session's environment (read from the session's process) and in the agent's home, so they show in the tree like apps opened from the menu.
+- Apps keep no cache to give until a client listens for an event, so the helper registers one cheap event (`window:activate`) when it connects; every app on the bus, and every one started later, then answers `GetItems`.
+- Pasted text is the helper's own: it owns the clipboard and the primary selection (text fields paste the first on Shift+Insert, terminals the second) and sends the next keys only once the focused app took the text, so they land after it. It keeps the selections between pastes: taking them again makes the VNC server and the session's clipboard managers read them each time.
 - Filtering, refs, occlusion and guards live in the runner's TypeScript, where they are tested; the helper's pure parts (both `GetItems` formats, the settle state machine) have Python unit tests.
 - The runner treats it as the agent's process: replies capped and checked, a restart on any violation or after 3 failures in a row, a stop after 15 idle minutes.
 
