@@ -7518,6 +7518,19 @@ export const ptBR = {
       description:
         "Pede para uma pessoa fazer algo na tela do agente (como entrar num aplicativo) e espera ela terminar.",
     },
+    desktop_do: {
+      label: "Fazer passos na tela do computador",
+      description:
+        "Faz vários passos na tela do agente de uma vez (abrir um aplicativo, clicar, digitar, apertar teclas), conferindo cada um.",
+    },
+    desktop_read: {
+      label: "Ler a tela",
+      description: "Lê a tela do agente como texto, com um número para cada botão, campo e menu.",
+    },
+    desktop_screenshot: {
+      label: "Tirar um print da tela",
+      description: "Salva uma imagem da tela do agente na pasta dele.",
+    },
   },
   /** The agent browser (ADR 0040): the agent's page, the computer's page, the chat card, the live view. */
   browser: {

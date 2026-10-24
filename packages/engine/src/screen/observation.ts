@@ -230,6 +230,31 @@ export function describeElement(e: ScreenElement, max = 220): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+/** A look this recent is the screen as it is: a plan's first target can be found on it. */
+export const FRESH_LOOK_MS = 8000;
+/** A look this recent is still what the agent knows of the screen: a plan's changes are counted from it. */
+export const KNOWN_LOOK_MS = 10 * 60_000;
+
+/** The last look at each agent's screen, by key, for the newest `max` keys: what its plans start from. */
+export function createLookMemory(now: () => number = Date.now, max = 1000) {
+  const looks = new Map<string, ScreenObservation>();
+  return {
+    remember(key: string, o: ScreenObservation) {
+      looks.delete(key);
+      looks.set(key, o);
+      if (looks.size > max) looks.delete(looks.keys().next().value as string);
+    },
+    /** The last look, when it is younger than `ms`. */
+    within(key: string, ms: number) {
+      const o = looks.get(key);
+      return o && now() - o.at < ms ? o : null;
+    },
+    forget(key: string) {
+      looks.delete(key);
+    },
+  };
+}
+
 /** The address without its fragment: two looks at the same document. */
 const documentOf = (url: string | null) => (url ? url.replace(/#.*$/, "") : null);
 

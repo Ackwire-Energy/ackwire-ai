@@ -227,6 +227,9 @@ export interface DesktopLookReply {
   screen: { width: number; height: number };
 }
 
+/** Protocol 19: the attribute of the agent browser's window in a look (one line: `browser_do` drives it). */
+export const DESKTOP_AGENT_BROWSER = "agent browser: use browser_do";
+
 /** The screens of an agent that people watch and take over: one open handoff per agent and screen. */
 export const SCREEN_KINDS = ["browser", "desktop"] as const;
 export type ScreenKind = (typeof SCREEN_KINDS)[number];

@@ -73,6 +73,48 @@ export interface ScreenStep {
 /** Where an action lands: an element, or a point found on an image (the surface's pixels). */
 export type ActTarget = { ref: string } | { x: number; y: number };
 
+const STEP_TEXT = [
+  "target",
+  "to",
+  "app",
+  "path",
+  "url",
+  "text",
+  "value",
+  "key",
+  "secret",
+  "until",
+  "find",
+  "expect",
+] as const;
+
+/** A step from a model's input when its `do` is one of `verbs`; fields that aren't a step's are dropped. */
+export function screenStepOf(v: unknown, verbs: readonly ScreenVerb[]): ScreenStep | null {
+  if (!v || typeof v !== "object") return null;
+  const s = v as Record<string, unknown>;
+  if (typeof s.do !== "string" || !(verbs as readonly string[]).includes(s.do)) return null;
+  const out: ScreenStep = { do: s.do as ScreenVerb };
+  for (const k of STEP_TEXT) if (typeof s[k] === "string") out[k] = s[k] as string;
+  if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
+    out.direction = s.direction;
+  }
+  if (typeof s.pixels === "number") out.pixels = s.pixels;
+  if (typeof s.seconds === "number") out.seconds = s.seconds;
+  return out;
+}
+
+/**
+ * The plan acts on the screen the agent last saw: a step acts before any `open`. After a person changed
+ * the screen, such a plan waits until the agent looked at it again.
+ */
+export function actsBeforeOpening(steps: ScreenStep[]) {
+  for (const s of steps) {
+    if (s.do === "open") return false;
+    if (s.do !== "read" && s.do !== "wait" && s.do !== "back") return true;
+  }
+  return false;
+}
+
 type Scroll = { kind: "scroll"; direction: "up" | "down" | "left" | "right"; pixels: number };
 
 /**

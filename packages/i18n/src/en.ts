@@ -7498,6 +7498,19 @@ export const en: Translations = {
       description:
         "Asks a person to do something on the agent's desktop (like signing in to an app) and waits until they're done.",
     },
+    desktop_do: {
+      label: "Do steps on the desktop",
+      description:
+        "Does several steps on the agent's desktop in one go (open an app, click, type, press keys), checking each one.",
+    },
+    desktop_read: {
+      label: "Read the screen",
+      description: "Reads the agent's desktop as text, with a number for each button, field and menu.",
+    },
+    desktop_screenshot: {
+      label: "Take a screenshot of the desktop",
+      description: "Saves an image of the agent's desktop in its folder.",
+    },
   },
   browser: {
     title: "Browser",

@@ -1,4 +1,4 @@
-import type { BrowserCaptureMark } from "@agenteschat/adapters/machine-protocol";
+import { type BrowserCaptureMark, DESKTOP_AGENT_BROWSER } from "@agenteschat/adapters/machine-protocol";
 import {
   HELPER_ROOT_PATH,
   HELPER_TEXT_MAX,
@@ -541,7 +541,7 @@ export function desktopLook(snap: HelperSnapshot, refOf: DesktopRefs, options: D
     if (w.types.some((t) => t === "dock" || t === "desktop" || t === "tooltip")) continue;
     const title = nameOf(w.title);
     if (w.pid !== null && browser.has(w.pid)) {
-      if (!w.override) out.push({ depth: 0, role: "window", name: title, attrs: ["agent browser: use browser_do"] });
+      if (!w.override) out.push({ depth: 0, role: "window", name: title, attrs: [DESKTOP_AGENT_BROWSER] });
       continue;
     }
     const first = topsOf.get(w.xid)?.[0];

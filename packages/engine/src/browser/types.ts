@@ -66,8 +66,24 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
   browser_close: { label: "Close the browser", description: "Closes the agent's browser; logins stay saved." },
 };
 
-/** The desktop's own tools under `desktop:use` (ADR 0056); desktop computer use adds its own. */
+/**
+ * The tools under `desktop:use`: asking a person for help on the desktop (ADR 0056) and the agent's own
+ * use of it (ADR 0057). Labels and descriptions in English; the app translates them by tool name.
+ */
 export const DESKTOP_TOOL_INFO = {
+  desktop_do: {
+    label: "Do steps on the desktop",
+    description:
+      "Does several steps on the agent's desktop in one go (open an app, click, type, press keys), checking each one.",
+  },
+  desktop_read: {
+    label: "Read the screen",
+    description: "Reads the agent's desktop as text, with a number for each button, field and menu.",
+  },
+  desktop_screenshot: {
+    label: "Take a screenshot of the desktop",
+    description: "Saves an image of the agent's desktop in its folder.",
+  },
   desktop_ask_person: {
     label: "Ask for help on the desktop",
     description:

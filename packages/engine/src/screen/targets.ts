@@ -101,7 +101,8 @@ export function createTargetCache(max = 2000): TargetCache {
   };
 }
 
-const normalize = (s: string) =>
+/** Words as targets and names are compared: lowercase, no accents or quotes, single spaces. */
+export const normalizeWords = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFKD")
@@ -126,7 +127,7 @@ export function pageKey(url: string | null): string {
 }
 
 export const targetKey = (scope: string, url: string | null, use: TargetUse, words: string) =>
-  `${scope}|${pageKey(url)}|${use}|${normalize(words)}`;
+  `${scope}|${pageKey(url)}|${use}|${normalizeWords(words)}`;
 
 const WINDOWS = new Set(["window", "dialog", "alertdialog"]);
 /**
@@ -144,11 +145,11 @@ function candidatesFor(words: string, use: TargetUse, o: ScreenObservation, max:
   // Only a window is brought to the front: with none on the screen, nothing else stands in.
   const pool = fitting.length > 0 || use === "window" ? fitting : o.elements;
   if (pool.length <= max) return pool;
-  const terms = normalize(words)
+  const terms = normalizeWords(words)
     .split(" ")
     .filter((t) => t.length > 1);
   const scored = pool.map((e) => {
-    const text = normalize(`${e.role} ${e.name} ${e.context.join(" ")}`);
+    const text = normalizeWords(`${e.role} ${e.name} ${e.context.join(" ")}`);
     return { e, score: terms.reduce((n, t) => n + (text.includes(t) ? 1 : 0), 0) };
   });
   return scored
@@ -160,9 +161,9 @@ function candidatesFor(words: string, use: TargetUse, o: ScreenObservation, max:
 
 /** The one element with exactly these words as its name (and a fitting role), if there is exactly one. */
 function exactMatch(words: string, use: TargetUse, o: ScreenObservation): ScreenElement | null {
-  const w = normalize(words.replace(/^(the|o|a|os|as)\s+/i, ""));
+  const w = normalizeWords(words.replace(/^(the|o|a|os|as)\s+/i, ""));
   if (!w) return null;
-  const same = o.elements.filter((e) => fits(use, e) && normalize(e.name) === w);
+  const same = o.elements.filter((e) => fits(use, e) && normalizeWords(e.name) === w);
   if (same.length === 1) return same[0] as ScreenElement;
   // The same name on a heading and a button: the button is what one acts on.
   const controls = same.filter((e) => CONTROLS.has(e.role));
@@ -171,8 +172,8 @@ function exactMatch(words: string, use: TargetUse, o: ScreenObservation): Screen
   const m = /^([a-z]+)\s+"(.+)"$/i.exec(words.trim());
   if (m) {
     const role = (m[1] as string).toLowerCase();
-    const name = normalize(m[2] as string);
-    const hits = o.elements.filter((e) => e.role.toLowerCase() === role && normalize(e.name) === name);
+    const name = normalizeWords(m[2] as string);
+    const hits = o.elements.filter((e) => e.role.toLowerCase() === role && normalizeWords(e.name) === name);
     if (hits.length === 1) return hits[0] as ScreenElement;
   }
   return null;
@@ -295,10 +296,10 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
  * role, then where it sits; a control comes before text with the same words.
  */
 function closestByWords(words: string, candidates: ScreenElement[]): ScreenElement[] {
-  const terms = normalize(words)
+  const terms = normalizeWords(words)
     .split(" ")
     .filter((t) => t.length > 1);
-  const hits = (text: string) => terms.filter((t) => normalize(text).includes(t)).length;
+  const hits = (text: string) => terms.filter((t) => normalizeWords(text).includes(t)).length;
   return candidates
     .map((e) => ({
       e,
