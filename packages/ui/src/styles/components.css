@@ -712,6 +712,7 @@ textarea.ac-input {
   background: var(--surface-sunken);
   border-radius: var(--radius-sm);
   overflow-x: auto;
+  overflow-y: hidden;
   white-space: pre;
 }
 .ac-msg__text pre code {
@@ -3271,6 +3272,7 @@ a.ac-list__row:focus-visible {
   /* Never wider than its place: a long choice list scrolls sideways (the pill scrolls with it). */
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 .ac-seg::-webkit-scrollbar {
@@ -4267,6 +4269,7 @@ a.ac-list__row:focus-visible {
   flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 .ac-composer__format::-webkit-scrollbar {
@@ -4729,6 +4732,7 @@ a.ac-list__row:focus-visible {
   align-self: flex-start;
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 .ac-recur__row {
   display: flex;
@@ -5034,6 +5038,7 @@ a.ac-list__row:focus-visible {
     flex-wrap: nowrap;
     max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .ac-toolbar__filters {
@@ -6709,6 +6714,7 @@ label.ac-setrow__title {
   min-width: 0;
   padding: 2px;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }

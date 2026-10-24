@@ -2136,6 +2136,7 @@ p {
 }
 .level-matrix {
   overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
@@ -2617,6 +2618,7 @@ p {
     margin: 0 -16px;
     padding: 2px 16px 6px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   .settings__group-label {
     display: none;
@@ -5677,6 +5679,7 @@ button.live-call__head:hover {
   margin: 0;
   padding: 10px 44px 10px 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
@@ -6312,6 +6315,7 @@ a.machine-row__name:hover {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   .onb__step {
     width: auto;
@@ -7075,6 +7079,7 @@ a.machine-row__name:hover {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
     padding: 2px;
   }
@@ -7119,6 +7124,7 @@ a.machine-row__name:hover {
     margin: 14px -16px 0;
     padding: 2px 16px 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .newag__tip {
@@ -7640,6 +7646,7 @@ a.machine-row__name:hover {
   margin: 18px 0 0;
   padding: 0 calc(var(--agp-gutter) - 12px);
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   -webkit-backdrop-filter: blur(14px);
@@ -7655,6 +7662,13 @@ a.machine-row__name:hover {
   gap: 7px;
   height: 48px;
   white-space: nowrap;
+}
+/* Inside the sideways scroller: the tab and its underline stay within it (1px past the edge made it scroll up and down). */
+.agp-tabs .ac-tab {
+  margin-bottom: 0;
+}
+.agp-tabs .ac-tab[data-state="active"]::after {
+  bottom: 0;
 }
 .agp-badge {
   display: inline-flex;
