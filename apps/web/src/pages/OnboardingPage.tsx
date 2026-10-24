@@ -1395,7 +1395,7 @@ function WorkspaceComputerStep({ view, orgName }: { view: SetupView; orgName: st
     <Card as="div" className="onb__workspace-computer">
       <div className="row" style={{ gap: 16, alignItems: "center" }}>
         <ComputerPortrait kind="cloud" state={setupPortrait(view, true)} size={96} />
-        <span className="stack-4" style={{ gap: 4 }}>
+        <span className="stack-4" style={{ gap: 4, flex: "1 1 220px", minWidth: 0 }}>
           <b>{t("computerSetup.title", { org: orgName })}</b>
           <span className="small muted">{t("computerSetup.lead")}</span>
         </span>
