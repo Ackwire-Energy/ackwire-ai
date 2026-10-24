@@ -87,13 +87,15 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
         ? {
             sendResetPassword: async ({
               user,
-              url,
               token,
             }: {
               user: { email: string; locale?: string | null };
               url: string;
               token: string;
             }) => {
+              // Straight to our page (not Better Auth's redirect): the same link opens the phone app when it is
+              // installed (universal link / App Link, app-links.ts) and the website otherwise; both reset with it.
+              const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
               await queueEmail(db, {
                 orgId: null,
                 key: `password-reset:${sha256(token)}`,
@@ -173,8 +175,10 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => {
-            await assertSignupAllowed(user.email);
+          // Social sign-up too (the phone's Apple sign-in from an invitation): an org invite link's token in
+          // the request (`x-invite-token`) opens sign-up for it, as it does for e-mail sign-up.
+          before: async (user, context) => {
+            await assertSignupAllowed(user.email, context?.headers?.get("x-invite-token")?.trim() || null);
             return { data: { ...user, email: user.email.toLowerCase() } };
           },
           after: async (user) => {

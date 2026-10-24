@@ -94,12 +94,12 @@ describe("invitations", () => {
       .where(eq(schema.organizationInvitations.id, invitation.id));
     expect(row?.tokenHash).toBe(sha256(token));
     expect(JSON.stringify(row)).not.toContain(token);
-    expect(await previewInvitation(f.db, token)).toEqual({
-      orgName: "Acme",
-      email: "bia@example.com",
-      role: "member",
-      kind: "email",
-    });
+    const preview = await previewInvitation(f.db, token);
+    expect(preview).toMatchObject({ orgName: "Acme", email: "bia@example.com", role: "member", kind: "email" });
+    // Who invited and a few of the org's agents (name and look), for the phone's invitation screen.
+    expect(typeof preview?.invitedBy).toBe("string");
+    expect(preview?.agents.length).toBeLessThanOrEqual(3);
+    for (const a of preview?.agents ?? []) expect(Object.keys(a).sort()).toEqual(["appearance", "id", "name"]);
 
     const wrong = await addUser(f.db, "carl");
     await expect(acceptInvitation(f.db, wrong, token)).rejects.toBeInstanceOf(ForbiddenError);

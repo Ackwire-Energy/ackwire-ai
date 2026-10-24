@@ -169,7 +169,20 @@ export const envVars = {
   },
   APPLE_APP_BUNDLE_ID: {
     schema: z.string().optional(),
-    description: "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively.",
+    description:
+      "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively. With `APPLE_TEAM_ID`, invitation and password reset links open the app (`/.well-known/apple-app-site-association`).",
+    section: "Sign-in",
+  },
+  ANDROID_APP_PACKAGE: {
+    schema: z.string().optional(),
+    description:
+      "Package of the Android app (e.g. `chat.agentes.app`). With `ANDROID_APP_CERT_SHA256`, invitation and password reset links open the app (`/.well-known/assetlinks.json`).",
+    section: "Sign-in",
+  },
+  ANDROID_APP_CERT_SHA256: {
+    schema: z.string().optional(),
+    description:
+      "SHA-256 fingerprints of the Android app's signing certificates (`AA:BB:…`), comma-separated (e.g. the upload key and Play's app signing key).",
     section: "Sign-in",
   },
   AGENT_DEFAULT_MODEL: {
