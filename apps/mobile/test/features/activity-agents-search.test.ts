@@ -356,7 +356,7 @@ describe("Busca", () => {
       hits: [file, { ...file, kind: "message", sourceId: "m1", channelIds: ["c"] }],
     });
     expect(r.files.map((h) => h.sourceId)).toEqual(["f1"]);
-    expect(searchCounts(r)).toEqual({ all: 3, chats: 1, messages: 1, files: 1 });
+    expect(searchCounts(r)).toEqual({ all: 3, chats: 1, team: 0, messages: 1, files: 1 });
     const onlyFiles = filterResults(r, "files");
     expect(onlyFiles.files).toHaveLength(1);
     expect(onlyFiles.actions.length + onlyFiles.agents.length + onlyFiles.messages.length).toBe(0);
@@ -372,5 +372,29 @@ describe("Busca", () => {
         hits: [file],
       }).files,
     ).toEqual([]);
+  });
+
+  test("the team's actions (ADR 0058): only those that open where they happened, with their own chip", () => {
+    const action = {
+      kind: "action" as const,
+      sourceId: "a1",
+      channelIds: ["c"],
+      title: "open_pull_request",
+      snippet: "GitHub · Nova tela de login",
+      score: 1,
+      createdAt: "",
+      author: { type: "agent" as const, id: "ada", name: "Ada" },
+    };
+    const r = searchResults("nova", {
+      actionLabels: { newConversation: "x", newTask: "y", newAgent: "z" },
+      agents: [],
+      channels: [],
+      dms: [],
+      hits: [action, { ...action, sourceId: "a2", channelIds: [] }],
+    });
+    expect(r.team.map((h) => h.sourceId)).toEqual(["a1"]);
+    expect(searchCounts(r)).toMatchObject({ all: 1, team: 1 });
+    expect(filterResults(r, "team").team).toHaveLength(1);
+    expect(filterResults(r, "messages").team).toEqual([]);
   });
 });
