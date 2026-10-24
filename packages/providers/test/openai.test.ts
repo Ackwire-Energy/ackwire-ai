@@ -256,16 +256,16 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
   test("catalog: OpenAI models priced per token; cheap model per provider", () => {
     expect(MODEL_CATALOG["gpt-6-sol"]?.provider).toBe("openai");
     expect(
-      costNanoUsd("gpt-6-sol", { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }),
-    ).toBe(2_000_000_000);
+      costNanoUsd("gpt-6-sol", { inputTokens: 100_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }),
+    ).toBe(200_000_000);
     expect(
       costNanoUsd("gpt-6-luna", {
         inputTokens: 0,
         outputTokens: 1_000_000,
-        cacheReadTokens: 1_000_000,
+        cacheReadTokens: 100_000,
         cacheWriteTokens: 0,
       }),
-    ).toBe(510_000_000);
+    ).toBe(501_000_000);
     expect(cheapModelOf("openai")).toBe("gpt-6-luna");
     expect(cheapModelOf("anthropic")).toBe("claude-haiku-5-5");
   });

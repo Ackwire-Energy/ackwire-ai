@@ -27,7 +27,7 @@ const account = {
   id: "m1",
   provider: "imap",
   via: "imap",
-  address: "ana@icloud.com",
+  address: "ana@example.com",
   label: "Ana",
   status: "active",
   lastError: null,
@@ -60,7 +60,7 @@ describe("mail API", () => {
     expect((await api.mail.providers("o1")).composio).toBe(true);
     expect((await api.mail.accounts("o1"))[0]?.id).toBe("m1");
     expect(
-      (await api.mail.connectImap("o1", { preset: "icloud", address: "ana@icloud.com", password: "abcd" })).id,
+      (await api.mail.connectImap("o1", { preset: "icloud", address: "ana@example.com", password: "abcd" })).id,
     ).toBe("m1");
     expect(await api.mail.connectComposio("o1", { provider: "gmail" })).toEqual({
       accountId: "m2",

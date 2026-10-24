@@ -30,17 +30,17 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(installCommand("https://agentes.chat/")).toBe(
       "curl -fsSL https://agentes.chat/api/machines/install.sh | sh",
     );
-    expect(allowFolderCommand("/Users/walter/Projects/loja-v5", "bento")).toBe(
-      "agentes-runner folders allow /Users/walter/Projects/loja-v5 --agent bento",
+    expect(allowFolderCommand("/Users/you/Projects/loja-v5", "bento")).toBe(
+      "agentes-runner folders allow /Users/you/Projects/loja-v5 --agent bento",
     );
-    expect(allowFolderCommand("/Users/walter/Meus Projetos")).toBe(
-      "agentes-runner folders allow '/Users/walter/Meus Projetos'",
+    expect(allowFolderCommand("/Users/you/Meus Projetos")).toBe(
+      "agentes-runner folders allow '/Users/you/Meus Projetos'",
     );
     expect(shellQuote("it's")).toBe("'it'\\''s'");
   });
 
   test("folders: the name, and the ones an agent may use", () => {
-    expect(folderName("/Users/walter/Projects/loja-v5/")).toBe("loja-v5");
+    expect(folderName("/Users/you/Projects/loja-v5/")).toBe("loja-v5");
     expect(folderName("C:\\Users\\w\\docs")).toBe("docs");
     const access = {
       folders: [

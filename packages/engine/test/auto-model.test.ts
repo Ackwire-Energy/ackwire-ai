@@ -54,8 +54,9 @@ describe("chooseAutoModel (D83)", () => {
     const call = judge.calls[0];
     expect(call).toMatchObject({ kind: "auto_model", orgId: "o", agentId: "a", runId: "r" });
     expect(Object.keys(call?.questions ?? {})).toEqual(["tier", "effort"]);
-    expect(Object.keys(call?.questions.tier?.criteria ?? {})).toEqual(["small", "medium", "large"]);
-    expect(Object.keys(call?.questions.effort?.criteria ?? {})).toEqual(["low", "medium", "high"]);
+    const { tier, effort } = call?.questions ?? {};
+    expect(Object.keys((tier as { criteria: Record<string, string> }).criteria)).toEqual(["small", "medium", "large"]);
+    expect(Object.keys((effort as { criteria: Record<string, string> }).criteria)).toEqual(["low", "medium", "high"]);
     expect(call?.state).toMatchObject({
       message: input.message,
       recent: "person: a cobrança está falhando",
@@ -94,7 +95,7 @@ describe("one decision, mapped per brain (D83)", () => {
     expect(modelForTier("anthropic", "medium")).toBe("claude-sonnet-5-5");
     expect(modelForTier("anthropic", "large")).toBe("claude-opus-5-5");
     expect(modelForTier("openai", "small")).toBe("gpt-6-luna");
-    expect(modelForTier("openai", "large")).toBe("gpt-6-sol");
+    expect(modelForTier("openai", "large")).toBe("gpt-6.1-sol");
     expect(modelForTier("nobody", "large")).toBeNull();
   });
 
@@ -103,7 +104,7 @@ describe("one decision, mapped per brain (D83)", () => {
     expect(brainModelForTier("claude_code", "medium")).toBe("sonnet");
     expect(brainModelForTier("claude_code", "large")).toBe("opus");
     expect(brainModelForTier("codex", "small")).toBe("gpt-6-luna");
-    expect(brainModelForTier("codex", "large")).toBe("gpt-6-sol");
+    expect(brainModelForTier("codex", "large")).toBe("gpt-6.1-sol");
     expect(brainModelForTier("model", "large")).toBeUndefined();
   });
 
@@ -113,7 +114,7 @@ describe("one decision, mapped per brain (D83)", () => {
     const applied = autoApplied(agent, plan, choice, "anthropic");
     expect(applied).toEqual({ apiModel: "claude-haiku-5-5", effort: "low" });
     expect(autoApplied(agent, plan, { tier: "large", effort: "high" }, "openai")).toEqual({
-      apiModel: "gpt-6-sol",
+      apiModel: "gpt-6.1-sol",
       effort: "high",
     });
     const run = withAuto({ ...agent, id: "a" }, plan, applied);

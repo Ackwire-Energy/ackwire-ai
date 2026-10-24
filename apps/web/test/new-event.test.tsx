@@ -8,9 +8,10 @@ setupDom();
  * in CI right after the calendar proposal test: the "Novo evento" dialog with
  * the new DatePicker / TimeSelect / PeoplePicker, and the DatePicker and
  * TimeSelect interaction tests. They are skipped in the main suite; a
- * separate, non-blocking CI step runs this file alone with RUN_NEW_EVENT=1 and
- * a 20 s timeout to see whether it hangs or crashes. Bring them back into
- * planning.test.tsx and floating.test.tsx once that step is green.
+ * separate CI step runs this file alone with RUN_NEW_EVENT=1 and a 20 s
+ * timeout, and a failure there fails CI. Bring them back into
+ * planning.test.tsx and floating.test.tsx once the main suite runs them
+ * without aborting.
  */
 
 import { toYmd } from "@agenteschat/client/lib/format";

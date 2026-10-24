@@ -2,10 +2,10 @@ import type { ModelUsage } from "./types";
 
 /**
  * Prices in nano-USD per token (1e-9 USD), i.e. USD per million tokens × 1000,
- * so every cost is an exact integer. First-party Anthropic API list prices as
- * of 2026-10 (checked against the claude-api reference, cached 2026-10-06);
- * cache reads are listed per model (Opus 5.5 and Sonnet 5.5: $0.20/MTok),
- * cache writes use the 5-minute rate (1.25 × input).
+ * so every cost is an exact integer. First-party Anthropic API list prices,
+ * checked on Anthropic's pricing page (2026-10-20); cache reads are listed per
+ * model (Opus 5.5: $0.20/MTok, Sonnet 5.5: $0.10/MTok), cache writes use the
+ * 5-minute rate (1.25 × input).
  * Update this table when prices change: usage records store the computed cost,
  * so history is never repriced.
  */
@@ -77,7 +77,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
   "claude-sonnet-5-5": {
     provider: "anthropic",
     label: "Claude Sonnet 5.5",
-    prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2500 },
+    prices: { input: 2000, output: 10000, cacheRead: 100, cacheWrite: 2500 },
     contextWindow: 1_000_000,
     serverSideFallback: true,
     recommended: true,
@@ -93,22 +93,38 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     cheap: true,
     tier: "small",
   },
-  // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-14).
-  // TODO: the page lists long-context prices but not the threshold; add `longContext` once known.
+  // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-20); cache writes
+  // at the 30-minute rate. Above 272K prompt tokens, input, cached input and cache writes cost 2×, output 1.5×.
   // TODO: `contextWindow` not checked yet; they use `DEFAULT_CONTEXT_WINDOW` until then.
-  "gpt-6-sol": {
+  "gpt-6.1-sol": {
     provider: "openai",
-    label: "GPT-6 Sol",
-    prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2500 },
+    label: "GPT-6.1 Sol",
+    prices: { input: 2000, output: 10000, cacheRead: 100, cacheWrite: 2500 },
+    longContext: {
+      aboveInputTokens: 272_000,
+      prices: { input: 4000, output: 15000, cacheRead: 200, cacheWrite: 5000 },
+    },
     serverSideFallback: false,
     reasoning: true,
     recommended: true,
     tier: "medium",
   },
+  "gpt-6-sol": {
+    provider: "openai",
+    label: "GPT-6 Sol",
+    prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2500 },
+    longContext: {
+      aboveInputTokens: 272_000,
+      prices: { input: 4000, output: 15000, cacheRead: 400, cacheWrite: 5000 },
+    },
+    serverSideFallback: false,
+    reasoning: true,
+  },
   "gpt-6-luna": {
     provider: "openai",
     label: "GPT-6 Luna",
     prices: { input: 100, output: 500, cacheRead: 10, cacheWrite: 125 },
+    longContext: { aboveInputTokens: 272_000, prices: { input: 200, output: 750, cacheRead: 20, cacheWrite: 250 } },
     serverSideFallback: false,
     reasoning: true,
     cheap: true,

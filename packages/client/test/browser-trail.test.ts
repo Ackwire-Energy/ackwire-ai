@@ -57,7 +57,7 @@ describe("where the agent browsed (meta.browser)", () => {
     const at = "2026-10-20T21:10:00.000Z";
     const s = (tool: string, failed = false, detail: string | null = null) => ({ tool, detail, at, failed });
     const steps = [
-      s("browser_open", false, "web.viajolo.example/trips"),
+      s("browser_open", false, "app.example.com/trips"),
       ...[1, 2, 3, 4].flatMap(() => [s("browser_read"), s("browser_click")]),
       s("browser_read"),
       s("browser_back"),

@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, Pressable, View } from "react-native";
-import { API_URL } from "@/config";
 import { authClient } from "@/lib/auth";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
@@ -38,9 +37,6 @@ const BACK: Record<Step, Step | null> = {
   sent: "password",
 };
 
-const TERMS_URL = "https://agentes.chat/terms";
-const PRIVACY_URL = "https://agentes.chat/privacy";
-
 export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; email?: string }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -58,6 +54,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  const termsUrl = config.data?.termsUrl;
+  const privacyUrl = config.data?.privacyUrl;
 
   const go = (next: Step) => {
     setError(null);
@@ -148,11 +146,9 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setPending(true);
     setError(null);
     try {
-      // The answer is the same whether or not the account exists; the link opens the website.
-      const res = await authClient.requestPasswordReset({
-        email: email.trim(),
-        redirectTo: `${API_URL}/reset-password`,
-      });
+      // The answer is the same whether or not the account exists. Relative: the server resolves it
+      // against its own address, so the link opens its web page whatever address the app reached it at.
+      const res = await authClient.requestPasswordReset({ email: email.trim(), redirectTo: "/reset-password" });
       if (res.error) return failed(res.error.status);
       haptics.success();
       go("sent");
@@ -234,7 +230,11 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       onBack={onBack}
       agentMode={pending ? "run" : "idle"}
       expression={expression}
-      footer={step === "email" || step === "newPassword" ? <Terms /> : null}
+      footer={
+        (step === "email" || step === "newPassword") && termsUrl && privacyUrl ? (
+          <Terms termsUrl={termsUrl} privacyUrl={privacyUrl} />
+        ) : null
+      }
     >
       {step !== "email" && step !== "forgot" && step !== "sent" ? (
         <Who email={email.trim()} onChange={() => go("email")} />
@@ -393,7 +393,7 @@ function Quiet({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 /** "Ao continuar, você aceita os Termos e a Política de privacidade." */
-function Terms() {
+function Terms({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl: string }) {
   const { t } = useTranslation();
   const link = (label: string, url: string): ReactNode => (
     <Text
@@ -408,9 +408,9 @@ function Terms() {
   return (
     <Text variant="caption" tone="muted" style={{ textAlign: "center" }}>
       {t("auth.termsBefore")}
-      {link(t("auth.terms"), TERMS_URL)}
+      {link(t("auth.terms"), termsUrl)}
       {t("auth.termsMiddle")}
-      {link(t("auth.privacy"), PRIVACY_URL)}
+      {link(t("auth.privacy"), privacyUrl)}
       {t("auth.termsAfter")}
     </Text>
   );

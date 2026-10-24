@@ -15,6 +15,11 @@ export interface AuthConfig {
   firstRun: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
+  /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
+  landing?: boolean;
+  /** Linked on the sign-in screen; the line shows only when both are set. */
+  termsUrl?: string | null;
+  privacyUrl?: string | null;
 }
 
 export type SignInProvider = "google" | "github" | "apple";

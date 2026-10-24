@@ -20,6 +20,17 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { level: 1, name: /trabalham com o seu time/ })).toBeTruthy();
   });
 
+  test("signed out, without the landing page (self-hosted): / goes to sign-in, or to sign-up on first run", async () => {
+    const off = (authConfig: { landing: boolean; firstRun?: boolean }) =>
+      createFakeApi(seedState({ me: null, authConfig }));
+    const { router } = await renderApp("/", { api: off({ landing: false }) });
+    expect(router.state.location.pathname).toBe("/login");
+    expect(screen().getByRole("heading", { name: "Oi. Qual é o seu e-mail?" })).toBeTruthy();
+    cleanup();
+    const first = await renderApp("/", { api: off({ landing: false, firstRun: true }) });
+    expect(first.router.state.location.pathname).toBe("/signup");
+  });
+
   test("signed in without organizations: / goes to onboarding", async () => {
     const state = seedState();
     if (state.me) state.me.organizations = [];

@@ -34,7 +34,7 @@ test("tools follow the agent's level on each mailbox; sends ask unless the polic
   const tools = await m.tools.list(ctx);
   const send = tools.find((t) => t.name === "mail_support_send");
   expect(send && isSensitive(send)).toBe(true);
-  expect(send?.description.startsWith("[Email support@icloud.com]")).toBe(true);
+  expect(send?.description.startsWith("[Email support@example.com]")).toBe(true);
   expect(send?.connectionId).toBe(account.id);
   expect(tools.some((t) => t.name === "mail_support_trash")).toBe(false);
   expect(isSensitive(tools.find((t) => t.name === "mail_support_draft") ?? { name: "", scope: "" })).toBe(false);
@@ -164,7 +164,7 @@ test("wrapUntrusted neutralises every spelling of the markers", () => {
 test("send asks a person with the exact action; approved, it sends once and is counted", async () => {
   m = await mailSetup();
   const account = await imapAccount(m);
-  await giveMail(m, account.id, "read_write", { fromAddress: "hello@icloud.com" });
+  await giveMail(m, account.id, "read_write", { fromAddress: "hello@example.com" });
   const ctx = await runContext(m.f);
   const input = { to: ["Ana@Acme.com"], cc: ["boss@acme.com"], subject: "Hi", body: "Hello there" };
   const r = await m.tools.invoke(ctx, {
@@ -175,7 +175,7 @@ test("send asks a person with the exact action; approved, it sends once and is c
   if (r.type !== "approval") throw new Error("expected an approval");
   expect(r.approval.title).toBe('Send email to ana@acme.com, boss@acme.com: "Hi"');
   expect(r.approval.detail).toBe(
-    "From: hello@icloud.com\nTo: ana@acme.com\nCc: boss@acme.com\nSubject: Hi\n\nHello there",
+    "From: hello@example.com\nTo: ana@acme.com\nCc: boss@acme.com\nSubject: Hi\n\nHello there",
   );
   expect(m.box.state.sent).toEqual([]);
 
@@ -183,7 +183,7 @@ test("send asks a person with the exact action; approved, it sends once and is c
   expect(out.isError).toBeUndefined();
   expect(m.box.state.sent).toEqual([
     {
-      from: "hello@icloud.com",
+      from: "hello@example.com",
       to: ["ana@acme.com"],
       cc: ["boss@acme.com"],
       bcc: [],
@@ -204,7 +204,7 @@ test("recipients outside the list are refused, including reply-all's computed on
   m.box.add({
     id: "t1",
     from: { address: "ana@acme.com" },
-    to: [{ address: "support@icloud.com" }, { address: "lurker@evil.com" }],
+    to: [{ address: "support@example.com" }, { address: "lurker@evil.com" }],
     subject: "Question",
     date: daysAgo(1),
   });
@@ -262,13 +262,13 @@ test("the daily cap counts this agent's sends from this mailbox (UTC day)", asyn
     });
   expect(await send()).toMatchObject({
     type: "result",
-    output: { content: 'Sent "s" to a@acme.com from support@icloud.com.' },
+    output: { content: 'Sent "s" to a@acme.com from support@example.com.' },
   });
   expect(await send()).toMatchObject({
     output: {
       isError: true,
       content:
-        "Not allowed: this agent reached its limit of 1 emails a day from support@icloud.com. Try again tomorrow (UTC) or ask a person to raise the limit.",
+        "Not allowed: this agent reached its limit of 1 emails a day from support@example.com. Try again tomorrow (UTC) or ask a person to raise the limit.",
     },
   });
   // Yesterday's send doesn't count.

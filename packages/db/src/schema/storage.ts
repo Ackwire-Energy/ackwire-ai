@@ -18,17 +18,18 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * Platform blob storage in Postgres: the fallback when the deployment has no
- * bucket (S3_* unset). Keys always start with `orgs/{org_id}/`. Content is
- * base64 (artifacts are small; big files belong in a bucket).
+ * Platform blob storage in Postgres: the fallback when the deployment has
+ * neither a bucket (S3_*) nor a folder on disk (FILES_DIR). Keys start with
+ * `orgs/{org_id}/` or `org-logos/{org_id}/` (the row carries that org and is
+ * deleted with it) or `avatars/{user_id}/` (a person's photo, shown in every
+ * org they are in, so org_id is null). Content is base64 (artifacts are
+ * small; big files belong in a bucket).
  */
 export const blobs = pgTable(
   "blobs",
   {
     key: text().primaryKey(),
-    orgId: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid().references(() => organizations.id, { onDelete: "cascade" }),
     contentType: text().notNull(),
     size: integer().notNull(),
     content: text().notNull(),

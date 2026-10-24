@@ -7,6 +7,18 @@
 .data
 .claude
 coverage
-docs/prototipo
+docs
 *.log
+# Backups as SELF_HOSTING.md takes them.
+*.dump
+files-*.tar.gz
 .DS_Store
+apps/desktop/src-tauri/target
+apps/mobile/ios
+apps/mobile/android
+apps/mobile/.expo
+**/*.p8
+**/*.p12
+**/*.jks
+**/*.keystore
+**/credentials.json

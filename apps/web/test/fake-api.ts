@@ -7,6 +7,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  AuthConfig,
   Channel,
   ChannelMember,
   Connection,
@@ -58,6 +59,8 @@ const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOStri
 
 export interface FakeState {
   me: Me | null;
+  /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
+  authConfig?: Partial<AuthConfig>;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
@@ -653,7 +656,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     account: {
-      authConfig: async () => ({ socialProviders: { google: false, github: true }, signupOpen: true, firstRun: false }),
+      authConfig: async () => ({
+        socialProviders: { google: false, github: true },
+        signupOpen: true,
+        firstRun: false,
+        landing: true,
+        ...state.authConfig,
+      }),
       signInOptions: async () => ({ account: false, password: false, providers: [], canSignUp: true }),
       me: async () => state.me,
       updateMe: async (input) => {

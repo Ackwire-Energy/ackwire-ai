@@ -5,6 +5,7 @@ import {
   createComposioClient,
   createComposioMailConnector,
   createDaytonaSandboxProvider,
+  createDiskBlobStore,
   createExpoPushSender,
   createImapConnectionTester,
   createImapMailConnector,
@@ -18,13 +19,21 @@ import {
   createPostgresPubSub,
   createPostgresSearchResolver,
   createS3BlobStore,
+  createSmtpEmailSender,
+  type EmailSender,
   envPlatformCredentials,
   MAIL_PRESETS,
   type MailAdapters,
   postgresJsNotifier,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
-import { createDatabase, type Database, ensureMessagePartitions, MigrationMismatchError } from "@agenteschat/db";
+import {
+  createDatabase,
+  type Database,
+  type DatabaseHandle,
+  ensureMessagePartitions,
+  MigrationMismatchError,
+} from "@agenteschat/db";
 import {
   createLocalKeyWrapper,
   drainLocalRuns,
@@ -38,7 +47,7 @@ import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/prov
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
-import { createLogger } from "./logger";
+import { createLogger, type Logger } from "./logger";
 import { createMachineSockets } from "./realtime/machines";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
@@ -72,22 +81,14 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
 
   const log = createLogger(config.LOG_LEVEL);
   log.info("starting agentes.chat", { version, edition, config: redactConfig(config) });
+  if (config.NODE_ENV === "production" && config.PUBLIC_URL === "http://localhost:3000") {
+    log.warn(
+      "PUBLIC_URL is http://localhost:3000 (the default): only a browser on this machine, at exactly that address, can sign in and save. Set PUBLIC_URL to the address people open (e.g. https://chat.example.com): sign-in cookies, the browser origin allowed to make changes (CSRF) and the links in emails all come from it, so from any other address sign-in and saving fail with bad_origin.",
+    );
+  }
 
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
-  if (config.RUN_MIGRATIONS_ON_BOOT) {
-    log.info("applying database migrations");
-    try {
-      await database.migrate();
-    } catch (error) {
-      if (error instanceof MigrationMismatchError) {
-        // Never re-run or skip a changed migration against a real database.
-        log.error("refusing to migrate: the database's migrations don't match this build", { reason: error.message });
-        process.exit(1);
-      }
-      throw error;
-    }
-  }
-  await ensureMessagePartitions(database.db);
+  await prepareDatabase(database, log, config.RUN_MIGRATIONS_ON_BOOT);
 
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
@@ -96,13 +97,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     rateLimiter: createMemoryRateLimiter(),
     keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
     legacyKeyWrappers: [],
-    email: config.MILLIONSEND_API_KEY
-      ? createMillionSendSender({
-          apiKey: config.MILLIONSEND_API_KEY,
-          from: config.EMAIL_FROM,
-          replyTo: config.EMAIL_REPLY_TO,
-        })
-      : createLogEmailSender((line, data) => log.info(line, data)),
+    email: emailSender(config, log),
     platformCredentials: envPlatformCredentials({
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
@@ -122,6 +117,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     databases: createPostgresDatabaseDriver(),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
+  log.info("transactional email", { sender: defaults.email.id });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
   const base = { config, db: database.db, edition, version };
@@ -209,14 +205,17 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     if (stopping) return;
     stopping = true;
     log.info("shutting down", { signal });
-    // No new jobs; HTTP stops taking requests (the new deploy serves them).
+    // No new jobs; HTTP stops taking requests (the new deploy serves them). Not awaited: the
+    // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
-    await server.stop();
+    void server.stop();
     // Runners reconnect to the next instance.
     await engine.machineHub.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
+    // Browser tabs, left open so they saw those runs finish, reconnect to the next instance.
+    await server.stop(true);
     for (const module of modules) await module.onStop?.();
     await adapters.pubsub.close?.();
     await database.close();
@@ -228,17 +227,58 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   return { server, config };
 }
 
-/** Our bucket (S3_*) when configured, else Postgres. */
+/**
+ * The database steps of boot, shared with `main.ts migrate`: pending
+ * migrations (unless `migrate` is false), then the upcoming `messages`
+ * partitions. Exits 1 when the database's migrations don't match this build.
+ */
+export async function prepareDatabase(database: DatabaseHandle, log: Logger, migrate = true) {
+  if (migrate) {
+    log.info("applying database migrations");
+    try {
+      await database.migrate();
+    } catch (error) {
+      if (error instanceof MigrationMismatchError) {
+        // Never re-run or skip a changed migration against a real database.
+        log.error("refusing to migrate: the database's migrations don't match this build", { reason: error.message });
+        process.exit(1);
+      }
+      throw error;
+    }
+  }
+  await ensureMessagePartitions(database.db);
+}
+
+/** MillionSend (or another Resend-compatible API) when keyed, else SMTP when `SMTP_URL` is set, else only the log. */
+function emailSender(config: Config, log: Logger): EmailSender {
+  // The Cloud (PUBLIC_URL https://agentes.chat) sends as ola@agentes.chat.
+  const from = config.EMAIL_FROM ?? `agentes <ola@${new URL(config.PUBLIC_URL).hostname}>`;
+  const replyTo = config.EMAIL_REPLY_TO;
+  if (config.MILLIONSEND_API_KEY) {
+    return createMillionSendSender({
+      apiKey: config.MILLIONSEND_API_KEY,
+      baseURL: config.MILLIONSEND_API_URL,
+      from,
+      replyTo,
+    });
+  }
+  if (config.SMTP_URL) return createSmtpEmailSender({ url: config.SMTP_URL, from, replyTo });
+  return createLogEmailSender((line, data) => log.info(line, data));
+}
+
+/** Our bucket (S3_*) when configured, else a folder on this server (FILES_DIR), else Postgres. */
 function platformBlobStore(config: Config, db: Database) {
   const { S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY } = config;
-  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) return createPostgresBlobStore(db);
+  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) {
+    return config.FILES_DIR ? createDiskBlobStore(config.FILES_DIR) : createPostgresBlobStore(db);
+  }
   return createS3BlobStore({
     endpoint: S3_ENDPOINT,
     region: config.S3_REGION,
     bucket: S3_BUCKET,
     accessKeyId: S3_ACCESS_KEY_ID,
     secretAccessKey: S3_SECRET_ACCESS_KEY,
-    pathStyle: false,
+    pathStyle: config.S3_PATH_STYLE,
   });
 }
 

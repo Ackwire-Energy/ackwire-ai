@@ -2,7 +2,7 @@ import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfi
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -85,6 +85,8 @@ export function AuthPage({
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  const termsUrl = config.data?.termsUrl;
+  const privacyUrl = config.data?.privacyUrl;
   const desktop = inDesktopApp();
   const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
     null,
@@ -478,12 +480,12 @@ export function AuthPage({
             </>
           )}
 
-          {(step === "email" || step === "newPassword") && (
+          {(step === "email" || step === "newPassword") && termsUrl && privacyUrl && (
             <p className="auth__fine">
               {t("auth.termsBefore")}
-              <Link to="/terms">{t("auth.terms")}</Link>
+              <a href={termsUrl}>{t("auth.terms")}</a>
               {t("auth.termsMiddle")}
-              <Link to="/privacy">{t("auth.privacy")}</Link>
+              <a href={privacyUrl}>{t("auth.privacy")}</a>
               {t("auth.termsAfter")}
             </p>
           )}

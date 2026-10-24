@@ -5,9 +5,16 @@ import { browser, createTestServer, ORIGIN, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer();
+  t = await createTestServer({ env: { LANDING_PAGE: "true" } });
 });
 afterEach(() => t.close());
+
+test("without LANDING_PAGE there is no waiting list", async () => {
+  await t.close();
+  t = await createTestServer();
+  expect((await browser(t)("/api/waitlist", { json: { email: "ana@acme.com" } })).status).toBe(404);
+  expect((await browser(t)("/api/waitlist/confirm", { json: { token: "x" } })).status).toBe(404);
+});
 
 const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
 

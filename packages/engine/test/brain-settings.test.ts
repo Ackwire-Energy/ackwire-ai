@@ -40,7 +40,7 @@ describe("brain settings", () => {
     expect(() => normalizeBrainModel("codex", "rm -rf /")).toThrow();
     expect(() => normalizeBrainModel("model", "opus")).toThrow();
     expect(defaultBrainModel("claude_code")).toBe("sonnet");
-    expect(defaultBrainModel("codex")).toBe("gpt-6-sol");
+    expect(defaultBrainModel("codex")).toBe("gpt-6.1-sol");
     expect(defaultBrainModel("model")).toBeNull();
     expect(brainModelId("claude_code", "opus")).toBe("claude-opus-5-5");
     expect(brainModelId("claude_code", null)).toBe("claude-sonnet-5-5");
