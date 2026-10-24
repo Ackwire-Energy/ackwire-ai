@@ -31,6 +31,7 @@ import type {
   Role,
   Run,
   ScopeGrant,
+  SearchHit,
   SecretRequest,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -153,7 +154,10 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
   actionCheck?: boolean;
+  /** What agents did outside (search kind `action`), as the search returns it. */
+  teamActions?: SearchHit[];
   /** My inbox (`notifications.*`); empty unless a test fills it. */
   notifications?: AppNotification[];
   /** `actions.undo`/`redo`/`undoMessage` fail for these receipt ids with this error (`action.changed_since`…). */
@@ -1497,7 +1501,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             score: 0.5,
             createdAt: m.updatedAt,
           }));
-        return [...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+        const actions = (state.teamActions ?? []).filter((h) => h.snippet.toLowerCase().includes(q));
+        return [...actions, ...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
       },
     },
     memory: {

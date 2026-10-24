@@ -2,9 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-10-24
-- Planning: D89
 - Builds on: ADR 0053 (who is behind a run, the policy table, the routine room, the command policy on every brain), the hybrid search (`search.ts`, `packages/adapters/src/search.ts`)
-- Prototype: `docs/design/telas/TimeEPedidos.html`, part 1 (local only, not in the repo), option "B · Explica"
 - Code: `packages/engine/src/team-actions.ts` (targets, commands, the check, the record, search), `tools/gateway.ts` (where it runs), `executor.ts` (the reply's `meta.teamChecks`), `management.ts` (the switch), `packages/db/src/schema/team-actions.ts`; web `components/TeamChecks.tsx`, `pages/SearchPage.tsx`, `pages/SettingsPage.tsx`
 
 ## Context
