@@ -1159,10 +1159,14 @@ export function webAddress(typed: string): string | null {
 /** How long a person's open may take on the computer (a slow page, or Chrome starting). */
 const OPEN_PAGE_SECONDS = 60;
 
+/** Whether the agent itself may use one of its screens (`browser:use`, `desktop:use`): people see and drive it only then. */
+export async function agentUsesScreen(db: Database, orgId: string, agentId: string, screen: ScreenKind = "browser") {
+  return isAllowed(toolAccess(await grantedScopeKeys(db, orgId, agentId), SCREENS[screen].tool));
+}
+
 /** People drive an agent's screen only while the agent itself may use it (`browser:use`, ADR 0040 §3). */
 async function requireAgentBrowserSwitch(db: Database, orgId: string, agentId: string, screen: ScreenKind = "browser") {
-  const granted = await grantedScopeKeys(db, orgId, agentId);
-  if (!isAllowed(toolAccess(granted, SCREENS[screen].tool))) {
+  if (!(await agentUsesScreen(db, orgId, agentId, screen))) {
     throw new ForbiddenError(`This agent can't use its ${SCREENS[screen].what}`);
   }
 }

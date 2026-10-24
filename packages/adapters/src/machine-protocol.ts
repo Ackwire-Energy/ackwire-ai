@@ -311,14 +311,50 @@ export const STREAM_LIMITS = {
 } as const;
 
 /**
+ * Close codes of desktop and terminal streams (protocol 18): the viewer's
+ * socket (`/api/desktop`, `/api/terminal`) and the runner's data socket
+ * (`/api/machines/stream`). A stream that ends closes both sides.
+ */
+export const STREAM_CLOSE = {
+  normal: 1000,
+  /** The server restarts: open again. */
+  restarting: 1001,
+  internal: 1011,
+  /** A side doesn't keep up: its backlog passed the limit. */
+  tooSlow: 1013,
+  badRequest: 4400,
+  /** Data socket: a bad token, or another machine's stream. */
+  badToken: 4401,
+  /** Viewer: not allowed, or no longer. */
+  forbidden: 4403,
+  /** Viewer: no such agent, or no computer (or desktop) for it. Data socket: no such stream (ended, or served already). */
+  notFound: 4404,
+  /** Data socket: no `stream.hello` in time. Viewer: the computer didn't open the stream in time (retry). */
+  late: 4408,
+  /** Viewer: someone else is in control of the desktop. */
+  hidden: 4409,
+  /** Viewer: control isn't this person's (any more): open again as a watcher. */
+  controlEnded: 4410,
+  /** Viewer: too many streams, or opened too often. */
+  tooMany: 4429,
+  /** Viewer: the computer refused; the reason is its error code (or `machine_paused`, `runner_outdated`). */
+  refused: 4502,
+  /** Viewer: the computer is offline, or its socket is on another server (retry). */
+  unreachable: 4503,
+} as const;
+
+/** What a stream shows: one viewer of the agent's desktop, or one terminal as the agent with its size. */
+export type StreamRequest =
+  | { kind: "desktop"; mode: "watch" | "control" }
+  | { kind: "terminal"; cols: number; rows: number };
+
+/**
  * `stream.open` (protocol 18): one viewer of the request's agent's desktop
  * (`watch` logs in with the view-only password, `control` with the full one),
  * or one terminal as the agent. `streamId` (32 random bytes, base64url) names
  * the stream on the data socket.
  */
-export type StreamOpenRequest =
-  | { streamId: string; kind: "desktop"; mode: "watch" | "control" }
-  | { streamId: string; kind: "terminal"; cols: number; rows: number };
+export type StreamOpenRequest = StreamRequest & { streamId: string };
 
 /**
  * A data socket's first frame (runner → server, text): the machine's token
@@ -2139,15 +2175,16 @@ export function parseStreamHello(raw: string): StreamHello | null {
   return { type: "stream.hello", token: f.token, streamId: f.streamId };
 }
 
+/** A terminal's size within `STREAM_LIMITS` (whole columns and rows). */
+export const isTerminalSize = (cols: unknown, rows: unknown) =>
+  inRange(cols, STREAM_LIMITS.cols) && inRange(rows, STREAM_LIMITS.rows);
+
 /** A text frame on a ready stream (either side); null when it isn't one or a size is out of bounds. */
 export function parseStreamControl(raw: string): StreamControl | null {
   const f = smallJson(raw, 200);
   if (!isObject(f)) return null;
   if (f.type === "resize") {
-    const { cols, rows } = f;
-    return inRange(cols, STREAM_LIMITS.cols) && inRange(rows, STREAM_LIMITS.rows)
-      ? { type: "resize", cols, rows }
-      : null;
+    return isTerminalSize(f.cols, f.rows) ? { type: "resize", cols: f.cols as number, rows: f.rows as number } : null;
   }
   if (f.type === "exit" && (f.code === null || Number.isInteger(f.code))) {
     return { type: "exit", code: f.code as number | null };

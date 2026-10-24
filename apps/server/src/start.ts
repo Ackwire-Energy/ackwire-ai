@@ -49,6 +49,7 @@ import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger, type Logger } from "./logger";
 import { createMachineSockets } from "./realtime/machines";
+import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
 import { startWorkers } from "./workers";
@@ -189,6 +190,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     ...adapters,
     machines: createMachineSockets(engine.machineHub),
     browserLive: engine.browserLive,
+    streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
@@ -212,8 +214,9 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
     void server.stop();
-    // Runners reconnect to the next instance.
+    // Runners reconnect to the next instance, and people's desktops and terminals open again there.
     await engine.machineHub.stop();
+    engine.streams.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
