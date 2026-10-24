@@ -89,7 +89,7 @@ function setup(
     user,
     log: (line) => logs.push(line),
     spawn: fake.spawn,
-    system: { platform: "linux", pty: true, runtime: "Bun 1.4.4" },
+    system: { platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 1000 },
     limits,
   });
   opened.push(terminals);
@@ -106,14 +106,37 @@ function setup(
 const exitFrames = (data: ReturnType<typeof memoryDataSocket>) => data.texts().map((t) => JSON.parse(t));
 
 test("info: Linux and Mac computers, with the runner on Bun 1.3.5 or newer", () => {
-  const ask = (system: { platform: string; pty: boolean; runtime: string }) =>
-    new Terminals({ user: async () => USER, log: () => undefined, system }).info();
+  const ask = (system: { platform: string; pty: boolean; runtime: string; uid?: number }) =>
+    new Terminals({ user: async () => USER, log: () => undefined, system: { uid: 1000, ...system } }).info();
   expect(ask({ platform: "linux", pty: true, runtime: "Bun 1.4.4" })).toEqual({ available: true });
   expect(ask({ platform: "darwin", pty: true, runtime: "Bun 1.4.4" })).toEqual({ available: true });
   expect(ask({ platform: "win32", pty: true, runtime: "Bun 1.4.4" }).reason).toContain("Linux and Mac");
   expect(ask({ platform: "linux", pty: false, runtime: "Node 22.12.0" }).reason).toBe(
     "The terminal needs the runner on Bun 1.3.5 or newer (it runs on Node 22.12.0)",
   );
+  expect(ask({ platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 0 }).reason).toContain("never run as root");
+});
+
+test("a runner running as root opens a shell only through a launcher that runs it as the agent", async () => {
+  const shells = fakeShells();
+  const asRoot = (user: TerminalUser, agentUsers = true) =>
+    new Terminals({
+      user: async () => user,
+      log: () => undefined,
+      spawn: shells.spawn,
+      system: { platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 0 },
+      agentUsers,
+    });
+  const data = async () => memoryDataSocket().socket;
+  expect(await errorCode(() => asRoot(USER, false).open(dev, SIZE, data))).toBe("terminal_unavailable");
+  // Said to run agents as their own users, yet given no launcher: still never as root.
+  expect(await errorCode(() => asRoot(USER).open(dev, SIZE, data))).toBe("terminal_unavailable");
+  expect(shells.shells).toHaveLength(0);
+  const prefix = ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"];
+  const root = asRoot({ ...USER, prefix });
+  opened.push(root);
+  await root.open(dev, SIZE, data);
+  expect(shells.shells[0]?.argv.slice(0, prefix.length)).toEqual(prefix);
 });
 
 test("the agent's login shell in its folder, through its launcher, with TERM and nothing of the runner's environment", async () => {

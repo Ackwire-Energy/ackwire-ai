@@ -37,6 +37,11 @@ import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
+/**
+ * Never refused as busy: a brain turn holds its slot for the whole turn, so a computer full of agents' work
+ * would otherwise keep people from watching or taking control. Short, and capped per agent on both sides.
+ */
+const PEOPLE_OPS: ReadonlySet<string> = new Set(["stream.open", "desktop.session.status", "desktop.session.stop"]);
 export const MAX_LIST_ENTRIES = 5000;
 
 /** Ops that start new work: refused while the owner paused the computer (protocol 9). Reads of status, output and cancel still go. */
@@ -821,7 +826,7 @@ export class RequestRunner {
       this.reply(id, { ok: false, error: { code: "bad_request", message: "Duplicate request id" } });
       return Promise.resolve();
     }
-    if (this.inflight.size >= this.maxConcurrent) {
+    if (this.inflight.size >= this.maxConcurrent && !PEOPLE_OPS.has(req.op)) {
       this.reply(id, { ok: false, error: { code: "internal", message: "busy" } });
       return Promise.resolve();
     }
