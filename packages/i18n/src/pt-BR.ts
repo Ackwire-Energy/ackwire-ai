@@ -1238,6 +1238,7 @@ export const ptBR = {
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
+      desktopHandoff: "<b>{{name}}</b> precisa de você no computador",
       reaction_one: "<b>{{names}}</b> reagiu à sua mensagem",
       reaction_other: "<b>{{names}}</b> reagiram à sua mensagem",
     },

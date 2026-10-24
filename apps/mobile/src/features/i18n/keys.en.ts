@@ -668,6 +668,8 @@ export const featureKeysEn: FeatureTranslations = {
       reaction_other: "{{names}} reacted",
       browser_handoff_one: "{{names}} needs you in the browser",
       browser_handoff_other: "{{names}} need you in the browser",
+      desktop_handoff_one: "{{names}} needs you on the computer",
+      desktop_handoff_other: "{{names}} need you on the computer",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",
@@ -1146,6 +1148,7 @@ export const featureKeysEn: FeatureTranslations = {
       failedNote: "Couldn't: {{note}}",
       expired: "Nobody opened it in time: {{title}}",
       cancelled: "Canceled: {{title}}",
+      computer: "Open it on a computer to see the screen: {{title}}",
     },
     live: {
       inControl: "You're in control",

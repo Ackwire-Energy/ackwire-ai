@@ -155,7 +155,7 @@ Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.contro
 - Watchers ask quality 3, the person in control 6.
 - The person in control picks their keyboard layout (a guess from the browser's language and, where the browser tells, its keys; kept per browser); the control stream carries it (`keyboard`, one of `DESKTOP_KEYBOARDS`) and the runner sets it with `setxkbmap` as the agent.
 - "Colar texto" puts the text in the desktop's clipboard and presses Shift+Insert: typed keysyms lose some accents. Shift+Insert pastes in every window there, a terminal included (where Ctrl+V doesn't: it reads PRIMARY, which Xvnc sets with the clipboard; checked in xfce4-terminal). The person's own clipboard is never written from the desktop (a "Copiar" button instead).
-- The phone app keeps the browser card and says the screen opens on a computer.
+- The phone app keeps the browser card. A request on the agent's desktop shows there as one line saying it opens on a computer, and is never taken from the phone (taking it would hold the desktop for someone who can't see it).
 
 ## Order
 

@@ -170,7 +170,8 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
-  else if (n.kind === "machine_connected") [icon, label] = ["computer", t("notifications.source.machine")];
+  else if (n.kind === "machine_connected" || (n.kind === "browser_handoff" && s.screen === "desktop"))
+    [icon, label] = ["computer", t("notifications.source.machine")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
   else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
   else if (s.issueNumber != null)
@@ -214,6 +215,7 @@ type WhatKey =
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
+  | "desktopHandoff"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -271,7 +273,7 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
         ? k("machineConnected", { name, label: n.source.label })
         : k("machineConnectedAny", { name });
     case "browser_handoff":
-      return k("browserHandoff", { name });
+      return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
     case "reaction":
       return k("reaction", { names, count });
   }

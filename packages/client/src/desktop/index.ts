@@ -224,7 +224,7 @@ export const useDesktopStatus = (
   });
 };
 
-/** "Ligar": 409 `desktop.desktop_busy` when the computer runs as many desktops as it can. */
+/** "Ligar": 502 `machine.desktop_busy` when the computer runs as many desktops as it can. */
 export function useStartDesktop(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();

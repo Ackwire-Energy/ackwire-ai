@@ -1229,6 +1229,7 @@ export const en: Translations = {
       machineConnected: "<b>{{name}}</b> connected the computer <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> connected a computer",
       browserHandoff: "<b>{{name}}</b> needs you in its browser",
+      desktopHandoff: "<b>{{name}}</b> needs you on its computer",
       reaction_one: "<b>{{names}}</b> reacted to your message",
       reaction_other: "<b>{{names}}</b> reacted to your message",
     },

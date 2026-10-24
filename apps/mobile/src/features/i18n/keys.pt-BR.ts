@@ -672,6 +672,8 @@ export const featureKeysPtBR = {
       reaction_other: "{{names}} reagiram",
       browser_handoff_one: "{{names}} precisa de você no navegador",
       browser_handoff_other: "{{names}} precisam de você no navegador",
+      desktop_handoff_one: "{{names}} precisa de você no computador",
+      desktop_handoff_other: "{{names}} precisam de você no computador",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
@@ -1150,6 +1152,7 @@ export const featureKeysPtBR = {
       failedNote: "Não deu: {{note}}",
       expired: "Ninguém abriu a tempo: {{title}}",
       cancelled: "Cancelado: {{title}}",
+      computer: "Abra num computador para ver a tela: {{title}}",
     },
     live: {
       inControl: "Você está no controle",
