@@ -872,15 +872,22 @@ test.if(posix)(
       expect(k?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.kimi.ai/coding/");
       expect(k?.settingsEnv?.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("kimi-for-coding");
 
-      // A sign-in account pins Anthropic's own endpoint; the computer's own sign-in is left as the person set it.
+      // A sign-in account pins Anthropic's own endpoint; the computer's own sign-in keeps what the person set
+      // for the runner, pinned where a project can't change it, unless the owner's own settings load.
       await turn(3, "hi", { account: SIGNED_IN, model: "opus", session: { id: SESSION(3), resume: false } });
       const own = runs()[3];
       expect(own?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
       expect(own?.settingsEnv?.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeUndefined();
       expect(flag(own, "--fallback-model")).toBe("sonnet");
       await turn(4, "hi", { session: { id: SESSION(4), resume: false } });
-      expect(runs()[4]?.settingsEnv).toBeNull();
+      expect(runs()[4]?.settingsEnv).toMatchObject({
+        ANTHROPIC_BASE_URL: "https://elsewhere.test",
+        CLAUDE_CODE_USE_BEDROCK: "",
+        HTTPS_PROXY: "http://proxy.local:3128",
+      });
       expect(runs()[4]?.apiKey).toBe("sk-ant-stray");
+      await turn(5, "hi", { personalMcp: true, session: { id: SESSION(5), resume: false } });
+      expect(runs()[5]?.settingsEnv).toBeNull();
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }
@@ -895,6 +902,10 @@ test("plan aliases and the pinned env without a plan", () => {
   expect(env.HTTP_PROXY).toBe("http://p:1");
   expect(env.PATH).toBeUndefined();
   expect(Object.keys(env).some((k) => k.startsWith("ANTHROPIC_DEFAULT_"))).toBe(false);
+  const own = { ANTHROPIC_BASE_URL: "https://llm.corp.test", CLAUDE_CODE_USE_VERTEX: "1" };
+  expect(accountSettingsEnv(undefined, "opus", own, true)).toMatchObject({ ...own, CLAUDE_CODE_USE_BEDROCK: "" });
+  expect(accountSettingsEnv(undefined, "opus", {}, true).ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+  expect(accountSettingsEnv(undefined, "opus", own).ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
 });
 
 test.if(posix)("an account that isn't on the computer is account_missing, never another account", async () => {

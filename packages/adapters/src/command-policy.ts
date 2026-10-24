@@ -312,7 +312,7 @@ function secretPath(scope: CommandScope, p: string) {
 }
 
 /** A command that names the variables pointing at an account's sign-in, or holding a plan's key. */
-const SECRET_VARIABLE = /\$\{?(CLAUDE_CONFIG_DIR|CODEX_HOME|ANTHROPIC_AUTH_TOKEN)\b/;
+const SECRET_VARIABLE = /\$\{?(CLAUDE_CONFIG_DIR|CODEX_HOME|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY)\b/;
 
 /** A word of a line that can't be parsed plainly, without the quotes and substitution marks around it (`$(cat`, `x)`). */
 const bareWord = (w: string) => w.replace(/^[$('"`{]+|[)'"`};]+$/g, "");

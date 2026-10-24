@@ -569,6 +569,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Signing in to it again is its owner's.
   const signedOut = current?.status === "signed_out" && current.mine;
   const accountChanged = accountsOn && account !== view.account;
+  // One account thinks for one agent: picking another agent's takes it from that one ("Mover para cá").
+  const moving = accountChanged && current?.usedBy.some((n) => n !== agent.name) === true;
   // An automatic model picks the effort too; a fixed one takes the ramp's level.
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
   const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
@@ -619,7 +621,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           model: planModel === option?.defaultModel ? null : planModel,
           fallback,
           ...(effortChanged ? { effort: effortToSave } : {}),
-          ...(accountChanged && view.canUsePlans ? { account } : {}),
+          ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
           ...(shareChanged ? { onlyOwner, ...(onlyOwner ? {} : { acceptPlanTerms: true }) } : {}),
         });
       }
@@ -710,14 +712,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         : a.status === "signed_out"
           ? t("agentPage.work.brain.accountSignedOut")
           : others
-            ? t("agentPage.work.brain.accountInUse", { agents: others })
+            ? t("agentPage.work.brain.accountMove", { agents: others })
             : a.keyHint
               ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
               : a.email;
       return {
         value: a.id,
         label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
-        disabled: !a.mine || others !== "",
+        disabled: !a.mine,
         description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
         leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
       };
@@ -848,6 +850,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           agentName={agent.name}
           brain={accountKind}
           plan={current?.plan ?? null}
+          {...(plan ? { maker: plan.maker } : {})}
           everyone
           onAccept={() => {
             setShare({ kind: accountKind, onlyOwner: false });

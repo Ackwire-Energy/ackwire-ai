@@ -192,7 +192,7 @@ export function accountUnavailable(
   if (account.status === "signed_out") {
     return {
       code: "not_logged_in",
-      message: `The ${name} account "${account.label}"${where} is signed out; the computer's owner can sign in again in the agent's settings.`,
+      message: `The ${name} account "${account.label}"${where} is signed out; its owner can sign in again in Settings, AI accounts.`,
     };
   }
   return null;

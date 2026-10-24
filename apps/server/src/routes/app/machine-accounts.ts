@@ -11,7 +11,7 @@ import {
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { errorResponse } from "../../http/errors";
+import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
   body,
@@ -146,21 +146,24 @@ export function machineAccountRoutes(deps: AppDeps) {
           }),
         ),
       },
-      responses: { 201: json(AccountLogin, "Started"), ...errors, ...offline },
+      responses: {
+        201: json(AccountLogin, "Started"),
+        429: errorResponse("Too many sign-ins started"),
+        ...errors,
+        ...offline,
+      },
     }),
     async (c) => {
       const { orgId, machineId } = c.req.valid("param");
       const { kind, accountId, email, provider } = c.req.valid("json");
-      const login = await beginAccountLogin(
-        withHub(),
-        c.get("user").id,
-        orgId,
-        machineId,
-        kind,
-        accountId,
-        email,
-        provider,
-      );
+      const userId = c.get("user").id;
+      // Each one starts the provider's CLI on the computer, and on a shared one any member may.
+      const limit = await deps.adapters.rateLimiter.consume(`account-login:${userId}:${machineId}`, {
+        limit: 10,
+        windowMs: 15 * 60_000,
+      });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many sign-ins started; try again later");
+      const login = await beginAccountLogin(withHub(), userId, orgId, machineId, kind, accountId, email, provider);
       return c.json(login, 201);
     },
   );

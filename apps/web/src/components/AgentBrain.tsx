@@ -10,9 +10,9 @@ export function brainModelLabel(option: BrainOption | undefined, model: string |
 }
 
 /**
- * The plan warning (the subscription is personal; answering other people with
- * it may go against the provider's terms). Shown when Claude Code or Codex is
- * chosen, and again on save if a switch reached the draft unconfirmed.
+ * Before the agents think with the person's plan (onboarding): each will
+ * answer only that person until they let it out in Quem pensa, where the
+ * provider's own words come first (ADR 0056 §5).
  */
 export function PlanTermsDialog({
   brain,

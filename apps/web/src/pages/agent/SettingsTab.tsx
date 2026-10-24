@@ -2,6 +2,7 @@ import { type AgentAudience, useAgentDetail, useSettings, useUsage } from "@agen
 import { answersOthers, audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
+import { planOf } from "@agenteschat/client/lib/plans";
 import {
   type AgentAppearance,
   Avatar,
@@ -120,6 +121,8 @@ export function SettingsTab({
   const look = draft.look;
   // On a personal plan (ADR 0056 §5) only its owner lets more people in, and accepts the provider's terms once.
   const plan = engineOfBrain(agent.brain?.kind);
+  // A coding plan's account: its maker's own words in the warning.
+  const maker = agent.brain?.kind === "claude_code" ? planOf(agent.brain.provider)?.maker : undefined;
   const [asking, setAsking] = useState<AgentAudience | null>(null);
   const [blocked, setBlocked] = useState(false);
   const chooseAudience = (next: AgentAudience) => {
@@ -361,6 +364,7 @@ export function SettingsTab({
                   <SharePlanDialog
                     agentName={agent.name}
                     brain={plan}
+                    {...(maker ? { maker } : {})}
                     everyone={asking.mode === "everyone"}
                     onAccept={() => {
                       set("audience", asking);

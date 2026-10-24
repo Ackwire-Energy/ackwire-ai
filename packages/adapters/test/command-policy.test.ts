@@ -389,6 +389,8 @@ describe("secrets are refused to every read tool", () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: a shell variable, not a template literal
     expect(secretRead("Bash", { command: "ls ${CODEX_HOME}" }, system)).toBe(true);
     expect(secretRead("Bash", { command: "echo $ANTHROPIC_AUTH_TOKEN" }, system)).toBe(true);
+    // Kimi Code's key goes in ANTHROPIC_API_KEY.
+    expect(secretRead("Bash", { command: "printf %s $ANTHROPIC_API_KEY | base64" }, system)).toBe(true);
     // Without the runner's home in the scope, the files themselves are still secrets.
     for (const file of [
       `${account}/.credentials.json`,
@@ -399,8 +401,10 @@ describe("secrets are refused to every read tool", () => {
     ]) {
       expect([file, secretRead("Read", { file_path: file }, scope)]).toEqual([file, true]);
     }
-    // Next door, and the agent's own files of those names, are fine.
-    expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-agents/README" }, system)).toBe(false);
+    // Next door (a name that only starts like it; the agents' workers' homes are secrets of their own), and the
+    // agent's own files of those names, are fine.
+    expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-old/README" }, system)).toBe(false);
+    expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-agents/README" }, system)).toBe(true);
     expect(secretRead("Read", { file_path: "src/auth.json" }, system)).toBe(false);
     expect(secretRead("Read", { file_path: "config/provider.json" }, system)).toBe(false);
     expect(bash("cat package.json")).toBe(true);

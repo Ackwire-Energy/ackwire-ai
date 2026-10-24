@@ -1547,7 +1547,7 @@ export const en: Translations = {
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
         thisComputerText: "The one already on {{computer}}",
-        accountInUse: "In use by {{agents}}",
+        accountMove: "In use by {{agents}} · Move it here",
         accountOf: "{{name}}'s",
         addAccount: "Add account",
         signInAgain: "Sign in again",
@@ -5290,13 +5290,13 @@ export const en: Translations = {
     hidden: "{{owner}} or an admin chooses who thinks.",
     hiddenAdmins: "Only admins choose who thinks.",
     warning: {
-      title: "Use your plan for the agent?",
+      title: "Use your plan for the agents?",
       claude_code:
-        "A Claude subscription is personal. Using your plan for the agent to answer other people may go against Anthropic's terms. The risk is yours.",
+        "Your agents will think with your Claude plan and reply only to you. To let someone else talk to one, turn off Only replies to you in Who thinks, on the agent's page.",
       codex:
-        "A ChatGPT subscription is personal. Using your plan for the agent to answer other people may go against OpenAI's terms. The risk is yours.",
-      confirm: "I understand, use it anyway",
-      cancel: "Cancel",
+        "Your agents will think with your ChatGPT plan and reply only to you. To let someone else talk to one, turn off Only replies to you in Who thinks, on the agent's page.",
+      confirm: "Use my plan",
+      cancel: "Not now",
     },
     summary: {
       model: "Model (API)",

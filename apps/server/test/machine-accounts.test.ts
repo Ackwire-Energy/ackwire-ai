@@ -318,6 +318,15 @@ test("a computer nobody connected: anyone signs in, the account is theirs from t
   expect(await duplicate.json()).toMatchObject({ state: "failed", duplicate: { label: "Claude Max" } });
   expect(runner.accountRequests("remove")).toMatchObject([{ accountId: again.loginId }]);
   expect(await accountRow(again.loginId)).toBeNull();
+
+  // Each start runs a CLI on the shared computer: ten per person per computer every 15 minutes.
+  for (let n = 0; n < 5; n++) {
+    expect((await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code", email: "x" } })).status).toBe(400);
+  }
+  const tooMany = await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code" } });
+  expect(tooMany.status).toBe(429);
+  expect(await code(tooMany)).toBe("rate_limited");
+  expect((await api(`${base}/account-logins`, { json: { kind: "claude_code", email: "x" } })).status).toBe(400);
 });
 
 test("the OpenAPI document lists the account routes", async () => {

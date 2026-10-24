@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { existsSync, linkSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { accountCodeAad, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
@@ -12,6 +13,7 @@ import {
   parseClaudeStatus,
   parseCodexLogin,
   parseCodexStatus,
+  planKeyOf,
   stripAnsi,
 } from "../../runner/accounts";
 import { describeRequest, type HandlerContext, handleRequest } from "../../runner/handlers";
@@ -329,6 +331,16 @@ test.if(posix)("a sign-in nobody finishes expires: the CLI is killed and the fol
   await waitFor(() => !existsSync(path.join(root, "claude_code", id)));
 });
 
+test.if(posix)("a computer runs at most four sign-ins at once; a key's waits on no CLI", async () => {
+  const { m, root } = setup();
+  for (let n = 60; n < 64; n++) await m.begin("claude_code", LOGIN(n));
+  expect(await errorCode(() => m.begin("codex", LOGIN(64)))).toBe("bad_request");
+  expect(existsSync(path.join(root, "codex", LOGIN(64)))).toBe(false);
+  expect((await m.begin("claude_code", LOGIN(65), false, undefined, "zai")).publicKey).toBeTruthy();
+  await m.cancel(LOGIN(60));
+  expect((await m.begin("claude_code", LOGIN(64))).url).toBeTruthy();
+});
+
 test.if(posix)("cancel stops a sign-in and removes its folder; a second cancel has nothing to stop", async () => {
   const { m, root } = setup();
   const id = LOGIN(8);
@@ -534,6 +546,19 @@ test.if(posix)(
     expect(existsSync(path.join(root, "claude_code", `${id}.lent`))).toBe(false);
   },
 );
+
+test.if(posix)("system mode: a pipe an agent's user leaves where a key would be never hangs root", async () => {
+  const { m, root } = setup({ lending: { chown: async () => {} } });
+  const id = LOGIN(55);
+  const dir = path.join(root, "claude_code", id);
+  mkdirSync(dir, { recursive: true });
+  expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
+  expect(spawnSync("mkfifo", [path.join(dir, "provider.json")]).status).toBe(0);
+  expect(await planKeyOf(dir)).toBeNull();
+  m.invalidate();
+  const listed = await Promise.race([m.list(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+  expect(listed).toEqual([{ id, kind: "claude_code", loggedIn: true }]);
+});
 
 test.if(posix)("system mode: a sign-in in progress is lent to nobody; without lending nothing is", async () => {
   const chown = async () => {};

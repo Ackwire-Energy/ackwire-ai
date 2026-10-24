@@ -76,6 +76,7 @@ export const USAGE_BACKOFF_MS = 15 * 60_000;
 /** What the turns say about usage reaches the server at most this often (unless `usageCrossed`). */
 export const USAGE_NOTIFY_MS = 60_000;
 const USAGE_PROBES_AT_ONCE = 2;
+const SIGN_INS_AT_ONCE = 4;
 /** How long `begin` waits for the CLI to print its URL (and Codex its code). */
 export const ACCOUNT_BEGIN_WAIT_MS = 15_000;
 /** A finished sign-in still answers `status` this long (a late poll gets the result). */
@@ -128,11 +129,13 @@ const MAX_KEY_CHARS = 2048;
 /** System mode: the account folders, outside root's home (its parents 711) so an agent's user reaches the one lent to it. */
 export const SYSTEM_ACCOUNTS_ROOT = path.join(AGENT_WORKER_HOMES, "accounts");
 
-/** A key account's plan and key (`provider.json`); null when the folder isn't one. Never follows a link. */
+/**
+ * A key account's plan and key (`provider.json`); null when the folder isn't one. Never follows a link, and
+ * never waits on a pipe an agent's user put there (root reads lent folders: a blocked open would hang it).
+ */
 export async function planKeyOf(dir: string): Promise<{ provider: PlanId; key: string } | null> {
-  const file = await open(path.join(dir, PROVIDER_FILE), constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)).catch(
-    () => null,
-  );
+  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
+  const file = await open(path.join(dir, PROVIDER_FILE), flags).catch(() => null);
   if (!file) return null;
   try {
     const st = await file.stat();
@@ -491,6 +494,14 @@ export class AccountManager {
     }
     if (this.logins.get(loginId)?.state === "waiting") {
       throw new RunnerError("bad_request", "This sign-in already exists");
+    }
+    // Each one is a CLI waiting up to its TTL, and anyone in a workspace can start one on its shared computer.
+    const running = [...this.logins.values()].filter((l) => l.state === "waiting" && l.child).length;
+    if (!provider && running >= SIGN_INS_AT_ONCE) {
+      throw new RunnerError(
+        "bad_request",
+        "Too many sign-ins are in progress on this computer; try again in a few minutes",
+      );
     }
     const dir = this.dirOf(kind, loginId);
     if (again) {

@@ -524,6 +524,8 @@ export function brainProfileLaunch(
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
 export const fallbackModelFor = (model: string | undefined) => (model && /opus/i.test(model) ? "sonnet" : undefined);
 
+const API_ANTHROPIC = "https://api.anthropic.com";
+
 /** What sends requests elsewhere besides the base URL: proxies and the certificates trusted on the way. */
 const NETWORK_ENV = [
   "HTTPS_PROXY",
@@ -540,20 +542,27 @@ const NETWORK_ENV = [
   "NODE_TLS_REJECT_UNAUTHORIZED",
 ] as const;
 
+/** Claude Code's switches to another company's cloud. */
+const CLOUD_ENV = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"] as const;
+
 /**
- * The `env` of an account turn's own `--settings`, which outranks the project's settings (the agent can
+ * The `env` of a Claude Code turn's own `--settings`, which outranks the project's settings (the agent can
  * write those, and a cloned repo can bring them): the endpoint (the plan's, else Anthropic's), no other
  * cloud, and the runner's own proxies and certificates (or none), so the sign-in or key goes nowhere else;
  * for a plan, what each model alias runs. The key itself stays in the process env (the CLI doesn't sign in
- * with one given only here).
+ * with one given only here). `own` (the computer's own sign-in): the endpoint and cloud the runner itself
+ * runs with, whatever its owner set there, still out of a project's reach.
  */
-export function accountSettingsEnv(plan: CodingPlan | undefined, model: string | undefined, runner = process.env) {
+export function accountSettingsEnv(
+  plan: CodingPlan | undefined,
+  model: string | undefined,
+  runner = process.env,
+  own = false,
+) {
   const env: Record<string, string> = {
-    ANTHROPIC_BASE_URL: plan?.claudeCode.baseUrl ?? "https://api.anthropic.com",
-    CLAUDE_CODE_USE_BEDROCK: "",
-    CLAUDE_CODE_USE_VERTEX: "",
-    CLAUDE_CODE_USE_FOUNDRY: "",
+    ANTHROPIC_BASE_URL: plan?.claudeCode.baseUrl ?? (own ? runner.ANTHROPIC_BASE_URL : undefined) ?? API_ANTHROPIC,
   };
+  for (const k of CLOUD_ENV) env[k] = own ? (runner[k] ?? "") : "";
   for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
   if (!plan) return env;
   for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
@@ -1533,7 +1542,12 @@ export class BrainManager {
           // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
           { promptReads: true, ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}) },
         ),
-        ...(ctx.accountHome ? { env: accountSettingsEnv(plan, model) } : {}),
+        // With the owner's own settings loaded (`personalMcp`), theirs decide the computer's own sign-in.
+        ...(ctx.accountHome
+          ? { env: accountSettingsEnv(plan, model) }
+          : req.personalMcp === true
+            ? {}
+            : { env: accountSettingsEnv(undefined, model, process.env, true) }),
       }),
       { mode: 0o600 },
     );

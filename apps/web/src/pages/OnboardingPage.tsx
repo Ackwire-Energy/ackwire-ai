@@ -374,18 +374,16 @@ export function OnboardingPage() {
       // Imported: one apply after the presets (a handle a preset took gets the next free one).
       const crewSoFar = await applyImported(list, key === "platform" ? "anthropic" : key);
       // The connected computer chosen a step before: every agent works there, and thinks with its
-      // Claude Code when that was picked (the person confirmed the plan warning).
+      // Claude Code when that was picked (each then answers only the person, as they were told).
       if (computer !== "machine" || !machine) return;
       const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
       for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
       if (brain !== "claude_code") return;
       let failed = false;
       for (const agentId of all) {
-        await api.agents
-          .setBrain(created.orgId, agentId, { brain: "claude_code", fallback: true, acceptPlanTerms: true })
-          .catch(() => {
-            failed = true;
-          });
+        await api.agents.setBrain(created.orgId, agentId, { brain: "claude_code", fallback: true }).catch(() => {
+          failed = true;
+        });
       }
       if (failed) toast.show(t("onboarding.brain.failed", { computer: machine.name }), "error");
     },

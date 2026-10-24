@@ -24,12 +24,12 @@ const brainCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.setBrain").map((c) => c.args[2]);
 
 /** Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does). */
-async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "" } = {}) {
+async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider = "" } = {}) {
   const state = seedState();
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
     agent.ownerUserId = mine ? "u-walter" : "u-joao";
-    agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet" };
+    agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet", ...(provider ? { provider } : {}) };
     agent.audience = { mode: patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
   }
   const api = createFakeApi(state);
@@ -120,6 +120,22 @@ describe("Só responde a você (Quem pensa)", () => {
     expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
       "A Anthropic diz que cada assento do plano é de uma pessoa.",
     );
+    cleanup();
+    const glm: MachineAccount = {
+      ...seat,
+      id: "acct_glm",
+      label: "GLM Coding",
+      email: null,
+      plan: null,
+      provider: "zai",
+      keyHint: "a1b2",
+    };
+    await ada({ account: "acct_glm", accounts: [glm] });
+    d = await brainDialog();
+    await click(shareSwitch(d));
+    expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
+      "Z.ai diz que o plano é só de quem assina.",
+    );
   });
 
   test("onto a plan it starts on, and Usar asks nothing", async () => {
@@ -191,6 +207,14 @@ describe("Quem pode falar, on a plan", () => {
       audience: { mode: "everyone", userIds: [] },
       acceptPlanTerms: true,
     });
+  });
+
+  test("on a coding plan the warning is its maker's", async () => {
+    await ada({}, { tab: "?tab=settings&sec=audience", provider: "kimi" });
+    await click(within(audience()).getByRole("radio", { name: /^Todos do workspace/ }));
+    expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
+      "Kimi diz que o plano é só de quem assina.",
+    );
   });
 
   test("an admin who doesn't own it can't let more people in: it says whose plan it is", async () => {

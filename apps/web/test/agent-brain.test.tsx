@@ -239,7 +239,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     });
   });
 
-  test("one agent per account, each person's own: another agent's is in use, someone else's only shows while it's this one's", async () => {
+  test("one agent per account, each person's own: another agent's moves here, someone else's only shows while it's this one's", async () => {
     const theo: MachineAccount = { ...work, id: "acct_theo", label: "Pessoal", plan: "Max", usedBy: ["Theo"] };
     const hers: MachineAccount = {
       ...work,
@@ -252,7 +252,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       usedBy: ["Ada"],
     };
     const other: MachineAccount = { ...hers, id: "acct_ana2", label: "Claude Team 3", usedBy: [] };
-    await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    const { state } = await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
     account.focus();
@@ -261,10 +261,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(options.map((o) => [o.textContent, o.getAttribute("aria-disabled") === "true"])).toEqual([
       ["Conta deste MacBookA que já está no MacBook", false],
       ["Trabalho · Teamwalt@acme.com", false],
-      ["Pessoal · MaxEm uso por Theo", true],
+      ["Pessoal · MaxEm uso por Theo · Mover para cá", false],
       ["Claude Team 2 · TeamDe Ana", true],
       ["Adicionar conta", false],
     ]);
+    await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_theo", moveAccount: true });
   });
 
   test("plan usage: the chosen account's meter; at the limit, its owner's free accounts, never another agent's", async () => {

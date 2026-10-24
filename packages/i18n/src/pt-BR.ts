@@ -1557,7 +1557,7 @@ export const ptBR = {
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
         thisComputerText: "A que já está no {{computer}}",
-        accountInUse: "Em uso por {{agents}}",
+        accountMove: "Em uso por {{agents}} · Mover para cá",
         accountOf: "De {{name}}",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
@@ -5302,13 +5302,13 @@ export const ptBR = {
     hidden: "{{owner}} ou um admin escolhe quem pensa.",
     hiddenAdmins: "Só admins escolhem quem pensa.",
     warning: {
-      title: "Usar o seu plano para o agente?",
+      title: "Usar o seu plano nos agentes?",
       claude_code:
-        "A assinatura do Claude é pessoal. Usar o seu plano para o agente responder a outras pessoas pode contrariar os termos da Anthropic. O risco é seu.",
+        "Os agentes vão pensar com o seu plano do Claude e responder só a você. Para outra pessoa falar com um deles, desligue Só responde a você em Quem pensa, na página do agente.",
       codex:
-        "A assinatura do ChatGPT é pessoal. Usar o seu plano para o agente responder a outras pessoas pode contrariar os termos da OpenAI. O risco é seu.",
-      confirm: "Entendi, usar mesmo assim",
-      cancel: "Cancelar",
+        "Os agentes vão pensar com o seu plano do ChatGPT e responder só a você. Para outra pessoa falar com um deles, desligue Só responde a você em Quem pensa, na página do agente.",
+      confirm: "Usar meu plano",
+      cancel: "Agora não",
     },
     summary: {
       model: "Modelo (API)",
