@@ -1,16 +1,14 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import os from "node:os";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION, shQuote } from "../../runner/install-script";
 import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
+import { removeDirs, tempDir } from "./helpers";
 
-const roots: string[] = [];
-afterAll(() => {
-  for (const r of roots) rmSync(r, { recursive: true, force: true });
-});
+const dirs: string[] = [];
+afterEach(() => removeDirs(dirs));
 
 /** The bytes the fake GitHub serves as the Bun zip; a test that wants it to match swaps its SHA-256 in. */
 const FAKE_ZIP = "not really a zip";
@@ -26,8 +24,8 @@ const fakeNode = (version: string) =>
  * an unzip that "unpacks" a Bun 1.4.4, the runtimes given, and the real tools the script uses.
  */
 function fakeComputer(runtimes: { bun?: string; homeBun?: string; node?: string }) {
-  const root = mkdtempSync(path.join(os.tmpdir(), "install-script-"));
-  roots.push(root);
+  const root = tempDir("install-script-");
+  dirs.push(root);
   const [fake, sys, home] = ["fake", "sys", "home"].map((d) => path.join(root, d)) as [string, string, string];
   for (const d of [fake, sys, home]) mkdirSync(d);
   const tools: Record<string, string | undefined> = {
