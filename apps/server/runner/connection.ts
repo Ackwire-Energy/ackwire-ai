@@ -1,5 +1,6 @@
 import {
   HEARTBEAT_MS,
+  type MachineLoad,
   type MachineRequest,
   parseServerFrame,
   type RunnerFrame,
@@ -106,6 +107,8 @@ export interface ConnectionOptions {
   mcp?: Pick<McpBridge, "attach" | "detach" | "result"> & Partial<Pick<McpBridge, "tools">>;
   /** Protocol 7: the coding CLIs on the machine, looked up for each `hello` (cached by the caller). */
   executors?: () => RunnerInfo["executors"];
+  /** Protocol 22: the last day's load; each new summary goes out once, on the next `pong`. */
+  load?: () => MachineLoad | null;
   /** Called after each `welcome` (frames sent from here on reach the server). */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
@@ -221,6 +224,7 @@ export class RunnerConnection {
       let outcome: ConnectionOutcome | undefined;
       let heartbeatMs = HEARTBEAT_MS;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
+      let sentLoad: MachineLoad | null = null;
 
       const send = (frame: RunnerFrame) => {
         if (finished || !socket) return;
@@ -302,10 +306,13 @@ export class RunnerConnection {
           case "task.ack":
             tasks?.ack(frame.taskId);
             return;
-          case "ping":
-            send({ type: "pong", at: frame.at });
+          case "ping": {
+            const load = opts.load?.() ?? null;
+            send({ type: "pong", at: frame.at, ...(load && load !== sentLoad ? { load } : {}) });
+            sentLoad = load;
             arm();
             return;
+          }
           case "request": {
             const { type: _type, id, ...request } = frame;
             void runner.start(id, request as MachineRequest);

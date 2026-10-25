@@ -25,9 +25,9 @@ import {
   publishMachineAgentsChanged,
   sha256Hex,
 } from "./machines";
-import { can, type MemberRole, requirePermission } from "./organizations";
+import { can, installOwner, type MemberRole, requirePermission } from "./organizations";
 
-const { agents, channels, machines, organizationMembers, organizations, users } = schema;
+const { agents, channels, machines, organizationMembers, organizations } = schema;
 
 /**
  * The server's own computer (`HOST_COMPUTER_TOKEN`, and `agentes-runner host`
@@ -79,12 +79,6 @@ export interface HostDeps {
 export const hostKey = (hostToken: string) => sha256Hex(hostToken);
 
 const OSES = new Set(["linux", "darwin", "windows"]);
-
-/** The installation's first account. */
-async function installOwner(db: Database): Promise<string | null> {
-  const [first] = await db.select({ id: users.id }).from(users).orderBy(asc(users.createdAt), asc(users.id)).limit(1);
-  return first?.id ?? null;
-}
 
 /**
  * The organizations served (or just `orgId`, when it is one): made by the first account and still run by it.
