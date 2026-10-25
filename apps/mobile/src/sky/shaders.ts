@@ -77,7 +77,7 @@ float field(float u, float v, float x, float y) {
   return f;
 }
 `,
-  // The launch splash (telas/SplashApp.html, B): the sky up to `level` (share of the height from the
+  // The launch splash: the sky up to `level` (share of the height from the
   // bottom), a soft wave on its top edge, deepest at the bottom.
   horizon: `
 uniform float level;
