@@ -118,6 +118,7 @@ import type {
   ScopeGrant,
   SearchHit,
   SecretRequest,
+  ServerTelemetry,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -308,6 +309,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           throw error;
         }
       },
+      telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
+      setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
     },
     waitlist: {
       join: async (input) => {

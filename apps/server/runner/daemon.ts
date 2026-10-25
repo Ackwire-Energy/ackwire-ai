@@ -1,11 +1,13 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { LoadWindow, machineSize, sampleLoad } from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
   isAccountId,
   isAccountKind,
+  LOAD_SAMPLE_MS,
   MACHINE_PROTOCOL_VERSION,
   type MachineAgent,
   type MachineOs,
@@ -284,6 +286,8 @@ export class RunnerDaemon implements RequestObserver {
   private pairing: AbortController | null = null;
   private stopWatch: (() => void) | null = null;
   private readonly timers: ReturnType<typeof setInterval>[] = [];
+  /** Protocol 22: how busy this computer got over the last day (rides on `pong`). */
+  private readonly load = new LoadWindow();
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private stopping = false;
@@ -440,6 +444,14 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
+    const sample = () =>
+      void sampleLoad()
+        .then((s) => this.load.add(s))
+        .catch(() => undefined);
+    sample();
+    const load = setInterval(sample, LOAD_SAMPLE_MS);
+    load.unref?.();
+    this.timers.push(load);
     this.expireRequests();
   }
 
@@ -839,6 +851,7 @@ export class RunnerDaemon implements RequestObserver {
         };
       },
       executors: () => this.helloExecutors(),
+      load: () => this.load.summary(),
       context,
       // System mode: the agents' tasks and MCP calls are their workers'.
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
@@ -931,6 +944,7 @@ export class RunnerDaemon implements RequestObserver {
       exec: access.tools.commands,
       paused: this.pauseState(),
       access,
+      size: machineSize(workspaceReal),
     };
   }
 
