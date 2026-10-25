@@ -18,6 +18,7 @@ const {
   channelMembers,
   users,
   accounts,
+  agents,
 } = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
@@ -688,26 +689,62 @@ async function findInviteLink(db: Database, token: string) {
   return row ?? null;
 }
 
-/** What the invite page shows before signing in (`email` is empty for an org link). */
+/** How many of the organization's agents an invitation shows ("Ada, Theo e Lia já trabalham lá"). */
+const INVITE_AGENTS = 3;
+
+/** The organization's first agents (not archived), for an invitation page: name and look only. */
+async function inviteAgents(db: Database, orgId: string) {
+  return db
+    .select({ id: agents.id, name: agents.name, appearance: agents.appearance })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .orderBy(asc(agents.createdAt))
+    .limit(INVITE_AGENTS);
+}
+
+/**
+ * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
+ * invited (their name), the role and a few of its agents. Only for a valid token, which reached the person.
+ */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
     .select({
+      orgId: organizationInvitations.orgId,
       orgName: organizations.name,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
       acceptedAt: organizationInvitations.acceptedAt,
+      invitedBy: users.name,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
+    .leftJoin(users, eq(users.id, organizationInvitations.invitedByUserId))
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
   if (!row) {
     const link = await findInviteLink(db, token);
     if (!link || link.link.revokedAt || link.link.expiresAt <= now) return null;
-    return { orgName: link.orgName, email: "", role: link.link.role, kind: "link" as const };
+    const [creator] = link.link.createdByUserId
+      ? await db.select({ name: users.name }).from(users).where(eq(users.id, link.link.createdByUserId))
+      : [];
+    return {
+      orgName: link.orgName,
+      email: "",
+      role: link.link.role,
+      kind: "link" as const,
+      invitedBy: creator?.name ?? null,
+      agents: await inviteAgents(db, link.link.orgId),
+    };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
-  return { orgName: row.orgName, email: row.email, role: row.role, kind: "email" as const };
+  return {
+    orgName: row.orgName,
+    email: row.email,
+    role: row.role,
+    kind: "email" as const,
+    invitedBy: row.invitedBy ?? null,
+    agents: await inviteAgents(db, row.orgId),
+  };
 }
 
 /**

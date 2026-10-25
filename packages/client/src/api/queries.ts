@@ -614,6 +614,19 @@ export function useStartOAuth(orgId: string) {
   });
 }
 
+/** Where the phone app's OAuth lands: the callback hands `state` and `code` back to the app. */
+export const APP_OAUTH_RETURN = "app:connectors";
+
+/** The phone app finishes an authorization it started (see `APP_OAUTH_RETURN`). */
+export function useCompleteOAuth(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+  });
+}
+
 export const useGitHubApp = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.githubApp(orgId), queryFn: () => api.githubApp.info(orgId), staleTime: 30_000 });

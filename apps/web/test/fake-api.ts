@@ -1451,6 +1451,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("connectors.startOAuth", orgId, connector, input);
         return `https://github.com/login/oauth/authorize?state=s&return=${encodeURIComponent(input.returnTo)}`;
       },
+      completeOAuth: async (orgId, input) => {
+        log("connectors.completeOAuth", orgId, input);
+        throw new Error("the web app finishes OAuth in the callback");
+      },
       disconnect: async (orgId, connectionId) => {
         log("connectors.disconnect", orgId, connectionId);
         state.connections = state.connections.filter((c) => c.id !== connectionId);

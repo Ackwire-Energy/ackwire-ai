@@ -3,6 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
 import installScript from "../../../install.sh" with { type: "text" };
+import { registerAppLinks } from "./app-links";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accessRoutes } from "./routes/app/access";
@@ -188,6 +189,7 @@ export function createApp(options: AppOptions) {
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
   });
   app.route("/api", api);
+  if (options.services) registerAppLinks(app, options.services.config);
   app.notFound((c) =>
     c.req.path.startsWith("/api/") ? apiError(c, 404, "not_found", "Route not found") : c.text("Not found", 404),
   );

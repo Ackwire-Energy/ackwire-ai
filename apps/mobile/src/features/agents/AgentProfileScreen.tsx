@@ -419,6 +419,18 @@ function Profile({ id }: { id: string }) {
                     : t("mobile.intentAgents.uses.asksAdmins")}
               </Text>
             ) : null}
+            {decides ? (
+              // Ferramentas: a new service for this agent starts in Conectores (who uses it is chosen there).
+              <View style={styles.foot}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="plus"
+                  label={t("mobile.connectors.fromAgent")}
+                  onPress={() => router.push("/connectors")}
+                />
+              </View>
+            ) : null}
           </Section>
         ) : null}
 

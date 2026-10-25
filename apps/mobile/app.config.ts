@@ -12,6 +12,9 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 const variant = process.env.APP_VARIANT ?? "production";
 const suffix = variant === "production" ? "" : `.${variant}`;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://agentes.chat";
+// Invitation and password reset links on this host open the app (universal links / App Links); the server
+// publishes the matching /.well-known files (apps/server/src/app-links.ts).
+const linkHost = new URL(apiUrl).host;
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
 // expo-image-picker and expo-camera both set iOS's camera text: one text for both uses.
@@ -40,6 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: `chat.agentes.app${suffix}`,
     supportsTablet: false,
     usesAppleSignIn: true,
+    associatedDomains: [`applinks:${linkHost}`],
     config: { usesNonExemptEncryption: false },
   },
   android: {
@@ -49,6 +53,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#0f0f0e",
     },
     predictiveBackGestureEnabled: false,
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [
+          { scheme: "https", host: linkHost, pathPrefix: "/invite/" },
+          { scheme: "https", host: linkHost, path: "/reset-password" },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
   },
   // Native permission texts (the OS shows them before the app's i18n runs).
   locales: {

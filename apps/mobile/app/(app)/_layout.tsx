@@ -19,7 +19,7 @@ export const unstable_settings = { anchor: "(tabs)" };
 export default function AppLayout() {
   const { colors } = useTheme();
   const org = useOrgGate();
-  // Signed in, the organization not known yet (the splash covers this) or none (`NoOrganization` covers it):
+  // Signed in, the organization not known yet (the splash covers this) or none (the first run, `OnboardingFlow`, covers it):
   // the screens need one, so they mount once it's chosen, at the URL the app opened with.
   if (!org.state) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   return <AppStack />;
@@ -51,6 +51,11 @@ function AppStack() {
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={formSheet} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen
+        name="connectors/oauth"
+        options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}
+      />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="me" options={meSheet} />

@@ -41,6 +41,7 @@ export * from "./connectors/custom";
 export * from "./connectors/listing";
 export * from "./connectors/mcp";
 export * from "./connectors/oauth-mcp";
+export * from "./connectors/oauth-return";
 export * from "./connectors/presets";
 export * from "./consultations";
 export * from "./context";
