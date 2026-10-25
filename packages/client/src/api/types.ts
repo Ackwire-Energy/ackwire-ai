@@ -129,8 +129,14 @@ export interface Invitation {
 
 export interface InvitationPreview {
   orgName: string;
+  /** Empty for an org-wide invite link. */
   email: string;
   role: Role;
+  kind?: "email" | "link";
+  /** Who invited (their name), when known. */
+  invitedBy?: string | null;
+  /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
+  agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
 }
 
 export interface Credential {
