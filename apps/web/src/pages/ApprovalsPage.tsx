@@ -506,13 +506,13 @@ export function ExactAction({ approval, max }: { approval: Approval; max?: numbe
             ))}
           </dl>
         ) : (
-          <ul className="ap-exact__facts">
+          <div className="ap-exact__facts">
             {values.map(([label, value]) => (
-              <li key={label}>
-                {label}: <b>{value}</b>
-              </li>
+              <Chip key={label}>
+                {label}: {value}
+              </Chip>
             ))}
-          </ul>
+          </div>
         ))}
       {full && (
         <details className="ap-exact__tech">

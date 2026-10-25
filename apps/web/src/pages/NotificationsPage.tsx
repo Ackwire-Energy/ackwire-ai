@@ -862,9 +862,7 @@ function ApprovalSay({
         <div className="nt-facts">
           {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
           {values.map((v) => (
-            <span key={v} className="nt-fact">
-              {v}
-            </span>
+            <Chip key={v}>{v}</Chip>
           ))}
           {reason && (
             <button
