@@ -1,5 +1,5 @@
 /**
- * Test fake — the agent browser (ADR 0040) and desktop (ADR 0058), same shapes as the server's
+ * Test fake — the agent browser (ADR 0040) and screen (ADR 0058), same shapes as the server's
  * `…/agents/{id}/browser`, `…/agents/{id}/desktop` and `…/browser/handoffs/*` routes. Agents start
  * without a browser or a desktop (their computer is the cloud one); tests put handoffs in
  * `fake.handoffs`, settings in `fake.settings` and desktops in `fake.desktops`.
@@ -14,6 +14,8 @@ export interface FakeBrowser {
   handoffs: Map<string, BrowserHandoff>;
   /** An agent's desktop as the server would see it; its open handoff comes from `handoffs`. */
   desktops: Map<string, Partial<DesktopStatus>>;
+  /** Agents whose computer this person may not watch (`GET …/desktop` answers 403). */
+  forbidden: Set<string>;
 }
 
 const NO_DESKTOP: DesktopStatus = {
@@ -26,8 +28,7 @@ const NO_DESKTOP: DesktopStatus = {
   handoff: null,
   viewers: 0,
   canControl: false,
-  canStart: false,
-  terminal: { available: false, reason: "no_computer", allowed: false },
+  held: false,
 };
 
 const NONE: AgentBrowserSettings = {
@@ -47,6 +48,7 @@ export function createFakeBrowser(
   const settings = new Map<string, AgentBrowserSettings>();
   const handoffs = new Map<string, BrowserHandoff>();
   const desktops = new Map<string, Partial<DesktopStatus>>();
+  const forbidden = new Set<string>();
   const openOn = (agentId: string, screen: BrowserHandoff["screen"] = "browser") =>
     [...handoffs.values()].find(
       (h) => h.agentId === agentId && handoffScreen(h) === screen && (h.status === "pending" || h.status === "active"),
@@ -141,14 +143,14 @@ export function createFakeBrowser(
         throw new ApiError(403, "browser.not_allowed", `${host} is outside the sites this agent may use`);
       }
     },
-    stop: async (orgId, agentId, screen) => {
-      log("browser.stop", orgId, agentId, ...(screen ? [screen] : []));
-      if (screen === "desktop") desktops.set(agentId, { ...desktops.get(agentId), running: false });
+    stop: async (orgId, agentId) => {
+      log("browser.stop", orgId, agentId);
     },
   };
   const desktop: ApiClient["desktop"] = {
     status: async (orgId, agentId) => {
       log("desktop.status", orgId, agentId);
+      if (forbidden.has(agentId)) throw new ApiError(403, "forbidden", "You can't use this agent's desktop");
       const open = openOn(agentId, "desktop");
       return {
         ...NO_DESKTOP,
@@ -156,10 +158,6 @@ export function createFakeBrowser(
         ...(open ? { handoff: open, controllerUserId: open.status === "active" ? open.controllerUserId : null } : {}),
       };
     },
-    start: async (orgId, agentId) => {
-      log("desktop.start", orgId, agentId);
-      desktops.set(agentId, { ...desktops.get(agentId), running: true });
-    },
   };
-  return { client, desktop, settings, handoffs, desktops };
+  return { client, desktop, settings, handoffs, desktops, forbidden };
 }

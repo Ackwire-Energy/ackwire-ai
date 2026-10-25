@@ -286,12 +286,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
-      stop: (orgId, agentId, screen = "browser") =>
-        request<void>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/stop`, { json: {} }),
+      stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
-      start: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/desktop/start`, { json: {} }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),

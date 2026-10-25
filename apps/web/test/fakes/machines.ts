@@ -91,7 +91,11 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     step: null,
     reason: null,
     since: null,
-    etaSeconds: null,
+    requestedAt: null,
+    expectedReadyAt: null,
+    secondsLeft: null,
+    secondsWaited: null,
+    notifyByEmail: false,
     specs: null,
     machineId: null,
   };

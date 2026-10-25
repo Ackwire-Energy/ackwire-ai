@@ -47,7 +47,7 @@ describe("Configurações → Computadores, in the app", () => {
     fakeMachinesOf.get(api)?.addDevice("WXYZ-1234");
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
-    const card = screen().getByRole("region", { name: "Conectar um computador" });
+    const card = screen().getByRole("region", { name: "Conectar outro computador" });
     expect(within(card).queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
 
     // The runner picks its token up right after the site confirms.

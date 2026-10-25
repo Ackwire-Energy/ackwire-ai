@@ -400,8 +400,11 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
-      // The workspace's computer on its way and its standing may have moved meanwhile.
+      // The workspace's computer on its way and its standing may have moved meanwhile, and so may the computers
+      // (one back online, a pause) and the agents' screens.
       void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });

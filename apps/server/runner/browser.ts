@@ -1524,7 +1524,7 @@ export class BrowserManager {
     if (!desktops) return null;
     if (session.desktopFailedAt !== undefined && this.now() - session.desktopFailedAt < DESKTOP_RETRY_MS) return null;
     try {
-      await desktops.ensure(agent);
+      await desktops.ensure(agent, { chrome: true });
     } catch (err) {
       session.desktopFailedAt = this.now();
       this.opts.log(

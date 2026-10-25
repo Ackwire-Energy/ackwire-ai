@@ -18,13 +18,11 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
-import { BrowserNow } from "./BrowserNow";
+import { ComputerNow } from "./ComputerNow";
 import { CardHead, useAgentEdit } from "./context";
-import { DesktopNow } from "./DesktopNow";
 import { Numbers } from "./Hero";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
-import { TerminalNow } from "./TerminalNow";
 import { WorkCard } from "./Work";
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
@@ -65,9 +63,7 @@ export function OverviewTab() {
       <ReadOnlyNote />
       <div className="agp-cols">
         <div className="agp-col">
-          <BrowserNow />
-          <DesktopNow />
-          <TerminalNow />
+          <ComputerNow />
           {(approvals > 0 || pending.length > 0) && (
             <div className="agp-attns">
               {approvals > 0 && (

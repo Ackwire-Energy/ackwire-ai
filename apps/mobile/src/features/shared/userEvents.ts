@@ -1,5 +1,7 @@
 import {
   type Approval,
+  applyComputerEvent,
+  applyMachineEvent,
   applyNotificationEvent,
   applyWorkspaceEvent,
   cacheApproval,
@@ -9,10 +11,8 @@ import {
   type ThreadFollowEvent,
   type ThreadInfo,
 } from "@agenteschat/client";
-import { isOutageEvent } from "@agenteschat/client/lib/machine-outages";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { outagesKey } from "../outages/queries";
 import { useConnection, useOrgId } from "./hooks";
 
 /**
@@ -48,8 +48,10 @@ export function useUserEvents() {
         );
         void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
       }
-      // Org events: a computer went offline or came back, agents moved off one ("Computador desconectado").
-      if (isOutageEvent(event)) void qc.invalidateQueries({ queryKey: outagesKey(orgId) });
+      // Org events about the computers, as on the web: one went offline or came back (and the agents waiting for
+      // it, "Computador desconectado"), paused, renamed, removed, its agents moved; an agent switched computers.
+      applyMachineEvent(qc, orgId, event);
+      applyComputerEvent(qc, orgId, event);
       // The workspace's standing (the suspended screen comes and goes) and its own computer on its way.
       applyWorkspaceEvent(qc, orgId, event);
       // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
@@ -62,8 +64,12 @@ export function useUserEvents() {
     const offReconnect = connection.onReconnect(() => {
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
-      // The organization's standing may have changed meanwhile (the suspended screen).
+      // The organization's standing may have changed meanwhile (the suspended screen), and so may the workspace's
+      // computer on its way, the computers and the agents' screens.
       void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
     });
     return () => {
       offUser();

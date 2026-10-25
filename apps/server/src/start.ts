@@ -247,6 +247,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     log,
     pubsub: adapters.pubsub,
     hub: engine.machineHub,
+    emails: adapters.email.delivers,
   });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });

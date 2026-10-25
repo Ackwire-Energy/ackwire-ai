@@ -6,6 +6,7 @@ import { keys } from "../src/api/keys";
 import type { ComputerSetup, Me } from "../src/api/types";
 import {
   agentsWaitingForComputer,
+  computerName,
   newerSetup,
   noComputerChoice,
   SETUP_STEPS,
@@ -29,7 +30,11 @@ const external = (patch: Partial<ComputerSetup> = {}): ComputerSetup => ({
   step: null,
   reason: null,
   since: "2026-10-24T18:49:04.020Z",
-  etaSeconds: null,
+  requestedAt: "2026-10-24T18:49:00.000Z",
+  expectedReadyAt: null,
+  secondsLeft: null,
+  secondsWaited: 4,
+  notifyByEmail: false,
   specs: null,
   machineId: null,
   ...patch,
@@ -64,19 +69,19 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupView(external({ step: "polishing" as never }))?.step).toBeNull();
   });
 
-  test("waiting says why; a step left over from before isn't shown; problem and ready have their own words", () => {
-    expect(setupView(external({ state: "waiting", reason: "approval", step: "starting" }))).toMatchObject({
+  test("a wait takes longer than usual, whatever reason it gives; problem and ready have their own words", () => {
+    expect(setupView(external({ state: "waiting", reason: "capacity", step: "starting" }))).toMatchObject({
       phase: "waiting",
       step: null,
-      reason: "approval",
-      textKey: "computerSetup.status.approval",
-      chipKey: "computerSetup.chip.approval",
+      reason: "capacity",
+      textKey: "computerSetup.status.capacity",
+      chipKey: "computerSetup.chip.capacity",
     });
-    expect(setupView(external({ state: "waiting", reason: "capacity" }))?.textKey).toBe(
+    // An older server's approval, or no reason at all: no wait for an approval anymore.
+    expect(setupView(external({ state: "waiting", reason: "approval" as never }))?.textKey).toBe(
       "computerSetup.status.capacity",
     );
-    // No reason given: the calm one.
-    expect(setupView(external({ state: "waiting" }))?.reason).toBe("approval");
+    expect(setupView(external({ state: "waiting" }))?.reason).toBe("capacity");
     expect(setupView(external({ state: "problem" }))?.textKey).toBe("computerSetup.status.problem");
     expect(setupView(external({ state: "ready", machineId: "m1" }))).toMatchObject({
       phase: "ready",
@@ -89,17 +94,15 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     const lines = new Set<string>();
     for (const state of ["preparing", "waiting", "problem", "ready"] as const)
       for (const step of [null, ...SETUP_STEPS])
-        for (const reason of [null, "approval", "capacity"] as const) {
+        for (const reason of [null, "approval" as never, "capacity"] as const) {
           const view = setupView(external({ state, step, reason }));
           if (view) lines.add(view.textKey).add(view.chipKey);
         }
     expect([...lines].sort()).toEqual([
-      "computerSetup.chip.approval",
       "computerSetup.chip.capacity",
       "computerSetup.chip.preparing",
       "computerSetup.chip.problem",
       "computerSetup.chip.ready",
-      "computerSetup.status.approval",
       "computerSetup.status.capacity",
       "computerSetup.status.preparing",
       "computerSetup.status.problem",
@@ -142,14 +145,28 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupNoticeKey("o1", starting)).not.toBe(setupNoticeKey("o2", starting));
   });
 
+  test("named in the reader's words while it keeps the name it got, in any language; a name given to it stays", () => {
+    const managed = (name: string) => ({ kind: "managed" as const, name });
+    const ours = t("computerSetup.title", { org: "Oficina" });
+    // Before it exists, and under the name it got in its first owner's language, whichever that was.
+    expect(computerName(t, "Oficina", null)).toBe(ours);
+    expect(computerName(t, "Oficina", managed("Oficina's computer"))).toBe(ours);
+    expect(computerName(t, "Oficina", managed("Computador da Oficina"))).toBe(ours);
+    // Renamed by an admin: theirs. Any other computer: its own.
+    expect(computerName(t, "Oficina", managed("Servidor da loja"))).toBe("Servidor da loja");
+    expect(computerName(t, "Oficina", { kind: "connected", name: "Oficina's computer" })).toBe("Oficina's computer");
+  });
+
   test("drawn as a server before and after it exists, never as the cloud computer an agent gets", () => {
     expect(WORKSPACE_COMPUTER_KIND).toBe("linux");
   });
 
-  test('"no computer" in the pickers: the cloud, the workspace\'s computer on its way, or plainly none', () => {
+  test('"no computer" in the pickers: a Daytona sandbox, the workspace\'s computer on its way, or plainly none', () => {
     const at = (state: ComputerSetup["state"]) => setupView(external({ state }));
-    // People connect their own computers: as ever.
-    expect(noComputerChoice(null, false, false)).toBe("cloud");
+    // People connect their own computers: Daytona's sandbox only where the server has them, never "the cloud".
+    expect(noComputerChoice(null, true, false)).toBe("cloud");
+    expect(noComputerChoice(null, false, false)).toBeNull();
+    expect(noComputerChoice(null, false, true)).toBe("none");
     // On its way: the agents with no computer get it, so that's what the choice is.
     for (const state of ["preparing", "waiting", "problem"] as const) {
       expect(noComputerChoice(at(state), false, false)).toBe("workspace");
@@ -195,7 +212,10 @@ describe("live: machine.provisioning and org.standing", () => {
         reason: "capacity",
         step: null,
         since: "2026-10-24T19:00:00.000Z",
-        etaSeconds: null,
+        requestedAt: "2026-10-24T18:49:00.000Z",
+        expectedReadyAt: null,
+        secondsLeft: null,
+        secondsWaited: 660,
         specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
         machineId: null,
       } as { type: string }),
@@ -206,7 +226,12 @@ describe("live: machine.provisioning and org.standing", () => {
       step: null,
       reason: "capacity",
       since: "2026-10-24T19:00:00.000Z",
-      etaSeconds: null,
+      requestedAt: "2026-10-24T18:49:00.000Z",
+      expectedReadyAt: null,
+      secondsLeft: null,
+      secondsWaited: 660,
+      // The event doesn't say whether the server sends email: what the answer said stays.
+      notifyByEmail: false,
       specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
       machineId: null,
     });

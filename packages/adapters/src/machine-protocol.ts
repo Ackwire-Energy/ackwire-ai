@@ -568,9 +568,11 @@ export type StreamRequest =
  * `stream.open` (protocol 18): one viewer of the request's agent's desktop
  * (`watch` logs in with the view-only password, `control` with the full one),
  * or one terminal as the agent. `streamId` (32 random bytes, base64url) names
- * the stream on the data socket.
+ * the stream on the data socket. `start` (a desktop): one that isn't running
+ * starts first; without it the runner refuses `desktop_off`, as runners before
+ * it did. The server leaves it out while the agent may start nothing (held).
  */
-export type StreamOpenRequest = StreamRequest & { streamId: string };
+export type StreamOpenRequest = StreamRequest & { streamId: string; start?: boolean };
 
 /**
  * A data socket's first frame (runner → server, text): the machine's token

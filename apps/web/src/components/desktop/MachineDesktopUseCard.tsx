@@ -3,7 +3,6 @@ import { commandInReason } from "@agenteschat/client/lib/machines";
 import { Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { CommandBlock } from "../Machines";
-import { NotWorkingNote } from "../WorkspaceComputer";
 import "../browser/browser.css";
 
 /** Both switches desktop use needs, turned on at the computer. */
@@ -13,18 +12,16 @@ const TURN_ON = "agentes-runner tools enable desktop && agentes-runner tools ena
  * Apps on the agents' desktops, on a computer's page (ADR 0062): whether agents can use apps on their own
  * desktops there; when not, on Linux the computer's own words on what is missing (each agent its own user,
  * packages) with the command in them, elsewhere that it takes a Linux computer; or the two switches to turn on.
- * On the workspace's own computer, only that it doesn't work and who to ask.
+ * Not on the workspace's own computer, whose page says what is on it instead.
  */
 export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
   const use = m.desktopUse;
   if (!use) return null;
   const off = use.available && !(m.access?.tools.desktop && m.access.tools.commands);
-  // The workspace's own computer: no way in to turn it on or run a command (`NotWorkingNote`).
-  const managed = m.kind === "managed";
   // A Mac or Windows has nothing to install for it: said in the app's words, not the runner's English.
   const linux = m.os === "linux";
-  const reason = use.available || managed ? null : linux ? use.reason : t("desktop.use.linuxOnly");
+  const reason = use.available ? null : linux ? use.reason : t("desktop.use.linuxOnly");
   const command = linux ? commandInReason(reason) : null;
   return (
     <Card aria-labelledby="sec-machine-desktop-use">
@@ -45,8 +42,7 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
           </Chip>
         )}
       </div>
-      {managed && (off || !use.available) && <NotWorkingNote />}
-      {off && !managed && (
+      {off && (
         <div className="brw-note">
           <Icon name="computer" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>

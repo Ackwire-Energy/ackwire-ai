@@ -46,6 +46,10 @@ export function commandInReason(reason: string | null | undefined): string | nul
   return m?.[1] ?? null;
 }
 
+/** Turns the agents' screens on at the computer: its runner's settings, which are root's in system mode (ADR 0057). */
+export const screensOnCommand = (m: Pick<Machine, "mode">) =>
+  `${m.mode === "system" ? "sudo " : ""}agentes-runner tools enable desktop`;
+
 /** The last part of a path: "/Users/you/Projects/loja-v5" → "loja-v5". */
 export function folderName(path: string): string {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);

@@ -1043,16 +1043,15 @@ export interface ApiClient {
      * `browser.bad_address` or `browser.open_failed`.
      */
     open(orgId: string, agentId: string, url: string): Promise<void>;
-    /** "Parar": closes the agent's browser now (its logins stay), or stops that screen. */
-    stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
+    /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
+    stop(orgId: string, agentId: string): Promise<void>;
   };
   /**
-   * The agent's desktop (ADR 0058): its state and "Ligar". The screen itself is a WebSocket
-   * (`desktopSocketUrl`); control, "Devolver" and "Desligar" are the browser's screen routes with `desktop`.
+   * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which
+   * starts it when it isn't running; control and "Devolver" are the browser's screen routes with `desktop`.
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
-    start(orgId: string, agentId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

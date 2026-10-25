@@ -9,6 +9,8 @@ export interface RailStep {
   optional?: boolean;
   /** What was answered, under a done step's name (e.g. the workspace name). */
   value?: string;
+  /** Under the name whatever the step's state: how far something it waits for is. */
+  note?: string;
 }
 
 /**
@@ -39,7 +41,7 @@ export function StepRail({
       <ol className="onb__steps">
         {steps.map((s, i) => {
           const done = s.done && i !== current;
-          const sub = done && s.value ? s.value : s.optional && optionalLabel ? optionalLabel : null;
+          const sub = s.note ?? (done && s.value ? s.value : s.optional && optionalLabel ? optionalLabel : null);
           return (
             <li key={s.id} data-done={done || undefined}>
               <button

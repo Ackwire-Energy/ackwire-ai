@@ -10,6 +10,7 @@ import {
   useAgents,
   useComputer,
   useComputerAction,
+  useComputerSetup,
   useMachines,
   useSandboxSettings,
   useSaveSandboxSettings,
@@ -28,6 +29,7 @@ import {
   type SetupView,
   setupPending,
   setupPortrait,
+  setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -68,7 +70,8 @@ import { LoadingCards, LoadingLine } from "@/components/Loading";
 import { MachineChip } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, ThisMacButton, useIsThisMac } from "@/components/ThisMac";
-import { SetupProgress, useSetupView } from "@/components/WorkspaceComputer";
+import { SetupProgress } from "@/components/WorkspaceComputer";
+import { useNow } from "@/hooks/useNow";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
@@ -123,18 +126,6 @@ function ComputerFacts({ pc }: { pc: AgentComputer }) {
   );
 }
 
-/** Ticks once a second while `active` (the elapsed seconds and the steps). */
-function useNow(active: boolean) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [active]);
-  return now;
-}
-
 interface Busy {
   action: ComputerAction;
   since: number;
@@ -156,7 +147,8 @@ function useComputerLifecycle(agent: Agent) {
   const [error, setError] = useState<{ action: ComputerAction; message: string } | null>(null);
   const [ready, setReady] = useState(false);
   const pc = useComputer(org.id, agent.id, true, busy ? POLL_MS : false);
-  const now = useNow(busy !== null);
+  // The elapsed seconds and the steps move on once a second.
+  const now = useNow(busy !== null ? 1000 : false);
   const g = agentGrammar(t, agent.name);
   const view = busy ? busyView(busy.action, busy.since, now, busy.fresh) : null;
 
@@ -337,8 +329,10 @@ export const CLOUD = "cloud";
 export function useNoComputer() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const setup = useSetupView(org.id);
-  const sandbox = useSandboxSettings(org.id, setup?.phase === "ready");
+  const setupQ = useComputerSetup(org.id);
+  const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
+  // Daytona's sandboxes count only where the server has them: no workspace computer on its way.
+  const sandbox = useSandboxSettings(org.id, setupQ.data?.mode === "pair" || setup?.phase === "ready");
   const cloudAvailable = sandbox.data?.available === true;
   return {
     setup,
@@ -351,7 +345,7 @@ export function useNoComputer() {
         ? t("computerSetup.title", { org: org.name })
         : choice === "none"
           ? t("computer.target.none")
-          : t("computer.target.cloud"),
+          : t("computer.target.daytona"),
   };
 }
 
@@ -362,10 +356,9 @@ export function NoComputerIcon({ choice }: { choice: NoComputer }) {
 }
 
 /**
- * "Computador: Nuvem | <máquina>". Admins pick any machine; the agent's
- * owner, the ones they paired (the server checks again). Offline machines
- * stay selectable, marked. The choice is a draft: the page saves it. Where
- * the workspace gets its own computer, "Nuvem" reads as `useNoComputer` says.
+ * "Computador: <máquina>", or the no-computer option as `useNoComputer` names it. Admins pick any
+ * machine; the agent's owner, the ones they paired (the server checks again). Offline machines
+ * stay selectable, marked. The choice is a draft: the page saves it.
  */
 function ComputerTargetSelect({
   target,
@@ -416,7 +409,7 @@ function ComputerTargetSelect({
                 ? t(noComputer.setup.chipKey)
                 : cloud === "none"
                   ? t("computer.target.noneText")
-                  : t("computer.target.cloudText"),
+                  : t("computer.target.daytonaText"),
           },
         ]
       : []),
@@ -678,7 +671,7 @@ export function CloudComputerCard() {
       <ComputerPortrait kind="cloud" state={s && !s.enabled ? "offline" : "online"} />
       <span className="computers-card__title">
         <h2 id="sec-cloud" className="ac-card__title">
-          {t("computers.cloud.cardTitle")}
+          {t("computers.daytona.cardTitle")}
         </h2>
         <span className="small muted">{summary ?? t("computers.cloud.cardText")}</span>
       </span>
@@ -772,7 +765,7 @@ function CloudComputerDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("computers.cloud.cardTitle")}
+      title={t("computers.daytona.cardTitle")}
       description={t("computers.cloud.cardText")}
       closeLabel={t("common.close")}
     >
