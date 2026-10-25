@@ -5,11 +5,14 @@ import {
   addChannelMember,
   cancelRun,
   createAgentRuns,
+  deliverNoticeToRun,
   drainOutbox,
+  holdsMessages,
   insertMessage,
   postPersonMessage,
   queueOnRun,
   recoverStaleRuns,
+  releaseHeldInbox,
   releaseInbox,
   stopChecksSettled,
   sweepEndedInboxes,
@@ -314,5 +317,126 @@ describe("the floor (a follow-up without @ in the channel)", () => {
     expect((await messageById(late.id))?.meta.steeredRunIds).toBeUndefined();
     expect((await runById(run.id))?.pendingMessageIds).toEqual([follow.id]);
     expect(await runs()).toHaveLength(1);
+  });
+});
+
+describe("a run held by a decision takes nothing new: the agent stays responsive (D97)", () => {
+  const holdOnApproval = (id: string) =>
+    f.db.update(schema.agentRuns).set({ status: "waiting_approval" }).where(eq(schema.agentRuns.id, id));
+  /** Paused on a mission's own wait (a blocking decision): a message can't move it. */
+  const holdOnDecision = (id: string) =>
+    f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "waiting_input",
+        transcript: {
+          system: [],
+          messages: [],
+          postedUpTo: 0,
+          postedCount: 0,
+          deltaSeq: 0,
+          pending: { calls: [{ toolUseId: "t1", name: "ask_decision", waitId: "decision-1" }] },
+        },
+      })
+      .where(eq(schema.agentRuns.id, id));
+
+  test("waiting on an approval: a person's message, another agent's or a notice starts a run of its own", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Ok."] }) });
+    const ask = await post("@dev faz o deploy");
+    const [held] = await runs();
+    if (!held) throw new Error("no run");
+    await holdOnApproval(held.id);
+    expect(await holdsMessages(f.db, { ...held, status: "waiting_approval" })).toBe(true);
+
+    const more = await post("@dev e o changelog?", { threadId: ask.id });
+    let all = await runs();
+    expect(all).toHaveLength(2);
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+    expect(all[1]?.triggerMessageId).toBe(more.id);
+
+    // Through the dispatch path (an agent's message, a router pick): it joins the new run, never the held one.
+    const note = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: ask.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "e setembro",
+    });
+    await f.db.transaction((tx) => createAgentRuns(tx, note, [f.agent.id], "mention"));
+    all = await runs();
+    expect(all).toHaveLength(2);
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+    expect(all[1]?.pendingMessageIds).toEqual([note.id]);
+
+    // A notice for the held run (another agent's answer) wakes the agent instead of waiting on it.
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", finishedAt: new Date(), pendingMessageIds: [] })
+      .where(eq(schema.agentRuns.id, all[1]?.id ?? ""));
+    const delivered = await f.db.transaction((tx) =>
+      deliverNoticeToRun(tx, held, { kind: "wait_result", text: "Staging is on Railway.", from: "@infra" }),
+    );
+    expect(delivered.runs).toHaveLength(1);
+    expect((await runById(held.id))?.pendingMessageIds).toEqual([]);
+    expect((await runById(held.id))?.status).toBe("waiting_approval");
+  });
+
+  test("waiting on a mission's decision: a person's message leaves it for a run of its own", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Ok."] }) });
+    const events = f.listen(f.general.id);
+    const ask = await post("@dev prepara o deploy");
+    const [held] = await runs();
+    if (!held) throw new Error("no run");
+    await holdOnDecision(held.id);
+    expect(await holdsMessages(f.db, { id: held.id, orgId: held.orgId, status: "waiting_input" })).toBe(true);
+
+    const more = await post("e o changelog?", { threadId: ask.id });
+    await stopChecksSettled();
+    const all = await runs();
+    expect(all).toHaveLength(2);
+    expect(all[0]?.status).toBe("waiting_input");
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+    expect(all[1]?.triggerMessageId).toBe(more.id);
+    expect(events.find((e) => e.type === "agent.run.redispatched")).toMatchObject({
+      runId: held.id,
+      newRunId: all[1]?.id,
+      messageIds: [more.id],
+    });
+  });
+
+  test("waiting on a person's answer: a message still goes to that run", async () => {
+    f = await setup();
+    await post("@dev prepara o deploy");
+    const [run] = await runs();
+    if (!run) throw new Error("no run");
+    const transcript = {
+      system: [],
+      messages: [],
+      postedUpTo: 0,
+      postedCount: 0,
+      deltaSeq: 0,
+      pending: { calls: [{ toolUseId: "t1", name: "ask_user", questionId: "q-1" }] },
+    };
+    expect(await holdsMessages(f.db, { ...run, status: "waiting_input", transcript })).toBe(false);
+    expect(await holdsMessages(f.db, { ...run, status: "running" })).toBe(false);
+  });
+
+  test("a run that pauses on an approval hands on what it hadn't read yet", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Ok."] }) });
+    const ask = await post("@dev faz o deploy");
+    const [run] = await runs();
+    if (!run) throw new Error("no run");
+    // Sent while it worked: queued on it.
+    const more = await post("@dev e o changelog?", { threadId: ask.id });
+    expect((await runById(run.id))?.pendingMessageIds).toEqual([more.id]);
+    // Still working: nothing to hand on.
+    expect(await releaseHeldInbox(f.db, f.pubsub, run.id)).toBeNull();
+
+    await holdOnApproval(run.id);
+    expect(await releaseHeldInbox(f.db, f.pubsub, run.id)).toMatchObject({ messageIds: [more.id] });
+    const all = await runs();
+    expect(all).toHaveLength(2);
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+    expect(all[1]?.triggerMessageId).toBe(more.id);
   });
 });

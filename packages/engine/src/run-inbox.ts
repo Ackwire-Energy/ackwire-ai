@@ -3,6 +3,7 @@ import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sq
 import { mayJoin, type RunTrigger, startOrJoinRun } from "./dispatch";
 import { publishChannelEvent } from "./events";
 import type { Message } from "./messages";
+import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
 const { agentRuns, channels, messages } = schema;
@@ -16,8 +17,11 @@ const { agentRuns, channels, messages } = schema;
  */
 export const ACTIVE_RUN_STATUSES = ["queued", "running", "waiting_approval", "waiting_input"] as const;
 
-/** Why a run's unread messages were handed on (kept on the run's trail). */
-export type ReleaseReason = "done" | "failed" | "canceled" | "interrupted" | "swept";
+/**
+ * Why a run's unread messages were handed on (kept on the run's trail). `held`: the run waits on
+ * something a message can't move (an approval, a secret, a mission's decision: `holdsMessages`).
+ */
+export type ReleaseReason = "done" | "failed" | "canceled" | "interrupted" | "swept" | "held";
 
 /**
  * Queues a message on a run, only while the run is still active (status-guarded: a run that ended
@@ -65,6 +69,59 @@ export async function releaseInbox(
   options: { reason: ReleaseReason; exclude?: string[] },
 ): Promise<{ runId: string; messageIds: string[] } | null> {
   const taken = await takeInbox(db, run.id).catch(() => [] as string[]);
+  return handOn(db, pubsub, run, taken, options);
+}
+
+/**
+ * Some messages queued on a run that holds them (`holdsMessages`: it waits on an approval, a secret, a
+ * mission's decision) leave its inbox and get a run of their own, like an ending's (`releaseInbox`): the
+ * agent answers now, the held run still waits for its decision. Those no longer queued there (read, or
+ * already handed on) are left alone.
+ */
+export async function handOnMessages(
+  db: Database,
+  pubsub: PubSub | undefined,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "trigger">,
+  messageIds: string[],
+): Promise<{ runId: string; messageIds: string[] } | null> {
+  // Forum turns are driven by the topic: nothing is handed on from them.
+  if (messageIds.length === 0 || run.trigger === "forum") return null;
+  const taken = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ pending: agentRuns.pendingMessageIds })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, run.id))
+      .for("update");
+    const pending = row?.pending ?? [];
+    const ids = pending.filter((id) => messageIds.includes(id));
+    if (ids.length === 0) return [];
+    await tx
+      .update(agentRuns)
+      .set({ pendingMessageIds: pending.filter((id) => !ids.includes(id)) })
+      .where(eq(agentRuns.id, run.id));
+    return ids;
+  });
+  return handOn(db, pubsub, run, taken, { reason: "held" });
+}
+
+/**
+ * The run just paused on something a message can't move (`holdsMessages`): what it hadn't read yet gets
+ * a run of its own instead of waiting behind the decision. A no-op for any other pause.
+ */
+export async function releaseHeldInbox(db: Database, pubsub: PubSub | undefined, runId: string) {
+  const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId));
+  if (!row || row.pendingMessageIds.length === 0 || !(await holdsMessages(db, row))) return null;
+  return releaseInbox(db, pubsub, row, { reason: "held" });
+}
+
+/** Messages taken from a run's inbox go on: to a run of their own, or the agent's run already active there. */
+async function handOn(
+  db: Database,
+  pubsub: PubSub | undefined,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "trigger">,
+  taken: string[],
+  options: { reason: ReleaseReason; exclude?: string[] },
+): Promise<{ runId: string; messageIds: string[] } | null> {
   const ids = taken.filter((id) => !options.exclude?.includes(id));
   if (ids.length === 0 || run.trigger === "forum") return null;
   const rows = await db
