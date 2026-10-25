@@ -8,7 +8,7 @@
  */
 import type { ControlAccessRequest, ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
 import { Button, Icon, Kbd, normalizeAppearance, PixelSpinner, Segmented } from "@agenteschat/ui";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import {
@@ -187,7 +187,8 @@ export function Popover() {
   useEffect(() => {
     const end = bodyEnd.current;
     if (!end || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([entry]) => setMore(entry?.isIntersecting === false), {
+    // Crossings queued before the callback runs arrive together, oldest first.
+    const io = new IntersectionObserver((entries) => setMore(entries.at(-1)?.isIntersecting === false), {
       root: end.parentElement,
     });
     io.observe(end);
@@ -344,9 +345,14 @@ export function Popover() {
     }
   };
 
+  // A short screen lowers the card's cap (`.dk-pop`): the window, the card and its margins, opens under the menu
+  // bar with nothing keeping it on screen, and the actions at its bottom have to stay there.
+  const room = window.screen.availHeight - POP_PAD.top - POP_PAD.bottom;
+  const shell = { padding: POP_PADDING, ...(room > 0 && { "--pop-room": `${room}px` }) } as CSSProperties;
+
   if (confirmQuit) {
     return (
-      <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
+      <div className="dk-pop-shell" style={shell}>
         <main className="dk-pop" ref={card} aria-label={t("desktop.tray.quitTitle")}>
           <div className="dk-confirm">
             <h2>{t("desktop.tray.quitTitle")}</h2>
@@ -417,7 +423,7 @@ export function Popover() {
   // Nothing of this computer works for agents: the way into the app, and what waits there.
   if (!works) {
     return (
-      <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
+      <div className="dk-pop-shell" style={shell}>
         <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
           <div className="dk-pop__body" data-more={more || undefined}>
             {hereCard || (
@@ -458,7 +464,7 @@ export function Popover() {
   }
 
   return (
-    <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
+    <div className="dk-pop-shell" style={shell}>
       <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
         <div className="dk-pop__body" data-more={more || undefined}>
           {hereCard || (

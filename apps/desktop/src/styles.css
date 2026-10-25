@@ -261,13 +261,14 @@ body[data-window="popover"] {
 .dk-pop-shell {
   width: 100%;
 }
-/* The window follows the card's height (Popover.tsx), so this caps both. Past it, the middle scrolls and
-   the actions below it (the way to the app, Preferences, Quit) stay in view. */
+/* The window follows the card's height (Popover.tsx), so this caps both, lower on a short screen
+   (--pop-room). Past it, the middle scrolls and the actions below it (the way to the app, Preferences,
+   Quit) stay in view. */
 .dk-pop {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: 660px;
+  max-height: min(660px, var(--pop-room, 660px));
   border-radius: 18px;
   padding: 6px;
   background: var(--glass-solid);
