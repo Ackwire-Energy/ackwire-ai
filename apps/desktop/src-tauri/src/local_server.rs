@@ -314,9 +314,21 @@ pub fn prepare(folder: &Folder, usage: bool, free_port: impl Fn() -> Option<u16>
     write_env(folder, &entries)
 }
 
+/// `TELEMETRY` as the server reads it (packages/config: a boolean string, on when unset).
+fn telemetry_on(value: Option<&str>) -> bool {
+    !value.is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "off" | "false" | "0" | "no" | "n" | "disabled"))
+}
+
 /// The first port of the range nothing listens on.
 pub fn free_port() -> Option<u16> {
-    PORTS.into_iter().find(|p| std::net::TcpListener::bind(("127.0.0.1", *p)).is_ok())
+    PORTS.into_iter().find(|p| port_free(*p))
+}
+
+/// Free as the server judges it (it exits 5 when something answers on 127.0.0.1 there), and bindable. A bind alone
+/// isn't enough: on a Mac, Rust's bind of 127.0.0.1 succeeds beside another program's `*:port` or `[::]:port`.
+fn port_free(port: u16) -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    std::net::TcpListener::bind(addr).is_ok() && TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_err()
 }
 
 // ───────────────────────────── the app's copies of the server ─────────────────────────────
@@ -398,6 +410,7 @@ pub fn install_version(folder: &Folder, bundle: &Path, version: &str) -> io::Res
     let copied = match before.filter(|b| b != version && folder.entry(b).is_file()) {
         Some(from) => {
             if folder.db().is_dir() {
+                not_held(folder)?;
                 make_private_dir(&folder.backups())?;
                 let aside = folder.backups().join(format!("db-{from}"));
                 let _ = fs::remove_dir_all(&aside);
@@ -421,6 +434,7 @@ pub fn install_version(folder: &Folder, bundle: &Path, version: &str) -> io::Res
 pub fn go_back(folder: &Folder, from: &str, to: &str) -> io::Result<()> {
     let aside = folder.backups().join(format!("db-{to}"));
     if aside.is_dir() {
+        not_held(folder)?;
         let failed = folder.backups().join(format!("failed-db-{from}-{}", stamp()));
         if folder.db().is_dir() {
             fs::rename(folder.db(), &failed)?;
@@ -440,9 +454,14 @@ fn stamp() -> String {
 /// One HTTP/1.1 request to the server on this computer's loopback (`Host` is its own address, which it
 /// answers); the status and the body.
 pub fn http(port: u16, method: &str, path: &str, body: Option<&Value>) -> Option<(u16, String)> {
+    http_within(port, method, path, body, Duration::from_secs(15))
+}
+
+/// `http`, waiting at most `read` for each read of the answer.
+pub fn http_within(port: u16, method: &str, path: &str, body: Option<&Value>, read: Duration) -> Option<(u16, String)> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(2)).ok()?;
-    stream.set_read_timeout(Some(Duration::from_secs(15))).ok()?;
+    stream.set_read_timeout(Some(read)).ok()?;
     let body = body.map(Value::to_string).unwrap_or_default();
     let request = format!(
         "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nAccept: application/json\r\n\
@@ -561,6 +580,11 @@ fn stop_pid(pid: u32, grace: Duration, gone: impl Fn() -> bool) {
         if !gone() {
             // SAFETY: as above.
             unsafe { libc::kill(pid as libc::pid_t, libc::SIGKILL) };
+            // Until it is gone: what comes next checks that no server holds the folder.
+            let killed = Instant::now();
+            while killed.elapsed() < Duration::from_secs(2) && !gone() {
+                std::thread::sleep(Duration::from_millis(50));
+            }
         }
     }
     #[cfg(not(unix))]
@@ -584,9 +608,8 @@ fn ready_pid(folder: &Folder) -> Option<u32> {
     pid_in(&folder.ready())
 }
 
-/// A server of this folder that `file` names and that still runs: its own command line names `native.js` and
-/// this folder. Anything else is left alone.
-fn folder_server(folder: &Folder, file: &Path) -> Option<u32> {
+/// A server that `file` names and that still runs (its own command line names `native.js`), with that line.
+fn live_server(file: &Path) -> Option<(u32, String)> {
     #[cfg(unix)]
     {
         let pid = pid_in(file)?;
@@ -594,13 +617,29 @@ fn folder_server(folder: &Folder, file: &Path) -> Option<u32> {
             return None;
         }
         let out = Command::new("ps").args(["-o", "command=", "-p", &pid.to_string()]).output().ok()?;
-        let line = String::from_utf8_lossy(&out.stdout);
-        (line.contains("native.js") && line.contains(&*folder.0.to_string_lossy())).then_some(pid)
+        let line = String::from_utf8_lossy(&out.stdout).into_owned();
+        line.contains("native.js").then_some((pid, line))
     }
     #[cfg(not(unix))]
     {
-        let _ = (folder, file);
+        let _ = file;
         None
+    }
+}
+
+/// A server of this folder that `file` names and that still runs: its own command line names `native.js` and
+/// this folder. Anything else is left alone.
+fn folder_server(folder: &Folder, file: &Path) -> Option<u32> {
+    live_server(file).and_then(|(pid, line)| line.contains(&*folder.0.to_string_lossy()).then_some(pid))
+}
+
+/// The server that holds this folder's lock now, even one whose command line doesn't name the folder (started by
+/// hand without `--data`, the default folder): never stopped by the app, and its database is never copied or moved
+/// while it runs.
+fn not_held(folder: &Folder) -> io::Result<()> {
+    match live_server(&folder.lock()) {
+        Some((pid, _)) => Err(io::Error::other(format!("another agentes-server (pid {pid}) uses {}", folder.0.display()))),
+        None => Ok(()),
     }
 }
 
@@ -645,14 +684,15 @@ pub fn next_after(on_purpose: bool, code: Option<i32>, answered: bool, failed: u
     if !answered && code == Some(exit::UPGRADE) {
         return Next::Upgrade { from: update_from.map(str::to_string) };
     }
+    if !answered && failed >= MAX_FAILED_STARTS {
+        // A port or a folder another program holds says nothing about the version: going back wouldn't help.
+        return match update_from {
+            Some(to) if !matches!(code, Some(exit::PORT | exit::LOCKED)) => Next::GoBack { to: to.to_string() },
+            _ => Next::GiveUp,
+        };
+    }
     if !answered && code == Some(exit::PORT) {
         return Next::NewPort;
-    }
-    if !answered && failed >= MAX_FAILED_STARTS {
-        return match update_from {
-            Some(to) => Next::GoBack { to: to.to_string() },
-            None => Next::GiveUp,
-        };
     }
     Next::Restart(crate::runners::backoff(if answered { 0 } else { failed }))
 }
@@ -923,7 +963,7 @@ pub fn status(app: &AppHandle, welcome: bool) -> Status {
         url: port.map(loopback_url).or_else(|| ready.as_ref().and_then(|r| r["url"].as_str().map(str::to_string))),
         reach: public.as_deref().is_some_and(|p| p.starts_with("https://")),
         public_url: public,
-        usage: env_get(&env, "TELEMETRY").as_deref() != Some("off"),
+        usage: telemetry_on(env_get(&env, "TELEMETRY").as_deref()),
         version: ready
             .as_ref()
             .and_then(|r| r["version"].as_str().map(str::to_string))
@@ -1010,7 +1050,7 @@ fn start_now(app: &AppHandle) -> Result<(), String> {
 /// it): the server never starts behind someone else's answers.
 fn port_here(app: &AppHandle, folder: &Folder) -> Result<u16, String> {
     let port = port_of(folder).ok_or("no PORT in .env")?;
-    if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+    if port_free(port) {
         return Ok(port);
     }
     note(app, format!("port {port} is taken on this computer: moving to another"));
@@ -1886,6 +1926,16 @@ mod tests {
             next_after(false, Some(1), false, MAX_FAILED_STARTS, Some("0.6.0")),
             Next::GoBack { to: "0.6.0".into() }
         );
+        // Not while a server holds the folder, even one started by hand that doesn't name it.
+        fs::write(folder.db().join("data"), "migrated").unwrap();
+        let mut held = Command::new("sh").args(["-c", "sleep 30; :", "native.js"]).spawn().unwrap();
+        fs::write(folder.lock(), format!(r#"{{"pid":{}}}"#, held.id())).unwrap();
+        assert!(go_back(&folder, "0.7.0", "0.6.0").is_err());
+        assert_eq!(fs::read_to_string(folder.db().join("data")).unwrap(), "migrated");
+        assert!(install_version(&folder, &fake_bundle(&root, "three"), "0.8.0").is_err(), "no copy aside under it");
+        let _ = held.kill();
+        let _ = held.wait();
+        fs::remove_file(folder.lock()).unwrap();
         go_back(&folder, "0.7.0", "0.6.0").unwrap();
         assert_eq!(current_version(&folder).as_deref(), Some("0.6.0"));
         assert_eq!(fs::read_to_string(folder.db().join("data")).unwrap(), "before");
@@ -1903,6 +1953,30 @@ mod tests {
         assert_eq!(next_after(false, Some(5), false, 1, None), Next::NewPort);
         // A crash after it answered is a restart, never the way back.
         assert_eq!(next_after(false, Some(1), true, 5, Some("0.6.0")), Next::Restart(Duration::from_secs(1)));
+        // A taken port or folder counts toward the limit, and never sends an update back.
+        assert_eq!(next_after(false, Some(5), false, MAX_FAILED_STARTS, None), Next::GiveUp);
+        assert_eq!(next_after(false, Some(5), false, MAX_FAILED_STARTS, Some("0.6.0")), Next::GiveUp);
+        assert_eq!(next_after(false, Some(3), false, MAX_FAILED_STARTS, Some("0.6.0")), Next::GiveUp);
+    }
+
+    #[test]
+    fn a_port_is_free_only_when_nothing_answers_there() {
+        // Another program on every address (Node's default listen) leaves 127.0.0.1 bindable with SO_REUSEADDR.
+        let wide = std::net::TcpListener::bind("0.0.0.0:0").unwrap();
+        assert!(!port_free(wide.local_addr().unwrap().port()));
+        let port = wide.local_addr().unwrap().port();
+        drop(wide);
+        assert!(port_free(port));
+    }
+
+    #[test]
+    fn usage_off_as_the_server_reads_it() {
+        assert!(telemetry_on(None));
+        assert!(telemetry_on(Some("on")));
+        assert!(telemetry_on(Some("true")));
+        for off in ["off", "OFF", "false", "0", "no", "n", "disabled", " off "] {
+            assert!(!telemetry_on(Some(off)), "{off}");
+        }
     }
 
     #[test]

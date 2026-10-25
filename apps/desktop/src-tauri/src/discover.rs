@@ -12,6 +12,8 @@ use tauri::{AppHandle, Manager};
 
 /// Devices named agentes… on the tailnet, at most.
 const MAX_PEERS: usize = 5;
+/// How long a program on a loopback port here gets to answer whether it is the page's server.
+const PROBE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
 /// Where the native server and a Docker install answer on this computer, when nothing says otherwise.
 const LOCAL: &[&str] = &["http://127.0.0.1:4310", "http://127.0.0.1:3000"];
 
@@ -63,6 +65,48 @@ fn tailnet(status: &Value) -> Vec<String> {
     }
     out.retain(|s| crate::servers::origin_of(s).as_deref() == Some(s.as_str()));
     out
+}
+
+/// The servers the setup's service for this computer's own agents works for, by the loopback address its homes
+/// keep (on a Mac it keeps them in `~/.agentes-runner/host`, apps/server runner host.ts `defaultHostState`).
+fn host_servers(home: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(home.join(".agentes-runner").join("host").join("orgs")) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|e| std::fs::read_to_string(e.path().join("config.json")).ok())
+        .filter_map(|text| serde_json::from_str::<Value>(&text).ok())
+        .filter(|config| config["managedBy"] == "host")
+        .filter_map(|config| config["server"].as_str().and_then(crate::servers::origin_of))
+        .collect()
+}
+
+/// The loopback ports a server on this computer may answer on: `here`'s, then those of the service's homes.
+fn local_ports(home: &Path) -> Vec<u16> {
+    let mut ports = Vec::new();
+    for server in here(home).into_iter().chain(host_servers(home)) {
+        let port = crate::servers::is_loopback(&server)
+            .then(|| server.parse::<tauri::Url>().ok()?.port_or_known_default())
+            .flatten();
+        if let Some(port) = port.filter(|p| !ports.contains(p)) {
+            ports.push(port);
+        }
+    }
+    ports
+}
+
+/// Whether `origin` is a server on this computer that people reach at another address (Tailscale, a domain): a
+/// server answering on a loopback port here gives it as its own. Its own computer is set up on its own, as a
+/// loopback server's is, so the app doesn't pair this computer with it a second time. An SSH tunnel to that server
+/// on one of those ports reads the same while it is open: "This Mac" hides then, the safe way round.
+pub fn served_here(home: &Path, origin: &str) -> bool {
+    local_ports(home).into_iter().any(|port| {
+        crate::local_server::http_within(port, "GET", "/api/instance", None, PROBE_WAIT)
+            .filter(|(status, _)| *status == 200)
+            .and_then(|(_, body)| serde_json::from_str::<Value>(&body).ok())
+            .is_some_and(|instance| instance["url"].as_str() == Some(origin))
+    })
 }
 
 pub fn find(home: &Path, status: Option<&Value>) -> Vec<Candidate> {
@@ -135,5 +179,34 @@ mod tests {
         );
         std::fs::remove_dir_all(&home).unwrap();
         assert_eq!(find(&home, None).len(), LOCAL.len());
+    }
+
+    #[test]
+    fn a_server_on_this_computer_at_its_address_for_people() {
+        use std::io::{Read, Write};
+        let home = std::env::temp_dir().join(format!("agentes-served-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        // The setup's service keeps its homes on a Mac in ~/.agentes-runner/host, at the server's loopback port.
+        let org = home.join(".agentes-runner/host/orgs/0192a6b0-0000-7000-8000-00000000000a");
+        std::fs::create_dir_all(&org).unwrap();
+        let config = json!({ "managedBy": "host", "server": format!("http://127.0.0.1:{port}") });
+        std::fs::write(org.join("config.json"), config.to_string()).unwrap();
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut s, _) = listener.accept().unwrap();
+                let mut buf = [0u8; 2048];
+                let _ = s.read(&mut buf).unwrap();
+                let body = r#"{"name":"agentes.chat","url":"https://agentes.tail1234.ts.net"}"#;
+                let reply = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}", body.len());
+                s.write_all(reply.as_bytes()).unwrap();
+            }
+        });
+        assert!(local_ports(&home).contains(&port));
+        assert!(served_here(&home, "https://agentes.tail1234.ts.net"));
+        assert!(!served_here(&home, "https://agentes-mini.tail1234.ts.net"), "another server, elsewhere");
+        server.join().unwrap();
+        std::fs::remove_dir_all(&home).unwrap();
     }
 }

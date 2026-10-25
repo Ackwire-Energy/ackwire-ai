@@ -53,6 +53,7 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
 /// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
 /// computer of its own), a server on this computer itself, the server here included at its Tailscale address
 /// (`server_here`: its own computer is set up with it), or on Windows (no program for agents ships there yet).
+/// Another server on this computer at its address for people is `discover::served_here`, which asks it.
 pub fn agents_here(origin: &str, server_here: bool) -> bool {
     origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here && PLATFORM != "windows"
 }
@@ -606,8 +607,14 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
         }
         _ => {}
     }
-    let here = agents_here(&origin, server_here);
-    if matches!(request["kind"].as_str(), Some("status" | "connect" | "reconnect")) {
+    let asks_here = matches!(request["kind"].as_str(), Some("status" | "connect" | "reconnect"));
+    let here = asks_here && agents_here(&origin, server_here) && {
+        let (home, asking) = (app.path().home_dir().ok(), origin.clone());
+        tauri::async_runtime::spawn_blocking(move || home.is_some_and(|h| !crate::discover::served_here(&h, &asking)))
+            .await
+            .unwrap_or(false)
+    };
+    if asks_here {
         request["origin"] = json!(origin);
         request["agentsHere"] = json!(here);
         // The server here's own homes point at its loopback address, whichever address the page has.
