@@ -1,7 +1,7 @@
 [test]
 # Browser DOM for the web app and design system tests, attached only while
 # those files run (see packages/ui/testing/dom.ts). The db preload raises the
-# default test timeout (first PGlite migration of each file).
+# default test timeout of a run's first test file (see there).
 preload = ["./packages/db/test/preload.ts", "./packages/ui/testing/preload.ts", "./packages/ui/testing/preload-done.ts"]
 
 [install]
