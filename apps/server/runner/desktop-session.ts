@@ -706,7 +706,10 @@ export class DesktopSessions {
           );
         }
         // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
-        const look = lookCommand(user.home, lookTheme((f) => this.sys.exists(f)));
+        const look = lookCommand(
+          user.home,
+          lookTheme((f) => this.sys.exists(f)),
+        );
         const looked = await this.step(
           this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
         );

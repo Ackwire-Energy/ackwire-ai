@@ -364,7 +364,16 @@ test("the look: written as the agent into its desktop's HOME, after the prepare 
   expect(t.fake.procs.indexOf(look)).toBeLessThan(t.fake.procs.indexOf(xvnc));
   const home = path.join(t.folders, "dev", ".agentes", "home");
   const count = String(lookFiles(home, "stock").length);
-  expect(look.argv).toEqual(["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, lookId("stock", home), LOOK_MARKER, count]);
+  expect(look.argv).toEqual([
+    "/bin/sh",
+    "-c",
+    LOOK_SCRIPT,
+    "agentes-look",
+    home,
+    lookId("stock", home),
+    LOOK_MARKER,
+    count,
+  ]);
   expect(look.opts).toMatchObject({ cwd: "/", env: { HOME: home } });
   expect(look.opts.input?.startsWith(".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml ")).toBe(true);
   await t.desktops.stop(dev);

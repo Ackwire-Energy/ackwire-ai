@@ -1,5 +1,6 @@
 import { DESKTOP_SIZE } from "@agenteschat/adapters/machine-protocol";
-import { base64 } from "./assets/embed" with { type: "macro" };
+import MARK_BASE64 from "./assets/desktop-mark.png.b64" with { type: "text" };
+import WALLPAPER_BASE64 from "./assets/desktop-wallpaper.png.b64" with { type: "text" };
 import { xmlEscape } from "./xml";
 
 /**
@@ -44,10 +45,14 @@ export const lookId = (theme: LookTheme, home: string) => `${LOOK_VERSION}:${the
 export const LOOK_DIR = ".local/share/agentes";
 export const LOOK_MARKER = `${LOOK_DIR}/look`;
 
-/** 1280×900, the exact desktop size: shown 1:1, its logo centered on the dock's line below maximized windows. */
-const WALLPAPER = Buffer.from(base64("desktop-wallpaper.png"), "base64");
+/**
+ * 1280×900, the exact desktop size: shown 1:1, its logo centered on the dock's line below maximized windows. The
+ * images are base64 text (`assets/*.png.b64`, written next to the PNGs by docs/design/desktop/render.sh): Bun's
+ * text loader inlines them in the one-file runner, and would mangle a PNG's bytes.
+ */
+const WALLPAPER = Buffer.from(WALLPAPER_BASE64, "base64");
 /** The favicon at the dock's icon size: the same mark as the wallpaper's logo. */
-const MARK = Buffer.from(base64("desktop-mark.png"), "base64");
+const MARK = Buffer.from(MARK_BASE64, "base64");
 
 /** The ink of the sky's agents (the wallpaper's logo): the dock's lines and its window bars. */
 const INK = "4, 32, 63";

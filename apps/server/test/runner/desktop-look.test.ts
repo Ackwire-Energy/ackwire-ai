@@ -57,13 +57,7 @@ test("the dock: the mark's apps menu, Files and Terminal, then the windows; floa
   const plugins = [...panel.matchAll(/<property name="plugin-(\d+)" type="string" value="([a-z]+)">/g)].map(
     ([, id, name]) => `${name}-${id}`,
   );
-  expect(plugins).toEqual([
-    "applicationsmenu-1",
-    "separator-2",
-    "launcher-3",
-    "launcher-4",
-    "tasklist-5",
-  ]);
+  expect(plugins).toEqual(["applicationsmenu-1", "separator-2", "launcher-3", "launcher-4", "tasklist-5"]);
   expect(panel).toContain(`<property name="button-icon" type="string" value="${home}/.local/share/agentes/mark.png"/>`);
   expect(panel).toContain(`value="p=0;x=${DESKTOP_SIZE.width / 2};y=${DESKTOP_SIZE.height - 31}"`);
   expect(panel).toContain('<property name="show-labels" type="bool" value="false"/>');
@@ -106,7 +100,12 @@ test("the rest: one workspace, the wallpaper 1:1, no desktop icons, the theme th
   // XFCE's own menu in a layout of ours: nothing above Terminal Emulator, nothing after the merged submenus.
   const menu = textOf(home, "stock", ".config/menus/xfce-applications.menu");
   expect(menu).toContain('<MergeFile type="parent"/>');
-  expect(menu.slice(menu.indexOf("<Layout>"), menu.indexOf("</Layout>")).trim().split(/\s*\n\s*/)).toEqual([
+  expect(
+    menu
+      .slice(menu.indexOf("<Layout>"), menu.indexOf("</Layout>"))
+      .trim()
+      .split(/\s*\n\s*/),
+  ).toEqual([
     "<Layout>",
     "<Filename>xfce4-terminal-emulator.desktop</Filename>",
     "<Filename>xfce4-file-manager.desktop</Filename>",
@@ -127,7 +126,7 @@ test("the rest: one workspace, the wallpaper 1:1, no desktop icons, the theme th
   );
 });
 
-test("the images ship as committed: the wallpaper the desktop's exact size, the mark the dock's icon size", () => {
+test("the images ship as committed (their base64 text is the PNGs): the wallpaper the desktop's size, the mark the dock's icon size", () => {
   const wallpaper = fileOf("/h", "stock", ".local/share/agentes/wallpaper.png");
   const mark = fileOf("/h", "stock", ".local/share/agentes/mark.png");
   expect(wallpaper.equals(readFileSync(path.join(ASSETS, "desktop-wallpaper.png")))).toBe(true);
