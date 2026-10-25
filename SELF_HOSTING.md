@@ -519,7 +519,7 @@ about 2.5 hours, then dropped: the next day's report replaces it. These are all 
 | `organizations` | How many workspaces. |
 | `people` | How many accounts (`total`), and how many used the server in the last 1, 7 and 30 days (`active1d`, `active7d`, `active30d`). |
 | `agents` | How many agents, archived ones aside. |
-| `computers` | Every computer agents use (this server's own, the ones people connected, one given by a provisioner): its `kind` (`host`, `connected`, `managed`), `os` and `arch`, its `size` and the last day's `load` as above (`null` when its runner is too old to say), and how many `agents` use it. |
+| `computers` | Every computer agents use (this server's own, once for all the workspaces it serves; the ones people connected; one given by a provisioner): its `kind` (`host`, `connected`, `managed`), `os` and `arch`, its `size` and the last day's `load` as above (`null` when its runner is too old to say), and how many `agents` use it. |
 | `lastDay.runs`, `lastDay.toolCalls` | Agent runs started, and tool calls they made, in the last 24 hours. |
 | `lastDay.desktopMinutes`, `lastDay.terminalMinutes` | Minutes people watched or controlled agents' desktops, and had terminals open, in the last 24 hours. |
 | `lastDay.models` | For each AI provider and model used in the last 24 hours (the 50 most used): `provider`, `model`, `calls`, `inputTokens` (cached ones included) and `outputTokens`. A model name that isn't a model id goes as `other`. |

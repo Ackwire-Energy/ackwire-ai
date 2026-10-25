@@ -146,7 +146,7 @@ export async function buildTelemetryReport(
         ) seen group by user_id
       ) people`),
   );
-  const computers = rowsOf<{
+  const machines = rowsOf<{
     kind: schema.MachineKind;
     os: string;
     arch: string;
@@ -163,6 +163,27 @@ export async function buildTelemetryReport(
       where m.deleted_at is null and m.last_seen_at is not null
       order by m.created_at`),
   );
+  const computers: TelemetryComputer[] = [];
+  let host: TelemetryComputer | undefined;
+  for (const m of machines) {
+    const c = {
+      kind: m.kind,
+      os: m.os,
+      arch: archOf(m.arch),
+      size: m.size ?? m.specs ?? null,
+      agents: int(m.agents),
+      load: fresh(m.load, now),
+    };
+    // The server's own computer has a row for each organization it serves: one machine all the same.
+    if (m.kind === "host" && host) {
+      host.agents += c.agents;
+      host.size ??= c.size;
+      host.load ??= c.load;
+      continue;
+    }
+    if (m.kind === "host") host = c;
+    computers.push(c);
+  }
   const models = rowsOf<Record<string, unknown>>(
     await db.execute(sql`
       select provider, model, count(*) as calls,
@@ -192,14 +213,7 @@ export async function buildTelemetryReport(
       active30d: int(active?.d30),
     },
     agents: int(counts?.agents),
-    computers: computers.map((m) => ({
-      kind: m.kind,
-      os: m.os,
-      arch: archOf(m.arch),
-      size: m.size ?? m.specs ?? null,
-      agents: int(m.agents),
-      load: fresh(m.load, now),
-    })),
+    computers,
     lastDay: {
       runs: int(counts?.runs),
       toolCalls: int(counts?.tool_calls),

@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   buildTelemetryReport,
   createMachineHub,
+  createOrganization,
   isAgentesCloud,
   type MachineHub,
   markServerStarted,
@@ -334,4 +335,36 @@ test("the instance id is made once and kept; the switch and the Cloud decide wha
   expect(isAgentesCloud("https://www.agentes.chat")).toBe(true);
   expect(isAgentesCloud("https://agentes.chat.example.com")).toBe(false);
   expect(isAgentesCloud("https://notagentes.chat")).toBe(false);
+});
+
+test("the server's own computer is one machine, however many organizations it serves", async () => {
+  f = await setup();
+  const { db, owner, org, agent } = f;
+  const { organization: second } = await createOrganization(db, owner.id, { name: "Second" });
+  const at = new Date().toISOString();
+  const rows = await db
+    .insert(schema.machines)
+    .values([
+      { orgId: org.id, name: "This server", kind: "host", os: "linux", arch: "x64", lastSeenAt: new Date() },
+      {
+        orgId: second.id,
+        name: "This server",
+        kind: "host",
+        os: "linux",
+        arch: "x64",
+        lastSeenAt: new Date(),
+        size: { cpus: 2, memoryGb: 4, diskGb: 80 },
+        load: { ...LOAD, at },
+      },
+    ])
+    .returning({ id: schema.machines.id });
+  await db.update(schema.agents).set({ machineId: rows[0]?.id }).where(eq(schema.agents.id, agent.id));
+  await db
+    .insert(schema.agents)
+    .values({ orgId: second.id, name: "Bot", handle: "bot", model: "claude-sonnet-5-5", machineId: rows[1]?.id });
+  const { computers, organizations, agents } = await buildTelemetryReport(db, FACTS);
+  expect([organizations, agents]).toEqual([2, 2]);
+  expect(computers).toEqual([
+    { kind: "host", os: "linux", arch: "x64", size: { cpus: 2, memoryGb: 4, diskGb: 80 }, agents: 2, load: LOAD },
+  ]);
 });
