@@ -565,7 +565,7 @@ async function noteReply(deps: { db: Database; pubsub?: PubSub }, run: { id: str
   return delivered.message;
 }
 
-/** A question an agent asked from a conversation that is still out (the working line: "Theo está perguntando à Ada…"). */
+/** A question an agent asked from a conversation that is still out (the working line: one agent asking another). */
 export interface OpenConsultation {
   /** The asking run (it may have ended: `ask_agent` never waits; the answer wakes the agent). */
   runId: string;
@@ -580,7 +580,7 @@ export interface OpenConsultation {
 
 /**
  * Questions agents asked from this conversation that have no answer yet, oldest first: the app shows
- * "Theo está perguntando à Ada…" until the answer comes (`agent.consulted`), even after a reload and
+ * that one agent is asking another until the answer comes (`agent.consulted`), even after a reload and
  * after the asking turn ended. Only what people see live already; no question, no answer.
  */
 export async function openConsultationsIn(

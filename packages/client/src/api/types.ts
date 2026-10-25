@@ -399,7 +399,7 @@ export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "fa
 export type WaitMessageOutcome = "resolved" | "woke" | "held";
 
 /** A run the server still considers active in a channel (`GET …/channels/{id}/active-runs`). */
-/** A question an agent asked from a conversation, still out (`GET …/active-runs`): "Theo está perguntando à Ada…". */
+/** A question an agent asked from a conversation, still out (`GET …/active-runs`): the working line's "asking…". */
 export interface OpenConsult {
   /** The asking run (it may have ended: the answer wakes the agent). */
   runId: string;

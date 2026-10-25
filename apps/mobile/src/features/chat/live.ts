@@ -239,7 +239,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Questions agents asked from here still out ("Theo está perguntando à Ada…"), listed with the active runs.
+  // Questions agents asked from here still out (the "asking…" line), listed with the active runs.
   useEffect(
     () =>
       consultSeeds.subscribe((id, open, askedAt) => {

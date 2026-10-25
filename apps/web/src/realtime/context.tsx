@@ -328,7 +328,7 @@ export function createStreamsStore(
     /** The server's active runs for a channel (load, reconnect): stale rows go away. */
     reconcile: (channelId: string, active: ActiveRun[], askedAt = now()) =>
       set({ ...state, streams: reconcileRuns(state.streams, channelId, active, now(), askedAt) }),
-    /** The server's questions still out in a channel (load, reconnect): "Theo está perguntando à Ada…". */
+    /** The server's questions still out in a channel (load, reconnect): the "asking…" line. */
     reconcileConsults: (channelId: string, open: OpenConsult[], askedAt = now()) =>
       set({ ...state, consults: reconcileConsults(state.consults, channelId, open, askedAt, now()) }),
     /** "Continuar" went through (or there is nothing left to continue: `newRunId` null). */

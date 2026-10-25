@@ -419,7 +419,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         );
         // What the agents working here haven't read yet ("lê na próxima pausa" after a reload).
         if (res) steerStore.reconcile(channelId, res.runs, askedAt);
-        // Questions agents asked from here still out ("Theo está perguntando à Ada…" after a reload).
+        // Questions agents asked from here still out (the "asking…" line after a reload).
         if (res?.consults) consultSeeds.publish(channelId, res.consults, askedAt);
         return res ? res.runs : null;
       },

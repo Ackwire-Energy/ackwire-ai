@@ -107,7 +107,7 @@ export function applyConsultEvent(
       const message = (event as Extract<ChannelEvent, { type: "message.created" }>).message;
       const runId = message?.agentRunId;
       if (!runId) return state;
-      // "Perguntei pra Ada… te aviso quando ela responder": the question is still out.
+      // "I asked; I'll tell you when the answer comes": the question is still out.
       const next = dropIfBack(state, runId);
       return message.author.type === "agent" ? dropBackOf(next, message.author.id, message.channelId) : next;
     }

@@ -266,7 +266,7 @@ export function chatRoutes(deps: AppDeps) {
               )
               .openapi({
                 description:
-                  "Questions agents asked from here (`ask_agent`) still without an answer: \"Theo está perguntando à Ada…\" until `agent.consulted`.",
+                  "Questions agents asked from here (`ask_agent`) still without an answer: the working line says one agent is asking another until `agent.consulted`.",
               }),
           }),
         ),

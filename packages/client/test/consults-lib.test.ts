@@ -62,8 +62,8 @@ describe("live consultations", () => {
 describe("questions still out, from the server (load, reconnect)", () => {
   const open = (runId: string, since = "2026-10-25T12:00:00.000Z") => ({
     runId,
-    agentId: "theo",
-    consultedAgentId: "ada",
+    agentId: "dev",
+    consultedAgentId: "infra",
     channelId: "c1",
     threadId: "t1",
     since,
