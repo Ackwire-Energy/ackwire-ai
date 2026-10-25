@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
@@ -78,6 +79,8 @@ import { agentFolderName, isInside } from "./paths";
  *   desktop doesn't stop as idle; while its desktop is watched, it is in use.
  *   In system mode this runs in the agent's worker, as the agent's own user,
  *   on the desktop root starts for it (`WorkerLink.desktop`).
+ * - Browser on the agent's desktop (`desktop-browser.ts`, `show`): a person's
+ *   click brings that same Chrome there, started, moved or in front.
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -357,9 +360,10 @@ const HEADLESS_ARGS = ["--headless=new", "--window-size=1280,800"];
  * Wayland session. A headed Chrome shows a bar about the automation flag above
  * and, Chrome for Testing, one saying it is only for automated testing: each
  * takes the page's height and people see it. `--test-type` hides the first;
- * its value `gpu` is what hides the second.
+ * its value `gpu` is what hides the second. Its windows' class is the dock's
+ * Browser's (`StartupWMClass`), so the dock shows them there.
  */
-const HEADED_ARGS = ["--start-maximized", "--test-type=gpu", "--ozone-platform=x11"];
+const HEADED_ARGS = ["--start-maximized", "--test-type=gpu", "--ozone-platform=x11", `--class=${BROWSER_WM_CLASS}`];
 
 /**
  * A normal Chrome user agent for this Chrome's version (no "HeadlessChrome"),
@@ -984,7 +988,7 @@ export class BrowserManager {
   /** `hello.browser`: whether this computer can serve the agent browser (cheap: nothing is started). */
   info(): RunnerBrowserInfo {
     const chrome = (this.opts.chrome ?? (() => findChrome(this.userHome)))();
-    const recent = this.failure && this.now() - this.failure.at < RETRY_FAILURE_MS ? this.failure : null;
+    const recent = this.recentFailure();
     if (!this.opts.command && !this.bundled() && !agentBrowserTarget()) {
       return {
         available: false,
@@ -1026,7 +1030,7 @@ export class BrowserManager {
   /** The binary (downloaded and checked if needed) and a Chrome; throws `browser_unavailable` with the reason. */
   private ensureReady(): Promise<string[]> {
     if (this.opts.command) return this.ensureChrome(this.opts.command).then(() => this.opts.command as string[]);
-    const recent = this.failure && this.now() - this.failure.at < RETRY_FAILURE_MS ? this.failure : null;
+    const recent = this.recentFailure();
     if (recent) return Promise.reject(new RunnerError("browser_unavailable", recent.reason));
     this.ready ??= this.prepare().finally(() => {
       this.ready = null;
@@ -1115,6 +1119,11 @@ export class BrowserManager {
   private fail(reason: string) {
     this.failure = { reason: reason.slice(0, BROWSER_LIMITS.message), at: this.now() };
     return new RunnerError("browser_unavailable", this.failure.reason);
+  }
+
+  /** The last download or install that failed, while it is recent enough to answer for (`RETRY_FAILURE_MS`). */
+  private recentFailure() {
+    return this.failure && this.now() - this.failure.at < RETRY_FAILURE_MS ? this.failure : null;
   }
 
   // ── Commands ───────────────────────────────────────────────────────────────
@@ -1422,18 +1431,20 @@ export class BrowserManager {
    * our flags and the agent's profile, headed on the agent's desktop when it
    * belongs there and the desktop runs (started first), else headless; its pid
    * and display go in `chromes.json`. One running in the other mode starts
-   * again in this one on the page it showed, unless someone may be looking.
+   * again in this one on the page it showed, unless someone may be looking
+   * (`asked`: a person's own click, `show`, moves it anyway).
    */
   private async ensureOwnChrome(
     agent: AgentScope,
     session: Session,
     desktop: boolean,
     allowed: string[],
+    asked = false,
   ): Promise<OwnChrome> {
     const running = session.chrome;
     if (!running && session.chromeStarting) return session.chromeStarting;
-    if (running && ((running.display !== undefined) === desktop || this.inView(session))) return running;
-    const where = desktop ? await this.desktopFor(agent, session) : null;
+    if (running && ((running.display !== undefined) === desktop || (!asked && this.inView(session)))) return running;
+    const where = desktop ? await this.desktopFor(agent, session, asked) : null;
     let page: string | undefined;
     if (running) {
       if ((running.display !== undefined) === (where !== null)) return running;
@@ -1517,12 +1528,13 @@ export class BrowserManager {
    * The agent's desktop for a headed Chrome, started when it isn't running.
    * Null when it can't be there now: Chrome runs headless meanwhile, and a
    * desktop that failed to start isn't tried again for a while (each try can
-   * take seconds).
+   * take seconds), unless a person `asked` from that desktop.
    */
-  private async desktopFor(agent: AgentScope, session: Session): Promise<ChromeDisplay | null> {
+  private async desktopFor(agent: AgentScope, session: Session, asked = false): Promise<ChromeDisplay | null> {
     const desktops = this.opts.desktops;
     if (!desktops) return null;
-    if (session.desktopFailedAt !== undefined && this.now() - session.desktopFailedAt < DESKTOP_RETRY_MS) return null;
+    const failedAt = session.desktopFailedAt;
+    if (!asked && failedAt !== undefined && this.now() - failedAt < DESKTOP_RETRY_MS) return null;
     try {
       await desktops.ensure(agent, { chrome: true });
     } catch (err) {
@@ -1844,6 +1856,52 @@ export class BrowserManager {
       await this.stopChrome(session);
     }).catch(() => undefined);
     return { stopped: true };
+  }
+
+  /**
+   * Browser on the agent's desktop (`desktop-browser.ts`): its own Chrome there, in front, for the person who
+   * clicked it. Chrome for Testing is installed first when it isn't here yet (`installing` says so). A Chrome
+   * running headless moves there even while someone watches it or a person's turn is open: a person asked, from
+   * that desktop. The click carries no address and no flag, so the browser reaches nothing new.
+   */
+  async show(agent: AgentScope, folder: string, installing: () => void): Promise<void> {
+    const chrome = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
+    if (!this.recentFailure() && (!this.presentCommand() || !chrome)) installing();
+    const session = await this.session(agent, folder);
+    await this.enqueue(session, async () => {
+      const before = session.chrome;
+      const shown = await this.ensureOwnChrome(agent, session, true, [], true);
+      if (shown.display === undefined) {
+        throw new RunnerError("desktop_unavailable", "The browser couldn't open on this screen; try again in a minute");
+      }
+      session.lastUsed = this.now();
+      if (shown === before) await this.activate(shown);
+    });
+    this.changed();
+  }
+
+  /**
+   * Chrome's window in front, on its most recent tab, through Chrome's own debugging endpoint; a Chrome with no
+   * tab left gets a blank one, in a window of its own.
+   */
+  private async activate(chrome: OwnChrome) {
+    const at = `http://127.0.0.1:${chrome.port}/json`;
+    const call = (p: string, method = "GET") =>
+      (this.opts.fetch ?? fetch)(`${at}/${p}`, {
+        method,
+        redirect: "error",
+        signal: AbortSignal.timeout(QUICK_TIMEOUT_MS),
+      });
+    try {
+      const targets = (await (await call("list")).json()) as unknown;
+      const page = Array.isArray(targets)
+        ? targets.find((t): t is { id: string } => isRecord(t) && t.type === "page" && typeof t.id === "string")
+        : undefined;
+      // Chrome takes a new tab only by PUT.
+      await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call("new?about:blank", "PUT"));
+    } catch {
+      // It stays where it is: on the desktop, behind whatever is in front.
+    }
   }
 
   // ── For the desktop app ────────────────────────────────────────────────────

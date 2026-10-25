@@ -115,7 +115,13 @@ export type WorkerLinkFrame =
       error?: { code: MachineErrorCode; message: string };
     }
   /** From the worker: its agent's Chrome is in use on the agent's desktop (`BROWSER_LEASE_MS`). */
-  | { type: "browser.desktop" };
+  | { type: "browser.desktop" }
+  /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
+  | { type: "browser.show"; showId: string; agent: AgentScope }
+  /** From the worker: Chrome for Testing installs first. */
+  | { type: "browser.showing"; showId: string }
+  /** From the worker: the agent's Chrome is on its desktop, or why not. */
+  | { type: "browser.shown"; showId: string; error?: { code: MachineErrorCode; message: string } };
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
@@ -185,8 +191,16 @@ interface Worker {
   waiters: Set<{ resolve(): void; reject(err: RunnerError): void }>;
   /** Requests sent to it, by the id this side gave them. */
   inflight: Map<string, Inflight>;
+  /** Clicks on Browser on its agent's desktop it is answering, by the id this side gave them. */
+  shows: Map<string, Show>;
   /** When it last said its agent's Chrome is in use on the agent's desktop. */
   browserLeaseAt: number;
+}
+
+interface Show {
+  agent: AgentScope;
+  installing(): void;
+  settle(error?: RunnerError): void;
 }
 
 export class Supervisor {
@@ -338,6 +352,30 @@ export class Supervisor {
     return !!w?.proc && (this.opts.now ?? Date.now)() - w.browserLeaseAt < BROWSER_LEASE_MS;
   }
 
+  /**
+   * Browser clicked on the agent's desktop (`desktop-browser.ts`): its worker, started when it isn't running,
+   * brings the agent's Chrome there, and gets the desktop from root meanwhile (`desktop.ensure`).
+   */
+  async showBrowser(agent: AgentScope, installing: () => void): Promise<void> {
+    if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
+    const w = this.entry(this.opts.user(agent));
+    await this.ready(w, new AbortController().signal);
+    if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
+    const showId = String(++this.seq);
+    await new Promise<void>((resolve, reject) => {
+      w.shows.set(showId, {
+        agent,
+        installing,
+        settle: (error) => {
+          if (!w.shows.delete(showId)) return;
+          if (error) reject(error);
+          else resolve();
+        },
+      });
+      this.send(w, { type: "browser.show", showId, agent });
+    });
+  }
+
   /** The session is over: workers' stdin closes (they finish and exit), and the ones still there after `graceMs` are killed. */
   async close(graceMs = 5000) {
     this.closed = true;
@@ -351,6 +389,7 @@ export class Supervisor {
       for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("internal", stopping));
       w.ready = false;
       this.endSession(w, stopping);
+      this.endShows(w, stopping);
       if (!w.proc) continue;
       w.proc.stdin.end();
       exits.push(w.proc.exited);
@@ -377,6 +416,7 @@ export class Supervisor {
         timer: null,
         waiters: new Set(),
         inflight: new Map(),
+        shows: new Map(),
         browserLeaseAt: 0,
       };
       this.workers.set(user.id, w);
@@ -476,6 +516,7 @@ export class Supervisor {
     w.ready = false;
     w.browserLeaseAt = 0;
     this.endSession(w, "The agent's worker stopped on this computer; try again");
+    this.endShows(w, "The agent's worker stopped on this computer; try again");
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
@@ -487,6 +528,11 @@ export class Supervisor {
   private endSession(w: Worker, message: string) {
     for (const e of [...w.inflight.values()]) e.settle({ ok: false, error: new RunnerError("internal", message) });
     for (const [callId, caller] of this.calls) if (caller === w) this.calls.delete(callId);
+  }
+
+  /** The worker is gone: the clicks it was answering fail. Not with its session, which follows the server's. */
+  private endShows(w: Worker, message: string) {
+    for (const s of [...w.shows.values()]) s.settle(new RunnerError("internal", message));
   }
 
   private send(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
@@ -634,13 +680,29 @@ export class Supervisor {
   // ── Uploads ────────────────────────────────────────────────────────────────
 
   private linkFrame(w: Worker, line: string) {
-    if (!w.ready) return;
     let f: Record<string, unknown> | null;
     try {
       f = JSON.parse(line) as Record<string, unknown> | null;
     } catch {
       return;
     }
+    // A click's answer may come between two of the worker's sessions (they follow the server's): its id is this
+    // side's own, so no other click's answer can pass for it.
+    if (f?.type === "browser.showing" || f?.type === "browser.shown") {
+      const show = w.shows.get(typeof f.showId === "string" ? f.showId : "");
+      if (!show) return;
+      if (f.type === "browser.showing") return show.installing();
+      const error = f.error as { code?: unknown; message?: unknown } | undefined;
+      return show.settle(
+        error
+          ? new RunnerError(
+              typeof error.code === "string" ? (error.code as MachineErrorCode) : "internal",
+              typeof error.message === "string" ? error.message.slice(0, 500) : "The browser didn't open",
+            )
+          : undefined,
+      );
+    }
+    if (!w.ready) return;
     if (f?.type === "desktop.ensure") {
       const use = f.use === "browser" ? "browser" : "desktop";
       return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "", use);
@@ -686,13 +748,15 @@ export class Supervisor {
 
   /**
    * The worker's agent's desktop, only while it serves a request the server sent it that uses the desktop that
-   * way (desktop use, or a browser command the server put on the desktop): the agent's own code runs as the
-   * worker's user and could ask at any other time.
+   * way (desktop use, or a browser command the server put on the desktop), or, for its Chrome, a click on Browser
+   * on that desktop (`showBrowser`): the agent's own code runs as the worker's user and could ask at any other time.
    */
   private ensureDesktop(w: Worker, ensureId: string, use: WorkerDesktopUse) {
     const reply = (r: { desktop: WorkerDesktop } | { error: { code: MachineErrorCode; message: string } }) =>
       this.send(w, { type: "desktop.ensured", ensureId, ...r });
-    const agent = [...w.inflight.values()].find((e) => desktopUseOf(e.req) === use)?.req.agent;
+    const agent =
+      [...w.inflight.values()].find((e) => desktopUseOf(e.req) === use)?.req.agent ??
+      (use === "browser" ? [...w.shows.values()][0]?.agent : undefined);
     if (!agent || !this.opts.desktop) {
       const message =
         use === "desktop"

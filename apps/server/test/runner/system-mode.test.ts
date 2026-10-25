@@ -17,6 +17,7 @@ import { type HandlerContext, handleRequest, OP_ROUTES } from "../../runner/hand
 import {
   BROWSER_APT_PACKAGES,
   DESKTOP_APT_PACKAGES,
+  DESKTOP_DOCK_APT_PACKAGES,
   DESKTOP_LOOK_APT_PACKAGES,
   installScript,
   RUNNER_BUN_SHA256,
@@ -358,11 +359,11 @@ test.if(posix)(
     // Root on Linux, as far as the script can tell.
     writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
     writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });
-    // apt-get notes its calls (and has no Orchis with $NO_ORCHIS); apt-cache knows the packages in $KNOWN once
-    // apt-get update has fetched the lists.
+    // apt-get notes its calls (and has no Orchis with $NO_ORCHIS, no docklike with $NO_DOCKLIKE); apt-cache knows
+    // the packages in $KNOWN once apt-get update has fetched the lists.
     writeFileSync(
       path.join(fake, "apt-get"),
-      '#!/bin/sh\necho "apt-get $*" >> "$LOG"\ncase "$*" in *update*) : > "$LISTS" ;; *orchis*) [ -z "$NO_ORCHIS" ] || exit 100 ;; esac\n',
+      '#!/bin/sh\necho "apt-get $*" >> "$LOG"\ncase "$*" in *update*) : > "$LISTS" ;; *orchis*) [ -z "$NO_ORCHIS" ] || exit 100 ;; *docklike*) [ -z "$NO_DOCKLIKE" ] || exit 100 ;; esac\n',
       { mode: 0o755 },
     );
     writeFileSync(
@@ -371,7 +372,10 @@ test.if(posix)(
       { mode: 0o755 },
     );
     // The installer as run, up to the first folder it makes: from there on it writes to the computer's own folders.
-    const step = (desktop: boolean, opts: { known?: string[]; apt?: boolean; noOrchis?: boolean } = {}) => {
+    const step = (
+      desktop: boolean,
+      opts: { known?: string[]; apt?: boolean; noOrchis?: boolean; noDocklike?: boolean } = {},
+    ) => {
       const d = home();
       const r = spawnSync("/bin/sh", ["-s", "--", "--system", ...(desktop ? ["--desktop"] : [])], {
         input: installScript("https://agentes.test").replace(/main "\$@"\n$/, `mkdir() { exit 0; }\nmain "$@"\n`),
@@ -382,6 +386,7 @@ test.if(posix)(
           LISTS: path.join(d, "lists"),
           KNOWN: (opts.known ?? []).join(" "),
           NO_ORCHIS: opts.noOrchis ? "1" : "",
+          NO_DOCKLIKE: opts.noDocklike ? "1" : "",
         },
       });
       const log = path.join(d, "log");
@@ -413,12 +418,24 @@ test.if(posix)(
     // With --desktop: one install with the screens' packages too.
     r = step(true, { known: t64 });
     expect(r.out).toBe("Installing the packages for the agents' browser and screens ...\n");
-    // Then the screens' theme, where apt has it: a failure only says so.
-    expect(r.calls).toBe(update + install([...t64, ...DESKTOP_APT_PACKAGES]) + install(DESKTOP_LOOK_APT_PACKAGES));
+    // Then the screens' theme and dock, each in its own call where apt has it: a failure only says so.
+    const look = install(DESKTOP_LOOK_APT_PACKAGES);
+    const dock = install(DESKTOP_DOCK_APT_PACKAGES);
+    expect(DESKTOP_DOCK_APT_PACKAGES).toEqual(["xfce4-docklike-plugin"]);
+    expect(r.calls).toBe(update + install([...t64, ...DESKTOP_APT_PACKAGES]) + look + dock);
+    // Ubuntu 22.04: no Orchis; the dock is still asked for on its own.
     r = step(true, { known: t64, noOrchis: true });
     expect(r.status).toBe(0);
     expect(r.out).toContain(
       "The agents' screens keep the stock theme: apt has no orchis-gtk-theme librsvg2-common here",
+    );
+    expect(r.calls.endsWith(look + dock)).toBe(true);
+    // Debian 12, Ubuntu 24.04: Orchis, and the panel's own dock.
+    r = step(true, { known: t64, noDocklike: true });
+    expect(r.status).toBe(0);
+    expect(r.out).toBe(
+      "Installing the packages for the agents' browser and screens ...\n" +
+        "The agents' screens keep the panel's own dock: apt has no xfce4-docklike-plugin here\n",
     );
 
     // No apt: what to install, by name.

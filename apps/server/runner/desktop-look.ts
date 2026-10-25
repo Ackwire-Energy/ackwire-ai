@@ -1,49 +1,84 @@
-import { DESKTOP_SIZE } from "@agenteschat/adapters/machine-protocol";
+import { createHash } from "node:crypto";
+import path from "node:path";
+import { type AgentScope, DESKTOP_SIZE } from "@agenteschat/adapters/machine-protocol";
 import MARK_BASE64 from "./assets/desktop-mark.png.b64" with { type: "text" };
 import WALLPAPER_BASE64 from "./assets/desktop-wallpaper.png.b64" with { type: "text" };
+import { shQuote } from "./install-script";
 import { xmlEscape } from "./xml";
 
 /**
  * The agents' desktops' own look (ADR 0058 §15): the agentes.chat wallpaper and a dock floating at the bottom
- * center (the mark, which opens the apps menu, then Files and Terminal, then a button for each open window), one
- * workspace, no top panel and no desktop icons, Orchis's light theme where it is installed.
+ * center (the mark, which opens the apps menu, then Browser, Files and Terminal), one workspace, no top panel and
+ * no desktop icons, Orchis's light theme where it is installed.
  *
  * - It is XFCE's own settings, written into the desktop session's HOME only (the agent's own home in system
  *   mode, `<agent folder>/.agentes/home` otherwise), by the agent's own process (`LOOK_SCRIPT`): never the
  *   computer's settings, so a self-hosted computer's own desktop stays as it is.
- * - Versioned: the HOME's marker names the look written there. A desktop gets it at its first start, and
- *   again once when the version, the theme the computer has or the HOME's own path changes; what a person
- *   changes in between stays until then.
- * - The dock is the panel's own launcher and window-button plugins, which the agent's desktop use reads
- *   (ADR 0062): a dock plugin that runs in a process of its own isn't on the accessibility bus.
+ * - Versioned: the HOME's marker names the look written there. A desktop gets it at its first start, and again
+ *   once when anything it writes changes (its version, the theme or dock the computer has, the HOME's own path,
+ *   the agent's name, how Browser reaches the runner); what a person changes in between stays until then.
+ * - The dock is xfce4-docklike-plugin where it is installed, so an app's windows show on its own launcher; else
+ *   the panel's own launchers, then a button for each window. Desktop use (ADR 0062) reads the panel's own
+ *   plugins only: docklike runs in a process of its own, outside what the agent reads of the screen.
+ * - Browser, Files and Terminal are desktop entries of the look's own (`agentes-*.desktop`), on the dock and at
+ *   the top of the apps menu, in place of XFCE's generic Terminal Emulator and File Manager.
+ * - The terminal's prompt and title show the agent's name, where bash's own show its system user and the
+ *   computer's hostname.
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 2;
+export const LOOK_VERSION = 3;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
 
+/** xfce4-docklike-plugin, else the panel's own launchers and window buttons. */
+export type LookDock = "docklike" | "panel";
+
+const TRIPLETS = ["x86_64-linux-gnu", "aarch64-linux-gnu"];
 const ORCHIS = "/usr/share/themes/Orchis-Light/xfwm4/themerc";
 /** Orchis's window buttons are SVG files: without gdk-pixbuf's SVG loader, windows would have no close button. */
-const SVG_LOADERS = ["x86_64-linux-gnu", "aarch64-linux-gnu"].flatMap((triplet) =>
+const SVG_LOADERS = TRIPLETS.flatMap((triplet) =>
   ["libpixbufloader_svg.so", "libpixbufloader-svg.so"].map(
     (file) => `/usr/lib/${triplet}/gdk-pixbuf-2.0/2.10.0/loaders/${file}`,
   ),
 );
+const DOCKLIKE = "/usr/share/xfce4/panel/plugins/docklike.desktop";
+const DOCKLIKE_MODULES = TRIPLETS.map((triplet) => `/usr/lib/${triplet}/xfce4/panel/plugins/libdocklike.so`);
 
 export const lookTheme = (exists: (path: string) => boolean): LookTheme =>
   exists(ORCHIS) && SVG_LOADERS.some(exists) ? "orchis" : "stock";
 
-/**
- * What the marker says: the look's version, its theme and the HOME it was written for. Its settings name files
- * by their full path, and a HOME can move (single-user mode renames an agent's folder with its handle).
- */
-export const lookId = (theme: LookTheme, home: string) => `${LOOK_VERSION}:${theme}:${home}`;
+export const lookDock = (exists: (path: string) => boolean): LookDock =>
+  exists(DOCKLIKE) && DOCKLIKE_MODULES.some(exists) ? "docklike" : "panel";
+
+/** What a desktop's look depends on besides its HOME. */
+export interface LookOptions {
+  theme: LookTheme;
+  dock: LookDock;
+  /** The terminal's prompt and title show its name. */
+  agent: Pick<AgentScope, "name" | "handle">;
+  /** The session's shell (`SHELL`): the prompt is bash's, so any other shell keeps its own. */
+  shell: string;
+  /** What Browser runs: this runner's `desktop-browser` with the desktop's socket (`desktop-browser.ts`). */
+  browser: string[];
+}
+
+/** The agent's name as its desktop shows it: the name viewers see, the terminal's prompt. */
+export const desktopName = (agent: Pick<AgentScope, "name" | "handle">) =>
+  (agent.name || agent.handle)
+    .replace(/\p{Cc}/gu, " ")
+    .trim()
+    .slice(0, 60) || "agent";
 
 /** The look's own files and its marker, under HOME. */
 export const LOOK_DIR = ".local/share/agentes";
 export const LOOK_MARKER = `${LOOK_DIR}/look`;
+
+/** The agent's Chrome on its desktop has this window class (`browser.ts`), so the dock shows it on Browser. */
+export const BROWSER_WM_CLASS = "agentes-browser";
+/** The icon theme's web browser (a globe), with the theme's Files and Terminal icons. */
+export const BROWSER_ICON = "org.xfce.webbrowser";
 
 /**
  * 1280×900, the exact desktop size: shown 1:1, its logo centered on the dock's line below maximized windows. The
@@ -57,13 +92,121 @@ const MARK = Buffer.from(MARK_BASE64, "base64");
 /** The ink of the sky's agents (the wallpaper's logo): the dock's lines and its window bars. */
 const INK = "4, 32, 63";
 
+/** Browser, Files and Terminal, in the dock's and the menu's order. */
+interface DockApp {
+  /** Its desktop id, without `.desktop`. */
+  id: string;
+  name: string;
+  /** Its name for a desktop in pt-BR. */
+  ptBR: string;
+  exec: string;
+  icon: string;
+  /** Its windows' WM_CLASS: the dock shows them on its launcher. */
+  wmClass: string;
+  /** Browser's window is Chrome's, never its command's own: a startup notice would spin until it timed out. */
+  notify: boolean;
+}
+
+/**
+ * One argument of a desktop entry's Exec, as the Desktop Entry spec quotes it: as it is when it has no reserved
+ * character, else in double quotes with `"`, `` ` ``, `$` and `\` escaped; then the string's own escape of `\`,
+ * and `%` doubled, since it starts a field code.
+ */
+export const execArg = (arg: string) =>
+  (/^[\w@+=:,./-]+$/.test(arg) ? arg : `"${arg.replace(/["`$\\]/g, "\\$&")}"`)
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "%%");
+
+const dockApps = (browser: string[]): DockApp[] => [
+  {
+    id: "agentes-browser",
+    name: "Browser",
+    ptBR: "Navegador",
+    exec: browser.map(execArg).join(" "),
+    icon: BROWSER_ICON,
+    wmClass: BROWSER_WM_CLASS,
+    notify: false,
+  },
+  {
+    id: "agentes-files",
+    name: "Files",
+    ptBR: "Arquivos",
+    exec: "thunar",
+    icon: "org.xfce.thunar",
+    wmClass: "Thunar",
+    notify: true,
+  },
+  {
+    id: "agentes-terminal",
+    name: "Terminal",
+    ptBR: "Terminal",
+    exec: "xfce4-terminal",
+    icon: "org.xfce.terminalemulator",
+    wmClass: "Xfce4-terminal",
+    notify: true,
+  },
+];
+
+/** Top level only (X-Xfce-Toplevel): none of the menu's categories lists them a second time. */
+const desktopEntry = (app: DockApp) =>
+  [
+    "[Desktop Entry]",
+    "Type=Application",
+    `Name=${app.name}`,
+    `Name[pt_BR]=${app.ptBR}`,
+    `Exec=${app.exec}`,
+    `Icon=${app.icon}`,
+    `StartupWMClass=${app.wmClass}`,
+    `StartupNotify=${app.notify}`,
+    "Categories=X-Xfce-Toplevel;",
+    "",
+  ].join("\n");
+
+/**
+ * Plugin ids: they name their widgets (`#separator-2` in gtk.css), the panel's launchers' folders (`launcher-3`)
+ * and docklike's settings (`docklike-7.rc`). Files and Terminal keep the ids they had before Browser came, so a
+ * desktop that had the earlier look reuses their folders.
+ */
+const LAUNCHERS = [
+  { plugin: 6, file: "browser.desktop" },
+  { plugin: 3, file: "files.desktop" },
+  { plugin: 4, file: "terminal.desktop" },
+];
+const TASKLIST = 5;
+const DOCKLIKE_PLUGIN = 7;
+
+const launcherPlugin = ({ plugin, file }: (typeof LAUNCHERS)[number]) =>
+  `    <property name="plugin-${plugin}" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="${file}"/>
+      </property>
+    </property>
+`;
+
+/** The panel's own: a launcher each, then a button for each window, flat, no labels. */
+const PANEL_PLUGINS = `${LAUNCHERS.map(launcherPlugin).join("")}    <property name="plugin-${TASKLIST}" type="string" value="tasklist">
+      <property name="show-labels" type="bool" value="false"/>
+      <property name="grouping" type="bool" value="false"/>
+      <property name="include-all-workspaces" type="bool" value="false"/>
+      <property name="show-handle" type="bool" value="false"/>
+      <property name="flat-buttons" type="bool" value="true"/>
+      <property name="window-scrolling" type="bool" value="false"/>
+      <property name="sort-order" type="uint" value="0"/>
+    </property>
+`;
+
 /**
  * The dock: floating (p=0) with its center 31 px above the bottom, so it stays centered as windows come and go.
- * It reserves no room of its own: xfwm4's margin_bottom keeps maximized windows 60 px above the bottom. Plugin
- * ids name their widgets (`#separator-2` in gtk.css) and the launchers' folders (`launcher-3`). No gap before
- * the windows: a separator there would also stand in the empty dock, off its center.
+ * It reserves no room of its own: xfwm4's margin_bottom keeps maximized windows 60 px above the bottom. No gap
+ * before the windows: a separator there would also stand in the empty dock, off its center.
  */
-const panel = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
+const panel = (home: string, dock: LookDock) => {
+  const ids = dock === "docklike" ? [1, 2, DOCKLIKE_PLUGIN] : [1, 2, ...LAUNCHERS.map((l) => l.plugin), TASKLIST];
+  const own =
+    dock === "docklike"
+      ? `    <property name="plugin-${DOCKLIKE_PLUGIN}" type="string" value="docklike"/>\n`
+      : PANEL_PLUGINS;
+  return `<?xml version="1.0" encoding="UTF-8"?>
 
 <channel name="xfce4-panel" version="1.0">
   <property name="configver" type="int" value="2"/>
@@ -78,11 +221,7 @@ const panel = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
       <property name="size" type="uint" value="48"/>
       <property name="icon-size" type="uint" value="32"/>
       <property name="plugin-ids" type="array">
-        <value type="int" value="1"/>
-        <value type="int" value="2"/>
-        <value type="int" value="3"/>
-        <value type="int" value="4"/>
-        <value type="int" value="5"/>
+${ids.map((id) => `        <value type="int" value="${id}"/>`).join("\n")}
       </property>
     </property>
   </property>
@@ -94,27 +233,30 @@ const panel = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
     <property name="plugin-2" type="string" value="separator">
       <property name="style" type="uint" value="1"/>
     </property>
-    <property name="plugin-3" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="files.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-4" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="terminal.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-5" type="string" value="tasklist">
-      <property name="show-labels" type="bool" value="false"/>
-      <property name="grouping" type="bool" value="false"/>
-      <property name="include-all-workspaces" type="bool" value="false"/>
-      <property name="show-handle" type="bool" value="false"/>
-      <property name="flat-buttons" type="bool" value="true"/>
-      <property name="window-scrolling" type="bool" value="false"/>
-      <property name="sort-order" type="uint" value="0"/>
-    </property>
-  </property>
+${own}  </property>
 </channel>
+`;
+};
+
+/**
+ * docklike's own settings: Browser, Files and Terminal pinned; a click on one with windows brings them up (or
+ * down), a middle click opens another (1; 0 would close them all); icons at the mark's 32 px; under an app with
+ * windows a short bar (style 2) at the bottom (orientation 1: the automatic one finds no edge on a floating panel
+ * and draws none), in the sky's ink, solid under the active window's app.
+ */
+const dockSettings = (apps: DockApp[]) => `[user]
+pinned=${apps.map((app) => `${app.id};`).join("")}
+forceIconSize=true
+iconSize=32
+noWindowsListIfSingle=true
+showPreviews=false
+middleButtonBehavior=1
+indicatorOrientation=1
+indicatorStyle=2
+inactiveIndicatorStyle=2
+indicatorColorFromTheme=false
+indicatorColor=rgb(${INK})
+inactiveColor=rgba(${INK}, 0.65)
 `;
 
 /** One workspace, the wallpaper zoomed (an image of the screen's size: 1:1) over the bottom band's tone, no icons. */
@@ -195,8 +337,14 @@ const settings = (theme: LookTheme) => `<?xml version="1.0" encoding="UTF-8"?>
 </channel>
 `;
 
-/** The design system's dark tokens, also for the 16 colors programs print in (the shell's prompt among them). */
-const TERMINAL = `<?xml version="1.0" encoding="UTF-8"?>
+/** The prompt's own startup file, under HOME. */
+const BASHRC = `${LOOK_DIR}/bashrc`;
+
+/**
+ * The design system's dark tokens, also for the 16 colors programs print in (the shell's prompt among them). With
+ * bash, each new terminal runs it on the look's own startup file (`BASHRC`).
+ */
+const terminal = (home: string, bash: string | null) => `<?xml version="1.0" encoding="UTF-8"?>
 
 <channel name="xfce4-terminal" version="1.0">
   <property name="color-use-theme" type="bool" value="false"/>
@@ -206,8 +354,30 @@ const TERMINAL = `<?xml version="1.0" encoding="UTF-8"?>
   <property name="color-cursor" type="string" value="#5aa8ff"/>
   <property name="color-bold-use-default" type="bool" value="true"/>
   <property name="color-palette" type="string" value="#242423;#f08a80;#5fc48a;#e0a84a;#5aa8ff;#c9a2f5;#6cc7d6;#d6d6d2;#71716c;#f5a69e;#7fd3a2;#ebbd6a;#8cc3ff;#d9bdfa;#92d8e3;#efefec"/>
-</channel>
+${
+  bash
+    ? `  <property name="run-custom-command" type="bool" value="true"/>
+  <property name="custom-command" type="string" value="${xmlEscape(`${shQuote(bash)} --rcfile ${shQuote(`${home}/${BASHRC}`)}`)}"/>
+`
+    : ""
+}</channel>
 `;
+
+/**
+ * The shell's own startup files first (bash reads neither with `--rcfile`), then the agent's name, green, in the
+ * prompt and in the window's title. The prompt names it through a variable it expands, never in its own text,
+ * so no character of the name runs anything or takes a prompt escape.
+ */
+const bashrc = (name: string) =>
+  [
+    "# The desktop's Terminal: the shell's own setup, then the agent's name in the prompt and the window's title.",
+    "[ -r /etc/bash.bashrc ] && . /etc/bash.bashrc",
+    "[ -r ~/.bashrc ] && . ~/.bashrc",
+    `AGENTES_NAME=${shQuote(name)}`,
+    "shopt -s promptvars",
+    String.raw`PS1='\[\e]0;$AGENTES_NAME: \w\a\]\[\e[1;32m\]$AGENTES_NAME\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '`,
+    "",
+  ].join("\n");
 
 const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairline that still shows on the sky's pale band. */
 .xfce4-panel.background {
@@ -216,6 +386,13 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
   border: 1px solid rgba(${INK}, 0.18);
   border-radius: 16px;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.9);
+}
+
+/* docklike draws in a window of its own process, inside the dock: the dock's glass there, not a second frame. */
+#XfcePanelWindowWrapper.xfce4-panel.background {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .xfce4-panel.background button {
@@ -233,7 +410,8 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
 }
 
 .xfce4-panel.background button:active,
-.xfce4-panel.background button:checked {
+.xfce4-panel.background button:checked,
+.xfce4-panel.background button.active_group {
   background-color: rgba(${INK}, 0.11);
 }
 
@@ -261,54 +439,101 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
 `;
 
 /**
- * The apps menu: XFCE's own, laid out without its first and last groups (Run Program, About, Log Out), which are
- * missing or hidden here and left a separator alone at each end.
+ * The apps menu: XFCE's own in a layout of ours. Browser, Files and Terminal first; then the menus of whatever
+ * else is installed, then Settings, so no separator is left alone at the end when there are none. Thunar, its bulk
+ * renamer and XFCE's own terminal leave Accessories and System, which listed them again: those menus show only
+ * with something else in them. Run Program, About and Log Out are missing or hidden here.
  */
-const MENU = `<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+const menu = (
+  apps: DockApp[],
+) => `<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
 
 <Menu>
   <Name>Xfce</Name>
   <MergeFile type="parent"/>
   <Layout>
-    <Filename>xfce4-terminal-emulator.desktop</Filename>
-    <Filename>xfce4-file-manager.desktop</Filename>
-    <Separator/>
-    <Menuname>Settings</Menuname>
+${apps.map((app) => `    <Filename>${app.id}.desktop</Filename>`).join("\n")}
     <Separator/>
     <Merge type="all"/>
+    <Menuname>Settings</Menuname>
   </Layout>
+  <Menu>
+    <Name>Accessories</Name>
+    <Exclude>
+      <Filename>thunar.desktop</Filename>
+      <Filename>thunar-bulk-rename.desktop</Filename>
+    </Exclude>
+  </Menu>
+  <Menu>
+    <Name>System</Name>
+    <Exclude>
+      <Filename>thunar.desktop</Filename>
+      <Filename>xfce4-terminal.desktop</Filename>
+    </Exclude>
+  </Menu>
 </Menu>
 `;
 
-const launcher = (name: string, exec: string, icon: string) =>
-  `[Desktop Entry]\nType=Application\nName=${name}\nExec=${exec}\nIcon=${icon}\nStartupNotify=true\n`;
-/** Out of the apps menu: a browser and a mail reader that aren't installed, and Log Out, which ends the desktop. */
+/**
+ * Out of the apps menu: XFCE's web browser and mail reader, which open nothing here, Log Out (it ends the
+ * desktop), and its generic Terminal Emulator and File Manager, which Terminal and Files replace.
+ */
+const HIDDEN: Record<string, string> = {
+  "xfce4-web-browser": "Web Browser",
+  "xfce4-mail-reader": "Mail Reader",
+  "xfce4-session-logout": "Log Out",
+  "xfce4-terminal-emulator": "Terminal Emulator",
+  "xfce4-file-manager": "File Manager",
+};
 const hidden = (name: string) => `[Desktop Entry]\nType=Application\nName=${name}\nHidden=true\n`;
 
+interface LookFile {
+  /** Under HOME. */
+  path: string;
+  data: Buffer;
+}
+
 /** Every file of the look, by its path under HOME. */
-export function lookFiles(home: string, theme: LookTheme): { path: string; data: Buffer }[] {
+export function lookFiles(home: string, o: LookOptions): LookFile[] {
   const xfconf = ".config/xfce4/xfconf/xfce-perchannel-xml";
+  const apps = dockApps(o.browser);
+  const bash = path.basename(o.shell) === "bash" ? o.shell : null;
+  const dock: [string, string][] =
+    o.dock === "docklike"
+      ? [[`.config/xfce4/panel/docklike-${DOCKLIKE_PLUGIN}.rc`, dockSettings(apps)]]
+      : LAUNCHERS.map((l, i) => [
+          `.config/xfce4/panel/launcher-${l.plugin}/${l.file}`,
+          desktopEntry(apps[i] as DockApp),
+        ]);
   const files: [string, string | Buffer][] = [
-    [`${xfconf}/xfce4-panel.xml`, panel(home)],
+    [`${xfconf}/xfce4-panel.xml`, panel(home, o.dock)],
     [`${xfconf}/xfce4-desktop.xml`, backdrop(home)],
-    [`${xfconf}/xfwm4.xml`, windowManager(theme)],
-    [`${xfconf}/xsettings.xml`, settings(theme)],
-    [`${xfconf}/xfce4-terminal.xml`, TERMINAL],
-    [".config/xfce4/panel/launcher-3/files.desktop", launcher("Files", "thunar", "org.xfce.thunar")],
-    [
-      ".config/xfce4/panel/launcher-4/terminal.desktop",
-      launcher("Terminal", "xfce4-terminal", "org.xfce.terminalemulator"),
-    ],
+    [`${xfconf}/xfwm4.xml`, windowManager(o.theme)],
+    [`${xfconf}/xsettings.xml`, settings(o.theme)],
+    [`${xfconf}/xfce4-terminal.xml`, terminal(home, bash)],
+    ...dock,
     [".config/gtk-3.0/gtk.css", GTK_CSS],
-    [".config/menus/xfce-applications.menu", MENU],
-    [".local/share/applications/xfce4-web-browser.desktop", hidden("Web Browser")],
-    [".local/share/applications/xfce4-mail-reader.desktop", hidden("Mail Reader")],
-    [".local/share/applications/xfce4-session-logout.desktop", hidden("Log Out")],
+    [".config/menus/xfce-applications.menu", menu(apps)],
+    ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),
+    ...Object.entries(HIDDEN).map(([id, name]): [string, string] => [
+      `.local/share/applications/${id}.desktop`,
+      hidden(name),
+    ]),
+    ...(bash ? [[BASHRC, bashrc(desktopName(o.agent))] as [string, string]] : []),
     [`${LOOK_DIR}/wallpaper.png`, WALLPAPER],
     [`${LOOK_DIR}/mark.png`, MARK],
   ];
-  return files.map(([path, data]) => ({ path, data: Buffer.isBuffer(data) ? data : Buffer.from(data) }));
+  return files.map(([file, data]) => ({ path: file, data: Buffer.isBuffer(data) ? data : Buffer.from(data) }));
 }
+
+/** What the marker says: the look's version, theme and dock, and a hash of every file it writes, paths and all. */
+const idOf = (o: LookOptions, files: LookFile[]) => {
+  const hash = createHash("sha256");
+  for (const f of files) hash.update(f.path).update("\0").update(f.data).update("\0");
+  return `${LOOK_VERSION}:${o.theme}:${o.dock}:${hash.digest("hex").slice(0, 16)}`;
+};
+
+export const lookId = (home: string, o: LookOptions) => idOf(o, lookFiles(home, o));
 
 /**
  * Run as the agent (`lookCommand`), the files on its stdin, a `<path under HOME> <base64>` line each: unless the
@@ -328,10 +553,10 @@ export const LOOK_SCRIPT = [
  * `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> <file count>`, the files as its input. Not as
  * arguments: in system mode systemd-run names the agent's scope after its command line, and the journal logs it.
  */
-export function lookCommand(home: string, theme: LookTheme): { argv: string[]; input: string } {
-  const files = lookFiles(home, theme);
+export function lookCommand(home: string, o: LookOptions): { argv: string[]; input: string } {
+  const files = lookFiles(home, o);
   return {
-    argv: ["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, lookId(theme, home), LOOK_MARKER, String(files.length)],
+    argv: ["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, idOf(o, files), LOOK_MARKER, String(files.length)],
     input: files.map((f) => `${f.path} ${f.data.toString("base64")}\n`).join(""),
   };
 }

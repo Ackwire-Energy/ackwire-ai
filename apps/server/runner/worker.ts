@@ -3,8 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import {
+  type AgentScope,
   MACHINE_PROTOCOL_VERSION,
   MAX_FRAME_BYTES,
+  type MachineErrorCode,
   parseAccess,
   parsePause,
 } from "@agenteschat/adapters/machine-protocol";
@@ -15,7 +17,7 @@ import { BrowserManager, type BrowserManagerOptions } from "./browser";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
-import { RUNNER_VERSION, RunnerError } from "./errors";
+import { RUNNER_VERSION, RunnerError, toMachineError } from "./errors";
 import { type HandlerContext, handleRequest } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { readLines } from "./lines";
@@ -89,6 +91,8 @@ export class WorkerLink {
   private readonly desktops = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "desktop.ensured" }>) => void>();
   private nextEnsure = 0;
   onState: (state: WorkerState) => void = () => {};
+  /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
+  onShow: (showId: string, agent: AgentScope) => void = () => {};
   /** The supervisor is gone (stdin closed). */
   onEnd: () => void = () => {};
 
@@ -160,9 +164,28 @@ export class WorkerLink {
       case "desktop.ensured":
         if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
         return;
+      case "browser.show": {
+        const agent = f.agent as Partial<AgentScope> | undefined;
+        if (typeof f.showId === "string" && typeof agent?.id === "string" && typeof agent.handle === "string") {
+          this.onShow(f.showId, agent as AgentScope);
+        }
+        return;
+      }
       default:
         this.session?.onMessage(line);
     }
+  }
+
+  /** Chrome for Testing installs first, for that click. */
+  showing(showId: string) {
+    this.write(JSON.stringify({ type: "browser.showing", showId } satisfies WorkerLinkFrame));
+  }
+
+  /** The agent's Chrome is on its desktop, or why it isn't. */
+  shown(showId: string, error?: { code: MachineErrorCode; message: string }) {
+    this.write(
+      JSON.stringify({ type: "browser.shown", showId, ...(error ? { error } : {}) } satisfies WorkerLinkFrame),
+    );
   }
 
   /**
@@ -302,6 +325,16 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
   leases.unref?.();
   void browser.closeAll();
+  link.onShow = (showId, agent) => {
+    const shown =
+      agent.id === o.agentId
+        ? agentWorkspace(workspaceReal, agent).then((folder) => browser.show(agent, folder, () => link.showing(showId)))
+        : Promise.reject(new RunnerError("not_allowed", "This worker serves another agent"));
+    shown.then(
+      () => link.shown(showId),
+      (err: unknown) => link.shown(showId, toMachineError(err)),
+    );
+  };
   const own = process.getuid?.() ?? null;
   const desktopUse = new DesktopManager({
     desktops: {
