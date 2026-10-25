@@ -210,7 +210,8 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       : null;
   const target = work.target;
   const machine = target?.kind === "machine" ? target : null;
-  const choice = machine ? null : noComputer.choice(true);
+  // Read once the server says where it works: "no computer" never shows while that loads.
+  const choice = target && !machine ? noComputer.choice(true) : null;
   // No computer yet where the workspace's own is on its way: it works there once it's ready.
   const waiting = choice === "workspace" ? noComputer.setup : null;
   const member = viewer === "member";
@@ -245,7 +246,9 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
                   ? machine.name
                   : choice === "cloud"
                     ? t("agentPage.work.cloud")
-                    : noComputer.label(choice ?? "cloud")
+                    : choice
+                      ? noComputer.label(choice)
+                      : null
               }
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
               openLabel={t("agentPage.work.open.computer")}
