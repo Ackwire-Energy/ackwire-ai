@@ -78,6 +78,7 @@ test("the snapshots recorded on a real desktop have the shape of the types", () 
   expect(names.sort()).toEqual([
     "chromium-skipped.json",
     "dialog.json",
+    "dock.json",
     "gtk4.json",
     "menu.json",
     "qt.json",
@@ -87,7 +88,11 @@ test("the snapshots recorded on a real desktop have the shape of the types", () 
   const isBox = (b: unknown) => Array.isArray(b) && b.length === 4 && b.every(Number.isInteger);
   for (const name of names) {
     const snap = JSON.parse(readFileSync(path.join(FIXTURES, name), "utf8")) as HelperSnapshot;
-    expect(snap.screen).toEqual([1280, 800]);
+    // The desktops' size, or the 1280×800 the first snapshots were recorded at.
+    expect([
+      [1280, 800],
+      [1280, 900],
+    ]).toContainEqual(snap.screen);
     expect(snap.windows.filter((w) => w.active)).toHaveLength(1);
     for (const w of snap.windows) {
       expect([typeof w.xid, typeof w.title, isBox(w.box), w.class.length, Array.isArray(w.types)]).toEqual([
