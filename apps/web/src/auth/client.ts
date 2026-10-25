@@ -19,4 +19,6 @@ export interface AuthClient {
   desktopHandoff(challenge: string): Promise<AuthResult>;
   /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
   desktopRedeem(verifier: string): Promise<boolean>;
+  /** The installation's owner, from the installer's link (`/owner#claim=`): made once, then signed in. */
+  ownerClaim(input: { token: string; name: string; email: string; password: string }): Promise<AuthResult>;
 }

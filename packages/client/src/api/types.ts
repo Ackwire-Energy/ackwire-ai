@@ -13,6 +13,8 @@ export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
   firstRun: boolean;
+  /** No account yet, and the first one only through the owner link the installer printed (absent: false). */
+  ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
   /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
@@ -65,6 +67,8 @@ export interface User {
   name: string;
   email: string;
   image: string | null;
+  /** Signs in with a password (false: only Google or Apple, or the desktop app that runs the server). */
+  hasPassword?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */

@@ -208,6 +208,8 @@ export interface ApiClient {
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
+    /** A password for an account that has none (`password_set` 409 when it has one). */
+    addPassword(password: string): Promise<void>;
   };
   orgs: {
     create(input: {

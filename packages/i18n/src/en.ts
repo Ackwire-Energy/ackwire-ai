@@ -107,6 +107,12 @@ export const en: Translations = {
       sent: "Done. I sent the link to {{email}}.",
       sentLead: "It's valid for 1 hour. Not there in a minute? Check spam.",
       openMail: "Open {{app}}",
+      ownerWaits: "This server waits for its owner.",
+      ownerWaitsLead:
+        "Open the link its installer showed at the end, on this computer or on your phone. To see it again, run the install command on the server once more.",
+      noPassword: "This account signs in from the agentes.chat app.",
+      noPasswordLead:
+        "Open the app on the computer that runs this server. There, in your account menu, choose Add a password: then you can sign in here too.",
       backToSignIn: "Back to sign in",
     },
     desktop: {
@@ -129,6 +135,18 @@ export const en: Translations = {
       expired: "This link expired.",
       expiredLead: "Links are valid for 1 hour. Ask for another one on the sign-in screen.",
       askAgain: "Ask for another link",
+    },
+    owner: {
+      title: "Set up this server",
+      lead: "Create its owner account. You'll invite your team after.",
+      create: "Create the owner account",
+      noLink: "Open the link from the installer",
+      noLinkLead:
+        "This page needs the link the installer showed at the end. To see it again, run the install command on the server once more.",
+      wrongLink: "This link isn't this server's.",
+      wrongLinkLead: "Open the newest link the installer showed.",
+      taken: "This server already has its owner.",
+      takenLead: "Sign in with your account.",
     },
   },
   invite: {
@@ -615,6 +633,11 @@ export const en: Translations = {
     profileHint: "Name, photo and @",
     openOnPhone: "Open on your phone",
     openOnPhoneHint: "Sign in to the app with a QR code",
+    addPassword: "Add a password",
+    addPasswordHint: "To sign in from other browsers and devices",
+    addPasswordText: "With it you also sign in with your email, from any browser.",
+    addPasswordLabel: "New password",
+    addPasswordSaved: "Password added.",
     thisMonth: "This month",
     budgetOf: "{{name}} budget",
     yourWorkspaces: "Your workspaces",

@@ -6,6 +6,7 @@ export function createFakeAuth(
     signUp?: AuthResult;
     reset?: AuthResult;
     redeem?: boolean;
+    claim?: AuthResult;
     onSignIn?: () => void;
   } = {},
 ) {
@@ -43,6 +44,10 @@ export function createFakeAuth(
     desktopRedeem: async (verifier) => {
       calls.push({ method: "desktopRedeem", args: [verifier] });
       return options.redeem ?? false;
+    },
+    ownerClaim: async (input) => {
+      calls.push({ method: "ownerClaim", args: [input] });
+      return options.claim ?? { ok: true };
     },
   };
   return { auth, calls };
