@@ -250,6 +250,7 @@ export function authUiConfig(config: Config) {
     landing: config.LANDING_PAGE,
     termsUrl: config.TERMS_URL ?? null,
     privacyUrl: config.PRIVACY_URL ?? null,
+    supportEmail: config.SUPPORT_EMAIL ?? null,
   };
 }
 

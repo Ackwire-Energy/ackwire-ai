@@ -62,6 +62,7 @@ import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
+import { useSetupView } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
@@ -90,6 +91,7 @@ export function SettingsPage({
   const { org } = useOrg();
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
   const current = visible.some((s) => s.id === section) ? section : "general";
+  const workspaceComputer = useSetupView(org.id);
 
   return (
     <div className="settings">
@@ -136,7 +138,9 @@ export function SettingsPage({
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
             <p className="muted" style={{ margin: 0 }}>
-              {t(`settings.sectionText.${current}`)}
+              {current === "computers" && workspaceComputer
+                ? t("computerSetup.sectionText")
+                : t(`settings.sectionText.${current}`)}
             </p>
           </header>
         )}

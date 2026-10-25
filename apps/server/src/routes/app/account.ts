@@ -25,6 +25,7 @@ import {
   setMyLocale,
   setOrgLogo,
   signInOptions,
+  toldReason,
   USER_LOCALES,
   updateOrganization,
   updateOrgSettings,
@@ -97,6 +98,9 @@ export function accountRoutes(deps: AppDeps) {
               .string()
               .nullable()
               .openapi({ description: "Privacy policy linked on the sign-in screen (PRIVACY_URL)." }),
+            supportEmail: z.string().nullable().openapi({
+              description: "Where people write to whoever runs this server (SUPPORT_EMAIL): hold, suspension.",
+            }),
           }),
         ),
       },
@@ -208,6 +212,7 @@ export function accountRoutes(deps: AppDeps) {
             name: m.orgName,
             role: m.role,
             logo: m.orgLogo ?? null,
+            ...(m.standing ? { standing: { state: m.standing.state, reason: toldReason(m.standing) } } : {}),
           })),
         },
         200,

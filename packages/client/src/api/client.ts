@@ -44,6 +44,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -431,6 +432,8 @@ export interface ApiClient {
     host(orgId: string): Promise<HostComputer | null>;
     /** Uses the server's computer again (admins); `remove` is how it stops. */
     hostOn(orgId: string): Promise<HostComputer>;
+    /** ADR 0056 §10: whether the workspace gets its own computer, and how far it is (every member). */
+    computerSetup(orgId: string): Promise<ComputerSetup>;
     /**
      * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
      * (`machine.device_not_found` once expired, used or unknown).

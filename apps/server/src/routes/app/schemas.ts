@@ -1,4 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
+import { STANDING_STATES } from "@agenteschat/engine";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -23,6 +24,13 @@ export const Organization = z
       .nullable()
       .optional()
       .openapi({ description: "The workspace logo (`/api/app/org-logos/…`); null = the agent mark." }),
+    standing: z
+      .object({
+        state: z.enum(STANDING_STATES),
+        reason: z.string().nullable().openapi({ description: "Only when the workspace is told why; else null." }),
+      })
+      .optional()
+      .openapi({ description: "In `GET /me` (ADR 0056 §8). Changes come as `org.standing` org events." }),
   })
   .openapi("Organization");
 

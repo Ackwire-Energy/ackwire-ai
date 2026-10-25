@@ -14,6 +14,7 @@ import { formatBytes } from "@agenteschat/client/lib/files";
 import { daysBetween, formatShortDate, formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  canReduceAccess,
   computerKind,
   computerState,
   DESKTOP_TARGET,
@@ -59,6 +60,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
+import { SetupFacts, useSetupView } from "./WorkspaceComputer";
 
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
@@ -294,10 +296,15 @@ function MachineMenu({
       <MenuItem icon="edit" onSelect={onRename}>
         {t("machines.rename")}
       </MenuItem>
-      <MenuSeparator />
-      <MenuItem icon={m.kind === "host" ? "block" : "trash"} danger onSelect={onRemove}>
-        {m.kind === "host" ? t("machines.host.stop") : t("machines.remove")}
-      </MenuItem>
+      {/* The workspace's own computer stays: people rename it, never remove it. */}
+      {m.kind !== "managed" && (
+        <>
+          <MenuSeparator />
+          <MenuItem icon={m.kind === "host" ? "block" : "trash"} danger onSelect={onRemove}>
+            {m.kind === "host" ? t("machines.host.stop") : t("machines.remove")}
+          </MenuItem>
+        </>
+      )}
     </Menu>
   );
 }
@@ -514,7 +521,8 @@ export function MachinesSection() {
   const canPair = can(org.role, "post");
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
-  const list = machines.data ?? [];
+  // The workspace's own computer has a card of its own (`WorkspaceComputerCard`): this list is people's.
+  const list = (machines.data ?? []).filter((m) => m.kind !== "managed");
   const hostOff = host.data?.on === false;
   return (
     <>
@@ -716,7 +724,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
                 ) : (
                   <span className="small muted">{t("machines.access.nobody")}</span>
                 )}
-                {m.canManage && (
+                {canReduceAccess(m) && (
                   <Menu
                     align="end"
                     label={label}
@@ -746,7 +754,7 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   );
 }
 
-/** Ferramentas: on/off chips; the owner can turn one off (never on). */
+/** Ferramentas: on/off chips; the owner can turn one off (never on), except on the workspace's own computer. */
 function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: Reduce) => void }) {
   const { t } = useTranslation();
   const access = m.access;
@@ -778,7 +786,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
                 {tool === "commands" && on && <span className="small muted">{t("machines.access.commandsWarn")}</span>}
               </span>
               <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
-              {on && m.canManage && (
+              {on && canReduceAccess(m) && (
                 <Button
                   size="sm"
                   aria-label={t("machines.access.disableLabel", { tool: name })}
@@ -803,7 +811,10 @@ function GrantCard({ machine: m }: { machine: Machine }) {
   const here = useIsThisMac(org.id, m.id);
   const path = t("machines.access.pathPlaceholder");
   const agent = t("machines.access.agentPlaceholder");
-  const allowExample = `agentes-runner folders allow ${path} --agent ${agent}`;
+  // In system mode the runner's settings are root's (ADR 0057): allowing takes the computer's administrator.
+  const system = m.mode === "system";
+  const allowExample = `${system ? "sudo " : ""}agentes-runner folders allow ${path} --agent ${agent}`;
+  const mac = m.os === "darwin";
   return (
     <Card aria-labelledby="sec-machine-grant">
       <h2 id="sec-machine-grant" className="ac-card__title">
@@ -819,9 +830,13 @@ function GrantCard({ machine: m }: { machine: Machine }) {
       ) : m.canManage ? (
         <>
           <p className="small" style={{ margin: 0 }}>
-            {t("machines.access.grantText")}
+            {mac
+              ? t("machines.access.grantText")
+              : system
+                ? t("machines.access.grantTextAdmin")
+                : t("machines.access.grantTextTerminal")}
           </p>
-          <span className="small muted">{t("machines.access.grantTerminal")}</span>
+          {mac && <span className="small muted">{t("machines.access.grantTerminal")}</span>}
           <CommandBlock command={allowExample} />
         </>
       ) : (
@@ -869,6 +884,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
   const [reduce, setReduce] = useState<Reduce | null>(null);
+  const setup = useSetupView(org.id);
   const m = machines.data?.find((x) => x.id === machineId);
   const back = (
     <Button asChild size="sm" variant="ghost" className="machine-page__back">
@@ -894,6 +910,8 @@ export function MachinePage({ machineId }: { machineId: string }) {
     );
   }
   const paused = isPaused(m);
+  // The workspace's own computer (ADR 0056 §10): its size and one user per agent, never its system or folder.
+  const managed = m.kind === "managed";
   return (
     <>
       {back}
@@ -920,16 +938,28 @@ export function MachinePage({ machineId }: { machineId: string }) {
         </div>
         <div className="machine-page__facts">
           {m.kind === "host" && <span className="small">{t(`machines.host.${hostDescKey(m.os)}`)}</span>}
-          <span className="small muted">
-            {t("machines.details", {
-              os: t(`machines.os.${osOf(m.os)}`),
-              arch: m.arch,
-              version: m.runnerVersion,
-              seen: seenText(t, i18n.language, m),
-            })}
-          </span>
+          {managed ? (
+            <>
+              <span className="small">{t("computerSetup.lead")}</span>
+              {setup && <SetupFacts view={setup} />}
+              {!m.online && <span className="small muted">{seenText(t, i18n.language, m)}</span>}
+            </>
+          ) : (
+            <span className="small muted">
+              {t("machines.details", {
+                os: t(`machines.os.${osOf(m.os)}`),
+                arch: m.arch,
+                version: m.runnerVersion,
+                seen: seenText(t, i18n.language, m),
+              })}
+            </span>
+          )}
           {paused && <span className="small muted">{t("machines.pausedHint")}</span>}
-          {m.workspace && (
+          {/* System mode: each agent works in its own home, never in the folder the computer was connected from. */}
+          {m.mode === "system" && !managed && m.kind !== "host" && (
+            <span className="small muted">{t("machines.agentUsers")}</span>
+          )}
+          {m.workspace && m.mode !== "system" && (
             <span className="small muted machine-row__workspace">
               {t("machines.workspace")} <code>{m.workspace}</code>
             </span>
@@ -981,7 +1011,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
       <ToolsCard machine={m} onReduce={setReduce} />
       <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
       <MachineDesktopUseCard machine={m} />
-      <GrantCard machine={m} />
+      {!managed && <GrantCard machine={m} />}
       <ReduceDialog machine={m} reduce={reduce} onClose={() => setReduce(null)} />
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />
       <RemoveDialog

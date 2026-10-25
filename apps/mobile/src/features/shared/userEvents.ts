@@ -1,6 +1,7 @@
 import {
   type Approval,
   applyNotificationEvent,
+  applyWorkspaceEvent,
   cacheApproval,
   isNotificationEvent,
   keys,
@@ -49,6 +50,8 @@ export function useUserEvents() {
       }
       // Org events: a computer went offline or came back, agents moved off one ("Computador desconectado").
       if (isOutageEvent(event)) void qc.invalidateQueries({ queryKey: outagesKey(orgId) });
+      // The workspace's standing (the suspended screen comes and goes) and its own computer on its way.
+      applyWorkspaceEvent(qc, orgId, event);
       // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
       // tasks refresh too (the columns live under the same key).
       if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
@@ -59,6 +62,8 @@ export function useUserEvents() {
     const offReconnect = connection.onReconnect(() => {
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+      // The organization's standing may have changed meanwhile (the suspended screen).
+      void qc.invalidateQueries({ queryKey: keys.me });
     });
     return () => {
       offUser();

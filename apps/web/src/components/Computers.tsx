@@ -1,19 +1,36 @@
-import { useAgents, useMachines, useSandboxSettings } from "@agenteschat/client";
+import { useAgents, useComputerSetup, useMachines, useSandboxSettings } from "@agenteschat/client";
+import { setupView } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, ComputerPortrait, Icon, Popover, ProviderLogo } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentComputersCard, CloudComputerCard } from "@/components/AgentComputer";
+import { LoadingCards } from "@/components/Loading";
 import { DownloadMacButton, MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { WorkspaceComputerCard } from "@/components/WorkspaceComputer";
 
 /**
  * Configurações → Computadores: one section for the
  * two places agents work. The two kinds side by side, the cloud computer's
  * settings (admins), your own computers, and which computer each agent uses.
+ * Where the workspace gets its own computer (ADR 0056 §10), its card takes the cloud's place.
  */
 export function ComputersSection() {
   const { org } = useOrg();
+  const setup = useComputerSetup(org.id);
+  const view = setupView(setup.data);
+  // Not the cloud's cards for a moment before the workspace's own computer.
+  if (setup.isLoading) return <LoadingCards count={2} />;
+  if (view) {
+    return (
+      <>
+        <WorkspaceComputerCard view={view} />
+        <MachinesSection />
+        <AgentComputersCard />
+      </>
+    );
+  }
   return (
     <>
       <ComputerKinds />
