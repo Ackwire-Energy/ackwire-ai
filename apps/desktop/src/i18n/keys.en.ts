@@ -170,6 +170,7 @@ export const desktopEn: DesktopTranslations = {
       "{{host}} has no owner account yet. Open the link its installer showed at the end, on this {{device}} or on your phone. To see it again, run the install command there once more.",
     unreachable:
       "We can't reach {{host}}. If it's on Tailscale, open Tailscale on this {{device}}, connect and try again.",
+    unreachableHere: "Nothing answers at {{host}} on this {{device}}. Start agentes.chat here, then try again.",
     certificate: "The certificate of {{host}} isn't valid. Talk to whoever runs the server.",
     notAgentes: "{{host}} isn't an agentes.chat server. Check the address.",
     serverTooOld: "{{host}} needs an update to work with this app.",
@@ -180,12 +181,15 @@ export const desktopEn: DesktopTranslations = {
     how: "It runs inside this app, with its own database built in, and keeps everything in one folder on this {{device}}. Nothing else to install: no Docker, no database to set up.",
     again: "It ran here before, and its data is still in {{path}}.",
     name: "Your name",
+    nameNeeded: "Write your name.",
     email: "Your email",
     emailHint: "Your team sees it.",
+    emailNeeded: "Write your email, like ana@example.com.",
     reach: "Reach it from your phone and teammates",
     reachText:
       "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat.",
     reachOff: "Tailscale is on this {{device}} but not connected. Open Tailscale and connect.",
+    reachOffTerminal: "Tailscale is on this {{device}} but not connected. Connect it in the terminal, then come back:",
     reachMissing:
       "Install Tailscale, free, to reach agentes.chat from your phone and invite teammates. You can do it later.",
     openTailscale: "Open Tailscale",
@@ -206,6 +210,13 @@ export const desktopEn: DesktopTranslations = {
       computer: "Getting this {{device}} ready for your agents",
       reach: "Turning on access from your devices",
     },
+    /** Each step's state in words, for screen readers (the marks are drawn). */
+    stepState: {
+      active: "in progress",
+      done: "done",
+      failed: "didn't work",
+      warn: "needs your attention",
+    },
     fail: {
       start: "agentes.chat didn't start on this {{device}}.",
       account: "Your account wasn't created.",
@@ -215,16 +226,24 @@ export const desktopEn: DesktopTranslations = {
     reason: {
       https: "HTTPS is off on your Tailscale network",
       serve: "Tailscale on this {{device}} can't share it; install Tailscale from tailscale.com",
-      operator: "Tailscale needs your permission first: run sudo tailscale set --operator=$USER once",
+      operator: "Tailscale needs your permission first",
     },
+    operatorRun: "Run this once in the terminal, then try again:",
     turnOn: "Turn it on",
     copyDiagnostics: "Copy diagnostics",
     already: "agentes.chat is already installed on this {{device}}",
     alreadyText: "It runs on its own, installed from the terminal, at {{url}}.",
     useIt: "Use it",
+    notRunning: "agentes.chat is installed on this {{device}}, but it isn't running",
+    notRunningText: "It was installed from the terminal, in {{path}}. Start it there, then try again.",
+    running: "agentes.chat already runs on this {{device}}",
+    runningText: "This app runs it, at {{url}}. Its settings are in Preferences › Servers.",
+    openIt: "Open it",
     win: {
       title: "Run agentes.chat on this PC",
       lead: "On Windows, this comes later. Two ways for now:",
+      later:
+        "On Windows, this comes later. For now, run agentes.chat on another computer, a Mac, a Linux or a server online, then choose Connect to my server.",
       other:
         "On another computer, a Mac, a Linux or a server online: run the one-command install, then choose Connect to my server.",
       wsl: "On this PC, with WSL 2: open Ubuntu from the Start menu, run this, then choose Connect to my server. It finds it here.",
@@ -250,7 +269,8 @@ export const desktopEn: DesktopTranslations = {
     ownSub: "Your server",
     ownTailnet: "Your server · on your Tailscale network",
     ownHere: "Your server · on this {{device}}",
-    hereSub: "Runs here",
+    hereOnly: "Runs here · only on this {{device}}",
+    hereTailnet: "Runs here · on your Tailscale network",
     open: "Open",
     openNow: "Open now",
     add: "Add a server…",
@@ -277,6 +297,7 @@ export const desktopEn: DesktopTranslations = {
     phoneOff: "Turn on reach first.",
     showQr: "Show QR code",
     usageRestart: "Changing it restarts agentes.chat for a moment.",
+    usageBoth: "Off here or in agentes.chat's Settings › General, nothing is sent.",
     reachFailed: "Access from your devices didn't turn on: {{reason}}.",
     backup: "Back up now",
     backedUp: "Backed up: {{file}}",
@@ -290,10 +311,12 @@ export const desktopEn: DesktopTranslations = {
     stopHereBody:
       "It stops now and no longer starts with the app. Its data stays in {{path}}: start it again here any time.",
     stopHereConfirm: "Stop it",
+    notHere: "Not running here. Its data is still in {{path}}.",
+    startHere: "Start it here",
     stoppedBanner: "agentes.chat stopped on this {{device}}",
     stoppedBody: "Nobody can use it until it starts again.",
     failingBanner: "agentes.chat isn't starting on this {{device}}",
-    failingBody: "Copy the diagnostics to see what happened, or try again.",
+    failingBody: "Try again, or copy the diagnostics for whoever helps you with it.",
     version: "Version {{version}}, updated with the app",
     updatesWithApp: "Updating the app updates agentes.chat on this {{device}} too.",
     updateBack: "The update didn't start; agentes.chat is back on {{version}}.",
@@ -325,6 +348,7 @@ export const desktopEn: DesktopTranslations = {
       "Commands can reach other parts of the {{device}}, not only the allowed folders, including another organization's folders. Protected mode will prevent that. Every command shows in Activity.",
     commandsWarnHere:
       "Commands run as you and can reach other parts of this {{device}}, this agentes.chat's data included. You see each one in Activity.",
+    commandsSome: "On only for {{orgs}}. Turn it on for every organization here.",
     browserName: "Browser",
     browserDesc: "Opens websites for the agents in a browser of their own, without your logins.",
     browserLogins:
@@ -527,6 +551,7 @@ export const desktopEn: DesktopTranslations = {
     failing: "agentes.chat isn't starting on this {{device}}",
     tailnetOff:
       "agentes.chat runs, but it opens at your Tailscale address, and Tailscale isn't connected on this {{device}}.",
+    tailnetUp: "To connect it, run sudo tailscale up in the terminal.",
     onlyHere: "Use only on this {{device}}",
     start: "Start it",
     copy: "Copy diagnostics",

@@ -11,9 +11,10 @@
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
  * The server here: `?phase=` (starting, updating, stopped, failing), `?reach=1`, `?back=<version>` (an update
- * went back), `?tailscale=` (on, off, missing), `?installed=terminal` (one from the terminal; `&claim=1` waits
- * for its owner), `?fail=` (database, start, account, reach: that setup step fails), `?hold=<step>` (setting up
- * stops there).
+ * went back), `?run=0` (it stopped running here, its data kept), `?usage=0` (usage statistics off),
+ * `?tailscale=` (on, off, missing), `?installed=terminal` (one from the terminal; `&claim=1` waits for its owner,
+ * `&serving=0` isn't running), `?fail=` (database, start, account, reach: that setup step fails), `?hold=<step>`
+ * (setting up stops there).
  */
 import { CLOUD_SERVER, readInstance, type ServerCheck } from "@agenteschat/client/lib/server";
 import type { Candidate } from "../control/first-run";
@@ -40,9 +41,12 @@ export interface HereOptions {
   phase?: LocalPhase;
   reach?: boolean;
   back?: string | null;
+  run?: boolean;
+  usage?: boolean;
   tailscale?: Tailnet["state"];
   installed?: "terminal";
   claim?: boolean;
+  serving?: boolean;
   fail?: SetupStep;
   hold?: SetupStep;
 }
@@ -108,17 +112,18 @@ export function createFakeHost(
       : here.tailscale === "off"
         ? { state: "off" }
         : { state: "on", device: "ana-mac.tail1234.ts.net" };
-  const running = scenario === "here";
+  const running = scenario === "here" && here.run !== false;
   let local: LocalServerStatus = {
     ...NO_SERVER,
     bundled: platform !== "windows",
     dir: "/Users/voce/.agentes",
-    ...(running
+    usage: here.usage !== false,
+    ...(scenario === "here"
       ? {
           installed: "app" as const,
-          run: true,
+          run: running,
           owner: true,
-          phase: here.phase ?? "running",
+          phase: running ? (here.phase ?? "running") : "off",
           url: LOCAL_URL,
           publicUrl: here.reach ? TAILNET_URL : LOCAL_URL,
           reach: !!here.reach,
@@ -130,7 +135,8 @@ export function createFakeHost(
             installed: "terminal" as const,
             url: LOCAL_URL,
             version: "1.4.0",
-            claim: here.claim ? "b3duZXItY2xhaW0tYWJjZGVmZ2hpamtsbW5vcHFy" : null,
+            serving: here.serving !== false,
+            claim: here.claim && here.serving !== false ? "b3duZXItY2xhaW0tYWJjZGVmZ2hpamtsbW5vcHFy" : null,
           }
         : { systemName: "Ana Souza" }),
   };

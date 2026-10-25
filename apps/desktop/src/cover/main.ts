@@ -28,7 +28,8 @@ const GIVE_UP_MS = 15_000;
 
 const strings = DESKTOP_STRINGS[systemLocale()] as DesktopTranslations;
 const words = strings.cover;
-const device = strings.device[platformOf(navigator.userAgent)];
+const platform = platformOf(navigator.userAgent);
+const device = strings.device[platform];
 const root = document.querySelector<HTMLElement>(".cover");
 const line = document.querySelector<HTMLElement>(".cover__line");
 const sky = document.querySelector<HTMLCanvasElement>(".cover__sky");
@@ -169,15 +170,22 @@ function showHere(state: NonNullable<ReturnType<typeof coverHere>>) {
   } else if (state === "failing") {
     say(fill(words.failing));
     buttons([
-      [words.copy, copyDiagnostics],
       [words.retry, start],
+      [words.copy, copyDiagnostics],
     ]);
   } else {
-    say(fill(words.tailnetOff));
-    buttons([
-      [words.openTailscale, () => void invoke("tailscale_open", { page: "app" }).catch(() => {})],
-      [fill(words.onlyHere), () => void invoke("local_server_reach", { on: false }).catch(() => {})],
-    ]);
+    const onlyHere: [string, () => void] = [
+      fill(words.onlyHere),
+      () => void invoke("local_server_reach", { on: false }).catch(() => {}),
+    ];
+    // Tailscale has an app to open on a Mac; elsewhere it connects from the terminal.
+    if (platform === "mac") {
+      say(fill(words.tailnetOff));
+      buttons([[words.openTailscale, () => void invoke("tailscale_open", { page: "app" }).catch(() => {})], onlyHere]);
+    } else {
+      say(`${fill(words.tailnetOff)} ${words.tailnetUp}`);
+      buttons([onlyHere]);
+    }
   }
 }
 

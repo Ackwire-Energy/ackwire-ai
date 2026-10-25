@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ControlEvent, ControlStatus } from "@agenteschat/adapters/runner-control";
-import { DesktopStore } from "../src/control/store";
-import { answerThisMac } from "../src/control/this-mac";
+import { DesktopStore, type Home } from "../src/control/store";
+import { answerThisMac, toolsHere } from "../src/control/this-mac";
 import type { Host } from "../src/host/types";
 
 /**
@@ -155,6 +155,52 @@ test("connect: pairs with the asking page's own server; the first organization s
     ["commands", false],
     ["browser", true],
   ]);
+});
+
+test("connect: a new organization copies the others' tools but never their commands (the dialog said off)", async () => {
+  // Another organization here has commands on.
+  const { store, sent, event, deps } = setup({ h1: paired("o1") }, true);
+  store.start();
+  await settle();
+  const answer = answerThisMac(deps, { kind: "connect", orgId: "o2", origin: SERVER, agentsHere: true });
+  await settle();
+  event("new1", {
+    kind: "pair.code",
+    userCode: "ABCD-EFGH",
+    verificationUrl: `${SERVER}/c`,
+    expiresAt: "2026-10-21T20:00:00Z",
+  });
+  await answer;
+  event("new1", { kind: "pair.done", org: { id: "o2", name: "Beta" }, machine: { id: "m2", name: "MacBook" } });
+  await settle();
+  await settle();
+  const tools = sent.filter((s) => s.homeId === "new1" && s.type === "tools.set").map((s) => [s.tool, s.on]);
+  expect(tools).toEqual([
+    ["claude", true],
+    ["codex", false],
+    ["commands", false],
+    ["browser", false],
+  ]);
+});
+
+test("Preferences' tools: commands read on only when every organization has them, and say who does", () => {
+  const home = (name: string, commands: boolean) =>
+    ({
+      status: { org: { id: name, name } },
+      access: { folders: [], tools: { claude: true, codex: false, commands, browser: true } },
+    }) as unknown as Home;
+  expect(toolsHere([home("Acme", true), home("Beta", false)])).toEqual({
+    tools: { claude: true, codex: false, commands: false, browser: true },
+    commandsOnlyFor: ["Acme"],
+  });
+  expect(toolsHere([home("Acme", true), home("Beta", true)])).toMatchObject({
+    tools: { commands: true },
+    commandsOnlyFor: [],
+  });
+  expect(toolsHere([])).toEqual({
+    tools: { claude: false, codex: false, commands: false, browser: false },
+    commandsOnlyFor: [],
+  });
 });
 
 test("connect: a refused organization comes back on its own home; a failure rejects", async () => {

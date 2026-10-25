@@ -69,6 +69,9 @@ describe("setting it up", () => {
       }
       const reason = i18n.t(REASON_TEXT.https);
       expect(i18n.t("desktop.here.fail.reach", { reason })).toContain(reason);
+      // Screen readers hear each step's state: the marks on screen are drawn.
+      for (const state of ["active", "done", "failed", "warn"])
+        expect({ state, ok: has(`desktop.here.stepState.${state}`) }).toEqual({ state, ok: true });
     }
   });
 });
@@ -85,7 +88,8 @@ describe("which screen", () => {
   });
 
   test("one installed from the terminal, or another answering here: use it, with its claim while it waits", () => {
-    expect(hereView({ ...NO_SERVER, installed: "terminal", url: LOCAL, claim: "c".repeat(43) }, null)).toEqual({
+    const terminal = { ...NO_SERVER, installed: "terminal" as const, url: LOCAL, serving: true };
+    expect(hereView({ ...terminal, claim: "c".repeat(43) }, null)).toEqual({
       kind: "already",
       server: LOCAL,
       claim: "c".repeat(43),
@@ -96,7 +100,22 @@ describe("which screen", () => {
       claim: null,
     });
     // The app's own server isn't "another one".
-    expect(hereView(running, "http://127.0.0.1:3000").kind).toBe("form");
+    expect(hereView(running, "http://127.0.0.1:3000").kind).toBe("running");
+  });
+
+  test("a terminal install that isn't running: it starts where it was installed, nothing to use yet", () => {
+    expect(hereView({ ...NO_SERVER, installed: "terminal", url: LOCAL, serving: false }, null)).toEqual({
+      kind: "stopped",
+    });
+    expect(hereView({ ...NO_SERVER, installed: "terminal", url: null }, "http://127.0.0.1:3000")).toEqual({
+      kind: "stopped",
+    });
+  });
+
+  test("the app runs it already: open it, never set it up again", () => {
+    expect(hereView(running, null)).toEqual({ kind: "running", server: LOCAL });
+    expect(hereView(reached, null)).toEqual({ kind: "running", server: TAILNET });
+    expect(hereView({ ...running, phase: "failing" }, null).kind).toBe("running");
   });
 });
 

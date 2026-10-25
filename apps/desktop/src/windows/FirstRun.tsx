@@ -33,9 +33,11 @@ import {
   type Candidate,
   type ConnectProblem,
   connectOutcome,
+  escapeAction,
   type FirstScreen,
   foundServers,
   INSTALL_COMMAND,
+  INSTALL_COMMAND_LIVE,
   type LinkView,
   LOOK_MS,
   linkView,
@@ -56,7 +58,7 @@ import {
 } from "../control/local-server";
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, writePref } from "../hooks";
-import { BrandFace } from "../ui/bits";
+import { BrandFace, CommandCopy } from "../ui/bits";
 import { CopyDiagnostics, ReachProblem, ReachRow } from "../ui/here";
 import { shortPath } from "../ui/time";
 
@@ -81,6 +83,11 @@ export function FirstRun() {
   const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView } | null>(null);
   // This build carries the server (Mac and Linux): "Run agentes.chat on this computer" is offered.
   const [canRunHere, setCanRunHere] = useState(false);
+  // agentes.chat is being set up here: Esc leaves it on screen.
+  const settingUp = useRef(false);
+  const setSettingUp = useCallback((busy: boolean) => {
+    settingUp.current = busy;
+  }, []);
   const linkSeq = useRef(0);
   const screenRef = useRef(screen);
   screenRef.current = screen;
@@ -189,8 +196,9 @@ export function FirstRun() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (trail.length > 0) back();
-      else
+      const action = escapeAction(trail.length, settingUp.current);
+      if (action === "back") back();
+      else if (action === "close")
         void host.servers().then(({ current }) => {
           if (current) void host.hideWindow("welcome").catch(() => {});
         });
@@ -219,7 +227,9 @@ export function FirstRun() {
             onConfirm={confirm}
           />
         )}
-        {screen === "here" && <RunHere onBack={back} onUse={finish} onConfirm={confirm} onLink={openLink} />}
+        {screen === "here" && (
+          <RunHere onBack={back} onUse={finish} onConfirm={confirm} onLink={openLink} onBusy={setSettingUp} />
+        )}
         {screen === "windows" && <WindowsWays onBack={back} onConnect={() => go("connect")} />}
         {screen === "link" && link && (
           <LinkSheet
@@ -316,43 +326,6 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
         </button>
       </div>
     </>
-  );
-}
-
-/** A command to copy, with Copy turning into Copied. */
-function CommandCopy({ command }: { command: string }) {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-  return (
-    <div className="dk-fr__cmd">
-      {/* Breaks only between words: a flag like `--network` never splits (selecting it copies the same text). */}
-      <code>
-        {command.split(" ").map((word, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, in order
-          <span key={i}>
-            {i > 0 && " "}
-            <span className="dk-fr__word">{word}</span>
-          </span>
-        ))}
-      </code>
-      <Button
-        size="sm"
-        icon={copied ? "check" : "copy"}
-        onClick={() =>
-          void navigator.clipboard
-            .writeText(command)
-            .then(() => setCopied(true))
-            .catch(() => {})
-        }
-      >
-        {copied ? t("desktop.common.copied") : t("desktop.common.copy")}
-      </Button>
-    </div>
   );
 }
 
@@ -476,9 +449,14 @@ function Connect({
                   <Icon name={f.where === "tailnet" ? "globe" : "computer"} size={16} />
                 </span>
                 <span className="dk-fr__foundtext">
-                  <b>{serverName(f.server)}</b>
+                  {/* This computer by its name; its address too when it answers at more than one. */}
+                  <b>{f.where === "tailnet" ? serverName(f.server) : t("desktop.link.chipHere")}</b>
                   <small>
-                    {f.where === "tailnet" ? t("desktop.connect.foundTailnet") : t("desktop.connect.foundHere")}
+                    {f.where === "tailnet"
+                      ? t("desktop.connect.foundTailnet")
+                      : found.filter((o) => o.where === "here").length > 1
+                        ? `${t("desktop.connect.foundHere")} · ${serverName(f.server)}`
+                        : t("desktop.connect.foundHere")}
                   </small>
                 </span>
                 <Button size="sm" disabled={checking !== null} onClick={() => void submit(f.server)}>
@@ -489,31 +467,37 @@ function Connect({
           </section>
         )
       )}
-      <section className="dk-fr__none" aria-label={t("desktop.connect.none")}>
-        <h2>{t("desktop.connect.none")}</h2>
-        <CommandCopy command={INSTALL_COMMAND} />
-        <p className="dk-help">{t("desktop.connect.noneText")}</p>
-      </section>
+      {INSTALL_COMMAND_LIVE && (
+        <section className="dk-fr__none" aria-label={t("desktop.connect.none")}>
+          <h2>{t("desktop.connect.none")}</h2>
+          <CommandCopy command={INSTALL_COMMAND} />
+          <p className="dk-help">{t("desktop.connect.noneText")}</p>
+        </section>
+      )}
     </>
   );
 }
 
 /**
  * F4: agentes.chat on this computer, inside the app: the owner's name and email (until the owner exists), reach
- * through Tailscale (off), usage statistics (on), then Start. F4b: the steps as the app runs them, each problem
- * on its own step (F4c). F4d: one installed from the terminal already runs here: Use it (its owner page while it
- * waits for one).
+ * through Tailscale (off), usage statistics (on; as they were, for one that ran here before), then Start. F4b: the
+ * steps as the app runs them, each problem on its own step (F4c). F4d: one installed from the terminal already
+ * runs here: Use it (its owner page while it waits for one); installed but not running: it starts there. The app
+ * runs it already: open it.
  */
 function RunHere({
   onBack,
   onUse,
   onConfirm,
   onLink,
+  onBusy,
 }: {
   onBack: () => void;
   onUse: (server: string) => Promise<void>;
   onConfirm: (server: string) => Promise<void>;
   onLink: (raw: string) => Promise<void>;
+  /** Setting it up now (Esc leaves the steps on screen). */
+  onBusy: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const host = useHost();
@@ -525,18 +509,23 @@ function RunHere({
   const [email, setEmail] = useState("");
   const [reach, setReach] = useState(false);
   const [usage, setUsage] = useState(true);
+  // Start was pressed with a field missing: each one says what it needs.
+  const [tried, setTried] = useState(false);
   const [setup, setSetup] = useState<{ steps: SetupStep[]; changes: StepChange[] } | null>(null);
   const [problem, setProblem] = useState<{ problem: ConnectProblem; host: string } | null>(null);
   const [checking, setChecking] = useState(false);
   // Reach ended with a warning: the window stays until the person read it (the main window is already open).
   const warned = useRef(false);
 
-  useEffect(() => {
+  const read = useCallback(() => {
     void host
       .localServer()
       .then((s) => {
         setStatus(s);
         if (s.systemName) setName((n) => n || (s.systemName ?? ""));
+        // One that ran here before starts again as it was.
+        setReach(s.reach);
+        setUsage(s.usage);
       })
       .catch(() => {});
     void host
@@ -544,6 +533,9 @@ function RunHere({
       .then((c) => setAnswering(c.ok ? c.server : null))
       .catch(() => setAnswering(null));
   }, [host]);
+  useEffect(read, [read]);
+  // Left mid-setup (a link arrived): the setup goes on in the app, and Esc works again on what shows.
+  useEffect(() => () => onBusy(false), [onBusy]);
 
   // Tailscale, each time the window comes to the front (the person may have just connected it).
   useEffect(() => {
@@ -566,15 +558,6 @@ function RunHere({
     [host],
   );
 
-  // Esc goes back, except while it is being set up.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && setup && !setup.changes.some((c) => c.state === "failed")) e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [setup]);
-
   if (!status || answering === undefined) {
     return (
       <>
@@ -587,6 +570,36 @@ function RunHere({
     );
   }
   const view = hereView(status, answering);
+
+  if (view.kind === "running") {
+    return (
+      <>
+        <BackLink label={t("desktop.own.title")} onClick={onBack} />
+        <h1>{t("desktop.here.running")}</h1>
+        <p className="dk-lead">{t("desktop.here.runningText", { url: view.server })}</p>
+        <div className="dk-fr__end" data-near>
+          <Button variant="primary" autoFocus onClick={() => void onUse(view.server)}>
+            {t("desktop.here.openIt")}
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  if (view.kind === "stopped") {
+    return (
+      <>
+        <BackLink label={t("desktop.own.title")} onClick={onBack} />
+        <h1>{t("desktop.here.notRunning")}</h1>
+        <p className="dk-lead">{t("desktop.here.notRunningText", { path: shortPath(status.dir) })}</p>
+        <div className="dk-fr__end" data-near>
+          <Button variant="primary" icon="refresh" autoFocus onClick={read}>
+            {t("desktop.common.retry")}
+          </Button>
+        </div>
+      </>
+    );
+  }
 
   if (view.kind === "already") {
     const use = async () => {
@@ -617,11 +630,14 @@ function RunHere({
     const choice = view.ask ? { name: name.trim(), email: email.trim(), reach, usage } : { reach, usage };
     setSetup({ steps: setupSteps(reach), changes: [] });
     warned.current = false;
+    onBusy(true);
     try {
       await host.installLocalServer(choice);
       if (!warned.current) await host.hideWindow("welcome").catch(() => {});
     } catch {
       // The failed step says it (F4c); Try again starts over, keeping what was done.
+    } finally {
+      onBusy(false);
     }
   };
 
@@ -636,10 +652,12 @@ function RunHere({
     );
   }
 
-  const ready = !view.ask || (name.trim().length > 0 && isEmail(email));
+  const nameOk = name.trim().length > 0;
+  const emailOk = isEmail(email);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (ready) void start();
+    if (!view.ask || (nameOk && emailOk)) void start();
+    else setTried(true);
   };
   return (
     <>
@@ -653,7 +671,7 @@ function RunHere({
       <form className="dk-fr__here" onSubmit={submit} noValidate>
         {view.ask && (
           <div className="dk-fr__who">
-            <Field label={t("desktop.here.name")}>
+            <Field label={t("desktop.here.name")} error={tried && !nameOk ? t("desktop.here.nameNeeded") : undefined}>
               <Input
                 autoFocus
                 value={name}
@@ -665,6 +683,7 @@ function RunHere({
             <Field
               label={t("desktop.here.email")}
               labelAside={<span className="dk-help">{t("desktop.here.emailHint")}</span>}
+              error={tried && !emailOk ? t("desktop.here.emailNeeded") : undefined}
             >
               <Input
                 type="email"
@@ -697,7 +716,7 @@ function RunHere({
           <p className="dk-help">{t("desktop.here.limits")}</p>
         </div>
         <div className="dk-fr__end">
-          <Button type="submit" variant="primary" autoFocus={!view.ask} disabled={!ready}>
+          <Button type="submit" variant="primary" autoFocus={!view.ask}>
             {t("desktop.here.start")}
           </Button>
         </div>
@@ -747,6 +766,10 @@ function HereSetup({
                 <span className="dk-fr__stepname">
                   <b className={state === "active" ? "dk-shimmer" : undefined}>{t(`desktop.here.step.${step}`)}</b>
                   {step === "database" && <small>{t("desktop.here.step.databaseNote")}</small>}
+                  {/* The marks are drawn: screen readers hear the state as words. */}
+                  {state !== "todo" && (
+                    <span className="ac-visually-hidden">{t(`desktop.here.stepState.${state}`)}</span>
+                  )}
                 </span>
                 {state === "failed" && (
                   <span className="dk-fr__stepfail">
@@ -796,20 +819,26 @@ function WindowsWays({ onBack, onConnect }: { onBack: () => void; onConnect: () 
     <>
       <BackLink label={t("desktop.own.title")} onClick={onBack} />
       <h1>{t("desktop.here.win.title")}</h1>
-      <p className="dk-lead">{t("desktop.here.win.lead")}</p>
-      <ol className="dk-fr__ways">
-        <li>
-          <span className="dk-fr__num">1</span>
-          <p>{t("desktop.here.win.other")}</p>
-        </li>
-        <li>
-          <span className="dk-fr__num">2</span>
-          <div>
-            <p>{t("desktop.here.win.wsl")}</p>
-            <CommandCopy command={WSL_INSTALL_COMMAND} />
-          </div>
-        </li>
-      </ol>
+      {INSTALL_COMMAND_LIVE ? (
+        <>
+          <p className="dk-lead">{t("desktop.here.win.lead")}</p>
+          <ol className="dk-fr__ways">
+            <li>
+              <span className="dk-fr__num">1</span>
+              <p>{t("desktop.here.win.other")}</p>
+            </li>
+            <li>
+              <span className="dk-fr__num">2</span>
+              <div>
+                <p>{t("desktop.here.win.wsl")}</p>
+                <CommandCopy command={WSL_INSTALL_COMMAND} />
+              </div>
+            </li>
+          </ol>
+        </>
+      ) : (
+        <p className="dk-lead">{t("desktop.here.win.later")}</p>
+      )}
       <div className="dk-fr__end">
         <Button variant="primary" onClick={onConnect}>
           {t("desktop.connect.title")}

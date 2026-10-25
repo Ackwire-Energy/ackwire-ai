@@ -27,7 +27,9 @@ export interface LocalServerStatus {
   dir: string;
   /** The person's name on this computer (the welcome window only). */
   systemName: string | null;
-  /** A terminal install still waiting for its owner: its claim (the welcome window only). */
+  /** A terminal install's server runs now (the welcome window only). */
+  serving: boolean;
+  /** A terminal install still waiting for its owner, and running: its claim (the welcome window only). */
   claim: string | null;
   /** An update didn't start and it went back to this version. */
   backTo: string | null;
@@ -66,6 +68,7 @@ export const NO_SERVER: LocalServerStatus = {
   version: null,
   dir: "~/.agentes",
   systemName: null,
+  serving: false,
   claim: null,
   backTo: null,
 };
@@ -90,16 +93,23 @@ export function stepStates(steps: readonly SetupStep[], changes: readonly StepCh
 export type HereView =
   /** The form; `ask`: the owner's name and email (no owner yet). */
   | { kind: "form"; ask: boolean }
+  /** The app runs it already: open it. */
+  | { kind: "running"; server: string }
   /** One already runs on this computer, installed from the terminal: use it (its owner page while it waits). */
-  | { kind: "already"; server: string; claim: string | null };
+  | { kind: "already"; server: string; claim: string | null }
+  /** One is installed from the terminal but isn't running: it starts there (the app never runs it). */
+  | { kind: "stopped" };
 
 /**
  * `answering`: an agentes.chat server that answered on this computer's loopback (Connect's discovery), when the
  * app doesn't run one itself.
  */
 export function hereView(status: LocalServerStatus, answering: string | null): HereView {
-  if (status.installed === "terminal" && status.url)
-    return { kind: "already", server: status.url, claim: status.claim };
+  if (status.run) return { kind: "running", server: status.publicUrl ?? status.url ?? "" };
+  if (status.installed === "terminal")
+    return status.serving && status.url
+      ? { kind: "already", server: status.url, claim: status.claim }
+      : { kind: "stopped" };
   if (status.installed !== "app" && answering) return { kind: "already", server: answering, claim: null };
   return { kind: "form", ask: !(status.installed === "app" && status.owner) };
 }

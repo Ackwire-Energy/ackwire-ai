@@ -8,9 +8,10 @@
  * the person (the system's own dialog) before a `connect` gets here.
  */
 
+import type { RunnerTools } from "@agenteschat/adapters/machine-protocol";
 import { ControlError } from "./client";
 import { homeServer } from "./server";
-import { type DesktopStore, type Home, isPairedHome, isRefusedHome, pairedHomes } from "./store";
+import { type DesktopStore, type Home, isPairedHome, isRefusedHome, orgName, pairedHomes } from "./store";
 
 /**
  * `local`: the asking page is the server here (`local_server.rs`), whose own homes point at its loopback
@@ -142,22 +143,36 @@ async function connect(
 
 /**
  * A new organization's tools on this computer: the ones the others have (they are for the whole computer);
- * the first one starts with the browser on, Claude Code and Codex on when found here, and commands off. More
- * is Preferences › Tools.
+ * the first one starts with the browser on, Claude Code and Codex on when found here. Commands always start off:
+ * a page asked for this pairing, and the system's dialog promised it; only Preferences › Tools turns them on.
  */
 export async function firstTools(store: DesktopStore, homeId: string) {
   await store.refresh(homeId);
   const snap = store.getSnapshot();
   const found = snap.homes.find((h) => h.homeId === homeId)?.status?.executors ?? {};
-  const base = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools ?? {
+  const others = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools ?? {
     claude: !!found.claude,
     codex: !!found.codex,
     commands: false,
     browser: true,
   };
+  const base = { ...others, commands: false };
   for (const tool of ["claude", "codex", "commands", "browser"] as const) {
     await store.request(homeId, { type: "tools.set", tool, on: !!base[tool] }).catch(() => {});
   }
+}
+
+/**
+ * The tools as Preferences › Tools shows them, one switch each for every organization here. Commands may be on
+ * for some only (a new organization starts without them): the switch is on when all have them, and
+ * `commandsOnlyFor` names the organizations that do while others don't.
+ */
+export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; commandsOnlyFor: string[] } {
+  const known = homes.filter((h) => h.access);
+  const tools = known[0]?.access?.tools ?? { claude: false, codex: false, commands: false, browser: false };
+  const withCommands = known.filter((h) => h.access?.tools.commands);
+  const all = known.length > 0 && withCommands.length === known.length;
+  return { tools: { ...tools, commands: all }, commandsOnlyFor: all ? [] : withCommands.map(orgName) };
 }
 
 /** Once the site confirmed the pairing, the new organization's first tools. */

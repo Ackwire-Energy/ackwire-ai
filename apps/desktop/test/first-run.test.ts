@@ -3,10 +3,12 @@ import { connectLink, parseConnectLink, readInstance, type ServerCheck } from "@
 import { menuBarShown } from "../src/control/dock";
 import {
   connectOutcome,
+  escapeAction,
   foundServers,
   INSTALL_COMMAND,
   linkView,
   ownServerScreen,
+  PROBLEM_TEXT,
   runHereScreen,
   typedServer,
   WSL_INSTALL_COMMAND,
@@ -55,6 +57,13 @@ describe("which screen", () => {
     expect(INSTALL_COMMAND).toBe("curl -fsSL https://agentes.chat/install | sh");
     expect(WSL_INSTALL_COMMAND).toBe("curl -fsSL https://agentes.chat/install | sh -s -- --network local");
   });
+
+  test("Esc: back a screen, or the window closes; never while agentes.chat is being set up here", () => {
+    expect(escapeAction(2, false)).toBe("back");
+    expect(escapeAction(0, false)).toBe("close");
+    expect(escapeAction(2, true)).toBe("stay");
+    expect(escapeAction(0, true)).toBe("stay");
+  });
 });
 
 describe("discovery", () => {
@@ -93,6 +102,27 @@ describe("a typed address", () => {
       problem: "no-owner",
       host: "agentes.tail1234.ts.net",
     });
+  });
+
+  test("nothing answering on this computer is said as such, not as a Tailscale problem", () => {
+    const here = "http://127.0.0.1:4310";
+    expect(connectOutcome(here, down(here))).toEqual({
+      kind: "problem",
+      problem: "unreachable-here",
+      host: "127.0.0.1:4310",
+    });
+    const raw = connectLink(here);
+    expect(linkView(parseConnectLink(raw, { allowHttp: "loopback" }), down(here), null)).toEqual({
+      kind: "problem",
+      server: here,
+      problem: "unreachable-here",
+    });
+    for (const lng of ["en", "pt-BR"] as const) {
+      const i18n = createDesktopI18n(lng, "mac");
+      const text = i18n.t(PROBLEM_TEXT["unreachable-here"], { host: "127.0.0.1:4310" });
+      expect(text).toContain("127.0.0.1:4310");
+      expect(text).not.toContain("Tailscale");
+    }
   });
 });
 

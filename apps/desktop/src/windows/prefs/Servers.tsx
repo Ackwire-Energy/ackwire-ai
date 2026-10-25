@@ -2,13 +2,7 @@ import { Button, Chip, Dialog, DialogFooter, Icon, type IconName, Menu, MenuItem
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
-import {
-  hereLine,
-  isHereServer,
-  type LocalServerStatus,
-  type ServeProblem,
-  type Tailnet,
-} from "../../control/local-server";
+import { isHereServer, type LocalServerStatus, type ServeProblem, type Tailnet } from "../../control/local-server";
 import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
 import { pairedHomes } from "../../control/store";
 import { useLocalServer, useOnShown } from "../../hooks";
@@ -79,6 +73,7 @@ export function Servers() {
     <>
       <PrefHead title={t("desktop.servers.title")} lead={t("desktop.servers.lead")} />
       {local.run && <HereServer local={local} current={list.current} />}
+      {!local.run && local.installed === "app" && local.owner && <StoppedHere local={local} />}
       {others.length > 0 && (
         <>
           {local.run && <CardTitle>{t("desktop.servers.title")}</CardTitle>}
@@ -164,6 +159,43 @@ export function Servers() {
   );
 }
 
+/** agentes.chat on this computer, stopped running here ("Stop running it here…"): its data stays, Start brings it back. */
+function StoppedHere({ local }: { local: LocalServerStatus }) {
+  const { t } = useTranslation();
+  const host = useHost();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <PrefCard>
+      <PrefRow
+        lead={
+          <span className="dk-logo dk-logo--soft">
+            <Icon name="computer" size={16} />
+          </span>
+        }
+        title={t("desktop.server.title")}
+        desc={t("desktop.server.notHere", { path: shortPath(local.dir) })}
+        end={
+          <Button
+            size="sm"
+            icon="play"
+            loading={busy}
+            onClick={() => {
+              setBusy(true);
+              void host
+                .startLocalServer()
+                .catch(() => toast(t("desktop.common.error"), "alert"))
+                .finally(() => setBusy(false));
+            }}
+          >
+            {t("desktop.server.startHere")}
+          </Button>
+        }
+      />
+    </PrefCard>
+  );
+}
+
 /**
  * agentes.chat on this computer (the app runs it): its state and address, reach from the person's other
  * devices (Tailscale) and the phone's QR code with it, the usage-statistics switch, its version, data and
@@ -236,7 +268,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
             </span>
           }
           title={t("desktop.server.title")}
-          desc={t(hereLine(local))}
+          desc={t(local.reach ? "desktop.servers.hereTailnet" : "desktop.servers.hereOnly")}
           end={chip}
         />
         <PrefRow
@@ -272,7 +304,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
         />
         <PrefRow
           title={t("desktop.here.usage")}
-          desc={`${t("desktop.here.usageText")} ${t("desktop.server.usageRestart")}`}
+          desc={`${t("desktop.here.usageText")} ${t("desktop.server.usageRestart")} ${t("desktop.server.usageBoth")}`}
           htmlFor="here-usage-prefs"
           end={
             <Switch

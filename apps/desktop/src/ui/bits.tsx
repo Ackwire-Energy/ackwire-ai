@@ -2,6 +2,7 @@ import type { ControlAgent, ControlStatus } from "@agenteschat/adapters/runner-c
 import {
   type AgentState,
   Avatar,
+  Button,
   Chip,
   ComputerPortrait,
   type ComputerState,
@@ -11,8 +12,45 @@ import {
   type IconName,
   normalizeAppearance,
 } from "@agenteschat/ui";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/** A command to copy, with Copy turning into Copied. */
+export function CommandCopy({ command }: { command: string }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <div className="dk-fr__cmd">
+      {/* Breaks only between words: a flag like `--network` never splits (selecting it copies the same text). */}
+      <code>
+        {command.split(" ").map((word, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, in order
+          <span key={i}>
+            {i > 0 && " "}
+            <span className="dk-fr__word">{word}</span>
+          </span>
+        ))}
+      </code>
+      <Button
+        size="sm"
+        icon={copied ? "check" : "copy"}
+        onClick={() =>
+          void navigator.clipboard
+            .writeText(command)
+            .then(() => setCopied(true))
+            .catch(() => {})
+        }
+      >
+        {copied ? t("desktop.common.copied") : t("desktop.common.copy")}
+      </Button>
+    </div>
+  );
+}
 
 /**
  * An organization's tile: its logo when it has one (a `data:` URL from the runner), otherwise its

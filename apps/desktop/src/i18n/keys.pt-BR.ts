@@ -174,6 +174,7 @@ export const desktopPtBR = {
       "{{host}} ainda não tem a conta de dono. Abra o link que o instalador mostrou no fim, neste {{device}} ou no celular. Para ver de novo, rode o comando de instalação lá mais uma vez.",
     unreachable:
       "Não conseguimos acessar {{host}}. Se ele está no Tailscale, abra o Tailscale neste {{device}}, conecte e tente de novo.",
+    unreachableHere: "Nada responde em {{host}} neste {{device}}. Inicie o agentes.chat aqui e tente de novo.",
     certificate: "O certificado de {{host}} não é válido. Fale com quem cuida do servidor.",
     notAgentes: "{{host}} não é um servidor do agentes.chat. Confira o endereço.",
     serverTooOld: "{{host}} precisa de uma atualização para funcionar com este app.",
@@ -185,12 +186,15 @@ export const desktopPtBR = {
     how: "Ele roda dentro deste app, com um banco de dados embutido, e guarda tudo numa pasta deste {{device}}. Nada mais para instalar: sem Docker, sem banco para configurar.",
     again: "Ele já rodou aqui, e os dados continuam em {{path}}.",
     name: "Seu nome",
+    nameNeeded: "Escreva o seu nome.",
     email: "Seu e-mail",
     emailHint: "A sua equipe vê.",
+    emailNeeded: "Escreva o seu e-mail, como ana@exemplo.com.",
     reach: "Acessar pelo celular e pela equipe",
     reachText:
       "Com o Tailscale, uma rede particular dos seus aparelhos: o seu celular e quem você convidar entram nela, e mais ninguém chega ao agentes.chat.",
     reachOff: "O Tailscale está neste {{device}}, mas desconectado. Abra o Tailscale e conecte.",
+    reachOffTerminal: "O Tailscale está neste {{device}}, mas desconectado. Conecte pelo terminal e volte aqui:",
     reachMissing:
       "Instale o Tailscale, que é grátis, para acessar o agentes.chat pelo celular e convidar a equipe. Dá para fazer depois.",
     openTailscale: "Abrir o Tailscale",
@@ -212,6 +216,13 @@ export const desktopPtBR = {
       computer: "Preparando este {{device}} para os agentes",
       reach: "Ligando o acesso pelos seus aparelhos",
     },
+    /** Each step's state in words, for screen readers (the marks are drawn). */
+    stepState: {
+      active: "em andamento",
+      done: "feito",
+      failed: "não deu certo",
+      warn: "precisa da sua atenção",
+    },
     fail: {
       start: "O agentes.chat não iniciou neste {{device}}.",
       account: "A sua conta não foi criada.",
@@ -221,16 +232,24 @@ export const desktopPtBR = {
     reason: {
       https: "o HTTPS está desligado na sua rede do Tailscale",
       serve: "o Tailscale deste {{device}} não consegue compartilhar; instale o Tailscale pelo tailscale.com",
-      operator: "o Tailscale precisa da sua permissão antes: rode sudo tailscale set --operator=$USER uma vez",
+      operator: "o Tailscale precisa da sua permissão antes",
     },
+    operatorRun: "Rode isto uma vez no terminal e tente de novo:",
     turnOn: "Ligar",
     copyDiagnostics: "Copiar o diagnóstico",
     already: "O agentes.chat já está instalado neste {{device}}",
     alreadyText: "Ele roda sozinho, instalado pelo terminal, em {{url}}.",
     useIt: "Usar",
+    notRunning: "O agentes.chat está instalado neste {{device}}, mas não está rodando",
+    notRunningText: "Ele foi instalado pelo terminal, em {{path}}. Inicie por lá e tente de novo.",
+    running: "O agentes.chat já roda neste {{device}}",
+    runningText: "Este app roda ele, em {{url}}. Os ajustes ficam em Preferências › Servidores.",
+    openIt: "Abrir",
     win: {
       title: "Rodar o agentes.chat neste PC",
       lead: "No Windows, isso vem depois. Por enquanto, dois caminhos:",
+      later:
+        "No Windows, isso vem depois. Por enquanto, rode o agentes.chat em outro computador, um Mac, um Linux ou um servidor na internet, e escolha Conectar ao meu servidor.",
       other:
         "Em outro computador, um Mac, um Linux ou um servidor na internet: rode a instalação de um comando e escolha Conectar ao meu servidor.",
       wsl: "Neste PC, com o WSL 2: abra o Ubuntu pelo menu Iniciar, rode isto e escolha Conectar ao meu servidor. Ele encontra aqui.",
@@ -258,7 +277,8 @@ export const desktopPtBR = {
     ownSub: "Seu servidor",
     ownTailnet: "Seu servidor · na sua rede do Tailscale",
     ownHere: "Seu servidor · neste {{device}}",
-    hereSub: "Roda aqui",
+    hereOnly: "Roda aqui · só neste {{device}}",
+    hereTailnet: "Roda aqui · na sua rede do Tailscale",
     open: "Abrir",
     openNow: "Aberto agora",
     add: "Adicionar um servidor…",
@@ -286,6 +306,7 @@ export const desktopPtBR = {
     phoneOff: "Ligue o acesso primeiro.",
     showQr: "Mostrar o QR code",
     usageRestart: "Mudar reinicia o agentes.chat por um instante.",
+    usageBoth: "Desligado aqui ou em Configurações › Geral do agentes.chat, nada é enviado.",
     reachFailed: "O acesso pelos aparelhos não ligou: {{reason}}.",
     backup: "Fazer backup agora",
     backedUp: "Backup feito: {{file}}",
@@ -299,10 +320,12 @@ export const desktopPtBR = {
     stopHereBody:
       "Ele para agora e não liga mais com o app. Os dados continuam em {{path}}: dá para iniciar aqui de novo quando quiser.",
     stopHereConfirm: "Parar",
+    notHere: "Não está rodando aqui. Os dados continuam em {{path}}.",
+    startHere: "Iniciar aqui",
     stoppedBanner: "O agentes.chat parou neste {{device}}",
     stoppedBody: "Ninguém consegue usar até ele iniciar de novo.",
     failingBanner: "O agentes.chat não está iniciando neste {{device}}",
-    failingBody: "Copie o diagnóstico para ver o que aconteceu, ou tente de novo.",
+    failingBody: "Tente de novo, ou copie o diagnóstico para quem for te ajudar.",
     version: "Versão {{version}}, atualizada com o app",
     updatesWithApp: "Atualizar o app atualiza também o agentes.chat neste {{device}}.",
     updateBack: "A atualização não iniciou; o agentes.chat voltou para a {{version}}.",
@@ -337,6 +360,7 @@ export const desktopPtBR = {
       "Comandos podem chegar a outras partes do {{device}}, não só às pastas liberadas, inclusive às pastas de outra organização. O modo protegido vai evitar isso. Cada comando fica em Atividade.",
     commandsWarnHere:
       "Comandos rodam como você e alcançam outras partes deste {{device}}, inclusive os dados deste agentes.chat. Você vê cada um na Atividade.",
+    commandsSome: "Ligado só para {{orgs}}. Ligue para todas as organizações daqui.",
     browserName: "Navegador",
     browserDesc: "Abre sites para os agentes num navegador só deles, sem os seus logins.",
     browserLogins:
@@ -540,6 +564,7 @@ export const desktopPtBR = {
     failing: "O agentes.chat não está iniciando neste {{device}}",
     tailnetOff:
       "O agentes.chat está rodando, mas abre pelo endereço do Tailscale, e o Tailscale não está conectado neste {{device}}.",
+    tailnetUp: "Para conectar, rode sudo tailscale up no terminal.",
     onlyHere: "Usar só neste {{device}}",
     start: "Iniciar",
     copy: "Copiar o diagnóstico",

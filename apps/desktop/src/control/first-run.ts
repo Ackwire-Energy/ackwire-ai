@@ -3,11 +3,24 @@
  * discovery found, what a typed address or a connect link leads to. Nothing here changes the server
  * the app opens; the window does that only after the person confirmed (`chooseServer`).
  */
-import { type ConnectLink, type ServerCheck, type ServerProblem, serverHost } from "@agenteschat/client/lib/server";
+import {
+  type ConnectLink,
+  isLoopback,
+  type ServerCheck,
+  type ServerProblem,
+  serverHost,
+} from "@agenteschat/client/lib/server";
 import type { Platform } from "./platform";
 import { appServer, serverName } from "./server";
 
 export type FirstScreen = "choose" | "own" | "connect" | "here" | "windows" | "link";
+
+/**
+ * Esc in the first run: back a screen, or the window closes (when a server is open already); never while
+ * agentes.chat is being set up here (`busy`), which keeps going whatever the window shows.
+ */
+export const escapeAction = (screensBack: number, busy: boolean): "stay" | "back" | "close" =>
+  busy ? "stay" : screensBack > 0 ? "back" : "close";
 
 /**
  * Where "Use your own server ›" goes: the two ways where both exist (`canRunHere`: this build carries the
@@ -22,6 +35,13 @@ export const runHereScreen = (platform: Platform): FirstScreen => (platform === 
 /** The one-command setup, for a server without a screen; on Windows, inside WSL 2 with no network question. */
 export const INSTALL_COMMAND = "curl -fsSL https://agentes.chat/install | sh";
 export const WSL_INSTALL_COMMAND = `${INSTALL_COMMAND} -s -- --network local`;
+
+/**
+ * Whether the one-command setup works from a clean machine: it needs the repository, the setup package and the
+ * image to be public. Until then Connect's "Run this on it" and Windows' WSL way stay hidden, since the command
+ * would fail for anyone outside.
+ */
+export const INSTALL_COMMAND_LIVE = false;
 
 /** Discovery looks this long, at most, before it shows what it found (or nothing). */
 export const LOOK_MS = 3000;
@@ -43,7 +63,7 @@ export function foundServers(candidates: readonly Candidate[], checks: readonly 
 }
 
 /** What can go wrong with an address, in the words of `desktop.connect.*`. */
-export type ConnectProblem = ServerProblem | "invalid" | "http" | "no-owner";
+export type ConnectProblem = ServerProblem | "invalid" | "http" | "no-owner" | "unreachable-here";
 
 /** Each problem's sentence (`desktop.connect.*`, each takes `{ host }`). */
 export const PROBLEM_TEXT: Record<ConnectProblem, string> = {
@@ -51,6 +71,7 @@ export const PROBLEM_TEXT: Record<ConnectProblem, string> = {
   http: "desktop.connect.httpRefused",
   "no-owner": "desktop.connect.noOwner",
   unreachable: "desktop.connect.unreachable",
+  "unreachable-here": "desktop.connect.unreachableHere",
   certificate: "desktop.connect.certificate",
   "not-agentes": "desktop.connect.notAgentes",
   "server-too-old": "desktop.connect.serverTooOld",
@@ -82,8 +103,12 @@ export type ConnectOutcome =
   | { kind: "confirm"; server: string }
   | { kind: "problem"; problem: ConnectProblem; host: string };
 
+/** A failed check's problem: nothing answering on this computer itself has nothing to do with Tailscale. */
+const problemOf = (check: Extract<ServerCheck, { ok: false }>): ConnectProblem =>
+  check.problem === "unreachable" && isLoopback(check.server) ? "unreachable-here" : check.problem;
+
 export function connectOutcome(asked: string, check: ServerCheck): ConnectOutcome {
-  if (!check.ok) return { kind: "problem", problem: check.problem, host: serverHost(check.server) };
+  if (!check.ok) return { kind: "problem", problem: problemOf(check), host: serverHost(check.server) };
   if (check.instance.ownerClaim) return { kind: "problem", problem: "no-owner", host: serverHost(check.server) };
   return serverHost(check.server) === serverHost(asked)
     ? { kind: "use", server: check.server }
@@ -115,7 +140,7 @@ export type LinkView =
 export function linkView(link: ConnectLink | null, check: ServerCheck | "checking", current: string | null): LinkView {
   if (!link) return { kind: "notALink" };
   if (check === "checking") return { kind: "checking", server: link.server };
-  if (!check.ok) return { kind: "problem", server: check.server, problem: check.problem };
+  if (!check.ok) return { kind: "problem", server: check.server, problem: problemOf(check) };
   const server = check.server;
   const leave = current && current !== server ? serverName(current) : null;
   if (check.instance.ownerClaim) {
