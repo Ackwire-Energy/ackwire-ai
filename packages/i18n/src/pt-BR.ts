@@ -136,6 +136,10 @@ export const ptBR = {
       handoverFailed: "O código expirou ou já foi usado.",
       handoverFailedLead: "Entre com o seu e-mail, ou mostre um código novo no outro aparelho.",
     },
+    desktopOwner: {
+      continue: "Continuar neste {{device}}",
+      text: "Você instalou o agentes.chat neste {{device}}: não precisa de senha.",
+    },
     reset: {
       title: "Crie uma senha nova.",
       save: "Salvar senha",

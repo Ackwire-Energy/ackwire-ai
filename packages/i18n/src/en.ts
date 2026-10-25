@@ -130,6 +130,10 @@ export const en: Translations = {
       handoverFailed: "The code expired or was already used.",
       handoverFailedLead: "Sign in with your email, or show a new code on the other device.",
     },
+    desktopOwner: {
+      continue: "Continue on this {{device}}",
+      text: "You set up agentes.chat on this {{device}}: no password needed.",
+    },
     reset: {
       title: "Create a new password.",
       save: "Save password",

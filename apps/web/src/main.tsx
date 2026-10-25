@@ -16,7 +16,7 @@ import {
   startVersionWatch,
   VERSION_CHECK_MS,
 } from "./lib/app-version";
-import { applyDesktopDevice, desktopPlatform } from "./lib/desktop";
+import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
 import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
@@ -29,6 +29,7 @@ const platform = desktopPlatform();
 if (platform) {
   document.documentElement.dataset.desktop = platform;
   applyDesktopDevice(i18n, platform);
+  if (asksForPhone(window.location.search)) askForPhone();
 }
 const toasts = createToastStore();
 const api = createApiClient();

@@ -146,6 +146,8 @@ export interface ThisMacStatus {
   orgs: { orgId: string; machineId: string | null; connection: string }[];
   /** False where agents can't work on this computer for this server (agentes.chat, a server on it, Windows). */
   agentsHere?: boolean;
+  /** This server runs inside the app on this computer: the app signs its owner in ("Continue on this Mac"). */
+  local?: boolean;
 }
 
 type Invoke = (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -184,7 +186,35 @@ export const thisMac = {
   orgs: (orgs: { id: string; name: string }[]) => invoke<unknown>({ kind: "orgs", orgs }),
   /** A notification while the app is in the background (the app limits how many); `path` opens on a click. */
   notify: (title: string, body: string, path: string) => invoke<unknown>({ kind: "notify", title, body, path }),
+  /**
+   * On the server the app runs here: the app signs its owner in (its owner key buys a one-time sign-in, which
+   * this window trades at `/desktop/handover`; the key never reaches the page). The window moves there.
+   */
+  signIn: () => invoke<unknown>({ kind: "signIn" }),
 };
+
+/**
+ * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"
+ * opens once the account menu is on screen.
+ */
+const phone = { asked: false, listeners: new Set<() => void>() };
+export const asksForPhone = (search: string) => new URLSearchParams(search).get("open") === "phone";
+export function askForPhone() {
+  phone.asked = true;
+  for (const listener of phone.listeners) listener();
+}
+/** True once per ask. */
+export function takePhoneAsk() {
+  const asked = phone.asked;
+  phone.asked = false;
+  return asked;
+}
+export function onPhoneAsk(listener: () => void) {
+  phone.listeners.add(listener);
+  return () => {
+    phone.listeners.delete(listener);
+  };
+}
 
 /** The window's title in the app (and the tab's in a browser) while a screen shows; back when it goes. */
 export function useDocumentTitle(title: string | undefined) {

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { RouterContext } from "@/app/router-context";
 import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
-import { inDesktopApp, pageReady } from "@/lib/desktop";
+import { askForPhone, asksForPhone, inDesktopApp, pageReady } from "@/lib/desktop";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: Root,
@@ -27,7 +27,9 @@ function Root() {
     const w = window as { __agentesNavigate?: (path: string) => void };
     w.__agentesNavigate = (path) => {
       if (!path.startsWith("/") || path.startsWith("//")) return;
-      if (path.startsWith("/api/")) window.location.assign(path);
+      // "Show QR code" in the app: the dialog over the page the person is on.
+      if (asksForPhone(new URL(path, window.location.origin).search)) askForPhone();
+      else if (path.startsWith("/api/")) window.location.assign(path);
       else router.history.push(path);
     };
     return () => {
