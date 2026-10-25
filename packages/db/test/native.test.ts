@@ -145,6 +145,32 @@ test("commits reach the disk: Postgres syncs, and its syncs reach the system", a
   }
 });
 
+/**
+ * Runs `script` in another process, with `openPglite` imported, until it prints `signal`: this process must
+ * be refused the folder while that one lives, and open it once that one is killed.
+ */
+async function heldByAnotherProcess(script: string, signal: string) {
+  const holder = Bun.spawn(
+    [
+      process.execPath,
+      "-e",
+      `const { openPglite } = await import(${JSON.stringify(join(import.meta.dir, "../src/pglite.ts"))});\n${script}`,
+    ],
+    { stdout: "pipe" },
+  );
+  try {
+    expect(new TextDecoder().decode((await holder.stdout.getReader().read()).value)).toContain(signal);
+    expect(() => openPglite(db)).toThrow(DatabaseInUseError);
+  } finally {
+    // Also after a failed check: left running, it would keep the folder, and the test run's output, open.
+    holder.kill("SIGKILL");
+    await holder.exited;
+  }
+  const after = openPglite(db);
+  await after.ready;
+  await after.pg.close();
+}
+
 test("one process at a time has a folder's database open, until it stops however it stops", async () => {
   const first = openPglite(db);
   await first.ready;
@@ -154,24 +180,43 @@ test("one process at a time has a folder's database open, until it stops however
   await first.pg.close();
 
   // Another program holds it, then is killed: the system lets go of its lock with it.
-  const holder = Bun.spawn(
-    [
-      process.execPath,
-      "-e",
-      `const { openPglite } = await import(${JSON.stringify(join(import.meta.dir, "../src/pglite.ts"))});
-       const { ready } = openPglite(${JSON.stringify(db)});
-       await ready;
-       console.log("open");
-       setInterval(() => {}, 1000);`,
-    ],
-    { stdout: "pipe" },
+  await heldByAnotherProcess(
+    `const { pg, ready } = openPglite(${JSON.stringify(db)});
+     await ready;
+     console.log("open");
+     setInterval(() => pg.query("select 1"), 1000);`,
+    "open",
   );
-  const reader = holder.stdout.getReader();
-  expect(new TextDecoder().decode((await reader.read()).value)).toContain("open");
-  expect(() => openPglite(db)).toThrow(DatabaseInUseError);
-  holder.kill("SIGKILL");
-  await holder.exited;
-  const after = openPglite(db);
-  await after.ready;
-  await after.pg.close();
+}, 30_000);
+
+test("a database dropped without being closed still holds its folder, until its process ends", async () => {
+  await heldByAnotherProcess(
+    `const folder = ${JSON.stringify(db)};
+     // Opened and closed once first: while a process has opened only one database, the engine's compiled
+     // code can keep that one reachable, and this process must let go of it.
+     {
+       const { pg, ready } = openPglite(folder);
+       await ready;
+       await pg.close();
+     }
+     let collected = false;
+     const registry = new FinalizationRegistry(() => {
+       collected = true;
+     });
+     await (async () => {
+       const { pg, ready } = openPglite(folder);
+       registry.register(pg, "");
+       await ready;
+     })();
+     let rounds = 0;
+     const collect = setInterval(() => {
+       Bun.gc(true);
+       if (collected || ++rounds === 300) {
+         clearInterval(collect);
+         console.log(collected ? "collected" : "still referenced");
+       }
+     }, 10);
+     setInterval(() => {}, 1000);`,
+    "collected",
+  );
 }, 30_000);

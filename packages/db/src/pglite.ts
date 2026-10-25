@@ -90,6 +90,12 @@ export class DatabaseInUseError extends Error {
 export const folderLockFile = (folder: string) => `${folder}.lock`;
 
 /**
+ * Every lock this process holds. Bun closes a SQLite handle the garbage collector reclaims, and the system
+ * drops its lock with it: a database dropped without being closed would let another process open its folder.
+ */
+const heldLocks = new Set<SQLite>();
+
+/**
  * Locks `folder` for this process until the returned function runs, or the process ends however it ends:
  * the lock is the system's own file lock, which SQLite takes on an empty file for an open write transaction.
  * The file sits beside the folder, never in it: Postgres opens every file of its folder when it recovers, and
@@ -106,7 +112,11 @@ function lockFolder(folder: string): () => void {
     if ((error as { code?: string }).code === "SQLITE_BUSY") throw new DatabaseInUseError(folder);
     throw error;
   }
-  return () => lock.close();
+  heldLocks.add(lock);
+  return () => {
+    heldLocks.delete(lock);
+    lock.close();
+  };
 }
 
 /**
