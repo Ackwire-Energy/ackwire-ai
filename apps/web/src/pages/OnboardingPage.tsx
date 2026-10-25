@@ -645,8 +645,9 @@ export function OnboardingPage() {
           : step.id === "team" && toSend.length > 0
             ? t("onboarding.actions.invite", { count: toSend.length })
             : t("onboarding.actions.continue");
-  // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception).
-  const showSkip = step.id === "computer" ? edition === "selfhost" : step.optional;
+  // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception); the
+  // computer is one only where it is a choice, shown once its setup has answered.
+  const showSkip = step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.optional;
   const back = () => {
     if (step.id === "agents" && agentsPhase === "key") setAgentsPhase("pick");
     else go(index - 1);
