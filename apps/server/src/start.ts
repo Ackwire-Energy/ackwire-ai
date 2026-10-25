@@ -224,19 +224,29 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     browserLive: engine.browserLive,
     streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
+  const publicUrl = new URL(config.PUBLIC_URL);
   const ownHosts = ownHostsOnly
-    ? new Set([`127.0.0.1:${config.PORT}`, `localhost:${config.PORT}`, new URL(config.PUBLIC_URL).host])
+    ? new Set([`127.0.0.1:${config.PORT}`, `localhost:${config.PORT}`, publicUrl.host])
     : null;
+  /**
+   * A 421 for a name not its own; and a page opened at another of its own names goes to `PUBLIC_URL`,
+   * the only origin that sign-in and saving accept. Temporary: `PUBLIC_URL` changes with Tailscale.
+   */
+  const ownHostAnswer = (req: Request) => {
+    const host = req.headers.get("host") ?? "";
+    if (!ownHosts || host === publicUrl.host) return null;
+    if (!ownHosts.has(host)) return new Response("This server answers only at its own address.\n", { status: 421 });
+    if (req.method !== "GET" || !req.headers.get("accept")?.includes("text/html")) return null;
+    const { pathname, search } = new URL(req.url);
+    return Response.redirect(new URL(pathname + search, publicUrl).href, 302);
+  };
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
     port: config.PORT,
     // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
     // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
     idleTimeout: 120,
-    fetch: (req, srv) =>
-      ownHosts && !ownHosts.has(req.headers.get("host") ?? "")
-        ? new Response("This server answers only at its own address.\n", { status: 421 })
-        : realtime.fetch(req, srv, (r) => app.fetch(r)),
+    fetch: (req, srv) => ownHostAnswer(req) ?? realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
