@@ -283,6 +283,16 @@ body[data-window="popover"] {
   min-height: 0;
   overflow-y: auto;
 }
+.dk-pop__body[data-more] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+}
+/* What Popover.tsx watches to know whether the middle's end is in sight; it takes no room. */
+.dk-pop__end {
+  display: block;
+  height: 1px;
+  margin-top: -1px;
+}
 .dk-pop__foot {
   flex: none;
 }

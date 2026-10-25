@@ -52,6 +52,8 @@ export function Popover() {
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const card = useRef<HTMLElement>(null);
+  const bodyEnd = useRef<HTMLSpanElement>(null);
+  const [more, setMore] = useState(false);
 
   const homes = pairedHomes(snap);
   const pause = combinedPause(homes.map((h) => h.status?.paused ?? { paused: false }));
@@ -179,6 +181,18 @@ export function Popover() {
     ro.observe(el);
     return () => ro.disconnect();
   }, [host, confirmQuit]);
+
+  // The middle's end out of sight: it fades out at the bottom, so what's below reads as more to scroll to.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe the new middle after switching views
+  useEffect(() => {
+    const end = bodyEnd.current;
+    if (!end || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([entry]) => setMore(entry?.isIntersecting === false), {
+      root: end.parentElement,
+    });
+    io.observe(end);
+    return () => io.disconnect();
+  }, [works, confirmQuit]);
 
   // The site in the main window asking this Mac (ADR 0036): the popover owns the runners, so it answers.
   useEffect(() => {
@@ -405,7 +419,7 @@ export function Popover() {
     return (
       <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
         <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
-          <div className="dk-pop__body">
+          <div className="dk-pop__body" data-more={more || undefined}>
             {hereCard || (
               <header className="dk-ph">
                 <BrandFace size="md" />
@@ -432,6 +446,7 @@ export function Popover() {
                 {t("desktop.tray.updateBody")}
               </Banner>
             )}
+            <span className="dk-pop__end" ref={bodyEnd} />
           </div>
           <div className="dk-pop__foot">
             <section className="dk-psec">{appRows}</section>
@@ -445,7 +460,7 @@ export function Popover() {
   return (
     <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
       <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
-        <div className="dk-pop__body">
+        <div className="dk-pop__body" data-more={more || undefined}>
           {hereCard || (
             <header className="dk-ph">
               <MacPortrait state={macStateOf(homes)} />
@@ -575,6 +590,7 @@ export function Popover() {
             </div>
             <NowList homes={homes} paused={!!pause} now={now} />
           </section>
+          <span className="dk-pop__end" ref={bodyEnd} />
         </div>
 
         <div className="dk-pop__foot dk-pop__foot--ruled">
