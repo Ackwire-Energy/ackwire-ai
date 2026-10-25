@@ -198,7 +198,10 @@ describe("browser_ask_person", () => {
       handoff: { status: string; note: string | null };
     }[];
     expect(updates.at(-1)?.handoff).toMatchObject({ status: "done", note: null });
-    expect(JSON.stringify(heard)).not.toContain("4821");
+    // Ids are random hex and may hold those digits by chance: none of the note may be in what is left.
+    const words = JSON.stringify(heard).replace(/[0-9a-f-]{8,}/g, "");
+    expect(words).not.toContain("4821");
+    expect(words).not.toContain("cartão");
   });
 
   test("past its deadline it expires and the run goes on", async () => {
