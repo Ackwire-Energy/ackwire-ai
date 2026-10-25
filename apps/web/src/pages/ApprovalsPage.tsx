@@ -1,4 +1,4 @@
-import type { Agent, Approval, Member } from "@agenteschat/client";
+import type { Agent, Approval, ConnectorDef, Member } from "@agenteschat/client";
 import {
   sendHelpers,
   useApproval,
@@ -427,53 +427,63 @@ function groups(list: Approval[]): ["today" | "yesterday" | "earlier", Approval[
 }
 
 /** "github · acme" with the brand icon, or the app's own tool. */
-export function ConnectorLine({ approval }: { approval: Approval }) {
-  // An email goes through a mailbox, not a catalog connector ("email" has no entry): the box and its provider.
-  if (approval.email)
-    return (
-      <span className="ap-conn">
-        <span className="ap-conn__own" aria-hidden="true">
-          <Icon name="mail" size={14} />
-        </span>
-        <b>{approval.email.mailbox}</b>
-        {approval.email.provider && <span className="ap-conn__account">· {approval.email.provider}</span>}
-      </span>
-    );
-  return <CatalogConnectorLine approval={approval} />;
-}
+type ApprovalVia = {
+  kind: "mail" | "connector" | "own";
+  name: string;
+  account: string | null;
+  def: ConnectorDef | null;
+};
 
-function CatalogConnectorLine({ approval }: { approval: Approval }) {
+/** What an approval goes through: a mailbox, a server connected by address, a catalog connector, or the app itself. */
+function useApprovalVia(approval: Approval): ApprovalVia {
   const { t } = useTranslation();
   const { org } = useOrg();
   const catalog = useCatalog();
   // A server connected by address (`custom:{connectionId}`): its own name, and the preset's icon when it came from one.
   const customId = approval.connector?.startsWith("custom:") ? approval.connector.slice("custom:".length) : null;
   const servers = useCustomServers(org.id, customId !== null);
+  // An email goes through a mailbox, not a catalog connector ("email" has no entry): the box and its provider.
+  if (approval.email) return { kind: "mail", name: approval.email.mailbox, account: approval.email.provider, def: null };
+  if (!approval.connector) return { kind: "own", name: t("approvals.panel.builtIn"), account: null, def: null };
   const server = customId ? servers.data?.find((s) => s.id === customId) : undefined;
   const custom = server ? fromServer(server, catalog.data?.connectors ?? []) : null;
-  const def = custom
-    ? (custom.def ?? undefined)
-    : approval.connector
-      ? catalog.data?.connectors.find((c) => c.id === approval.connector)
-      : undefined;
+  const def = custom ? custom.def : (catalog.data?.connectors.find((c) => c.id === approval.connector) ?? null);
   const name = custom
     ? itemName(t, custom)
     : customId
       ? t("approvals.panel.orgConnector")
-      : approval.connector
-        ? connectorName(t, def ?? { id: approval.connector, label: approval.connector })
-        : t("approvals.panel.builtIn");
+      : connectorName(t, def ?? { id: approval.connector, label: approval.connector });
+  return { kind: "connector", name, account: approval.connectorAccount ?? null, def };
+}
+
+function ViaGlyph({ via }: { via: ApprovalVia }) {
+  if (via.kind === "connector") return <ConnectorIcon def={via.def} label={via.name} />;
+  return (
+    <span className="ap-conn__own" aria-hidden="true">
+      <Icon name={via.kind === "mail" ? "mail" : "shield"} size={14} />
+    </span>
+  );
+}
+
+export function ConnectorLine({ approval }: { approval: Approval }) {
+  const via = useApprovalVia(approval);
   return (
     <span className="ap-conn">
-      {approval.connector ? (
-        <ConnectorIcon def={def ?? null} label={name} />
-      ) : (
-        <span className="ap-conn__own" aria-hidden="true">
-          <Icon name="shield" size={14} />
-        </span>
-      )}
-      <b>{name}</b>
-      {approval.connectorAccount && <span className="ap-conn__account">· {approval.connectorAccount}</span>}
+      <ViaGlyph via={via} />
+      <b>{via.name}</b>
+      {via.account && <span className="ap-conn__account">· {via.account}</span>}
+    </span>
+  );
+}
+
+/** Only the logo, its name in a tooltip and for screen readers (the approval sentence in Notificações). */
+export function ConnectorMark({ approval }: { approval: Approval }) {
+  const via = useApprovalVia(approval);
+  const label = via.account ? `${via.name} · ${via.account}` : via.name;
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so a keyboard reaches the name in its tooltip
+    <span className="ap-conn-mark" role="img" aria-label={label} data-tip={label} tabIndex={0}>
+      <ViaGlyph via={via} />
     </span>
   );
 }

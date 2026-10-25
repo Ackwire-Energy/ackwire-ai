@@ -62,7 +62,7 @@ import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
-import { ApproveButton, RefuseBox } from "./ApprovalsPage";
+import { ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
@@ -824,8 +824,8 @@ function RoundWaits({ topicId }: { topicId: string }) {
 }
 
 /**
- * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then
- * "Só lê", its values in words and the agent's why behind "Por quê?".
+ * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then the
+ * connector's logo (its name in a tooltip), "Só lê", its values in words and the agent's why behind "Por quê?".
  */
 function ApprovalSay({
   approvalId,
@@ -858,8 +858,9 @@ function ApprovalSay({
           components={{ b: <b /> }}
         />
       </p>
-      {(approvalReadsOnly(a) || values.length > 0 || reason) && (
+      {(a.connector || a.email || approvalReadsOnly(a) || values.length > 0 || reason) && (
         <div className="nt-facts">
+          {(a.connector || a.email) && <ConnectorMark approval={a} />}
           {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
           {values.map((v) => (
             <Chip key={v}>{v}</Chip>
