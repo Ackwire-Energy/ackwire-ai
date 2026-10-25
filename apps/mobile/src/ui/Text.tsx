@@ -80,6 +80,12 @@ const MAX_SCALE: Partial<Record<TextVariant, number>> = {
   caption: CHROME_MAX_SCALE,
 };
 
+/** How tall one line of a variant is on screen: it grows with the text size setting, as far as the variant does. */
+export function lineHeightOf(variant: TextVariant, fontScale: number): number {
+  const max = MAX_SCALE[variant];
+  return (variantStyle(variant).lineHeight ?? 0) * (max ? Math.min(fontScale, max) : fontScale);
+}
+
 /** Text in the design system's scale and tones. Names stay in ink; counts use `Count`. */
 export function Text({ variant = "body", tone, style, maxFontSizeMultiplier, ...rest }: TextProps) {
   const { colors } = useTheme();

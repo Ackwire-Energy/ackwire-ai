@@ -16,7 +16,19 @@ import { lastLines } from "@agenteschat/client/lib/missions";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
-import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, PixelOrbit, PlanTrack, Text, useTheme, useToast } from "@/ui";
+import {
+  Button,
+  CHROME_MAX_SCALE,
+  Chip,
+  Count,
+  Icon,
+  LineIcon,
+  PixelOrbit,
+  PlanTrack,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -599,7 +611,7 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
             accessible
             accessibilityLabel={`${t(`missions.findings.${f.kind}`)}: ${f.text}`}
           >
-            <Icon name={FINDING_ICON[f.kind]} size={15} color={open ? colors.ink : colors.faint} />
+            <LineIcon name={FINDING_ICON[f.kind]} size={15} color={open ? colors.ink : colors.faint} variant="small" />
             <View style={styles.grow}>
               <Text variant="small" tone={open ? "ink" : "ink2"} style={open ? styles.bold : undefined}>
                 {f.text}
