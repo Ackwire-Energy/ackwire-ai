@@ -182,9 +182,13 @@ test("Windows and Linux: each platform's own files, from the newest release that
     url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_x64-setup.exe",
     signature: "SIGNATURE-BASE64",
   });
-  expect(await update("target=linux&arch=x86_64&current=0.2.0")).toMatchObject({
+  expect(await update("target=linux&arch=x86_64&current=0.2.0&bundle=appimage")).toMatchObject({
     url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_amd64.AppImage",
   });
+  // A deb install can't take the AppImage (the updater would refuse it after the whole download): it downloads
+  // the new deb instead, and so does an app that doesn't say which it is.
+  expect(await update("target=linux&arch=x86_64&current=0.2.0&bundle=deb")).toBe(204);
+  expect(await update("target=linux&arch=x86_64&current=0.2.0")).toBe(204);
   // The Mac's newest release has no updater bundle: nothing to install.
   expect(await update("target=darwin&arch=aarch64&current=0.2.0")).toBe(204);
 });

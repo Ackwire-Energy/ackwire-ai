@@ -342,6 +342,9 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
     const limit = await rateLimiter.consume(`desktop-update:${requestIp(c.req.raw.headers)}`, LATEST_LIMIT);
     if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
     const platform = desktopTarget(c.req.query("target"), c.req.query("arch"));
+    // On Linux the updater bundle is the AppImage, which only an AppImage install takes in place: a deb (or an
+    // app that doesn't say which it is, `bundle`) updates by downloading again, from `/desktop/latest`'s link.
+    if (platform === "linux" && c.req.query("bundle") !== "appimage") return c.body(null, 204);
     const release = platform ? await releases.latest(platform).catch(() => null) : null;
     if (!release?.updater) return c.body(null, 204);
     return c.json(

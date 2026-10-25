@@ -29,11 +29,13 @@ const LOOPBACK_HOST = /^(localhost|127(\.\d+){3}|\[::1\])$/i;
 
 /**
  * "agentes.tail1234.ts.net" or "https://chat.example.com/login" → the server's origin. Null when it can't be
- * one: not http(s), a user or password in it, or http where it isn't allowed. `allowHttp: true` (a development
- * build) allows the local network; `"loopback"` (the desktop app) only this computer.
+ * one: not http(s), a space in it, a user or password in it, or http where it isn't allowed. `allowHttp: true`
+ * (a development build) allows the local network; `"loopback"` (the desktop app) only this computer.
  */
 export function normalizeServer(input: string, opts: { allowHttp?: boolean | "loopback" } = {}): string | null {
   const raw = input.trim();
+  // Some URL parsers (Chromium's) keep a space in a host as `%20`: never an address.
+  if (/\s/.test(raw)) return null;
   let url: URL;
   try {
     url = new URL(/^[a-z][\w+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
@@ -152,12 +154,13 @@ async function askInstance(server: string, fetchFn: FetchLike, timeoutMs: number
 
 /**
  * Asks a server (an origin from `normalizeServer`) whether these apps can use it. A server that names
- * another https address as its own (`PUBLIC_URL`) is used there or not at all: its realtime and its
- * computer-pairing page accept only that address.
+ * another address as its own (`PUBLIC_URL`) is used there or not at all: its sign-in, realtime and
+ * computer-pairing page accept only that address. That is an https address, or, for a server on this
+ * computer, its own name for this computer (`http://localhost:3000` asked at `http://127.0.0.1:3000`).
  */
 export async function checkServer(server: string, fetchFn: FetchLike = fetch, timeoutMs = 8000): Promise<ServerCheck> {
   const here = await askInstance(server, fetchFn, timeoutMs);
   if (!here.ok) return here;
-  const own = normalizeServer(here.instance.url ?? "");
+  const own = normalizeServer(here.instance.url ?? "", { allowHttp: isLoopback(server) ? "loopback" : false });
   return own && own !== server ? askInstance(own, fetchFn, timeoutMs) : here;
 }

@@ -81,16 +81,6 @@ export function desktopNotice(
   };
 }
 
-/**
- * A one-time secret in this page's fragment (`#token=…`), taken out of the address and the history at once;
- * null when there is none, or it isn't one.
- */
-export function takeFragmentSecret(key: "token" | "claim"): string | null {
-  const value = new URLSearchParams(window.location.hash.slice(1)).get(key);
-  window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
-  return value && /^[A-Za-z0-9_-]{20,200}$/.test(value) ? value : null;
-}
-
 /** The window opens this in the browser instead of loading it (main_window.rs). */
 export const BROWSER_SIGN_IN_PATH = "/desktop/sign-in";
 /** Loading this brings the window to the front (main_window.rs), then goes on to `to`. */

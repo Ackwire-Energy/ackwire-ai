@@ -68,6 +68,11 @@ describe("server addresses", () => {
       expect(normalizeServer(bad)).toBeNull();
   });
 
+  test("a space anywhere isn't an address (some URL parsers keep it in a host as %20)", () => {
+    for (const bad of ["https://box.tail1234.ts.net/ x", "box.tail1234.ts.net\tx", "http://localhost:3000/ a"])
+      expect(normalizeServer(bad, { allowHttp: "loopback" })).toBeNull();
+  });
+
   test("the host to show, and whether it is on a tailnet", () => {
     expect(serverHost("https://box.tail1234.ts.net")).toBe("box.tail1234.ts.net");
     expect(serverHost("https://chat.example.com:8443")).toBe("chat.example.com:8443");
@@ -205,5 +210,18 @@ describe("checking a server", () => {
     // A server that calls itself by an http address keeps the one typed.
     const local = fakeFetch({ [typed]: { status: 200, body: instance({ url: "http://localhost:3000" }) } });
     expect(await checkServer(typed, local)).toMatchObject({ ok: true, server: typed });
+  });
+
+  test("a server on this computer is used at its own name for it (it accepts sign-ins only from there)", async () => {
+    const asked = "http://127.0.0.1:3000";
+    const own = "http://localhost:3000";
+    const both = fakeFetch({
+      [asked]: { status: 200, body: instance({ url: own }) },
+      [own]: { status: 200, body: instance({ url: own }) },
+    });
+    expect(await checkServer(asked, both)).toMatchObject({ ok: true, server: own });
+    // Its own name points off this computer over plain http: never followed.
+    const away = fakeFetch({ [asked]: { status: 200, body: instance({ url: "http://192.168.1.20:3000" }) } });
+    expect(await checkServer(asked, away)).toMatchObject({ ok: true, server: asked });
   });
 });

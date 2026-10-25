@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
-import { takeFragmentSecret } from "@/lib/desktop";
+import { takeFragmentParam } from "@/lib/fragment";
 
 /**
  * In the app's window: the one-time sign-in a connect link carried, taken out of the address and the history
@@ -20,7 +20,7 @@ export function DesktopHandoverPage({ to }: { to?: string }) {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const token = takeFragmentSecret("token");
+    const token = takeFragmentParam("token");
     if (!token) {
       setFailed(true);
       return;
