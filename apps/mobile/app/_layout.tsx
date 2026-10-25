@@ -30,7 +30,10 @@ export default function RootLayout() {
  * splash stays up until the fonts, the session and the organization are known, so nobody sees a flash of the
  * wrong side. Exactly one group is open at any moment: with both guarded (e.g. signed in while the
  * organization still loads), expo-router sends the guarded screen to the first open route, `+not-found`, and
- * the app would stay there once the organization arrived.
+ * the app would stay there once the organization arrived. While the session is still being read (the saved
+ * one comes out of SecureStore a moment after launch) `(app)` is the open one, so the URL the app opened with
+ * ("/", a push's conversation) is kept: closing it then sent "/" to `+not-found`, still on screen when the
+ * session arrived ("Não achamos isso" on every launch). Each side sends a closed screen to the other's start.
  */
 function Gate() {
   const fontsReady = useAppFonts();
@@ -39,6 +42,7 @@ function Gate() {
   const { colors, scheme } = useTheme();
   const navigationTheme = useNavigationTheme();
   const signedIn = session.signedIn;
+  const inApp = signedIn || session.pending;
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
 
   useEffect(() => {
@@ -65,10 +69,10 @@ function Gate() {
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Protected guard={signedIn}>
+        <Stack.Protected guard={inApp} redirectTo="/sign-in">
           <Stack.Screen name="(app)" />
         </Stack.Protected>
-        <Stack.Protected guard={!signedIn}>
+        <Stack.Protected guard={!inApp} redirectTo="/">
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
       </Stack>
