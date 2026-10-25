@@ -35,7 +35,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       contents: write
@@ -44,7 +44,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       ref: ${{ steps.version.outputs.ref }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: useblacksmith/checkout@v1 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -119,7 +119,7 @@ jobs:
   macos:
     needs: version
     # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
-    runs-on: macos-15-intel
+    runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
@@ -295,7 +295,7 @@ jobs:
 
   windows:
     needs: version
-    runs-on: windows-latest
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 60
     env:
       VERSION: ${{ needs.version.outputs.version }}
@@ -358,13 +358,13 @@ jobs:
   linux:
     needs: version
     # 22.04: an older glibc, so the app runs on more distributions.
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     timeout-minutes: 60
     env:
       BIN_DIR: apps/desktop/src-tauri/binaries
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: useblacksmith/checkout@v1 # v4.4.0
         with:
           ref: ${{ needs.version.outputs.ref }}
 
@@ -463,12 +463,12 @@ jobs:
   publish:
     needs: [version, macos, windows, linux]
     if: ${{ needs.version.outputs.tag != '' }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: useblacksmith/checkout@v1 # v4.4.0
         with:
           ref: ${{ needs.version.outputs.ref }}
 
