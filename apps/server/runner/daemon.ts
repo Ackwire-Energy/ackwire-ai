@@ -386,7 +386,7 @@ export class RunnerDaemon implements RequestObserver {
           : "The browser on the agent's desktop needs this computer's desktop and browser switches on",
       );
     }
-    const started = await this.desktops.ensure(agent);
+    const started = await this.desktops.ensure(agent, { chrome: use === "browser" });
     const s = this.desktops.session(agent.id);
     if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
     return { ...started, xauthority: s.xauthority, home: s.home };

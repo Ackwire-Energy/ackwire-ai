@@ -33,7 +33,7 @@ import {
   storeOwnUsage,
   syncMachineAccounts,
 } from "./machine-accounts";
-import { onManagedMachineHello } from "./machine-provisioning";
+import { onManagedMachineHello, type ReadyEmailDeps } from "./machine-provisioning";
 import {
   applyTaskDone,
   applyTaskEvent,
@@ -128,6 +128,8 @@ export interface MachineStatus {
   id: string;
   orgId: string;
   name: string;
+  /** `managed`: the workspace's own computer (ADR 0056 §10), always on. */
+  kind?: string;
   online: boolean;
   execAllowed: boolean;
   os: string;
@@ -195,6 +197,8 @@ export interface MachineHubDeps {
   brainIdleMs?: number;
   /** A cross-replica caller checks this often that the replica it asked still holds the socket (default 5 s). */
   rpcLivenessMs?: number;
+  /** The server sends email: the workspace's own computer, ready after a long wait, is emailed to its owners. */
+  readyEmail?: Omit<ReadyEmailDeps, "machines"> | null;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -245,7 +249,8 @@ export function isNewWork(request: MachineRequest) {
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove";
-    // Watching a desktop that already runs starts nothing; taking control of it or a terminal is work on it.
+    // Watching a desktop isn't (the runner starts one that isn't running, and it stays on); taking control of it
+    // or a terminal is work on it.
     case "stream.open":
       return request.kind === "terminal" || request.mode === "control";
     default:
@@ -472,7 +477,8 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.lastPong = Date.now();
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
     // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
-    await onManagedMachineHello({ db, pubsub }, machine).catch((error) =>
+    const readyEmail = deps.readyEmail ? { ...deps.readyEmail, machines: hub } : null;
+    await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
       deps.log?.warn("managed machine hello failed", { machineId: machine.id, error: String(error) }),
     );
     // Protocol 9: the agents that use this computer, for the desktop app.
@@ -920,7 +926,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     }),
   );
 
-  return {
+  const hub = {
     replicaId,
 
     /** A socket opened on `/api/machines/connect`: it has `HELLO_TIMEOUT_MS` to say `hello`. */
@@ -1079,6 +1085,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         id: row.id,
         orgId: row.orgId,
         name: row.name,
+        kind: row.kind,
         online,
         execAllowed: row.execAllowed,
         os: row.os,
@@ -1125,6 +1132,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       }
     },
   };
+  return hub;
 }
 
 export type MachineHub = ReturnType<typeof createMachineHub>;

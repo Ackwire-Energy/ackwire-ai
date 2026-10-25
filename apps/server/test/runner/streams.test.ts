@@ -5,10 +5,14 @@ import type { DesktopSessions } from "../../runner/desktop-session";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { DataSockets, openDataSocket } from "../../runner/streams";
 import type { Terminals } from "../../runner/terminal";
-import { errorCode, waitFor } from "./helpers";
+import { desktopOn, errorCode, fakeXvnc, removeDirs, tempDir, waitFor } from "./helpers";
 
 const servers: { stop(force?: boolean): unknown }[] = [];
+const dirs: string[] = [];
+const closers: (() => void)[] = [];
 afterEach(async () => {
+  for (const close of closers.splice(0)) close();
+  removeDirs(dirs);
   for (const s of servers.splice(0)) await Promise.race([s.stop(true), Bun.sleep(300)]);
 });
 
@@ -130,8 +134,13 @@ const ACCESS = (tools: Partial<RunnerAccess["tools"]>): RunnerAccess => ({
 });
 const scope: RequestScope = { signal: new AbortController().signal, output: () => undefined };
 
-test("stream.open: each kind behind its switch; control and a terminal are new work on a paused computer, watching isn't", async () => {
+test("stream.open: each kind behind its switch; a desktop that isn't running starts for whoever opens it, unless paused", async () => {
   const s = streamServer();
+  const dir = tempDir("streams-x-");
+  dirs.push(dir);
+  const x = await fakeXvnc(dir);
+  closers.push(x.close);
+  const desktop = desktopOn(x.socketPath, { running: false });
   const opened: string[] = [];
   let paused = false;
   let tools: Partial<RunnerAccess["tools"]> = { desktop: true, terminal: true };
@@ -142,11 +151,7 @@ test("stream.open: each kind behind its switch; control and a terminal are new w
     access: () => ACCESS(tools),
     paused: () => paused,
     streams: new DataSockets({ url: s.url, token: TOKEN }),
-    desktops: {
-      status: () => ({ running: false, streams: 0 }),
-      session: () => null,
-      hold: () => null,
-    } as unknown as DesktopSessions,
+    desktops: desktop.desktops as unknown as DesktopSessions,
     terminals: {
       open: async (_agent: AgentScope, size: { cols: number }, dial: () => Promise<unknown>) => {
         await dial();
@@ -165,13 +170,22 @@ test("stream.open: each kind behind its switch; control and a terminal are new w
   expect(await open(terminal)).toBe("ok");
   expect(opened).toEqual(["terminal 80"]);
   expect(s.hellos).toEqual([{ type: "stream.hello", token: TOKEN, streamId: STREAM_ID }]);
-  // The desktop isn't running: a viewer never starts it.
-  expect(await open(watch)).toBe("desktop_off");
 
+  // Nothing new starts on a paused computer: not even the desktop for a viewer.
   paused = true;
-  expect(await open(watch)).toBe("desktop_off");
+  expect(await open(watch)).toBe("paused");
   expect(await open(control)).toBe("paused");
   expect(await open(terminal)).toBe("paused");
+  expect(desktop.state.started).toEqual([]);
+  paused = false;
+
+  // A viewer of a desktop that isn't running starts it, then watches it (logged in view-only).
+  expect(await open(watch)).toBe("ok");
+  expect(desktop.state.started).toEqual(["dev"]);
+  expect(x.logins.map((l) => l.password)).toEqual(["view"]);
+  // Running: watched on a paused computer as before.
+  paused = true;
+  expect(await open(watch)).toBe("ok");
   paused = false;
 
   tools = { desktop: false, terminal: false };

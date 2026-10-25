@@ -1,4 +1,4 @@
-import { SCREEN_KINDS, type ScreenKind } from "@agenteschat/adapters";
+import { SCREEN_KINDS } from "@agenteschat/adapters";
 import {
   cancelHandoff,
   claimHandoff,
@@ -11,7 +11,6 @@ import {
   requireBrowserAccess,
   startTakeover,
   stopAgentBrowser,
-  stopDesktop,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -39,13 +38,6 @@ export const BrowserHandoff = z
 
 const HandoffParams = OrgParams.extend({ handoffId: z.uuid() });
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
-
-/** What "Parar" does to each screen, for the API docs. */
-const STOP_SUMMARY: Record<ScreenKind, string> = {
-  browser: "Close the agent's browser now (its logins stay); its next browser call opens a fresh one",
-  desktop:
-    "Stop the agent's desktop now, with what runs on it (admins, the agent's owner, whoever may drive its computer)",
-};
 
 /**
  * A person's turn on one of an agent's screens (ADR 0040 §6). The agent asks
@@ -114,27 +106,26 @@ export function browserRoutes(deps: AppDeps) {
         return c.json(await startTakeover(handoffDeps, c.get("user").id, orgId, agentId, runId ?? null, screen), 200);
       },
     );
-
-    app.openapi(
-      createRoute({
-        method: "post",
-        path: `/organizations/{orgId}/agents/{agentId}/${screen}/stop`,
-        tags,
-        security,
-        summary: STOP_SUMMARY[screen],
-        request: { params: AgentParams },
-        responses: { 204: { description: "Stopped" }, ...errors },
-      }),
-      async (c) => {
-        const { orgId, agentId } = c.req.valid("param");
-        const hub = deps.extras?.sandbox?.machines?.hub;
-        const userId = c.get("user").id;
-        if (screen === "desktop") await stopDesktop({ db, hub, pubsub: adapters.pubsub }, userId, orgId, agentId);
-        else await stopAgentBrowser(db, hub, userId, orgId, agentId, adapters.pubsub, screen);
-        return c.body(null, 204);
-      },
-    );
   }
+
+  // Only the browser stops: the agent's screen stays on (ADR 0058 §1).
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/stop",
+      tags,
+      security,
+      summary: "Close the agent's browser now (its logins stay); its next browser call opens a fresh one",
+      request: { params: AgentParams },
+      responses: { 204: { description: "Stopped" }, ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const hub = deps.extras?.sandbox?.machines?.hub;
+      await stopAgentBrowser(db, hub, c.get("user").id, orgId, agentId, adapters.pubsub);
+      return c.body(null, 204);
+    },
+  );
 
   app.openapi(
     createRoute({

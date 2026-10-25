@@ -91,20 +91,17 @@ export async function signInForDesktop(
 }
 
 /**
- * The agent's desktop turned on when it is off, watched as noVNC would until
- * its first framebuffer update (RFB 3.8, security None, shared), and its
- * terminal asked who it runs as (never root). Throws on the first failure.
+ * The agent's desktop watched as noVNC would until its first framebuffer
+ * update (RFB 3.8, security None, shared; opening it starts one that isn't
+ * running), and its terminal asked who it runs as (never root). Throws on the
+ * first failure.
  */
 export async function checkDesktop(s: DesktopSmokeSession, step: (line: string) => void) {
   const headers = { cookie: s.cookie, origin: s.origin };
-  const api = async (path: string, method: "GET" | "POST" = "GET") => {
-    const res = await fetch(`${s.base}/api/app/organizations/${s.orgId}/agents/${s.agentId}/desktop${path}`, {
-      method,
-      headers: { ...headers, "content-type": "application/json" },
-      ...(method === "POST" ? { body: "{}" } : {}),
-    });
-    if (!res.ok) throw new Error(`${method} …/desktop${path}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
-    return res;
+  const status = async () => {
+    const res = await fetch(`${s.base}/api/app/organizations/${s.orgId}/agents/${s.agentId}/desktop`, { headers });
+    if (!res.ok) throw new Error(`GET …/desktop: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    return (await res.json()) as { available: boolean; reason: string | null; detail: string | null; running: boolean };
   };
   const socket = (path: string, query: Record<string, string>) => {
     const url = new URL(path, s.base);
@@ -113,28 +110,17 @@ export async function checkDesktop(s: DesktopSmokeSession, step: (line: string) 
     return url.toString();
   };
 
-  const status = (await (await api("")).json()) as {
-    available: boolean;
-    reason: string | null;
-    detail: string | null;
-    running: boolean;
-    terminal: { available: boolean; reason: string | null };
-  };
-  if (!status.available) {
+  const desktop = await status();
+  if (!desktop.available) {
     throw new Error(
-      `@${s.handle}'s desktop can't be shown: ${status.reason}${status.detail ? ` (${status.detail})` : ""}`,
+      `@${s.handle}'s desktop can't be shown: ${desktop.reason}${desktop.detail ? ` (${desktop.detail})` : ""}`,
     );
   }
-  if (!status.running) {
-    const started = performance.now();
-    await api("/start", "POST");
-    step(`desktop: turned on in ${Math.round(performance.now() - started)} ms`);
-  }
+  if (!desktop.running) step("desktop: not running; watching it starts it");
   const rfb = await watchDesktop(socket(STREAM_PATHS.desktop, { mode: "watch" }), headers);
   step(
     `desktop: RFB 003.008, security None, ${rfb.width}×${rfb.height} "${rfb.name}"; its version after ${rfb.versionMs} ms, a framebuffer update after ${rfb.updateMs} ms`,
   );
-  if (!status.terminal.available) throw new Error(`@${s.handle}'s terminal can't open: ${status.terminal.reason}`);
   const shell = await terminalUser(socket(STREAM_PATHS.terminal, { cols: "80", rows: "24" }), headers);
   if (shell.user === "root") throw new Error(`@${s.handle}'s terminal runs as root`);
   step(`terminal: as ${shell.user}; the shell's first output after ${shell.firstMs} ms`);

@@ -708,6 +708,20 @@
       "when": 1792856168749,
       "tag": "0100_usage_plan_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792897226858,
+      "tag": "0101_provisioning_ready_time",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1792897233327,
+      "tag": "0102_drop_eta_seconds",
+      "breakpoints": true
     }
   ]
 }

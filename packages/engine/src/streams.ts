@@ -182,12 +182,20 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     if ("refused" in target) return close(s, target.refused, target.reason);
     if (full(s, target.machineId)) return close(s, STREAM_CLOSE.tooMany, "too_many_streams");
     s.machineId = target.machineId;
-    const request = { op: "stream.open", streamId: s.id, ...s.request, agent: target.agent } as Extract<
+    const { machineId, agent } = target;
+    const request = { op: "stream.open", streamId: s.id, ...s.request, agent } as Extract<
       MachineRequest,
       { op: "stream.open" }
     >;
+    const open = () => deps.hub.call(machineId, request, { timeoutMs: limits.openTimeoutMs });
     try {
-      await deps.hub.call(target.machineId, request, { timeoutMs: limits.openTimeoutMs });
+      await open().catch(async (error: unknown) => {
+        // A runner from before desktops stayed on refuses one that isn't running: it starts, then opens.
+        if (!(error instanceof MachineRequestError && error.code === "desktop_off") || s.closed) throw error;
+        const start = { op: "desktop.session.start" as const, agent };
+        await deps.hub.call(machineId, start, { timeoutMs: limits.openTimeoutMs });
+        if (!s.closed) await open();
+      });
       // The runner answers only once its data socket got `stream.ready`: without one by now, none is coming.
       if (!s.runner) close(s, STREAM_CLOSE.late, "no data socket");
     } catch (error) {

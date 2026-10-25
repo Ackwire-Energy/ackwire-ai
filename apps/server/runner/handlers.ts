@@ -364,6 +364,8 @@ async function doList(
   return { entries };
 }
 
+const PAUSED = "The owner paused this computer; nothing new starts here until it is resumed";
+
 /** Protocol 18: a stream that is new work (control of a desktop, a terminal); watching one that runs isn't. */
 const workStream = (req: MachineRequest) =>
   req.op === "stream.open" && (req.kind === "terminal" || req.mode === "control");
@@ -371,9 +373,7 @@ const workStream = (req: MachineRequest) =>
 /** Runs one request; throws RunnerError (or fs errors) on failure. */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
-  if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) {
-    throw new RunnerError("paused", "The owner paused this computer; nothing new starts here until it is resumed");
-  }
+  if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
   if (ctx.systemMode?.() && OP_ROUTES[req.op] !== "machine") {
     if (!ctx.workers) {
       throw new RunnerError(
@@ -550,6 +550,11 @@ async function handleStream(
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
     if (req.mode !== "watch" && req.mode !== "control") throw new RunnerError("bad_request", "watch or control");
+    // Whoever opens one that isn't running starts it, and it stays on; except on a paused computer.
+    if (!ctx.desktops.status(agent).running) {
+      if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+      await ctx.desktops.ensure(agent);
+    }
     const keyboard = req.mode === "control" && isDesktopKeyboard(req.keyboard) ? req.keyboard : undefined;
     await openDesktopStream(ctx.desktops, agent, req.mode, dial, keyboard);
   } else if (req.kind === "terminal") {

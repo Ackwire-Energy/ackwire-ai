@@ -68,6 +68,19 @@ export type EmailTemplate =
       /** `agentName` empty: "an agent" in the email's language. */
       items: { agentName: string; title: string; ageHours: number }[];
       url: string;
+    }
+  /** The workspace's own computer is ready after a long wait (ADR 0056 §10): what it is, and what to do next. */
+  | {
+      kind: "computer_ready";
+      locale?: EmailLocale;
+      orgName: string;
+      /** Its size, when the provisioner said it. */
+      specs: { cpus: number; memoryGb: number; diskGb: number } | null;
+      /** No agent has an AI to think with yet: connecting one is the first step. */
+      needsAi: boolean;
+      hasAgents: boolean;
+      /** The workspace in the app. */
+      url: string;
     };
 
 const esc = (s: string) =>
@@ -85,9 +98,12 @@ const LAYOUT = {
   },
 };
 
+/** A paragraph of HTML, or numbered steps (`<ol>`, counted in the text part too). */
+type Block = string | { steps: string[] };
+
 function layout(
   title: string,
-  paragraphs: string[],
+  paragraphs: Block[],
   action?: { label: string; url: string },
   options: { lang?: EmailLocale; footer?: string } = {},
 ) {
@@ -99,7 +115,13 @@ function layout(
 <main style="max-width:560px;margin:0 auto">
 <p style="font-weight:600;margin:0 0 24px">agentes</p>
 <h1 style="font-size:20px;margin:0 0 16px">${esc(title)}</h1>
-${paragraphs.map((p) => `<p style="margin:0 0 16px">${p}</p>`).join("\n")}
+${paragraphs
+  .map((p) =>
+    typeof p === "string"
+      ? `<p style="margin:0 0 16px">${p}</p>`
+      : `<ol style="margin:0 0 16px;padding-left:24px">${p.steps.map((step) => `<li style="margin:0 0 8px">${step}</li>`).join("")}</ol>`,
+  )
+  .join("\n")}
 ${
   action
     ? `<p style="margin:24px 0"><a href="${esc(action.url)}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px">${esc(action.label)}</a></p>
@@ -116,9 +138,10 @@ ${
       .replace(/&gt;/g, ">")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'");
-  const text = [title, "", ...paragraphs.map(strip), ...(action ? ["", `${action.label}: ${action.url}`] : [])].join(
-    "\n",
+  const lines = paragraphs.flatMap((p) =>
+    typeof p === "string" ? [strip(p)] : p.steps.map((step, i) => `${i + 1}. ${strip(step)}`),
   );
+  const text = [title, "", ...lines, ...(action ? ["", `${action.label}: ${action.url}`] : [])].join("\n");
   return { html, text };
 }
 
@@ -296,6 +319,20 @@ const WORDS = {
       note: "Pedidos sem decisão expiram em 24 horas e nada é executado.",
       button: "Abrir aprovações",
     },
+    computerReady: {
+      subject: (org: string) => `O computador da ${org} está pronto`,
+      title: "O computador dos seus agentes está pronto",
+      sizes: (cpus: string, memory: string, disk: string) => `${cpus}, ${memory} GB de memória e ${disk} GB de disco`,
+      body: (org: string, sizes: string | null) =>
+        `O computador da ${org} está ligado e configurado${sizes ? `: ${sizes}` : ""}, com um usuário só para cada agente. Ele fica ligado dia e noite, para os agentes trabalharem a qualquer hora.`,
+      next: "Próximos passos",
+      ai: "<strong>Conecte sua IA.</strong> Entre com o seu plano do Claude ou do ChatGPT, com o plano de código de outra IA, ou com uma chave de API. É com ela que os agentes pensam.",
+      task: "<strong>Passe a primeira tarefa.</strong> No #general, chame um agente com @ e diga do que precisa.",
+      watch:
+        "<strong>Veja os agentes trabalhando.</strong> Na página de um agente, clique em Abrir para ver o computador dele ao vivo. Assuma o controle quando quiser e devolva quando terminar.",
+      create: "<strong>Crie um agente.</strong> Ele trabalha neste computador desde o começo.",
+      button: (org: string) => `Abrir ${org}`,
+    },
   },
   en: {
     role: { owner: "owner", admin: "admin", member: "member" } as Record<string, string>,
@@ -355,6 +392,20 @@ const WORDS = {
       note: "Requests without a decision expire after 24 hours and nothing runs.",
       button: "Open approvals",
     },
+    computerReady: {
+      subject: (org: string) => `${org}'s computer is ready`,
+      title: "Your agents' computer is ready",
+      sizes: (cpus: string, memory: string, disk: string) => `${cpus}, ${memory} GB of memory and ${disk} GB of disk`,
+      body: (org: string, sizes: string | null) =>
+        `${org}'s computer is on and set up${sizes ? `: ${sizes}` : ""}, with a user of its own for each agent. It stays on day and night, so your agents can work any time.`,
+      next: "Next steps",
+      ai: "<strong>Connect your AI.</strong> Sign in with your Claude or ChatGPT plan, another AI's coding plan, or an API key. Your agents think with it.",
+      task: "<strong>Give a first task.</strong> In #general, call an agent with @ and say what you need.",
+      watch:
+        "<strong>Watch them work.</strong> On an agent's page, press Open to see its computer live. Take control whenever you want, and hand it back when you're done.",
+      create: "<strong>Create an agent.</strong> It works on this computer from the start.",
+      button: (org: string) => `Open ${org}`,
+    },
   },
 } satisfies Record<EmailLocale, unknown>;
 
@@ -362,7 +413,7 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
   if (t.kind === "waitlist_confirm") return waitlistEmail(t);
   const lang = emailLocale(t.locale);
   const w = WORDS[lang];
-  const page = (title: string, paragraphs: string[], action: { label: string; url: string }) =>
+  const page = (title: string, paragraphs: Block[], action: { label: string; url: string }) =>
     layout(title, paragraphs, action, { lang });
   switch (t.kind) {
     case "invitation": {
@@ -421,6 +472,25 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
           ],
           { label: w.budget.button, url: t.url },
         ),
+      };
+    }
+    case "computer_ready": {
+      const c = w.computerReady;
+      const num = (n: number) => n.toLocaleString(lang, { maximumFractionDigits: 1 });
+      const sizes = t.specs
+        ? c.sizes(
+            `${num(t.specs.cpus)} ${t.specs.cpus === 1 ? "CPU" : "CPUs"}`,
+            num(t.specs.memoryGb),
+            num(t.specs.diskGb),
+          )
+        : null;
+      const steps = [...(t.needsAi ? [c.ai] : []), ...(t.hasAgents ? [c.task, c.watch] : [c.create])];
+      return {
+        subject: c.subject(t.orgName),
+        ...page(c.title, [c.body(esc(t.orgName), sizes), `<strong>${c.next}</strong>`, { steps }], {
+          label: c.button(t.orgName),
+          url: t.url,
+        }),
       };
     }
     case "approval_digest": {

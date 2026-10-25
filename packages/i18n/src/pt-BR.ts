@@ -6739,6 +6739,7 @@ export const ptBR = {
       notFound: "Este computador não está mais conectado.",
       nameRequired: "Dê um nome ao computador.",
       pairingInvalid: "Código inválido, já usado ou vencido. Gere outro.",
+      pairingOff: "Este workspace tem um computador próprio: outros computadores não podem ser conectados a ele.",
       targetOffline: "Esse computador desconectou. Escolha outro.",
       targetNotFound: "Esse computador não existe mais. Escolha outro.",
       targetSame: "Os agentes já estão nesse computador.",

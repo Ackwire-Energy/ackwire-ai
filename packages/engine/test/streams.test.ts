@@ -199,7 +199,7 @@ describe("the broker", () => {
     const machine = await paired();
     const answers: (() => Promise<unknown>)[] = [
       async () => {
-        throw new MachineRequestError("desktop_off", "The desktop is off");
+        throw new MachineRequestError("desktop_unavailable", "Install the agents' desktops");
       },
       async () => {
         throw new MachineOfflineError("Box");
@@ -221,13 +221,49 @@ describe("the broker", () => {
       closes.push(viewer.closed);
     }
     expect(closes).toEqual([
-      { code: STREAM_CLOSE.refused, reason: "desktop_off" },
+      { code: STREAM_CLOSE.refused, reason: "desktop_unavailable" },
       { code: STREAM_CLOSE.unreachable, reason: "offline" },
       { code: STREAM_CLOSE.refused, reason: "machine_paused" },
       { code: STREAM_CLOSE.tooMany, reason: "too_many_streams" },
       { code: STREAM_CLOSE.late, reason: "no data socket" },
     ]);
     expect(broker.count(f.agent.id, "desktop")).toBe(0);
+  });
+
+  test("an older runner refuses a desktop that isn't running: the server starts it and opens once more", async () => {
+    f = await setup();
+    const machine = await paired();
+    let refuse = 1;
+    const { broker, requests } = brokerFor(machine, {
+      reply: async (request) => {
+        if (request.op === "desktop.session.start") return { display: 20, started: true };
+        if (refuse-- > 0) throw new MachineRequestError("desktop_off", "The agent's desktop isn't running");
+        const link = broker.accept(fakeSocket().socket);
+        await broker.fromRunner(
+          link,
+          JSON.stringify({
+            type: "stream.hello",
+            token: machine.token,
+            streamId: (request as { streamId: string }).streamId,
+          }),
+        );
+        return { opened: true };
+      },
+    });
+    const viewer = fakeSocket();
+    const stream = broker.open(viewer.socket, input(WATCH));
+    await until(() => stream.runner !== null, "the data socket");
+    expect(viewer.closed).toBeNull();
+    expect(requests.map((r) => r.op)).toEqual(["stream.open", "desktop.session.start", "stream.open"]);
+    expect(requests[1]).toMatchObject({ agent: { id: f.agent.id } });
+
+    // Still not running after its start: refused, once.
+    refuse = 2;
+    const again = fakeSocket();
+    broker.open(again.socket, input(WATCH));
+    await until(() => again.closed !== null, "the refusal");
+    expect(again.closed).toEqual({ code: STREAM_CLOSE.refused, reason: "desktop_off" });
+    expect(requests.slice(3).map((r) => r.op)).toEqual(["stream.open", "desktop.session.start", "stream.open"]);
   });
 
   test("a viewer that doesn't keep up ends the stream on both sides; too much or malformed input is 4400", async () => {

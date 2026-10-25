@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { ARTIFACT_LIMITS, createUpload } from "@agenteschat/engine";
+import { ARTIFACT_LIMITS, createUpload, issueManagedMachine, setProvisioning } from "@agenteschat/engine";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -74,6 +74,49 @@ test("connecting over HTTP: code, confirm page, confirm, the token once; errors 
   // The old pairing is gone.
   expect((await api("/machines/pairings", { json: { name: "x" } })).status).toBe(404);
   expect((await runnerPost("/api/machines/pair", { code: "AAAA-BBBB" })).status).toBe(404);
+});
+
+test("a server that gives each workspace its own computer refuses people's pairing; that computer still enrolls", async () => {
+  t = await createTestServer({
+    env: { ALLOW_SIGNUP: "true", MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: "o".repeat(40) },
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const refusal = { code: "machine.pairing_off", message: expect.stringContaining("its own computer") };
+
+  // `curl …/install.sh | sh` against it stops at once: no code nobody could confirm.
+  const asked = await runnerPost("/api/machines/device", { name: "Build box", ...RUNNER });
+  expect(asked.status).toBe(403);
+  expect(await asked.json()).toEqual({ error: refusal });
+  const confirm = await owner(`/api/app/organizations/${orgId}/machines/device/K7Q4ZP/confirm`, { json: {} });
+  expect(confirm.status).toBe(403);
+  expect(await confirm.json()).toEqual({
+    error: {
+      code: "machine.pairing_off",
+      message: "This workspace has its own computer: other computers can't be connected to it.",
+    },
+  });
+
+  // The workspace's own computer redeems the code it was issued.
+  const issued = await issueManagedMachine({ db: t.db }, orgId);
+  const redeemed = await runnerPost("/api/machines/device/token", { deviceCode: issued?.enrollCode });
+  expect(redeemed.status).toBe(200);
+  expect(await redeemed.json()).toMatchObject({ machineId: issued?.machineId, org: { id: orgId } });
+
+  // Its people see the time left, counted by the server, and that this server emails the owners.
+  await setProvisioning({ db: t.db }, orgId, {
+    state: "preparing",
+    step: "installing",
+    expectedReadyAt: new Date(Date.now() + 360_000),
+  });
+  const setup = (await (await owner(`/api/app/organizations/${orgId}/computer-setup`)).json()) as Record<
+    string,
+    unknown
+  >;
+  expect(setup).toMatchObject({ mode: "external", state: "preparing", step: "installing", notifyByEmail: true });
+  expect(setup.secondsLeft).toBeGreaterThan(350);
+  expect(setup).not.toHaveProperty("etaSeconds");
 });
 
 test("\"it wasn't me\", outsiders can't confirm, and new codes are rate limited per address", async () => {

@@ -22,6 +22,8 @@ export interface OperatorDeps {
   pubsub?: PubSub;
   /** Stops a suspended workspace's tasks on its computers. */
   hub?: MachineHub;
+  /** The server sends email: a workspace waiting long for its computer is told its owners will be emailed. */
+  emails?: boolean;
 }
 
 /**

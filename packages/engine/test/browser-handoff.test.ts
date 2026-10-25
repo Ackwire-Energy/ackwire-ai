@@ -499,7 +499,7 @@ describe("take over", () => {
     const [row] = await handoffs();
     if (!row) throw new Error("no handoff");
     expect(row.runId).toBeNull();
-    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/agents/${f.agent.id}?browser=1`);
+    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/agents/${f.agent.id}?computer=1`);
   });
 
   test("a run that isn't the agent's can't carry a take over; one that already ended binds nothing", async () => {
@@ -968,7 +968,7 @@ describe("live view", () => {
     await Bun.sleep(20);
     expect(calls.find((c) => c.op === "browser.act" && c.command === "open")).toMatchObject({
       args: ["https://shop.example.com/login"],
-      link: `/org/${f.org.id}/agents/${f.agent.id}?browser=1`,
+      link: `/org/${f.org.id}/agents/${f.agent.id}?computer=1`,
     });
     expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
     expect(lastStatus(a.got)).toMatchObject({ mode: "control", controllerUserId: f.owner.id, hidden: false });

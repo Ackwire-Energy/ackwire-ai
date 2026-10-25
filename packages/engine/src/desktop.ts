@@ -18,15 +18,13 @@ import {
   openHandoffOn,
   requireBrowserAccess,
   setControlDeadline,
-  stopAgentBrowser,
   touchControl,
 } from "./browser/handoff";
 import { HANDOFF_KEEPALIVE_MS } from "./browser/live";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ForbiddenError, NotFoundError } from "./errors";
 import type { MachineCaller, MachineHub } from "./machine-hub";
-import { drivesComputer, getMachine, machineOnline, requireComputerDriver } from "./machines";
-import { can, getMembership } from "./organizations";
-import { orgStanding } from "./standing";
+import { getMachine, machineOnline, requireComputerDriver } from "./machines";
+import { orgStanding, standingRefusal } from "./standing";
 import type { Stream, StreamBroker, StreamInput, StreamTarget } from "./streams";
 
 const { agents, browserHandoffs } = schema;
@@ -39,21 +37,6 @@ const refused = (code: number, reason: string) => ({ refused: code, reason });
  */
 export const requireDesktopAccess = (db: Database, userId: string, orgId: string, agentId: string) =>
   requireBrowserAccess(db, userId, orgId, agentId, undefined, "desktop");
-
-/** Who may turn an agent's desktop on and off: admins, the agent's owner, and whoever may drive its computer. */
-export async function requireDesktopManager(db: Database, userId: string, orgId: string, agentId: string) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  const [agent] = await db
-    .select({ owner: agents.ownerUserId, machineId: agents.machineId })
-    .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-  if (!agent) throw new NotFoundError("Agent not found");
-  if (can(membership.role, "manage_agents") || agent.owner === userId) return;
-  const machine = agent.machineId ? await getMachine(db, orgId, agent.machineId) : null;
-  if (machine && drivesComputer(machine, { userId, admin: false, owner: false })) return;
-  throw new ForbiddenError("Only admins and the agent's owner can turn its desktop on or off");
-}
 
 /**
  * The computer a person's stream of an agent goes to, or why it can't: the
@@ -202,13 +185,15 @@ export interface DesktopDeps {
   db: Database;
   hub?: MachineCaller;
   streams?: Pick<StreamBroker, "count">;
-  pubsub?: PubSub;
 }
 
 /** The REST reaches a computer through whichever server holds its socket (`hub.call`), unlike a stream. */
 const ANYWHERE = { isLocal: () => true };
 
-/** An agent's desktop as one person sees it: whether it can be shown and runs, who controls it, what they may do. */
+/**
+ * An agent's desktop as one person sees it: whether it can be shown and runs, who controls it, what they may
+ * do. Not running is not "off": opening a stream starts it, and then it stays on (ADR 0058 §1).
+ */
 export interface DesktopStatus {
   /** Whether it can be shown now, else why (a stream's refusal reason: `not_allowed`, `offline`…). */
   available: boolean;
@@ -222,10 +207,10 @@ export interface DesktopStatus {
   handoff: BrowserHandoffView | null;
   /** People watching it through this server. */
   viewers: number;
-  /** This person may take control (and open the terminal), and turn it on or off. */
+  /** This person may take control. */
   canControl: boolean;
-  canStart: boolean;
-  terminal: { available: boolean; reason: string | null; allowed: boolean };
+  /** The agent is held, or its workspace on hold: people may watch, nobody takes control. */
+  held: boolean;
 }
 
 const passes = (check: Promise<unknown>) =>
@@ -243,20 +228,14 @@ export async function desktopStatus(
 ): Promise<DesktopStatus> {
   const { db } = deps;
   await requireDesktopAccess(db, userId, orgId, agentId);
-  const [served, terminalServed, open, canControl, canStart] = await Promise.all([
+  const [served, open, canControl, held] = await Promise.all([
     desktopTarget(db, ANYWHERE, orgId, agentId, "desktop"),
-    desktopTarget(db, ANYWHERE, orgId, agentId, "terminal"),
     openHandoffOn(db, orgId, agentId, "desktop"),
     passes(requireComputerDriver(db, userId, orgId, agentId)),
-    passes(requireDesktopManager(db, userId, orgId, agentId)),
+    standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
   ]);
-  const machineId =
-    "machineId" in served ? served.machineId : "machineId" in terminalServed ? terminalServed.machineId : null;
-  const online = machineId && deps.hub ? (await deps.hub.status(machineId))?.online === true : false;
-  const now = (t: StreamTarget): StreamTarget =>
-    "refused" in t || online ? t : refused(STREAM_CLOSE.unreachable, "offline");
-  const desktop = now(served);
-  const terminal = now(terminalServed);
+  const online = "machineId" in served && deps.hub ? (await deps.hub.status(served.machineId))?.online === true : false;
+  const desktop: StreamTarget = "refused" in served || online ? served : refused(STREAM_CLOSE.unreachable, "offline");
   let running = false;
   let startedAt: string | null = null;
   if ("machineId" in desktop && deps.hub) {
@@ -269,7 +248,7 @@ export async function desktopStatus(
       running = reply.running;
       startedAt = reply.startedAt ?? null;
     } catch {
-      // Not known now: the panel shows it off, and a stream finds out.
+      // Not known now: a stream finds out (and starts it).
     }
   }
   const reasonOf = (t: StreamTarget) => ("refused" in t ? t.reason : null);
@@ -292,33 +271,8 @@ export async function desktopStatus(
     handoff: open ? handoffView(open) : null,
     viewers: deps.streams?.count(agentId, "desktop") ?? 0,
     canControl,
-    canStart,
-    terminal: { available: "machineId" in terminal, reason: reasonOf(terminal), allowed: canControl },
+    held,
   };
-}
-
-/** `POST …/desktop/start` ("Ligar"): admins, the agent's owner, whoever may drive its computer. */
-export async function startDesktop(deps: DesktopDeps, userId: string, orgId: string, agentId: string) {
-  await requireDesktopManager(deps.db, userId, orgId, agentId);
-  if (!deps.hub) throw new ValidationError("Connected computers are not available on this server");
-  const target = await desktopTarget(deps.db, ANYWHERE, orgId, agentId, "desktop");
-  if ("refused" in target) {
-    if (target.refused === STREAM_CLOSE.notFound) {
-      throw new NotFoundError("This agent has no desktop", `desktop.${target.reason}`);
-    }
-    throw new ConflictError("The desktop can't start on this agent's computer", `desktop.${target.reason}`);
-  }
-  await deps.hub.call<"desktop.session.start">(
-    target.machineId,
-    { op: "desktop.session.start", agent: target.agent },
-    { timeoutMs: 30_000 },
-  );
-}
-
-/** `POST …/desktop/stop` ("Desligar"): the same people as "Ligar". */
-export async function stopDesktop(deps: DesktopDeps, userId: string, orgId: string, agentId: string) {
-  await requireDesktopManager(deps.db, userId, orgId, agentId);
-  await stopAgentBrowser(deps.db, deps.hub, userId, orgId, agentId, deps.pubsub, "desktop");
 }
 
 // ── Control on this server ────────────────────────────────────────────────────
@@ -374,8 +328,8 @@ export function createDesktopControl(deps: DesktopControlDeps) {
     /**
      * Keeps the desktops of open desktop handoffs running (worker, every
      * minute): a start every `HANDOFF_KEEPALIVE_MS` counts as use (and starts
-     * one that stopped), so the runner's idle stop never ends a desktop a
-     * person was asked to work on.
+     * one that stopped, after a reboot), so the runner never parks a desktop
+     * a person was asked to work on (it parks only ones untouched for an hour).
      */
     async keepAlive(now = Date.now()) {
       const open = await deps.db
