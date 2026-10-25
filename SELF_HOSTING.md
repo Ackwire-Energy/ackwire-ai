@@ -451,8 +451,9 @@ computer and opens agentes.chat, signed in.
 - **Only its own answer counts.** Other programs and accounts on this computer can listen on its port,
   so the app trusts the server only once its own process answers there (it names itself in
   `~/.agentes/server.json`, which only you can write). Until then nothing of yours goes to that port: not
-  your sign-in, not this computer's token. If something else holds the port when it starts, it moves to a
-  free one. With reach on, Tailscale shares it only while it runs.
+  your sign-in, not this computer's token, not your agents' connections (they pause while it is down).
+  If something else holds the port when it starts, it moves to a free one. With reach on, Tailscale
+  shares it only while it runs.
 - **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
   whenever your session ends. For a browser on another device, add one in your account menu, **Add a
   password**.

@@ -772,6 +772,12 @@ pub fn loopback(app: &AppHandle) -> Option<String> {
     port_of(&folder(app)?).map(loopback_url)
 }
 
+/// Its loopback address while its own child answers there: its host homes run only then (`Runners::rescan`),
+/// so their tokens never reach whatever listens on the port while it is down.
+pub fn answering_loopback(app: &AppHandle) -> Option<String> {
+    is_running(app).then(|| loopback(app)).flatten()
+}
+
 /// Its address for people: `PUBLIC_URL` (the Tailscale one with reach on), else the loopback one.
 pub fn public_url(app: &AppHandle) -> Option<String> {
     let folder = folder(app)?;
@@ -1081,6 +1087,7 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: 
     let (next, answered) = {
         let mut inner = state(app);
         inner.pid = None;
+        inner.phase = Some(Phase::Stopped);
         let answered = inner.answered;
         if !answered && !inner.on_purpose {
             inner.failed = failed_starts(inner.failed, timed_out);
@@ -1095,6 +1102,11 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: 
         let next = next_after(inner.on_purpose, code, answered, inner.failed, inner.update_from.as_deref());
         (next, answered)
     };
+    if answered {
+        // Its host homes pause until it answers again (the next sync starts them).
+        let app = app.clone();
+        std::thread::spawn(move || app.state::<crate::runners::Runners>().rescan(&app));
+    }
     if let Some(code) = code {
         note(app, format!("agentes-server exited with {code}"));
     }
@@ -1300,14 +1312,12 @@ pub fn load(app: &AppHandle) {
     }
 }
 
-/// The person stopped it (Stop, "Stop running it here…"): Tailscale stops sharing it too, and with `forget` the
-/// agents of its organizations stop working here (their homes stay, for when it runs here again).
+/// The person stopped it (Stop, "Stop running it here…"): Tailscale stops sharing it too, and the agents of its
+/// organizations stop working here until it runs again (their homes stay).
 pub fn stop_by_hand(app: &AppHandle, forget: bool) {
     stop(app, forget);
     unserve_here(app);
-    if forget {
-        app.state::<crate::runners::Runners>().rescan(app);
-    }
+    app.state::<crate::runners::Runners>().rescan(app);
 }
 
 /// Quitting, logging out, an update: the server finishes and stops (before the app goes).

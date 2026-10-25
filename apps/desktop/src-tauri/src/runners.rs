@@ -171,7 +171,7 @@ impl Runners {
             return;
         }
         let Ok(root) = orgs_root(app) else { return };
-        let own = crate::local_server::loopback(app);
+        let own = crate::local_server::answering_loopback(app);
         let homes = app_homes(&root, own.as_deref());
         let gone: Vec<String> = {
             let map = self.lock();
