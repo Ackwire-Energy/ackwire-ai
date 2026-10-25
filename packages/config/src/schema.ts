@@ -114,6 +114,24 @@ export const envVars = {
       "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
     section: "Sign-in",
   },
+  OWNER_CLAIM_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner link's token)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the token in the owner link the setup prints. While no account exists, only that link (`/owner#claim=…`) creates the first account, the installation's owner; every other sign-up waits. Unset (an install by hand): the first account to sign up owns the installation.",
+    section: "Sign-in",
+  },
+  OWNER_KEY_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner key)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the key the agentes.chat desktop app keeps when it runs this server on the same computer. Only that key creates the first account (the owner, with no password), and the app signs that owner in with it again whenever the session ends. Set by the desktop app.",
+    section: "Sign-in",
+  },
   TERMS_URL: {
     schema: z.url().optional(),
     description:

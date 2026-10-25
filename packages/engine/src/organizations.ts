@@ -195,22 +195,31 @@ export async function countUsers(db: Database): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** Who may create an account (ADR 0006): see `isSignupAllowed`. */
+export interface SignupPolicy {
+  /** `ALLOW_SIGNUP`: anyone. */
+  allowSignup: boolean;
+  /** An owner link (`OWNER_CLAIM_SHA256`) or the desktop app's owner key (`OWNER_KEY_SHA256`) makes the first account (ADR 0060 §6). */
+  ownerByLink: boolean;
+}
+
 /**
  * Self-hosted sign-up policy: the first account may always register (there is
- * no other way in); after that, only with ALLOW_SIGNUP or a pending
+ * no other way in), unless the installation waits for its owner's link or key,
+ * which make it on their own path; after that, only with ALLOW_SIGNUP or a pending
  * invitation for that email (or from a valid org invite link). Open sign-up on a reachable server would let
  * anyone create organizations (and spend model credits) on it.
  */
 export async function isSignupAllowed(
   db: Database,
   email: string,
-  allowSignup: boolean,
+  policy: SignupPolicy,
   now = new Date(),
   /** The token of an org invite link the person is signing up from. */
   inviteToken?: string | null,
 ) {
-  if (allowSignup) return true;
-  if ((await countUsers(db)) === 0) return true;
+  if ((await countUsers(db)) === 0) return !policy.ownerByLink;
+  if (policy.allowSignup) return true;
   if (inviteToken) {
     const link = await findInviteLink(db, inviteToken);
     if (link && !link.link.revokedAt && link.link.expiresAt > now) return true;
@@ -238,7 +247,7 @@ const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
  * allowed for that e-mail). This tells whether the e-mail has an account, so
  * the route that serves it is rate limited.
  */
-export async function signInOptions(db: Database, email: string, allowSignup: boolean, inviteToken?: string | null) {
+export async function signInOptions(db: Database, email: string, policy: SignupPolicy, inviteToken?: string | null) {
   const rows = await db
     .select({ providerId: accounts.providerId })
     .from(users)
@@ -249,7 +258,7 @@ export async function signInOptions(db: Database, email: string, allowSignup: bo
       account: false,
       password: false,
       providers: [] as SignInProvider[],
-      canSignUp: await isSignupAllowed(db, email, allowSignup, new Date(), inviteToken),
+      canSignUp: await isSignupAllowed(db, email, policy, new Date(), inviteToken),
     };
   }
   const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
@@ -259,6 +268,18 @@ export async function signInOptions(db: Database, email: string, allowSignup: bo
     providers: [...new Set(ids.filter((id) => SIGN_IN_PROVIDERS.has(id)))] as SignInProvider[],
     canSignUp: false,
   };
+}
+
+/** Whether the account signs in with a password (its credential row has one). */
+export async function hasPassword(db: Database, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(
+      and(eq(accounts.userId, userId), eq(accounts.providerId, "credential"), sql`${accounts.password} is not null`),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 /**
