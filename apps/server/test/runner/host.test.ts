@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import path from "node:path";
 import { readStoredConfig } from "../../runner/config";
 import { TOKEN_REFUSED_EXIT } from "../../runner/connection";
-import { HostComputer, type HostOptions } from "../../runner/host";
+import { defaultHostState, HostComputer, type HostOptions } from "../../runner/host";
 import { installSystemService, launchdPlist, systemdSystemUnit } from "../../runner/service";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -123,7 +123,7 @@ test("a home per organization (mode 600, kept by the host) and a runner in each;
     orgId: A,
     orgName: "Acme",
     managedBy: "host",
-    access: { folders: [], tools: { claude: true, codex: true, commands: true } },
+    access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
   });
   expect(existsSync(path.join(state, "work", "acme"))).toBe(true);
   expect(readStoredConfig(home(B))?.workspace).toBe(path.join(state, "work", "beta"));
@@ -202,6 +202,23 @@ test("turned off (404) or refused (401): nothing runs; back on when the server s
   expect(off.children.started).toEqual([]);
 });
 
+test("--no-exec turns commands off in new homes; Claude Code, Codex and the browser stay on, on a Mac and on Linux", async () => {
+  for (const system of [false, true]) {
+    const { host, server, home } = makeHost({ exec: false, system });
+    server.answer([org(A, MA, "agm_a")]);
+    await host.sync();
+    expect(readStoredConfig(home(A))).toMatchObject({
+      exec: false,
+      access: { folders: [], tools: { claude: true, codex: true, commands: false, browser: true } },
+    });
+  }
+});
+
+test("its homes on a Mac go apart from the agentes app's, which starts every home in <home>/orgs", () => {
+  expect(defaultHostState("darwin", "/Users/ana/.agentes-runner")).toBe("/Users/ana/.agentes-runner/host");
+  expect(defaultHostState("linux", "/var/lib/agentes-runner")).toBe("/var/lib/agentes-runner");
+});
+
 test("system mode: each organization its own block of agent uids, root's folder as workspace, one list of uids", async () => {
   const { host, server, home } = makeHost({ system: true, uidRange: [20000, 20299] });
   server.answer([org(A, MA, "agm_a"), org(B, MB, "agm_b")]);
@@ -271,7 +288,8 @@ test("its service: the root unit runs `host` (the token from a file), starts wit
 });
 
 test("once: the homes written, every tool off, nothing started; what is new and what is gone", async () => {
-  const { host, server, children, home } = makeHost({ exec: false, rotate: [B] });
+  // Commands on, as `host` has them without --no-exec: once's homes still get no tool at all.
+  const { host, server, children, home } = makeHost({ exec: true, rotate: [B] });
   server.answer([org(A, MA, "agm_a"), org(B, MB, "agm_b")]);
   expect(await host.once()).toEqual({
     status: "on",
@@ -283,11 +301,10 @@ test("once: the homes written, every tool off, nothing started; what is new and 
   });
   expect(server.sent[0]?.body.rotate).toEqual([B]);
   expect(children.started).toEqual([]);
-  expect(readStoredConfig(home(A))).toMatchObject({
-    managedBy: "host",
-    exec: false,
-    access: { folders: [], tools: { claude: false, codex: false, commands: false } },
-  });
+  const stored = readStoredConfig(home(A));
+  expect(stored).toMatchObject({ managedBy: "host", exec: false, access: { folders: [] } });
+  // Nothing else on: a browser that's off has no key.
+  expect(stored?.access?.tools).toEqual({ claude: false, codex: false, commands: false });
 
   // The next round: nothing new, and an organization it no longer serves is named, its home left alone.
   server.answer([org(A, MA)]);
@@ -295,6 +312,21 @@ test("once: the homes written, every tool off, nothing started; what is new and 
   expect(next).toMatchObject({ status: "on", homes: [{ orgId: A, new: false }], gone: [B] });
   expect(existsSync(home(B))).toBe(true);
   expect(children.started).toEqual([]);
+});
+
+test("once: the server at another port is the same server, its homes not new and its tools kept", async () => {
+  const { host, server, state, home } = makeHost();
+  server.answer([org(A, MA, "agm_a")]);
+  await host.once();
+  const opened = { ...readStoredConfig(home(A)), access: { folders: [], tools: { claude: true, commands: true } } };
+  writeFileSync(path.join(home(A), "config.json"), JSON.stringify(opened));
+
+  const moved = makeHost({ server: "http://127.0.0.1:4311", state, fetch: server.fetch }).host;
+  expect(await moved.once()).toMatchObject({ status: "on", homes: [{ orgId: A, new: false }], gone: [] });
+  expect(readStoredConfig(home(A))).toMatchObject({
+    server: "http://127.0.0.1:4311",
+    access: { tools: { claude: true, commands: true } },
+  });
 });
 
 test("once: says why it wrote nothing", async () => {
@@ -308,7 +340,7 @@ test("once: says why it wrote nothing", async () => {
   expect((await makeHost({ token: () => null }).host.once()).status).toBe("no_token");
 });
 
-test("host --once from the command line: one JSON line, as this computer's user", async () => {
+test("host --once from the command line: one JSON line, as this computer's user, in the home's orgs on a Mac too", async () => {
   const state = tempDir("host-once-");
   dirs.push(state);
   writeFileSync(path.join(state, "token"), "host-token\n", { mode: 0o600 });
@@ -332,19 +364,23 @@ test("host --once from the command line: one JSON line, as this computer's user"
         `http://127.0.0.1:${fake.port}`,
         "--token-file",
         path.join(state, "token"),
-        "--state",
-        state,
         "--name",
         "Ana's Mac",
         "--rotate",
         A,
       ],
-      { stdout: "pipe", stderr: "pipe", env: { ...process.env, AGENTES_RUNNER_HOME: state } },
+      // HOME too: the organization's workspace goes in ~/agentes.
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, AGENTES_RUNNER_HOME: state, HOME: state } },
     );
     const [code, out] = await Promise.all([child.exited, new Response(child.stdout).text()]);
     expect(code).toBe(0);
     expect(out.trim().split("\n")).toHaveLength(1);
-    expect(JSON.parse(out)).toMatchObject({ status: "on", homes: [{ orgId: A, new: true }], gone: [] });
+    // Without --state, where the agentes app keeps the homes it starts (not `host`'s own folder on a Mac).
+    expect(JSON.parse(out)).toMatchObject({
+      status: "on",
+      homes: [{ orgId: A, new: true, home: path.join(state, "orgs", A) }],
+      gone: [],
+    });
     expect(seen[0]).toMatchObject({ name: "Ana's Mac", rotate: [A] });
     // Single-user, on Linux too: no system mode, no uid block.
     const stored = readStoredConfig(path.join(state, "orgs", A));

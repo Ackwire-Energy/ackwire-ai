@@ -121,7 +121,7 @@ export const envVars = {
       .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner link's token)")
       .optional(),
     description:
-      "SHA-256 (hex) of the token in the owner link the setup prints. While no account exists, only that link (`/owner#claim=…`) creates the first account, the installation's owner; every other sign-up waits. Unset (an install by hand): the first account to sign up owns the installation.",
+      "SHA-256 (hex) of the token in an owner link (`<PUBLIC_URL>/owner#claim=<token>`). While no account exists, only that link creates the first account, the installation's owner; every other sign-up waits. Unset: the first account to sign up owns the installation.",
     section: "Sign-in",
   },
   OWNER_KEY_SHA256: {

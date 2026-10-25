@@ -8,6 +8,7 @@ import {
   DEFAULT_AGENT_UID_RANGE,
   expandHome,
   readStoredConfig,
+  runnerHome,
   type StoredConfig,
   serializeConfig,
   writeConfig,
@@ -71,7 +72,7 @@ export interface HostOptions {
   name: string;
   /** Linux as root: every child in system mode. */
   system: boolean;
-  /** Commands on in new homes (`--no-exec`: off). */
+  /** Commands on in the homes `sync` makes (`--no-exec`: off); Claude Code, Codex and the browser are on either way. */
   exec: boolean;
   log: (line: string) => void;
   start: StartChild;
@@ -194,20 +195,24 @@ export class HostComputer {
 
   /**
    * One round that writes the homes and starts nothing (`host --once`, for a program that runs their
-   * runners itself, the desktop app). `gone`: this server's homes here that it no longer serves; they
-   * stay until their owner removes them.
+   * runners itself, the desktop app). A new home has every tool off: that program turns on its own.
+   * New means the organization had no home here: one written for the server at its previous port is the same
+   * home, tools and all. `gone`: this server's homes here that it no longer serves; they stay until their
+   * owner removes them.
    */
   async once(): Promise<HostSyncResult> {
-    const before = this.homes().filter((h) => h.config.managedBy === "host" && h.config.server === this.opts.server);
+    const before = this.homes().filter((h) => h.config.managedBy === "host");
     const orgs = await this.ask();
     if (!orgs) return { status: this.status === "starting" ? "unreachable" : this.status, homes: [], gone: [] };
     const homes = orgs.flatMap((org) => {
       const home = path.join(this.orgsDir, org.orgId);
-      if (!this.writeHome(home, org)) return [];
+      if (!this.writeHome(home, org, false)) return [];
       const fresh = !before.some((h) => h.orgId === org.orgId);
       return [{ orgId: org.orgId, orgName: org.orgName, machineId: org.machineId, home, new: fresh }];
     });
-    const gone = before.filter((h) => !orgs.some((o) => o.orgId === h.orgId)).map((h) => h.orgId);
+    const gone = before
+      .filter((h) => h.config.server === this.opts.server && !orgs.some((o) => o.orgId === h.orgId))
+      .map((h) => h.orgId);
     return { status: "on", homes, gone };
   }
 
@@ -279,8 +284,11 @@ export class HostComputer {
     }
   }
 
-  /** Brings the organization's home up to date (mode 600, written only when it changes). False: it can't run yet. */
-  private writeHome(home: string, org: SyncedOrg): boolean {
+  /**
+   * Brings the organization's home up to date (mode 600, written only when it changes). False: it can't run yet.
+   * A new home gets Claude Code, Codex, the browser and commands (`exec`), or with `tools` false none of them.
+   */
+  private writeHome(home: string, org: SyncedOrg, tools = true): boolean {
     let prev: StoredConfig = {};
     try {
       prev = readStoredConfig(home) ?? {};
@@ -294,8 +302,7 @@ export class HostComputer {
       this.opts.log(`[${tag(org.orgName, org.orgId)}] no agent uids left on this computer for another organization`);
       return false;
     }
-    const exec = this.opts.exec;
-    const browser = exec && this.opts.system;
+    const exec = tools && this.opts.exec;
     const next: StoredConfig = {
       ...prev,
       server: this.opts.server,
@@ -313,7 +320,7 @@ export class HostComputer {
             exec,
             access: {
               folders: [],
-              tools: { claude: exec, codex: exec, commands: exec, ...(browser ? { browser } : {}) },
+              tools: { claude: tools, codex: tools, commands: exec, browser: tools },
             },
           }),
       ...(uids ? { mode: "system" as const, agentUidRange: uids } : {}),
@@ -453,6 +460,13 @@ export class HostComputer {
     });
   }
 }
+
+/**
+ * Where `host` keeps its homes without `--state`. On a Mac the agentes app keeps its own homes in
+ * `<home>/orgs` and starts every one it finds there, so this server's go one folder down.
+ */
+export const defaultHostState = (platform: NodeJS.Platform = process.platform, home = runnerHome()) =>
+  platform === "darwin" ? path.join(home, "host") : home;
 
 /** `HOST_COMPUTER_TOKEN` from a file (the service's way: no secret in the unit), or null. */
 export function readTokenFile(file: string): string | null {

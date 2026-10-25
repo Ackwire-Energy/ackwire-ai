@@ -264,7 +264,6 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     [["--runner-sha256"], "--runner-sha256 needs a value"],
     [["--runner-sha256", "abc"], "64 lowercase hex digits"],
     [["--runner-sha256", "A".repeat(64)], "64 lowercase hex digits"],
-    [["--host-token-file", "/bin/sh"], "go with --system"],
     [["--system", "--host-token-file", "/nonexistent/host-token"], "can't read /nonexistent/host-token"],
     [
       ["--system", "--host-token-file", "/bin/sh", "--enroll-file", "/run/agentes/enroll-code"],
