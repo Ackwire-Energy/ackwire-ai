@@ -395,8 +395,15 @@ function Connect({
             setProblem(null);
           }}
         />
-        <Button type="submit" variant="primary" loading={checking !== null} disabled={!address.trim()}>
-          {checking ? t("desktop.connect.checking") : t("desktop.connect.go")}
+        <Button type="submit" variant="primary" disabled={!address.trim() || checking !== null}>
+          {checking ? (
+            <>
+              <PixelSpinner size={14} color="sky" />
+              {t("desktop.connect.checking")}
+            </>
+          ) : (
+            t("desktop.connect.go")
+          )}
         </Button>
       </form>
       {problem && <ProblemLine problem={problem.problem} host={problem.host} />}

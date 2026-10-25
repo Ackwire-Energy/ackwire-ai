@@ -814,7 +814,7 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 600px;
+  max-width: 560px;
 }
 .dk-fr__none h2 {
   font-size: 13.5px;
@@ -833,7 +833,7 @@ body[data-window="popover"] {
   flex: 1;
   min-width: 0;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--ink);
   overflow-wrap: anywhere;
   -webkit-user-select: text;

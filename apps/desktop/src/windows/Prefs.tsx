@@ -3,6 +3,7 @@
  * (Folders, Tools, Activity, Advanced). Everything about this computer acts through the runners; nothing is
  * granted from the site.
  */
+import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
 import { CountChip, Icon, type IconName } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -89,7 +90,11 @@ export function Prefs() {
           <span className="dk-pnav__whotext">
             <b>{works ? machine : "agentes.chat"}</b>
             <small>
-              {works ? t("desktop.orgCount", { count: homes.length }) : current ? serverName(current) : null}
+              {works
+                ? t("desktop.orgCount", { count: homes.length })
+                : current === CLOUD_SERVER
+                  ? t("desktop.servers.cloudSub")
+                  : current && serverName(current)}
             </small>
           </span>
         </div>

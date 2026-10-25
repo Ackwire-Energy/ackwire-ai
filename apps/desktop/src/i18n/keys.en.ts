@@ -300,7 +300,7 @@ export const desktopEn: DesktopTranslations = {
       dockDesc:
         "With the count of what waits for you. Off, the app stays in the menu bar only while no window is open.",
       menuBarTitle: "Show in the menu bar",
-      menuBarDesc: "The icon up top, with what agents are doing now and the way into the app.",
+      menuBarDesc: "The icon up top: what waits for you, and the way into the app.",
       notchTitle: "Show the agents in the notch",
       notchDesc: "On MacBooks with a notch: who is working shows around the camera.",
     },

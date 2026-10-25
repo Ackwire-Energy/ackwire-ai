@@ -310,7 +310,7 @@ export const desktopPtBR = {
       dockDesc:
         "Com o número do que espera por você. Desligado, o app fica só na barra de menus quando não há janela aberta.",
       menuBarTitle: "Mostrar na barra de menus",
-      menuBarDesc: "O ícone lá em cima, com o que os agentes fazem agora e o atalho para o app.",
+      menuBarDesc: "O ícone lá em cima: o que espera por você, e o atalho para o app.",
       notchTitle: "Mostrar os agentes no notch",
       notchDesc: "Em MacBooks com notch: quem está trabalhando aparece em volta da câmera.",
     },
