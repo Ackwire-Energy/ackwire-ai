@@ -44,7 +44,7 @@ Product name in code and docs: **agentes.chat**. Package scope `@agenteschat/*`.
 
 ### Commands
 
-`bun test` · `bun run typecheck` · `bun run lint` · `bun run format` · `bun run check:boundaries` · `bun run check:licenses` · `bun run db:generate <name>` · `bun run docs:env` · `bun run dev`
+`bun run ci:local` (every CI check but the image boot) · `bun test` · `bun run typecheck` · `bun run lint` · `bun run format` · `bun run check:boundaries` · `bun run check:licenses` · `bun run db:generate <name>` · `bun run docs:env` · `bun run dev`
 
 Run lint, typecheck, tests and boundaries before declaring work done.
 
