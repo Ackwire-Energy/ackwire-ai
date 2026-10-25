@@ -6822,16 +6822,16 @@ label.ac-setrow__title {
   border: 0;
 }
 
-/* Carousel: one row that slides item by item; the arrows step back when it all fits. */
+/*
+ * Carousel: one row that slides item by item. The arrows float over its edges, only where there is
+ * more to see, and the row fades out under them: the first item always starts where rows that fit do.
+ */
 .ac-carousel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
   min-width: 0;
 }
 .ac-carousel__track {
   display: flex;
-  flex: 1;
   gap: 6px;
   min-width: 0;
   padding: 2px;
@@ -6847,9 +6847,20 @@ label.ac-setrow__title {
   flex: none;
   scroll-snap-align: start;
 }
+.ac-carousel[data-more="end"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+.ac-carousel[data-more="start"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+.ac-carousel[data-more="both"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
 .ac-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-raised);
   display: grid;
-  flex: none;
   place-items: center;
   width: 28px;
   height: 28px;
@@ -6860,21 +6871,25 @@ label.ac-setrow__title {
   box-shadow: var(--e1), var(--top);
   color: var(--muted);
   cursor: pointer;
+  transform: translateY(-50%);
   transition:
     color 0.15s,
     opacity 0.15s;
+}
+.ac-carousel__arrow:first-child {
+  left: 0;
+}
+.ac-carousel__arrow:last-child {
+  right: 0;
 }
 .ac-carousel__arrow:hover:not(:disabled) {
   color: var(--ink);
 }
 .ac-carousel__arrow:disabled {
-  opacity: 0.35;
-  cursor: default;
+  opacity: 0;
+  pointer-events: none;
 }
 .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
-}
-.ac-carousel--fits .ac-carousel__arrow {
-  display: none;
 }
