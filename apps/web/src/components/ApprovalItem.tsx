@@ -7,7 +7,9 @@ import {
   approvalTraits,
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
+import { partsOf, toolName } from "@agenteschat/client/lib/tool-review";
 import { ApprovalCard, Button } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
@@ -45,6 +47,80 @@ function permissionLabel(t: TFunction, permission: string, title: string) {
   if (!permission || permission.startsWith("connector:")) return fromServer;
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
   return tt(`scopes.${permission.replace(/[^a-zA-Z0-9]/g, "_")}.label`, { defaultValue: fromServer });
+}
+
+/** Verbs that only look (the backend classifies connector tools by the same words). */
+const READ_VERBS = new Set([
+  "get",
+  "list",
+  "search",
+  "read",
+  "describe",
+  "query",
+  "check",
+  "estimate",
+  "fetch",
+  "find",
+  "view",
+  "show",
+  "count",
+  "preview",
+  "lookup",
+]);
+
+/** A connector tool that runs another one by name (`{ name, arguments }`): that tool's name, when it reads as one. */
+function innerTool(approval: Pick<Approval, "connector" | "params">): string | null {
+  const name = approval.params?.name;
+  if (!approval.connector || typeof name !== "string" || !/^[a-z][a-z0-9_]*$/i.test(name)) return null;
+  return partsOf(name).verb ? name : null;
+}
+
+/**
+ * What it will do, said after "Ada quer …", always in the person's language: the inner tool's readable name
+ * ("ver stack trace do evento"), the app's own titles and an email's, the known actions ("fazer um deploy"), else the tool's
+ * own name in words. The server's title (English, "Sentry: Execute sentry tool") stays out of the sentence.
+ */
+export function approvalDoing(
+  t: TFunction,
+  approval: Pick<Approval, "tool" | "title" | "params" | "connector" | "scope" | "email">,
+) {
+  const inner = innerTool(approval);
+  const action = approvalAction(approval);
+  const text = inner
+    ? toolName(t, partsOf(inner), inner)
+    : approval.email || OWN_TITLES.has(approval.tool)
+      ? approvalTitle(t, approval)
+      : action !== "other"
+        ? t(`notifications.wait.doing.${action}`)
+        : toolName(t, partsOf(approval.tool), approval.tool);
+  // "Ver …" → "ver …"; an acronym ("PR #42") stays.
+  return /^[A-Z][^A-Z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
+}
+
+/** It only looks: asked under a read scope, or its tool's name starts with a reading verb. */
+export function approvalReadsOnly(approval: Pick<Approval, "tool" | "scope" | "params" | "connector">) {
+  if (approval.scope.endsWith(":read")) return true;
+  const verb = partsOf(innerTool(approval) ?? approval.tool).verb;
+  return verb !== null && READ_VERBS.has(verb);
+}
+
+/** Its values in words ("Issue id: ACME-177"), one level into objects, without the inner tool's name. */
+export function approvalValues(approval: Pick<Approval, "params" | "connector" | "email">, max = 3) {
+  // An email is said by its sentence ("salvar um rascunho de resposta para …"); its fields aren't chips.
+  if (approval.email) return [];
+  const skip = innerTool(approval) ? "name" : null;
+  const out: string[] = [];
+  const walk = (obj: Record<string, unknown>, top: boolean) => {
+    for (const [k, v] of Object.entries(obj)) {
+      if (top && k === skip) continue;
+      if (typeof v === "string" || typeof v === "number") {
+        const text = String(v).trim();
+        if (text && text.length <= 60) out.push(`${humanize(k)}: ${text}`);
+      } else if (top && v && typeof v === "object" && !Array.isArray(v)) walk(v as Record<string, unknown>, false);
+    }
+  };
+  walk(approval.params ?? {}, true);
+  return out.slice(0, max);
 }
 
 /** "Aprovado por você · agora" / "Recusado por João · ontem 18:02" / "Expirou · ontem". */

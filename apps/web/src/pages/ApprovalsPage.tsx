@@ -419,7 +419,7 @@ function groups(list: Approval[]): ["today" | "yesterday" | "earlier", Approval[
 }
 
 /** "github · acme" with the brand icon, or the app's own tool. */
-function ConnectorLine({ approval }: { approval: Approval }) {
+export function ConnectorLine({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const catalog = useCatalog();
@@ -523,7 +523,7 @@ function expiryText(t: TFunction, a: Approval) {
 }
 
 /** Approve: one click, or a hold for high risk (let go early and nothing happens). */
-function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
+export function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -613,7 +613,7 @@ function ApproveButton({ approval, block }: { approval: Approval; block?: boolea
 const SUGGESTIONS = ["later", "review", "tests", "smaller"] as const;
 
 /** Refuse with a reason the agent reads (and keeps as a lesson). */
-function RefuseBox({ approval, agent, onCancel }: { approval: Approval; agent?: Agent; onCancel: () => void }) {
+export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; agent?: Agent; onCancel: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
