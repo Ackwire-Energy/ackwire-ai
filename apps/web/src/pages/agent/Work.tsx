@@ -38,6 +38,7 @@ import {
   planOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
   BrainLogo,
   BrainPortrait,
@@ -69,10 +70,10 @@ import { CLOUD, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
-import { cleanSite, SITE } from "@/components/browser/sites";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -162,8 +163,10 @@ function Cell({
  */
 export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const { agent, viewer, saved, can, g } = useAgentEdit();
   const noComputer = useNoComputer();
+  const edition = useComputerEdition(org.id);
   const models = useModels();
   const work = useWork();
   const view = work.brain.data;
@@ -233,26 +236,19 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         <div className="agp-cells">
           {!member && (
             <Cell
-              icon={<Icon name={choice === "cloud" ? "cloud" : choice === "none" ? "dash" : "computer"} size={16} />}
+              icon={<Icon name={choice === "none" ? "dash" : "computer"} size={16} />}
               label={
-                choice === "cloud"
-                  ? t("agentPage.work.cell.cloud")
-                  : choice === "none"
-                    ? t("computer.target.label")
+                choice === "none"
+                  ? t("computer.target.label")
+                  : choice === "cloud"
+                    ? t("agentPage.work.cell.daytona")
                     : t("agentPage.work.cell.computer")
               }
-              value={
-                machine
-                  ? machine.name
-                  : choice === "cloud"
-                    ? t("agentPage.work.cloud")
-                    : choice
-                      ? noComputer.label(choice)
-                      : null
-              }
+              value={machine ? machine.name : choice ? noComputer.label(choice) : null}
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
               openLabel={t("agentPage.work.open.computer")}
-              onOpen={can("machine") ? () => onOpen("computer") : undefined}
+              // The Cloud's agents all work on the workspace's own computer: nothing to pick.
+              onOpen={can("machine") && edition === "selfhost" ? () => onOpen("computer") : undefined}
             />
           )}
           <Cell
@@ -288,7 +284,9 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       {waiting && !member && <SettingNote icon="waiting">{t("computerSetup.agentWaiting", g)}</SettingNote>}
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
-          {t("agentPage.work.offline", { ...g, computer: machine.name })}
+          {edition === "cloud"
+            ? t("agentPage.work.offlineCloud", { ...g, computer: machine.name })
+            : t("agentPage.work.offline", { ...g, computer: machine.name })}
           <ThisMacReconnect machineId={machine.machineId} />
         </SettingNote>
       )}
@@ -547,6 +545,7 @@ function BrainField({ label, children }: { label?: string; children: ReactNode }
 function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const edition = useComputerEdition(org.id);
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
@@ -730,7 +729,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       return (
         <>
           <Icon name="alert" size={14} />
-          {t("agentPage.work.brain.off", { computer: where.name })}
+          {edition === "cloud"
+            ? t("agentPage.work.brain.offCloud", { computer: where.name })
+            : t("agentPage.work.brain.off", { computer: where.name })}
         </>
       );
     return (
@@ -744,7 +745,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   };
   const reason = (k: BrainKind) => {
     const o = view.options.find((x) => x.kind === k);
-    return o?.reason ? t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "" }) : null;
+    if (!o?.reason) return null;
+    // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
+    if (o.reason === "no_computer" && edition === "cloud")
+      return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
+    return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "" });
   };
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
@@ -1137,11 +1142,11 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
         await api.agents.setBrain(org.id, agent.id, { brain: "model" });
       refresh();
       toast.show(
-        chosen
-          ? t("agentPage.work.saved.computer", { ...g, computer: chosen.name })
-          : workspace
-            ? t("agentPage.work.saved.computer", { ...g, computer: noComputer.label("workspace") })
-            : t("agentPage.work.saved.cloud", g),
+        chosen || workspace
+          ? t("agentPage.work.saved.computer", { ...g, computer: chosen ? chosen.name : noComputer.label("workspace") })
+          : cloud === "cloud"
+            ? t("agentPage.work.saved.daytona", g)
+            : t("agentPage.work.saved.none", g),
       );
       onClose();
     } catch {
@@ -1195,7 +1200,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
                       ? t(workspace.textKey)
                       : cloud === "none"
                         ? t("computer.target.noneText")
-                        : t("agentPage.work.computer.cloudText"),
+                        : t("computer.target.daytonaText"),
                     children: note(CLOUD),
                   },
                 ]
@@ -1233,7 +1238,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
             : workspace
               ? t("agentPage.work.computer.useMachine", { computer: noComputer.label("workspace") })
               : cloud === "cloud"
-                ? t("agentPage.work.computer.useCloud")
+                ? t("agentPage.work.computer.useDaytona")
                 : t("agentPage.work.use")
         }
         onClose={onClose}
@@ -1254,6 +1259,7 @@ function BrowserDialog({ onClose }: { onClose: () => void }) {
 function BrowserForm({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const edition = useComputerEdition(org.id);
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
@@ -1289,6 +1295,8 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const sitesNow = mode === "only" ? sites : [];
   const unchanged = on === work.granted && (!on || JSON.stringify(sitesNow) === JSON.stringify(domains));
   const noComputer = on && work.machineId === CLOUD && !moveTo;
+  // On the Cloud the agent's browser comes with the workspace's computer: it can be turned on while that one is prepared.
+  const blocked = noComputer && edition !== "cloud";
   const use = async () => {
     setBusy(true);
     try {
@@ -1404,8 +1412,16 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
               {t("agentPage.work.browserDialog.moves", { ...g, computer: moveTo.name })}
             </SettingNote>
           )}
-          {noComputer && <SettingNote icon="alert">{t("agentPage.work.browserDialog.noComputer")}</SettingNote>}
-          {noComputer && inDesktopApp() && (
+          {noComputer && (
+            <SettingNote icon="alert">
+              {edition === "cloud"
+                ? t("agentPage.work.browserDialog.noComputerCloud", {
+                    computer: t("computerSetup.title", { org: org.name }),
+                  })
+                : t("agentPage.work.browserDialog.noComputer")}
+            </SettingNote>
+          )}
+          {blocked && inDesktopApp() && (
             <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
           )}
           {on && (moveTo ? !ready(moveTo) : !work.browser.data?.available && work.browser.data?.machine) && (
@@ -1418,7 +1434,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
         </div>
       </DialogBody>
       <Footer
-        disabled={unchanged || noComputer}
+        disabled={unchanged || blocked}
         busy={busy}
         primary={t("agentPage.work.use")}
         onClose={onClose}

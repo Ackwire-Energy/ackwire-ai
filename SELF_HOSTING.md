@@ -729,9 +729,11 @@ whether each of the two can run there and, when one can't, what is missing.
 `agentes-runner desktop-check --agent <handle>` starts that agent's desktop, logs in to it and opens a
 terminal, then stops what it started (stop the runner first). Agents use their desktop with the
 **Use its desktop** permission, which new agents have. A desktop takes about 0.2 GB of memory, 0.8 GB
-with the agent's browser on it. It turns on when the agent needs it (or with **Turn on** on its
-page), turns off after 15 minutes unused, and the computer runs as many at once as its memory holds
-after 2 GB for the rest (7 on 8 GB).
+with the agent's browser on it. It starts the first time the agent, or someone watching, needs it, and
+then stays on, so what a person left open there is still there later. Only when the computer runs short
+of memory (under 1.5 GB free) or of displays (50) does it close the desktops nobody touched for an hour,
+least used first; each starts again at its next use. An agent's desktop stops when the agent leaves the
+computer (archived, or moved to another one).
 
 Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
 terminal are for the person who connected the computer, since they act as its user: by default every

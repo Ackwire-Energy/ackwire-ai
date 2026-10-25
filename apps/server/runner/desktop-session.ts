@@ -48,17 +48,25 @@ import { KeyedQueue } from "./queue";
  *   is root's: Xvnc reads it on every connection, so an agent that could
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
- * - Started on demand (`ensure`), stopped after `DESKTOP_IDLE_MS` with no
- *   stream and no use (the agent's Chrome on it in use counts), started again
- *   (at most 3 times in 10 minutes) when it ends by itself.
+ * - Started the first time it is needed (`ensure`: the agent's screen or
+ *   browser, a person opening it), then left on: none stops for being idle,
+ *   so what a person left open on it is still there later. Started again (at
+ *   most 3 times in 10 minutes) when it ends by itself. It stops when its
+ *   agent leaves this computer, or its workspace is suspended.
+ * - Parked only when room runs short (`makeRoom`, before a desktop or a
+ *   headed Chrome starts): the least recently used ones nobody watches or
+ *   uses, untouched for `PARK_AFTER_MS`, until `MIN_FREE_BYTES` are free and,
+ *   for a new desktop, a display. One parked starts again like a first time.
  * - Desktops outlive the runner (their own sessions; the service has
  *   `KillMode=process`): the next runner takes them back from
  *   `<runner home>/desktop/<id8>.json` once the pid there is still that
  *   display's Xtigervnc.
  */
 
-/** A desktop with no stream and no use for this long stops (Chrome on it with it). */
-export const DESKTOP_IDLE_MS = 15 * 60_000;
+/** Memory left free before a desktop or a headed Chrome starts: desktops are parked to keep it. */
+export const MIN_FREE_BYTES = 1.5 * 1024 ** 3;
+/** A desktop untouched this long, unwatched and unused, may be parked (an open request keeps it touched). */
+export const PARK_AFTER_MS = 60 * 60_000;
 const SWEEP_MS = 60_000;
 /** Xvnc listens within a few hundred ms. */
 const XVNC_START_MS = 5000;
@@ -68,9 +76,6 @@ const RESTARTS = { max: 3, windowMs: 10 * 60_000 };
 /** Agents' displays are :20 to :69, one slot each. */
 const FIRST_DISPLAY = 20;
 const SLOT_COUNT = 50;
-/** Memory a desktop takes with a headed Chrome on it (about 780 MB measured), and what the computer keeps for the rest. */
-const DESKTOP_BYTES = 800 * 1024 * 1024;
-const RESERVED_BYTES = 2 * 1024 * 1024 * 1024;
 const SLOTS_FILE = "slots.json";
 /** System mode: where root keeps each agent's password file (`<uid>/passwd`). */
 const SYSTEM_RUN_DIR = "/run/agentes-desktop";
@@ -173,9 +178,19 @@ export function vncPasswordFile(full: string, view: string): Buffer {
 const newPassword = () =>
   Array.from({ length: 8 }, () => PASSWORD_ALPHABET[randomInt(PASSWORD_ALPHABET.length)]).join("");
 
-/** Desktops one computer runs at once: what its memory holds after a reserve for everything else (7 on 8 GB). */
-export function defaultMaxDesktops(totalBytes: number = os.totalmem()): number {
-  return Math.max(1, Math.floor((totalBytes - RESERVED_BYTES) / DESKTOP_BYTES));
+/** `MemAvailable` from `/proc/meminfo`'s text, in bytes; null when it isn't there. */
+export function memAvailableBytes(meminfo: string): number | null {
+  const kb = /^MemAvailable:\s+(\d+)\s+kB$/m.exec(meminfo)?.[1];
+  return kb === undefined ? null : Number(kb) * 1024;
+}
+
+/** The memory Linux says is available now; null elsewhere. */
+function hostMemAvailable(): number | null {
+  try {
+    return memAvailableBytes(readFileSync("/proc/meminfo", "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /** Where and as whom an agent's desktop runs. */
@@ -330,10 +345,10 @@ export interface DesktopSessionsOptions {
   /** Tests: where X keeps display locks (`/tmp`), and system mode's password folders (`/run/agentes-desktop`). */
   lockDir?: string;
   runDir?: string;
-  maxDesktops?: number;
-  idleMs?: number;
+  /** Tests: the memory available now (default: `/proc/meminfo`; null: not known, never short). */
+  memAvailable?: () => number | null;
   now?: () => number;
-  /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): not idle then. */
+  /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): never parked then. */
   inUse?: (agentId: string) => boolean;
   /** A viewer of the agent's desktop came or went (`status().streams`). */
   onViewers?: (agentId: string) => void;
@@ -359,7 +374,7 @@ interface Desktop extends Saved {
   /** Its `<id8>.json`. */
   file: string;
   lastUsed: number;
-  /** Open viewers: a desktop being watched isn't idle. */
+  /** Open viewers: a desktop being watched is never parked. */
   streams: number;
   /** Being stopped on purpose: its processes ending isn't a crash. */
   ending?: boolean;
@@ -391,7 +406,6 @@ export class DesktopSessions {
   private readonly restarts = new Map<string, number[]>();
   /** Displays of desktops being started. */
   private readonly claimed = new Set<number>();
-  private launching = 0;
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
   private readonly sys: DesktopSystem;
   private readonly dir: string;
@@ -422,20 +436,69 @@ export class DesktopSessions {
     return { available: true, ...DESKTOP_SIZE };
   }
 
-  /** Starts the agent's desktop, or only marks it used when it runs (`desktop.session.start`). */
-  ensure(agent: AgentScope): Promise<MachineReplies["desktop.session.start"]> {
+  /**
+   * Starts the agent's desktop, or only marks it used when it runs (`desktop.session.start`, a stream opening).
+   * `chrome`: the agent's Chrome is about to start on it, so there must be room for that too.
+   */
+  ensure(agent: AgentScope, opts: { chrome?: boolean } = {}): Promise<MachineReplies["desktop.session.start"]> {
     return this.serial(agent.id, async () => {
-      const d = this.desktops.get(agent.id);
-      if (d && this.alive(d)) {
+      let d = this.desktops.get(agent.id);
+      const running = d !== undefined && this.alive(d);
+      if (d && running) {
         d.agent = agent;
         d.lastUsed = this.now();
-        return this.started(d, false);
+      } else {
+        if (d) await this.end(d);
+        const info = this.info();
+        if (!info.available) throw new RunnerError("desktop_unavailable", info.reason ?? "Desktops can't run here");
+        d = await this.start(agent);
       }
-      if (d) await this.end(d);
-      const info = this.info();
-      if (!info.available) throw new RunnerError("desktop_unavailable", info.reason ?? "Desktops can't run here");
-      return this.started(await this.start(agent), true);
+      if (opts.chrome && !(await this.makeRoom(agent.id))) {
+        throw new RunnerError(
+          "desktop_busy",
+          "This computer is short of memory for the agent's browser on its desktop",
+        );
+      }
+      return this.started(d, !running);
     });
+  }
+
+  /**
+   * Room for a headed Chrome, or with `display` for one more desktop: while less than `MIN_FREE_BYTES` is
+   * available, or no display is free, parks desktops (`parkable`), least recently used first. False: still no
+   * room, with nothing left to park. Where the memory isn't known (not Linux) only the displays count.
+   */
+  async makeRoom(forAgentId: string, display = false): Promise<boolean> {
+    const full = () => {
+      const free = (this.opts.memAvailable ?? hostMemAvailable)();
+      return (free !== null && free < MIN_FREE_BYTES) || (display && this.freeSlots().length === 0);
+    };
+    while (full()) {
+      const [oldest] = [...this.desktops.values()]
+        .filter((d) => this.parkable(d, forAgentId))
+        .sort((a, b) => a.lastUsed - b.lastUsed);
+      if (!oldest) return false;
+      await this.serial(oldest.agent.id, async () => {
+        if (this.desktops.get(oldest.agent.id) !== oldest || !this.parkable(oldest, forAgentId)) return;
+        this.opts.log(`the desktop of ${oldest.agent.handle} was parked to make room: nobody used it for an hour`);
+        await this.end(oldest);
+      });
+    }
+    return true;
+  }
+
+  /**
+   * Nobody watches it, its agent doesn't use it, and nothing touched it for `PARK_AFTER_MS`.
+   * ponytail: parking closes what was left open on the least-used desktops, which on 8 GB happens only with many
+   * agents browsing at once; a per-agent memory measure replaces the hour rule if that ever bites.
+   */
+  private parkable(d: Desktop, forAgentId: string) {
+    return (
+      d.agent.id !== forAgentId &&
+      d.streams === 0 &&
+      this.now() - d.lastUsed >= PARK_AFTER_MS &&
+      !this.opts.inUse?.(d.agent.id)
+    );
   }
 
   stop(agent: AgentScope): Promise<MachineReplies["desktop.session.stop"]> {
@@ -461,7 +524,7 @@ export class DesktopSessions {
     return { display, socket, xauthority, home, passwords };
   }
 
-  /** A viewer on the agent's desktop: it doesn't stop as idle until the returned release is called. */
+  /** A viewer on the agent's desktop: it isn't parked until the returned release is called. */
   hold(agentId: string): (() => void) | null {
     const d = this.desktops.get(agentId);
     if (!d) return null;
@@ -478,9 +541,13 @@ export class DesktopSessions {
     };
   }
 
-  /** Every desktop stops (the machine's desktop switch went off). */
-  async stopAll() {
-    await Promise.all([...this.desktops.values()].map((d) => this.stop(d.agent).catch(() => undefined)));
+  /**
+   * Every desktop stops (the machine's desktop switch went off), or every one but those of `keep`: the agents
+   * this computer still serves (one archived or moved to another computer leaves).
+   */
+  async stopAll(keep: ReadonlySet<string> = new Set()) {
+    const leaving = [...this.desktops.values()].filter((d) => !keep.has(d.agent.id));
+    await Promise.all(leaving.map((d) => this.stop(d.agent).catch(() => undefined)));
   }
 
   /**
@@ -529,23 +596,14 @@ export class DesktopSessions {
     }
   }
 
-  /** Desktops that ended by themselves start again; idle ones stop. */
-  async sweep() {
-    const idleMs = this.opts.idleMs ?? DESKTOP_IDLE_MS;
-    const idle = (d: Desktop) => d.streams === 0 && this.now() - d.lastUsed >= idleMs && !this.opts.inUse?.(d.agent.id);
+  /**
+   * Desktops that ended by themselves start again (one taken back from an earlier runner has no exit to wait
+   * on). The agent's Chrome in use on one touches it, so it isn't parked as soon as that Chrome closes.
+   */
+  sweep() {
     for (const d of [...this.desktops.values()]) {
-      if (!this.alive(d)) {
-        this.ended(d);
-        continue;
-      }
-      if (!idle(d)) continue;
-      await this.serial(d.agent.id, async () => {
-        if (this.desktops.get(d.agent.id) !== d || !idle(d)) return;
-        this.opts.log(
-          `the desktop of ${d.agent.handle} stopped: nobody used it for ${Math.round(idleMs / 60_000)} minutes`,
-        );
-        await this.end(d);
-      }).catch(() => undefined);
+      if (!this.alive(d)) this.ended(d);
+      else if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
     }
   }
 
@@ -565,15 +623,17 @@ export class DesktopSessions {
 
   private add(d: Desktop) {
     this.desktops.set(d.agent.id, d);
-    this.sweepTimer ??= setInterval(() => void this.sweep(), SWEEP_MS);
+    this.sweepTimer ??= setInterval(() => this.sweep(), SWEEP_MS);
     (this.sweepTimer as { unref?: () => void }).unref?.();
   }
 
   private async start(agent: AgentScope): Promise<Desktop> {
-    if (this.desktops.size + this.launching >= (this.opts.maxDesktops ?? defaultMaxDesktops())) {
-      throw new RunnerError("desktop_busy", "This computer already runs as many desktops as its memory allows");
+    if (!(await this.makeRoom(agent.id, true))) {
+      throw new RunnerError(
+        "desktop_busy",
+        "This computer has no room for another desktop, and every one on it is in use",
+      );
     }
-    this.launching++;
     let display: number | null = null;
     try {
       const user = await this.opts.user(agent);
@@ -681,7 +741,6 @@ export class DesktopSessions {
         closeSync(log);
       }
     } finally {
-      this.launching--;
       if (display !== null) this.claimed.delete(display);
     }
   }
@@ -814,6 +873,14 @@ export class DesktopSessions {
     }
   }
 
+  /** The display slots no desktop of ours and no other process holds. */
+  private freeSlots(): number[] {
+    const ours = new Set([...this.claimed, ...[...this.desktops.values()].map((d) => d.display)]);
+    return [...Array(SLOT_COUNT).keys()].filter(
+      (slot) => !ours.has(FIRST_DISPLAY + slot) && this.displayFree(FIRST_DISPLAY + slot),
+    );
+  }
+
   /**
    * The agent's display: the one it had before (`slots.json`) when nobody
    * holds it, else the first free one no other agent had, else any free one.
@@ -824,13 +891,11 @@ export class DesktopSessions {
     const slots = new Map(
       isRecord(saved) ? Object.entries(saved).filter((e): e is [string, number] => isSlot(e[1])) : [],
     );
-    const ours = new Set([...this.claimed, ...[...this.desktops.values()].map((d) => d.display)]);
-    const free = (slot: number) => !ours.has(FIRST_DISPLAY + slot) && this.displayFree(FIRST_DISPLAY + slot);
+    const open = this.freeSlots();
     const own = slots.get(agentId);
-    let slot = own !== undefined && free(own) ? own : undefined;
+    let slot = own !== undefined && open.includes(own) ? own : undefined;
     if (slot === undefined) {
       const others = new Set([...slots].filter(([id]) => id !== agentId).map(([, s]) => s));
-      const open = [...Array(SLOT_COUNT).keys()].filter(free);
       slot = open.find((s) => !others.has(s)) ?? open[0];
     }
     if (slot === undefined) throw new RunnerError("desktop_busy", "Every display for the agents' desktops is taken");

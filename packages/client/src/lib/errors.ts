@@ -17,6 +17,7 @@ const KNOWN = {
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
   "machine.pairing_invalid": "errors.machine.pairingInvalid",
+  "machine.pairing_off": "errors.machine.pairingOff",
   "machine.target_offline": "errors.machine.targetOffline",
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",

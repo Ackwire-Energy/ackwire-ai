@@ -255,7 +255,7 @@ describe("suspended", () => {
     expect(audit).toMatchObject({ actorType: "system", actorId: null, details: { from: "running" } });
   });
 
-  test("its computers stop its tasks and a queued run never starts", async () => {
+  test("its computers stop its tasks and its agents' desktops, and a queued run never starts", async () => {
     f = await setup({ machines: true });
     const hub = f.machineHub as MachineHub;
     const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
@@ -285,7 +285,12 @@ describe("suspended", () => {
     const running = await task("running", { startedAt: new Date() });
     const waiting = await task("queued", { startRequest: { title: "Build" } });
     await post("@dev deploy it");
+    await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
     await standing("suspended", "silent");
+    // A desktop stays on otherwise: it ends here, and what runs on it with it.
+    expect(runner.requests().filter((r) => r.op === "desktop.session.stop")).toMatchObject([
+      { agent: { id: f.agent.id, handle: "dev" } },
+    ]);
 
     expect((await runs()).map((r) => [r.status, r.error])).toEqual([
       ["canceled", "This workspace is unavailable for now."],

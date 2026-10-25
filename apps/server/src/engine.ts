@@ -193,7 +193,12 @@ export function buildEngine(o: EngineOptions) {
   // Code sandbox (ADR 0021): cloud computers only when a provider is configured (Daytona in the Cloud);
   // connected machines (ADR 0025) always, through the hub that holds their sockets.
   const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
-  const machineHub = createMachineHub({ db, pubsub: adapters.pubsub, replicaId: o.replicaId });
+  const machineHub = createMachineHub({
+    db,
+    pubsub: adapters.pubsub,
+    replicaId: o.replicaId,
+    readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
+  });
   const sandbox: SandboxDeps = {
     db,
     provider: sandboxProvider,

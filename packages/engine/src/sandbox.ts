@@ -648,6 +648,8 @@ export async function agentComputerInfo(
       kind: "machine";
       machineId: string;
       name: string;
+      /** The workspace's own computer (ADR 0056 §10): always on, nobody's to turn on or off. */
+      managed: boolean;
       online: boolean;
       execAllowed: boolean;
       os: string;
@@ -673,6 +675,7 @@ export async function agentComputerInfo(
     kind: "machine",
     machineId: status.id,
     name: status.name,
+    managed: status.kind === "managed",
     online: status.online,
     execAllowed: status.execAllowed,
     os: status.os,

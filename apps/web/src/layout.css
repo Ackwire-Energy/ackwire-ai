@@ -5944,6 +5944,33 @@ a.machine-row__name:hover {
   align-items: center;
   gap: 6px;
 }
+.setup-facts--stack {
+  flex-direction: column;
+}
+/* The wait in words: the time left, then who hears when it's ready, the plans. */
+.setup-wait {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.setup-eta {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.setup-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.setup-line > :first-child {
+  flex: none;
+  margin-top: 2px;
+}
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
   flex-wrap: wrap;

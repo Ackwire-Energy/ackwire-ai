@@ -1208,7 +1208,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         brains.set(agentId, next);
         return structuredClone(next);
       },
-      runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
+      runs: async (_orgId, filter = {}) =>
+        state.runs
+          .filter(
+            (r) => (!filter.agentId || r.agentId === filter.agentId) && (!filter.status || r.status === filter.status),
+          )
+          .slice(0, filter.limit),
       cancelRun: async (orgId, runId) => {
         log("agents.cancelRun", orgId, runId);
         if (state.runs.some((r) => r.id === runId && r.status !== "running" && r.status !== "queued"))

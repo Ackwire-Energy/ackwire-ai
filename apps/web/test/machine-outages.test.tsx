@@ -93,6 +93,22 @@ describe("an offline computer: the notice", () => {
     expect(dialog.textContent).toContain("Dá para voltar ao MacBook Air depois.");
   });
 
+  test("the Cloud's computer stopped answering: it is looked after, and there is no other computer to switch to", async () => {
+    const data = outages();
+    const first = data.outages[0];
+    if (!first) throw new Error("no outage");
+    data.outages = [{ ...first, name: "Computador da Acme", platform: "other", managed: true }];
+    const { api } = setup(data);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready" });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const notice = screen().getByRole("region", { name: "Computadores desconectados" });
+    expect(notice.textContent).toContain("O Computador da Acme parou de responder há 12 min");
+    expect(notice.textContent).toContain("Já estamos cuidando: nada a fazer do seu lado.");
+    expect(notice.textContent).not.toContain("desconectou");
+    expect(within(notice).queryByRole("button", { name: "Trocar computador" })).toBeNull();
+  });
+
   test("closing it is remembered until that computer comes back", async () => {
     const { api } = setup();
     const first = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
@@ -138,8 +154,8 @@ describe("Trocar o computador", () => {
     const row = (name: string) => rows.find((r) => r.textContent?.includes(name)) as HTMLElement;
     expect(row("MacBook Pro do Walter").getAttribute("aria-checked")).toBe("true");
     expect(row("MacBook Pro do Walter").hasAttribute("disabled")).toBe(false);
-    expect(row("Computador na nuvem").hasAttribute("disabled")).toBe(true);
-    expect(row("Computador na nuvem").textContent).toContain("Não roda o Claude Code");
+    expect(row("Sandbox da Daytona").hasAttribute("disabled")).toBe(true);
+    expect(row("Sandbox da Daytona").textContent).toContain("Não roda o Claude Code");
     expect(row("PC do escritório").hasAttribute("disabled")).toBe(true);
     expect(row("PC do escritório").textContent).toContain("Desconectado agora");
     expect(row("Servidor").hasAttribute("disabled")).toBe(true);

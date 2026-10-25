@@ -4,6 +4,7 @@ import { schema } from "@agenteschat/db";
 import {
   createJobHandlers,
   drainOutbox,
+  type EmailTemplate,
   grantScopes,
   postPersonMessage,
   queueApprovalDigests,
@@ -136,6 +137,80 @@ describe("templates in English (the recipient's locale)", () => {
     }
     // Jobs queued before locales existed stay pt-BR.
     expect(renderEmail({ kind: "verify_email", url: "u" }).subject).toBe("Confirme seu e-mail no agentes");
+  });
+});
+
+describe("the computer ready email (ADR 0056 §10)", () => {
+  const ready = (over: Partial<Extract<EmailTemplate, { kind: "computer_ready" }>> = {}) =>
+    renderEmail({
+      kind: "computer_ready",
+      locale: "en",
+      orgName: "Oficina",
+      specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
+      needsAi: true,
+      hasAgents: true,
+      url: "https://agentes.chat/org/o1",
+      ...over,
+    });
+
+  test("English: what it is, the next steps numbered, the workspace's link and the footer", () => {
+    const e = ready();
+    expect(e.subject).toBe("Oficina's computer is ready");
+    expect(e.html).toContain('<html lang="en">');
+    expect(e.html.match(/<li /g)).toHaveLength(3);
+    expect(e.html).toContain("You got this email because you use agentes.chat.");
+    expect(e.text).toBe(
+      [
+        "Your agents' computer is ready",
+        "",
+        "Oficina's computer is on and set up: 4 CPUs, 8 GB of memory and 100 GB of disk, with a user of its own for each agent. It stays on day and night, so your agents can work any time.",
+        "Next steps",
+        "1. Connect your AI. Sign in with your Claude or ChatGPT plan, another AI's coding plan, or an API key. Your agents think with it.",
+        "2. Give a first task. In #general, call an agent with @ and say what you need.",
+        "3. Watch them work. On an agent's page, press Open to see its computer live. Take control whenever you want, and hand it back when you're done.",
+        "",
+        "Open Oficina: https://agentes.chat/org/o1",
+      ].join("\n"),
+    );
+  });
+
+  test("the steps count only those shown: no AI step with an AI, one step to create an agent with none", () => {
+    const withAi = ready({ needsAi: false });
+    expect(withAi.html.match(/<li /g)).toHaveLength(2);
+    expect(withAi.text).toContain("\n1. Give a first task.");
+    expect(withAi.text).toContain("\n2. Watch them work.");
+    expect(withAi.text).not.toContain("Connect your AI");
+    const noAgent = ready({ hasAgents: false });
+    expect(noAgent.text).toContain("\n1. Connect your AI.");
+    expect(noAgent.text).toContain("\n2. Create an agent. It works on this computer from the start.");
+    expect(noAgent.text).not.toContain("first task");
+    expect(ready({ needsAi: false, hasAgents: false }).text).toContain(
+      "\n1. Create an agent. It works on this computer from the start.\n",
+    );
+  });
+
+  test("pt-BR, without sizes, and an escaped workspace name", () => {
+    const e = ready({ locale: "pt-BR", specs: null, orgName: "Oficina <b>" });
+    expect(e.subject).toBe("O computador da Oficina <b> está pronto");
+    expect(e.html).toContain('<html lang="pt-BR">');
+    expect(e.html).not.toContain("<b>");
+    expect(e.html).toContain("Abrir Oficina &lt;b&gt;");
+    expect(e.text).toBe(
+      [
+        "O computador dos seus agentes está pronto",
+        "",
+        "O computador da Oficina <b> está ligado e configurado, com um usuário só para cada agente. Ele fica ligado dia e noite, para os agentes trabalharem a qualquer hora.",
+        "Próximos passos",
+        "1. Conecte sua IA. Entre com o seu plano do Claude ou do ChatGPT, com o plano de código de outra IA, ou com uma chave de API. É com ela que os agentes pensam.",
+        "2. Passe a primeira tarefa. No #general, chame um agente com @ e diga do que precisa.",
+        "3. Veja os agentes trabalhando. Na página de um agente, clique em Abrir para ver o computador dele ao vivo. Assuma o controle quando quiser e devolva quando terminar.",
+        "",
+        "Abrir Oficina <b>: https://agentes.chat/org/o1",
+      ].join("\n"),
+    );
+    expect(ready({ locale: "pt-BR", specs: { cpus: 1, memoryGb: 7.8, diskGb: 100 } }).text).toContain(
+      "está ligado e configurado: 1 CPU, 7,8 GB de memória e 100 GB de disco, com um usuário",
+    );
   });
 });
 

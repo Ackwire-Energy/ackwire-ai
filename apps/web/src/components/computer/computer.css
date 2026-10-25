@@ -1,0 +1,249 @@
+/* ---------- the agent's computer: one entry on its page, one dialog everywhere ---------- */
+
+/* The entry: one row, the size of the browser's row it replaced. */
+.cmp-entry {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cmp-entry[data-tone="warn"] {
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
+    var(--e1);
+}
+.cmp-entry__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+}
+.cmp-entry__t {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cmp-entry__t b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.cmp-entry__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.cmp-entry__line > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmp-entry__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+/* The dialog: up to 96vw × 94vh; the stage keeps the screen's shape (1280×900) and letterboxes. */
+.ac-dialog.cmp-dialog {
+  --cmp-room: 210px;
+  width: min(96vw, 1280px);
+  max-height: 94vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  max-height: 94dvh;
+}
+.ac-dialog.cmp-dialog.is-full {
+  inset: 0;
+  transform: none;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+}
+.cmp-dialog .ac-dialog__head {
+  padding-bottom: 8px;
+}
+.cmp-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cmp-sub:empty::before {
+  content: "\00a0";
+}
+.cmp-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 16px;
+  overflow-y: auto;
+}
+/* The page in the dialog is the stage itself, not a card in a message. */
+.brw-ac.is-surface {
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+  animation: none;
+}
+.cmp-body .brw-ac__stage {
+  border-radius: 12px;
+}
+/* The screen and the page fill what the head, the banner and the footer leave, keeping their shape. */
+.cmp-body .dsk-screen,
+.cmp-stage__box {
+  width: min(100%, calc((94dvh - var(--cmp-room)) * 1280 / 900));
+  max-height: none;
+  aspect-ratio: 1280 / 900;
+  margin: 0 auto;
+}
+.cmp-body .dsk.is-control .dsk-screen {
+  width: min(100%, calc((94dvh - var(--cmp-room) - 130px) * 1280 / 900));
+}
+.cmp-body .brw-ac__page {
+  width: min(100%, calc((94dvh - var(--cmp-room) - 30px) * 16 / 10));
+  max-height: none;
+  margin: 0 auto;
+}
+.cmp-dialog.is-full .dsk-screen,
+.cmp-dialog.is-full .cmp-stage__box {
+  width: min(100%, calc((100dvh - var(--cmp-room) + 40px) * 1280 / 900));
+}
+.cmp-stage__box {
+  border-radius: 10px;
+  background: var(--sunken);
+}
+.cmp-body .brw-ac__foot {
+  border-top: 0;
+  padding: 8px 0 0;
+}
+
+/* What covers the stage: the agent's sky behind a screen opening. */
+.brw-dim--sky {
+  overflow: hidden;
+}
+.cmp-sky {
+  position: absolute;
+  inset: 0;
+}
+.cmp-sky canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.brw-dim--sky .brw-dim__box {
+  position: relative;
+}
+.brw-dim__box > .ac-computer {
+  align-self: center;
+}
+
+/* A line over the live stage: the agent held, its computer paused, a request waiting. */
+.cmp-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cmp-banner[data-tone="warn"] {
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
+}
+.cmp-banner__t {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13.5px;
+}
+.cmp-banner__t span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* The request this person helps with, and the site the page is on, above the stage. */
+.cmp-asked,
+.cmp-site {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.cmp-asked {
+  font-weight: 600;
+}
+
+/* The run's last steps under the stage, only while the agent works. */
+.cmp-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cmp-steps li + li::before {
+  content: "›";
+  margin-right: 8px;
+  color: var(--faint);
+}
+
+/* The workspace's computer on its way, in the dialog. */
+.cmp-prep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 16px;
+  border-radius: 12px;
+  background: var(--sunken);
+}
+.cmp-prep__title {
+  font-size: 16px;
+}
+.cmp-prep .setup-wait {
+  width: min(560px, 100%);
+}
+
+/* Web on a phone: the dialog is a full-screen sheet. */
+@media (max-width: 720px) {
+  .ac-dialog.cmp-dialog {
+    --cmp-room: 190px;
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+  .cmp-body {
+    padding: 8px 12px 12px;
+  }
+}
+
+/* The DM header's button: its dot in the agent's color while it works, amber while a request waits. */
+.brw-dm[data-state="live"]::after {
+  background: var(--dot, var(--ok));
+}

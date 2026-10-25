@@ -97,9 +97,11 @@ const SESSION: Record<string, unknown> = {
 /**
  * A runner on real sockets: its machine socket says hello; each `stream.open`
  * dials a data socket, says hello and answers once it got `stream.ready`; a
- * desktop's own requests get the answers of one that runs.
+ * desktop's own requests get the answers of one that runs. `refuseOpens`: the
+ * first opens get `desktop_off`, as a runner from before desktops stayed on.
  */
-async function connectRunner(token: string) {
+async function connectRunner(token: string, options: { refuseOpens?: number } = {}) {
+  let refuse = options.refuseOpens ?? 0;
   const ws = new WebSocket(`${base()}/api/machines/connect`);
   const requests: string[] = [];
   const opened: Record<string, unknown>[] = [];
@@ -114,6 +116,10 @@ async function connectRunner(token: string) {
         ws.send(JSON.stringify({ type: "result", id: frame.id, ok: true, data: SESSION[String(frame.op)] }));
       }
       if (frame.type !== "request" || frame.op !== "stream.open") return;
+      if (refuse-- > 0) {
+        const error = { code: "desktop_off", message: "The agent's desktop isn't running" };
+        return void ws.send(JSON.stringify({ type: "result", id: frame.id, ok: false, error }));
+      }
       opened.push(frame);
       const socket = new WebSocket(`${base()}/api/machines/stream`);
       socket.binaryType = "arraybuffer";
@@ -414,24 +420,26 @@ test("bun run smoke --desktop-agent: signed in as who paired the computer, one f
   }
 });
 
-test("the desktop's REST: its state for who may watch it, Ligar and Desligar, take over through the screen's routes", async () => {
+test("the desktop's REST: its state for who may watch it, nothing to turn on or off, take over through the screen's routes", async () => {
   const { owner, org, machine, invite } = await seeded();
   const runner = await connectRunner(machine.token);
   const api = (path: string, init?: Parameters<Browser>[1]) =>
     owner(`/api/app/organizations/${org.orgId}/agents/${org.agentId}${path}`, init);
-  expect(await (await api("/desktop")).json()).toMatchObject({
+  expect(await (await api("/desktop")).json()).toEqual({
     available: true,
     reason: null,
+    detail: null,
     running: true,
     startedAt: "2026-10-24T10:00:00.000Z",
     controllerUserId: null,
     handoff: null,
     viewers: 0,
     canControl: true,
-    canStart: true,
-    terminal: { available: true, reason: null, allowed: true },
+    held: false,
   });
-  expect((await api("/desktop/start", { json: {} })).status).toBe(204);
+  // It stays on: no route turns it on or off (the browser still closes).
+  expect((await api("/desktop/start", { json: {} })).status).toBe(404);
+  expect((await api("/desktop/stop", { json: {} })).status).toBe(404);
   const taken = (await (await api("/desktop/takeover", { json: {} })).json()) as {
     id: string;
     controllerUserId: string;
@@ -455,17 +463,25 @@ test("the desktop's REST: its state for who may watch it, Ligar and Desligar, ta
   await until(() => runner.opened.length === 2, "another control stream");
   expect(runner.opened[1]).toMatchObject({ kind: "desktop", mode: "control" });
   expect(runner.opened[1]).not.toHaveProperty("keyboard");
-  expect((await api("/desktop/stop", { json: {} })).status).toBe(204);
-  expect(runner.requests).toEqual(
-    expect.arrayContaining(["desktop.session.status", "desktop.session.start", "desktop.session.stop"]),
-  );
+  expect(runner.requests).toContain("desktop.session.status");
+  expect(runner.requests).not.toContain("desktop.session.stop");
 
   // A member the agent's work doesn't involve sees nothing of it.
   const ana = await invite("ana@example.com", "member");
-  const hers = (path: string, init?: Parameters<Browser>[1]) =>
-    ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}${path}`, init);
-  expect((await hers("/desktop")).status).toBe(403);
-  expect((await hers("/desktop/start", { json: {} })).status).toBe(403);
-  expect((await hers("/desktop/stop", { json: {} })).status).toBe(403);
+  expect((await ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}/desktop`)).status).toBe(403);
+  runner.ws.close();
+});
+
+test("a runner from before desktops stayed on refuses one that isn't running: the server starts it and opens again", async () => {
+  const { owner, machine, desktop } = await seeded();
+  const runner = await connectRunner(machine.token, { refuseOpens: 1 });
+  const viewer = openViewer(desktop, owner);
+  await until(() => runner.data.some((d) => d.ready), "the data socket");
+  expect(runner.requests.filter((op) => op !== "desktop.session.status")).toEqual([
+    "stream.open",
+    "desktop.session.start",
+    "stream.open",
+  ]);
+  expect(viewer.closed).toBeNull();
   runner.ws.close();
 });

@@ -390,7 +390,7 @@ export class RunnerDaemon implements RequestObserver {
           : "The browser on the agent's desktop needs this computer's desktop and browser switches on",
       );
     }
-    const started = await this.desktops.ensure(agent);
+    const started = await this.desktops.ensure(agent, { chrome: use === "browser" });
     const s = this.desktops.session(agent.id);
     if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
     return { ...started, xauthority: s.xauthority, home: s.home };
@@ -1049,6 +1049,8 @@ export class RunnerDaemon implements RequestObserver {
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
     }
+    // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good.
+    void this.desktops.stopAll(new Set(list.map((a) => a.id))).catch(() => undefined);
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
     this.agents = list;
     try {

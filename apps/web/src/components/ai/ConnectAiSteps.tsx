@@ -1,5 +1,6 @@
 import type { AiComputer, MachineAccount, MachineAccountKind } from "@agenteschat/client";
-import { keys, useAiAccounts, useApi, useMachines } from "@agenteschat/client";
+import { keys, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
+import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { CODING_PLANS, PLAN_IDS, type PlanId } from "@agenteschat/client/lib/plans";
 import {
   Button,
@@ -18,6 +19,7 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
+import { managedOf, SetupWaitLines, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
@@ -59,6 +61,12 @@ export function ConnectAiDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const ai = useAiAccounts(org.id);
+  // On the Cloud, plans sign in on the workspace's own computer: its words, never a computer to connect.
+  const setupQ = useComputerSetup(org.id);
+  const edition = computerEdition(setupQ.data);
+  const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
+  const reader = useWaitReader();
+  const workspaceComputer = computerName(t, org.name, managedOf(useMachines(org.id, edition === "cloud").data));
   const [choice, setChoice] = useState<ConnectChoice | null>(null);
   const [machineId, setMachineId] = useState<string | null>(null);
   const [added, setAdded] = useState<MachineAccount | null>(null);
@@ -68,10 +76,18 @@ export function ConnectAiDialog({ onClose }: { onClose: () => void }) {
   const name = (c: ConnectChoice) => (c.provider ? CODING_PLANS[c.provider].label : t(`aiAccounts.connect.${c.kind}`));
 
   let body: ReactNode;
-  if (!ai.data) {
+  // Which edition's words, from the server: before it says, neither (self-host's would offer pairing on the Cloud).
+  if (!ai.data || !edition) {
     body = (
       <DialogBody>
-        {ai.isError ? <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote> : <Spinner />}
+        {ai.isError || setupQ.isError ? <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote> : <Spinner />}
+      </DialogBody>
+    );
+  } else if (!computers.some((c) => c.canAdd) && edition === "cloud") {
+    body = (
+      <DialogBody>
+        <SettingNote icon="computer">{t("aiAccounts.connect.preparing", { computer: workspaceComputer })}</SettingNote>
+        {setup && <SetupWaitLines view={setup} reader={reader} />}
       </DialogBody>
     );
   } else if (!computers.some((c) => c.canAdd)) {
@@ -104,7 +120,11 @@ export function ConnectAiDialog({ onClose }: { onClose: () => void }) {
                   <span className="ac-option__title">{name(c)}</span>
                   <span className="ac-option__desc">
                     {why
-                      ? t(`aiAccounts.connect.needs.${why}`)
+                      ? edition === "cloud"
+                        ? t(`aiAccounts.connect.needsCloud.${why === "keys" ? "claude_code" : why}`, {
+                            computer: workspaceComputer,
+                          })
+                        : t(`aiAccounts.connect.needs.${why}`)
                       : c.provider
                         ? t("aiAccounts.connect.keyText")
                         : t(`aiAccounts.connect.${c.kind}Text`)}
