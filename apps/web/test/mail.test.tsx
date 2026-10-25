@@ -209,10 +209,10 @@ describe("Conectores → Email", () => {
     const others = () => within(flow()).getByRole("list", { name: "Outros endereços desta caixa" });
     expect(others().textContent).toContain("suporte@acme.com.br");
     // Only addresses (a whole domain isn't an address to send from).
-    await type(within(flow()).getByLabelText("Outros endereços desta caixa"), "@acme.com.br");
+    await type(within(flow()).getByRole("textbox", { name: "Outros endereços desta caixa" }), "@acme.com.br");
     await click(within(flow()).getByRole("button", { name: "Adicionar em Outros endereços desta caixa" }));
     expect(flow().textContent).toContain("Use um email, como contato@suaempresa.com.");
-    await type(within(flow()).getByLabelText("Outros endereços desta caixa"), "Vendas@acme.com.br");
+    await type(within(flow()).getByRole("textbox", { name: "Outros endereços desta caixa" }), "Vendas@acme.com.br");
     await click(within(flow()).getByRole("button", { name: "Adicionar em Outros endereços desta caixa" }));
     expect(others().textContent).toContain("vendas@acme.com.br");
     await choose(within(flow()).getByRole("combobox", { name: "Emails novos saem de" }), "vendas@acme.com.br");
@@ -259,7 +259,7 @@ describe("Conectores → Email", () => {
     await click(within(row).getByRole("button", { name: "Salvar" }));
     await settle(4);
     const call = other.state.calls.find((c) => c.method === "mail.setAgent");
-    expect((call?.args[3] as { policy: { fromAddress: string | null } }).policy.fromAddress).toBe(
+    expect((call?.args[3] as { policy?: { fromAddress: string | null } } | undefined)?.policy?.fromAddress).toBe(
       "suporte@acme.com.br",
     );
   });
