@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { linkSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { errnoCode } from "./errors";
 
@@ -43,6 +44,15 @@ export function bootId(): string {
     }
   }
   return thisBoot;
+}
+
+/**
+ * Whether a lock was taken before this boot of the computer: its boot isn't this one, or, in a lock
+ * that doesn't say its boot (older versions), it was taken before the computer started.
+ */
+function beforeThisBoot(holder: LockInfo, boot: string): boolean {
+  if (holder.boot) return Boolean(boot) && holder.boot !== boot;
+  return Date.parse(holder.startedAt) < Date.now() - os.uptime() * 1000;
 }
 
 export type LockResult = { ok: true; release: () => void } | { ok: false; holder: LockInfo };
@@ -124,8 +134,9 @@ export function acquireLock(
       const seen = readText(file);
       if (seen === null) continue;
       const holder = parseLock(seen);
-      const sameBoot = !holder?.boot || !boot || holder.boot === boot;
-      if (holder && holder.pid !== pid && sameBoot && alive(holder.pid)) return { ok: false, holder };
+      if (holder && holder.pid !== pid && !beforeThisBoot(holder, boot) && alive(holder.pid)) {
+        return { ok: false, holder };
+      }
       // Stale (its process is gone, or an earlier boot's), unreadable, or our own PID from before a restart.
       const aside = `${draft}.stale`;
       try {

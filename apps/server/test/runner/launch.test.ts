@@ -84,10 +84,10 @@ test("lock: one taken before the computer restarted is stale, whichever process 
   const home = tempDir("home-");
   dirs.push(home);
   const other = process.pid + 100_000;
-  const left = (boot?: string) =>
+  const left = (boot?: string, startedAt = new Date().toISOString()) =>
     writeFileSync(
       path.join(home, LOCK_FILE),
-      JSON.stringify({ pid: other, mode: "start", startedAt: "2026-10-20T00:00:00.000Z", ...(boot ? { boot } : {}) }),
+      JSON.stringify({ pid: other, mode: "start", startedAt, ...(boot ? { boot } : {}) }),
     );
   const alive = () => true;
   left("earlier-boot");
@@ -97,7 +97,10 @@ test("lock: one taken before the computer restarted is stale, whichever process 
   // Taken in this boot, by a live process: held.
   left("this-boot");
   expect(acquireLock(home, "start", { alive, boot: "this-boot" })).toMatchObject({ ok: false, holder: { pid: other } });
-  // An older version's lock doesn't say its boot: its pid decides.
+  // An older version's lock doesn't say its boot: taken before the computer started, it's stale…
+  left(undefined, "2000-01-01T00:00:00.000Z");
+  expect(acquireLock(home, "start", { alive, boot: "this-boot" }).ok).toBe(true);
+  // …and since, its pid decides.
   left();
   expect(acquireLock(home, "start", { alive, boot: "this-boot" }).ok).toBe(false);
   if (process.platform === "linux" || process.platform === "darwin") expect(bootId()).toMatch(/^[\w-]{8,}$/);
