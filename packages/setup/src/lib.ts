@@ -654,6 +654,18 @@ export interface ThisMachine {
 export type ComputerOffer = { mac: boolean; yes: boolean; why: string | null } | { problem: Problem };
 
 /**
+ * A setting the server refuses to start with alongside HOST_COMPUTER_TOKEN (packages/config, `loadConfig`),
+ * and the value that lifts it; null when there's none.
+ */
+export function hostTokenConflict(content: string | null): { now: string; off: string } | null {
+  if (envFlag(content, "ALLOW_SIGNUP")) return { now: "ALLOW_SIGNUP=true", off: "ALLOW_SIGNUP=false" };
+  if (envValue(content, "MACHINE_PROVISIONING") === "external") {
+    return { now: "MACHINE_PROVISIONING=external", off: "MACHINE_PROVISIONING=off" };
+  }
+  return null;
+}
+
+/**
  * Whether this machine can be its agents' computer, and the answer when nobody gives one: yes, except on
  * a Linux machine too small for agents' screens or without apt-get for their packages, which `why` says.
  */
@@ -666,10 +678,17 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
       `Follow "This server as the agents' computer" in ${GUIDE_URL}.`,
     );
   }
-  if (envFlag(content, "ALLOW_SIGNUP")) {
+  const conflict = hostTokenConflict(content);
+  if (conflict?.off === "ALLOW_SIGNUP=false") {
     return no(
       "Sign-up is open here (ALLOW_SIGNUP=true), and this machine works for agents only while people join by invitation.",
       `Set ALLOW_SIGNUP=false in .env, or ${later}.`,
+    );
+  }
+  if (conflict) {
+    return no(
+      "Each workspace here gets a computer of its own from a provisioner (MACHINE_PROVISIONING=external), and no other computer joins it.",
+      "Set MACHINE_PROVISIONING=off in .env to use this machine instead.",
     );
   }
   const mac = machine.platform === "darwin";
@@ -812,13 +831,13 @@ export function decideComputer(p: {
   if ("problem" in p.offer) {
     if (p.computer === "yes") return { problem: p.offer.problem };
     if (p.computer === "no" || now === "off") return off();
-    if (now === "on" && envFlag(p.content, "ALLOW_SIGNUP")) {
+    const conflict = hostTokenConflict(p.content);
+    if (now === "on" && conflict) {
       return {
         problem: {
           check: "computer",
-          error:
-            "Sign-up is open here (ALLOW_SIGNUP=true), and agentes.chat doesn't start with this machine's token (HOST_COMPUTER_TOKEN in .env) then.",
-          fix: "Set ALLOW_SIGNUP=false in .env, or run the setup again with --computer no.",
+          error: `agentes.chat doesn't start with this machine's token (HOST_COMPUTER_TOKEN in .env) and ${conflict.now} together.`,
+          fix: `Set ${conflict.off} in .env, or run the setup again with --computer no.`,
         },
       };
     }

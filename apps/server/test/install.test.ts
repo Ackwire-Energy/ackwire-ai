@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadConfig } from "@agenteschat/config";
 import { en } from "../../../packages/i18n/src/en";
 import {
   computerFiles,
@@ -9,6 +10,7 @@ import {
   HOST_SERVICE,
   hostLogFile,
   hostState,
+  hostTokenConflict,
   installedCommands,
   parseOptions,
   SYSTEM_RUNNER_HOME,
@@ -191,6 +193,21 @@ describe("the setup reads the agents' computer the way the runner writes it", ()
       // A connected computer's own service isn't this server's.
       expect(installedCommands(write(launch, ["start"]))).toBeNull();
     }
+  });
+
+  test("each setting the setup won't add the token beside is one the server refuses to start with", () => {
+    const valid = { DATABASE_URL: "postgres://u:p@localhost:5432/db", AGENTES_SECRET: "x".repeat(48) };
+    const token = { HOST_COMPUTER_TOKEN: "t".repeat(64), OPERATOR_API_TOKEN: "o".repeat(64) };
+    const env = (setting: string) => Object.fromEntries([setting.split("=") as [string, string]]);
+    for (const content of ["ALLOW_SIGNUP=true\n", "MACHINE_PROVISIONING=external\n"]) {
+      const conflict = hostTokenConflict(content);
+      if (!conflict) throw new Error(`no conflict for ${content}`);
+      expect(() => loadConfig({ ...valid, ...token, ...env(conflict.now) })).toThrow(
+        /HOST_COMPUTER_TOKEN can't be set/,
+      );
+      expect(() => loadConfig({ ...valid, ...token, ...env(conflict.off) })).not.toThrow();
+    }
+    expect(hostTokenConflict("ALLOW_SIGNUP=false\nMACHINE_PROVISIONING=off\n")).toBeNull();
   });
 
   test("the usage statistics question says what the web app's switch says", () => {

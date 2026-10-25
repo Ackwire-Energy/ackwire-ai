@@ -480,6 +480,14 @@ describe("the agents' computer", () => {
       expect(why(server, open)?.error).toContain("Sign-up is open here (ALLOW_SIGNUP=true)");
     }
     expect(why(server, "ALLOW_SIGNUP=false\n")).toBeNull();
+    // Every workspace gets a computer from a provisioner, and the server takes no other.
+    expect(why(server, "MACHINE_PROVISIONING=external\n")).toEqual({
+      check: "computer",
+      error:
+        "Each workspace here gets a computer of its own from a provisioner (MACHINE_PROVISIONING=external), and no other computer joins it.",
+      fix: "Set MACHINE_PROVISIONING=off in .env to use this machine instead.",
+    });
+    expect(why(server, "MACHINE_PROVISIONING=off\n")).toBeNull();
     expect(why({ ...server, root: false })?.error).toContain("needs root");
     expect(why({ ...server, systemd: false })?.error).toContain("systemd isn't running");
     expect(why(server, null, true)?.fix).toContain("This server as the agents' computer");
@@ -634,11 +642,23 @@ describe("the agents' computer", () => {
       });
       // Run again as someone else: the computer set up earlier stays on.
       expect(decide(noRoot, { content: TOKEN })).toMatchObject({ plan: { state: "skipped" }, entries: {} });
-      // Sign-up opened after a yes: the server refuses to start with both.
-      const open = decide(server, { content: `${TOKEN}ALLOW_SIGNUP=true\n` });
-      expect("problem" in open && open.problem.fix).toBe(
-        "Set ALLOW_SIGNUP=false in .env, or run the setup again with --computer no.",
+      // Sign-up opened, or a provisioner turned on, after a yes: the server refuses to start with either.
+      expect(decide(server, { content: `${TOKEN}ALLOW_SIGNUP=true\n` })).toEqual({
+        problem: {
+          check: "computer",
+          error:
+            "agentes.chat doesn't start with this machine's token (HOST_COMPUTER_TOKEN in .env) and ALLOW_SIGNUP=true together.",
+          fix: "Set ALLOW_SIGNUP=false in .env, or run the setup again with --computer no.",
+        },
+      });
+      const provisioned = decide(server, { content: `${TOKEN}MACHINE_PROVISIONING=external\n` });
+      expect("problem" in provisioned && provisioned.problem.fix).toBe(
+        "Set MACHINE_PROVISIONING=off in .env, or run the setup again with --computer no.",
       );
+      expect(decide(server, { content: `${TOKEN}MACHINE_PROVISIONING=external\n`, computer: "no" })).toEqual({
+        plan: { state: "off", wasOn: true },
+        entries: { HOST_COMPUTER_TOKEN: "" },
+      });
     });
   });
 

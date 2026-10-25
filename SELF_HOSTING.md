@@ -279,7 +279,7 @@ A failure names the check, what happened and the fix:
 | `port` | Another program uses the app's port, or 80 and 443 for a public domain | `HOST_PORT=3001` in `.env`, or stop that program. |
 | `app.config` | The app refused a value in `.env` | The values `error` names. |
 | `app.health`, `tailscale.timeout` | Something didn't answer in time (`--timeout`, 300 s by default) | `docker compose logs agentes`, or `tailscale`. |
-| `computer` | `--computer yes` on a machine that can't be the agents' computer: sign-up is open, no root or no systemd on Linux, or it's already connected as a computer. Or sign-up was opened after a yes, and agentes.chat won't start with both | What `fix` says, or `--computer no`. |
+| `computer` | `--computer yes` on a machine that can't be the agents' computer: sign-up is open, a provisioner gives workspaces their computers, no root or no systemd on Linux, or it's already connected as a computer. Or one of the first two was turned on after a yes, and agentes.chat won't start with the token | What `fix` says, or `--computer no`. |
 | `computer.install`, `computer.off`, `computer.token` | The agents' computer didn't install or wasn't accepted (agentes.chat itself is up, and the result still has `url` and `appLink`) | What `fix` says, then the same command again. Its log shows its state: `journalctl -u agentes-runner` on Linux, `~/.agentes-runner/runner.log` on a Mac. |
 
 </details>
@@ -709,8 +709,9 @@ address the app is published on (`BIND_ADDRESS` and `HOST_PORT`), and waits for 
 up again when agentes.chat brings a newer version. Answering no leaves `HOST_COMPUTER_TOKEN=` empty,
 so the setup doesn't ask again; `--computer yes` on a later run turns it on, and `--computer no`
 after a yes empties the token, removes `host-computer-token` and prints the command that removes the
-service. It's skipped while sign-up is open (`ALLOW_SIGNUP=true`), and on a machine already
-connected as a computer, whose connection stays as it is.
+service. It's skipped while sign-up is open (`ALLOW_SIGNUP=true`) or a provisioner gives every
+workspace its computer (`MACHINE_PROVISIONING=external`), since the server won't start with the token
+then, and on a machine already connected as a computer, whose connection stays as it is.
 
 By hand on Linux (a server set up before, say): set a token in `.env` and give the same one to the
 agents' computer, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you
