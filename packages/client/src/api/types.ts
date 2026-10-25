@@ -49,6 +49,8 @@ export interface Instance {
   url: string;
   signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
   signup: "open" | "invite";
+  /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
+  ownerClaim?: boolean;
 }
 
 /** "Abrir no celular": a sign-in for the phone, single use, a few minutes long. */

@@ -30,7 +30,7 @@ describe("desktop strings", () => {
   test("no empty strings and no internal names in the UI", () => {
     for (const s of [...values(desktopPtBR), ...values(desktopEn)]) {
       expect(s.trim().length).toBeGreaterThan(0);
-      expect(s).not.toMatch(/\b(runner|MCP|protocol|protocolo|sidecar|Tauri)\b/i);
+      expect(s).not.toMatch(/\b(runner|MCP|protocol|protocolo|sidecar|Tauri|PGlite)\b/i);
     }
   });
 
@@ -46,6 +46,82 @@ describe("desktop strings", () => {
     expect(pt.t("desktop.orgCount", { count: 2 })).toBe("2 organizações");
     const en = createDesktopI18n("en");
     expect(en.t("desktop.tray.now")).toBe("Now");
+  });
+
+  test("this computer's name fills {{device}} everywhere, by system and language", () => {
+    expect(createDesktopI18n("pt-BR", "mac").t("desktop.tray.calmBody")).toBe(
+      "Os agentes usam este Mac quando precisam.",
+    );
+    expect(createDesktopI18n("pt-BR", "windows").t("desktop.own.here")).toBe("Rodar o agentes.chat neste PC");
+    expect(createDesktopI18n("pt-BR", "linux").t("desktop.link.chipHere")).toBe("Este computador");
+    expect(createDesktopI18n("en", "linux").t("desktop.connect.httpRefused", { host: "192.168.1.20:3000" })).toBe(
+      "192.168.1.20:3000 uses plain http, which only works on this computer. Use its Tailscale address or one with https.",
+    );
+    for (const s of [...values(desktopPtBR), ...values(desktopEn)]) {
+      // "this Mac" always through {{device}}, so Windows and Linux read right.
+      expect(s).not.toMatch(/\b(this|este|neste|deste) Mac\b/i);
+    }
+  });
+
+  test("what the app shows in the Cloud names no computer", () => {
+    const get = (tree: object, path: string) =>
+      path.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], tree);
+    const cloudKeys = [
+      ...leaves(desktopEn.first).map((k) => `first.${k}`),
+      "servers.title",
+      "servers.lead",
+      "servers.cloud",
+      "servers.cloudSub",
+      "servers.open",
+      "servers.openNow",
+      "servers.add",
+      "servers.manage",
+      "servers.remove",
+      "servers.removeTitle",
+      "servers.removeBody",
+      "tray.open",
+      "tray.prefs",
+      "tray.quit",
+      "tray.label",
+      "tray.waiting_one",
+      "tray.waiting_other",
+      "tray.nothingWaiting",
+      "tray.unreachable",
+      "cover.offline",
+      "cover.unreachable",
+      "link.question",
+      "link.questionSignIn",
+      "link.questionClaim",
+      "link.leave",
+      "link.connect",
+      "link.continue",
+      "link.checking",
+      "link.notALink",
+      "prefs.nav.general",
+      "prefs.nav.servers",
+      "prefs.nav.updates",
+      "prefs.general.title",
+      "prefs.general.lead",
+      "prefs.general.behavior",
+      "prefs.general.launchTitle",
+      "prefs.general.notifySiteTitle",
+      "prefs.general.notifySiteDesc",
+      "prefs.general.dockTitle",
+      "prefs.general.dockDesc",
+      "prefs.general.menuBarTitle",
+      "prefs.general.menuBarDesc",
+      ...leaves(desktopEn.prefs.updates).map((k) => `prefs.updates.${k}`),
+    ];
+    for (const tree of [desktopEn, desktopPtBR]) {
+      for (const key of cloudKeys) {
+        const text = get(tree, key);
+        expect({ key, text: typeof text }).toEqual({ key, text: "string" });
+        expect({ key, text }).not.toEqual({
+          key,
+          text: expect.stringMatching(/\{\{device\}\}|\bMac\b|\bPC\b|computer|computador/i),
+        });
+      }
+    }
   });
 
   test("picks the Mac's language", () => {

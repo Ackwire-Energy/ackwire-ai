@@ -4,7 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { ThisMacStatus } from "@/lib/desktop";
+import { createI18n } from "@/i18n";
+import { applyDesktopDevice, type ThisMacStatus } from "@/lib/desktop";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -56,7 +57,8 @@ describe("Configurações → Computadores, in the app", () => {
       mac.status = connected;
     });
     await settle(8);
-    expect(asked).toContainEqual({ kind: "connect", orgId: ORG_ID });
+    // The organization's name goes along, for the app's own dialog before it pairs this computer.
+    expect(asked).toContainEqual({ kind: "connect", orgId: ORG_ID, orgName: "Acme" });
     expect(state.calls.find((c) => c.method === "machines.confirmDevice")?.args.slice(0, 2)).toEqual([
       ORG_ID,
       "WXYZ-1234",
@@ -99,6 +101,24 @@ describe("Configurações → Computadores, in the app", () => {
     await settle(8);
     expect(screen().getByText(/Liberar é no próprio computador/)).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Abrir Pastas" })).toBeNull();
+  });
+
+  test("agentes.chat, a server on this computer, Windows: the app says no, and no This Mac shows", async () => {
+    const asked = inTheApp({ status: { orgs: [], agentsHere: false }, code: "WXYZ-1234" });
+    const api = createFakeApi(seedState());
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    expect(screen().queryByRole("button", { name: "Usar este Mac" })).toBeNull();
+    expect(asked.some((r) => r.kind === "connect")).toBe(false);
+  });
+
+  test("this computer's own name, on Linux, in the app's language", () => {
+    const i18n = createI18n("pt-BR");
+    applyDesktopDevice(i18n, "linux");
+    expect(i18n.t("machines.thisMac.connect")).toBe("Usar este computador");
+    void i18n.changeLanguage("en");
+    expect(i18n.t("machines.thisMac.connect")).toBe("Use this computer");
+    expect(createI18n("en").t("machines.thisMac.connect")).toBe("Use this Mac");
   });
 
   test("outside the app: the download, and nothing asks the Mac", async () => {

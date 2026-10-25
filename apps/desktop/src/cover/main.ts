@@ -1,25 +1,31 @@
 /**
- * The main window's cover (cover.rs): the boot sky with the agent, over the site while it
- * loads, so the window is never blank. Rust shows it and hides it (the site says when it painted); this page
- * only tells, while it shows, whether the site can be reached: "Sem conexão…" / "O agentes.chat não
- * respondeu…", and when it is back it asks to load the site again.
+ * The main window's cover (cover.rs): the boot sky with the agent, over the server's page while it
+ * loads, so the window is never blank. Rust shows it and hides it (the page says when it painted); this page
+ * only tells, while it shows, whether the server open now can be reached ("No internet connection…" or
+ * "Can't reach {{host}}…"), and when it is back it asks to load the page again.
  */
+
+import { isTailnet, serverHost } from "@agenteschat/client/lib/server";
 import { drawAgent, idlePose } from "@agenteschat/ui/agent/engine";
 import { startSky } from "@agenteschat/ui/sky/engine";
 import { SKY_TONES } from "@agenteschat/ui/sky/math";
 import { invoke } from "@tauri-apps/api/core";
 import "../fonts.css";
 import "./cover.css";
+import { platformOf } from "../control/platform";
 import { SITE_URL } from "../control/version";
 import { DESKTOP_STRINGS, systemLocale } from "../i18n";
 import type { DesktopTranslations } from "../i18n/keys.pt-BR";
+import { fillIn } from "../ui/time";
 
 /** How long the cover waits before it asks whether the site can be reached, and how often after. */
 const CHECK_MS = 3000;
 /** Reachable but never said it painted (an older site): the cover steps aside after this. */
 const GIVE_UP_MS = 15_000;
 
-const words = (DESKTOP_STRINGS[systemLocale()] as DesktopTranslations).cover;
+const strings = DESKTOP_STRINGS[systemLocale()] as DesktopTranslations;
+const words = strings.cover;
+const device = strings.device[platformOf(navigator.userAgent)];
 const root = document.querySelector<HTMLElement>(".cover");
 const line = document.querySelector<HTMLElement>(".cover__line");
 const sky = document.querySelector<HTMLCanvasElement>(".cover__sky");
@@ -92,24 +98,39 @@ const w = window as { __coverShown?: () => void; __coverFade?: () => void };
 w.__coverShown = shown;
 w.__coverFade = fade;
 
-/** Whether agentes.chat answers at all (any answer: the cover can't read it, only that it came). */
-async function reachable(): Promise<boolean> {
+/** The server the main window opens (servers.json, through Rust); agentes.chat before one is chosen. */
+const currentServer = () =>
+  invoke<string | null>("cover_server").then(
+    (s) => s ?? SITE_URL,
+    () => SITE_URL,
+  );
+
+/** Whether the server answers at all (any answer: the cover can't read it, only that it came). */
+async function reachable(server: string): Promise<boolean> {
   if (!navigator.onLine) return false;
   try {
-    await fetch(`${SITE_URL}/api/health`, { mode: "no-cors", cache: "no-store" });
+    await fetch(`${server}/api/health`, { mode: "no-cors", cache: "no-store" });
     return true;
   } catch {
     return false;
   }
 }
 
+/** Why the page isn't there: no internet, or this server; on Tailscale, the likely reason too. */
+function unreachableText(server: string): string {
+  if (!navigator.onLine) return words.offline;
+  const text = fillIn(words.unreachable, { host: serverHost(server) });
+  return isTailnet(server) ? `${text} ${fillIn(words.tailnet, { device })}` : text;
+}
+
 async function check() {
   if (document.visibilityState !== "visible" || root?.hasAttribute("data-fading")) return;
   const waited = performance.now() - shownAt;
   if (waited < CHECK_MS) return;
-  if (!(await reachable())) {
+  const server = await currentServer();
+  if (!(await reachable(server))) {
     unreachable = true;
-    say(navigator.onLine ? words.down : words.offline);
+    say(unreachableText(server));
     return;
   }
   if (unreachable) {

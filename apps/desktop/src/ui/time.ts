@@ -44,3 +44,7 @@ export function listNames(names: readonly string[], locale: string): string {
     return names.join(", ");
   }
 }
+
+/** `{{name}}` placeholders filled in without i18next (the cover's small bundle); unknown ones stay as they are. */
+export const fillIn = (text: string, vars: Record<string, string>) =>
+  text.replace(/\{\{(\w+)\}\}/g, (all, key: string) => vars[key] ?? all);

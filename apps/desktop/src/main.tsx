@@ -6,31 +6,39 @@ import { AppProvider } from "./app";
 import { DesktopStore } from "./control/store";
 import { DevFrame } from "./dev/DevFrame";
 import { readPref } from "./hooks";
-import { createFakeHost } from "./host/fake";
+import { createFakeHost, SCENARIOS, type Scenario } from "./host/fake";
 import { createTauriHost, inTauri } from "./host/tauri";
 import { type Host, WINDOW_NAMES, type WindowName } from "./host/types";
-import { createDesktopI18n } from "./i18n";
+import { createDesktopI18n, pickLocale, systemLocale } from "./i18n";
 import { ToastProvider } from "./ui/Toast";
 import { baseName } from "./ui/time";
 import { WindowView } from "./WindowView";
 
 const params = new URLSearchParams(window.location.search);
 const asked = params.get("window");
+const scenario = params.get("scenario");
 const fakeHost = inTauri()
   ? null
   : createFakeHost(
       (WINDOW_NAMES as readonly string[]).includes(asked ?? "") ? (asked as WindowName) : "popover",
-      params.get("scenario") === "first" ? "first" : "default",
+      (SCENARIOS as readonly string[]).includes(scenario ?? "") ? (scenario as Scenario) : "selfhost",
+      { link: params.get("link"), found: params.get("found") !== "0" },
     );
 const host: Host = fakeHost ?? createTauriHost();
 
-const i18n = createDesktopI18n();
+// The browser's own language, or `?lang=` while designing.
+const i18n = createDesktopI18n(
+  fakeHost && params.get("lang") ? pickLocale([params.get("lang")]) : systemLocale(),
+  host.platform,
+);
 document.documentElement.lang = i18n.language;
 
-// Light or dark like the Mac.
+// Light or dark like the system (`?theme=` while designing).
 const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const forced = fakeHost ? params.get("theme") : null;
 const applyTheme = () => {
-  document.documentElement.dataset.theme = dark.matches ? "dark" : "light";
+  document.documentElement.dataset.theme =
+    forced === "dark" || forced === "light" ? forced : dark.matches ? "dark" : "light";
 };
 applyTheme();
 dark.addEventListener("change", applyTheme);

@@ -1,9 +1,9 @@
-//! The app's menus: the menu bar and the site's right-click menu when the person
-//! chose the system's look. The popover sends the menu bar's labels in the app's language (`app_menu_set`);
-//! the site sends what its right-click menu has (`context_menu`) and the system draws it. What the site
-//! handles goes back to it through `window.__agentesMenu(action)` and `window.__agentesContextMenu(token, id)`,
-//! a call into the page, never a command the page can make; the rest stays here (Preferences, updates, zoom,
-//! quit).
+//! The app's menus: the menu bar (with the servers it opens), the tray's own menu on Windows and Linux
+//! (tray.rs), and the site's right-click menu when the person chose the system's look. The popover sends
+//! every label in the app's language (`app_menu_set`, the pairing dialog's too); the site sends what its
+//! right-click menu has (`context_menu`) and the system draws it. What the site handles goes back to it
+//! through `window.__agentesMenu(action)` and `window.__agentesContextMenu(token, id)`, a call into the page,
+//! never a command the page can make; the rest stays here (servers, Preferences, updates, zoom, quit).
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -42,6 +42,40 @@ pub struct Zoom(Mutex<Option<usize>>);
 pub struct MenuParts {
     labels: Mutex<HashMap<String, String>>,
     orgs: Mutex<Vec<(String, String)>>,
+    /// Shown once the labels arrive: where the folders of retired Cloud homes stay (`runners::migrate`).
+    retired: Mutex<Option<String>>,
+}
+
+/// The labels the popover sent last (empty before it did).
+pub fn labels(app: &AppHandle) -> HashMap<String, String> {
+    app.state::<MenuParts>().labels.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// An organization's name from the site's last list (the Go menu's).
+pub fn org_name(app: &AppHandle, id: &str) -> Option<String> {
+    let parts = app.state::<MenuParts>();
+    let orgs = parts.orgs.lock().unwrap_or_else(|e| e.into_inner());
+    orgs.iter().find(|(o, _)| o == id).map(|(_, name)| name.clone())
+}
+
+/// The move from the menu bar app retired Cloud homes: one notification, once the app's language is known.
+pub fn retired_cloud_homes(app: &AppHandle, folders: String) {
+    *app.state::<MenuParts>().retired.lock().unwrap_or_else(|e| e.into_inner()) = Some(folders);
+}
+
+fn show_retired_notice(app: &AppHandle, labels: &HashMap<String, String>) {
+    use tauri_plugin_notification::NotificationExt;
+    let (Some(title), Some(body)) = (labels.get("migrateTitle"), labels.get("migrateBody")) else { return };
+    let Some(folders) = app.state::<MenuParts>().retired.lock().unwrap_or_else(|e| e.into_inner()).take() else {
+        return;
+    };
+    let _ = app.notification().builder().title(title).body(body.replace("{path}", &folders)).show();
+}
+
+/// The server list changed (chosen, removed): the menus that list them.
+pub fn servers_changed(app: &AppHandle) {
+    let _ = rebuild(app);
+    crate::tray::refresh(app);
 }
 
 /// The zoom kept from last time (window_state.rs): applied when the window is made.
@@ -102,13 +136,26 @@ pub fn on_event(app: &AppHandle, id: &str) {
         to_site(app, site_call("__agentesMenu", &["org", org]));
         return;
     }
+    // A server of the list, by its place in it: the main window opens there.
+    if let Some(n) = id.strip_prefix("server:").and_then(|n| n.parse::<usize>().ok()) {
+        if let Some(url) = crate::servers::get(app).servers.get(n).and_then(|s| s.parse().ok()) {
+            let _ = main_window::show_url(app, url);
+        }
+        return;
+    }
     let Some(action) = id.strip_prefix("app:") else { return };
     match action {
         "prefs" => {
             let _ = crate::present(app, "prefs");
         }
-        // The popover owns updates, quitting (it asks first while agents are working) and access requests.
-        "updates" | "quit" | "requests" | "thisMac" => {
+        "serversAdd" => {
+            let _ = crate::present(app, "welcome");
+        }
+        "open" => crate::open_app(app),
+        // The popover owns updates, quitting (it asks first while agents are working), access requests, the
+        // Servers tab and pausing.
+        "updates" | "quit" | "requests" | "thisMac" | "servers" | "pause1h" | "pauseTomorrow" | "pauseManual"
+        | "resume" => {
             let _ = app.emit_to("popover", "menu://action", action);
         }
         "reload" => to_site(app, "location.reload()".into()),
@@ -171,6 +218,7 @@ fn build_app_menu(
         .item(&own("updates", None)?)
         .item(&sep()?)
         .item(&own("prefs", Some("CmdOrCtrl+,"))?)
+        .item(&servers_menu(app, &l)?)
         .item(&site("orgSettings")?)
         .item(&sep()?)
         .services_with_text(l("services"))
@@ -231,15 +279,15 @@ fn build_app_menu(
         }
     }
     let go = go.build()?;
-    let window = SubmenuBuilder::new(app, l("window"))
+    let mut window = SubmenuBuilder::new(app, l("window"))
         .minimize_with_text(l("minimize"))
         .maximize_with_text(l("zoom"))
-        .item(&sep()?)
-        .item(&own("thisMac", None)?)
-        .item(&own("requests", None)?)
-        .item(&sep()?)
-        .bring_all_to_front_with_text(l("bringAllToFront"))
-        .build()?;
+        .item(&sep()?);
+    // This computer's own items only while agents work on it.
+    if app.state::<crate::runners::Runners>().any_paired() {
+        window = window.item(&own("thisMac", None)?).item(&own("requests", None)?).item(&sep()?);
+    }
+    let window = window.bring_all_to_front_with_text(l("bringAllToFront")).build()?;
     // Empty on purpose: the Mac puts its search of every menu item there.
     let help = SubmenuBuilder::new(app, l("help")).build()?;
     #[cfg(target_os = "macos")]
@@ -253,6 +301,27 @@ fn build_app_menu(
 
 const MAX_LABEL: usize = 120;
 
+/// "Servers ›": the servers this app opens (✓ the one open now), then Add a server… and Manage servers….
+pub fn servers_menu(
+    app: &AppHandle,
+    l: &dyn Fn(&str) -> String,
+) -> tauri::Result<Submenu<tauri::Wry>> {
+    let file = crate::servers::get(app);
+    let mut menu = SubmenuBuilder::new(app, l("servers"));
+    for (n, server) in file.servers.iter().enumerate() {
+        let name = server.strip_prefix("https://").unwrap_or(server);
+        let current = file.current.as_deref() == Some(server.as_str());
+        let item = tauri::menu::CheckMenuItemBuilder::with_id(format!("server:{n}"), name).checked(current).build(app)?;
+        menu = menu.item(&item);
+    }
+    if !file.servers.is_empty() {
+        menu = menu.separator();
+    }
+    menu.item(&MenuItemBuilder::with_id("app:serversAdd", l("serversAdd")).build(app)?)
+        .item(&MenuItemBuilder::with_id("app:servers", l("serversManage")).build(app)?)
+        .build()
+}
+
 /// The popover's labels for the menu bar (it knows the app's language); only the popover sets them.
 #[tauri::command]
 pub fn app_menu_set(app: AppHandle, window: tauri::Window, labels: HashMap<String, String>) -> Result<(), String> {
@@ -262,12 +331,14 @@ pub fn app_menu_set(app: AppHandle, window: tauri::Window, labels: HashMap<Strin
     if labels.len() > 100 || labels.iter().any(|(k, v)| k.len() > 40 || v.chars().count() > MAX_LABEL) {
         return Err("bad labels".into());
     }
-    *app.state::<MenuParts>().labels.lock().unwrap_or_else(|e| e.into_inner()) = labels;
+    *app.state::<MenuParts>().labels.lock().unwrap_or_else(|e| e.into_inner()) = labels.clone();
+    show_retired_notice(&app, &labels);
+    crate::tray::refresh(&app);
     rebuild(&app)
 }
 
-/// The menu bar again, with the labels and organizations it has now.
-fn rebuild(app: &AppHandle) -> Result<(), String> {
+/// The menu bar again, with the labels, servers and organizations it has now.
+pub fn rebuild(app: &AppHandle) -> Result<(), String> {
     // Windows and Linux would show it inside every window, the popover too: the menu bar is the Mac's.
     #[cfg(target_os = "macos")]
     {

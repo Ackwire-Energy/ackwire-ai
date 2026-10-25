@@ -10,7 +10,8 @@ import { CardTitle, PrefCard, PrefHead } from "./shared";
 
 /**
  * Updates (ADR 0036 §9): one click installs the signed update and reopens the app. When that can't
- * happen (a release without the updater bundle, a failed download) the manual steps come back.
+ * happen (a release without the updater bundle, a failed download, a Linux package) the download and, on a
+ * Mac, the manual steps come back.
  */
 export function Updates({ update }: { update: UpdateCheck }) {
   const { t, i18n } = useTranslation();
@@ -91,11 +92,15 @@ export function Updates({ update }: { update: UpdateCheck }) {
             <>
               <CardTitle>{t("desktop.prefs.updates.howTitle")}</CardTitle>
               <PrefCard padded>
-                <ol className="dk-steps-list">
-                  <li>{t("desktop.prefs.updates.step1")}</li>
-                  <li>{t("desktop.prefs.updates.step2")}</li>
-                  <li>{t("desktop.prefs.updates.step3")}</li>
-                </ol>
+                {host.platform === "mac" ? (
+                  <ol className="dk-steps-list">
+                    <li>{t("desktop.prefs.updates.step1")}</li>
+                    <li>{t("desktop.prefs.updates.step2")}</li>
+                    <li>{t("desktop.prefs.updates.step3")}</li>
+                  </ol>
+                ) : (
+                  <p className="dk-help">{t("desktop.prefs.updates.installerNote")}</p>
+                )}
                 <div className="dk-ver__acts">
                   <Button variant="primary" icon="download" onClick={() => void host.openExternal(latest.url)}>
                     {t("desktop.prefs.updates.download", { version: latest.version })}

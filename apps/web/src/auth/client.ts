@@ -19,4 +19,6 @@ export interface AuthClient {
   desktopHandoff(challenge: string): Promise<AuthResult>;
   /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
   desktopRedeem(verifier: string): Promise<boolean>;
+  /** In the app's window: a one-time sign-in from another device's link, traded once for a session of its own. */
+  signInOneTime(token: string): Promise<AuthResult>;
 }

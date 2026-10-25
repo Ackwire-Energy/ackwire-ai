@@ -1,7 +1,7 @@
 [package]
 name = "agentes-desktop"
 version = "0.5.5"
-description = "agentes: the menu bar app that lets agents use this computer (ADR 0036)"
+description = "agentes.chat for macOS, Windows and Linux: the Cloud, your own server, and agents on this computer"
 license = "AGPL-3.0-only"
 edition = "2021"
 rust-version = "1.77.2"
@@ -18,7 +18,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api", "unstable"] }
 tauri-plugin-shell = "2"
 tauri-plugin-autostart = "2"
-tauri-plugin-single-instance = "2"
+# A second launch (a link on Windows and Linux arrives as one) reaches the running app.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

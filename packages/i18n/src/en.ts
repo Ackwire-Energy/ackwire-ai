@@ -120,6 +120,9 @@ export const en: Translations = {
       doneLead: "You're signed in to the agentes app. You can close this tab.",
       expired: "This request expired.",
       expiredLead: "Go back to the app and choose {{provider}} again.",
+      handover: "Signing in with your account from the other device…",
+      handoverFailed: "The code expired or was already used.",
+      handoverFailedLead: "Sign in with your email, or show a new code on the other device.",
     },
     reset: {
       title: "Create a new password.",
@@ -527,10 +530,10 @@ export const en: Translations = {
       mine: "This computer or a server",
       mineDesc:
         "Uses the Claude Code you already have, no key needed. The agentes app connects outward, no open ports.",
-      thisMac: "This Mac",
+      thisMac: "This {{device}}",
       thisMacDesc: "Agents work here, only in the folders you allow. Connects in one click.",
-      thisMacConnecting: "Connecting this Mac…",
-      thisMacConnected: "{{name}} connected. The chosen agents will work on this Mac.",
+      thisMacConnecting: "Connecting this {{device}}…",
+      thisMacConnected: "{{name}} connected. The chosen agents will work on this {{device}}.",
       thisMacFolders: "Choose folders",
       otherComputer: "Connect another computer",
       connected: "{{name}} connected · {{os}}. The chosen agents will use this computer.",
@@ -572,6 +575,19 @@ export const en: Translations = {
       open: "Open #general",
     },
     skip: "Skip this step",
+  },
+  // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).
+  desktopNotice: {
+    mention: "You were mentioned",
+    dm: "New direct message",
+    agent_question: "A question for you",
+    approval: "An approval is waiting for you",
+    forum_turn: "Your turn to weigh in",
+    mission_stopped: "A mission stopped",
+    routine_failed: "A routine didn't finish",
+    routine_paused: "A routine was paused",
+    browser_handoff: "An agent needs you in the browser",
+    waiting: "Something is waiting for you",
   },
   contextMenu: {
     label: "Actions",
@@ -6720,7 +6736,8 @@ export const en: Translations = {
       noComputer: "Missions run on a connected computer, and this agent has none.",
       computerOffline: "The agent's computer is offline.",
       execDisabled: "Commands are turned off on that computer.",
-      runnerOutdated: "The program on the computer is too old for missions: update agentes-runner.",
+      runnerOutdated:
+        "The program on the computer is too old for missions: update the agentes.chat app there, or run its install command again.",
       exists: "This thread already has a mission.",
       closed: "This mission is closed.",
       wrongStatus: "The mission isn't in a state that allows this.",
@@ -6827,11 +6844,13 @@ export const en: Translations = {
     commandCopied: "Command copied. Paste it in the computer's Terminal.",
     // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
-      text: "This Mac can work with your agents. They only use the folders you allow, and you can pause anytime.",
-      connect: "Use this Mac",
+      text: "This {{device}} can work with your agents. They only use the folders you allow, and you can pause anytime.",
+      connect: "Use this {{device}}",
       connected: "This Mac is connected. Choose the folders agents may use.",
       failed: "Couldn't connect this Mac. Try again.",
-      folders: "This Mac's folders",
+      folders: "This {{device}}'s folders",
+      // `{{device}}` in these strings, inside the desktop app (lib/desktop.ts).
+      device: { mac: "Mac", windows: "PC", linux: "computer" },
       grantHere: "It's this Mac: allow folders in the app's Preferences.",
       openFolders: "Open Folders",
       toolsHere: "It's this Mac: turn the browser on in the app's Preferences, under Tools.",

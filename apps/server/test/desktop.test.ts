@@ -140,6 +140,53 @@ test("update: Tauri's format for signed builds, 204 when the release has no upda
   expect((await server().app.request("/api/desktop/update?target=darwin&arch=x86_64")).status).toBe(204);
 });
 
+test("Windows and Linux: each platform's own files, from the newest release that has them", async () => {
+  const all = (v: string) => [
+    asset(`agentes_${v}_universal.dmg`),
+    asset(`agentes_${v}_universal.dmg.sha256`),
+    asset(`agentes_${v}_x64-setup.exe`),
+    asset(`agentes_${v}_x64-setup.exe.sha256`),
+    asset(`agentes_${v}_x64-setup.exe.sig`),
+    asset(`agentes_${v}_amd64.deb`),
+    asset(`agentes_${v}_amd64.deb.sha256`),
+    asset(`agentes_${v}_amd64.AppImage`),
+    asset(`agentes_${v}_amd64.AppImage.sha256`),
+    asset(`agentes_${v}_amd64.AppImage.sig`),
+  ];
+  // 0.4.0 was a Mac-only build: Windows and Linux keep 0.3.0.
+  const github = fakeGithub([release("0.4.0"), release("0.3.0", { assets: all("0.3.0") })]);
+  t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
+  const latest = async (query: string) => {
+    const res = await server().app.request(`/api/desktop/latest?${query}`);
+    return res.status === 200 ? ((await res.json()) as { version: string; url: string }) : res.status;
+  };
+  expect(await latest("target=darwin&arch=arm64")).toMatchObject({ version: "0.4.0" });
+  expect(await latest("target=windows&arch=x86_64")).toMatchObject({
+    version: "0.3.0",
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_x64-setup.exe",
+  });
+  // A deb is what a person downloads on Linux; the AppImage updates itself.
+  expect(await latest("target=linux&arch=x64")).toMatchObject({
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_amd64.deb",
+  });
+  expect(await latest("target=windows&arch=arm64")).toBe(404);
+  expect(await latest("target=freebsd&arch=x64")).toBe(404);
+
+  const update = async (query: string) => {
+    const res = await server().app.request(`/api/desktop/update?${query}`);
+    return res.status === 200 ? ((await res.json()) as { url: string; signature: string }) : res.status;
+  };
+  expect(await update("target=windows&arch=x86_64&current=0.2.0")).toMatchObject({
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_x64-setup.exe",
+    signature: "SIGNATURE-BASE64",
+  });
+  expect(await update("target=linux&arch=x86_64&current=0.2.0")).toMatchObject({
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_amd64.AppImage",
+  });
+  // The Mac's newest release has no updater bundle: nothing to install.
+  expect(await update("target=darwin&arch=aarch64&current=0.2.0")).toBe(204);
+});
+
 test("download streams an asset of a desktop-v* release, as an attachment; nothing else", async () => {
   const github = fakeGithub([release("0.2.0"), { tag_name: "v1.0.0", assets: [asset("secret.txt")] }]);
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });

@@ -126,6 +126,9 @@ export const ptBR = {
       doneLead: "Você entrou no app agentes. Pode fechar esta aba.",
       expired: "Esse pedido expirou.",
       expiredLead: "Volte ao app e escolha {{provider}} de novo.",
+      handover: "Entrando com a sua conta do outro aparelho…",
+      handoverFailed: "O código expirou ou já foi usado.",
+      handoverFailedLead: "Entre com o seu e-mail, ou mostre um código novo no outro aparelho.",
     },
     reset: {
       title: "Crie uma senha nova.",
@@ -535,10 +538,10 @@ export const ptBR = {
       cloudReady: "Computador na nuvem ligado. Fica pronto quando o primeiro agente precisar.",
       mine: "Este computador ou um servidor",
       mineDesc: "Usa o Claude Code que você já tem, sem chave. O app agentes conecta para fora, sem abrir porta.",
-      thisMac: "Este Mac",
+      thisMac: "Este {{device}}",
       thisMacDesc: "Os agentes trabalham aqui, só nas pastas que você liberar. Conecta com um clique.",
-      thisMacConnecting: "Conectando este Mac…",
-      thisMacConnected: "{{name}} conectado. Os agentes escolhidos vão trabalhar neste Mac.",
+      thisMacConnecting: "Conectando este {{device}}…",
+      thisMacConnected: "{{name}} conectado. Os agentes escolhidos vão trabalhar neste {{device}}.",
       thisMacFolders: "Escolher pastas",
       otherComputer: "Conectar outro computador",
       connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
@@ -582,6 +585,19 @@ export const ptBR = {
     skip: "Pular esta etapa",
   },
   /** The desktop app's right click (lib/context-menu.ts). */
+  // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).
+  desktopNotice: {
+    mention: "Mencionaram você",
+    dm: "Mensagem direta nova",
+    agent_question: "Uma pergunta para você",
+    approval: "Uma aprovação espera por você",
+    forum_turn: "Sua vez de opinar",
+    mission_stopped: "Uma missão parou",
+    routine_failed: "Uma rotina não terminou",
+    routine_paused: "Uma rotina foi pausada",
+    browser_handoff: "Um agente precisa de você no navegador",
+    waiting: "Tem algo esperando você",
+  },
   contextMenu: {
     label: "Ações",
     react: "Reagir",
@@ -6741,7 +6757,8 @@ export const ptBR = {
       noComputer: "Missões rodam num computador conectado, e este agente não tem um.",
       computerOffline: "O computador do agente está offline.",
       execDisabled: "Os comandos estão desligados nesse computador.",
-      runnerOutdated: "O programa no computador é antigo demais para missões: atualize o agentes-runner.",
+      runnerOutdated:
+        "O programa no computador é antigo demais para missões: atualize o app do agentes.chat nele, ou rode de novo o comando de instalação.",
       exists: "Esta thread já tem uma missão.",
       closed: "Esta missão está fechada.",
       wrongStatus: "A missão não está num estado que permita isso.",
@@ -6847,11 +6864,13 @@ export const ptBR = {
     commandCopied: "Comando copiado. Cole no Terminal do computador.",
     // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
-      text: "Este Mac pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
-      connect: "Usar este Mac",
+      text: "Este {{device}} pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
+      connect: "Usar este {{device}}",
       connected: "Este Mac está conectado. Escolha as pastas que os agentes podem usar.",
       failed: "Não deu para conectar este Mac. Tente de novo.",
-      folders: "Pastas deste Mac",
+      folders: "Pastas deste {{device}}",
+      // `{{device}}` in these strings, inside the desktop app (lib/desktop.ts).
+      device: { mac: "Mac", windows: "PC", linux: "computador" },
       grantHere: "É este Mac: libere pastas nas Preferências do app.",
       openFolders: "Abrir Pastas",
       toolsHere: "É este Mac: ligue o navegador nas Preferências do app, em Ferramentas.",

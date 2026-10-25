@@ -18,7 +18,8 @@ import {
   parseControlIn,
 } from "@agenteschat/adapters/runner-control";
 
-const SERVER = "https://agentes.chat";
+/** Agents work here only for a server of the person's own (the Cloud has a computer of its own). */
+export const FAKE_SERVER = "https://agentes.tail1234.ts.net";
 const VERSION = "0.1.0";
 const MACHINE_PROTOCOL = 10;
 
@@ -345,7 +346,7 @@ export class FakeRunner {
               this.emit({
                 kind: "pair.code",
                 userCode: code,
-                verificationUrl: `${SERVER}/conectar?code=${code}`,
+                verificationUrl: `${FAKE_SERVER}/conectar?code=${code}`,
                 expiresAt: new Date(Date.now() + 600_000).toISOString(),
               }),
             500,
@@ -486,7 +487,7 @@ export class FakeRunner {
     const s = this.seed;
     return {
       paired: !!s,
-      server: SERVER,
+      server: FAKE_SERVER,
       org: s ? { ...s.org, ...(s.logo ? { logoEtag: `"${s.org.id}.png"` } : {}) } : undefined,
       machine: s ? { id: `m_${this.homeId}`, name: this.machineName } : undefined,
       connection: this.connection,

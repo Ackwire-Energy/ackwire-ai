@@ -1,14 +1,20 @@
 import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
 
 /**
- * The "Versão nova" check (ADR 0036 §9): `GET https://agentes.chat/api/desktop/latest?target=darwin&arch=…`
- * at start and every 6 hours. A newer version shows the notes and "Atualizar e reabrir" (the Tauri
+ * The "new version" check (ADR 0036 §9): `GET https://agentes.chat/api/desktop/latest?target=…&arch=…`
+ * at start and every 6 hours. A newer version shows the notes and "Update and reopen" (the Tauri
  * updater, `update_install`); the download link and the manual steps are the fallback.
  */
 
-/** Where the app's own updates come from, whichever server it signs in to. */
+/** Where the app's own updates come from, whichever server it opens. */
 export const SITE_URL = CLOUD_SERVER;
 export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+
+/** The release's target for Rust's OS name (`std::env::consts::OS`), as the updater names it too. */
+export function targetParam(os: string): string {
+  if (os === "macos" || os === "darwin") return "darwin";
+  return os;
+}
 
 export interface LatestRelease {
   version: string;
@@ -26,8 +32,9 @@ export function archParam(rustArch: string): string {
   return rustArch;
 }
 
-export function latestUrl(rustArch: string, site: string = SITE_URL): string {
-  return `${site}/api/desktop/latest?target=darwin&arch=${encodeURIComponent(archParam(rustArch))}`;
+export function latestUrl(os: string, rustArch: string, site: string = SITE_URL): string {
+  const query = new URLSearchParams({ target: targetParam(os), arch: archParam(rustArch) });
+  return `${site}/api/desktop/latest?${query}`;
 }
 
 interface Parsed {

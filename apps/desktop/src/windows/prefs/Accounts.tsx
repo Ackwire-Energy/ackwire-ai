@@ -408,7 +408,7 @@ function AddAccountDialog({
   );
 }
 
-/** Codex's one-time code (`ABCD-EFGHI`) big, in Doto, as the sign-in code on the first run. */
+/** Codex's one-time code (`ABCD-EFGHI`) big, in Doto. */
 function AccountCode({ code }: { code: string }) {
   const { t } = useTranslation();
   const parts = code
@@ -419,7 +419,7 @@ function AccountCode({ code }: { code: string }) {
     <span
       className="dk-code"
       role="img"
-      aria-label={t("desktop.welcome.codeAria", { code: parts.join("").split("").join(" ") })}
+      aria-label={t("desktop.prefs.accounts.codeAria", { code: parts.join("").split("").join(" ") })}
     >
       {parts[0]}
       {parts.length > 1 && <span className="dk-code__dot">·</span>}

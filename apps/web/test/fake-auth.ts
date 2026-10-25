@@ -6,6 +6,7 @@ export function createFakeAuth(
     signUp?: AuthResult;
     reset?: AuthResult;
     redeem?: boolean;
+    oneTime?: AuthResult;
     onSignIn?: () => void;
   } = {},
 ) {
@@ -43,6 +44,10 @@ export function createFakeAuth(
     desktopRedeem: async (verifier) => {
       calls.push({ method: "desktopRedeem", args: [verifier] });
       return options.redeem ?? false;
+    },
+    signInOneTime: async (token) => {
+      calls.push({ method: "signInOneTime", args: [token] });
+      return options.oneTime ?? { ok: true };
     },
   };
   return { auth, calls };

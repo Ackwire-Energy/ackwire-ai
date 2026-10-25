@@ -4,6 +4,7 @@ import {
   APP_API,
   checkServer,
   connectLink,
+  isLoopback,
   isTailnet,
   normalizeServer,
   parseConnectLink,
@@ -48,6 +49,20 @@ describe("server addresses", () => {
     expect(normalizeServer("http://mac-mini.local:3000", { allowHttp: true })).toBe("http://mac-mini.local:3000");
   });
 
+  test("the desktop app: plain http only on this computer itself", () => {
+    const loopback = { allowHttp: "loopback" } as const;
+    expect(normalizeServer("http://127.0.0.1:4310", loopback)).toBe("http://127.0.0.1:4310");
+    expect(normalizeServer("http://localhost:3000/login", loopback)).toBe("http://localhost:3000");
+    expect(normalizeServer("http://[::1]:4310", loopback)).toBe("http://[::1]:4310");
+    expect(normalizeServer("agentes.tail1234.ts.net", loopback)).toBe("https://agentes.tail1234.ts.net");
+    for (const other of ["http://192.168.1.20:3000", "http://mac-mini.local:3000", "http://chat.example.com"])
+      expect(normalizeServer(other, loopback)).toBeNull();
+    expect(isLoopback("http://127.0.0.1:4310")).toBe(true);
+    expect(isLoopback("http://localhost:3000")).toBe(true);
+    expect(isLoopback("https://agentes.tail1234.ts.net")).toBe(false);
+    expect(isLoopback("not a url")).toBe(false);
+  });
+
   test("not a server address", () => {
     for (const bad of ["", "   ", "agentes chat", "ftp://files.example.com", "https://ana:segredo@chat.example.com"])
       expect(normalizeServer(bad)).toBeNull();
@@ -62,14 +77,40 @@ describe("server addresses", () => {
 });
 
 describe("connect links", () => {
+  const token = "Qm9vdHN0cmFwLXRva2VuLTEyMzQ1Njc4OTBhYmNkZWY";
+  const claim = "b3duZXItY2xhaW0tYWJjZGVmZ2hpamtsbW5vcHFyc3R1";
+
   test("round trip, with and without a sign-in token", () => {
-    const link = connectLink("https://box.tail1234.ts.net", "tok_123");
-    expect(link).toBe("agenteschat://connect?server=https%3A%2F%2Fbox.tail1234.ts.net&token=tok_123");
-    expect(parseConnectLink(link)).toEqual({ server: "https://box.tail1234.ts.net", token: "tok_123" });
+    const link = connectLink("https://box.tail1234.ts.net", { token });
+    expect(link).toBe(`agenteschat://connect?server=https%3A%2F%2Fbox.tail1234.ts.net&token=${token}`);
+    expect(parseConnectLink(link)).toEqual({ server: "https://box.tail1234.ts.net", token });
     expect(parseConnectLink(connectLink("https://agentes.chat"))).toEqual({ server: "https://agentes.chat" });
     expect(parseConnectLink("agenteschat:///connect?server=https://agentes.chat")).toEqual({
       server: "https://agentes.chat",
     });
+  });
+
+  test("the owner claim the setup prints, and other parameters ignored", () => {
+    const link = connectLink("https://agentes.tail1234.ts.net", { claim });
+    expect(parseConnectLink(link)).toEqual({ server: "https://agentes.tail1234.ts.net", claim });
+    expect(parseConnectLink(`${link}&utm=qr&token=${token}`)).toEqual({
+      server: "https://agentes.tail1234.ts.net",
+      token,
+      claim,
+    });
+    const local = connectLink("http://127.0.0.1:4310", { claim });
+    expect(parseConnectLink(local, { allowHttp: "loopback" })).toEqual({ server: "http://127.0.0.1:4310", claim });
+    expect(parseConnectLink(local)).toBeNull();
+  });
+
+  test("a token or claim that isn't one, or a link that is too long, is no link", () => {
+    const base = "agenteschat://connect?server=https%3A%2F%2Fagentes.chat";
+    expect(parseConnectLink(`${base}&token=short`)).toBeNull();
+    expect(parseConnectLink(`${base}&claim=${"x".repeat(19)}`)).toBeNull();
+    expect(parseConnectLink(`${base}&claim=${encodeURIComponent("<script>alert(1)</script>xxxxxxxxxx")}`)).toBeNull();
+    expect(parseConnectLink(`${base}&token=${"a".repeat(201)}`)).toBeNull();
+    expect(parseConnectLink(`${base}&x=${"a".repeat(2048)}`)).toBeNull();
+    expect(parseConnectLink(`${base}&token=`)).toEqual({ server: "https://agentes.chat" });
   });
 
   test("anything else is not a connect link", () => {

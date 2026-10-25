@@ -82,23 +82,6 @@ export function MacPortrait({ state, size = 48 }: { state: ComputerState; size?:
   return <ComputerPortrait kind="mac" state={state} size={size} />;
 }
 
-/** The device code, `K7Q·4ZP`, in Doto. */
-export function CodeDigits({ code }: { code: string }) {
-  const { t } = useTranslation();
-  const clean = code.replace(/[^0-9A-Z]/gi, "").toUpperCase();
-  return (
-    <span
-      className="dk-code"
-      role="img"
-      aria-label={t("desktop.welcome.codeAria", { code: clean.split("").join(" ") })}
-    >
-      {clean.slice(0, 3)}
-      <span className="dk-code__dot">·</span>
-      {clean.slice(3)}
-    </span>
-  );
-}
-
 /** A number with − and + (custom, never a native input). */
 export function Stepper({
   value,
