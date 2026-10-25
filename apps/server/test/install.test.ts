@@ -370,8 +370,9 @@ describe("install.sh", () => {
   test("a Mac without Docker, or with it stopped, is told what to install or start; --native isn't there yet", async () => {
     const none = await plan(mac);
     expect(none.code).toBe(1);
-    expect(none.err).toContain("agentes.chat runs on Docker, and this Mac doesn't have it.");
+    expect(none.err).toContain("This installer runs agentes.chat on Docker, and this Mac doesn't have it.");
     expect(none.err).toContain("Docker Desktop, OrbStack or Colima");
+    expect(none.err).toContain("Run agentes.chat on this Mac");
     expect(none.out).not.toContain("Bun");
     expect(none.changes).toEqual([]);
 
@@ -382,7 +383,7 @@ describe("install.sh", () => {
     for (const machine of [mac, linuxRoot]) {
       const native = await plan(machine, ["--native"]);
       expect(native.code).toBe(1);
-      expect(native.err).toContain("(--native) isn't available yet");
+      expect(native.err).toContain("can't run agentes.chat without Docker yet (--native)");
       expect(native.calls).toEqual([]);
     }
   });

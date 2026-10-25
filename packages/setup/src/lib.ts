@@ -958,8 +958,8 @@ export const COMPUTER_PROBLEMS = {
 // ── The end ─────────────────────────────────────────────────────────────────
 
 /**
- * The link the agentes.chat phone app opens on this server, from the QR code. The web app's "Abrir no
- * celular" adds `&token=` for a one-time sign-in. SELF_HOSTING.md, "Your phone".
+ * The link the agentes.chat phone and desktop apps open on this server (the phone from the QR code). The web
+ * app's "Abrir no celular" adds `&token=` for a one-time sign-in. SELF_HOSTING.md, "Your phone".
  */
 export const appLink = (origin: string) => `agenteschat://connect?${new URLSearchParams({ server: origin })}`;
 
@@ -1115,7 +1115,7 @@ export function planSteps(p: PlanInput): string[] {
   const linked = p.network === "proxy" ? hasAppLink(p.publicUrl.now ?? "") : p.network !== "local";
   steps.push(
     linked
-      ? "finish: the address, the link that opens the agentes.chat phone app on it with its QR code, and what to do next"
+      ? "finish: the address, the link that opens the agentes.chat phone or desktop app on it with its QR code, and what to do next"
       : "finish: the address and what to do next",
   );
   return steps;

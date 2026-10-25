@@ -37,8 +37,8 @@ main() {
       --plan | --dry-run) PLAN=1 ;;
       --yes | -y) YES=1 ;;
       --native)
-        die "Running without Docker (--native) isn't available yet." \
-          "Use Docker: on a Mac, Docker Desktop, OrbStack or Colima; on Linux, this installer sets it up."
+        die "This installer can't run agentes.chat without Docker yet (--native)." \
+          "On a Mac, the agentes.chat app runs it with no Docker (Use your own server, then Run agentes.chat on this Mac). Or use Docker: on a Mac, Docker Desktop, OrbStack or Colima; on Linux, this installer sets it up."
         ;;
       --dir)
         [ "$n" -gt 0 ] || die "--dir needs a folder, like --dir /srv/agentes."
@@ -142,8 +142,8 @@ main() {
   elif command -v docker >/dev/null 2>&1; then
     die "Docker is on this Mac, but it doesn't answer." "Start it (Docker Desktop, OrbStack or Colima) and run this again."
   else
-    die "agentes.chat runs on Docker, and this Mac doesn't have it." \
-      "Install Docker Desktop, OrbStack or Colima, start it, and run this again."
+    die "This installer runs agentes.chat on Docker, and this Mac doesn't have it." \
+      "Install Docker Desktop, OrbStack or Colima, start it, and run this again. Or, with no Docker, open the agentes.chat app: Use your own server, then Run agentes.chat on this Mac."
   fi
 
   if [ -z "$DIR" ]; then

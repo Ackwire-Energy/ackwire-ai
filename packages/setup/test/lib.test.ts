@@ -880,7 +880,7 @@ describe("the plan", () => {
     image: false,
   };
   const finishLine =
-    "finish: the address, the link that opens the agentes.chat phone app on it with its QR code, and what to do next";
+    "finish: the address, the link that opens the agentes.chat phone or desktop app on it with its QR code, and what to do next";
 
   test("an empty directory on a tailnet: every step, in order", () => {
     expect(planSteps(base)).toEqual([

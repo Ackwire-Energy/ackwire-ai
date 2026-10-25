@@ -169,8 +169,8 @@ Tailscale on it and sign in to the same tailnet first.
 
 The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a window of its own:
 
-1. On its first screen, under **Sign in to agentes.chat**, click **Use your own server** (on Windows,
-   then **Connect to my server**).
+1. On its first screen, under **Sign in to agentes.chat**, click **Use your own server**, then
+   **Connect to my server**.
 2. Type your address (`https://agentes.<your-tailnet>.ts.net`), or click **Use** next to one the app
    found: it looks on this computer and, when Tailscale is connected, on your tailnet. Plain http works
    only for an instance on the same computer (`http://127.0.0.1:…`), which the app then opens at the
@@ -186,15 +186,17 @@ sign-in.
   the instance and the organization. Its agents start with no folders of yours and commands off, even
   when other organizations' agents there have commands on; you choose more in the app's Preferences. On
   Windows, and with agentes.chat Cloud, the app is only a window onto the workspace and nothing of the
-  computer is used.
+  computer is used. Nor on the computer that runs the instance: its agents work there through the
+  instance itself (This server as the agents' computer, below), so the app doesn't offer it.
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
 
-Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), an instance's download button asks
-agentes.chat for the newest version of the app (the request names the system, nothing of the instance or
-its people). The app asks agentes.chat for its own updates when it starts and every 6 hours, the same
-way: its system, processor and version, nothing else. On Linux the AppImage updates itself; a deb
-downloads the new deb.
+Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), the page that offers the app (Settings →
+Computers, and onboarding's computer step) asks agentes.chat for its newest version as it opens, from
+your browser or the app's window: the request names the system and, like any request a page makes to
+another site, carries this instance's address (its `Origin` header) and the browser's IP. The app asks
+agentes.chat for its own updates when it starts and every 6 hours, naming its system and processor (its
+version too, when it installs one). On Linux the AppImage updates itself; a deb downloads the new deb.
 
 </details>
 
@@ -490,13 +492,17 @@ computer and opens agentes.chat, signed in.
 - A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
   offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
   running, start it the way you installed it.
+- **Moving it to a server:** quit the app, dump the database with the app's own copy of the server,
+  then follow Moving to Docker (below) from step 2. On a Mac:
+  `BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql`
+  (on Linux, the deb's `/usr/bin/agentes-runner` in its place).
 
 **Usage statistics.** Like any self-hosted install, it sends agentes.chat an anonymous usage report
 once a day (Optional services and what they receive lists every field in it). To turn it off, put
 `TELEMETRY=off` in `~/.agentes/.env` and start it again (the desktop app's **Send anonymous usage
 statistics** switch does that), or use the switch in **Settings → General → Usage statistics**.
-`agentes-server telemetry` prints the next report and sends nothing (with the server stopped; while it
-runs, **See what is sent** there shows the same).
+Installed by hand, `agentes-server telemetry` prints the next report and sends nothing (with the server
+stopped); while it runs, and from the desktop app, **See what is sent** there shows the same.
 
 **By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
 (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
@@ -743,8 +749,11 @@ carry nothing about the instance beyond what any download does: the installer
 (`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has
 none (`https://agentes.chat/install/docker-compose.yml`), the packages that run it without Docker
 (`https://agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and the
-desktop app's check for its own new version, at start and every 6 hours
-(`https://agentes.chat/api/desktop/latest`). The instance itself downloads nothing from agentes.chat.
+desktop app's own updates: a check at start and every 6 hours (`https://agentes.chat/api/desktop/latest`,
+naming its system and processor) and, when it installs one, `https://agentes.chat/api/desktop/update`
+(its version and package type too) and `/api/desktop/download/…`. The page that offers the app asks
+for its newest version from the browser (Connect a computer, above, says what that request carries).
+The instance itself downloads nothing from agentes.chat.
 
 An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, Chrome
 for Testing from Google the first time an agent opens the browser there, and, on Linux, the packages
@@ -766,9 +775,6 @@ party only when you turn that service on:
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.
-
-The desktop app, on its own, asks agentes.chat only for its updates: when it starts and every 6 hours,
-naming its system, processor and version.
 
 </details>
 
@@ -849,7 +855,7 @@ can. Give the runner a user of its own, or a VM. On a Linux server, the installe
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
-(`agentes-runner tools enable terminal`); the Mac app doesn't have them yet.
+(`agentes-runner tools enable terminal`); the desktop app doesn't have them yet.
 
 Use HTTPS with a certificate from a public authority (Tailscale and the Caddy profile get one). Over
 plain http the computer's token travels unencrypted, and the runner's background service doesn't

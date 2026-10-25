@@ -16,7 +16,7 @@ export const pt = {
     },
     brains: {
       label: "Quem pensa",
-      where: "Na nuvem ou no seu Mac",
+      where: "No computador do workspace, na nuvem",
       subscription: "Use sua assinatura do Claude ou do ChatGPT",
       code: "Clona, testa e abre PR",
     },
@@ -73,7 +73,7 @@ export const en: Widen<typeof pt> = {
     },
     brains: {
       label: "Who thinks",
-      where: "In the cloud or on your Mac",
+      where: "On your workspace's computer, in the cloud",
       subscription: "Use your Claude or ChatGPT subscription",
       code: "Clones, tests and opens PRs",
     },
