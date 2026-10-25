@@ -1309,6 +1309,13 @@ test.if(posix)(
       s.frame({ type: "task.ack", taskId: "task-ana-0001" });
       await waitFor(() => ana.of("task.ack").length === 1);
 
+      // The agents on this computer, from the server: the desktops of any other agent stop (they stay on otherwise).
+      const kept: string[][] = [];
+      daemon.desktops.stopAll = async (keep = new Set()) => void kept.push([...keep]);
+      s.frame({ type: "agents", agents: [ANA] });
+      await waitFor(() => kept.length === 1);
+      expect(kept).toEqual([[ANA.id]]);
+
       // Paused: new work is refused here, before any worker hears of it; the workers learn the pause too.
       daemon.pause(null);
       await waitFor(() => ana.of("worker.state").length === 2);

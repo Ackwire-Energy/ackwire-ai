@@ -45,6 +45,16 @@ import {
 
 const tags = ["Connected computers"];
 
+/**
+ * With external provisioning every workspace gets its own computer (ADR 0056 §10) and people connect none:
+ * refused on the server, so a runner pointed at it stops at once instead of showing a code nobody can confirm.
+ * The workspace's own computer never asks for a code: it redeems the one it was issued.
+ */
+const PAIRING_OFF = {
+  workspace: "This workspace has its own computer: other computers can't be connected to it.",
+  server: "Every workspace on this server has its own computer: other computers can't be connected to it.",
+};
+
 /** Headers and framing around a pushed file: the body may be a little over the file limit. */
 const UPLOAD_SLACK_BYTES = 64 * 1024;
 
@@ -164,10 +174,26 @@ const ComputerSetup = z
     reason: z
       .enum(PROVISIONING_REASONS)
       .nullable()
-      .openapi({ description: "While `waiting`: `approval` (soon) or `capacity` (taking longer than usual)." }),
+      .openapi({ description: "While `waiting`: `capacity` (taking longer than usual)." }),
     since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
-    etaSeconds: z.number().int().nullable(),
+    requestedAt: z.string().nullable().openapi({
+      description: "When its people started waiting: the computer's last removal, else the workspace's creation.",
+    }),
+    expectedReadyAt: z
+      .string()
+      .nullable()
+      .openapi({ description: "While `preparing`, when known: when it should be ready (already past: any moment)." }),
+    secondsLeft: z.number().int().nullable().openapi({
+      description:
+        "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter.",
+    }),
+    secondsWaited: z.number().int().nullable().openapi({
+      description: "This server's clock when it answered minus `requestedAt`, for the same reason.",
+    }),
     specs: z.object({ cpus: z.number().int(), memoryGb: z.number(), diskGb: z.number() }).nullable(),
+    notifyByEmail: z.boolean().openapi({
+      description: "The server sends email: after a wait over a minute, the owners get one once it's ready.",
+    }),
     machineId: z.uuid().nullable().openapi({ description: "The workspace's computer, once it has one." }),
   })
   .openapi("ComputerSetup");
@@ -340,6 +366,9 @@ export function machineAppRoutes(deps: AppDeps) {
       responses: { 201: json(Machine, "Connected"), ...errors },
     }),
     async (c) => {
+      if (deps.config.MACHINE_PROVISIONING === "external") {
+        return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.workspace);
+      }
       const { orgId, userCode } = c.req.valid("param");
       const machine = await confirmDeviceCode({ db, pubsub }, c.get("user").id, orgId, userCode, c.req.valid("json"));
       return c.json(machine, 201);
@@ -487,7 +516,8 @@ export function machineAppRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      return c.json(await computerSetup(db, deps.config.MACHINE_PROVISIONING, c.get("user").id, orgId), 200);
+      const emails = deps.adapters.email.delivers === true;
+      return c.json(await computerSetup(db, deps.config.MACHINE_PROVISIONING, c.get("user").id, orgId, emails), 200);
     },
   );
 
@@ -655,10 +685,13 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
             .openapi("MachineDeviceStart"),
         ),
         400: errorResponse("Invalid body or runner too old"),
+        403: errorResponse("Each workspace here has its own computer: no other can connect (`machine.pairing_off`)"),
         429: errorResponse("Too many requests or pending codes from this address"),
       },
     }),
     async (c) => {
+      if (config.MACHINE_PROVISIONING === "external")
+        return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.server);
       const ip = requestIp(c.req.raw.headers);
       const limit = await adapters.rateLimiter.consume(`machine-device:${ip}`, DEVICE_START_LIMIT);
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");

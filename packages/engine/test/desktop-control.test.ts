@@ -27,10 +27,9 @@ import {
   renderPush,
   requireComputerDriver,
   type StreamBroker,
+  setAgentHold,
   setOrgStanding,
-  startDesktop,
   startTakeover,
-  stopDesktop,
   waitIfPersonInControl,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -407,32 +406,35 @@ describe("the agent asks for help on its desktop", () => {
 });
 
 describe("the desktop's REST and keep-alive", () => {
-  test("its state for whoever may watch; on and off for admins, the agent's owner and who drives the computer", async () => {
+  test("its state for whoever may watch: control for who drives the computer, held, and nothing to turn on or off", async () => {
     const { hub, requests, setMachine } = await start();
-    const rest = { db: f.db, hub, streams: broker, pubsub: f.pubsub };
+    const rest = { db: f.db, hub, streams: broker };
     const caio = await asker("caio");
-    const bia = await addMember(f.db, f.org.id, "admin", "bia");
-    expect(await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
+    const owner = await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id);
+    expect(owner).toEqual({
       available: true,
+      reason: null,
+      detail: null,
       running: true,
       startedAt: "2026-10-24T10:00:00Z",
       controllerUserId: null,
+      handoff: null,
+      viewers: 0,
       canControl: true,
-      canStart: true,
-      terminal: { available: true, allowed: true },
+      held: false,
     });
-    expect(await desktopStatus(rest, caio.id, f.org.id, f.agent.id)).toMatchObject({
-      canControl: false,
-      canStart: false,
-      terminal: { allowed: false },
-    });
-    await expect(startDesktop(rest, caio.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(stopDesktop(rest, caio.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
-    await startDesktop(rest, bia.id, f.org.id, f.agent.id);
-    await stopDesktop(rest, bia.id, f.org.id, f.agent.id);
-    expect(requests.map((r) => r.op)).toEqual(
-      expect.arrayContaining(["desktop.session.status", "desktop.session.start", "desktop.session.stop"]),
-    );
+    expect(await desktopStatus(rest, caio.id, f.org.id, f.agent.id)).toMatchObject({ canControl: false, held: false });
+    expect(new Set(requests.map((r) => r.op))).toEqual(new Set(["desktop.session.status"]));
+
+    // Held, the agent or its workspace: people still watch.
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "Review" });
+    expect(await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id)).toMatchObject({ available: true, held: true });
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: false, reason: null });
+    await setOrgStanding(deps(), f.org.id, { state: "hold", reason: null, notice: "silent" });
+    expect(await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id)).toMatchObject({ held: true });
+    await setOrgStanding(deps(), f.org.id, { state: "active", reason: null, notice: "silent" });
+    expect(await desktopStatus(rest, f.owner.id, f.org.id, f.agent.id)).toMatchObject({ held: false });
+
     const outsider = await addMember(f.db, f.org.id, "member", "zed");
     await expect(desktopStatus(rest, outsider.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
 

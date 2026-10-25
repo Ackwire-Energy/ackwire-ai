@@ -430,11 +430,40 @@ test("external provisioning: requests, progress, the workspace's computer and it
     { state: "waiting", reason: "bored" },
     { state: "problem", etaSeconds: -1 },
     { state: "preparing", specs: { cpus: 0, memoryGb: 8, diskGb: 75 } },
+    { state: "preparing", expectedReadyAt: "in ten minutes" },
+    { state: "preparing", expectedReadyAt: new Date(Date.now() + 8 * 86_400_000).toISOString() },
   ]) {
     expect({ bad, status: (await put(`/orgs/${orgId}/provisioning`, bad)).status }).toEqual({ bad, status: 400 });
   }
   expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/provisioning", { state: "problem" })).status).toBe(404);
   const specs = { cpus: 4, memoryGb: 8, diskGb: 75 };
+  // A time already past is normal: any moment now.
+  const readyAt = new Date(Date.now() - 5000).toISOString();
+  expect(
+    (
+      await put(`/orgs/${orgId}/provisioning`, {
+        state: "preparing",
+        step: "connecting",
+        specs,
+        expectedReadyAt: readyAt,
+      })
+    ).status,
+  ).toBe(204);
+  const progress = await body<Requests>(
+    await external.request("/api/operator/v1/machine-requests?limit=200", { headers: { authorization: BEARER } }),
+  );
+  expect(progress.requests.find((r) => r.orgId === orgId)?.provisioning).toEqual({
+    state: "preparing",
+    step: "connecting",
+    reason: null,
+    since: expect.any(String),
+    requestedAt: listed.requests.find((r) => r.orgId === orgId)?.createdAt,
+    expectedReadyAt: readyAt,
+    specs,
+  });
+  // An older client's words still go through.
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "approval" })).status).toBe(204);
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "preparing", etaSeconds: 600 })).status).toBe(204);
   expect((await put(`/orgs/${orgId}/provisioning`, { state: "preparing", step: "connecting", specs })).status).toBe(
     204,
   );
@@ -444,8 +473,12 @@ test("external provisioning: requests, progress, the workspace's computer and it
     step: null,
     reason: null,
     since: null,
-    etaSeconds: null,
+    requestedAt: null,
+    expectedReadyAt: null,
     specs: null,
+    secondsLeft: null,
+    secondsWaited: null,
+    notifyByEmail: false,
     machineId: null,
   });
 

@@ -4,13 +4,13 @@ import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
 import {
-  DESKTOP_IDLE_MS,
   DesktopSessions,
   type DesktopSessionsOptions,
   type DesktopSpawnOptions,
   type DesktopSystem,
   type DesktopUser,
-  defaultMaxDesktops,
+  memAvailableBytes,
+  PARK_AFTER_MS,
   runnerUser,
   systemDesktopUser,
   vncPasswordFile,
@@ -23,7 +23,7 @@ afterEach(() => removeDirs(dirs));
 
 const dev: AgentScope = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev", name: "Dev" };
 const ops: AgentScope = { id: "9f00aa11-0000-7000-8000-000000000000", handle: "ops" };
-const MiB = 1024 * 1024;
+const GiB = 1024 ** 3;
 
 interface FakeProc {
   pid: number;
@@ -130,7 +130,8 @@ function setup(over: Partial<DesktopSessionsOptions> = {}) {
     user: async (agent) => runnerUser(home, path.join(folders, agent.handle), agent),
     system: fake.system,
     lockDir,
-    maxDesktops: 7,
+    // Plenty free: parking only where a test says memory runs short.
+    memAvailable: () => 4 * GiB,
     now: () => clock.now,
     ...over,
   };
@@ -148,10 +149,11 @@ test("the password file: each password DES-encrypted with VNC's fixed key, the f
   expect(file.subarray(8)).toEqual(vncPasswordFile("Viewpw34", "x").subarray(0, 8));
 });
 
-test("how many desktops a computer runs: its memory after a 2 GiB reserve, 800 MiB each", () => {
-  expect(defaultMaxDesktops(7947 * MiB)).toBe(7);
-  expect(defaultMaxDesktops(4096 * MiB)).toBe(2);
-  expect(defaultMaxDesktops(1024 * MiB)).toBe(1);
+test("the memory available: MemAvailable from /proc/meminfo, in bytes; none when it isn't there", () => {
+  const meminfo =
+    "MemTotal:        8131956 kB\nMemFree:          912340 kB\nMemAvailable:    5932248 kB\nBuffers: 1 kB\n";
+  expect(memAvailableBytes(meminfo)).toBe(5932248 * 1024);
+  expect(memAvailableBytes("MemTotal:        8131956 kB\n")).toBeNull();
 });
 
 test("info: Linux, the runner on Bun 1.3.5 or newer, and the packages (installed without recommends)", () => {
@@ -459,51 +461,126 @@ test("restore: a desktop left running is taken back only when its pid is still t
   next.close();
 });
 
-test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer or a use keeps it", async () => {
+test("a desktop stays on: a day with no viewer and no use, and it still runs; a viewer is counted", async () => {
   // Each viewer that comes or goes is told (system mode: the agent's worker learns it).
   const viewers: number[] = [];
   const t = setup({ onViewers: (agentId) => viewers.push(t.desktops.status({ id: agentId }).streams) });
   await t.desktops.ensure(dev);
   const release = t.desktops.hold(dev.id);
   expect(t.desktops.status(dev).streams).toBe(1);
-  t.clock.now += DESKTOP_IDLE_MS + 1;
-  await t.desktops.sweep();
-  expect(t.desktops.status(dev).running).toBe(true);
-
   release?.();
   release?.();
   expect(t.desktops.status(dev).streams).toBe(0);
   expect(viewers).toEqual([1, 0]);
-  t.clock.now += DESKTOP_IDLE_MS - 1;
-  await t.desktops.ensure(dev);
-  t.clock.now += DESKTOP_IDLE_MS - 1;
-  await t.desktops.sweep();
+  for (let hour = 0; hour < 24; hour++) {
+    t.clock.now += 3_600_000;
+    t.desktops.sweep();
+  }
   expect(t.desktops.status(dev).running).toBe(true);
-
-  t.clock.now += 2;
-  await t.desktops.sweep();
-  expect(t.desktops.status(dev).running).toBe(false);
-  const [xvnc] = t.fake.of("Xtigervnc");
-  const [session] = t.fake.of("dbus-launch");
-  expect(t.fake.kills).toContainEqual([xvnc?.pid ?? 0, "SIGTERM"]);
-  expect(t.fake.kills).toContainEqual([session?.pid ?? 0, "SIGTERM"]);
-  expect(existsSync(path.join(t.home, "desktop", "01a142cb.json"))).toBe(false);
-  expect(t.logs.some((l) => l.includes("nobody used it"))).toBe(true);
-  // Stopped on purpose: no restart.
-  await new Promise((r) => setTimeout(r, 10));
+  expect(t.fake.kills).toEqual([]);
   expect(t.fake.of("Xtigervnc")).toHaveLength(1);
+  t.desktops.close();
 });
 
-test("idle: the agent's Chrome in use on its desktop keeps the desktop", async () => {
-  let chromeInUse = true;
-  const t = setup({ inUse: (agentId) => agentId === dev.id && chromeInUse });
+test("parking: short of memory, the least recently used desktop untouched for an hour goes first; never one watched, in use or just used", async () => {
+  const agent = (handle: string, i: number): AgentScope => ({ id: `0000000${i}-0000-7000-8000-000000000000`, handle });
+  const [a, b, watched, busy, recent, c, d, e] = ["a", "b", "watched", "busy", "recent", "c", "d", "e"].map(agent) as [
+    AgentScope,
+    AgentScope,
+    AgentScope,
+    AgentScope,
+    AgentScope,
+    AgentScope,
+    AgentScope,
+    AgentScope,
+  ];
+  // Each desktop takes 0.4 GiB of what this computer has; 1.5 GiB must stay free when one more starts.
+  const running = () => t.fake.of("Xtigervnc").filter((p) => p.alive).length;
+  const t = setup({ memAvailable: () => 3.4 * GiB - running() * 0.4 * GiB, inUse: (id) => id === busy.id });
+  await t.desktops.ensure(a);
+  t.clock.now += 60_000;
+  for (const next of [b, watched, busy]) await t.desktops.ensure(next);
+  // Watched since then: only its viewer keeps it.
+  t.desktops.hold(watched.id);
+  t.clock.now += 2 * PARK_AFTER_MS;
+  await t.desktops.ensure(recent);
+  const runs = (of: AgentScope) => t.desktops.status(of).running;
+
+  await t.desktops.ensure(c);
+  expect([a, b, c].map(runs)).toEqual([false, true, true]);
+  await t.desktops.ensure(d);
+  expect([b, d].map(runs)).toEqual([false, true]);
+  expect(t.logs.filter((l) => l.includes("was parked"))).toHaveLength(2);
+  // Nothing left to park (watched, in use, or used within the hour): refused, and nothing else stops.
+  expect(await errorCode(() => t.desktops.ensure(e))).toBe("desktop_busy");
+  expect([watched, busy, recent, c, d].map(runs)).toEqual([true, true, true, true, true]);
+  // The agent's Chrome is about to start on its running desktop: the same room is needed.
+  expect(await errorCode(() => t.desktops.ensure(recent, { chrome: true }))).toBe("desktop_busy");
+  expect(runs(recent)).toBe(true);
+
+  // An hour on, a parked desktop starts again like a first time.
+  t.clock.now += PARK_AFTER_MS;
+  expect(await t.desktops.ensure(a)).toMatchObject({ started: true });
+  expect(runs(watched) && runs(busy)).toBe(true);
+  t.desktops.close();
+});
+
+test("parking: with every display taken, the least recently used desktop untouched for an hour makes room", async () => {
+  const t = setup();
+  // Every display but the first two is held by programs that aren't ours.
+  for (let slot = 2; slot < 50; slot++) {
+    writeFileSync(path.join(t.lockDir, `.X${20 + slot}-lock`), `${String(9000 + slot).padStart(10)}\n`);
+    t.fake.others.set(9000 + slot, ["/usr/lib/xorg/Xorg", `:${20 + slot}`]);
+  }
+  const qa: AgentScope = { id: "77aa0000-0000-7000-8000-000000000000", handle: "qa" };
   await t.desktops.ensure(dev);
-  t.clock.now += DESKTOP_IDLE_MS + 1;
-  await t.desktops.sweep();
-  expect(t.desktops.status(dev).running).toBe(true);
+  t.clock.now += 60_000;
+  await t.desktops.ensure(ops);
+  // Both used within the hour: no room, and both go on.
+  expect(await errorCode(() => t.desktops.ensure(qa))).toBe("desktop_busy");
+  t.clock.now += PARK_AFTER_MS;
+  expect(await t.desktops.ensure(qa)).toMatchObject({ display: 20, started: true });
+  expect([dev, ops, qa].map((a) => t.desktops.status(a).running)).toEqual([false, true, true]);
+  expect(t.logs.filter((l) => l.includes("was parked"))).toHaveLength(1);
+  t.desktops.close();
+});
+
+test("the agent's Chrome in use on its desktop touches it: parked an hour after that use, not as Chrome closes", async () => {
+  let chromeInUse = true;
+  // Short of memory while dev's desktop runs: only parking it makes room.
+  const t = setup({
+    memAvailable: () => (t.desktops.status(dev).running ? GiB : 4 * GiB),
+    inUse: (id) => id === dev.id && chromeInUse,
+  });
+  await t.desktops.ensure(dev);
+  // Hours of browsing on it, the sweep once a minute; then its Chrome closes.
+  for (let minute = 0; minute < 180; minute++) {
+    t.clock.now += 60_000;
+    t.desktops.sweep();
+  }
   chromeInUse = false;
-  await t.desktops.sweep();
+  expect(await errorCode(() => t.desktops.ensure(ops))).toBe("desktop_busy");
+  expect(t.desktops.status(dev).running).toBe(true);
+  t.clock.now += PARK_AFTER_MS;
+  expect((await t.desktops.ensure(ops)).started).toBe(true);
   expect(t.desktops.status(dev).running).toBe(false);
+  t.desktops.close();
+});
+
+test("the desktops of agents this computer no longer serves stop; the others go on", async () => {
+  const t = setup();
+  await t.desktops.ensure(dev);
+  await t.desktops.ensure(ops);
+  await t.desktops.stopAll(new Set([ops.id]));
+  expect([dev, ops].map((a) => t.desktops.status(a).running)).toEqual([false, true]);
+  await t.desktops.stopAll();
+  expect(t.desktops.status(ops).running).toBe(false);
+});
+
+test("where the memory isn't known there is always room", async () => {
+  const t = setup({ memAvailable: () => null });
+  for (const agent of [dev, ops]) expect((await t.desktops.ensure(agent)).started).toBe(true);
+  t.desktops.close();
 });
 
 test("supervision: a desktop that ends by itself starts again, 3 times in 10 minutes at most", async () => {
@@ -537,15 +614,18 @@ test("a desktop found gone by the sweep (taken back, so no exit event) starts ag
   next.restore();
   const session = t.fake.of("dbus-launch")[0];
   if (session) session.alive = false;
-  await next.sweep();
+  next.sweep();
   await waitFor(() => t.fake.of("Xtigervnc").length === 2 && next.status(dev).running);
   next.close();
 });
 
-test("limits and failures: the memory cap, Xvnc that doesn't start, a computer without the packages", async () => {
-  const t = setup({ maxDesktops: 1 });
+test("limits and failures: short of memory, Xvnc that doesn't start, a computer without the packages", async () => {
+  let free = 4 * GiB;
+  const t = setup({ memAvailable: () => free });
   await t.desktops.ensure(dev);
+  free = GiB;
   expect(await errorCode(() => t.desktops.ensure(ops))).toBe("desktop_busy");
+  free = 4 * GiB;
   await t.desktops.stop(dev);
 
   t.fake.failXvnc("(EE) Fatal server error: vncExtInit: Failed to bind socket");
