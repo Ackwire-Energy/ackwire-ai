@@ -71,7 +71,7 @@ export function ApprovalCard({
           {origin && (
             <span className="ac-approval__origin">
               {" · "}
-              <Icon name="routines" size={13} />
+              <Icon name="routines" size={14} />
               {origin}
             </span>
           )}

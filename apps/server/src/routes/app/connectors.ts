@@ -214,14 +214,10 @@ export function connectorRoutes(deps: AppDeps) {
         params: OrgParams.extend({ connector: z.string() }),
         body: body(
           z.object({
-            returnTo: z
-              .string()
-              .max(500)
-              .optional()
-              .openapi({
-                description:
-                  'Path to land on afterwards; "app:connectors" from the phone app (the callback hands the code back to the app, which finishes with `oauth/complete`).',
-              }),
+            returnTo: z.string().max(500).optional().openapi({
+              description:
+                'Path to land on afterwards; "app:connectors" from the phone app (the callback hands the code back to the app, which finishes with `oauth/complete`).',
+            }),
             serverUrl: z.url().optional(),
           }),
         ),

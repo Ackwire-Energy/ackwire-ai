@@ -108,5 +108,5 @@ function Inline({ line, bare }: { line: string; bare?: boolean }) {
       <Fragment key={i}>{p.text}</Fragment>
     ),
   );
-  return bare ? <>{parts}</> : <p>{parts}</p>;
+  return bare ? parts : <p>{parts}</p>;
 }

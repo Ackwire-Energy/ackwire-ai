@@ -123,6 +123,18 @@ export const pillWorkField: Field = (u, v, t) => {
   return Math.min(0.75, band) + 0.04 * Math.sin(v * 6 + t);
 };
 
+/**
+ * The launch splash's sky up to `level` (share of the height from the bottom), deepest at the bottom; its top
+ * edge waves a little, more as it rises (nothing at all at level 0).
+ */
+export const horizonField =
+  (level: number): Field =>
+  (u, v, t) => {
+    const edge = v - (1 - level) + 0.08 * level * Math.sin(u * 6 + t * 1.1);
+    const s = Math.min(1, Math.max(0, edge / Math.max(0.0001, level)));
+    return s * s * (3 - 2 * s) * 0.97;
+  };
+
 /** The grid of a drawing `width`×`height` (points) at `pixel` points per cell. */
 export const gridOf = (width: number, height: number, pixel: number) => ({
   w: Math.max(2, Math.ceil(width / pixel)),

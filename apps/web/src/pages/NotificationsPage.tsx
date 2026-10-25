@@ -1194,7 +1194,7 @@ function WaitCard({
           <span>{whenText(t, i18n.language, n.createdAt)}</span>
           {origin && (
             <span className="nt-origin">
-              <Icon name="routines" size={13} />
+              <Icon name="routines" size={14} />
               {sayWords(t, origin)}
             </span>
           )}
@@ -1202,7 +1202,9 @@ function WaitCard({
           {leftChip}
         </>
       );
-      head = <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />;
+      head = (
+        <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />
+      );
       body = <ApprovalActs approvalId={approvalId} agent={agent} onOpen={open} tail={tail} />;
     } else {
       meta = (

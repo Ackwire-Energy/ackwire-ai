@@ -1329,6 +1329,10 @@ export const featureKeysPtBR = {
     titleNew: "Entrando…",
     lead: "Suas conversas já estão chegando.",
   },
+  splash: {
+    slow: "Conectando…",
+    offline: "Sem conexão. Tentando de novo.",
+  },
   onb: {
     progress: "Passo {{n}} de {{total}}",
     done: "Pronto",
@@ -1344,7 +1348,8 @@ export const featureKeysPtBR = {
     importOpenMausBotDesc: "O arquivo do time ou um link do GitHub",
     importOpenBot: "OpenBot",
     importOpenBotDesc: "O agents.yaml ou um link do GitHub",
-    importLater: "Para trazer agentes de outro app, use o computador: em Agentes → Importar. Aqui dá para seguir sem eles.",
+    importLater:
+      "Para trazer agentes de outro app, use o computador: em Agentes → Importar. Aqui dá para seguir sem eles.",
     importNever: "Chaves, senhas e conversas nunca vêm junto.",
     importSkip: "Não uso, pular",
     agentsAda: "Eu já estou aqui",

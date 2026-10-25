@@ -100,3 +100,10 @@ export function countStyle(fontSize: number, fontWeight: Weight = weights.semibo
     fontVariant: ["tabular-nums"] as ["tabular-nums"],
   };
 }
+
+/**
+ * Where the eye reads a line of text, from the top of its line box (points). The letters are centered in the
+ * line, but text reads at its small letters (the x-height), a hair under the line's middle: an icon beside
+ * text centers there, or it looks too high.
+ */
+export const readingMiddle = (fontSize: number, lineHeight: number) => lineHeight / 2 + 0.08 * fontSize;
