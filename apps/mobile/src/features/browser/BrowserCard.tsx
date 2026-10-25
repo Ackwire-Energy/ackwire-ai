@@ -1,6 +1,5 @@
 import {
   type BrowserHandoff,
-  type BrowserStep,
   browserSteps,
   handoffFuse,
   handoffMinutesLeft,
@@ -11,7 +10,7 @@ import {
   useBrowserHandoffActions,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import type { TFunction } from "i18next";
+import { isBlankPage } from "@agenteschat/client/lib/sites";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -31,23 +30,11 @@ import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf } from "./logic";
-import { FrameView, TypeBar, useLiveConnection } from "./parts";
+import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf, stepText } from "./logic";
+import { AddressBar, FrameView, TypeBar, useLiveConnection } from "./parts";
 
 /** The log's last lines under the page (the design shows three). */
 const LOG_LINES = 3;
-
-/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"), as on the web. */
-export function stepText(t: TFunction, s: Pick<BrowserStep, "tool" | "detail">): string {
-  const tool = s.tool.replace(/^mcp__agentes__/, "");
-  if (tool === "browser_open")
-    return s.detail
-      ? t("browser.watch.step.browser_open", { detail: s.detail })
-      : t("browser.watch.step.browser_open_plain");
-  const key = `browser.watch.step.${tool}`;
-  const text = t(key);
-  return text === key ? t("browser.watch.step.other") : text;
-}
 
 /**
  * The agent's browser as its card in the conversation, under a "Céu" header: a thin sky in the agent's
@@ -66,6 +53,8 @@ export function BrowserCard({
   onToggle,
   claim = false,
   computer,
+  surface = false,
+  canTakeOver = true,
   style,
 }: {
   agentId: string;
@@ -82,6 +71,13 @@ export function BrowserCard({
   claim?: boolean;
   /** The computer the browser runs on (its profile): what an idle card says. */
   computer?: string | null;
+  /**
+   * The agent's computer full screen: always open, nothing to fold; Take control also opens a closed browser,
+   * and in control an empty or closed one gets an address to open (the phone has no other way to a site).
+   */
+  surface?: boolean;
+  /** Take control may show: no hold or pause (the server still decides who may). */
+  canTakeOver?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const { t } = useTranslation();
@@ -97,7 +93,7 @@ export function BrowserCard({
   const now = useNow(15_000);
   const actions = useBrowserHandoffActions(orgId);
   const [ownOpen, setOwnOpen] = useState(false);
-  const open = openProp ?? ownOpen;
+  const open = surface || (openProp ?? ownOpen);
   const setOpen = (next: boolean) => {
     if (onToggle) onToggle(next);
     else setOwnOpen(next);
@@ -124,8 +120,11 @@ export function BrowserCard({
   const doing = steps.at(-1);
   const helper = controller && !mine ? dir.nameOf({ type: "person", id: controller }) : "";
   const closed = live.unavailable === "closed";
-  // Assumir and Parar need a live page to drive (the phone has no address field to open one).
+  // Assumir and Parar need a live page to drive; full screen, Assumir also opens a closed browser (there is
+  // an address to open a site there).
   const ready = watching && Boolean(live.frame) && !live.unavailable;
+  const canTake = canTakeOver && (ready || (surface && closed));
+  const goShown = surface && mine && (closed || !live.frame || isBlankPage(live.frame.metadata.url));
   const note = pageNoteOf(live.unavailable, live.hidden, mine);
   const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
 
@@ -265,12 +264,16 @@ export function BrowserCard({
     <View style={[styles.card, raised, style]}>
       <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
       <Pressable
-        onPress={() => {
-          tapHaptic();
-          setOpen(!open);
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+        onPress={
+          surface
+            ? undefined
+            : () => {
+                tapHaptic();
+                setOpen(!open);
+              }
+        }
+        accessibilityRole={surface ? undefined : "button"}
+        accessibilityState={surface ? undefined : { expanded: open }}
         accessibilityLabel={`${title}. ${subtitle}`}
         style={styles.head}
       >
@@ -311,23 +314,32 @@ export function BrowserCard({
           <Button variant="primary" size="sm" label={t("mobile.browser.card.open")} onPress={answer} />
         ) : (
           <View style={styles.acts}>
-            {!controller && ready ? (
+            {!controller && canTake ? (
               <>
-                <Button variant="secondary" size="sm" label={t("mobile.browser.live.takeOver")} onPress={takeover} />
-                <Pressable
-                  onPress={stop}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("mobile.browser.card.stop")}
-                  hitSlop={8}
-                  style={styles.icon}
-                >
-                  <Icon name="stop" size={16} color={c.muted} />
-                </Pressable>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={surface ? t("desktop.takeover") : t("mobile.browser.live.takeOver")}
+                  onPress={takeover}
+                />
+                {ready ? (
+                  <Pressable
+                    onPress={stop}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("mobile.browser.card.stop")}
+                    hitSlop={8}
+                    style={styles.icon}
+                  >
+                    <Icon name="stop" size={16} color={c.muted} />
+                  </Pressable>
+                ) : null}
               </>
             ) : null}
-            <View style={open ? styles.flip : undefined}>
-              <Icon name="chev" size={14} color={c.faint} />
-            </View>
+            {surface ? null : (
+              <View style={open ? styles.flip : undefined}>
+                <Icon name="chev" size={14} color={c.faint} />
+              </View>
+            )}
           </View>
         )}
       </Pressable>
@@ -360,6 +372,7 @@ export function BrowserCard({
           </View>
           {mine ? (
             <View style={styles.control}>
+              {goShown ? <AddressBar name={name} cloud={cloud} onOpen={(url) => actions.open(agentId, url)} /> : null}
               <TypeBar onInput={live.sendInput} />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (

@@ -6,7 +6,14 @@ import {
   useBrowserHandoffMutations,
   useMachineOutages,
 } from "@agenteschat/client";
-import { asksMe, type ComputerSurface, entryLine, entryState, surfaceOf } from "@agenteschat/client/lib/agent-computer";
+import {
+  asksMe,
+  type ComputerSurface,
+  entryLine,
+  entryState,
+  liveSubLine,
+  surfaceOf,
+} from "@agenteschat/client/lib/agent-computer";
 import { READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -185,17 +192,9 @@ function ComputerStage({
   const paused = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
   const waiting = waitingFor && isWaitingHandoff(waitingFor, now) ? waitingFor : null;
   const mine = controlledBy(f?.handoff, me.user.id);
-  const watching = f?.held
-    ? t("agentComputer.sub.held")
-    : paused
-      ? t("agentComputer.sub.paused", { computer })
-      : waiting
-        ? asksMe(waiting, me.user.id)
-          ? t("agentComputer.sub.needsYou", g)
-          : t("agentComputer.sub.askedOther", { ...g, person: person(waiting.requestedForUserId) })
-        : f?.working
-          ? t("agentComputer.sub.working", g)
-          : t("agentComputer.sub.watching");
+  const watching = f
+    ? liveSubLine(t, f, { name: agent.name, computer, person, nowMs: now })
+    : t("agentComputer.sub.watching");
   const head: DialogHeadSlots = { ...slots, watching };
   const refused = (err: unknown) =>
     toast.show(

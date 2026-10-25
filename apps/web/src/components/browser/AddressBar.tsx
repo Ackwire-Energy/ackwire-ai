@@ -1,9 +1,9 @@
 import { ApiError } from "@agenteschat/client";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { openRefusalKey } from "@agenteschat/client/lib/sites";
 import { Button, Icon } from "@agenteschat/ui";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { openRefusalKey } from "./sites";
 
 /**
  * The address bar of the agent's browser while a person is in control (ADR 0040 §7): the site

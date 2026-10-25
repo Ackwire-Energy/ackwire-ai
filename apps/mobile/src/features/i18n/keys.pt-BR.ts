@@ -1222,10 +1222,6 @@ export const featureKeysPtBR = {
         offlineCloudM: "O computador do {{name}} não está respondendo agora.",
       },
     },
-    profile: {
-      waitingF: "A {{name}} precisa de você",
-      waitingM: "O {{name}} precisa de você",
-    },
     done: {
       title: "Algum recado?",
       introF: "Opcional. A {{name}} lê isso antes de seguir.",

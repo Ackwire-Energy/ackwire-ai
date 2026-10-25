@@ -29,6 +29,7 @@ import {
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { isBlankPage } from "@agenteschat/client/lib/sites";
 import { Button, FilterToggle, Icon, type IconName, Input, PixelSpinner, SkyStrip, Textarea } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import {
@@ -51,7 +52,6 @@ import { ComputerSky, colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
-import { isBlankPage } from "./sites";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;

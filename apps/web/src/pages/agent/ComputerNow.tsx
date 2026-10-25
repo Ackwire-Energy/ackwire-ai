@@ -1,8 +1,6 @@
 import { isWaitingHandoff, useBrowserHandoffMutations } from "@agenteschat/client";
-import { entryButton, entryLine, entryState } from "@agenteschat/client/lib/agent-computer";
-import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { computerKind } from "@agenteschat/client/lib/machines";
-import { Button, ComputerPortrait, type ComputerState, Icon, SkyStrip } from "@agenteschat/ui";
+import { entryButton, entryKind, entryLine, entryPortrait, entryState } from "@agenteschat/client/lib/agent-computer";
+import { Button, ComputerPortrait, Icon, SkyStrip } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { stepText } from "@/components/browser/BrowserCard";
@@ -20,8 +18,6 @@ import "@/components/computer/computer.css";
 
 /** Older links to the agent's computer: notifications and the Mac app's tray carry them. */
 const OLD_LINKS = ["browser", "desktop", "terminal"] as const;
-
-const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
 /**
  * "Desk's computer" at the top of the agent's overview (on its page and in the panel beside its DM): one row,
@@ -61,25 +57,11 @@ export function ComputerNow() {
     computer: view.machine?.name ?? t("computerSetup.title", { org: org.name }),
     lastSeenAt: view.machine?.lastSeenAt ?? null,
     person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
-    step: last ? lowerFirst(stepText(t, last, last.screen), i18n.language) : null,
+    step: last ? stepText(t, last, last.screen) : null,
     emailPromised: setupWait.email && reader.owner,
     now: new Date(now),
   });
   const button = entryButton(state);
-  const kind =
-    f.edition === "cloud" || view.machine?.kind === "managed"
-      ? WORKSPACE_COMPUTER_KIND
-      : computerKind(view.machine?.os);
-  const portrait: ComputerState =
-    state.kind === "preparing" || state.kind === "slow" || state.kind === "problem"
-      ? f.setup
-        ? setupPortrait(f.setup, false)
-        : "paused"
-      : state.kind === "offline"
-        ? "offline"
-        : state.kind === "paused" || state.kind === "held"
-          ? "paused"
-          : "online";
   const help = () => {
     if (state.kind !== "needsYou") return;
     actions.takeControl.mutate(state.handoff.id, {
@@ -96,7 +78,7 @@ export function ComputerNow() {
     <section className="cmp-entry" data-tone={tone} aria-label={t("agentComputer.title", g)}>
       <SkyStrip color={colorOf(agent)} moving={state.kind === "working"} />
       <div className="cmp-entry__row">
-        <ComputerPortrait kind={kind} state={portrait} />
+        <ComputerPortrait kind={entryKind(f.edition, view.machine)} state={entryPortrait(state, f.setup)} />
         <span className="cmp-entry__t">
           <b>{t("agentComputer.title", g)}</b>
           <span className="cmp-entry__line">

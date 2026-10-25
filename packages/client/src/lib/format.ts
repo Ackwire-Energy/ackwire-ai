@@ -61,6 +61,9 @@ export const daysBetween = (iso: string, now: Date) =>
 
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
+/** A sentence's first letter in lower case, to follow a "·" ("Trabalhando · preencheu um campo"). */
+export const lowerFirst = (s: string, locale?: string) => (s ? s.charAt(0).toLocaleLowerCase(locale) + s.slice(1) : s);
+
 /** "Segunda-feira" */
 export const formatWeekday = (locale: string, iso: string) =>
   capitalize(new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(iso)));

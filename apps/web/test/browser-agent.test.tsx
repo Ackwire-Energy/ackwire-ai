@@ -4,8 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AgentBrowserSettings, BrowserHandoff } from "@agenteschat/client";
+import { isBlankPage, openRefusalKey } from "@agenteschat/client/lib/sites";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { isBlankPage, openRefusalKey } from "@/components/browser/sites";
 import { agentSearch } from "@/lib/agent-edit";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";

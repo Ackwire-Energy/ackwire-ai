@@ -1218,10 +1218,6 @@ export const featureKeysEn: FeatureTranslations = {
         offlineCloudM: "{{name}}'s computer isn't answering right now.",
       },
     },
-    profile: {
-      waitingF: "{{name}} needs you",
-      waitingM: "{{name}} needs you",
-    },
     done: {
       title: "Anything to add?",
       introF: "Optional. {{name}} reads it before going on.",

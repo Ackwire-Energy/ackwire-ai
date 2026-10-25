@@ -1,9 +1,17 @@
 import type { TFunction } from "i18next";
 import type { BrowserHandoff, DesktopStatus, Edition, Machine } from "../api/types";
 import { handoffMinutesLeft, handoffScreen, isWaitingHandoff } from "../browser";
-import { type EtaView, type SetupView, setupEta, setupPending } from "./computer";
-import { clockAt } from "./format";
-import { isPaused } from "./machines";
+import {
+  type EtaView,
+  type SetupView,
+  setupEta,
+  setupPending,
+  setupPortrait,
+  WORKSPACE_COMPUTER_KIND,
+} from "./computer";
+import { clockAt, lowerFirst } from "./format";
+import { agentGrammar } from "./grammar";
+import { type ComputerKind, type ComputerState, computerKind, isPaused } from "./machines";
 
 /*
  * The agent's computer as one entry and one dialog, on the web and the phone: what its status line says
@@ -99,6 +107,19 @@ export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryStat
 export const entryButton = (s: EntryState): "help" | "choose" | "open" =>
   s.kind === "needsYou" ? "help" : s.kind === "noComputer" ? "choose" : "open";
 
+/** The entry's portrait: the workspace's computer drawn as a server, a connected one by its system. */
+export const entryKind = (edition: Edition, machine: Pick<Machine, "kind" | "os"> | null): ComputerKind =>
+  edition === "cloud" || machine?.kind === "managed" ? WORKSPACE_COMPUTER_KIND : computerKind(machine?.os);
+
+/** The portrait's light: dimmed while it is prepared, dark when it doesn't answer, paused while held or paused. */
+export function entryPortrait(s: EntryState, setup: SetupView | null): ComputerState {
+  if (s.kind === "preparing" || s.kind === "slow" || s.kind === "problem") {
+    return setup ? setupPortrait(setup, false) : "paused";
+  }
+  if (s.kind === "offline") return "offline";
+  return s.kind === "paused" || s.kind === "held" ? "paused" : "online";
+}
+
 /** What the entry's words need from the platform. */
 export interface EntryWords {
   edition: Edition;
@@ -158,7 +179,9 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
     case "other":
       return t("agentComputer.status.other", { person: w.person(s.userId) });
     case "working":
-      return w.step ? t("agentComputer.status.working", { now: w.step }) : t("agentComputer.status.workingPlain");
+      return w.step
+        ? t("agentComputer.status.working", { now: lowerFirst(w.step, w.locale) })
+        : t("agentComputer.status.workingPlain");
     case "unavailable":
       return s.outdated && w.edition === "selfhost"
         ? t("agentComputer.status.outdated", { computer: w.computer })
@@ -170,6 +193,34 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
     default:
       return t("agentComputer.status.available");
   }
+}
+
+/**
+ * The dialog's sub-line while its stage is live (`agentComputer.sub.*`, `desktop.sub.*`): who holds the
+ * computer, then the hold, the pause, a request waiting, the agent at work.
+ */
+export function liveSubLine(
+  t: TFunction,
+  f: AgentComputerFacts,
+  w: Pick<EntryWords, "computer" | "person"> & { name: string; nowMs?: number },
+): string {
+  const nowMs = w.nowMs ?? Date.now();
+  const g = agentGrammar(t, w.name);
+  const h = f.handoff;
+  if (h?.status === "active" && h.controllerUserId) {
+    if (h.controllerUserId !== f.userId) return t("desktop.sub.hidden", { person: w.person(h.controllerUserId) });
+    return t(h.kind === "ask" ? "desktop.sub.controlAsked" : "desktop.sub.control", g);
+  }
+  if (f.held) return t("agentComputer.sub.held");
+  if (f.edition === "selfhost" && f.machine && isPaused(f.machine, nowMs)) {
+    return t("agentComputer.sub.paused", { computer: w.computer });
+  }
+  if (h && isWaitingHandoff(h, nowMs)) {
+    return asksMe(h, f.userId)
+      ? t("agentComputer.sub.needsYou", g)
+      : t("agentComputer.sub.askedOther", { ...g, person: w.person(h.requestedForUserId ?? "") });
+  }
+  return f.working ? t("agentComputer.sub.working", g) : t("agentComputer.sub.watching");
 }
 
 /** What the dialog's stage shows (checked in this order). */

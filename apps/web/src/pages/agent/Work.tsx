@@ -38,6 +38,7 @@ import {
   planOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
   BrainLogo,
   BrainPortrait,
@@ -69,7 +70,6 @@ import { CLOUD, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
-import { cleanSite, SITE } from "@/components/browser/sites";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";

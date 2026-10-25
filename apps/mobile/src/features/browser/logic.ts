@@ -3,8 +3,11 @@ import {
   BROWSER_TOOL_SCOPE,
   type BrowserHandoff,
   type BrowserLiveUnavailable,
+  type BrowserStep,
   handoffScreen,
+  type ScreenKind,
 } from "@agenteschat/client";
+import type { TFunction } from "i18next";
 
 /**
  * The agent's browser on the phone (ADR 0040): what only the app decides. The
@@ -27,6 +30,21 @@ export function cardStateOf(
   if (h.status === "pending") return "waiting";
   if (h.status === "active") return h.controllerUserId && h.controllerUserId === meId ? "mine" : "helping";
   return h.status;
+}
+
+/** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"), as on the web; its screen's too. */
+export function stepText(
+  t: TFunction,
+  s: Pick<BrowserStep, "tool" | "detail">,
+  screen: ScreenKind = "browser",
+): string {
+  const tool = s.tool.replace(/^mcp__agentes__/, "");
+  const words = screen === "desktop" ? "desktop.watch.step" : "browser.watch.step";
+  const open = screen === "desktop" ? "desktop_open" : "browser_open";
+  if (tool === open) return s.detail ? t(`${words}.${open}`, { detail: s.detail }) : t(`${words}.${open}_plain`);
+  const key = `${words}.${tool}`;
+  const text = t(key);
+  return text === key ? t(`${words}.other`) : text;
 }
 
 /** "dashboard.stripe.com" from a frame's URL (or nothing). */
@@ -69,20 +87,6 @@ export const NOTE_MAX = 1000;
 /** The agent may use its browser: `browser:use` granted to it ("all tools" doesn't cover it). */
 export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | undefined) =>
   Boolean(access?.builtins.some((s) => s.scope === BROWSER_TOOL_SCOPE && s.state === "granted"));
-
-/**
- * The agent's browser on its profile: its card (watch, take over) for whoever may take it over (its owner
- * and admins, while its computer serves the browser) and while a person is in it; a request still waiting,
- * for anyone else, as the row that opens the request's conversation; else nothing.
- */
-export function profileBrowserOf(
-  open: Pick<BrowserHandoff, "status"> | null,
-  mayTakeOver: boolean,
-): "card" | "waiting" | null {
-  if (mayTakeOver) return "card";
-  if (!open) return null;
-  return open.status === "pending" ? "waiting" : "card";
-}
 
 /** Why the card has no live page: the server's reason, or the stream ended. */
 export type PageGap = BrowserLiveUnavailable | "ended";

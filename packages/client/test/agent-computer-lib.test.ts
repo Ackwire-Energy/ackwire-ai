@@ -9,11 +9,23 @@ import {
   askLine,
   type EntryWords,
   entryButton,
+  entryKind,
   entryLine,
+  entryPortrait,
   entryState,
+  liveSubLine,
   surfaceOf,
 } from "../src/lib/agent-computer";
-import { computerEdition, etaLine, etaTickMs, etaView, promisesEmail, setupEta, setupView } from "../src/lib/computer";
+import {
+  computerEdition,
+  etaLine,
+  etaTickMs,
+  etaView,
+  promisesEmail,
+  setupEta,
+  setupView,
+  WORKSPACE_COMPUTER_KIND,
+} from "../src/lib/computer";
 import { clockAt } from "../src/lib/format";
 import { applyWorkspaceEvent } from "../src/realtime/machines";
 import type { LiveWork } from "../src/realtime/streams";
@@ -314,6 +326,10 @@ describe("the entry's status line, first match wins", () => {
     expect(line({ kind: "working" }, { step: "filled in a field" })).toBe(
       'agentComputer.status.working {"now":"filled in a field"}',
     );
+    // The step as the run card says it, after the "·" in lower case.
+    expect(line({ kind: "working" }, { step: "Filled in a field" })).toBe(
+      'agentComputer.status.working {"now":"filled in a field"}',
+    );
     expect(line({ kind: "unavailable", outdated: true })).toBe("agentComputer.status.unavailable");
     expect(line({ kind: "unavailable", outdated: true }, { edition: "selfhost", computer: "Mac mini" })).toBe(
       'agentComputer.status.outdated {"computer":"Mac mini"}',
@@ -323,6 +339,50 @@ describe("the entry's status line, first match wins", () => {
     expect(line({ kind: "available" })).toBe("agentComputer.status.available");
     // A request with no deadline says only what it asks.
     expect(askLine(t, request({ expiresAt: null }), NOW)).toBe("Sign in to gov.br");
+  });
+
+  test("its portrait: the workspace's computer drawn as a server, its light by the state", () => {
+    expect(entryKind("cloud", null)).toBe(WORKSPACE_COMPUTER_KIND);
+    expect(entryKind("selfhost", { kind: "managed", os: "other" })).toBe(WORKSPACE_COMPUTER_KIND);
+    expect(entryKind("selfhost", { kind: "connected", os: "darwin" })).toBe("mac");
+    expect(entryPortrait({ kind: "preparing", eta: null }, null)).toBe("paused");
+    expect(entryPortrait({ kind: "problem" }, setupView(external({ state: "problem" }), NOW))).toBe("offline");
+    expect(entryPortrait({ kind: "offline" }, null)).toBe("offline");
+    expect(entryPortrait({ kind: "held" }, null)).toBe("paused");
+    expect(entryPortrait({ kind: "paused", until: null }, null)).toBe("paused");
+    expect(entryPortrait({ kind: "working" }, null)).toBe("online");
+  });
+});
+
+describe("the dialog's sub-line while its stage is live", () => {
+  const w = { name: "Desk", computer: "Mac mini", person: (id: string) => (id === "ana" ? "Ana" : "?"), nowMs: NOW };
+  const active = (over: Partial<BrowserHandoff> = {}) =>
+    request({ status: "active", controllerUserId: "me", expiresAt: null, ...over });
+
+  test("who holds it first, then the hold, the pause on the computer, a request, the agent at work", () => {
+    expect(liveSubLine(t, facts(), w)).toBe("agentComputer.sub.watching");
+    expect(liveSubLine(t, facts({ working: true }), w)).toContain("agentComputer.sub.working ");
+    expect(liveSubLine(t, facts({ working: true, handoff: request() }), w)).toContain("agentComputer.sub.needsYou ");
+    expect(liveSubLine(t, facts({ handoff: request({ requestedForUserId: "ana" }) }), w)).toContain(
+      'agentComputer.sub.askedOther {"name":"Desk"',
+    );
+    const paused = { ...MAC, paused: { until: new Date(NOW + 600_000).toISOString() } };
+    expect(liveSubLine(t, facts({ machine: paused, handoff: request() }), w)).toBe(
+      'agentComputer.sub.paused {"computer":"Mac mini"}',
+    );
+    // A pause on the computer is self-host's: the Cloud's computer has none.
+    expect(liveSubLine(t, facts({ edition: "cloud", machine: paused }), w)).toBe("agentComputer.sub.watching");
+    expect(liveSubLine(t, facts({ held: true, machine: paused, handoff: request() }), w)).toBe(
+      "agentComputer.sub.held",
+    );
+    // In control: mine (a take over, or the agent's own request), or someone else's, its screen hidden.
+    expect(liveSubLine(t, facts({ held: true, handoff: active({ kind: "takeover" }) }), w)).toContain(
+      "desktop.sub.control ",
+    );
+    expect(liveSubLine(t, facts({ handoff: active() }), w)).toContain("desktop.sub.controlAsked ");
+    expect(liveSubLine(t, facts({ handoff: active({ controllerUserId: "ana" }) }), w)).toBe(
+      'desktop.sub.hidden {"person":"Ana"}',
+    );
   });
 });
 

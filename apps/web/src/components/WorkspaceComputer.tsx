@@ -15,7 +15,7 @@ import {
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Button,
@@ -260,8 +260,6 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
     </Card>
   );
 }
-
-const lowerFirst = (s: string, lang: string) => (s ? s.charAt(0).toLocaleLowerCase(lang) + s.slice(1) : s);
 
 /**
  * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
