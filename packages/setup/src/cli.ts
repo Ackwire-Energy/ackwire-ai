@@ -73,8 +73,7 @@ import {
   SYSTEM_RUNNER_HOME,
   secretEntries,
   smtpUrlProblem,
-  sshAddress,
-  sshUser,
+  sshTarget,
   stopCommand,
   TELEMETRY_TEXT,
   type ThisMachine,
@@ -842,7 +841,12 @@ function printCommands(
       : image && network === "domain"
         ? [
             "docker compose up -d",
-            ...privateStart({ domain: domain as string, port, user: sshUser(process.env) }).steps,
+            ...privateStart({
+              domain: domain as string,
+              port,
+              ssh: sshTarget(process.env),
+              interactive: ui.interactive,
+            }).steps,
             `Then in .env set PUBLIC_URL=https://${domain} and add https to COMPOSE_PROFILES, and run docker compose up -d.`,
           ]
         : [
@@ -996,7 +1000,7 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choi
   const url = `https://${domain}`;
   if (envValue(env.read(), "PUBLIC_URL") !== url) {
     const port = envValue(env.read(), "HOST_PORT") || "3000";
-    const { note, steps } = privateStart({ domain, port, user: sshUser(process.env) });
+    const { note, steps } = privateStart({ domain, port, ssh: sshTarget(process.env), interactive: ui.interactive });
     ui.note(note);
     await composeUp(ui);
     const app = await waitForApp(opts.timeout);
@@ -1235,7 +1239,7 @@ async function finish(
     choices: choices ? results(choices) : null,
     first,
     failed,
-    ssh: { user: sshUser(process.env), host: sshAddress(process.env.SSH_CONNECTION) },
+    ssh: sshTarget(process.env),
   });
   ui.write("");
   ui.write(`  ${url}`);

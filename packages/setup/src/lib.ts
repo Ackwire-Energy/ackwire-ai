@@ -957,28 +957,33 @@ export const COMPUTER_PROBLEMS = {
 
 // ── An SSH tunnel ───────────────────────────────────────────────────────────
 
-/** Where an SSH tunnel to this server logs in: a user, and the domain or this server's address when known. */
+/** Where an SSH tunnel to this server logs in: a user, the domain or this server's address, and the SSH port. */
 export interface SshTarget {
   user: string;
   host: string | null;
+  /** Null for 22, or when unknown. */
+  port: string | null;
 }
-
-/** The user an SSH tunnel to this server logs in as: the person behind sudo, else this user, root as a last resort. */
-export const sshUser = (env: Record<string, string | undefined>) => env.SUDO_USER || env.USER || env.LOGNAME || "root";
 
 /** RFC 1918, Tailscale's 100.64.0.0/10, and IPv6 unique local and link-local addresses. */
 const PRIVATE_ADDRESS =
   /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/i;
 
 /**
- * This server's address as the SSH session running the setup reached it (SSH_CONNECTION is "client port
- * server port"). Null without a session, and behind NAT, where a public client reached a private address it
- * never typed.
+ * The tunnel's login, from the setup's environment. The user: the person behind sudo, else this user; a
+ * placeholder when neither is set (inside the image, where Docker sets neither), never a guess like root, which
+ * cloud images refuse. The address and port the SSH session running the setup came in on (SSH_CONNECTION is
+ * "client port server port"; sudo drops it): no address behind NAT, where a public client reached a private
+ * address it never typed.
  */
-export function sshAddress(connection: string | undefined): string | null {
-  const [client, , server] = connection?.trim().split(/\s+/) ?? [];
-  if (!client || !server) return null;
-  return PRIVATE_ADDRESS.test(server) && !PRIVATE_ADDRESS.test(client) ? null : server;
+export function sshTarget(env: Record<string, string | undefined>): SshTarget {
+  const [client, , server, port] = env.SSH_CONNECTION?.trim().split(/\s+/) ?? [];
+  const natted = !!server && PRIVATE_ADDRESS.test(server) && !PRIVATE_ADDRESS.test(client ?? "");
+  return {
+    user: env.SUDO_USER || env.USER || env.LOGNAME || "<user>",
+    host: client && server && !natted ? server : null,
+    port: port && port !== "22" ? port : null,
+  };
 }
 
 /**
@@ -986,17 +991,22 @@ export function sshAddress(connection: string | undefined): string | null {
  * the browser's address has to be PUBLIC_URL, http://localhost:<port>, the only origin the app accepts.
  */
 export const sshTunnel = (port: string, to: SshTarget) =>
-  `ssh -L ${port}:localhost:${port} ${to.user}@${to.host ?? "<server-address>"}`;
+  `ssh ${to.port ? `-p ${to.port} ` : ""}-L ${port}:localhost:${port} ${to.user}@${to.host ?? "<server-address>"}`;
 
 /**
  * A public domain's first start: private (PUBLIC_URL http://localhost:<port>) until the owner's account
- * exists, created through an SSH tunnel so nobody else can claim the instance; then the domain goes live.
+ * exists, created through an SSH tunnel to the domain so nobody else can claim the instance; then the domain
+ * goes live.
  */
-export function privateStart(p: { domain: string; port: string; user: string }) {
+export function privateStart(p: { domain: string; port: string; ssh: SshTarget; interactive: boolean }) {
   return {
-    note: `Starting agentes.chat privately first (docker compose up -d): ${p.domain} goes live once your account exists. The first time downloads about 2 GB…`,
+    // Without a terminal the setup doesn't wait for the account: the domain goes live in this run if the account
+    // exists already, else in a later one, as the lines after this say.
+    note: p.interactive
+      ? `Starting agentes.chat privately first (docker compose up -d): ${p.domain} goes live once your account exists. The first time downloads about 2 GB…`
+      : "Starting agentes.chat privately first (docker compose up -d). The first time downloads about 2 GB…",
     steps: [
-      `From your computer, open a tunnel to this server: ${sshTunnel(p.port, { user: p.user, host: p.domain })}`,
+      `From your computer, open a tunnel to this server: ${sshTunnel(p.port, { ...p.ssh, host: p.domain })}`,
       `Open http://localhost:${p.port} and create your account: the first one owns the instance. It has to be port ${p.port} on your computer too: until ${p.domain} goes live, sign-up works only at that address.`,
     ],
   };

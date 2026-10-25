@@ -41,9 +41,8 @@ import {
   readTailscaleStatus,
   resolveChoice,
   secretEntries,
-  sshAddress,
+  sshTarget,
   sshTunnel,
-  sshUser,
   stopCommand,
   type ThisMachine,
   tailscaleKeyEntries,
@@ -59,7 +58,7 @@ import {
 const root = join(import.meta.dir, "../../..");
 const AUTH_KEY = "tskey-auth-kAbC123CNTRL-SECRETabc123";
 const CLIENT_SECRET = "tskey-client-kXyZ789CNTRL-SECRETxyz789";
-const SSH = { user: "ana", host: "203.0.113.7" };
+const SSH = { user: "ana", host: "203.0.113.7", port: null };
 
 describe("options", () => {
   const parse = (argv: string[], env: Record<string, string> = {}) => parseOptions(argv, env);
@@ -892,34 +891,52 @@ describe("the end", () => {
 });
 
 describe("an SSH tunnel", () => {
-  test("as the person behind sudo, else this user, root as a last resort", () => {
-    expect(sshUser({ SUDO_USER: "ana", USER: "root" })).toBe("ana");
-    expect(sshUser({ USER: "ana", LOGNAME: "ana" })).toBe("ana");
-    expect(sshUser({ LOGNAME: "ana" })).toBe("ana");
-    expect(sshUser({})).toBe("root");
+  const user = (env: Record<string, string>) => sshTarget(env).user;
+  const at = (connection: string) => sshTarget({ USER: "ana", SSH_CONNECTION: connection });
+
+  test("as the person behind sudo, else this user; without either (inside the image), a placeholder, not root", () => {
+    expect(user({ SUDO_USER: "ana", USER: "root" })).toBe("ana");
+    expect(user({ USER: "ana", LOGNAME: "ana" })).toBe("ana");
+    expect(user({ LOGNAME: "ana" })).toBe("ana");
+    expect(user({})).toBe("<user>");
+    expect(sshTunnel("3000", sshTarget({}))).toBe("ssh -L 3000:localhost:3000 <user>@<server-address>");
   });
 
   test("to the address the SSH session came in on, unless that one is behind NAT", () => {
-    expect(sshAddress("198.51.100.20 51234 203.0.113.7 22")).toBe("203.0.113.7");
-    expect(sshAddress("192.168.1.20 51234 192.168.1.50 22")).toBe("192.168.1.50");
-    expect(sshAddress("100.101.102.103 51234 100.64.0.5 22")).toBe("100.64.0.5");
-    expect(sshAddress("2001:db8::1 51234 2001:db8::7 22")).toBe("2001:db8::7");
+    expect(at("198.51.100.20 51234 203.0.113.7 22").host).toBe("203.0.113.7");
+    expect(at("192.168.1.20 51234 192.168.1.50 22").host).toBe("192.168.1.50");
+    expect(at("100.101.102.103 51234 100.64.0.5 22").host).toBe("100.64.0.5");
+    expect(at("2001:db8::1 51234 2001:db8::7 22").host).toBe("2001:db8::7");
     // A cloud's 1:1 NAT: the session came in on a public address this server never sees.
-    expect(sshAddress("198.51.100.20 51234 172.31.5.6 22")).toBeNull();
-    expect(sshAddress(undefined)).toBeNull();
-    expect(sshAddress("")).toBeNull();
-    expect(sshTunnel("3000", { user: "ana", host: null })).toBe("ssh -L 3000:localhost:3000 ana@<server-address>");
+    expect(at("198.51.100.20 51234 172.31.5.6 22").host).toBeNull();
+    expect(sshTarget({ USER: "ana" }).host).toBeNull();
+    expect(at("").host).toBeNull();
+  });
+
+  test("on the port the SSH session came in on, when it isn't 22", () => {
+    expect(at("198.51.100.20 51234 203.0.113.7 22").port).toBeNull();
+    // Behind NAT the address is unknown, but a 1:1 NAT keeps the port.
+    const natted = at("198.51.100.20 51234 172.31.5.6 2222");
+    expect(natted).toEqual({ user: "ana", host: null, port: "2222" });
+    expect(sshTunnel("3000", natted)).toBe("ssh -p 2222 -L 3000:localhost:3000 ana@<server-address>");
   });
 
   test("a public domain starts privately: the owner's account through a tunnel to the domain, on the same port", () => {
-    const start = privateStart({ domain: "chat.example.com", port: "3000", user: "ana" });
+    const ssh = at("198.51.100.20 51234 172.31.5.6 2222");
+    const start = privateStart({ domain: "chat.example.com", port: "3000", ssh, interactive: true });
     expect(start.note).toBe(
       "Starting agentes.chat privately first (docker compose up -d): chat.example.com goes live once your account exists. The first time downloads about 2 GB…",
     );
     expect(start.steps).toEqual([
-      "From your computer, open a tunnel to this server: ssh -L 3000:localhost:3000 ana@chat.example.com",
+      "From your computer, open a tunnel to this server: ssh -p 2222 -L 3000:localhost:3000 ana@chat.example.com",
       "Open http://localhost:3000 and create your account: the first one owns the instance. It has to be port 3000 on your computer too: until chat.example.com goes live, sign-up works only at that address.",
     ]);
+    // Without a terminal nothing waits for the account: whether this run makes the domain live depends on it.
+    const piped = privateStart({ domain: "chat.example.com", port: "3000", ssh, interactive: false });
+    expect(piped.note).toBe(
+      "Starting agentes.chat privately first (docker compose up -d). The first time downloads about 2 GB…",
+    );
+    expect(piped.steps).toEqual(start.steps);
   });
 });
 
