@@ -34,6 +34,7 @@ if (process.argv[2] === "telemetry") {
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: 1 });
   await printTelemetry(database.db, config);
   await database.close();
+  await new Promise((resolve) => process.stdout.write("", resolve));
   process.exit(0);
 }
 
