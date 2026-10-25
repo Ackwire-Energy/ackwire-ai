@@ -13,7 +13,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Chip, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
+import { Button, Chip, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalAction, approvalRisk } from "../approvals/logic";
 import {
   ApprovalDetails,
@@ -109,7 +109,7 @@ export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
                 key={l.key}
                 style={[styles.step, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
               >
-                {l.note ? <Icon name="chat" size={15} color={c.faint} /> : <Icon name="check" size={15} color={c.ok} />}
+                <LineIcon name={l.note ? "chat" : "check"} size={15} color={l.note ? c.faint : c.ok} variant="small" />
                 <Text variant="small" tone={l.note ? "muted" : "ink2"} style={styles.grow}>
                   {l.text}
                 </Text>
@@ -244,7 +244,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   return (
     <View style={[styles.askcard, raised]}>
       <View style={styles.label}>
-        <Icon name="shield" size={15} color={c.amber} />
+        <LineIcon name="shield" size={15} color={c.amber} variant="footnote" />
         <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]} numberOfLines={1}>
           {origin ? `${t("mobile.chat.approval.asks")} · ${origin}` : t("mobile.chat.approval.asks")}
         </Text>

@@ -45,6 +45,9 @@ CI runs on every pull request. These must pass:
 | Tests | `bun test <paths>` |
 | No secrets in the history | gitleaks, with `.gitleaks.toml` |
 
+`bun run ci:local` runs all of these in CI's order and prints a PASS/FAIL table (it needs `shellcheck` and
+`gitleaks` installed). Booting the image with `docker-compose.yml` is the one CI check it leaves out.
+
 Tests run on in-memory PGlite with a fake model provider: no `.env`, no Docker, no network. CI runs
 the browser-DOM tests (`apps/web`, `packages/ui`) in a process of their own, apart from the backend
 tests (`packages/*`, `apps/server`) and the phone and desktop tests (`apps/mobile/test`,

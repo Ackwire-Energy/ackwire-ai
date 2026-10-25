@@ -1325,6 +1325,10 @@ export const featureKeysPtBR = {
     titleNew: "Entrando…",
     lead: "Suas conversas já estão chegando.",
   },
+  splash: {
+    slow: "Conectando…",
+    offline: "Sem conexão. Tentando de novo.",
+  },
   onb: {
     progress: "Passo {{n}} de {{total}}",
     done: "Pronto",

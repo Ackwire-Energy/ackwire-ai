@@ -127,7 +127,7 @@ jobs:
         run: bun run lint
       - name: Shell scripts
         if: success() || failure()
-        run: shellcheck install.sh deploy/*.sh deploy/backup/*.sh
+        run: shellcheck install.sh deploy/*.sh deploy/backup/*.sh scripts/*.sh
       # No test shard covers scripts/, so the checks' own tests run here. The boundaries check itself runs in
       # the secrets job, which docs-only changes run too.
       - name: Boundaries check's own test

@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import { Platform, Text as RNText, type TextProps as RNTextProps, type TextStyle } from "react-native";
 import { useTheme } from "./theme";
-import { CHROME_MAX_SCALE, type OS, type TypeStyle, typeStyle, type Weight, weights } from "./type-scale";
+import {
+  CHROME_MAX_SCALE,
+  type OS,
+  readingMiddle,
+  type TypeStyle,
+  typeStyle,
+  type Weight,
+  weights,
+} from "./type-scale";
 
 export type TextVariant =
   | "display"
@@ -79,6 +87,24 @@ const MAX_SCALE: Partial<Record<TextVariant, number>> = {
   display2: CHROME_MAX_SCALE,
   caption: CHROME_MAX_SCALE,
 };
+
+/**
+ * One line of a variant on screen, grown with the text size setting as far as the variant grows: its height
+ * and where the eye reads it (`readingMiddle`). `metrics`: the text's own size when it sets one over its
+ * variant (e.g. `LIST_PREVIEW`).
+ */
+export function textLineOf(
+  variant: TextVariant,
+  fontScale: number,
+  metrics?: { fontSize?: number; lineHeight?: number },
+): { height: number; middle: number } {
+  const base = variantStyle(variant);
+  const max = MAX_SCALE[variant];
+  const k = max ? Math.min(fontScale, max) : fontScale;
+  const fontSize = (metrics?.fontSize ?? base.fontSize ?? 17) * k;
+  const height = (metrics?.lineHeight ?? base.lineHeight ?? 22) * k;
+  return { height, middle: readingMiddle(fontSize, height) };
+}
 
 /** Text in the design system's scale and tones. Names stay in ink; counts use `Count`. */
 export function Text({ variant = "body", tone, style, maxFontSizeMultiplier, ...rest }: TextProps) {

@@ -5,8 +5,8 @@ import { useSession } from "@/providers/session";
 import { Button, EmptyState, useTheme } from "@/ui";
 
 /**
- * A link to something the app doesn't have (or no longer has). Signed out, every screen is behind the
- * sign-in (the app's routes, `/` included, exist only for a session), so anything lands on it instead.
+ * A link to something the app doesn't have (or no longer has). Signed out, it goes to the sign-in, as the
+ * app's own screens do (`app/_layout.tsx`).
  * Like a native empty state: the sky, the two lines and the way back, centered on the screen.
  */
 export default function NotFound() {
