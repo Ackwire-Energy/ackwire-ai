@@ -41,7 +41,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "search_context",
       description:
-        "Search this organization's messages, summaries, decisions, facts and lessons that you can see. Use it before answering questions about past work.",
+        "Search this organization's messages, summaries, decisions, facts and lessons that you can see, and what the team did outside (emails sent, pull requests opened, posts: kind `action`). Use it before answering questions about past work.",
       scope: "context:read",
       inputSchema: {
         type: "object",
@@ -51,7 +51,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             type: "array",
             items: {
               type: "string",
-              enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki"],
+              enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki", "action"],
             },
           },
           limit: { type: "integer", minimum: 1, maximum: 20 },

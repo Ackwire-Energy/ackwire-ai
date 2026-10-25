@@ -38,6 +38,15 @@ describe("Configurações da organização", () => {
     });
   });
 
+  test("agents check what the team already did: on by default, one switch turns it off", async () => {
+    const { state } = await go();
+    const toggle = screen().getByRole("switch", { name: "Agentes conferem o que o time já fez" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await click(toggle);
+    await settle(4);
+    expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({ actionCheck: false });
+  });
+
   test("connected connectors are listed; disconnect asks first", async () => {
     const { state } = await go(seedState(), "settings/connectors");
     const section = screen().getByRole("region", { name: "Conectores" });
@@ -290,17 +299,41 @@ describe("budget alerts over the WebSocket", () => {
 
 describe("Buscar no workspace", () => {
   test("search as you type: results grouped by kind, with channel and author, linking to the channel", async () => {
-    const { state } = await go(seedState(), "search");
+    const seeded = seedState();
+    seeded.teamActions = [
+      {
+        kind: "action",
+        sourceId: "00000000-0000-4000-8000-0000000000a1",
+        channelIds: ["00000000-0000-4000-8000-0000000000c2"],
+        title: "open_pull_request",
+        snippet: "GitHub · Corrige o login com Google",
+        score: 1,
+        createdAt: new Date().toISOString(),
+        author: { type: "agent", id: "agent-ada", name: "Ada" },
+      },
+    ];
+    const { state } = await go(seeded, "search");
     const box = screen().getByRole("searchbox", { name: "Buscar" });
-    expect(document.body.textContent).toContain("Busque mensagens, decisões, fatos e resumos");
+    expect(document.body.textContent).toContain(
+      "Busque mensagens, decisões, fatos, resumos e o que os agentes já fizeram",
+    );
     await type(box, "login");
     await act(() => new Promise((r) => setTimeout(r, 300)));
     await settle(4);
     expect(state.calls.find((c) => c.method === "search.query")?.args[1]).toEqual({
       q: "login",
-      kinds: ["message", "context_item"],
+      kinds: ["action", "message", "context_item"],
       limit: 50,
     });
+    // What the team already did comes first: who did it, where, never the tool's id.
+    const regions = screen()
+      .getAllByRole("region")
+      .map((r) => r.getAttribute("aria-label"));
+    expect(regions.indexOf("Ações do time")).toBeLessThan(regions.indexOf("Mensagens"));
+    const done = screen().getByRole("region", { name: "Ações do time" });
+    expect(done.textContent).toContain("GitHub · Corrige o login com Google");
+    expect(done.textContent).toContain("Ada · em #eng");
+    expect(done.textContent).not.toContain("open_pull_request");
     const messages = screen().getByRole("region", { name: "Mensagens" });
     const link = within(messages).getAllByRole("link")[0] as HTMLElement;
     expect(link.textContent).toContain("o login está devolvendo 401");

@@ -61,6 +61,7 @@ import {
 } from "./logic";
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
+import { TeamChecks } from "./TeamChecks";
 import { recentTurn, stoppedOf } from "./turn";
 
 /**
@@ -289,6 +290,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
+        {isAgent ? <TeamChecks message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
