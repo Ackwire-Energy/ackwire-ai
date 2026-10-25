@@ -515,12 +515,51 @@ jobs:
             gh release create "$TAG" --verify-tag --title "agentes.chat ${TAG#v}" --generate-notes
           gh release upload "$TAG" install.sh --clobber
 
+  # A version tag's release also carries agentes.chat without Docker (ADR 0060 §2): one package per
+  # computer (macOS and Linux, x64 and arm64), each with the Bun install.sh pins, and native.json, signed
+  # with the desktop updater's key, which the installer checks before it downloads anything. After
+  # release-install, which makes the release.
+  release-native:
+    name: Release the native packages
+    needs: [changes, check, test-backend, test-web, secrets, compose, release-install]
+    if: >-
+      github.ref_type == 'tag' && !cancelled() &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - *setup-bun
+      - *cache-bun
+      - *install
+      - name: Build the packages
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bun scripts/native-package.ts packages --version "${TAG#v}" --out "$RUNNER_TEMP/native"
+      - name: Sign native.json
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          bun run tauri signer sign "$RUNNER_TEMP/native/native.json"
+          test -s "$RUNNER_TEMP/native/native.json.sig"
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd "$RUNNER_TEMP/native"
+          gh release upload "$TAG" agentes-native-*.tar.gz native.json native.json.sig --clobber --repo "$GITHUB_REPOSITORY"
+
   # The one check to require once branch protection is on: red when any job failed or was
   # cancelled; a skipped job is fine (nothing it covers changed).
   done:
     name: CI result
     if: always()
-    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish, release-install]
+    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish, release-install, release-native]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

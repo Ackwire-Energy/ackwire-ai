@@ -73,6 +73,10 @@ here=$(cd "$(dirname "$0")" && pwd -P)
 exec "$here/../runtime/bun" "$here/../server/native.js" "$@"
 `;
 
+/** Source maps (the web app's are most of its size) and drizzle-kit's schema snapshots aren't read at run time. */
+const notAtRunTime = (file: string) => file.endsWith(".map") || /[\\/]meta[\\/]\d+_snapshot\.json$/.test(file);
+const runtimeOnly = { recursive: true, filter: (file: string) => !notAtRunTime(file) };
+
 /** The entry the launcher and the desktop app run; the bundle sits one folder down, like a package's src/. */
 const ENTRY = `import { main } from "./lib/native.js";
 
@@ -98,7 +102,7 @@ function copyPackage(name: string, from: string, into: string, done = new Set<st
   if (done.has(name)) return;
   done.add(name);
   const dir = packageDir(name, from);
-  cpSync(dir, join(into, "node_modules", name), { recursive: true, dereference: true });
+  cpSync(dir, join(into, "node_modules", name), { ...runtimeOnly, dereference: true });
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
   for (const dep of Object.keys(pkg.dependencies ?? {})) copyPackage(dep, dir, into, done);
 }
@@ -142,7 +146,7 @@ export async function buildFolders(out: string, version: string) {
   mkdirSync(base, { recursive: true });
 
   sh(["bun", "run", "--filter", "@agenteschat/web", "build"]);
-  cpSync(join(ROOT, "apps/web/dist"), join(base, "web"), { recursive: true });
+  cpSync(join(ROOT, "apps/web/dist"), join(base, "web"), runtimeOnly);
   // The program that connects a computer, which every server offers for download (as the image does).
   const runner = await Bun.build({
     entrypoints: [join(ROOT, "apps/server/runner/main.ts")],
@@ -165,7 +169,7 @@ export async function buildFolders(out: string, version: string) {
   if (!built.success) throw new AggregateError(built.logs, "the server didn't bundle");
   writeFileSync(join(server, "native.js"), ENTRY);
   // Read beside the bundle, as from the packages' own folders (`../migrations`, `../assets`).
-  cpSync(join(ROOT, "packages/db/migrations"), join(server, "migrations"), { recursive: true });
+  cpSync(join(ROOT, "packages/db/migrations"), join(server, "migrations"), runtimeOnly);
   cpSync(join(ROOT, "packages/engine/assets"), join(server, "assets"), { recursive: true });
   const from = { "libpg-query": join(ROOT, "packages/engine") } as Record<string, string>;
   for (const name of EXTERNAL) copyPackage(name, from[name] ?? join(ROOT, "packages/db"), server);
