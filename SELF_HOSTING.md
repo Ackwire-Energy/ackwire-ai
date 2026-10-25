@@ -845,6 +845,20 @@ agentes-runner tools enable desktop terminal
 Keep `--no-install-recommends`: without it every desktop gets a screen locker nobody can unlock, more
 background services, and a set of empty folders in each agent's home. `agentes-runner status` says
 whether each of the two can run there and, when one can't, what is missing.
+
+Each agent's desktop has the agentes.chat look: its wallpaper and a dock at the bottom center (the mark
+opens the apps menu, then Files, Terminal and the open windows), one workspace and no desktop icons.
+The runner writes it into that desktop's own settings (`<agent folder>/.agentes/home`, or the agent's
+own home with `--system`), never your user's or the computer's, so your own desktop stays as it is.
+For its rounded windows, also install Orchis and the SVG loader it draws its buttons with (Debian 12
+and 13, Ubuntu 24.04; `--system --desktop` installs them where apt has them); without them the desktops
+use GTK's and XFCE's own theme:
+
+```sh
+sudo apt install --no-install-recommends orchis-gtk-theme librsvg2-common
+```
+
+What a person changes on a desktop (its theme, its panel) stays until a new version of the look.
 `agentes-runner desktop-check --agent <handle>` starts that agent's desktop, logs in to it and opens a
 terminal, then stops what it started (stop the runner first). Agents use their desktop with the
 **Use its desktop** permission, which new agents have. A desktop takes about 0.2 GB of memory, 0.8 GB
