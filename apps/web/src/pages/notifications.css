@@ -179,7 +179,7 @@
   font-weight: 600;
   color: var(--ink2);
 }
-/* An approval in one sentence (AprovacaoConector B): who wants what, the connector inline. */
+/* An approval in one sentence (AprovacaoConector B): who wants what. */
 .nt-say {
   margin: 3px 0 0;
   font-size: 16px;
@@ -189,20 +189,6 @@
 .nt-say b {
   font-weight: 650;
   color: var(--ink);
-}
-.nt-say .ap-conn {
-  display: inline-flex;
-  vertical-align: -4px;
-  margin-left: 6px;
-  gap: 6px;
-}
-/* Inside the sentence, the logo is the text's size. */
-.nt-say .ap-conn .connector-icon,
-.nt-say .ap-conn__own {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  font-size: 10.5px;
 }
 .nt-origin {
   display: inline-flex;

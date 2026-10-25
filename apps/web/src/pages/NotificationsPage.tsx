@@ -62,7 +62,7 @@ import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
-import { ApproveButton, ConnectorLine, RefuseBox } from "./ApprovalsPage";
+import { ApproveButton, RefuseBox } from "./ApprovalsPage";
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
@@ -824,7 +824,7 @@ function RoundWaits({ topicId }: { topicId: string }) {
 }
 
 /**
- * An approval in one sentence (AprovacaoConector B): "Ada quer ver o stack trace do evento · [Sentry]", then
+ * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then
  * "Só lê", its values in words and the agent's why behind "Por quê?".
  */
 function ApprovalSay({
@@ -857,7 +857,6 @@ function ApprovalSay({
           values={{ name, action: approvalDoing(t, a) }}
           components={{ b: <b /> }}
         />
-        {a.connector && <ConnectorLine approval={a} />}
       </p>
       {(approvalReadsOnly(a) || values.length > 0 || reason) && (
         <div className="nt-facts">
