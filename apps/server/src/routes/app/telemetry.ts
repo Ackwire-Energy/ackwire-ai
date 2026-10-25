@@ -68,7 +68,7 @@ const Report = z
       ),
     }),
   })
-  .openapi("UsageReport");
+  .openapi("TelemetryReport");
 
 const Telemetry = z
   .object({
