@@ -5932,6 +5932,63 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
+/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size and users. */
+.setup-progress {
+  margin: 0;
+}
+.setup-progress--line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.setup-progress--line > :first-child {
+  flex: none;
+  margin-top: 1px;
+}
+.setup-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.setup-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
+.hold-banner .outage__text {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  white-space: normal;
+}
+/* Where to write for help: the address reads as part of the sentence. */
+.support-line a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. */
+.suspended-page .support-line {
+  display: block;
+  margin-top: 6px;
+}
+.suspended-page__others {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.suspended-page__others > h2 {
+  flex-basis: 100%;
+}
 .computers-note {
   display: flex;
   align-items: flex-start;

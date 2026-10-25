@@ -4,6 +4,7 @@
  * - `GET    …/machines` → `{ machines: Machine[] }`
  * - `PATCH  …/machines/{id}` `{ name }`, `DELETE …/machines/{id}`
  * - `GET    …/machines/host` → `{ machineId, on }` (404 = `null`: no computer of the server's own here);
+ * - `GET    …/computer-setup` → `{ mode, state, step, reason, … }` (`pair` unless a test calls `setSetup()`);
  *   `POST …/machines/host` → `{ machineId, on: true }`
  * - `GET    /api/app/machines/device/{userCode}` → the computer that made the code (404 once gone)
  * - `POST   …/organizations/{orgId}/machines/device/{userCode}/confirm` `{ name? }` → 201, the machine
@@ -28,6 +29,7 @@ import type {
   AccountLoginStatus,
   AiAccounts,
   ApiClient,
+  ComputerSetup,
   DesktopRelease,
   DeviceRequest,
   HostComputer,
@@ -62,6 +64,8 @@ export interface FakeMachines {
   setMoveResult(result: MoveAgentsResult | null): void;
   /** The server's own computer in the organization; `null` (default): it has none. */
   setHost(state: HostComputer | null): void;
+  /** How far the workspace's own computer is (ADR 0056 §10); the default is `pair` (people connect theirs). */
+  setSetup(setup: Partial<ComputerSetup>): void;
   /** The newest sign-in started (ADR 0041), with the code box sent for it, if any. */
   lastLogin(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean } | undefined;
   /** The computer finished (or gave up on) a sign-in. */
@@ -81,6 +85,17 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   let outages: MachineOutages = { outages: [], targets: [] };
   let moveResult: MoveAgentsResult | null = null;
   let host: HostComputer | null = null;
+  const PAIR: ComputerSetup = {
+    mode: "pair",
+    state: null,
+    step: null,
+    reason: null,
+    since: null,
+    etaSeconds: null,
+    specs: null,
+    machineId: null,
+  };
+  let setup: ComputerSetup = PAIR;
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
   let ai: AiAccounts = { accounts: [], computers: [] };
   const logins: Login[] = [];
@@ -140,6 +155,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         );
       },
       host: async () => clone(host),
+      computerSetup: async () => clone(setup),
       hostOn: async (orgId) => {
         log("machines.hostOn", orgId);
         if (!host) throw new MockNotFoundError("Sem computador deste servidor.");
@@ -275,6 +291,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     },
     setMoveResult: (next) => {
       moveResult = next;
+    },
+    setSetup: (next) => {
+      setup = { ...PAIR, mode: "external", state: "preparing", ...next };
     },
     setHost: (next) => {
       host = clone(next);

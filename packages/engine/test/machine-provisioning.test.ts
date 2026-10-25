@@ -16,10 +16,13 @@ import {
   type MachineHub,
   OrgPausedError,
   pollDeviceToken,
+  reduceMachineAccess,
+  renameMachine,
   revokeManagedMachine,
   setAgentComputerTarget,
   setOrgStanding,
   setProvisioning,
+  updateOrganization,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
@@ -217,6 +220,31 @@ describe("external provisioning", () => {
     await expect(issueManagedMachine(deps(), f.org.id)).rejects.toBeInstanceOf(OrgPausedError);
   });
 
+  test("its name says a computer, in its first owner's language, and follows the workspace's until renamed", async () => {
+    f = await setup();
+    const issued = await issueManagedMachine(deps(), f.org.id);
+    if (!issued) throw new Error("no org");
+    const name = async (id = issued.machineId) => (await machineRow(id)).name;
+    expect(await name()).toBe("Computador da Acme");
+    await updateOrganization(f.db, f.owner.id, f.org.id, { name: "Acme Labs" });
+    expect(await name()).toBe("Computador da Acme Labs");
+    await updateOrganization(f.db, f.owner.id, f.org.id, { context: "Clinics." });
+    expect(await name()).toBe("Computador da Acme Labs");
+    // A name someone gave it stays.
+    await renameMachine(deps(), f.owner.id, f.org.id, issued.machineId, { name: "Servidor" });
+    await updateOrganization(f.db, f.owner.id, f.org.id, { name: "Acme" });
+    expect(await name()).toBe("Servidor");
+
+    const ana = await addUser(f.db, "ana");
+    await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, ana.id));
+    const { organization: beta } = await createOrganization(f.db, ana.id, { name: "Beta" });
+    const english = await issueManagedMachine(deps(), beta.id);
+    if (!english) throw new Error("no org");
+    expect(await name(english.machineId)).toBe("Beta's computer");
+    await updateOrganization(f.db, ana.id, beta.id, { name: "Beta Co" });
+    expect(await name(english.machineId)).toBe("Beta Co's computer");
+  });
+
   test("an issued code that expires leaves the managed row; a new code still connects it", async () => {
     f = await setup();
     const issued = await issueManagedMachine(deps(), f.org.id);
@@ -264,7 +292,7 @@ describe("external provisioning", () => {
         {
           type: "agent.computer",
           agentId: f.agent.id,
-          target: { kind: "machine", machineId, name: "Acme", online: true },
+          target: { kind: "machine", machineId, name: "Computador da Acme", online: true },
         },
       ]),
     );
@@ -272,7 +300,7 @@ describe("external provisioning", () => {
       agents: expect.arrayContaining([expect.objectContaining({ id: early.id })]),
     });
     const told = await f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "computer_ready"));
-    expect(told.map((n) => [n.userId, n.source])).toEqual([[f.owner.id, { machineId, label: "Acme" }]]);
+    expect(told.map((n) => [n.userId, n.source])).toEqual([[f.owner.id, { machineId, label: "Computador da Acme" }]]);
 
     // Someone takes an agent off it; a reconnect leaves that choice alone and tells nobody again.
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, early.id, null);
@@ -311,6 +339,12 @@ describe("external provisioning", () => {
       const refused = await deleteMachine(deps(), who, f.org.id, machineId).catch((e) => e);
       expect(refused).toBeInstanceOf(ForbiddenError);
       expect(refused).toMatchObject({ code: "machine.managed" });
+      // Nor turned down: nobody here could turn a tool or a folder back on.
+      const hub = { call: async () => ({ access: {} }), status: async () => ({ online: true }) } as never;
+      for (const input of [{ disableTool: "commands" as const }, { removeFolder: { path: "/srv/shared" } }]) {
+        const reduced = await reduceMachineAccess({ ...deps(), hub }, who, f.org.id, machineId, input).catch((e) => e);
+        expect(reduced).toMatchObject({ code: "machine.managed_access" });
+      }
     }
     // Nobody paired it: an agent's owner may put their agent back on it.
     const own = await createAgent(

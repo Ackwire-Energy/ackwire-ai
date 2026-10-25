@@ -486,7 +486,7 @@ with their email, sign-ins with their IP address and browser, workspaces, invita
 sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
 credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/standing` puts a
 workspace on hold (its agents stop) or suspends it (nobody can use it, and what its agents are doing
-stops), and brings it back; `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
+stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to write about it); `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
 `PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
@@ -553,6 +553,16 @@ on first use), and Claude Code or Codex when an agent thinks with a subscription
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
 `agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
+
+On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
+installer's `--system` option (below) installs them; with the command above, install them once
+(Debian and Ubuntu names; on Debian 13 and Ubuntu 24.04, `libasound2t64` in place of `libasound2`):
+
+```sh
+sudo apt install --no-install-recommends libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
+  libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2
+```
 
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a
@@ -862,6 +872,11 @@ for the agents' desktops and terminals), HTTP/1.1 to the app, and a read timeout
 **An agent's desktop or terminal "isn't available on this computer".** Run `agentes-runner status` on
 that computer: its `Desktops` and `Terminal` lines say what is missing (the runner on Bun 1.3.5 or
 newer, the packages, or the switch), as in Agent computers above.
+
+**An agent's browser "is missing system libraries".** Chrome for Testing can't load them on that
+computer. The message names the first few and the runner's log all of them; install the packages
+under Agent computers above. On a computer installed with `--system`, running that same install
+command again installs them.
 
 **`extension "vector" is not available` at the first start.** The database is a Postgres without
 pgvector. Use the compose file's `pgvector/pgvector` image; on a database of your own, install

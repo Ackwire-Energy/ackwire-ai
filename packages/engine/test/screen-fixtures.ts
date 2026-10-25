@@ -97,9 +97,9 @@ export const screenImage = (marks: ScreenImage["marks"] = []): ScreenImage => ({
   marks,
 });
 
-/** A close-up of `region` at the screen's native size. */
+/** A close-up of `region` at the screen's native size: a real image (one pixel), since a close-up is enlarged. */
 export const closeUpOf = (region: ScreenRegion): ScreenImage => ({
-  data: "CLOSE",
+  data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGPom7XoPwAGTgLKI4t8IAAAAABJRU5ErkJggg==",
   width: region.width,
   height: region.height,
   viewport: { width: region.width, height: region.height },
