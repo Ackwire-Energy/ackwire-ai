@@ -50,7 +50,7 @@ import { KeyedQueue } from "./queue";
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
  * - Its look (`desktop-look.ts`) is XFCE's settings in its HOME, written there
- *   as the agent before a start whenever the HOME has an older one.
+ *   as the agent before a start when the HOME's marker names another version.
  * - Started the first time it is needed (`ensure`: the agent's screen or
  *   browser, a person opening it), then left on: none stops for being idle,
  *   so what a person left open on it is still there later. Started again (at
