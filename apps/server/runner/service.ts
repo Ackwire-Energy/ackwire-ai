@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DEFAULT_AGENT_UID_RANGE, pairedConfig, runnerHome, updateConfig } from "./config";
@@ -416,6 +416,11 @@ export function installSystemService(io: SystemServiceIo): number {
   const limits = agentSliceLimitsPath(file);
   mkdirSync(path.dirname(limits), { recursive: true });
   writeFileSync(limits, AGENT_SLICE_LIMITS);
+  // Readable by all whatever the umask (a provisioner's 077), also where an earlier one left them closed: PID 1
+  // warns at every read of a unit or drop-in that isn't. Regular files only, as PID 1 checks: a masked one is a
+  // link to /dev/null, which chmod would follow.
+  chmodSync(path.dirname(limits), 0o755);
+  for (const f of [file, limits]) if (statSync(f).isFile()) chmodSync(f, 0o644);
   const start = io.start !== false;
   if (!(io.booted ?? systemdBooted())) {
     print(`Installed ${file}, but systemd isn't running here.`);
