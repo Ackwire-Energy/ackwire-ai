@@ -838,13 +838,16 @@ and Ubuntu names); then turn both on at that computer:
 ```sh
 sudo apt install --no-install-recommends tigervnc-standalone-server xauth dbus-x11 xfce4-session \
   xfwm4 xfce4-panel xfdesktop4 xfce4-settings thunar xfce4-terminal adwaita-icon-theme \
-  elementary-xfce-icon-theme fonts-noto-core
+  elementary-xfce-icon-theme fonts-noto-core fonts-noto-cjk
 agentes-runner tools enable desktop terminal
 ```
 
 Keep `--no-install-recommends`: without it every desktop gets a screen locker nobody can unlock, more
 background services, and a set of empty folders in each agent's home. `agentes-runner status` says
-whether each of the two can run there and, when one can't, what is missing.
+whether each of the two can run there and, when one can't, what is missing. `fonts-noto-cjk` is for
+Chinese, Japanese and Korean, which the agent's browser and apps otherwise show as empty boxes; it takes
+about 91 MB on Debian 13 and on Ubuntu 24.04 (a download of 57 MB and 61 MB), and `--system --desktop`
+installs it where apt has it.
 
 `agentes-runner desktop-check --agent <handle>` starts that agent's desktop, logs in to it and opens a
 terminal, then stops what it started (stop the runner first). Agents use their desktop with the

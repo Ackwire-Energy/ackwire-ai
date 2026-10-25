@@ -50,9 +50,17 @@ export const DESKTOP_APT_PACKAGES = [
 export const DESKTOP_LOOK_APT_PACKAGES = ["orchis-gtk-theme", "librsvg2-common"] as const;
 
 /**
- * The desktops' dock (ADR 0058 §15), each app's windows on its own launcher, installed after the theme in an apt
- * call of its own, where apt has it: Debian 13 (0.4.3, about 0.5 MB with nothing else to bring); not Debian 12 or
- * Ubuntu 22.04 and 24.04, whose desktops keep the panel's own launchers and window buttons.
+ * Chinese, Japanese and Korean for what the agents' desktops show (their browser among them): without it that
+ * text is empty boxes. Installed after the theme where apt has it, on its own since Ubuntu 22.04 has no Orchis
+ * (about 91 MB on Debian 13 and Ubuntu 24.04).
+ */
+export const DESKTOP_CJK_APT_PACKAGES = ["fonts-noto-cjk"] as const;
+
+/**
+ * The desktops' dock (ADR 0058 §15), each app's windows on its own launcher, installed after the fonts in an apt
+ * call of its own, where apt has it: Debian 13 (0.4.3, about 0.5 MB with nothing else to bring) and Ubuntu 25.04
+ * or newer (universe); not Debian 12 or Ubuntu 22.04 and 24.04, whose desktops keep the panel's own launchers and
+ * window buttons.
  */
 export const DESKTOP_DOCK_APT_PACKAGES = ["xfce4-docklike-plugin"] as const;
 
@@ -116,8 +124,9 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * `SYSTEM_RUNNER_DIR`, the launcher at `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
- * `--desktop` adds `DESKTOP_APT_PACKAGES` (and `DESKTOP_LOOK_APT_PACKAGES`, then
- * `DESKTOP_DOCK_APT_PACKAGES`, where apt has them), and `--agent-uid-range` sets the
+ * `--desktop` adds `DESKTOP_APT_PACKAGES` (then `DESKTOP_LOOK_APT_PACKAGES`,
+ * `DESKTOP_CJK_APT_PACKAGES` and `DESKTOP_DOCK_APT_PACKAGES`, each in an apt call
+ * of its own, where apt has them), and `--agent-uid-range` sets the
  * agents' uids (default `DEFAULT_AGENT_UID_RANGE`). Everything runs from
  * `main`, so a download cut short runs nothing.
  *
@@ -156,6 +165,7 @@ BUN_VERSION=${shQuote(RUNNER_BUN_VERSION)}
 BROWSER_PACKAGES=${shQuote(BROWSER_APT_PACKAGES.join(" "))}
 DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
 LOOK_PACKAGES=${shQuote(DESKTOP_LOOK_APT_PACKAGES.join(" "))}
+CJK_PACKAGES=${shQuote(DESKTOP_CJK_APT_PACKAGES.join(" "))}
 DOCK_PACKAGES=${shQuote(DESKTOP_DOCK_APT_PACKAGES.join(" "))}
 
 DIR=""
@@ -269,6 +279,9 @@ system_packages() {
       # shellcheck disable=SC2086
       apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $LOOK_PACKAGES ||
         say "The agents' screens keep the stock theme: apt has no $LOOK_PACKAGES here"
+      # shellcheck disable=SC2086
+      apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $CJK_PACKAGES ||
+        say "The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no $CJK_PACKAGES here"
       # shellcheck disable=SC2086
       apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $DOCK_PACKAGES ||
         say "The agents' screens keep the panel's own dock: apt has no $DOCK_PACKAGES here"
