@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import { Platform, Text as RNText, type TextProps as RNTextProps, type TextStyle } from "react-native";
 import { useTheme } from "./theme";
-import { CHROME_MAX_SCALE, type OS, readingMiddle, type TypeStyle, typeStyle, type Weight, weights } from "./type-scale";
+import {
+  CHROME_MAX_SCALE,
+  type OS,
+  readingMiddle,
+  type TypeStyle,
+  typeStyle,
+  type Weight,
+  weights,
+} from "./type-scale";
 
 export type TextVariant =
   | "display"
