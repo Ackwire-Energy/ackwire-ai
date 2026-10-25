@@ -265,6 +265,32 @@
   border-radius: 3px;
   background: var(--line2);
 }
+/* What the agent said, after the action: its face, its name and its words. */
+.ap-said {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-said > :first-child {
+  flex: none;
+  margin-top: 1px;
+}
+.ap-said b {
+  color: var(--ink);
+  font-weight: 600;
+}
+/* On the line of who asks: the routine (or nobody watching), with its icon. */
+.ap-card__origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 /* Asked while nobody watched (a routine, or no one behind the run): one quiet line with its icon. */
 .ap-origin {
   display: flex;

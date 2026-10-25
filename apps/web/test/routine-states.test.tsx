@@ -350,7 +350,7 @@ describe("Rotinas: the form's two plain questions", () => {
 });
 
 describe("Approval cards: why, and asked while nobody watched", () => {
-  test("the card shows the agent's why above the action, and the routine that asked", async () => {
+  test("the card says the routine that asked on its first line, then the action, then the agent's why", async () => {
     const state = seedState();
     const first = state.approvals[0];
     if (first) {
@@ -361,10 +361,12 @@ describe("Approval cards: why, and asked while nobody watched", () => {
     await settle(6);
     const group = screen().getByRole("group", { name: "Pedido de aprovação" });
     const text = group.textContent ?? "";
-    expect(text).toContain("Pedido pela rotina «Revisar PRs» enquanto ninguém acompanhava");
+    const origin = text.indexOf("rotina «Revisar PRs»");
+    const action = text.indexOf("Merge PR #42 into main");
     const why = text.indexOf("O PR #42 corrige o login");
-    expect(why).toBeGreaterThan(-1);
-    expect(why).toBeLessThan(text.indexOf("Merge PR #42 into main"));
+    expect(origin).toBeGreaterThan(-1);
+    expect(action).toBeGreaterThan(origin);
+    expect(why).toBeGreaterThan(action);
   });
 });
 

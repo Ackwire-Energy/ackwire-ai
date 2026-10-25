@@ -14,3 +14,13 @@ export function approvalOriginWords(a: Pick<Approval, "origin">): Words | null {
 
 /** Why the agent asks, trimmed; null when it said nothing. */
 export const approvalWhy = (a: Pick<Approval, "why">) => a.why?.trim() || null;
+
+/** The same, short, on the line of who asks: "rotina «X»", "sem ninguém acompanhando". */
+export function approvalOriginShort(a: Pick<Approval, "origin">): Words | null {
+  const o = a.origin;
+  if (!o) return null;
+  if (o.kind === "routine" && o.routineName) {
+    return { key: "approval.originShort.routine", values: { name: o.routineName } };
+  }
+  return { key: "approval.originShort.unattended", values: {} };
+}
