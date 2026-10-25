@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,6 +28,10 @@ import {
   systemdSystemUnit,
 } from "../runner/service";
 import { createApp } from "../src/app";
+
+// The install.sh tests spawn shells and stubs, which take seconds on a loaded machine; the preload's longer
+// default timeout reaches only the first test file of a run.
+setDefaultTimeout(30_000);
 
 /**
  * install.sh: served at /install, and its decisions per machine, read from `--plan`. The commands it
