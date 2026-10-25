@@ -91,7 +91,8 @@ describe("palettes", () => {
 test("every shader declares the uniforms the component passes", () => {
   for (const kind of ["sky", "fuse", "bar", "track", "sweep", "pill", "pillwork"] as const) {
     const src = shaderSource(kind);
-    for (const u of ["size", "px", "t", "last", "fade", "clear", "pal"]) expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
+    for (const u of ["size", "px", "t", "last", "fade", "clear", "pal"])
+      expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
     expect(src).toContain("half4 main(float2 pos)");
     expect(src).toContain("float field(");
   }

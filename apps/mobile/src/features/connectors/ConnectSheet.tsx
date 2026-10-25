@@ -64,7 +64,12 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
   const [step, setStep] = useState<Step>(existing ? "who" : "about");
   const name = connectorName(t, def);
   const tr = t as unknown as (key: string) => string;
-  const lines = capabilityLines(tr, (k) => i18n.exists(k), def, (s) => scopeText(t, s).label);
+  const lines = capabilityLines(
+    tr,
+    (k) => i18n.exists(k),
+    def,
+    (s) => scopeText(t, s).label,
+  );
   const index = step === "about" ? 0 : step === "connect" ? 1 : 2;
   return (
     <View style={styles.body}>

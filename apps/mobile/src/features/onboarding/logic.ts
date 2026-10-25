@@ -57,8 +57,7 @@ export function introducesAt(step: StepId): boolean {
 }
 
 /** The next and previous steps. */
-export const nextStep = (step: StepId): StepId =>
-  STEPS[Math.min(STEPS.length - 1, STEPS.indexOf(step) + 1)] ?? "done";
+export const nextStep = (step: StepId): StepId => STEPS[Math.min(STEPS.length - 1, STEPS.indexOf(step) + 1)] ?? "done";
 export const prevStep = (step: StepId): StepId | null => {
   const i = STEPS.indexOf(step);
   return i > 0 && step !== "done" ? (STEPS[i - 1] ?? null) : null;

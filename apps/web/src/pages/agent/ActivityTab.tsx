@@ -210,11 +210,7 @@ export function ActivityTab() {
         failures={detail.data?.failuresThisMonth ?? 0}
         perDay={detail.data?.runsByDay ?? []}
         tokens={formatTokensShort(t, locale, detail.data?.tokensThisMonth ?? 0)}
-        money={
-          viewer === "admin" && spent !== undefined && limit !== undefined
-            ? { spent, limit }
-            : { percent: used }
-        }
+        money={viewer === "admin" && spent !== undefined && limit !== undefined ? { spent, limit } : { percent: used }}
       />
       <Card as="section" className="agp-card" aria-label={t("agentPage.activity.title")}>
         <Toolbar

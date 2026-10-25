@@ -42,7 +42,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   expect(t.email.sent.at(-1)).toMatchObject({ to: ["owner@example.com"], subject: "Redefinir sua senha do agentes" });
 });
 
-test("password reset: the email's link lands on the web's /reset-password with a token, once", async () => {
+test("password reset: the email links straight to the web's /reset-password with a token, good once", async () => {
   t = await createTestServer();
   await signUp(browser(t), "owner@example.com");
   await t.drain();
@@ -52,13 +52,10 @@ test("password reset: the email's link lands on the web's /reset-password with a
   });
   expect(asked.status).toBe(200);
   await t.drain();
-  const link = /https?:\/\/\S+\/api\/auth\/reset-password\/\S+/.exec(t.email.sent.at(-1)?.text ?? "")?.[0] ?? "";
-  const open = async () =>
-    new URL((await t.app.request(link.replace(ORIGIN, ""))).headers.get("location") ?? "", ORIGIN);
-
-  const landed = await open();
-  expect(landed.pathname).toBe("/reset-password");
-  const token = landed.searchParams.get("token") ?? "";
+  // No redirect through /api/auth: the same address opens the phone app when it is installed (app-links.ts).
+  const link = new URL(/https?:\/\/\S+\/reset-password\S*/.exec(t.email.sent.at(-1)?.text ?? "")?.[0] ?? "", ORIGIN);
+  expect(`${link.origin}${link.pathname}`).toBe(`${ORIGIN}/reset-password`);
+  const token = link.searchParams.get("token") ?? "";
   expect(token).not.toBe("");
   const reset = await anon("/api/auth/reset-password", { json: { token, newPassword: "a brand new password" } });
   expect(reset.status).toBe(200);
@@ -67,7 +64,8 @@ test("password reset: the email's link lands on the web's /reset-password with a
   });
   expect(signIn.status).toBe(200);
 
-  // A used (or expired) link comes back with the error the page shows.
-  const used = await open();
-  expect([used.pathname, used.searchParams.get("error")]).toEqual(["/reset-password", "INVALID_TOKEN"]);
+  // A used (or expired) token gets the 400 the page shows as an expired link.
+  const again = await anon("/api/auth/reset-password", { json: { token, newPassword: "another new password" } });
+  expect(again.status).toBe(400);
+  expect(await again.json()).toMatchObject({ code: "INVALID_TOKEN" });
 });

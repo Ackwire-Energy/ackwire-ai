@@ -167,7 +167,7 @@ function keepSelection(ranges: Range[]) {
     highlights?.delete(KEPT_SELECTION);
     // A click elsewhere that closed the menu sets its own selection right after: only an emptied one comes back.
     const now = window.getSelection();
-    if (!now || !now.isCollapsed) return;
+    if (!now?.isCollapsed) return;
     now.removeAllRanges();
     for (const range of ranges) now.addRange(range);
   };

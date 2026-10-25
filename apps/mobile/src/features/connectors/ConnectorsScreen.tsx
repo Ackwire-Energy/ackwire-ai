@@ -47,15 +47,13 @@ function Gallery() {
   const list = catalog.data?.connectors ?? [];
   const conns = connections.data ?? [];
   const name = (d: ConnectorDef) => connectorName(t, d);
-  const shown = (d: ConnectorDef) => `${name(d)} ${connectorDescription(t, d)}`;
   const connected = useMemo(() => list.filter((d) => connectionOf(d, conns)), [list, conns]);
   const suggestions = useMemo(() => suggestionsOf(list, conns), [list, conns]);
   const searching = q.trim().length > 0;
   const rest = useMemo(() => {
     const pool = searching ? list : list.filter((d) => !suggestions.includes(d));
     const inCat = cat === "all" ? pool : pool.filter((d) => d.category === cat);
-    return searchConnectors(inCat, q, shown);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `shown` reads the language through `t`
+    return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
   const open = (def: ConnectorDef) => sheet.open(<ConnectSheet def={def} />);
@@ -232,13 +230,7 @@ function Suggestion({
       style={({ pressed }) => [styles.card, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
     >
       <View style={styles.band}>
-        <Dither
-          kind="sky"
-          tones={brandTones(c.bg, brand)}
-          pixel={3}
-          animated={false}
-          style={StyleSheet.absoluteFill}
-        />
+        <Dither kind="sky" tones={brandTones(c.bg, brand)} pixel={3} animated={false} style={StyleSheet.absoluteFill} />
         <ConnectorIcon def={def} label={name} size={44} />
       </View>
       <View style={styles.cardText}>
