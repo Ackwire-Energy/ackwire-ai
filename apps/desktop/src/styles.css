@@ -943,11 +943,6 @@ body[data-window="popover"] {
   height: 100%;
   display: block;
 }
-@media (prefers-reduced-motion: reduce) {
-  .dk-fr__body {
-    animation: none;
-  }
-}
 
 /* A sign-in code (Preferences > Tools, "Add account"): big, in Doto. */
 .dk-code {
