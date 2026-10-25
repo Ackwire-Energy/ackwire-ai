@@ -54,39 +54,39 @@
 
 /* The dialog: up to 96vw × 94vh. */
 .ac-dialog.cmp-dialog {
-  /* Around the page (a computer without screens): the head, the site line, the stage's padding, the tools. */
-  --cmp-page-room: 240px;
   width: min(96vw, 1280px);
   max-height: 94vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
   max-height: 94dvh;
 }
 /*
- * With the agent's screen, or a cover where it goes, the dialog wraps the screen: as large as 96vw × 94vh allow
- * and no larger than the screen itself (1280×900), keeping its shape. Around it: the head (70 px), the sky strip
- * (6) and the body's padding (8 + 16). The wait for the workspace's computer is as wide, so the screen that
- * follows it opens in place.
+ * One frame for whatever takes the screen's place (the screen, a cover, the agent's page), so the dialog keeps
+ * its size from one to the next: as large as 96vw × 94vh allow and no larger than the screen itself (1280×900),
+ * keeping its shape. Around the screen: the head (70 px), the sky strip (6), the body's padding (8 + 16) and the
+ * line of the run's steps (22 + 8). The wait for the workspace's computer is as wide, so the screen that follows
+ * it opens in place.
  */
-.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep)) {
+.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
   --cmp-side: 0px;
-  --cmp-screen: min(96vw - 32px - var(--cmp-side), 1280px, (94dvh - 100px) * 1280 / 900);
+  --cmp-screen: min(96vw - 32px - var(--cmp-side), 1280px, (94dvh - 130px) * 1280 / 900);
   width: calc(var(--cmp-screen) + 32px + var(--cmp-side));
 }
-.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage)) {
-  height: calc(var(--cmp-screen) * 900 / 1280 + 100px);
+.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface)) {
+  height: calc(var(--cmp-screen) * 900 / 1280 + 130px);
 }
-/* In control the tools go under the screen (the paste field and the keyboard, 112 px): the dialog grows by them. */
-.ac-dialog.cmp-dialog:where(:has(.dsk.is-control)) {
-  height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px));
+/* The steps' line stays while there are none: the screen never changes size as the agent starts or stops. */
+.cmp-steps-row {
+  flex: none;
+  height: 22px;
 }
 /*
- * A wide window: in control the tools take a column beside the screen and the dialog grows by that column, so
- * taking control never makes the screen smaller.
+ * In control, where the window is wide enough for it to leave the screen larger than tools under it would, the
+ * tools take a column beside the screen and the dialog grows by that column. The screen keeps its size wherever
+ * the column fits beside it (from about 1.5 times as wide as tall, most laptop and desktop windows).
  */
-@media (min-width: 1080px) and (min-aspect-ratio: 4 / 3) {
+@media (min-width: 1080px) and (min-aspect-ratio: 139 / 100) {
   .ac-dialog.cmp-dialog:where(:has(.dsk.is-control)) {
     --cmp-side: 252px;
-    height: calc(var(--cmp-screen) * 900 / 1280 + 100px);
   }
   .cmp-body > .dsk.is-control {
     display: grid;
@@ -113,6 +113,18 @@
   .dsk.is-control > .dsk-foot .brw-ac__row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+/*
+ * Elsewhere they go under the screen (the paste field and the keyboard, 112 px) in place of the steps' line, as
+ * nobody's steps show while a person is in control, and the dialog grows by them while there is room.
+ */
+@media not all and (min-width: 1080px) and (min-aspect-ratio: 139 / 100) {
+  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control)) {
+    height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px));
+  }
+  .cmp-body:has(> .dsk.is-control) > .cmp-steps-row {
+    display: none;
   }
 }
 .ac-dialog.cmp-dialog.is-full {
@@ -186,10 +198,33 @@
 .cmp-body > .cmp-stage > .brw-dim {
   border-radius: 10px;
 }
+/*
+ * The agent's page takes the same frame: its stage gets what the site's line and the tools leave, and the page
+ * the most of that it can at 16:10, on the stage's own ground. Its tools go under it in place of the steps' line.
+ */
+.cmp-body > .brw-ac.is-surface {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cmp-body > .brw-ac.is-surface > .brw-ac__body {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.cmp-body > .brw-ac.is-surface .brw-ac__stage {
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
 .cmp-body .brw-ac__page {
-  width: min(100%, calc((94dvh - var(--cmp-page-room)) * 16 / 10));
+  width: min(100cqw, 100cqh * 16 / 10);
   max-height: none;
-  margin: 0 auto;
+  margin: 0;
+}
+.cmp-body:has(> .brw-ac.is-control) > .cmp-steps-row {
+  display: none;
 }
 .cmp-stage__box {
   border-radius: 10px;
@@ -261,16 +296,26 @@
   font-weight: 600;
 }
 
-/* The run's last steps under the stage, only while the agent works. */
+/* The run's last steps under the stage, only while the agent works: one line, the older ones shortened first. */
 .cmp-steps {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 8px;
   margin: 0;
   padding: 0;
+  overflow: hidden;
   list-style: none;
   color: var(--muted);
   font-size: 13px;
+}
+.cmp-steps li {
+  flex: 0 4 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cmp-steps li:last-child {
+  flex-shrink: 1;
 }
 .cmp-steps li + li::before {
   content: "›";
@@ -298,7 +343,6 @@
 /* Web on a phone: a full-screen sheet, the screen as wide as it and what goes under the screen right below. */
 @media (max-width: 720px) {
   .ac-dialog.cmp-dialog {
-    --cmp-page-room: 220px;
     top: 0;
     left: 0;
     transform: none;
@@ -312,13 +356,29 @@
   }
   .cmp-body > .dsk,
   .cmp-body .dsk-stage,
-  .cmp-body > .cmp-stage {
+  .cmp-body > .cmp-stage,
+  .cmp-body > .brw-ac.is-surface,
+  .cmp-body > .brw-ac.is-surface > .brw-ac__body,
+  .cmp-body > .brw-ac.is-surface .brw-ac__stage {
     flex: none;
     container-type: normal;
   }
   .cmp-body .dsk-screen,
-  .cmp-body .cmp-stage__box {
+  .cmp-body .cmp-stage__box,
+  .cmp-body .brw-ac__page {
     width: 100%;
+  }
+  /* No frame to keep on the sheet: the steps wrap whole. */
+  .cmp-steps-row {
+    height: auto;
+    min-height: 22px;
+  }
+  .cmp-steps {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+  .cmp-steps li {
+    white-space: normal;
   }
 }
 

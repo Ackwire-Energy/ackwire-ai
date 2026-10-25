@@ -523,18 +523,33 @@ describe("the dialog's size (computer.css)", () => {
     expect(full).toContain("height: 100%");
   });
 
-  test("the dialog wraps the screen, and in control on a wide window grows by the tools' column beside it", async () => {
+  test("one frame for the screen, its covers and the agent's page, its steps' line kept while there are none", async () => {
     const text = await css();
     // The wait for the workspace's computer is as wide, so its screen opens in place.
-    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep))")).toContain(
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
       "width: calc(var(--cmp-screen) + 32px + var(--cmp-side))",
     );
-    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage))")).toContain(
-      "height: calc(var(--cmp-screen) * 900 / 1280 + 100px)",
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
+      "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
     );
-    const wide = text.split("@media (min-width: 1080px) and (min-aspect-ratio: 4 / 3) {")[1] ?? "";
+    expect(rule(text, ".cmp-steps-row")).toContain("height: 22px");
+    // The page at 16:10 takes the most of its stage in the same frame, never a size of its own.
+    expect(rule(text, ".cmp-body .brw-ac__page")).toContain("width: min(100cqw, 100cqh * 16 / 10)");
+    expect(text).not.toContain("--cmp-page-room");
+  });
+
+  test("in control the tools take a column beside the screen only where it leaves the screen larger", async () => {
+    const text = await css();
+    const query = "(min-width: 1080px) and (min-aspect-ratio: 139 / 100)";
+    const wide = text.split(`@media ${query} {`)[1] ?? "";
     expect(rule(wide, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain("--cmp-side: 252px");
     expect(wide).toMatch(/grid-template-columns: minmax\(0, 1fr\) 240px/);
     expect(wide).toMatch(/\.dsk\.is-control > \.brw-ac__foot \{[^}]*grid-area: tools/);
+    // Elsewhere under it, where the steps' line was, and the dialog grows by them while there is room.
+    const narrow = text.split(`@media not all and ${query} {`)[1] ?? "";
+    expect(rule(narrow, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain(
+      "height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px))",
+    );
+    expect(rule(narrow, "  .cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
   });
 });

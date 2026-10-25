@@ -175,6 +175,8 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+    // The wait isn't the screen's frame: no line for steps under it.
+    expect(box().querySelector(".cmp-steps-row")).toBeNull();
   });
 
   test("ready: it flashes Pronto, then opens with nothing to click", async () => {
@@ -290,10 +292,19 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).toContain("Tente de novo daqui a pouco.");
     expect(document.querySelector(".machine-command__code")).toBeNull();
     expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+    // A cover takes the screen's frame, its steps' line included: the screen that follows opens in place.
+    expect(box().querySelector(".cmp-body > .cmp-steps-row")).toBeTruthy();
   });
 });
 
 describe("the computer dialog, live", () => {
+  test("the steps' line stays under the screen, empty while the agent doesn't work: a run never resizes it", async () => {
+    await dialog();
+    const row = box().querySelector(".cmp-body > .cmp-steps-row");
+    expect(row?.textContent).toBe("");
+    expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
+  });
+
   test("held with a ready computer: watching, under the pause's banner, with no take control", async () => {
     await dialog({ desktop: { ...RUNNING, held: true } });
     expect(box().querySelector(".cmp-banner")?.textContent).toContain("A Ada está em pausa por enquanto");
