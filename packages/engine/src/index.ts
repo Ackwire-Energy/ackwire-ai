@@ -107,6 +107,7 @@ export * from "./machines";
 export * from "./mail/accounts";
 export * from "./mail/inbound";
 export * from "./mail/policies";
+export * from "./mail/preview";
 export * from "./mail/text";
 export * from "./mail/tools";
 export * from "./mail/watches";
