@@ -393,7 +393,14 @@ function UsageStatisticsCard() {
         icon="chart"
         title={t("settings.telemetry.title")}
         action={
-          <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setOpen(true);
+              void telemetry.refetch();
+            }}
+          >
             {t("settings.telemetry.see")}
           </Button>
         }

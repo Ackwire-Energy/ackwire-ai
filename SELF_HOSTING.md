@@ -525,7 +525,8 @@ about 2.5 hours, then dropped: the next day's report replaces it. These are all 
 | `lastDay.models` | For each AI provider and model used in the last 24 hours (the 50 most used): `provider`, `model`, `calls`, `inputTokens` (cached ones included) and `outputTokens`. A model name that isn't a model id goes as `other`. |
 
 It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
-workspaces, people or computers. `docker compose run --rm agentes telemetry` prints exactly the next
+workspaces, people or computers (the request itself comes from your server's address, as any request
+does). `docker compose run --rm agentes telemetry` prints exactly the next
 report, whether it is on or off, and sends nothing; in the app, **Settings → General → Usage
 statistics → See what is sent** shows the same. Turn it off either way:
 
