@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema, sql } from "@agenteschat/db";
-import { onUserCreated, recordSignUp, safeEqual, sha256 } from "@agenteschat/engine";
+import { installOwner, onUserCreated, recordSignUp, safeEqual, sha256 } from "@agenteschat/engine";
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint, formCsrfMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
@@ -122,12 +122,7 @@ export function ownerSignIn(deps: OwnerSignInDeps) {
           if (!matches(ctx.body.key, config.OWNER_KEY_SHA256)) {
             throw new APIError("UNAUTHORIZED", { message: "This isn't this server's owner key" });
           }
-          const [first] = await db
-            .select({ id: schema.users.id })
-            .from(schema.users)
-            .orderBy(schema.users.createdAt)
-            .limit(1);
-          let ownerId = first?.id;
+          let ownerId = await installOwner(db);
           if (!ownerId) {
             const { name, email } = ctx.body;
             if (!name || !email)
@@ -139,12 +134,7 @@ export function ownerSignIn(deps: OwnerSignInDeps) {
             } catch (error) {
               if (!(error instanceof OwnerExists)) throw error;
               // Made by a request just before this one: sign in that owner.
-              const [made] = await db
-                .select({ id: schema.users.id })
-                .from(schema.users)
-                .orderBy(schema.users.createdAt)
-                .limit(1);
-              ownerId = made?.id;
+              ownerId = await installOwner(db);
             }
           }
           if (!ownerId) throw new APIError("INTERNAL_SERVER_ERROR", { message: "No owner account" });

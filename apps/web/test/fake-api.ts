@@ -33,6 +33,7 @@ import type {
   ScopeGrant,
   SearchHit,
   SecretRequest,
+  ServerTelemetry,
   SignInOptions,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -179,6 +180,8 @@ export interface FakeState {
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
+  telemetry?: ServerTelemetry;
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
@@ -717,7 +720,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     return budget > 0 ? Math.round((spent / budget) * 1000) / 10 : 0;
   };
   return {
-    system: { health: async () => ({ status: "ok", version: "test", edition: "cloud" }) },
+    system: {
+      health: async () => ({ status: "ok", version: "test", edition: "cloud" }),
+      telemetry: async () => state.telemetry ?? null,
+      setTelemetry: async (enabled) => {
+        log("system.setTelemetry", enabled);
+        if (!state.telemetry) throw new ApiError(404, "not_found", "Not found");
+        state.telemetry = { ...state.telemetry, enabled };
+        return state.telemetry;
+      },
+    },
     waitlist: {
       join: async (input) => {
         log("waitlist.join", input);

@@ -195,6 +195,12 @@ export async function countUsers(db: Database): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** The installation's first account: the person who set it up. */
+export async function installOwner(db: Database): Promise<string | null> {
+  const [first] = await db.select({ id: users.id }).from(users).orderBy(asc(users.createdAt), asc(users.id)).limit(1);
+  return first?.id ?? null;
+}
+
 /** Who may create an account (ADR 0006): see `isSignupAllowed`. */
 export interface SignupPolicy {
   /** `ALLOW_SIGNUP`: anyone. */

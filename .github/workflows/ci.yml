@@ -285,7 +285,8 @@ jobs:
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
   # probe, the first sign-up (the installation's owner), an organization, a second sign-up refused
   # (sign-up is closed by default), the web app, the runner download and install.sh at /install,
-  # then an upgrade's steps on the same volumes, and the backup profile: a dump and its restore.
+  # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
+  # and the backup profile: a dump and its restore.
   # amd64 only, nothing pushed.
   # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
   # would crowd main's out of the repository's cache quota.
@@ -353,6 +354,8 @@ jobs:
           docker compose up -d
           healthy
           curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
+          docker compose run --rm -T agentes telemetry > report.json
+          jq -e '.report == 1 and .install == "docker" and .host.container and .people.total == 1' report.json
       # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
       # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
       - name: Back up and restore

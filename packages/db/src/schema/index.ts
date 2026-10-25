@@ -18,6 +18,7 @@ export * from "./sandbox";
 export * from "./skills";
 export * from "./storage";
 export * from "./team-actions";
+export * from "./telemetry";
 export * from "./tenancy";
 export * from "./waitlist";
 export * from "./wiki";
