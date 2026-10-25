@@ -17,7 +17,7 @@ import {
   VERSION_CHECK_MS,
 } from "./lib/app-version";
 import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
-import { emailConfirmedToast } from "./lib/email-confirmation";
+import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
@@ -105,12 +105,6 @@ if (connectorError) {
   toasts.show(i18n.t("connectors.errorToast", { reason: connectorError }), "error");
   window.history.replaceState(null, "", window.location.pathname);
 }
-// The confirmation email's link: wherever `/` then goes, the person hears the address is confirmed.
-const confirmed = emailConfirmedToast(window.location.search);
-if (confirmed) {
-  toasts.show(i18n.t(confirmed.key), confirmed.tone);
-  window.history.replaceState(null, "", window.location.pathname);
-}
 
 const services: AppServices = {
   api,
@@ -119,6 +113,18 @@ const services: AppServices = {
   i18n,
   toasts,
 };
+
+// The confirmation email's link: wherever `/` then goes, the person hears how it went.
+const confirmation = emailConfirmedToast(window.location.search);
+if (confirmation) {
+  window.history.replaceState(null, "", window.location.pathname);
+  void announceConfirmation(confirmation, {
+    auth: services.auth,
+    t: i18n.t,
+    show: toasts.show,
+    me: () => queryClient.fetchQuery({ ...meQuery(api), staleTime: 0 }),
+  });
+}
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");

@@ -72,22 +72,18 @@ export const SOURCE_NAME: Record<ImportSource, string> = {
   openbot: "OpenBot",
   agenteschat: "agentes.chat",
 };
-/** The source's own mark (apps/web/public/brands/README.md); "" where we ship none. */
-export const SOURCE_ICON: Record<ImportSource, string> = {
-  openclaw: "",
-  hermes: "",
-  openbotrun: "",
-  paperclip: "",
-  openmausbot: "/brands/openmausbot.png",
-  openbot: "/brands/openbot.png",
-  agenteschat: "/favicon.svg",
-};
-/** The letters on the tile of each source we ship no mark for, so no two tiles look alike. */
-export const SOURCE_MONOGRAM: Partial<Record<ImportSource, string>> = {
-  openclaw: "OC",
-  hermes: "H",
-  openbotrun: "OR",
-  paperclip: "P",
+/**
+ * Each source's tile: its own mark (apps/web/public/brands/README.md), or letters where we ship none, so no two
+ * tiles look alike.
+ */
+export const SOURCE_MARK: Record<ImportSource, { icon: string } | { letters: string }> = {
+  openclaw: { letters: "OC" },
+  hermes: { letters: "H" },
+  openbotrun: { letters: "OR" },
+  paperclip: { letters: "P" },
+  openmausbot: { icon: "/brands/openmausbot.png" },
+  openbot: { icon: "/brands/openbot.png" },
+  agenteschat: { icon: "/favicon.svg" },
 };
 const ARCHIVES = ".zip,.tar.gz,.tgz,.tar,application/zip,application/gzip,application/x-tar";
 /** What the file picker offers for each source. */

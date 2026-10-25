@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Me } from "@agenteschat/client";
 import {
   dayLabel,
   formatInt,
@@ -20,7 +21,9 @@ import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
 import { createBetterAuthClient } from "@/auth/better-auth";
 import { createI18n } from "@/i18n";
-import { EMAIL_CONFIRMED_PATH, emailConfirmedToast } from "@/lib/email-confirmation";
+import { announceConfirmation, emailConfirmedToast } from "@/lib/email-confirmation";
+import type { ToastAction } from "@/lib/toast";
+import { createFakeAuth } from "./fake-auth";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;
@@ -191,7 +194,7 @@ describe("i18n", () => {
 
 describe("the confirmation email", () => {
   test("its link lands back here: confirmed, or a link that no longer works; anything else is no toast", () => {
-    expect(emailConfirmedToast(EMAIL_CONFIRMED_PATH.slice(1))).toEqual({ key: "auth.emailConfirmed", tone: "info" });
+    expect(emailConfirmedToast("?email_confirmed=1")).toEqual({ key: "auth.emailConfirmed", tone: "info" });
     expect(emailConfirmedToast("?email_confirmed=1&error=TOKEN_EXPIRED")).toEqual({
       key: "auth.emailLinkExpired",
       tone: "error",
@@ -200,7 +203,48 @@ describe("the confirmation email", () => {
     expect(emailConfirmedToast("")).toBeNull();
   });
 
-  test("the auth client says the app's language on every request; a sign-up's link comes back to that page", async () => {
+  test("a link that no longer works offers a new one to whoever is signed in here with the address unconfirmed", async () => {
+    const shown: { text: string; tone?: string; action?: ToastAction | ToastAction[] }[] = [];
+    const show = (text: string, tone?: "info" | "error", action?: ToastAction | ToastAction[]) => {
+      shown.push({ text, tone, action });
+    };
+    const { auth, calls } = createFakeAuth();
+    const signedIn = (emailVerified: boolean | null) => async () =>
+      emailVerified === null ? null : ({ user: { email: "bia@example.com", emailVerified } } as Me);
+    const expired = { key: "auth.emailLinkExpired", tone: "error" } as const;
+
+    await announceConfirmation(expired, { auth, t, show, me: signedIn(false) });
+    expect(shown).toMatchObject([
+      { text: "Este link de confirmação não vale mais. Sua conta funciona normalmente.", tone: "error" },
+    ]);
+    const action = shown[0]?.action as ToastAction;
+    expect(action.label).toBe("Mandar outro link");
+    action.run();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["bia@example.com"] }]);
+    expect(shown[1]).toMatchObject({ text: "Mandamos outro link para bia@example.com." });
+
+    // Signed out, or confirmed meanwhile: nothing to send. A link that worked only says so.
+    shown.length = 0;
+    await announceConfirmation(expired, { auth, t, show, me: signedIn(null) });
+    await announceConfirmation(expired, { auth, t, show, me: signedIn(true) });
+    await announceConfirmation({ key: "auth.emailConfirmed", tone: "info" }, { auth, t, show, me: signedIn(false) });
+    expect(shown).toEqual([
+      {
+        text: "Este link de confirmação não vale mais. Sua conta funciona normalmente.",
+        tone: "error",
+        action: undefined,
+      },
+      {
+        text: "Este link de confirmação não vale mais. Sua conta funciona normalmente.",
+        tone: "error",
+        action: undefined,
+      },
+      { text: "E-mail confirmado.", tone: "info", action: undefined },
+    ]);
+  });
+
+  test("the auth client says the app's language on every request; the server picks where a link lands", async () => {
     const sent: { path: string; language: string | null; body: Record<string, unknown> | null }[] = [];
     const real = globalThis.fetch;
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -217,10 +261,16 @@ describe("the confirmation email", () => {
       await auth.signUp({ name: "Bia", email: "bia@example.com", password: "senha-longa" });
       language = "pt-BR";
       await auth.requestPasswordReset({ email: "bia@example.com", redirectTo: "/reset-password" });
+      expect(await auth.sendVerificationEmail("bia@example.com")).toEqual({ ok: true });
       const signUp = sent.find((r) => r.path === "/api/auth/sign-up/email");
       expect(signUp?.language).toBe("en");
-      expect(signUp?.body).toMatchObject({ callbackURL: EMAIL_CONFIRMED_PATH });
+      expect(signUp?.body).not.toHaveProperty("callbackURL");
       expect(sent.find((r) => r.path === "/api/auth/request-password-reset")?.language).toBe("pt-BR");
+      expect(sent.find((r) => r.path === "/api/auth/send-verification-email")).toEqual({
+        path: "/api/auth/send-verification-email",
+        language: "pt-BR",
+        body: { email: "bia@example.com" },
+      });
     } finally {
       globalThis.fetch = real;
     }

@@ -48,8 +48,7 @@ import {
   type PickedFile,
   parseImport,
   readImportFiles,
-  SOURCE_ICON,
-  SOURCE_MONOGRAM,
+  SOURCE_MARK,
   SOURCE_NAME,
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
@@ -344,10 +343,10 @@ function SourceMark({ card }: { card: ImportCard }) {
       </span>
     );
   }
-  const icon = SOURCE_ICON[card];
+  const mark = SOURCE_MARK[card];
   return (
     <span className="imp-mark" aria-hidden="true">
-      {icon ? <img src={icon} alt="" className="imp-mark__img" /> : SOURCE_MONOGRAM[card]}
+      {"icon" in mark ? <img src={mark.icon} alt="" className="imp-mark__img" /> : mark.letters}
     </span>
   );
 }

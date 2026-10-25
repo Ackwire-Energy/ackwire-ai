@@ -34,6 +34,8 @@ export interface AuthConfig {
   privacyUrl?: string | null;
   /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
   supportEmail?: string | null;
+  /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
+  workspaceComputer?: boolean;
 }
 
 export type SignInProvider = "google" | "github" | "apple";

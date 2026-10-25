@@ -11,7 +11,10 @@ import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
 
 const type = (label: string, value: string) =>
   act(async () => fireEvent.change(screen().getByLabelText(label), { target: { value } }));
@@ -277,6 +280,8 @@ describe("Onboarding", () => {
   const start = async () => {
     const state = seedState();
     if (state.me) state.me.organizations = [];
+    // A server where people connect their own computers says so before any workspace exists.
+    state.authConfig = { workspaceComputer: false };
     const api = createFakeApi(state);
     const r = await renderApp("/onboarding", { api });
     return { ...r, api, state };
@@ -308,15 +313,14 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     // The host introduces itself the first time it asks.
     expect(document.body.textContent).toContain("Oi, eu sou a Ada. Vou montar tudo com você.");
-    // Whether the computer is a choice is the workspace's to say: no edition's word before it exists.
+    // People connect their own computer here: a choice from the first step on.
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("opcional");
-    expect(railStep(/^Computador/).textContent).not.toContain("opcional");
+    expect(railStep(/^Computador/).textContent).toContain("opcional");
     // A name is no misspelling.
     expect(screen().getByLabelText("Nome").getAttribute("spellcheck")).toBe("false");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await type("Nome", "Acme Saúde");
     await next();
-    // Here people connect their own computer: a choice.
     expect(railStep(/^Computador/).textContent).toContain("opcional");
     // The workspace exists after step 1 (so the logo can be sent); the time zone goes to its settings.
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Acme Saúde" });
@@ -460,6 +464,17 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
   });
 
+  test("the key step's plan line goes to the computer step, where the plan signs in", async () => {
+    const { state } = await start();
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await next();
+    await click(button("Ou entre com o seu plano do Claude ou do ChatGPT no computador: sem chave."), 6);
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(button(/Outro computador/)).toBeTruthy();
+  });
+
   test("this server's own computer comes first and already picked; the agents go to it", async () => {
     const { state, api } = await start();
     const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
@@ -563,6 +578,8 @@ describe("Onboarding", () => {
   });
 
   test("optional steps can be skipped: no computer, no invites", async () => {
+    // This tab's sign-up was emailed a link: done setting up, a later onboarding says nothing of it.
+    sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");
     const { state } = await start();
     await throughAgents(state);
     expect(calls(state, "machines.createPairing")).toHaveLength(0);
@@ -589,6 +606,9 @@ describe("Onboarding", () => {
     expect(railStep(/^Time/).textContent).not.toContain("opcional");
     await skip();
     expect(progress()).toBe("Tudo certo");
+    expect(sessionStorage.getItem("agentes.confirmation.sent")).toBe("walter@acme.com.br");
+    await click(button("Abrir o #general"), 8);
+    expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
   });
 
   test('import: Theo\'s "pular" is the way out, and no two apps share a tile', async () => {
@@ -609,7 +629,7 @@ describe("Onboarding", () => {
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");
   });
 
-  test("the confirmation email: the first step says where it went, then that it's confirmed", async () => {
+  test("the confirmation email: where it went and for how long, a new link, then that it's confirmed", async () => {
     const state = seedState();
     if (!state.me) throw new Error("no me");
     state.me.organizations = [];
@@ -617,20 +637,30 @@ describe("Onboarding", () => {
     // This tab signed up with this address.
     sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");
     try {
-      await renderApp("/onboarding", { api: createFakeApi(state) });
+      const { auth, calls } = createFakeAuth();
+      await renderApp("/onboarding", { api: createFakeApi(state), auth });
       await settle(4);
       const note = () => document.querySelector(".onb__note")?.textContent;
-      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br. Abra quando quiser.");
+      expect(note()).toBe(
+        "Mandamos um link de confirmação para walter@acme.com.br. Ele vale por uma hora.Mandar outro link",
+      );
       // Nothing waits for it.
       expect(button("Continuar").hasAttribute("disabled")).toBe(true);
       await type("Nome", "Acme");
       expect(button("Continuar").hasAttribute("disabled")).toBe(false);
 
-      // The link opened in another tab: back here, the line says so.
+      // Didn't get it, or it ran out: a new one, once.
+      await click(button("Mandar outro link"), 4);
+      expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["walter@acme.com.br"] }]);
+      expect(document.body.textContent).toContain("Mandamos outro link para walter@acme.com.br.");
+      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br. Ele vale por uma hora.");
+
+      // The link opened in another tab: back here, the line says so, and this tab forgets it was sent.
       state.me = { ...state.me, user: { ...state.me.user, emailVerified: true } };
       await act(async () => window.dispatchEvent(new Event("visibilitychange")));
       await settle(6);
       expect(note()).toBe("E-mail confirmado: walter@acme.com.br.");
+      expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
     } finally {
       sessionStorage.clear();
     }

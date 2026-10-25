@@ -76,34 +76,58 @@ test("the sign-up's own language: the confirmation email and the account follow 
   const localeOf = async (email: string) =>
     (await t.db.select({ locale: schema.users.locale }).from(schema.users).where(eq(schema.users.email, email)))[0]
       ?.locale;
-  const signUpIn = async (email: string, acceptLanguage: string) => {
+  // Neither the web app nor the phone app names a page for the link: the server picks it.
+  const signUpIn = async (email: string, acceptLanguage: string, callbackURL?: string) => {
     const b = browser(t);
     const res = await b("/api/auth/sign-up/email", {
-      json: { email, password: "correct horse battery", name: "Bia", callbackURL: "/?email_confirmed=1" },
+      json: { email, password: "correct horse battery", name: "Bia", ...(callbackURL ? { callbackURL } : {}) },
       headers: { "accept-language": acceptLanguage },
     });
     expect(res.status).toBe(200);
     await t.drain();
     return b;
   };
+  const linkTo = (email: string) => {
+    const text = t.email.sent.filter((m) => m.to[0] === email).at(-1)?.text ?? "";
+    return new URL(/https?:\/\/\S+\/api\/auth\/verify-email\S*/.exec(text)?.[0] ?? "", ORIGIN);
+  };
 
   // The web app says its own language; a browser's list counts its most preferred language of ours.
   const bia = await signUpIn("bia@example.com", "en");
   expect(t.email.sent.at(-1)).toMatchObject({ to: ["bia@example.com"], subject: "Confirm your email on agentes" });
   expect(await localeOf("bia@example.com")).toBe("en");
-  await signUpIn("ana@example.com", "de-DE,pt-PT;q=0.9,en;q=0.8");
+  const ana = await signUpIn("ana@example.com", "de-DE,pt-PT;q=0.9,en;q=0.8");
   expect(t.email.sent.at(-1)).toMatchObject({ to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes" });
   expect(await localeOf("ana@example.com")).toBe("pt-BR");
 
-  // Not confirmed until its link is opened; the link lands where the app says so.
+  // The link works for the hour the onboarding promises.
+  const [, payload = ""] = (linkTo("bia@example.com").searchParams.get("token") ?? "").split(".");
+  const claims = JSON.parse(Buffer.from(payload, "base64url").toString()) as { iat: number; exp: number };
+  expect(claims.exp - claims.iat).toBe(60 * 60);
+
+  // Not confirmed until its link is opened; the link lands where the web app says how it went.
   const me = async () => ((await (await bia("/api/app/me")).json()) as { user: { emailVerified: boolean } }).user;
   expect((await me()).emailVerified).toBe(false);
-  const text = t.email.sent.find((m) => m.to[0] === "bia@example.com")?.text ?? "";
-  const link = new URL(/https?:\/\/\S+\/api\/auth\/verify-email\S*/.exec(text)?.[0] ?? "", ORIGIN);
+  const link = linkTo("bia@example.com");
   const opened = await browser(t)(`${link.pathname}${link.search}`);
   expect(opened.status).toBe(302);
   expect(opened.headers.get("location")).toBe("/?email_confirmed=1");
   expect((await me()).emailVerified).toBe(true);
+
+  // A new link, asked for while signed in: in the account's language, landing in the same place. (A link is
+  // stamped to the second: asked for within the sign-up's second, it would be the same link.)
+  await Bun.sleep(1000 - (Date.now() % 1000));
+  const sent = t.email.sent.length;
+  const again = await ana("/api/auth/send-verification-email", { json: { email: "ana@example.com" } });
+  expect(again.status).toBe(200);
+  await t.drain();
+  expect(t.email.sent.slice(sent)).toMatchObject([
+    { to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes" },
+  ]);
+  expect(linkTo("ana@example.com").searchParams.get("callbackURL")).toBe("/?email_confirmed=1");
+  // A sign-up that names its own page keeps it.
+  await signUpIn("caio@example.com", "pt-BR", "/onboarding");
+  expect(linkTo("caio@example.com").searchParams.get("callbackURL")).toBe("/onboarding");
 
   // An account that never had a language (made before sign-up kept one): the reset follows the request's.
   await signUp(browser(t), "old@example.com");

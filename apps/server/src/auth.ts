@@ -144,6 +144,8 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
           emailVerification: {
             sendOnSignUp: true,
             autoSignInAfterVerification: true,
+            // The onboarding says the link works for an hour (`onboarding.confirmation.sent`).
+            expiresIn: 60 * 60,
             sendVerificationEmail: async (
               {
                 user,
@@ -161,7 +163,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
                 orgId: null,
                 key: `verify-email:${sha256(token)}`,
                 to: [user.email],
-                template: { kind: "verify_email", locale, url },
+                template: { kind: "verify_email", locale, url: confirmationLanding(url) },
               });
             },
           },
@@ -274,6 +276,18 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
 
 /** `APIError` code of a sign-up refused because the first account waits for its owner's link or key. */
 export const OWNER_CLAIM_REQUIRED = "OWNER_CLAIM_REQUIRED";
+
+/**
+ * The confirmation link, landing on `/?email_confirmed=1`, where the web app says how it went
+ * (apps/web/src/lib/email-confirmation.ts), whenever the request named no other page: the phone app's sign-up
+ * and a new link asked for later name none.
+ */
+function confirmationLanding(verifyUrl: string): string {
+  const url = new URL(verifyUrl);
+  const back = url.searchParams.get("callbackURL");
+  if (!back || back === "/") url.searchParams.set("callbackURL", "/?email_confirmed=1");
+  return url.toString();
+}
 
 /** Who may sign up here (ADR 0006; the owner's link or key, ADR 0060 §6). */
 export function signupPolicy(config: Config): SignupPolicy {

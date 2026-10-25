@@ -431,8 +431,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
   const toComputerStep = async (setup: Partial<ComputerSetup>) => {
     const state = seedState();
     if (state.me) state.me.organizations = [];
+    // The server says every workspace gets its own: never "opcional", from the first step on.
+    state.authConfig = { workspaceComputer: true };
     const r = await open("/onboarding", setup, state);
-    // Nothing says whether the computer is a choice before the workspace exists.
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).not.toContain("opcional");
     for (const [label, value] of [
@@ -478,13 +479,15 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
 
-    // The key step offers the plan on it now, not "once it's ready".
+    // The key step: the plan signs in on it once the agents exist, so the way there is "Conectar depois". No
+    // link back to the computer step, which has nothing to sign in to.
     await click(screen().getByRole("button", { name: "Continuar" }));
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(document.body.textContent).toContain(
-      "Ou entre com o seu plano do Claude ou do ChatGPT no Computador da Acme Saúde: sem chave.",
+      "Sem chave? Conecte depois e entre com o seu plano no Computador da Acme Saúde.",
     );
+    expect(screen().queryByRole("button", { name: /seu plano/ })).toBeNull();
     await click(screen().getByRole("button", { name: "Conectar depois" }));
     await settle(6);
     await click(screen().getByRole("button", { name: "Pular esta etapa" }));
@@ -509,7 +512,39 @@ describe("the onboarding where the workspace gets its own computer", () => {
       return typeof interval === "function" && query ? interval(query) : interval;
     };
     expect(every()).toBe(5000);
+    // The key step says when the plan can sign in on it, and follows it.
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    const line = "Sem chave? Conecte depois e entre com o seu plano";
+    expect(document.body.textContent).toContain(`${line} quando o Computador da Acme Saúde ficar pronto.`);
     await r.reported({ state: "ready", machineId: "m-1", specs: SPECS });
     expect(every()).toBe(false);
+    expect(document.body.textContent).toContain(`${line} no Computador da Acme Saúde.`);
+  });
+
+  test("a step's column stays where it opened as its content changes; a resize or the next step places it", async () => {
+    // Where the column sits, centered, as the browser lays it out.
+    let top = 120;
+    const real = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      return this.classList.contains("onb__body") ? ({ top, y: top } as DOMRect) : real.call(this);
+    };
+    try {
+      const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 330, specs: SPECS });
+      const column = () => document.querySelector(".onb__body") as HTMLElement;
+      expect(column().style.marginTop).toBe("120px");
+      // The computer's progress grows and shrinks it (centered, it would move): the question and Back stay put.
+      top = 60;
+      await r.reported({ state: "preparing", step: "connecting", secondsLeft: 6, specs: SPECS });
+      await r.reported({ state: "ready", machineId: "m-1", specs: SPECS });
+      expect(column().style.marginTop).toBe("120px");
+      await act(async () => window.dispatchEvent(new Event("resize")));
+      expect(column().style.marginTop).toBe("60px");
+      top = 80;
+      await click(screen().getByRole("button", { name: "Continuar" }));
+      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+      expect(column().style.marginTop).toBe("80px");
+    } finally {
+      Element.prototype.getBoundingClientRect = real;
+    }
   });
 });

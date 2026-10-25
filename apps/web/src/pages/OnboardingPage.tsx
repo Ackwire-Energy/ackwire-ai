@@ -2,6 +2,7 @@ import type { Machine, Model, Role } from "@agenteschat/client";
 import {
   keys,
   meQuery,
+  useAuthConfig,
   useComputerSetup,
   useConfirmDevice,
   useMachines,
@@ -68,6 +69,7 @@ import {
 } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { PlanTermsDialog } from "@/components/AgentBrain";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
@@ -82,6 +84,7 @@ import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
 import { thisMac } from "@/lib/desktop";
+import { sendNewLink } from "@/lib/email-confirmation";
 import { importedModel } from "@/lib/import";
 import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
@@ -172,6 +175,7 @@ function useGuideMood() {
 export function OnboardingPage() {
   const { t, i18n } = useTranslation();
   const api = useApi();
+  const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
@@ -452,17 +456,19 @@ export function OnboardingPage() {
     (data) => computerPoll || (setupPending(setupView(data)) ? COMPUTER_POLL_MS : false),
   );
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
-  // Unknown until the workspace exists (its computer setup says): never one edition's words before.
-  const edition = computerEdition(setup.data);
+  // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
+  const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
   const email = me.data?.user.email ?? "";
-  // This tab's sign-up was emailed a link to confirm the address: the first step says where it went.
-  const confirmation =
-    email !== "" && sessionStore.get(STORAGE_KEYS.confirmationSent) === email
-      ? me.data?.user.emailVerified
-        ? "confirmed"
-        : "sent"
-      : null;
+  // The address this tab's sign-up was emailed a link to confirm: the first step says where it went. Read once and
+  // forgotten once confirmed or set up, so a later onboarding (another workspace) says nothing of it.
+  const [sentTo] = useState(() => sessionStore.get(STORAGE_KEYS.confirmationSent));
+  const verified = me.data?.user.emailVerified === true;
+  const confirmation = email !== "" && sentTo === email ? (verified ? "confirmed" : "sent") : null;
+  useEffect(() => {
+    if (verified) sessionStore.remove(STORAGE_KEYS.confirmationSent);
+  }, [verified]);
+  const resend = useMutation({ mutationFn: () => sendNewLink({ auth, t, show: toast.show }, email) });
 
   const saveComputer = useMutation({
     mutationFn: async () => {
@@ -494,6 +500,7 @@ export function OnboardingPage() {
   const finish = useMutation({
     mutationFn: async () => {
       if (!created) return;
+      sessionStore.remove(STORAGE_KEYS.confirmationSent);
       await qc.invalidateQueries({ queryKey: keys.me });
       await navigate({
         to: "/org/$orgId/c/$channelId",
@@ -1071,23 +1078,31 @@ export function OnboardingPage() {
                 </>
               )}
               <p className="onb__help">
-                {t("onboarding.suggestedAuto")}{" "}
-                <button
-                  type="button"
-                  className="onb__link"
-                  onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
-                >
-                  {t(
-                    setupPending(workspaceComputer)
-                      ? "onboarding.keyStep.useComputerCloud"
-                      : "onboarding.keyStep.useComputer",
-                    {
-                      computer: workspaceComputer
-                        ? t("computerSetup.title", { org: orgName })
-                        : (machine?.name ?? t("outage.someComputer")),
-                    },
-                  )}
-                </button>
+                {t("onboarding.suggestedAuto")}
+                {workspaceComputer ? (
+                  // The workspace's own computer has nothing to sign in to before the agents exist: a plan signs in
+                  // there after "Connect later", from where the workspace says its agents have no AI.
+                  <>
+                    <br />
+                    {t(
+                      setupPending(workspaceComputer)
+                        ? "onboarding.keyStep.planLater"
+                        : "onboarding.keyStep.planLaterReady",
+                      { computer: t("computerSetup.title", { org: orgName }) },
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="onb__link"
+                      onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
+                    >
+                      {t("onboarding.keyStep.useComputer", { computer: machine?.name ?? t("outage.someComputer") })}
+                    </button>
+                  </>
+                )}
               </p>
               <BudgetCard
                 value={budgetValue}
@@ -1170,7 +1185,22 @@ export function OnboardingPage() {
             {step.id === "workspace" && confirmation && (
               <p className="onb__help onb__note" role="status">
                 <Icon name={confirmation === "confirmed" ? "check" : "mail"} size={14} />
-                <span>{t(`onboarding.confirmation.${confirmation}`, { email })}</span>
+                <span>
+                  {t(`onboarding.confirmation.${confirmation}`, { email })}
+                  {confirmation === "sent" && !resend.data && (
+                    <>
+                      <br />
+                      <button
+                        type="button"
+                        className="onb__link"
+                        onClick={() => resend.mutate()}
+                        disabled={resend.isPending}
+                      >
+                        {t("auth.sendNewLink")}
+                      </button>
+                    </>
+                  )}
+                </span>
               </p>
             )}
           </div>

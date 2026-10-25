@@ -1,5 +1,4 @@
 import { createAuthClient } from "better-auth/client";
-import { EMAIL_CONFIRMED_PATH } from "@/lib/email-confirmation";
 import type { AuthClient, AuthResult } from "./client";
 
 const toResult = (error: { status?: number; message?: string; code?: string } | null | undefined): AuthResult =>
@@ -28,8 +27,8 @@ export function createBetterAuthClient(origin = window.location.origin, language
   });
   return {
     signIn: async ({ email, password }) => toResult((await client.signIn.email({ email, password })).error),
-    signUp: async ({ name, email, password }) =>
-      toResult((await client.signUp.email({ name, email, password, callbackURL: EMAIL_CONFIRMED_PATH })).error),
+    signUp: async ({ name, email, password }) => toResult((await client.signUp.email({ name, email, password })).error),
+    sendVerificationEmail: async (email) => toResult((await client.sendVerificationEmail({ email })).error),
     signInSocial: async (provider, callbackURL) =>
       toResult((await client.signIn.social({ provider, callbackURL, errorCallbackURL: "/login" })).error),
     requestPasswordReset: async ({ email, redirectTo }) =>

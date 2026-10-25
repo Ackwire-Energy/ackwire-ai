@@ -107,6 +107,10 @@ export function accountRoutes(deps: AppDeps) {
             supportEmail: z.string().nullable().openapi({
               description: "Where people write to whoever runs this server (SUPPORT_EMAIL): hold, suspension.",
             }),
+            workspaceComputer: z.boolean().openapi({
+              description:
+                "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",
+            }),
           }),
         ),
       },
@@ -122,6 +126,7 @@ export function accountRoutes(deps: AppDeps) {
           firstRun: users === 0 && !ownerWaits,
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
+          workspaceComputer: config.MACHINE_PROVISIONING === "external",
         },
         200,
       );
