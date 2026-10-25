@@ -192,9 +192,17 @@
 }
 .nt-say .ap-conn {
   display: inline-flex;
-  vertical-align: -6px;
+  vertical-align: -4px;
   margin-left: 6px;
   gap: 6px;
+}
+/* Inside the sentence, the logo is the text's size. */
+.nt-say .ap-conn .connector-icon,
+.nt-say .ap-conn__own {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 10.5px;
 }
 .nt-origin {
   display: inline-flex;

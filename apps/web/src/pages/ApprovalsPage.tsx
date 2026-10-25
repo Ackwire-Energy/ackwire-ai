@@ -428,6 +428,21 @@ function groups(list: Approval[]): ["today" | "yesterday" | "earlier", Approval[
 
 /** "github · acme" with the brand icon, or the app's own tool. */
 export function ConnectorLine({ approval }: { approval: Approval }) {
+  // An email goes through a mailbox, not a catalog connector ("email" has no entry): the box and its provider.
+  if (approval.email)
+    return (
+      <span className="ap-conn">
+        <span className="ap-conn__own" aria-hidden="true">
+          <Icon name="mail" size={14} />
+        </span>
+        <b>{approval.email.mailbox}</b>
+        {approval.email.provider && <span className="ap-conn__account">· {approval.email.provider}</span>}
+      </span>
+    );
+  return <CatalogConnectorLine approval={approval} />;
+}
+
+function CatalogConnectorLine({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const catalog = useCatalog();

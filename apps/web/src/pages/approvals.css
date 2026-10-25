@@ -214,6 +214,13 @@
 .ap-conn__account {
   color: var(--muted);
 }
+/* The connector's logo at the line's size (the catalog's 36px tile is for the catalog). */
+.ap-conn .connector-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  font-size: 11.5px;
+}
 .ap-conn__own {
   width: 24px;
   height: 24px;
