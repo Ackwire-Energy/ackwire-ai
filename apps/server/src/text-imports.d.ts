@@ -3,3 +3,9 @@ declare module "*.sh" {
   const text: string;
   export default text;
 }
+
+/** The compose file, served as text next to the installer. */
+declare module "*.yml" {
+  const text: string;
+  export default text;
+}

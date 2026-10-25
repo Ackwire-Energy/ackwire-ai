@@ -2,7 +2,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseOptions } from "../../../packages/setup/src/lib";
+import { HOST_SERVICE, hostLogFile, hostState, parseOptions } from "../../../packages/setup/src/lib";
+import { HostComputer } from "../runner/host";
+import { launchdPlist, SERVICE_NAME } from "../runner/service";
 import { createApp } from "../src/app";
 
 /**
@@ -99,23 +101,82 @@ const composeDownload = (asset: string) =>
   `$ curl -fsSL --proto =https --retry 3 -o <tmp>/docker-compose https://github.com/docker/compose/releases/download/v5.5.1/${asset}`;
 
 describe("GET /install", () => {
-  test("serves install.sh as a shell script, never cached, ahead of the web app", async () => {
+  const app = () => {
     const web = tempDir("web");
     writeFileSync(join(web, "index.html"), '<!doctype html><div id="root"></div>');
-    const app = createApp({
-      edition: "selfhost",
-      version: "1",
-      modules: [],
-      pingDatabase: async () => {},
-      webDir: web,
-    });
+    return createApp({ edition: "selfhost", version: "1", modules: [], pingDatabase: async () => {}, webDir: web });
+  };
+
+  test("serves install.sh as a shell script, never cached, ahead of the web app", async () => {
+    const server = app();
     for (const path of ["/install", "/install.sh"]) {
-      const res = await app.request(path);
+      const res = await server.request(path);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toStartWith("text/x-shellscript");
       expect(res.headers.get("cache-control")).toBe("no-store");
       expect(await res.text()).toBe(text);
     }
+  });
+
+  test("serves the repository's docker-compose.yml, the one the setup downloads into a folder that has none", async () => {
+    const res = await app().request("/install/docker-compose.yml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toStartWith("application/yaml");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.text()).toBe(readFileSync(join(import.meta.dir, "../../../docker-compose.yml"), "utf8"));
+  });
+});
+
+describe("the setup reads the agents' computer the way the runner writes it", () => {
+  test("its service's name, and its log on a Mac", () => {
+    expect(HOST_SERVICE).toBe(SERVICE_NAME);
+    const home = "/Users/ana/.agentes-runner";
+    const plist = launchdPlist({ runtime: "/usr/local/bin/bun", script: `${home}/agentes-runner.mjs`, home });
+    expect(plist).toContain(`<key>StandardOutPath</key>\n  <string>${hostLogFile(home)}</string>`);
+  });
+
+  test("each state of `agentes-runner host`, from the lines it logs", async () => {
+    const answers: [string, () => Promise<Response>][] = [
+      ["on", async () => Response.json({ orgs: [] })],
+      ["off", async () => new Response("{}", { status: 404 })],
+      ["refused", async () => new Response("{}", { status: 401 })],
+      [
+        "unreachable",
+        async () => {
+          throw new Error("Unable to connect");
+        },
+      ],
+    ];
+    for (const [state, answer] of answers) {
+      const lines: string[] = [];
+      const computer = new HostComputer({
+        server: "http://127.0.0.1:3000",
+        token: () => "t".repeat(64),
+        state: tempDir("host"),
+        name: "box",
+        system: false,
+        exec: false,
+        // As `agentes-runner host` writes it: a time stamp, then the line.
+        log: (line) => lines.push(`${new Date().toISOString()} ${line}`),
+        start: () => ({ exited: new Promise(() => {}), kill: () => {} }),
+        fetch: answer,
+      });
+      await computer.sync();
+      expect(hostState(lines.join("\n"))).toBe(state as ReturnType<typeof hostState>);
+    }
+    const lines: string[] = [];
+    const noToken = new HostComputer({
+      server: "http://127.0.0.1:3000",
+      token: () => null,
+      state: tempDir("host"),
+      name: "box",
+      system: false,
+      exec: false,
+      log: (line) => lines.push(`${new Date().toISOString()} ${line}`),
+      start: () => ({ exited: new Promise(() => {}), kill: () => {} }),
+    });
+    await noToken.sync();
+    expect(hostState(lines.join("\n"))).toBe("no_token");
   });
 });
 
@@ -249,6 +310,7 @@ describe("install.sh", () => {
   test("every option it hands the setup is one the setup knows", async () => {
     const runs = [
       await plan(linuxRoot, ["--yes", "--network", "local", "--email", "skip"]),
+      await plan(linuxRoot, ["--yes", "--computer", "no", "--computer-commands", "no", "--telemetry", "off"]),
       await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--json"]),
       await plan({ ...mac, docker: "28.5.1", bun: "1.4.4" }, ["--network", "local"]),
       await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--email", "skip"], { piped: text }),

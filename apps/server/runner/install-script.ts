@@ -113,9 +113,10 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * `--server URL` is where this computer reaches the server, when that isn't
  * the address the script names (the server's own machine, say, reaching it at
  * `http://127.0.0.1:3000` while people use a tailnet name). With `--system`,
- * `--host-token-file PATH` makes this the server's own computer: the service
- * runs `agentes-runner host` with the server's `HOST_COMPUTER_TOKEN` from that
- * file instead of pairing.
+ * or alone on a Mac (agents working as the person there), `--host-token-file
+ * PATH` makes this the server's own computer: the service runs `agentes-runner
+ * host` with the server's `HOST_COMPUTER_TOKEN` from that file instead of
+ * pairing, with `--no-exec` passed on.
  *
  * `--enroll-file FILE` (any mode) connects with a code issued for this
  * computer instead (`agentes-runner pair --enroll-file`, ADR 0056 §10),
@@ -172,7 +173,7 @@ usage() {
   say "  --agent-uid-range  with --system: the uids agent users get (default ${uids})"
   say "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)"
   say "  --server           where this computer reaches the server, if not at $SERVER"
-  say "  --host-token-file  with --system: this server's own computer, with HOST_COMPUTER_TOKEN from this file"
+  say "  --host-token-file  with --system (alone on a Mac): this server's own computer, with HOST_COMPUTER_TOKEN from this file"
   say "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
 }
 
@@ -333,6 +334,7 @@ install_system() {
     chmod 600 "$HOST_TOKEN_FILE"
     set -- service install --host --server "$SERVER" --token-file "$HOST_TOKEN_FILE"
     if [ "$NO_START" -eq 1 ]; then set -- "$@" --no-start; fi
+    if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
     "$LAUNCHER" "$@" || die "installing this server's computer failed"
   else
     connect
@@ -347,6 +349,10 @@ install_user() {
   LAUNCHER="$RUNNER_HOME/bin/agentes-runner"
   if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"managedBy": *"desktop"' "$RUNNER_HOME/config.json" 2>/dev/null; then
     die "this computer is connected by the agentes app; manage it there (or set AGENTES_RUNNER_HOME to another folder)"
+  fi
+  # A paired runner's launchd agent has the label this server's computer would take over.
+  if [ -n "$HOST_TOKEN_FILE" ] && [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
+    die "this Mac is already connected to agentes.chat as a computer, so it can't also be this server's own"
   fi
   mkdir -p "$RUNNER_HOME/bin" "$RUNNER_HOME/runtime"
   chmod 700 "$RUNNER_HOME"
@@ -381,6 +387,14 @@ install_user() {
   fi
 
   get_runner
+  if [ -n "$HOST_TOKEN_FILE" ]; then
+    chmod 600 "$HOST_TOKEN_FILE"
+    set -- service install --host --server "$SERVER" --token-file "$HOST_TOKEN_FILE"
+    if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
+    "$LAUNCHER" "$@" || die "installing this server's computer failed"
+    say "The agentes-runner command is $LAUNCHER (for example: $LAUNCHER status)."
+    return 0
+  fi
   connect
 
   SERVICE=0
@@ -451,13 +465,19 @@ main() {
   [ -z "$ENROLL_FILE" ] || [ "$NO_PAIR" -eq 0 ] || die "--enroll-file connects this computer, so it doesn't go with --no-pair"
   [ -z "$ENROLL_FILE" ] || [ -z "$HOST_TOKEN_FILE" ] ||
     die "--enroll-file doesn't go with --host-token-file: this server's own computer connects with its token"
+  # On a Mac this server's computer runs as the person (agents in folders of their own), so it needs no --system.
+  MAC_HOST=0
+  if [ -n "$HOST_TOKEN_FILE" ] && [ "$(uname -s)" = Darwin ]; then MAC_HOST=1; fi
   if [ "$SYSTEM" -eq 1 ]; then
     [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service; to leave it stopped, use --no-start"
     [ -z "$DIR" ] || die "--dir doesn't go with --system: each agent works in its own user's home"
     install_system
-  elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ] || [ -n "$HOST_TOKEN_FILE" ]; then
-    die "--desktop, --no-pair, --no-start, --agent-uid-range and --host-token-file go with --system"
+  elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ] ||
+    { [ -n "$HOST_TOKEN_FILE" ] && [ "$MAC_HOST" -eq 0 ]; }; then
+    die "--desktop, --no-pair, --no-start, --agent-uid-range and --host-token-file go with --system (on a Mac, --host-token-file goes alone)"
   else
+    [ "$MAC_HOST" -eq 0 ] || [ "$NO_SERVICE" -eq 0 ] ||
+      die "--host-token-file installs the service: it's how this Mac keeps up with the server"
     install_user
   fi
 }

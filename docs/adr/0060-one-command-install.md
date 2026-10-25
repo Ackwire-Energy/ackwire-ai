@@ -1,7 +1,7 @@
 # 0060. One-command install, native mode, and the server's computer
 
-- Status: Accepted. Built: the installer, the server's computer and plain words. Not built yet: native mode (§2), so a Mac needs Docker for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
-- Date: 2026-10-24
+- Status: Accepted. Built: the installer, the server's computer and the setup's question for it, and plain words. Not built yet: native mode (§2), so a Mac needs Docker for now.
+- Date: 2026-10-24. Revised 2026-10-25: the setup asks about the server's computer and the usage report, and ends with the link the apps open (§1, §3)
 - Extends: ADR 0003 (PGlite), ADR 0025 (connected computers), ADR 0030 (isolation on computers), ADR 0036 (one runner per organization), ADR 0041 (accounts on a computer)
 - Out of scope for now: Windows, a container image as the agents' computer, native mode as a server database at scale
 
@@ -25,6 +25,9 @@ After the install, agents still need a computer, and on a fresh server nobody ha
 - **Hand-off:** `cd` to the install folder, then `bun x --bun @agenteschat/setup@<version>` with the flags passed through.
 - **Flags:** `--dir`, `--yes`, and `--plan` (or `--dry-run`), which prints each decision and the commands it would run and runs nothing (what the tests assert). `--native` comes with native mode; until then it says so and stops. Every other flag goes to the wizard, and a test checks the wizard accepts every option the installer hands it; with its `--json`, the installer's own lines go to stderr. `AGENTES_INSTALL_SETUP` points at a local build of the wizard. A version is held the compose file's way, with `AGENTES_IMAGE` in `.env`.
 - **Folders:** `/opt/agentes` as root, `~/agentes` for a user who can already use Docker, `~/.agentes` in native mode.
+- **The wizard's last questions,** after the way in and email, each a yes/no with its default and a flag: the agents' computer (§3, `--computer`, and `--computer-commands` for a Mac) and the usage report (§5, `--telemetry on|off`, yes by default, in the words of the web app's switch). The usage answer goes into `.env` as `TELEMETRY=on|off` either way, so it's visible there and a run again doesn't ask; the wizard never prints the report.
+- **The compose file** is served by every instance at `/install/docker-compose.yml` (the one it was built with), and the wizard downloads agentes.chat's, the latest release's, into a folder that has none.
+- **The end:** the address, the link the apps open on it (`agenteschat://connect?server=…`: the desktop app from a click, the phone app from the QR code under it, which `local` leaves out since a phone reaches only its own localhost), and what to do next. `--json` gives the same as `appLink` (and `phoneLink`, kept), with `computer` (`on`, `off`, `skipped`) and `telemetry` (`on`, `off`).
 - The docs also show "download, read, then run".
 
 ### 2. Docker or native
@@ -51,7 +54,13 @@ After the install, agents still need a computer, and on a fresh server nobody ha
 
 ### 3. The server's computer
 
-The machine that runs agentes.chat is also a computer for its agents, "Computador deste servidor". It's on by default: the wizard asks, saying what it adds, and `--computer no` skips it. Until the wizard asks, it's set up by hand: the token in `.env`, then the runner's install (`SELF_HOSTING.md`).
+The machine that runs agentes.chat is also a computer for its agents, "Computador deste servidor". It's on by default: the wizard asks, saying what it adds, and `--computer no` skips it. Set up by hand, it's the token in `.env`, then the runner's install (`SELF_HOSTING.md`).
+
+**The wizard's question:**
+
+- **Default:** yes on Linux, as root with systemd and 4 GB of memory or more (3.5 GB counts: a 4 GB server reports a little less); no under that, saying how much there is and what screens and browsers take; yes on a Mac, with commands off unless the person says yes (they run as the person there). Skipped, saying why, while sign-up is open (the server refuses `HOST_COMPUTER_TOKEN` then), on Linux without root or without systemd, and inside the image. Without a terminal, the defaults; `--computer yes` where it can't be fails with the reason.
+- **Yes:** `HOST_COMPUTER_TOKEN` (48 random bytes, base64) in `.env` and in `host-computer-token` beside it (mode 600, written again from `.env` on every run). Once agentes.chat answers, the wizard runs the server's own installer for computers from `http://127.0.0.1:<port>`: on Linux with `--system --desktop --server http://127.0.0.1:<port> --host-token-file <file>`, on a Mac with `--server … --host-token-file …` alone (the runner as the person, a launchd agent, `--no-exec` unless commands are on). A Mac already connected as one of the person's computers is refused: its launchd agent has the label this one would take. Then the wizard waits up to 90 seconds for the runner's first sync, read from the runner's own log (the unit's journal, or `runner.log` on a Mac), and says "Agents' computer: this machine"; on a timeout it says how to check (`agentes-runner status`), and a failure still ends with the address and links, with `ok: false`.
+- **No:** `HOST_COMPUTER_TOKEN=` left empty (the server reads it as unset), so a run again asks nothing. Every run with yes runs the installer again, which also brings the runner to the server's version.
 
 - **Linux:** the runner is installed on the host in its system mode: a root supervisor that runs no agent code, and each agent as its own OS user with its own folder and memory limit. A container isn't used, because Chrome's sandbox doesn't start in a container with dropped capabilities and the default seccomp and AppArmor profiles, `--no-sandbox` next to every organization's tokens is not acceptable, and a container can't hold one OS user and one desktop per agent.
 - **macOS:** the runner on the Mac. Agents run as the person there, so with native mode the wizard keeps their commands off until the person says yes ("they run as you and can reach this server's files"). A dedicated macOS user is the safer yes (ADR 0030). Run by hand, `agentes-runner host` turns commands on unless given `--no-exec`, like `pair`.
