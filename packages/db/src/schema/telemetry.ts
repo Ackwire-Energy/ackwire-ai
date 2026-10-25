@@ -18,6 +18,10 @@ export const instanceTelemetry = pgTable(
     startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /** How busy the server's host got over the last day, as its last sample left it. */
     hostLoad: jsonb().$type<MachineLoadRecord>(),
+    /** The last day's samples behind `hostLoad` (epoch ms), so a restarted server keeps its day. */
+    hostSamples: jsonb().$type<{ at: number; load: number; memory: number }[]>(),
+    /** When the next report is due; kept so a restart neither delays it nor sends it twice in a day. */
+    nextReportAt: timestamp({ withTimezone: true }),
   },
   (t) => [check("instance_telemetry_one_row", sql`${t.id} = 1`)],
 );

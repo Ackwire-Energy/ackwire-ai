@@ -35,6 +35,7 @@ const FACTS: TelemetryFacts = {
   host: { size: { cpus: 2, memoryGb: 4, diskGb: 80 }, container: true },
 };
 const LOAD = { loadAvg: 0.42, loadPeak: 1.75, memoryAvg: 0.61, memoryPeak: 0.88, hours: 24 };
+const HOST_LOAD = { loadAvg: 0.3, loadPeak: 0.9, memoryAvg: 0.5, memoryPeak: 0.7, hours: 12 };
 /** Words that must never leave the server, seeded below. */
 const SECRET = {
   org: "Quokka Logistics",
@@ -45,6 +46,10 @@ const SECRET = {
   ip: "203.0.113.77",
   userAgent: "QuokkaBrowser/9.1",
   instructions: "Answer like a quokka would.",
+  /** Model names people type or CLIs report: a deployment, a fine-tune with the org's slug, an ARN with an account id. */
+  azureDeployment: "Acme-Legal-Azure-GPT",
+  fineTune: "ft:gpt-6-sol:quokka-logistics:contracts-bot:9abc123",
+  bedrockModel: "arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/x1y2z3",
 };
 
 /** A runner over an in-memory socket: its hello, then its pongs. */
@@ -167,15 +172,20 @@ async function seed() {
     costNanoUsd: 1,
     createdAt,
   });
-  await db
-    .insert(schema.usageRecords)
-    .values([
-      usage("anthropic", "claude-sonnet-5-5", 1000, 200),
-      usage("anthropic", "claude-sonnet-5-5", 500, 50),
-      usage("claude_code", "claude-opus-5-5", 3000, 900),
-      usage("moonshot", `${SECRET.agent} custom!`, 10, 1),
-      usage("anthropic", "claude-sonnet-5-5", 99_999, 99_999, ago(2 * 24 * HOUR)),
-    ]);
+  await db.insert(schema.usageRecords).values([
+    usage("anthropic", "claude-sonnet-5-5", 1000, 200),
+    usage("anthropic", "claude-sonnet-5-5", 500, 50),
+    usage("claude_code", "claude-opus-5-5", 3000, 900),
+    // What the CLIs name: a context window and a dated id are the catalog's model; anything typed isn't.
+    usage("claude_code", "claude-opus-5-5[1m]", 1000, 100),
+    usage("claude_code", "claude-sonnet-5-5-20261001", 400, 40),
+    usage("claude_code", SECRET.bedrockModel, 20, 2),
+    usage("codex", "gpt-6-sol", 700, 70),
+    usage("codex", SECRET.azureDeployment, 50, 5),
+    usage("codex", SECRET.fineTune, 30, 3),
+    usage("moonshot", `${SECRET.agent} custom!`, 10, 1),
+    usage("anthropic", "claude-sonnet-5-5", 99_999, 99_999, ago(2 * 24 * HOUR)),
+  ]);
   await db.insert(schema.usageRecords).values({ ...usage("", "", 0, 0), kind: "sandbox", agentId: agent.id });
 
   const audit = (action: string, seconds: number, createdAt = ago(HOUR)) => ({
@@ -232,8 +242,18 @@ async function seed() {
     .values({ orgId: org.id, state: "ready", specs: { cpus: 4, memoryGb: 8, diskGb: 75 } });
   await db.update(schema.agents).set({ machineId: fresh.machineId }).where(eq(schema.agents.id, agent.id));
 
+  // Seen 40 days ago: no longer one the agents use.
+  await db.insert(schema.machines).values({
+    orgId: org.id,
+    name: "Old laptop",
+    os: "darwin",
+    arch: "arm64",
+    lastSeenAt: ago(40 * 24 * HOUR),
+    size: { cpus: 8, memoryGb: 16, diskGb: 500 },
+  });
+
   await markServerStarted(db, ago(26.5 * HOUR));
-  await saveHostLoad(db, { loadAvg: 0.3, loadPeak: 0.9, memoryAvg: 0.5, memoryPeak: 0.7, hours: 12 });
+  await saveHostLoad(db, { summary: () => HOST_LOAD, samples: [] });
   return { now: new Date(now), fresh, old, managed, bia, caio };
 }
 
@@ -249,11 +269,7 @@ test("the report is exactly its fields, from the seeded data, with no content in
     os: "linux",
     arch: "x64",
     uptimeHours: 26.5,
-    host: {
-      size: { cpus: 2, memoryGb: 4, diskGb: 80 },
-      container: true,
-      load: { loadAvg: 0.3, loadPeak: 0.9, memoryAvg: 0.5, memoryPeak: 0.7, hours: 12 },
-    },
+    host: { size: { cpus: 2, memoryGb: 4, diskGb: 80 }, container: true, load: HOST_LOAD },
     organizations: 1,
     people: { total: 3, active1d: 1, active7d: 2, active30d: 2 },
     agents: 1,
@@ -263,11 +279,20 @@ test("the report is exactly its fields, from the seeded data, with no content in
         os: "linux",
         arch: "x64",
         size: { cpus: 4, memoryGb: 7.5, diskGb: 150 },
+        count: 1,
         agents: 1,
         load: LOAD,
       },
-      { kind: "connected", os: "linux", arch: "other", size: null, agents: 0, load: null },
-      { kind: "managed", os: "linux", arch: "x64", size: { cpus: 4, memoryGb: 8, diskGb: 75 }, agents: 0, load: null },
+      { kind: "connected", os: "linux", arch: "other", size: null, count: 1, agents: 0, load: null },
+      {
+        kind: "managed",
+        os: "linux",
+        arch: "x64",
+        size: { cpus: 4, memoryGb: 8, diskGb: 75 },
+        count: 1,
+        agents: 0,
+        load: null,
+      },
     ],
     lastDay: {
       runs: 2,
@@ -276,7 +301,11 @@ test("the report is exactly its fields, from the seeded data, with no content in
       terminalMinutes: 2,
       models: [
         { provider: "anthropic", model: "claude-sonnet-5-5", calls: 2, inputTokens: 1720, outputTokens: 250 },
-        { provider: "claude_code", model: "claude-opus-5-5", calls: 1, inputTokens: 3110, outputTokens: 900 },
+        { provider: "claude_code", model: "claude-opus-5-5", calls: 2, inputTokens: 4220, outputTokens: 1000 },
+        { provider: "codex", model: "other", calls: 2, inputTokens: 300, outputTokens: 8 },
+        { provider: "claude_code", model: "claude-sonnet-5-5", calls: 1, inputTokens: 510, outputTokens: 40 },
+        { provider: "claude_code", model: "other", calls: 1, inputTokens: 130, outputTokens: 2 },
+        { provider: "codex", model: "gpt-6-sol", calls: 1, inputTokens: 810, outputTokens: 70 },
         { provider: "moonshot", model: "other", calls: 1, inputTokens: 120, outputTokens: 1 },
       ],
     },
@@ -297,6 +326,8 @@ test("the report is exactly its fields, from the seeded data, with no content in
   }
   expect(text).not.toContain("@");
   expect(text.toLowerCase()).not.toContain("quokka");
+  expect(text.toLowerCase()).not.toContain("acme");
+  expect(text).not.toContain("123456789012");
 });
 
 test("an older runner's computer stays size unknown; a load older than a day says nothing", async () => {
@@ -365,6 +396,84 @@ test("the server's own computer is one machine, however many organizations it se
   const { computers, organizations, agents } = await buildTelemetryReport(db, FACTS);
   expect([organizations, agents]).toEqual([2, 2]);
   expect(computers).toEqual([
-    { kind: "host", os: "linux", arch: "x64", size: { cpus: 2, memoryGb: 4, diskGb: 80 }, agents: 2, load: LOAD },
+    {
+      kind: "host",
+      os: "linux",
+      arch: "x64",
+      size: { cpus: 2, memoryGb: 4, diskGb: 80 },
+      count: 1,
+      agents: 2,
+      load: LOAD,
+    },
   ]);
+});
+
+test("computers alike go as one line with their count, and a report stays under the receiver's 32 KB", async () => {
+  f = await setup();
+  const { db, org, agent } = f;
+  const seen = new Date();
+  const at = seen.toISOString();
+  const day = (loadAvg: number, loadPeak: number) => ({
+    loadAvg,
+    loadPeak,
+    memoryAvg: 0.5,
+    memoryPeak: 0.9,
+    hours: 24,
+    at,
+  });
+  // The Cloud's way, many computers of one size (two said how busy they got), and a big self-hosted
+  // server's, laptops of every disk size in containers.
+  const vps = Array.from({ length: 150 }, (_, i) => ({
+    orgId: org.id,
+    name: `vps ${i}`,
+    os: "linux",
+    arch: "x64",
+    lastSeenAt: seen,
+    size: { cpus: 4, memoryGb: 8, diskGb: 75 },
+    load: i === 0 ? day(0.2, 0.8) : i === 1 ? day(0.6, 1.9) : null,
+  }));
+  const laptops = Array.from({ length: 120 }, (_, i) => ({
+    orgId: org.id,
+    name: `laptop ${i}`,
+    os: "darwin",
+    arch: "arm64",
+    lastSeenAt: seen,
+    size: { cpus: 10, memoryGb: 16, diskGb: 200 + i, limit: { cpus: 8, memoryGb: 12 } },
+    load: day(0.42, 1.75),
+  }));
+  const rows = await db
+    .insert(schema.machines)
+    .values([...vps, ...laptops])
+    .returning({ id: schema.machines.id });
+  await db.update(schema.agents).set({ machineId: rows[1]?.id }).where(eq(schema.agents.id, agent.id));
+  // More providers and models than the list holds, each with the longest id and huge counts.
+  await db.insert(schema.usageRecords).values(
+    Array.from({ length: 80 }, (_, i) => ({
+      orgId: org.id,
+      agentId: agent.id,
+      provider: `${"p".repeat(37)}-${String(i).padStart(2, "0")}`,
+      model: "claude-sonnet-5-5",
+      requestedModel: "claude-sonnet-5-5",
+      inputTokens: 2_000_000_000,
+      outputTokens: 2_000_000_000,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      costNanoUsd: 1,
+    })),
+  );
+
+  const report = await buildTelemetryReport(db, FACTS);
+  expect(report.computers[0]).toEqual({
+    kind: "connected",
+    os: "linux",
+    arch: "x64",
+    size: { cpus: 4, memoryGb: 8, diskGb: 75 },
+    count: 150,
+    agents: 1,
+    load: { loadAvg: 0.4, loadPeak: 1.9, memoryAvg: 0.5, memoryPeak: 0.9, hours: 24 },
+  });
+  expect(report.computers[1]).toMatchObject({ size: { limit: { cpus: 8, memoryGb: 12 } }, count: 1 });
+  expect(report.computers).toHaveLength(50);
+  expect(report.lastDay.models).toHaveLength(50);
+  expect(new TextEncoder().encode(JSON.stringify(report)).length).toBeLessThan(32 * 1024);
 });

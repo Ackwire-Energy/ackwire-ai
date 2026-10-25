@@ -281,18 +281,23 @@ export const PLAN_KEYS_PROTOCOL = 20;
 export const DESKTOP_USE_PROTOCOL = 21;
 /**
  * From this protocol on: how big the computer is and how busy it gets.
- * `hello.size` gives its logical CPUs, memory and the disk of its workspace;
+ * `hello.size` gives the machine's logical CPUs and memory, the disk of its
+ * workspace, and `limit` when the runner may use less (a container's limits);
  * a `pong` carries `load`, the last day's summary, after each new sample (every
  * `LOAD_SAMPLE_MS`). Nothing new goes to the runner, so an older one simply
  * sends neither: its size and load are unknown.
  */
 export const MACHINE_STATS_PROTOCOL = 22;
 
-/** Protocol 22: a computer's size as its runner sees it (`hello.size`), rounded. */
+/**
+ * Protocol 22: a computer's size (`hello.size`), rounded: the whole machine's, which its load is
+ * measured against, and `limit` when the process may use less of it (a container's CPU or memory limit).
+ */
 export interface MachineSize {
   cpus: number;
   memoryGb: number;
   diskGb: number;
+  limit?: { cpus: number; memoryGb: number };
 }
 
 /**
@@ -2493,11 +2498,16 @@ export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInf
 const between = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
 
-/** `hello.size` (protocol 22): sane numbers, else none. */
+/** `hello.size` (protocol 22): sane numbers, else none; a `limit` that isn't sane is left out. */
 export function parseMachineSize(v: unknown): MachineSize | null {
   if (!isObject(v) || !inRange(v.cpus, [1, 4096])) return null;
   if (!between(v.memoryGb, 0, 1 << 16) || !between(v.diskGb, 0, 1 << 24)) return null;
-  return { cpus: v.cpus, memoryGb: v.memoryGb, diskGb: v.diskGb };
+  const l = v.limit;
+  const limit =
+    isObject(l) && inRange(l.cpus, [1, v.cpus]) && between(l.memoryGb, 0, v.memoryGb)
+      ? { limit: { cpus: l.cpus, memoryGb: l.memoryGb } }
+      : {};
+  return { cpus: v.cpus, memoryGb: v.memoryGb, diskGb: v.diskGb, ...limit };
 }
 
 /** `pong.load` (protocol 22): sane numbers, else none. */

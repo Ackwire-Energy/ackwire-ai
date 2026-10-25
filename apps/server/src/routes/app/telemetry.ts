@@ -12,7 +12,15 @@ import { type AppDeps, body, createAppRouter, errors, json, requireSession, secu
 
 const tags = ["System"];
 
-const Size = z.object({ cpus: z.number().int(), memoryGb: z.number(), diskGb: z.number() });
+const Size = z.object({
+  cpus: z.number().int(),
+  memoryGb: z.number(),
+  diskGb: z.number(),
+  limit: z
+    .object({ cpus: z.number().int(), memoryGb: z.number() })
+    .optional()
+    .openapi({ description: "What the process may use of the machine, when less (a container's limits)." }),
+});
 const Load = z
   .object({
     loadAvg: z.number(),
@@ -48,6 +56,7 @@ const Report = z
         os: z.string(),
         arch: z.string(),
         size: Size.nullable(),
+        count: z.number().int().openapi({ description: "How many computers are of this kind, system and size." }),
         agents: z.number().int(),
         load: Load,
       }),

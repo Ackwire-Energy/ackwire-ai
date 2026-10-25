@@ -1,11 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import os, { tmpdir } from "node:os";
 import { join } from "node:path";
-import { LoadWindow, machineSize, memAvailable, sampleLoad, vmStatAvailable } from "../src/host-stats";
+import { combineLoads, LoadWindow, machineSize, memAvailable, sampleLoad, vmStatAvailable } from "../src/host-stats";
 import { LOAD_SAMPLE_MS, parseRunnerFrame } from "../src/machine-protocol";
 
 const HOUR = 3600_000;
+const GIB = 2 ** 30;
+afterEach(() => mock.restore());
 
 describe("the load sampler", () => {
   test("averages and peaks the last day of samples; older ones drop out", () => {
@@ -56,8 +58,60 @@ describe("the load sampler", () => {
     expect(vmStatAvailable("nothing here")).toBeNull();
   });
 
-  test("this computer: a sample and a size", () => {
-    const s = sampleLoad();
+  test("a restarted process starts from the samples the last one kept", () => {
+    const t0 = Date.UTC(2026, 9, 25, 12);
+    const before = new LoadWindow();
+    before.add({ load: 2, memory: 0.9 }, t0);
+    before.add({ load: 1, memory: 0.5 }, t0 + LOAD_SAMPLE_MS);
+    const after = new LoadWindow(JSON.parse(JSON.stringify(before.samples)));
+    expect(after.summary()).toBeNull();
+    after.add({ load: 0, memory: 0.1 }, t0 + 3 * HOUR);
+    expect(after.summary()).toEqual({ loadAvg: 1, loadPeak: 2, memoryAvg: 0.5, memoryPeak: 0.9, hours: 0.3 });
+  });
+
+  test("several computers' days as one: the averages averaged, the highest peaks", () => {
+    const a = { loadAvg: 0.2, loadPeak: 0.8, memoryAvg: 0.4, memoryPeak: 0.6, hours: 24 };
+    const b = { loadAvg: 0.6, loadPeak: 1.9, memoryAvg: 0.7, memoryPeak: 0.95, hours: 12 };
+    expect(combineLoads([a, null, b])).toEqual({
+      loadAvg: 0.4,
+      loadPeak: 1.9,
+      memoryAvg: 0.55,
+      memoryPeak: 0.95,
+      hours: 18,
+    });
+    expect(combineLoads([null, a])).toBe(a);
+    expect(combineLoads([null])).toBeNull();
+  });
+
+  test("in a container with limits: the machine's size with the limit beside it, the load per machine CPU", async () => {
+    // A 4-CPU, 8 GB machine running `docker run --cpus=1 --memory=1g`.
+    spyOn(os, "cpus").mockReturnValue(Array.from({ length: 4 }, () => os.cpus()[0] as os.CpuInfo));
+    spyOn(os, "availableParallelism").mockReturnValue(1);
+    spyOn(os, "totalmem").mockReturnValue(8 * GIB);
+    spyOn(process, "constrainedMemory").mockReturnValue(GIB);
+    spyOn(os, "loadavg").mockReturnValue([4, 3.2, 2]);
+    const dir = mkdtempSync(join(tmpdir(), "stats-"));
+    expect(machineSize(dir)).toMatchObject({ cpus: 4, memoryGb: 8, limit: { cpus: 1, memoryGb: 1 } });
+    if (process.platform !== "win32") expect((await sampleLoad())?.load).toBe(0.8);
+    // No limit: none said.
+    spyOn(os, "availableParallelism").mockReturnValue(4);
+    spyOn(process, "constrainedMemory").mockReturnValue(8 * GIB);
+    expect(machineSize(dir)).not.toHaveProperty("limit");
+    spyOn(process, "constrainedMemory").mockReturnValue(0);
+    expect(machineSize(dir)).not.toHaveProperty("limit");
+  });
+
+  test("a sample doesn't hold up the process while the system answers", async () => {
+    let ticks = 0;
+    const tick = setInterval(() => ticks++, 0);
+    await sampleLoad();
+    clearInterval(tick);
+    // macOS reads its memory from `vm_stat`, a program; on Linux it is a file read.
+    if (process.platform === "darwin") expect(ticks).toBeGreaterThan(0);
+  });
+
+  test("this computer: a sample and a size", async () => {
+    const s = await sampleLoad();
     if (process.platform !== "win32") {
       expect(s?.load).toBeGreaterThanOrEqual(0);
       expect(s?.memory).toBeGreaterThan(0);
@@ -79,6 +133,14 @@ describe("protocol 22 on the wire", () => {
   test("hello carries the size; nonsense or an older runner's hello has none", () => {
     expect(hello({ size: { cpus: 2, memoryGb: 4, diskGb: 80 } })).toMatchObject({
       size: { cpus: 2, memoryGb: 4, diskGb: 80 },
+    });
+    const limited = { cpus: 4, memoryGb: 8, diskGb: 80, limit: { cpus: 1, memoryGb: 1 } };
+    expect(hello({ size: limited })).toMatchObject({ size: limited });
+    // A limit above the machine itself isn't one.
+    expect((hello({ size: { ...limited, limit: { cpus: 8, memoryGb: 1 } } }) as { size: object }).size).toEqual({
+      cpus: 4,
+      memoryGb: 8,
+      diskGb: 80,
     });
     expect(hello({})).not.toHaveProperty("size");
     expect(hello({ size: { cpus: 0, memoryGb: 4, diskGb: 80 } })).not.toHaveProperty("size");

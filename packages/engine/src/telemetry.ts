@@ -1,5 +1,7 @@
 import type { MachineLoad, MachineSize } from "@agenteschat/adapters";
+import { combineLoads, type LoadSample } from "@agenteschat/adapters/host-stats";
 import { type Database, eq, rowsOf, schema, sql } from "@agenteschat/db";
+import { catalogModelOf } from "@agenteschat/providers";
 
 const { instanceTelemetry } = schema;
 
@@ -32,13 +34,16 @@ export interface TelemetryReport {
   };
 }
 
+/** Computers of one kind, system and size, seen in the last 30 days (the Cloud has hundreds alike). */
 export interface TelemetryComputer {
   kind: schema.MachineKind;
   os: string;
   arch: string;
-  /** Null: its runner is older than protocol 22 and nobody else said. */
+  /** Null: their runner is older than protocol 22 and nobody else said. */
   size: MachineSize | null;
+  count: number;
   agents: number;
+  /** Their last day: the averages averaged and the highest peaks, of those that said in the last day. */
   load: MachineLoad | null;
 }
 
@@ -49,10 +54,11 @@ export type TelemetryFacts = Pick<TelemetryReport, "version" | "edition" | "inst
 
 const DAY_MS = 24 * 3600_000;
 const ARCHES = new Set(["x64", "arm64", "arm", "ia32", "ppc64", "s390x", "riscv64", "loong64"]);
-/** Ids, not text: anything else (a name someone typed) is reported as `other`. */
+/** Ids, not text: anything else is reported as `other`. */
 const PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,39}$/;
-const MODEL_ID = /^[a-z0-9][a-z0-9._:/-]{0,79}$/;
+/** Both lists capped, so a report stays well under the 32 KB telemetry.agentes.chat takes. */
 const MAX_MODELS = 50;
+const MAX_COMPUTERS = 50;
 
 /** agentes.chat's own servers: their report always goes out, and nobody there has the switch. */
 export function isAgentesCloud(publicUrl: string) {
@@ -73,12 +79,22 @@ export async function telemetryState(db: Database) {
   return row;
 }
 
-/** At boot: the uptime counts from now. */
+/** At boot: the uptime counts from now. The row as it is, with what the last process kept. */
 export async function markServerStarted(db: Database, now = new Date()) {
-  await db
+  const [row] = await db
     .insert(instanceTelemetry)
     .values({ startedAt: now })
-    .onConflictDoUpdate({ target: instanceTelemetry.id, set: { startedAt: now } });
+    .onConflictDoUpdate({ target: instanceTelemetry.id, set: { startedAt: now } })
+    .returning();
+  if (!row) throw new Error("instance_telemetry has no row");
+  return row;
+}
+
+export async function setNextReport(db: Database, at: Date) {
+  await db
+    .insert(instanceTelemetry)
+    .values({ nextReportAt: at })
+    .onConflictDoUpdate({ target: instanceTelemetry.id, set: { nextReportAt: at } });
 }
 
 /** The owner's switch in Settings. */
@@ -89,14 +105,19 @@ export async function setTelemetryEnabled(db: Database, enabled: boolean) {
     .onConflictDoUpdate({ target: instanceTelemetry.id, set: { enabled } });
 }
 
-/** The host's last day as its newest sample leaves it; kept in the row so `agentes telemetry` prints it too. */
-export async function saveHostLoad(db: Database, load: MachineLoad | null, now = new Date()) {
+/**
+ * The host's last day as its newest sample leaves it, with the samples behind it; kept in the row so
+ * `agentes telemetry` prints it too and a restart keeps the day.
+ */
+export async function saveHostLoad(
+  db: Database,
+  window: { summary(): MachineLoad | null; samples: readonly LoadSample[] },
+  now = new Date(),
+) {
+  const load = window.summary();
   if (!load) return;
-  const hostLoad = { ...load, at: now.toISOString() };
-  await db
-    .insert(instanceTelemetry)
-    .values({ hostLoad })
-    .onConflictDoUpdate({ target: instanceTelemetry.id, set: { hostLoad } });
+  const set = { hostLoad: { ...load, at: now.toISOString() }, hostSamples: [...window.samples] };
+  await db.insert(instanceTelemetry).values(set).onConflictDoUpdate({ target: instanceTelemetry.id, set });
 }
 
 /** A load summary from over a day ago says nothing about the last day. */
@@ -160,11 +181,12 @@ export async function buildTelemetryReport(
         (select count(*) from agents a where a.machine_id = m.id and a.archived_at is null) as agents
       from machines m
       left join machine_provisioning p on m.kind = 'managed' and p.org_id = m.org_id
-      where m.deleted_at is null and m.last_seen_at is not null
+      where m.deleted_at is null and m.last_seen_at >= ${since(30)}
       order by m.created_at`),
   );
-  const computers: TelemetryComputer[] = [];
-  let host: TelemetryComputer | undefined;
+  type One = Omit<TelemetryComputer, "count">;
+  const each: One[] = [];
+  let host: One | undefined;
   for (const m of machines) {
     const c = {
       kind: m.kind,
@@ -182,18 +204,50 @@ export async function buildTelemetryReport(
       continue;
     }
     if (m.kind === "host") host = c;
-    computers.push(c);
+    each.push(c);
   }
-  const models = rowsOf<Record<string, unknown>>(
+  const alike = new Map<string, { computer: TelemetryComputer; loads: (MachineLoad | null)[] }>();
+  for (const { load, ...c } of each) {
+    const s = c.size;
+    const key = JSON.stringify([c.kind, c.os, c.arch, s?.cpus, s?.memoryGb, s?.diskGb, s?.limit]);
+    const group = alike.get(key);
+    if (group) {
+      group.computer.count += 1;
+      group.computer.agents += c.agents;
+      group.loads.push(load);
+    } else {
+      alike.set(key, { computer: { ...c, count: 1, load: null }, loads: [load] });
+    }
+  }
+  const computers = [...alike.values()]
+    .map(({ computer, loads }) => ({ ...computer, load: combineLoads(loads) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, MAX_COMPUTERS);
+
+  const usage = rowsOf<Record<string, unknown>>(
     await db.execute(sql`
       select provider, model, count(*) as calls,
         sum(input_tokens + cache_read_tokens + cache_write_tokens) as input_tokens, sum(output_tokens) as output_tokens
       from usage_records
       where created_at >= ${day} and kind <> 'sandbox'
-      group by provider, model
-      order by calls desc, provider, model
-      limit ${MAX_MODELS}`),
+      group by provider, model`),
   );
+  const byModel = new Map<string, TelemetryReport["lastDay"]["models"][number]>();
+  for (const r of usage) {
+    const provider = PROVIDER_ID.test(String(r.provider)) ? String(r.provider) : "other";
+    // Only the catalog's ids: a model name someone typed (a deployment, a fine-tune, an ARN) can name a
+    // company or carry an account id.
+    const model = catalogModelOf(String(r.model).toLowerCase()) ?? "other";
+    const key = `${provider} ${model}`;
+    const row = byModel.get(key) ?? { provider, model, calls: 0, inputTokens: 0, outputTokens: 0 };
+    row.calls += int(r.calls);
+    row.inputTokens += int(r.input_tokens);
+    row.outputTokens += int(r.output_tokens);
+    byModel.set(key, row);
+  }
+  const models = [...byModel.values()]
+    .sort((a, b) => b.calls - a.calls || a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model))
+    .slice(0, MAX_MODELS);
 
   return {
     report: 1,
@@ -219,17 +273,7 @@ export async function buildTelemetryReport(
       toolCalls: int(counts?.tool_calls),
       desktopMinutes: int(Number(counts?.desktop_seconds) / 60),
       terminalMinutes: int(Number(counts?.terminal_seconds) / 60),
-      models: models.map((r) => {
-        const provider = String(r.provider);
-        const model = String(r.model).toLowerCase();
-        return {
-          provider: PROVIDER_ID.test(provider) ? provider : "other",
-          model: MODEL_ID.test(model) ? model : "other",
-          calls: int(r.calls),
-          inputTokens: int(r.input_tokens),
-          outputTokens: int(r.output_tokens),
-        };
-      }),
+      models,
     },
   };
 }

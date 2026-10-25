@@ -60,6 +60,7 @@ export interface MachineSizeRecord {
   cpus: number;
   memoryGb: number;
   diskGb: number;
+  limit?: { cpus: number; memoryGb: number };
 }
 
 /** How busy a computer got over the last day (protocol 22: `MachineLoad` in the protocol), and when it said so. */

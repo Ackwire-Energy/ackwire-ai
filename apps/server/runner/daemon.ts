@@ -444,7 +444,10 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
-    const sample = () => this.load.add(sampleLoad());
+    const sample = () =>
+      void sampleLoad()
+        .then((s) => this.load.add(s))
+        .catch(() => undefined);
     sample();
     const load = setInterval(sample, LOAD_SAMPLE_MS);
     load.unref?.();

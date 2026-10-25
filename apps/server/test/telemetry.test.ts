@@ -7,6 +7,7 @@ import { setTelemetryEnabled, telemetryState } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import {
   FIRST_REPORT_MS,
+  OVERDUE_REPORT_MS,
   printTelemetry,
   REPORT_EVERY_MS,
   RETRY_MS,
@@ -19,16 +20,18 @@ const log = createLogger("error");
 const PROD = { NODE_ENV: "production" };
 
 /**
- * Timers that run only when a test fires them. `fire(ms)` runs the newest one with that delay; `delays()` are
- * the report's, without the sampler's one (it re-arms itself every `LOAD_SAMPLE_MS`, like a retry may).
+ * Timers that run only when a test fires them, on a clock of their own. `fire(ms)` runs the newest one with
+ * that delay, the clock moved to its time; `delays()` are the report's, without the sampler's one (it re-arms
+ * itself every `LOAD_SAMPLE_MS`, like a retry may).
  */
-function fakeTimers() {
-  const queue: { id: number; ms: number; run: () => void }[] = [];
+function fakeTimers(start = Date.UTC(2026, 9, 25, 9)) {
+  const queue: { id: number; ms: number; at: number; run: () => void }[] = [];
   let next = 1;
+  let clock = start;
   const timers: Timers = {
     set: (run, ms) => {
       const id = next++;
-      queue.push({ id, ms, run });
+      queue.push({ id, ms, at: clock + ms, run });
       return id;
     },
     clear: (id) => {
@@ -38,6 +41,11 @@ function fakeTimers() {
   };
   return {
     timers,
+    now: () => clock,
+    /** Time passing with nothing fired (the server stopped). */
+    advance: (ms: number) => {
+      clock += ms;
+    },
     delays: () => {
       const ms = queue.map((t) => t.ms);
       const sampler = ms.indexOf(LOAD_SAMPLE_MS);
@@ -48,6 +56,7 @@ function fakeTimers() {
       if (i < 0) throw new Error(`no timer of ${ms} ms (have ${queue.map((t) => t.ms).join(", ")})`);
       const before = next;
       const [timer] = queue.splice(i, 1);
+      if (timer) clock = Math.max(clock, timer.at);
       timer?.run();
       // Done once it set its next timer.
       for (let n = 0; n < 200 && next === before; n++) await Bun.sleep(5);
@@ -82,16 +91,17 @@ afterEach(async () => {
 async function start(
   env: Record<string, string>,
   answers?: (number | "down")[],
-  sample: () => { load: number; memory: number } | null = () => null,
+  sample: () => Promise<{ load: number; memory: number } | null> = async () => null,
+  clock = fakeTimers(),
 ) {
-  ({ db, close } = await createTestDatabase());
+  // A restart keeps the database.
+  if (!close) ({ db, close } = await createTestDatabase());
   const config = testConfig({ ...PROD, ...env });
-  const clock = fakeTimers();
   const http = fakeFetch(answers);
-  const telemetry = startTelemetry({ db, config, log, fetch: http.fn, timers: clock.timers, sample });
+  const telemetry = startTelemetry({ db, config, log, fetch: http.fn, timers: clock.timers, sample, now: clock.now });
   stops.push(telemetry.stop);
   await telemetry.ready;
-  return { config, clock, http };
+  return { config, clock, http, stop: telemetry.stop };
 }
 
 describe("sending", () => {
@@ -144,6 +154,50 @@ describe("sending", () => {
     expect(clock.delays()).toEqual([REPORT_EVERY_MS]);
   });
 
+  test("a restart keeps the report's time: the rest is waited out, and one that came due meanwhile goes soon", async () => {
+    const clock = fakeTimers();
+    const first = await start({}, [204], undefined, clock);
+    expect(clock.delays()).toEqual([FIRST_REPORT_MS]);
+    // Restarted 40 minutes in: the first report still comes an hour after the first start.
+    first.stop();
+    clock.advance(40 * 60_000);
+    const second = await start({}, [204], undefined, clock);
+    expect(clock.delays()).toEqual([20 * 60_000]);
+    await clock.fire(20 * 60_000);
+    expect(second.http.calls).toHaveLength(1);
+    expect(clock.delays()).toEqual([REPORT_EVERY_MS]);
+    // Down for two days: the missed report goes soon after the next start, then a day after that.
+    second.stop();
+    clock.advance(2 * REPORT_EVERY_MS);
+    const third = await start({}, [204], undefined, clock);
+    expect(clock.delays()).toEqual([OVERDUE_REPORT_MS]);
+    await clock.fire(OVERDUE_REPORT_MS);
+    expect(third.http.calls).toHaveLength(1);
+    expect(clock.delays()).toEqual([REPORT_EVERY_MS]);
+  });
+
+  test("a restart keeps the host's day of samples", async () => {
+    const clock = fakeTimers();
+    const samples = [
+      { load: 2, memory: 0.9 },
+      { load: 1, memory: 0.5 },
+      { load: 0, memory: 0.1 },
+    ];
+    const take = async () => samples.shift() ?? null;
+    const first = await start({}, [204], take, clock);
+    await clock.fire(LOAD_SAMPLE_MS);
+    first.stop();
+    clock.advance(3600_000);
+    await start({}, [204], take, clock);
+    expect((await telemetryState(db)).hostLoad).toMatchObject({
+      loadAvg: 1,
+      loadPeak: 2,
+      memoryAvg: 0.5,
+      memoryPeak: 0.9,
+      hours: 0.3,
+    });
+  });
+
   test("off means nothing is sent: TELEMETRY=off schedules nothing", async () => {
     const { clock, http } = await start({ TELEMETRY: "off" });
     expect(clock.delays()).toEqual([]);
@@ -187,7 +241,7 @@ describe("sending", () => {
       { load: 0.5, memory: 0.4 },
       { load: 1.5, memory: 0.8 },
     ];
-    const { clock, http } = await start({}, [204], () => samples.shift() ?? null);
+    const { clock, http } = await start({}, [204], async () => samples.shift() ?? null);
     await clock.fire(LOAD_SAMPLE_MS);
     const load = { loadAvg: 1, loadPeak: 1.5, memoryAvg: 0.6, memoryPeak: 0.8, hours: 0.2 };
     expect((await telemetryState(db)).hostLoad).toMatchObject(load);
@@ -200,7 +254,15 @@ test("agentes telemetry prints exactly the next report, on or off, and sends not
   const { clock, http, config } = await start({});
   const out: string[] = [];
   const err: string[] = [];
-  await printTelemetry(db, config, { write: (s: string) => out.push(s) }, { write: (s: string) => err.push(s) });
+  const print = (c = config) =>
+    printTelemetry(
+      db,
+      c,
+      { write: (s: string) => out.push(s) },
+      { write: (s: string) => err.push(s) },
+      new Date(clock.now() + FIRST_REPORT_MS),
+    );
+  await print();
   await clock.fire(FIRST_REPORT_MS);
   expect(http.calls).toHaveLength(1);
   expect(JSON.parse(out.join(""))).toEqual(http.calls[0]?.body);
@@ -209,15 +271,10 @@ test("agentes telemetry prints exactly the next report, on or off, and sends not
   await setTelemetryEnabled(db, false);
   out.length = 0;
   err.length = 0;
-  await printTelemetry(db, config, { write: (s: string) => out.push(s) }, { write: (s: string) => err.push(s) });
+  await print();
   expect(JSON.parse(out.join(""))).toMatchObject({ report: 1, instance: http.calls[0]?.body.instance });
   expect(err.join("")).toBe("Off (turned off in Settings): nothing is sent.\n");
-  await printTelemetry(
-    db,
-    testConfig({ ...PROD, TELEMETRY: "off" }),
-    { write: () => {} },
-    { write: (s: string) => err.push(s) },
-  );
+  await print(testConfig({ ...PROD, TELEMETRY: "off" }));
   expect(err.at(-1)).toBe("Off (TELEMETRY=off): nothing is sent.\n");
   expect(http.calls).toHaveLength(1);
 });
