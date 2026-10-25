@@ -780,7 +780,7 @@ function RequestCard({
         <span>{t(`approvals.verb.${approvalAction(a)}`)}</span>
         {origin && (
           <span className="ap-card__origin">
-            · <Icon name="routines" size={13} />
+            · <Icon name="routines" size={14} />
             {tt(origin.key, origin.values)}
           </span>
         )}
