@@ -1377,7 +1377,7 @@ fn step(app: &AppHandle, step: &'static str, state: &'static str) {
     let _ = app.emit_to("welcome", STEP_EVENT, StepEvent { step, state, reason: None });
 }
 
-/// F4: makes the folder, starts the server, makes the owner, makes this computer the agents' computer, turns
+/// Makes the folder, starts the server, makes the owner, makes this computer the agents' computer, turns
 /// reach on when asked, then opens the main window there, signed in. Each step says when it starts and ends;
 /// reach failing never stops the rest. Err: the step that failed.
 fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
@@ -1455,7 +1455,7 @@ fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     Ok(())
 }
 
-/// F4's start and account steps: the server answers as the app's own child, then its owner exists. Its port.
+/// The setup's start and account steps: the server answers as the app's own child, then its owner exists. Its port.
 fn start_with_owner(
     app: &AppHandle,
     folder: &Folder,

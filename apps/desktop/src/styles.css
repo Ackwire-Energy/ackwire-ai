@@ -947,7 +947,7 @@ body[data-window="popover"] {
   display: flex;
   gap: 8px;
 }
-/* F4: run agentes.chat here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
+/* Run agentes.chat here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
    longer), and two fields side by side. */
 .dk-fr__body h1.dk-fr__h1sm {
   font-size: 28px;
@@ -987,7 +987,7 @@ body[data-window="popover"] {
   margin-top: 24px;
   max-width: 600px;
 }
-/* F4b, F4c: the steps as they run. */
+/* Run here's steps as they run. */
 .dk-fr__steps {
   list-style: none;
   margin: 24px 0 0;

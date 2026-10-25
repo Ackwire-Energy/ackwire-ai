@@ -256,7 +256,7 @@ export function FirstRun() {
   );
 }
 
-/** F1: agentes.chat, big; your own server, small. */
+/** agentes.chat, big; your own server, small. */
 function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: () => void }) {
   const { t } = useTranslation();
   return (
@@ -295,7 +295,7 @@ function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-/** F2: the two ways to use your own server. */
+/** The two ways to use your own server. */
 function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () => void; onHere: () => void }) {
   const { t } = useTranslation();
   const host = useHost();
@@ -339,7 +339,7 @@ function ProblemLine({ problem, host }: { problem: ConnectProblem; host: string 
   );
 }
 
-/** F3: the address, what was found, and the one-command setup for a server that has none yet. */
+/** The address, what was found, and the one-command setup for a server that has none yet. */
 function Connect({
   onBack,
   backLabel,
@@ -479,11 +479,11 @@ function Connect({
 }
 
 /**
- * F4: agentes.chat on this computer, inside the app: the owner's name and email (until the owner exists), reach
- * through Tailscale (off), usage statistics (on; as they were, for one that ran here before), then Start. F4b: the
- * steps as the app runs them, each problem on its own step (F4c). F4d: one installed from the terminal already
- * runs here: Use it (its owner page while it waits for one); installed but not running: it starts there. The app
- * runs it already: open it.
+ * agentes.chat on this computer, inside the app: the owner's name and email (until the owner exists), reach
+ * through Tailscale (off), usage statistics (on; as they were, for one that ran here before), then Start, and the
+ * steps as the app runs them, each problem on its own step. One installed from the terminal already runs here:
+ * Use it (its owner page while it waits for one); installed but not running: it starts there. The app runs it
+ * already: open it.
  */
 function RunHere({
   onBack,
@@ -635,7 +635,7 @@ function RunHere({
       await host.installLocalServer(choice);
       if (!warned.current) await host.hideWindow("welcome").catch(() => {});
     } catch {
-      // The failed step says it (F4c); Try again starts over, keeping what was done.
+      // The failed step says it; Try again starts over, keeping what was done.
     } finally {
       onBusy(false);
     }
@@ -725,7 +725,7 @@ function RunHere({
   );
 }
 
-/** F4b, F4c: each step as it runs; a failed step says what happened, reach failing never stops the rest. */
+/** Each step as it runs; a failed step says what happened, reach failing never stops the rest. */
 function HereSetup({
   steps,
   changes,
@@ -812,7 +812,7 @@ function HereSetup({
   );
 }
 
-/** F4w: on Windows, the two ways to run a server for now. */
+/** On Windows, the two ways to run a server for now. */
 function WindowsWays({ onBack, onConnect }: { onBack: () => void; onConnect: () => void }) {
   const { t } = useTranslation();
   return (
