@@ -211,8 +211,8 @@ curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-cli
 - Every answer is a flag or an `AGENTES_SETUP_<OPTION>` variable; `--help` lists them, and a flag
   wins over a variable. With `--json` nothing is asked: a missing answer is a failed check, and the
   two yes/no questions take their defaults. The server becomes its agents' computer where it can be
-  (on Linux as root, with systemd and 4 GB of memory or more, and on a Mac; `--computer no` says
-  otherwise), and the usage statistics are on (`--telemetry off` says otherwise).
+  (on Linux as root, with systemd, apt-get and 4 GB of memory or more, and on a Mac; `--computer no`
+  says otherwise), and the usage statistics are on (`--telemetry off` says otherwise).
 - stdout is one JSON object, and progress goes to stderr. Exit code 0: done; 1: a check failed;
   2: a wrong option.
 - `--dry-run --json` returns the plan and changes nothing.
@@ -238,9 +238,10 @@ Done:
 }
 ```
 
-Give the person `url`, `appLink` (it opens the agentes.chat apps on this server) and `nextSteps`:
-the first account, created from a device in the tailnet, owns the instance. `computer` is `on`
-when this server is its agents' computer, `off` when answered no, and `skipped` where it can't be.
+Give the person `url`, `appLink` (it opens the agentes.chat phone app on this server; `null` for an
+http address, which the phone app doesn't open) and `nextSteps`: the first account, created from a
+device in the tailnet, owns the instance. `computer` is `on` when this server is its agents'
+computer, `off` when answered no, and `skipped` where it can't be.
 A failure names the check, what happened and the fix:
 
 ```json
@@ -278,8 +279,8 @@ A failure names the check, what happened and the fix:
 | `port` | Another program uses the app's port, or 80 and 443 for a public domain | `HOST_PORT=3001` in `.env`, or stop that program. |
 | `app.config` | The app refused a value in `.env` | The values `error` names. |
 | `app.health`, `tailscale.timeout` | Something didn't answer in time (`--timeout`, 300 s by default) | `docker compose logs agentes`, or `tailscale`. |
-| `computer` | `--computer yes` on a machine that can't be the agents' computer: sign-up is open, no root or no systemd on Linux | What `fix` says, or `--computer no`. |
-| `computer.install`, `computer.off`, `computer.token` | The agents' computer didn't install or wasn't accepted (agentes.chat itself is up, and the result still has `url` and `appLink`) | What `fix` says, then the same command again. `agentes-runner status` and `journalctl -u agentes-runner` show its state. |
+| `computer` | `--computer yes` on a machine that can't be the agents' computer: sign-up is open, no root or no systemd on Linux, or it's already connected as a computer. Or sign-up was opened after a yes, and agentes.chat won't start with both | What `fix` says, or `--computer no`. |
+| `computer.install`, `computer.off`, `computer.token` | The agents' computer didn't install or wasn't accepted (agentes.chat itself is up, and the result still has `url` and `appLink`) | What `fix` says, then the same command again. Its log shows its state: `journalctl -u agentes-runner` on Linux, `~/.agentes-runner/runner.log` on a Mac. |
 
 </details>
 
@@ -553,6 +554,13 @@ statistics → See what is sent** shows the same. Turn it off either way:
 - The switch in **Settings → General → Usage statistics**. Only the installation's first account (the
   person who set it up) sees it.
 
+**Downloads and updates.** Installing and updating fetch files from agentes.chat, and those requests
+carry nothing about the instance beyond what any download does: the installer
+(`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has
+none (`https://agentes.chat/install/docker-compose.yml`), and the Mac app's check for its own new
+version, at start and every 6 hours (`https://agentes.chat/api/desktop/latest`). The instance itself
+downloads nothing from agentes.chat.
+
 Besides that report and the model providers each organization chooses, the instance talks to a third
 party only when you turn that service on:
 
@@ -565,7 +573,6 @@ party only when you turn that service on:
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
-| agentes.chat | Installing and updating | What any download asks for, nothing about the instance: the installer (`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has none (`https://agentes.chat/install/docker-compose.yml`), and the Mac app's check for its own new version, at start and every 6 hours (`https://agentes.chat/api/desktop/latest`). |
 | Tailscale | `COMPOSE_PROFILES=tailscale` | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
@@ -691,15 +698,21 @@ desktop use.
 **This server as the agents' computer.** The machine agentes.chat runs on can be a computer too, for
 the organizations the installation's first account made and is an owner or an admin of. The setup
 does it by default, after asking: on Linux each agent gets a user of its own with a screen (as root,
-with systemd and 4 GB of memory or more; under 4 GB the answer defaults to no), and on a Mac agents
-work as you, in folders of their own, with commands off unless you say yes. It writes
-`HOST_COMPUTER_TOKEN` to `.env` and to `host-computer-token` beside it (readable by you only),
-installs what runs the agents there, and waits for it to answer, up to 90 seconds. Answering no
-leaves `HOST_COMPUTER_TOKEN=` empty, so the setup doesn't ask again; `--computer yes` on a later run
-turns it on. It's skipped while sign-up is open (`ALLOW_SIGNUP=true`).
+with systemd, apt-get and 4 GB of memory or more; otherwise the answer defaults to no, saying why),
+and on a Mac agents work as you, in folders of their own, with a browser, Claude Code and Codex, and
+commands off unless you say yes. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
+`host-computer-token` beside it (readable by you only), installs what runs the agents there from the
+address the app is published on (`BIND_ADDRESS` and `HOST_PORT`), and waits for it to answer, up to
+90 seconds. Running the setup again leaves it running while it answers and is up to date, and sets it
+up again when agentes.chat brings a newer version. Answering no leaves `HOST_COMPUTER_TOKEN=` empty,
+so the setup doesn't ask again; `--computer yes` on a later run turns it on, and `--computer no`
+after a yes empties the token, removes `host-computer-token` and prints the command that removes the
+service. It's skipped while sign-up is open (`ALLOW_SIGNUP=true`), and on a machine already
+connected as a computer, whose connection stays as it is.
 
 By hand on Linux (a server set up before, say): set a token in `.env` and give the same one to the
-runner, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you changed it):
+agents' computer, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you
+changed it):
 
 ```sh
 (umask 077 && openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token)

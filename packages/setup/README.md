@@ -35,15 +35,16 @@ removes the old one's container.
    already there.
 5. **Email** for invitations and password resets, optional: an SMTP server or a Resend-compatible
    API.
-6. **The agents' computer:** this machine, by default where it can be (Linux as root with 4 GB of
-   memory or more, each agent a user of its own with a screen; a Mac, agents working as you).
+6. **The agents' computer:** this machine, by default where it can be (Linux as root with apt-get
+   and 4 GB of memory or more, each agent a user of its own with a screen; a Mac, agents working as
+   you with a browser, Claude Code and Codex, commands off unless you say yes).
 7. **Usage statistics:** whether to send anonymous usage statistics to agentes.chat (yes by
    default), written to `.env` as `TELEMETRY=on|off`.
 8. **Start:** downloads `docker-compose.yml` when the directory has none, runs `docker compose up -d`,
    waits for Tailscale, the HTTPS certificate and `/api/health`, writes `PUBLIC_URL` from the
    address Tailscale gives the server, and sets up the agents' computer.
-9. **The end:** the address, the link that opens the agentes.chat apps on it with its QR code for
-   the phone, and what to do next.
+9. **The end:** the address, the link that opens the agentes.chat phone app on it with its QR code
+   (for an https address), and what to do next.
 
 ## For scripts and AI agents
 
