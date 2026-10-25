@@ -244,7 +244,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   return (
     <View style={[styles.askcard, raised]}>
       <View style={styles.label}>
-        <Icon name="shield" size={15} color={c.amber} />
+        <LineIcon name="shield" size={15} color={c.amber} variant="footnote" />
         <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]} numberOfLines={1}>
           {origin ? `${t("mobile.chat.approval.asks")} · ${origin}` : t("mobile.chat.approval.asks")}
         </Text>
