@@ -89,6 +89,16 @@
   padding: 8px 16px 16px;
   overflow-y: auto;
 }
+/* The page in the dialog is the stage itself, not a card in a message. */
+.brw-ac.is-surface {
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+  animation: none;
+}
 .cmp-body .brw-ac__stage {
   border-radius: 12px;
 }

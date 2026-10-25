@@ -48,6 +48,7 @@ import { DialogHead, FullButton, useDialogHead } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
+import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
 import { isBlankPage } from "./sites";
@@ -327,6 +328,8 @@ export function BrowserCard({
   const toast = useToast();
   const head = useDialogHead();
   const openComputer = useOpenComputer();
+  // The workspace's own computer is never off and nobody connects one: its words say so.
+  const cloud = useComputerEdition(org.id) === "cloud";
   const agent = dir.agentById.get(agentId);
   const g = agentGrammar(t, name);
   const color = colorOf(agent);
@@ -680,9 +683,9 @@ export function BrowserCard({
   // What can't change by waiting is said plainly; everything else is "opening" while it retries.
   const blocker =
     unavailable?.reason === "offline"
-      ? t("browser.inCard.offline", g)
+      ? t(cloud ? "browser.inCard.offlineCloud" : "browser.inCard.offline", g)
       : unavailable?.reason === "no_computer"
-        ? t("browser.inCard.noComputer", g)
+        ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
         : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
           ? t("browser.inCard.forbidden")
           : null;
@@ -736,7 +739,9 @@ export function BrowserCard({
         ? ""
         : (open && starting) || opening
           ? t("agentComputer.sub.opening")
-          : (head?.watching ?? sub);
+          : closed
+            ? t("browser.watch.live")
+            : (head?.watching ?? sub);
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
   const fullLabel = full ? t("browser.inCard.fullExit") : t("browser.inCard.full");
   const thumbSrc = pic ? `data:image/jpeg;base64,${pic.data}` : null;
@@ -857,11 +862,13 @@ export function BrowserCard({
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
       ref={root}
-      className={["brw-ac", open && "is-open", inControl && "is-control", full && "is-full"].filter(Boolean).join(" ")}
+      className={["brw-ac", open && "is-open", inControl && "is-control", full && "is-full", surface && "is-surface"]
+        .filter(Boolean)
+        .join(" ")}
       role="group"
       aria-label={t("browser.inCard.group", g)}
     >
-      <SkyStrip color={color} muted={inControl} moving={live_} />
+      {!surface && <SkyStrip color={color} muted={inControl} moving={live_} />}
       {!open ? (
         // Closed: the small live picture, the site, what the agent does now; a click opens it right here.
         <div className="brw-ac__compact">
@@ -962,7 +969,7 @@ export function BrowserCard({
 
       {open && (
         <>
-          {goShown && <AddressBar grammar={g} focus={closed} onOpen={openSite} />}
+          {goShown && <AddressBar grammar={g} focus={closed} onOpen={openSite} cloud={cloud} />}
           <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
             <div className="brw-ac__stage">
               {src ? (

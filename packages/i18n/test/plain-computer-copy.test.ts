@@ -74,7 +74,9 @@ const CLOUD_EXTRA = [
   "desktop.sub.controlAsked",
   "desktop.sub.hidden",
   "desktop.takeover",
-  ...["handBack", "done", "couldnt", "full", "fullExit", "closed", "closedHelp"].map((k) => `browser.inCard.${k}`),
+  ...["handBack", "done", "couldnt", "full", "fullExit", "closed", "closedHelp", "offlineCloud", "noComputerCloud"].map(
+    (k) => `browser.inCard.${k}`,
+  ),
   "desktop.state.busy",
   "desktop.state.ended",
   "desktop.state.retrying",
@@ -117,6 +119,8 @@ const CLOUD_EXTRA = [
 /** The same screens' self-host keys, past the `agentComputer.` ones. */
 const SELFHOST_EXTRA = [
   "computers.lead",
+  "browser.inCard.offline",
+  "browser.inCard.noComputer",
   "computers.hostMissing",
   ...["title", "text", "emptyTitle", "emptyText"].map((k) => `computers.other.${k}`),
   "computers.daytona.cardTitle",

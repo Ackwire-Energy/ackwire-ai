@@ -206,10 +206,12 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
   });
 
   test("its computer not answering: said by name, looked after, nothing to do and no other computer", async () => {
+    // Its browser was there before it stopped answering: no page to show from a computer that doesn't answer.
     const t = await dialog({
       setup: { state: "ready" },
       machine: { name: "Computador da Acme", kind: "managed", os: "other", online: false },
       desktop: { available: false, reason: "offline" },
+      browser: true,
     });
     expect(sub()).toBe("Sem resposta");
     expect(box().textContent).toContain("O Computador da Acme não está respondendo");
@@ -279,6 +281,7 @@ describe("the computer dialog, self-host", () => {
     const t = await dialog({
       machine: { online: false, lastSeenAt: seen },
       desktop: { available: false, reason: "offline" },
+      browser: true,
     });
     expect(box().textContent).toContain("O Servidor de casa está offline");
     expect(box().textContent).toMatch(/Desde \d\d:\d\d\. A Ada espera o computador voltar\./);

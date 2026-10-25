@@ -187,13 +187,15 @@ export type ComputerSurface =
 
 /**
  * The dialog's stage. A person helping with a browser request gets the page, never the whole screen; a
- * computer that serves screens shows the agent's; one without them (a Mac) its browser's page.
+ * computer that serves screens shows the agent's; one without them (a Mac) its browser's page. An offline
+ * computer gets its cover: the browser it last reported can't open there now.
  */
 export function surfaceOf(f: AgentComputerFacts): ComputerSurface {
   if (f.held && waitsForWorkspace(f)) return "held";
   if (waitsForWorkspace(f)) return "preparing";
   const h = f.handoff;
   if (h?.status === "active" && h.controllerUserId === f.userId && handoffScreen(h) === "browser") return "page";
+  if (f.machine && !f.machine.online) return "cover";
   if (f.desktop?.available) return "screen";
   if (f.browser) return "page";
   return "cover";

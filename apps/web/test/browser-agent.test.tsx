@@ -150,6 +150,10 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     expect(card().textContent).toContain("O navegador da Ada está fechado");
     expect(card().textContent).toContain("Os logins continuam salvos.");
     expect(card().textContent).not.toContain("Abre quando");
+    expect(sub()).toBe("Ao vivo");
+    // The dialog's page is its stage, not a card in a message: one sky, under the dialog's head.
+    expect(card().classList.contains("is-surface")).toBe(true);
+    expect(card().querySelector(".ac-sky-strip")).toBeNull();
 
     // Take control opens it, to sign in ahead of time.
     await click(within(dialog() as HTMLElement).getByRole("button", { name: "Assumir o controle" }));
@@ -299,5 +303,8 @@ describe("browser helpers", () => {
     expect(openRefusalKey("browser.not_allowed")).toBe("browser.inCard.goNotAllowed");
     expect(openRefusalKey("browser.bad_address")).toBe("browser.inCard.goBadAddress");
     expect(openRefusalKey("machine.timeout")).toBe("browser.live.actionFailed");
+    // The workspace's own computer is never off.
+    expect(openRefusalKey("machine.offline")).toBe("browser.inCard.offline");
+    expect(openRefusalKey("machine.offline", true)).toBe("browser.inCard.offlineCloud");
   });
 });

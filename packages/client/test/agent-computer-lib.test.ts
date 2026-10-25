@@ -336,6 +336,9 @@ describe("what the dialog's stage shows", () => {
     // A Mac: no screens, the agent's page.
     expect(surfaceOf(facts({ desktop: { available: false, reason: "desktop_unavailable" } }))).toBe("page");
     expect(surfaceOf(facts({ desktop: { available: false, reason: "offline" }, browser: false }))).toBe("cover");
+    // Offline, the browser it last reported is no page to show: its cover says it isn't answering.
+    const offline = { name: "Oficina's computer", online: false, lastSeenAt: null, paused: null };
+    expect(surfaceOf(facts({ machine: offline, desktop: { available: false, reason: "offline" } }))).toBe("cover");
     expect(surfaceOf(facts({ machine: null, desktop: null, browser: false }))).toBe("cover");
   });
 });
