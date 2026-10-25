@@ -185,6 +185,23 @@ describe("who is working", () => {
     expect([...busyAgents(work)]).toEqual(["dev", "nina", "theo"]);
   });
 
+  test("a run stopped on a person is marked waiting (it isn't counted as working)", () => {
+    const work = workingNow(
+      [
+        run("r1", "nina", "running", "t9"),
+        run("r5", "theo", "waiting_approval", null, ago(3), { channelId: "d1", channelKind: "dm", channelName: null }),
+        run("r6", "lisa", "waiting_input", null, ago(4), { channelId: "d2", channelKind: "dm", channelName: null }),
+      ],
+      [mission({ id: "m1", agentId: "dev", threadId: "t1" })],
+    );
+    expect(work.map((w) => [w.key, w.waiting])).toEqual([
+      ["m:m1", false],
+      ["r:r1", false],
+      ["r:r5", true],
+      ["r:r6", true],
+    ]);
+  });
+
   test("a routine's background run is never working (no row, the DM doesn't say trabalhando)", () => {
     const work = workingNow(
       [

@@ -257,7 +257,7 @@ export async function handoffReplyIntent(
  *   comes later as a notice.
  * - Approvals and secrets: `held`. Text never grants or decides them; the
  *   card does. Such a run takes no new messages at all (`holdsMessages`,
- *   D97: they get a run of their own), so this only answers a race.
+ *   they get a run of their own), so this only answers a race.
  * - A question to people: null (the message already answered it, on insert).
  * - A mission's own wait, its computer: null (read when it resumes).
  *

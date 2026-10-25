@@ -52,6 +52,7 @@ Email needs rules about a call's arguments. These go in a standard per-call hook
 - **Draft:** creates a draft in the mailbox and never sends.
 - **Send / reply / forward:** a sensitive tool, so every call asks for approval in the chat by default, showing the exact recipients and body (ADR 0015).
   - Optional settings: allowed recipients or domains, a daily cap per agent, and which From address to use.
+  - **From:** a mailbox keeps its other addresses (`mail_accounts.aliases`: iCloud custom domains, Gmail "send as") and the one new mail goes out from (`default_from`). A reply, forward or reply draft goes out from the address the message reached (our own From, then To, then Cc, then `Delivered-To`/`X-Original-To` for an alias); new mail from `default_from`. An agent pinned to one address (`mail_agent_policies.from_address`, one of the mailbox's) uses only that one. The model may pick another of the mailbox's addresses, never one outside it. The connect flow offers the From addresses of the sent folder's recent mail.
   - An agent can be set to "send without asking" only when it has an allowed-recipients list.
 - **Organize:** move, flag and archive.
 - **Delete:** off. If turned on, it always asks.

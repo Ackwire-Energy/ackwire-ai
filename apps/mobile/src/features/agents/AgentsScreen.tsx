@@ -150,7 +150,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       sub={
         approval ? (
           <View style={styles.work}>
-            <Icon name="shield" size={13} color={c.amber} />
+            <Icon name="wait" size={13} color={c.amber} />
             <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
               {sub}
             </Text>

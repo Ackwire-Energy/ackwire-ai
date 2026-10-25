@@ -1,17 +1,8 @@
 import type { ApprovalEmail } from "@agenteschat/client";
-import { emailTitleWords } from "@agenteschat/client/lib/approval-kind";
 import { Icon } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import "./email-letter.css";
-
-/** What a mail approval does, in words: "Salvar um rascunho de resposta para ana@acme.com". */
-export function emailTitle(t: TFunction, email: ApprovalEmail) {
-  const words = emailTitleWords(email);
-  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
-  return tt(words.key, words.values);
-}
 
 /**
  * The email an approval writes, as it will be: De (the mailbox and its provider), Para, Assunto, the

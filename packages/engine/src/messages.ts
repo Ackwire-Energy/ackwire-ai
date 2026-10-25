@@ -506,8 +506,8 @@ export async function insertMessageWithRuns(
         -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
         -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
         -- Background runs (a routine's) hold no conversation: a person's message never goes to one.
-        -- Nor does a run waiting on an approval (D97): the agent answers in a run of its own meanwhile
-        -- (one waiting on a secret or a mission's decision hands it on after the insert: `steering.ts`).
+        -- Nor does a run waiting on an approval: the agent answers in a run of its own meanwhile
+        -- (one waiting on a secret or a mission's decision hands it on after the insert: steering.ts).
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id
         where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
@@ -536,7 +536,7 @@ export async function insertMessageWithRuns(
           )
         order by r.agent_id, r.created_at desc
       ), held as (
-        -- A reply in a thread where the agent's run waits on an approval (it takes nothing new, D97):
+        -- A reply in a thread where the agent's run waits on an approval (it takes nothing new):
         -- the agent answers it in a run of its own, as that run would have read it.
         select distinct r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id

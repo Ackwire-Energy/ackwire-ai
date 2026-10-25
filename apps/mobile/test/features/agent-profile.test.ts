@@ -27,6 +27,7 @@ const work = (agentId: string, since: string): WorkItem => ({
   missionId: null,
   plan: null,
   since,
+  waiting: false,
 });
 
 describe("Agentes: esperando você, trabalhando, livres", () => {

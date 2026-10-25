@@ -30,7 +30,7 @@ const { agentRuns } = schema;
  *    stays open; its result comes later as a notice). Parked waiting for its
  *    computer: look again now. Waiting on something the message can't move
  *    (a secret, a mission's decision; `holdsMessages`): the message leaves it
- *    for a run of its own (D97); an approval never takes it at all.
+ *    for a run of its own; an approval never takes it at all.
  * 4. The fast reply (`talker.ts`): when the run can't answer soon (waiting, or
  *    deep in a long turn), the agent's conversation layer may answer in a
  *    second or two, or pass.
@@ -107,7 +107,7 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     const waiting =
       !active.waitingMachineId && (active.status === "waiting_input" || active.status === "waiting_approval");
     // Waiting on something the message can't move (a secret, a mission's decision; an approval never takes
-    // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own (D97).
+    // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own.
     const handed =
       waiting &&
       (await holdsMessages(deps.db, active)) &&

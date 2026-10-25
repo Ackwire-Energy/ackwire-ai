@@ -72,6 +72,14 @@ export const mailAccounts = pgTable(
     askActions: text().array().notNull().default(sql`'{}'::text[]`),
     /** IMAP: the server's name for the sent folder (SMTP doesn't keep a copy). */
     sentFolder: text(),
+    /**
+     * Other addresses this mailbox sends and receives as (iCloud custom
+     * domains, Gmail "send as"), lowercase. A reply goes out from the one the
+     * message arrived at.
+     */
+    aliases: text().array().notNull().default(sql`'{}'::text[]`),
+    /** What new mail goes out from (`address` or one of `aliases`); null = `address`. */
+    defaultFrom: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -110,7 +118,11 @@ export const mailAgentPolicies = pgTable(
     /** Sends per agent per mailbox per day (UTC), approved or not. */
     dailySendCap: integer().notNull().default(25),
     sendWithoutAsking: boolean().notNull().default(false),
-    /** An alias of the mailbox to send from; null = the mailbox address. */
+    /**
+     * The only address this agent sends from (the mailbox's or one of its
+     * aliases); null = replies from the address the message arrived at, new
+     * mail from the mailbox's `default_from`.
+     */
     fromAddress: text(),
     updatedByUserId: text(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

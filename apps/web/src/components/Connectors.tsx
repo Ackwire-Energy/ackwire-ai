@@ -34,6 +34,7 @@ import {
 import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
 import {
+  MailAddressesDialog,
   MailConnectFlow,
   MailDisconnectDialog,
   type MailFlowState,
@@ -83,6 +84,7 @@ export function ConnectorsSection({
   const accounts = mailAccounts.data ?? [];
   const [mailFlow, setMailFlow] = useState<MailFlowState | null>(null);
   const [reconnecting, setReconnecting] = useState<MailAccount | null>(null);
+  const [addressesOf, setAddressesOf] = useState<MailAccount | null>(null);
   const [removingMail, setRemovingMail] = useState<MailAccount | null>(null);
   // People's Postgres databases (ADR 0039): rows of the same list, the same kind of flow.
   const databases = useDatabases(org.id);
@@ -166,6 +168,7 @@ export function ConnectorsSection({
               admin={admin}
               onTools={() => setMailFlow({ step: 1, account })}
               onWho={() => setMailFlow({ step: 2, account })}
+              onAddresses={() => setAddressesOf(account)}
               onReconnect={() => reconnect(account)}
               onDisconnect={() => setRemovingMail(account)}
             />
@@ -231,6 +234,7 @@ export function ConnectorsSection({
       <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
       <MailConnectFlow flow={mailFlow} onChange={setMailFlow} onClose={() => setMailFlow(null)} />
       <MailReconnectDialog account={reconnecting} onClose={() => setReconnecting(null)} />
+      <MailAddressesDialog account={addressesOf} onClose={() => setAddressesOf(null)} />
       <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
       <DatabaseConnectFlow flow={dbFlow} onChange={setDbFlow} onClose={() => setDbFlow(null)} />
       <DatabaseReconnectDialog connection={reconnectingDb} onClose={() => setReconnectingDb(null)} />

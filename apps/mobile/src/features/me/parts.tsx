@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, Text } from "@/ui";
-import { useColors } from "../shared/hooks";
+import { IconButton, Text } from "@/ui";
 
 /** One screen of the sheet: the bar (back, title, an action) over a scrolling body. */
 export function Page({
@@ -34,24 +33,13 @@ export function Page({
   );
 }
 
-/** The bar of a screen inside the sheet: a round back button, the title centered, an action (or room). */
+/** The bar of a screen inside the sheet: the round glass back button, the title centered, an action (or room). */
 export function SheetBar({ title, onBack, right }: { title: string; onBack?: () => void; right?: ReactNode }) {
   const { t } = useTranslation();
-  const c = useColors();
   return (
     <View style={styles.bar}>
       <View style={styles.side}>
-        {onBack ? (
-          <Pressable
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.common.back")}
-            hitSlop={8}
-            style={({ pressed }) => [styles.backBtn, { backgroundColor: pressed ? c.plate : c.plateSoft }]}
-          >
-            <Icon name="back" size={20} color={c.ink2} />
-          </Pressable>
-        ) : null}
+        {onBack ? <IconButton icon="back" label={t("mobile.common.back")} plate onPress={onBack} /> : null}
       </View>
       <Text variant="title" accessibilityRole="header" numberOfLines={1} style={styles.barTitle}>
         {title}
@@ -68,5 +56,4 @@ const styles = StyleSheet.create({
   side: { width: 56, flexDirection: "row" },
   sideRight: { justifyContent: "flex-end" },
   barTitle: { flex: 1, textAlign: "center" },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
 });

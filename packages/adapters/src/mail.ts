@@ -59,6 +59,12 @@ export interface MailMessage extends MailSummary {
   /** Plain text (HTML converted), quoted history kept. */
   text: string;
   replyTo: MailAddress[];
+  /**
+   * Where the server delivered it (`Delivered-To`, `X-Original-To`), when it
+   * says: the alias a message reached even when `To` doesn't show it (Bcc,
+   * lists). Lowercase.
+   */
+  deliveredTo?: string[];
   /** RFC 5322 `Message-ID` and `References`, for threading replies. */
   messageIdHeader?: string;
   references?: string[];

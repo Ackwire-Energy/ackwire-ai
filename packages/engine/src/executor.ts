@@ -543,7 +543,7 @@ async function executeRunInner(
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
     // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
-    // read gets a run of its own; nothing sent to the agent waits behind the decision (D97).
+    // read gets a run of its own; nothing sent to the agent waits behind the decision.
     if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
       await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
     // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
