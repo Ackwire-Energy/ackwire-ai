@@ -1,5 +1,5 @@
 import type { Config } from "@agenteschat/config";
-import type { Hono } from "hono";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 
 /**
  * Links that open the phone app: an invitation (`/invite/{token}`) and "Esqueci a senha"
@@ -44,7 +44,7 @@ export function androidAssetLinks(config: Pick<Config, "ANDROID_APP_PACKAGE" | "
 }
 
 /** Serves both files at `/.well-known/` (JSON, no redirect, as both platforms require). */
-export function registerAppLinks(app: Hono, config: Config) {
+export function registerAppLinks(app: OpenAPIHono, config: Config) {
   app.get("/.well-known/apple-app-site-association", (c) => {
     const body = appleAppSiteAssociation(config);
     return body ? c.json(body) : c.text("Not found", 404);

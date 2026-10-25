@@ -1336,7 +1336,8 @@ export const featureKeysEn: FeatureTranslations = {
     importOpenMausBotDesc: "The team file or a GitHub link",
     importOpenBot: "OpenBot",
     importOpenBotDesc: "agents.yaml or a GitHub link",
-    importLater: "To bring agents from another app, use the computer: Agents → Import. You can go on without them here.",
+    importLater:
+      "To bring agents from another app, use the computer: Agents → Import. You can go on without them here.",
     importNever: "Keys, passwords and conversations never come along.",
     importSkip: "I don't, skip",
     agentsAda: "I'm already here",

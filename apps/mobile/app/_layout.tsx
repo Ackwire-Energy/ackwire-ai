@@ -1,8 +1,8 @@
+import { keys, useApi } from "@agenteschat/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { ThemeProvider as NavigationThemeProvider, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { keys, useApi } from "@agenteschat/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { Entering } from "@/features/auth/Entering";
