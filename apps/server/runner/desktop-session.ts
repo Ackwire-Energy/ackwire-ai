@@ -26,6 +26,7 @@ import {
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
 import type { Launcher } from "./agent-users";
+import { lookCommand, lookTheme } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
@@ -48,6 +49,8 @@ import { KeyedQueue } from "./queue";
  *   is root's: Xvnc reads it on every connection, so an agent that could
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
+ * - Its look (`desktop-look.ts`) is XFCE's settings in its HOME, written there
+ *   as the agent before a start whenever the HOME has an older one.
  * - Started the first time it is needed (`ensure`: the agent's screen or
  *   browser, a person opening it), then left on: none stops for being idle,
  *   so what a person left open on it is still there later. Started again (at
@@ -276,6 +279,8 @@ export interface DesktopSystem {
   uid: number | null;
   /** A command's full path on `pathList` (default: the runner's PATH); null when it isn't there. */
   which(command: string, pathList?: string): string | null;
+  /** A file is there (the look's theme). */
+  exists(file: string): boolean;
   spawn(argv: string[], opts: DesktopSpawnOptions): DesktopProcess;
   /** A process's command line; null when it isn't running. */
   cmdline(pid: number): string[] | null;
@@ -313,6 +318,7 @@ export const hostSystem = (): DesktopSystem => ({
     const found = resolveCommand(command, pathList);
     return path.isAbsolute(found) ? found : null;
   },
+  exists: existsSync,
   spawn: spawnProcess,
   cmdline(pid) {
     try {
@@ -687,6 +693,19 @@ export class DesktopSessions {
           throw new RunnerError(
             "internal",
             `The agent's desktop couldn't be prepared: ${tailLines(logFile, 3).join(" ")}`,
+          );
+        }
+        // The agentes.chat look (desktop-look.ts), written as the agent; without it the desktop starts as its HOME has it.
+        const theme = lookTheme((f) => this.sys.exists(f));
+        const look = this.sys.spawn([...user.prefix, ...lookCommand(user.home, theme)], {
+          cwd: "/",
+          env: user.env,
+          log,
+        });
+        const lookExit = await look.exited;
+        if (lookExit !== 0) {
+          this.opts.log(
+            `the desktop of ${agent.handle} keeps the look its home has: writing the agentes.chat look failed (exit ${lookExit})`,
           );
         }
         this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
