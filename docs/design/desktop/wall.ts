@@ -55,9 +55,11 @@ const AGENTS: { x: number; y: number; body: "navy" | "ghost"; closed?: boolean }
 
 /**
  * The logo at the bottom left, on the pale band, centered on the dock's line (the dock spans y 844–893): below
- * 840, where a maximized window ends, so it shows whatever is open.
+ * 840, where a maximized window ends, so it shows whatever is open. ".chat" in the sprites' solid navy and Doto's
+ * heaviest dots (wall.html): the computer dialog shows the desktop at about 0.6, where the app's lighter ink and
+ * smaller dots thin out to a haze.
  */
-const LOGO = { left: 36, bottom: 15, size: 26, ink: "rgba(4, 32, 63, 0.8)", dim: "rgba(4, 32, 63, 0.66)" };
+const LOGO = { left: 36, bottom: 15, size: 26, ink: "rgba(4, 32, 63, 0.8)", chat: "#04203f" };
 
 function seeded(seed: number) {
   let a = seed >>> 0;
@@ -90,7 +92,7 @@ function logo(): HTMLElement {
     `<svg viewBox="0 0 32 32" aria-hidden="true"><defs><clipPath id="b"><path d="${body}"/></clipPath></defs>` +
     `<path d="${body}" fill="#0063d1"/><image href="${dither}" x="2" y="2" width="28" height="28" preserveAspectRatio="none" clip-path="url(#b)"/>` +
     `<g fill="#ffffff">${eyes}</g></svg>` +
-    `<span class="word"><span>agentes</span><span class="chat" style="color:${LOGO.dim}">.chat</span></span>`;
+    `<span class="word"><span>agentes</span><span class="chat" style="color:${LOGO.chat}">.chat</span></span>`;
   return el;
 }
 
@@ -99,7 +101,7 @@ async function main() {
   const canvas = host?.querySelector("canvas");
   if (!host || !canvas) return;
   host.append(logo());
-  const faces = [`300 ${LOGO.size}px "Funnel Display"`, `600 ${LOGO.size}px "Doto"`];
+  const faces = [`300 ${LOGO.size}px "Funnel Display"`, `900 ${LOGO.size}px "Doto"`];
   await Promise.all(faces.map((face) => document.fonts.load(face, "agentes.chat")));
   // Without the brand's fonts the logo would come out in a fallback face: the image stays black instead.
   if (!faces.every((face) => document.fonts.check(face, "agentes.chat"))) return;
