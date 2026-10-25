@@ -24,6 +24,8 @@ export interface AppColors extends ThemeColors {
   amber: string;
   /** A small tag's fill (chips, states). */
   chip: string;
+  /** Unread: the row's dot, the same red as the tab bar's badge (the system red). */
+  badge: string;
 }
 
 /** Light, native: what changes from the tokens. */
@@ -60,10 +62,18 @@ export function appColors(scheme: Scheme): AppColors {
       bubble: darkTokens.raised,
       amber: "#e8ac4c",
       chip: darkTokens.sunken,
+      badge: "#ff453a",
     };
   }
   const base = { ...lightTokens, ...NATIVE_LIGHT };
-  return { ...base, grouped: "#f2f2f7", bubble: "#eef0f3", amber: "#b26a00", chip: "rgba(120, 120, 128, 0.1)" };
+  return {
+    ...base,
+    grouped: "#f2f2f7",
+    bubble: "#eef0f3",
+    amber: "#b26a00",
+    chip: "rgba(120, 120, 128, 0.1)",
+    badge: "#ff3b30",
+  };
 }
 
 /** Light elevations are softer (a hairline and a short shadow, like iOS); dark keeps the tokens'. */

@@ -91,7 +91,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       <View style={styles.work}>
         {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
         {lines.state === "waiting" ? (
-          <LineIcon name="shield" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+          <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
         ) : null}
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text
@@ -110,7 +110,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = [verb, agentState.title].filter(Boolean).join(" · ");
     line = (
       <View style={styles.work}>
-        <LineIcon name="shield" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+        <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text variant="small" style={[LIST_PREVIEW, styles.em, { color: c.amber }]}>
             {verb}

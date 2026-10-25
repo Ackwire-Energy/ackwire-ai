@@ -35,15 +35,16 @@ export function Icon({ name, size = 20, color }: IconProps) {
         if (s.t === "rect")
           return (
             <Rect
-              key={`r${s.x}-${s.y}-${s.w}`}
+              key={`r${s.x}-${s.y}-${s.w}-${s.h}`}
               x={s.x}
               y={s.y}
               width={s.w}
               height={s.h}
               rx={s.rx}
-              fill="none"
-              stroke={stroke}
+              fill={s.fill ? stroke : "none"}
+              stroke={s.fill ? "none" : stroke}
               strokeWidth={1.7}
+              opacity={s.opacity}
             />
           );
         return (

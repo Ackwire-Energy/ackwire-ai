@@ -18,7 +18,7 @@ import { useOrg } from "@/providers/org";
 import { browserGranted } from "../browser/logic";
 import { useChatLive } from "../chat/live";
 import { useMeId, useOrgId } from "../shared/hooks";
-import { useWorkingNow } from "../shared/queries";
+import { useActiveWork } from "../shared/queries";
 
 /** Outside the agent's conversations no event says when its request changes: it's asked again this often. */
 const HANDOFF_POLL_MS = 30_000;
@@ -92,7 +92,7 @@ export type AgentComputerView = ReturnType<typeof useAgentComputer>;
  */
 export function useAgentRun(agentId: string): LiveRun | null {
   const orgId = useOrgId();
-  const where = useWorkingNow().find((w) => w.agentId === agentId);
+  const where = useActiveWork().find((w) => w.agentId === agentId);
   const live = useChatLive(orgId, where?.channelId ?? "", Boolean(where));
   return live.runs.filter((r) => r.agentId === agentId).at(-1) ?? null;
 }

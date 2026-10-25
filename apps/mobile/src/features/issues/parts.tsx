@@ -52,7 +52,7 @@ export function ColumnHeader({ label, count }: { label: string; count: number })
 }
 
 const STATE_ICON: Record<Exclude<IssueState, "running">, IconName> = {
-  waiting: "shield",
+  waiting: "wait",
   stalled: "pause",
   review: "code",
   progress: "clock",

@@ -21,8 +21,7 @@ import {
 
 /**
  * A request, from anywhere (deep link `approval/<id>`): who asks, the action
- * in words, the action itself (the whole email, else the detail and its
- * table), what the agent said, what it affects and the amber fuse. High risk
+ * in words, the action itself (the whole email, else the detail and every value, whole), what the agent said, what it affects and the amber fuse. High risk
  * takes a hold; refusing can say why ("ajuda o agente a aprender").
  */
 export function ApprovalSheet({
@@ -130,12 +129,13 @@ export function ApprovalSheet({
               <ApprovalEmailLetter email={a.email} full />
             ) : (
               <>
-                {a.detail ? (
+                {/* A connector's detail is its raw call (`tool · key=value`); its values are in the table, in words. */}
+                {a.detail && !a.connector ? (
                   <Text variant="body" tone="ink2" style={styles.detail}>
                     {a.detail}
                   </Text>
                 ) : null}
-                <ApprovalDetails approval={a} max={6} />
+                <ApprovalDetails approval={a} max={Number.POSITIVE_INFINITY} long />
               </>
             )}
             <ApprovalSaid approval={a} name={name} />
