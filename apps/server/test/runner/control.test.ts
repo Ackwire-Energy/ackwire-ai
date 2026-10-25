@@ -743,16 +743,12 @@ test.if(process.platform !== "win32")(
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "signed-in"), "");
     const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
-    const s = await c.connect();
-    // The first look never delays connecting: in `hello` if it was quick, else right after as `accounts.changed`.
-    const reported = () =>
-      (s.of("accounts.changed").at(-1) as { accounts?: unknown } | undefined)?.accounts ??
-      (s.of("hello")[0] as { accounts?: unknown } | undefined)?.accounts;
-    await waitFor(() => reported() !== undefined);
-    expect(reported()).toMatchObject([{ id: existing, kind: "codex", loggedIn: true }]);
+    // Connects once the first look is done, so `hello` lists what it found whatever the CLIs' speed.
     expect(await c.data({ type: "accounts.list" })).toEqual({
       accounts: [{ id: existing, kind: "codex", loggedIn: true }],
     });
+    const s = await c.connect();
+    expect(s.of("hello")[0]?.accounts).toMatchObject([{ id: existing, kind: "codex", loggedIn: true }]);
 
     const begun = await c.data<{ loginId: string; url: string; userCode?: string }>({
       type: "account.begin",

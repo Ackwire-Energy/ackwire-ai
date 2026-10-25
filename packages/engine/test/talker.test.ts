@@ -7,7 +7,6 @@ import {
   createTalker,
   drainOutbox,
   grantScopes,
-  listApprovals,
   listMessages,
   postPersonMessage,
   stopChecksSettled,
@@ -200,7 +199,7 @@ describe("talker: fast replies while the task waits", () => {
     expect(f.provider.calls).toHaveLength(0);
   });
 
-  test("waiting on an approval: the message gets a run of its own, the card stays, the talker isn't asked", async () => {
+  test("waiting on an approval: the talker isn't asked", async () => {
     const merge = {
       name: "github_merge_pr",
       input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
@@ -218,16 +217,10 @@ describe("talker: fast replies while the task waits", () => {
     expect(held?.status).toBe("waiting_approval");
 
     const { write, decisions } = talkerOn(trigger);
-    const asked = await write("já mergeou?");
+    await write("já mergeou?");
+    // The message gets a run of its own instead (waits.test.ts).
     expect(decisions).toEqual([]);
     expect(talkerCalls()).toHaveLength(0);
-    const runs = await f.db.select().from(schema.agentRuns);
-    expect(runs).toHaveLength(2);
-    expect(runs.find((r) => r.id === held?.id)).toMatchObject({ status: "waiting_approval", pendingMessageIds: [] });
-    expect(runs.find((r) => r.id !== held?.id)?.triggerMessageId).toBe(asked.id);
-    expect(await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" })).toEqual([
-      expect.objectContaining({ runId: held?.id }),
-    ]);
   });
 });
 
