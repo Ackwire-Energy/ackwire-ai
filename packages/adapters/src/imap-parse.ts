@@ -425,6 +425,25 @@ function capText(text: string): string {
   return text.length > MAX_TEXT_CHARS ? `${text.slice(0, MAX_TEXT_CHARS)}\n[…truncated]` : text;
 }
 
+const EMAIL_IN_TEXT = /[^\s<>"',;:]+@[^\s<>"',;:]+\.[^\s<>"',;:]+/g;
+
+/** `Delivered-To` and `X-Original-To` (parsed as addresses or kept as text, once or repeated), lowercase. */
+function deliveredOf(headers: Map<string, unknown>): { deliveredTo?: string[] } {
+  const out = new Set<string>();
+  const take = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const v of value) take(v);
+    } else if (typeof value === "string") {
+      for (const m of value.match(EMAIL_IN_TEXT) ?? []) out.add(m.toLowerCase());
+    } else if (value && typeof value === "object" && "value" in value) {
+      for (const a of flattenParsed(value as AddressObject)) out.add(a.address);
+    }
+  };
+  take(headers.get("delivered-to"));
+  take(headers.get("x-original-to"));
+  return out.size > 0 ? { deliveredTo: [...out] } : {};
+}
+
 /** Full MIME source → MailMessage. Attachments come from the IMAP structure (ids = part numbers). */
 export async function parseMessage(
   source: Uint8Array,
@@ -455,6 +474,7 @@ export async function parseMessage(
     hasAttachments: attachments.length > 0,
     text,
     replyTo: flattenParsed(parsed.replyTo),
+    ...deliveredOf(parsed.headers),
     ...(parsed.messageId ? { messageIdHeader: parsed.messageId } : {}),
     ...(references?.length ? { references } : {}),
     attachments,

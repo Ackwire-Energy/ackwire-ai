@@ -442,6 +442,18 @@ function gmailHeaders(payload: GmailPart | undefined): Record<string, string> {
   return headers;
 }
 
+/** Every `Delivered-To` and `X-Original-To` of a Gmail message (they repeat), lowercase. */
+function gmailDeliveredTo(payload: GmailPart | undefined): string[] {
+  const out = new Set<string>();
+  for (const header of payload?.headers ?? []) {
+    const name = header.name?.toLowerCase();
+    if ((name === "delivered-to" || name === "x-original-to") && typeof header.value === "string") {
+      for (const a of parseAddressList(header.value)) out.add(a.address);
+    }
+  }
+  return [...out];
+}
+
 function gmailParts(payload: GmailPart | undefined): GmailPart[] {
   const out: GmailPart[] = [];
   const walk = (part: GmailPart | undefined) => {
@@ -495,6 +507,7 @@ export function gmailMessage(raw: Obj): MailMessage {
   const snippetSource = str(raw.snippet) ?? str(preview.body) ?? text;
   const attachments = gmailAttachments(raw, payload);
   const folder = labels.find((label) => label in GMAIL_ROLES);
+  const deliveredTo = gmailDeliveredTo(payload);
   return {
     id: str(raw.messageId ?? raw.id ?? raw.message_id) ?? "",
     threadId: str(raw.threadId ?? raw.thread_id),
@@ -514,6 +527,7 @@ export function gmailMessage(raw: Obj): MailMessage {
     hasAttachments: attachments.length > 0 || payload?.mimeType?.toLowerCase() === "multipart/mixed",
     text,
     replyTo: parseAddressList(headers["reply-to"]),
+    ...(deliveredTo.length > 0 ? { deliveredTo } : {}),
     messageIdHeader: headers["message-id"],
     references: (headers.references ?? "").split(/\s+/).filter(Boolean),
     attachments,
