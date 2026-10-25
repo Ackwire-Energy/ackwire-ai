@@ -26,7 +26,7 @@ import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
 import { WorkCard } from "./Work";
 
-/** How much of its instructions "What it does" shows: about three lines; the rest is a click away. */
+/** "What it does": the start of its instructions in plain words, up to three lines and this many characters. */
 const DOES_PREVIEW = 280;
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */

@@ -384,6 +384,9 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     for (const id of ["n-ready", "n-hold"]) expect(row(id).querySelector(".nt-who .nt-sys svg")).toBeTruthy();
     expect(row("n-ready").classList.contains("is-unread")).toBe(true);
     expect(row("n-hold").classList.contains("is-unread")).toBe(false);
+    // With nobody to name, a screen reader reads what it tells.
+    expect(row("n-ready").getAttribute("aria-label")).toBe("O computador do seu workspace está pronto, não lida");
+    expect(row("n-hold").getAttribute("aria-label")).toBe("O workspace está em espera: os agentes estão pausados");
     // A headline with no name in it carries the unread weight whole.
     const css = await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text();
     expect(css).toMatch(/\.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 600/);

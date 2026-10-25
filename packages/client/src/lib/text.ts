@@ -1,3 +1,5 @@
+import { plainLines } from "./markdown";
+
 /** `Acme Saúde` → `acme-saude` (display only: the backend has no slug yet). */
 export const slugify = (value: string) =>
   value
@@ -100,11 +102,12 @@ export function webmailOf(
 const STOPS = /[.!?…](?=\s)|\n/g;
 
 /**
- * The start of a text in at most `max` characters: whole sentences and lines while they fit, so a full stop is
- * never followed by an ellipsis. A first sentence longer than that is cut at a word, with "…".
+ * The start of a Markdown text in plain words (`plainLines`), in at most `lines` lines and `max` characters:
+ * whole lines and sentences while they fit, so a full stop is never followed by an ellipsis. A first sentence
+ * longer than that is cut at a word, with "…".
  */
-export function excerpt(text: string, max: number) {
-  const whole = text.trim();
+export function excerpt(text: string, max: number, lines = 3) {
+  const whole = plainLines(text).slice(0, lines).join("\n");
   if (whole.length <= max) return whole;
   let end = 0;
   for (const stop of whole.matchAll(STOPS)) {

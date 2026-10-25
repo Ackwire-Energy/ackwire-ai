@@ -891,8 +891,8 @@ function GrantCard({ machine: m }: { machine: Machine }) {
 }
 
 /**
- * The workspace's own computer's page: what is on it for every agent, in a person's words, and where a person
- * opens it. The browser and the files are on each agent's screen, not cards of their own.
+ * The workspace's own computer's page: what is on it for every agent, in a person's words. Its browser and files
+ * are on each agent's screen, not cards of their own; "always on" is the page's lead.
  */
 function OnThisComputerCard() {
   const { t } = useTranslation();
@@ -907,20 +907,12 @@ function OnThisComputerCard() {
           {t("computers.onIt.screens")}
         </li>
         <li>
-          <Icon name="globe" size={14} />
-          {t("computers.onIt.browser")}
-        </li>
-        <li>
           <ProviderLogo id="claude_code" size="xs" />
           {t("computers.onIt.plans")}
         </li>
         <li>
           <Icon name="key" size={14} />
           {t("computers.onIt.coding")}
-        </li>
-        <li>
-          <Icon name="clock" size={14} />
-          {t("computers.onIt.always")}
         </li>
       </ul>
     </Card>
@@ -1019,7 +1011,6 @@ export function MachinePage({ machineId }: { machineId: string }) {
           {m.kind === "host" && <span className="small">{t(`machines.host.${hostDescKey(m.os)}`)}</span>}
           {managed ? (
             <>
-              <span className="small">{t("computerSetup.lead")}</span>
               {setup && <SetupFacts view={setup} />}
               {!m.online && <span className="small muted">{seenText(t, i18n.language, m)}</span>}
             </>

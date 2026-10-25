@@ -1002,7 +1002,6 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: a.name,
           handle: a.handle,
           role: a.role,
-          summary: a.instructions.split(/(?<=[.!?])\s/)[0] ?? "",
           appearance: a.appearance ?? null,
           ownerUserId: a.ownerUserId,
           capabilities: ["drive", "issues"],

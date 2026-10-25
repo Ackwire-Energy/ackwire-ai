@@ -2190,7 +2190,6 @@ export const en: Translations = {
   },
   newAgent: {
     title: "Create agent",
-    railTitle: "New agent",
     railOrg: "{{org}} · you are {{role}}",
     stepsLabel: "Steps to create the agent",
     leave: "Leave without creating",
@@ -7025,14 +7024,12 @@ export const en: Translations = {
       saved: "{{name}} now uses {{computer}}.",
     },
     lead: "Where your agents work: this server's computer and any other computer you connect.",
-    leadCloud: "Where your agents work: this workspace's own computer.",
+    leadCloud: "Where your agents work: a computer just for this workspace, always on.",
     onIt: {
       title: "On this computer",
-      screens: "Each agent's own screen: Open shows it live, and you can take control",
-      browser: "Its browser and its files open on that screen, from the bar at the bottom",
+      screens: "Each agent's own screen, with its browser and its files",
       plans: "Claude Code and Codex, ready for each agent to sign in with your Claude or ChatGPT plan",
       coding: "Coding plans from Z.ai (GLM), Kimi, MiniMax and OpenCode, with the plan's key",
-      always: "Always on, day and night",
     },
     hostMissing:
       "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>.",

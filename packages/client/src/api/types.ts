@@ -191,14 +191,12 @@ export interface Agent {
   brain?: AgentBrainLine;
 }
 
-/** An agent on the team screen: what it does and what it can do. */
+/** An agent on the team screen: what it can do. What it does comes from its instructions (`Agent`). */
 export interface TeamAgent {
   id: string;
   name: string;
   handle: string;
   role: string;
-  /** What it does: the first sentence of its instructions (empty without any). */
-  summary: string;
   appearance: AgentLookInput | null;
   ownerUserId: string | null;
   /** What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…). */

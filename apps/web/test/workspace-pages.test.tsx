@@ -276,6 +276,8 @@ describe("Criar agente", () => {
   test("role presets, validation, and creation in the chosen channels", async () => {
     const { state } = await go("agents/new");
     expect(screen().getByRole("heading", { level: 1, name: "Qual vai ser o papel?" })).toBeTruthy();
+    // The page says what the button that opened it said.
+    expect(document.querySelector(".newag__rail-title b")?.textContent).toBe("Criar agente");
     await click(screen().getByRole("button", { name: /^Dev/ }));
     await click(screen().getByRole("button", { name: "Continuar" }));
     // Dev starts as Ada, and @ada is taken: renamed here.
@@ -344,8 +346,18 @@ describe("Equipe", () => {
 
   test("the card: what it does, available or with no AI, each ability named and drawn its own way", async () => {
     const state = seedState({
-      aiStatus: { any: true, agents: [{ agentId: ATLAS_ID, state: "no_ai", reason: "no_key" }] },
+      aiStatus: {
+        any: true,
+        agents: [
+          { agentId: ADA_ID, state: "ready" },
+          { agentId: ATLAS_ID, state: "no_ai", reason: "no_key" },
+        ],
+      },
     });
+    const imported = state.agents.find((a) => a.id === ADA_ID);
+    if (imported)
+      imported.instructions =
+        "# SOUL.md - Quem você é\n\n_Você não é um chatbot. Você está se tornando alguém._\n\n## Verdades\n\n- **Ajude de verdade.**";
     const api = createFakeApi(state);
     const team = api.agents.team;
     api.agents.team = async (orgId) => {
@@ -363,9 +375,12 @@ describe("Equipe", () => {
     const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
     await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
     const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    // Its role is beside its name; what it does comes from its instructions.
+    // Its role is beside its name; what it does comes from its instructions, in plain words: their first line,
+    // as its page starts.
     expect(ada.querySelector(".team-card__meta")?.textContent).toContain("Dev");
-    expect(ada.querySelector(".team-card__call")?.textContent).toBe("Instruções de Ada.");
+    expect(ada.querySelector(".team-card__call")?.textContent).toBe(
+      "Você não é um chatbot. Você está se tornando alguém.",
+    );
     expect(ada.querySelector(".team-card__status")?.textContent).toBe("Disponível");
     expect(ada.textContent).not.toContain("Livre");
     const chip = (name: string) =>
@@ -377,5 +392,15 @@ describe("Equipe", () => {
     const atlas = screen().getByRole("dialog", { name: "Detalhes de Atlas" });
     expect(within(atlas).getByRole("button", { name: "Sem IA" })).toBeTruthy();
     expect(atlas.textContent).not.toContain("Disponível");
+  });
+
+  test("the card of an agent waiting for its computer says neither Available nor No AI", async () => {
+    await go("team", seedState({ aiStatus: { any: true, agents: [{ agentId: ADA_ID, state: "waiting" }] } }));
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    expect(ada.querySelector(".team-card__status")).toBeNull();
+    expect(within(ada).queryByRole("button", { name: "Sem IA" })).toBeNull();
+    expect(ada.textContent).toContain("Instruções de Ada.");
   });
 });

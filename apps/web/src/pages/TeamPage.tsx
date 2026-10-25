@@ -3,6 +3,7 @@ import { useAiStatus, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { excerpt } from "@agenteschat/client/lib/text";
 import {
   Avatar,
   Button,
@@ -27,6 +28,7 @@ import { ErrorState, LoadingCards } from "@/components/Loading";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useTheme } from "@/lib/theme";
 import "./team.css";
 
@@ -58,6 +60,8 @@ const CAPS = {
 } as const satisfies Record<string, IconName>;
 type CapKey = keyof typeof CAPS;
 const HIDDEN_CAPS = new Set(["context", "memory", "skills", "setup"]);
+/** "What it does" on its card: the first line of its instructions, in whole sentences while they fit. */
+const SUMMARY_MAX = 160;
 const isCap = (k: string): k is CapKey => k in CAPS;
 
 /** How long a new consultation's line stays lit, in ms. */
@@ -159,6 +163,8 @@ export function TeamPage() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const team = useTeam(org.id);
+  // Asked with the page, so an agent's card opens already saying whether it can work.
+  useAiStatus(org.id);
   const data = team.data;
   const working = data?.agents.filter((a) => a.busy).length ?? 0;
   return (
@@ -414,6 +420,10 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
   const { t } = useTranslation();
   const { org } = useOrg();
   const aiStatus = useAiStatus(org.id);
+  const ai = aiStateOf(aiStatus.data, agent.id);
+  const dir = useDirectory(org.id);
+  // The same plain words as its page's "What it does", from the instructions every member can read.
+  const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
   return (
@@ -441,20 +451,23 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
               <PixelSpinner size={14} color={colorOf(agent)} />
               {t("team.workingNow")}
             </span>
-          ) : aiStateOf(aiStatus.data, agent.id) === "no_ai" ? (
+          ) : ai === "no_ai" ? (
             <NoAiChip agentId={agent.id} />
           ) : (
-            <span className="team-card__status">
-              <span className="team-card__dot" aria-hidden="true" />
-              {t("team.available")}
-            </span>
+            // Waiting (its computer away, a plan's limit reached) can't work now either: no word, never Available.
+            ai === "ready" && (
+              <span className="team-card__status">
+                <span className="team-card__dot" aria-hidden="true" />
+                {t("team.available")}
+              </span>
+            )
           )}
         </div>
       </div>
-      {agent.summary && (
+      {summary && (
         <div className="team-card__sec">
           <span className="team-card__eyebrow">{t("team.does")}</span>
-          <p className="team-card__call">{agent.summary}</p>
+          <p className="team-card__call">{summary}</p>
         </div>
       )}
       <div className="team-card__sec">

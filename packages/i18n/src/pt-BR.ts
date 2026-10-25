@@ -2203,7 +2203,6 @@ export const ptBR = {
   },
   newAgent: {
     title: "Criar agente",
-    railTitle: "Novo agente",
     railOrg: "{{org}} · você é {{role}}",
     stepsLabel: "Passos para criar o agente",
     leave: "Sair sem criar",
@@ -7048,14 +7047,12 @@ export const ptBR = {
       saved: "{{name}} agora usa {{computer}}.",
     },
     lead: "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
-    leadCloud: "Onde os agentes trabalham: o computador deste workspace.",
+    leadCloud: "Onde os agentes trabalham: um computador só deste workspace, sempre ligado.",
     onIt: {
       title: "Neste computador",
-      screens: "A tela de cada agente: Abrir mostra ao vivo, e você pode assumir o controle",
-      browser: "O navegador e os arquivos dele abrem nessa tela, pela barra na parte de baixo",
+      screens: "Uma tela para cada agente, com o navegador e os arquivos dele",
       plans: "O Claude Code e o Codex, prontos para cada agente entrar com o seu plano do Claude ou do ChatGPT",
       coding: "Planos de código da Z.ai (GLM), Kimi, MiniMax e OpenCode, com a chave do plano",
-      always: "Sempre ligado, dia e noite",
     },
     hostMissing:
       "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no <code>SELF_HOSTING.md</code>.",

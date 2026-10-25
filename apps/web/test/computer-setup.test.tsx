@@ -151,10 +151,12 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     await push({ state: "ready", machineId: m.id });
     expect(card().textContent).toContain("Online");
     expect(card().textContent).toContain("Usado por Ada");
-    // The page says where the agents work in one line, and leaves what the computer is to its card; nothing else
-    // to connect or pick.
-    expect(document.body.textContent).toContain("Onde os agentes trabalham: o computador deste workspace.");
-    expect(document.body.textContent?.split("sempre ligado")).toHaveLength(2);
+    // The page says what the agents' computer is here in one line, and its card doesn't say it again; nothing
+    // else to connect or pick.
+    const words = document.body.textContent ?? "";
+    expect(words).toContain("Onde os agentes trabalham: um computador só deste workspace, sempre ligado.");
+    for (const said of ["sempre ligado", "onde os agentes trabalham"])
+      expect(words.toLowerCase().split(said)).toHaveLength(2);
     expect(card().textContent).not.toContain("Passo");
     expect(card().textContent).toContain("Um usuário para cada agente");
     expect(screen().queryByRole("region", { name: "Outros computadores" })).toBeNull();
@@ -168,6 +170,7 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(screen().getByRole("button", { name: "Abrir: Computador da Ada" })).toBeTruthy();
     const page = document.body.textContent ?? "";
     expect(page).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    expect(page.toLowerCase().split("sempre ligado")).toHaveLength(2);
     expect(page).not.toMatch(TECHNICAL);
     expect(page).not.toContain("Pasta:");
     expect(page).not.toContain("Para liberar mais");
@@ -200,12 +203,12 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     });
     expect(screen().getByRole("heading", { name: "Computador da Acme" })).toBeTruthy();
     const on = screen().getByRole("region", { name: "Neste computador" });
-    // What a person opens, and where: the agent's screen with Open, its browser and files on that screen.
-    expect(on.textContent).toContain("A tela de cada agente: Abrir mostra ao vivo, e você pode assumir o controle");
-    expect(on.textContent).toContain("O navegador e os arquivos dele abrem nessa tela, pela barra na parte de baixo");
+    // What each agent has there, true for whoever reads it (Open shows only for who may watch): its browser and
+    // files are on its screen.
+    expect(on.textContent).toContain("Uma tela para cada agente, com o navegador e os arquivos dele");
     expect(on.textContent).toContain("O Claude Code e o Codex, prontos para cada agente entrar");
     expect(on.textContent).toContain("Planos de código da Z.ai (GLM), Kimi, MiniMax e OpenCode");
-    expect(on.textContent).toContain("Sempre ligado, dia e noite");
+    expect(on.textContent).not.toMatch(/Abrir|assumir o controle/);
     // Not the cards of a computer someone connected: folders, tools, browser, apps.
     for (const name of ["Pastas liberadas", "Ferramentas", "Navegador", "Apps nas telas dos agentes"])
       expect(screen().queryByRole("region", { name })).toBeNull();

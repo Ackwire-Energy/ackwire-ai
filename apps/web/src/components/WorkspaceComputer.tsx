@@ -234,7 +234,6 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
           <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <SetupChip view={view} machine={machine} />
           </span>
-          <span className="small muted">{t("computerSetup.lead")}</span>
         </span>
       </div>
       {view.phase !== "ready" && <SetupProgress view={view} />}

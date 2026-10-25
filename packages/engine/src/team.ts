@@ -166,25 +166,6 @@ export function createFindAgentToolSource(): ToolSource {
 /** Consultations shown on the team screen: the last day. */
 export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
 
-/** A heading, a rule or a quote line: Markdown around the instructions, not what they say. */
-const NOT_PROSE = /^(#{1,6}\s|-{3,}$|\*{3,}$|_{3,}$|>)/;
-/** A list item's mark at the start of a line. */
-const LIST_MARK = /^(?:[-*+]|\d+[.)])\s+/;
-/** Emphasis around words (`**do**`, `_this_`), never inside one (`snake_case`), and code ticks. */
-const EMPHASIS = /(^|[\s(])[_*]+(?=\S)|(?<=\S)[_*]+(?=$|[\s).,;:!?])|`/g;
-
-/** The instructions' first sentence as plain words: past Markdown headings and rules, without list and emphasis marks. */
-const firstSentence = (text: string) => {
-  const prose = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !NOT_PROSE.test(line))
-    .map((line) => line.replace(LIST_MARK, "").replace(EMPHASIS, "$1"))
-    .join(" ");
-  const one = prose.replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0] ?? "";
-  return one.length > 160 ? `${one.slice(0, 157)}…` : one;
-};
-
 /**
  * The team screen: the org's agents grouped by their responsible person,
  * what each can do (stable capability keys), who is working now, and which
@@ -199,7 +180,6 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       name: agents.name,
       handle: agents.handle,
       role: agents.role,
-      instructions: agents.instructions,
       appearance: agents.appearance,
       ownerUserId: agents.ownerUserId,
       audienceMode: agents.audienceMode,
@@ -252,7 +232,6 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       name: a.name,
       handle: a.handle,
       role: a.role,
-      summary: firstSentence(a.instructions),
       appearance: (a.appearance ?? null) as AgentAppearance | null,
       ownerUserId: a.ownerUserId,
       capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),

@@ -125,6 +125,29 @@ describe("agent page: what it does", () => {
     expect(text).not.toContain("…");
     expect(text).not.toContain("Nunca faz merge");
   });
+
+  test("instructions in Markdown (an imported agent's) read as plain words, in three lines at most", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions = [
+        "# SOUL.md - Quem você é",
+        "",
+        "_Você não é um chatbot. Você está se tornando alguém._",
+        "",
+        "## Verdades",
+        "",
+        "- **Ajude de verdade.** Pule o “Ótima pergunta!” e ajude.",
+        "- Tenha opiniões.",
+        "- Seja cuidadosa com o que é dos outros.",
+        "- Lembre do que importa.",
+      ].join("\n");
+    await go("", state);
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    expect(does.querySelector(".agp-prose")?.textContent).toBe(
+      "Você não é um chatbot. Você está se tornando alguém.\nAjude de verdade. Pule o “Ótima pergunta!” e ajude.\nTenha opiniões.",
+    );
+  });
 });
 
 describe("agent page: its files", () => {
