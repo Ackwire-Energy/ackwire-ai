@@ -37,7 +37,7 @@ export function applyDesktopDevice(i18n: I18n, platform: DesktopPlatform) {
 }
 
 /** What a phone gets pushed (apps/server push.ts), and so what the desktop app shows while in the background. */
-const NOTICE_KINDS = new Set([
+const NOTICE_KINDS = [
   "mention",
   "dm",
   "agent_question",
@@ -47,7 +47,9 @@ const NOTICE_KINDS = new Set([
   "routine_failed",
   "routine_paused",
   "browser_handoff",
-]);
+] as const;
+type NoticeKind = (typeof NOTICE_KINDS)[number];
+const isNoticeKind = (kind: string): kind is NoticeKind => (NOTICE_KINDS as readonly string[]).includes(kind);
 /** Kinds whose own title says what it is (the approval's action, the mission's name); the rest say their text. */
 const TITLED = new Set(["approval", "forum_turn", "mission_stopped", "routine_failed", "routine_paused"]);
 const NOTICE_TITLE_MAX = 80;
@@ -69,7 +71,7 @@ export function desktopNotice(
   n: Pick<AppNotification, "kind" | "waiting" | "count" | "readAt" | "doneAt" | "latest">,
 ): { title: string; body: string; path: string } | null {
   if (n.readAt || n.doneAt || n.count > 1) return null;
-  const kind = NOTICE_KINDS.has(n.kind) ? n.kind : n.waiting ? "waiting" : null;
+  const kind = isNoticeKind(n.kind) ? n.kind : n.waiting ? "waiting" : null;
   if (!kind) return null;
   const [first, second] = TITLED.has(kind) ? [n.latest.title, n.latest.text] : [n.latest.text, n.latest.title];
   return {

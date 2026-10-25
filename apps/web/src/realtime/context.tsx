@@ -416,7 +416,7 @@ export function RealtimeProvider({
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
       // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
-      if (event.type === "notification.upserted" && inDesktopApp()) {
+      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
         const notice = desktopNotice(tRef.current, orgId, event.notification);
         if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
       }

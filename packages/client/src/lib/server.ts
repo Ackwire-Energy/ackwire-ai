@@ -74,13 +74,14 @@ export function isTailnet(server: string): boolean {
   }
 }
 
-export interface ConnectLink {
+// A type, not an interface: routers take it as route params, which need an index signature.
+export type ConnectLink = {
   server: string;
   /** A one-time sign-in from another device (the web app's "Open on your phone"). */
   token?: string;
   /** The owner claim the setup printed, while the server waits for its first account. */
   claim?: string;
-}
+};
 
 export function connectLink(server: string, { token, claim }: Omit<ConnectLink, "server"> = {}): string {
   const query = new URLSearchParams({ server });
