@@ -187,13 +187,18 @@
 }
 
 /* The exact action: connector, then its values. */
+/* The exact action (AprovacaoConector B): flat, no plate; the connector line, then its values in words. */
 .ap-exact {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--sunken);
+  min-width: 0;
+}
+.ap-exact__via {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   min-width: 0;
 }
 .ap-conn {
@@ -220,33 +225,83 @@
   box-shadow: var(--e1);
   color: var(--ink2);
 }
-.ap-exact__values {
+.ap-exact__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 0;
-  font-size: 13px;
-}
-.ap-exact__values > div {
-  display: flex;
-  align-items: baseline;
   gap: 6px;
-  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.ap-exact__values dt {
-  color: var(--faint);
+.ap-exact__facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  max-width: 100%;
+  padding: 0 8px;
+  border-radius: 8px 8px 8px var(--radius-cut);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.ap-exact__values dt code {
-  font-size: 11.5px;
+.ap-exact__facts b {
+  font-weight: 600;
+  color: var(--ink2);
 }
-.ap-exact__values dd {
+/* The details: every value, label above it, split by hairlines. */
+.ap-exact__rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.ap-exact__rows > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 30%) minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.ap-exact__rows dt {
+  color: var(--muted);
+}
+.ap-exact__rows dd {
   margin: 0;
   color: var(--ink);
   font-weight: 600;
   overflow-wrap: anywhere;
-  /* An email body: its lines kept, scrolling when long. */
+  /* Long values (code, a message) keep their lines and scroll. */
   white-space: pre-line;
   max-height: 200px;
+  overflow-y: auto;
+}
+.ap-exact__tech summary {
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ap-exact__tech summary:hover {
+  color: var(--ink2);
+}
+.ap-exact__tech pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--sunken);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
   overflow-y: auto;
 }
 .ap-why {

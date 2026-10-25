@@ -1327,7 +1327,6 @@ export const ptBR = {
       approval: "pede uma aprovação",
       decide: "Decidir em Aprovações",
       wants: "<b>{{name}}</b> quer <b>{{action}}</b>",
-      readsOnly: "Só lê",
       why: "Por quê?",
       hideWhy: "Esconder o porquê",
       openApprovals: "Abrir em Aprovações",
@@ -1459,6 +1458,8 @@ export const ptBR = {
   },
   approvals: {
     title: "Aprovações",
+    readsOnly: "Só lê",
+    technical: "Detalhes técnicos",
     summary_one: "{{count}} pedido esperando você",
     summary_other: "{{count}} pedidos esperando você",
     urgent: "o mais urgente expira em {{time}}",

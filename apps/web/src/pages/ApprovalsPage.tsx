@@ -36,7 +36,15 @@ import type { TFunction } from "i18next";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { approvalAction, approvalRisk, approvalTitle, approvalTraits, decisionLabel } from "@/components/ApprovalItem";
+import {
+  approvalAction,
+  approvalReadsOnly,
+  approvalRisk,
+  approvalTitle,
+  approvalTraits,
+  approvalValues,
+  decisionLabel,
+} from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { EmailLetter } from "@/components/EmailLetter";
 import { ErrorState, LoadingCards } from "@/components/Loading";
@@ -455,26 +463,47 @@ export function ConnectorLine({ approval }: { approval: Approval }) {
   );
 }
 
-/** The exact action: connector, then its values (names are the tool's own identifiers, shown as code). */
+/**
+ * The exact action, in words (AprovacaoConector B): the connector and "Só lê" on one line, then its values
+ * with labels; a list shows a few as chips, the details every one, and the tool's own name and values
+ * behind "Detalhes técnicos". An email shows as the email itself.
+ */
 export function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
+  const { t } = useTranslation();
   // An email shows as the email itself (folded in lists, whole in the details).
   if (approval.email) return <EmailLetter email={approval.email} full={!max} />;
-  const values = scalars(approval.params);
-  const shown = max ? values.slice(0, max) : values;
+  const full = max === undefined;
+  const values = approvalValues(approval, full ? { long: true } : { max });
   return (
     <div className="ap-exact">
-      <ConnectorLine approval={approval} />
-      {shown.length > 0 && (
-        <dl className="ap-exact__values">
-          {shown.map(([k, v]) => (
-            <div key={k}>
-              <dt>
-                <code>{k}</code>
-              </dt>
-              <dd>{String(v)}</dd>
-            </div>
-          ))}
-        </dl>
+      <div className="ap-exact__via">
+        <ConnectorLine approval={approval} />
+        {approvalReadsOnly(approval) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
+      </div>
+      {values.length > 0 &&
+        (full ? (
+          <dl className="ap-exact__rows">
+            {values.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <ul className="ap-exact__facts">
+            {values.map(([label, value]) => (
+              <li key={label}>
+                {label}: <b>{value}</b>
+              </li>
+            ))}
+          </ul>
+        ))}
+      {full && (
+        <details className="ap-exact__tech">
+          <summary>{t("approvals.technical")}</summary>
+          <pre>{`${approval.tool}\n${JSON.stringify(approval.params ?? {}, null, 2)}`}</pre>
+        </details>
       )}
     </div>
   );
@@ -1033,12 +1062,8 @@ function ApprovalDetails({
       )}
 
       <DetailsSection title={t("approvals.panel.exact")}>
+        {/* Values in words; nested values and the tool's own name behind "Detalhes técnicos". */}
         <ExactAction approval={a} />
-        {Object.keys(a.params ?? {}).length > scalars(a.params).length && (
-          <pre className="ap-code">
-            <code>{JSON.stringify(a.params, null, 2)}</code>
-          </pre>
-        )}
         <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
         {pr && (
           <a className="ap-link" href={pr} target="_blank" rel="noreferrer">

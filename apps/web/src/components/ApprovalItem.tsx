@@ -23,11 +23,17 @@ export { type ApprovalAction, approvalAction, approvalRisk, approvalTraits };
 const OWN_TITLES = new Set(["run_code", "upload_file", "run_skill_script", "post_message", "request_permission"]);
 
 /**
- * The approval's title: in the person's language for the app's own tools and for email ("Salvar um
- * rascunho de resposta para…"), else the server's (connector) title.
+ * The approval's title: in the person's language for the app's own tools, for email ("Salvar um
+ * rascunho de resposta para…") and for a connector tool that runs another by name ("Ver stack trace do
+ * evento", not "Sentry: Execute sentry tool"), else the server's (connector) title.
  */
-export function approvalTitle(t: TFunction, approval: Pick<Approval, "tool" | "title" | "params" | "email">): string {
+export function approvalTitle(
+  t: TFunction,
+  approval: Pick<Approval, "tool" | "title" | "params" | "email"> & Partial<Pick<Approval, "connector">>,
+): string {
   if (approval.email) return emailTitle(t, approval.email);
+  const inner = innerTool(approval);
+  if (inner) return toolName(t, partsOf(inner), inner);
   if (!OWN_TITLES.has(approval.tool)) return approval.title;
   const p = approval.params ?? {};
   const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
@@ -69,7 +75,7 @@ const READ_VERBS = new Set([
 ]);
 
 /** A connector tool that runs another one by name (`{ name, arguments }`): that tool's name, when it reads as one. */
-function innerTool(approval: Pick<Approval, "connector" | "params">): string | null {
+function innerTool(approval: Pick<Approval, "params"> & Partial<Pick<Approval, "connector">>): string | null {
   const name = approval.params?.name;
   if (!approval.connector || typeof name !== "string" || !/^[a-z][a-z0-9_]*$/i.test(name)) return null;
   return partsOf(name).verb ? name : null;
@@ -104,18 +110,24 @@ export function approvalReadsOnly(approval: Pick<Approval, "tool" | "scope" | "p
   return verb !== null && READ_VERBS.has(verb);
 }
 
-/** Its values in words ("Issue id: ACME-177"), one level into objects, without the inner tool's name. */
-export function approvalValues(approval: Pick<Approval, "params" | "connector" | "email">, max = 3) {
-  // An email is said by its sentence ("salvar um rascunho de resposta para …"); its fields aren't chips.
+/**
+ * Its values in words, label and value ("Issue id", "ACME-177"), one level into objects, without the inner
+ * tool's name. Lists keep them short (`long: false`, at most `max`); the details show every one.
+ */
+export function approvalValues(
+  approval: Pick<Approval, "params" | "connector" | "email">,
+  { max = Number.POSITIVE_INFINITY, long = false }: { max?: number; long?: boolean } = {},
+): [string, string][] {
+  // An email is said by its sentence and its letter; its fields aren't values.
   if (approval.email) return [];
   const skip = innerTool(approval) ? "name" : null;
-  const out: string[] = [];
+  const out: [string, string][] = [];
   const walk = (obj: Record<string, unknown>, top: boolean) => {
     for (const [k, v] of Object.entries(obj)) {
       if (top && k === skip) continue;
-      if (typeof v === "string" || typeof v === "number") {
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
         const text = String(v).trim();
-        if (text && text.length <= 60) out.push(`${humanize(k)}: ${text}`);
+        if (text && (long || text.length <= 60)) out.push([humanize(k), text]);
       } else if (top && v && typeof v === "object" && !Array.isArray(v)) walk(v as Record<string, unknown>, false);
     }
   };

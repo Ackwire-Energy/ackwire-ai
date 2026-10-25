@@ -1314,7 +1314,6 @@ export const en: Translations = {
       approval: "asks for approval",
       decide: "Decide in Approvals",
       wants: "<b>{{name}}</b> wants to <b>{{action}}</b>",
-      readsOnly: "Read only",
       why: "Why?",
       hideWhy: "Hide why",
       openApprovals: "Open in Approvals",
@@ -1446,6 +1445,8 @@ export const en: Translations = {
   },
   approvals: {
     title: "Approvals",
+    readsOnly: "Read only",
+    technical: "Technical details",
     summary_one: "{{count}} request waiting for you",
     summary_other: "{{count}} requests waiting for you",
     urgent: "the most urgent expires in {{time}}",

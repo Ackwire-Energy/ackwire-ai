@@ -848,7 +848,7 @@ function ApprovalSay({
   const a = approval.data;
   if (!a) return <h3>{fallback}</h3>;
   const reason = approvalWhy(a) ?? why;
-  const values = approvalValues(a);
+  const values = approvalValues(a, { max: 3 }).map(([label, value]) => `${label}: ${value}`);
   return (
     <>
       <p className="nt-say">
@@ -861,7 +861,7 @@ function ApprovalSay({
       </p>
       {(approvalReadsOnly(a) || values.length > 0 || reason) && (
         <div className="nt-facts">
-          {approvalReadsOnly(a) && <Chip icon="eye">{t("notifications.wait.readsOnly")}</Chip>}
+          {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
           {values.map((v) => (
             <span key={v} className="nt-fact">
               {v}

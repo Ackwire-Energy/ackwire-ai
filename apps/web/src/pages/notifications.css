@@ -343,9 +343,6 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.nt-wi .ap-exact {
-  border-radius: 14px;
-}
 .nt-resolved {
   display: flex;
   align-items: center;
