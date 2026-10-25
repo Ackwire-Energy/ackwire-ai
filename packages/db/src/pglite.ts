@@ -98,6 +98,8 @@ export const folderLockFile = (folder: string) => `${folder}.lock`;
 function lockFolder(folder: string): () => void {
   const lock = new SQLite(folderLockFile(folder), { create: true });
   try {
+    // Nothing is ever written: a journal on disk would only be a file a crash leaves behind.
+    lock.exec("PRAGMA journal_mode = MEMORY");
     lock.exec("BEGIN IMMEDIATE");
   } catch (error) {
     lock.close();

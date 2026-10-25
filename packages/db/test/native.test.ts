@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
-import fs, { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
@@ -148,6 +148,8 @@ test("commits reach the disk: Postgres syncs, and its syncs reach the system", a
 test("one process at a time has a folder's database open, until it stops however it stops", async () => {
   const first = openPglite(db);
   await first.ready;
+  // While held, the lock is one empty file beside the folder, and nothing else that a crash would leave.
+  expect(readdirSync(root).filter((name) => name.startsWith("db."))).toEqual(["db.lock"]);
   expect(() => openPglite(db)).toThrow(DatabaseInUseError);
   await first.pg.close();
 
