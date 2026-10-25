@@ -166,7 +166,8 @@ export const desktopPtBR = {
     foundHere: "O agentes.chat está rodando aqui",
     use: "Usar",
     none: "Ainda não tem? Rode isto nele",
-    noneText: "No terminal de um servidor ou de um Mac mini. No fim, aparece um link que abre este app já conectado.",
+    noneText:
+      "No terminal de um servidor ou de um Mac mini. No fim, aparece um link que abre este app e pergunta se quer conectá-lo a esse servidor.",
     invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
     httpRefused:
       "{{host}} usa http sem cadeado, que só funciona neste {{device}}. Use o endereço do Tailscale ou um com https.",

@@ -8,7 +8,7 @@
   background: #0a3f9c;
   color: #fff;
   font:
-    500 13.5px / 1.5 "Onest",
+    500 13.5px / 1.5 "Onest Variable",
     -apple-system,
     system-ui,
     sans-serif;
@@ -42,7 +42,7 @@
 }
 .cover__word {
   margin: 0;
-  font-family: "Funnel Display", "Onest", sans-serif;
+  font-family: "Funnel Display", "Onest Variable", sans-serif;
   font-weight: 300;
   font-size: 30px;
   letter-spacing: -0.01em;
