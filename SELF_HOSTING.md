@@ -166,7 +166,8 @@ The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a
    then **Connect to my server**).
 2. Type your address (`https://agentes.<your-tailnet>.ts.net`), or click **Use** next to one the app
    found: it looks on this computer and, when Tailscale is connected, on your tailnet. Plain http works
-   only for an instance on the same computer (`http://127.0.0.1:…`).
+   only for an instance on the same computer (`http://127.0.0.1:…`), which the app then opens at the
+   address it gives itself (`PUBLIC_URL`, such as `http://localhost:3000`): it accepts sign-ins only there.
 3. Sign in, as in the browser. The link the setup prints at the end (`agenteschat://connect?…`) does
    steps 1 and 2 for you; the app shows the address in large type and asks before it connects.
 
@@ -175,15 +176,18 @@ sign-in.
 
 - **Agents on that Mac or Linux computer:** in the instance's onboarding or **Settings → Computers**,
   click **Use this Mac** (**Use this computer** on Linux). The app asks first, in its own dialog naming
-  the instance and the organization. Agents start with no folders of yours and commands off; you choose
-  more in the app's Preferences. On Windows, and with agentes.chat Cloud, the app is only a window onto
-  the workspace and nothing of the computer is used.
+  the instance and the organization. Its agents start with no folders of yours and commands off, even
+  when other organizations' agents there have commands on; you choose more in the app's Preferences. On
+  Windows, and with agentes.chat Cloud, the app is only a window onto the workspace and nothing of the
+  computer is used.
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
 
 Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), an instance's download button asks
 agentes.chat for the newest version of the app (the request names the system, nothing of the instance or
-its people).
+its people). The app asks agentes.chat for its own updates when it starts and every 6 hours, the same
+way: its system, processor and version, nothing else. On Linux the AppImage updates itself; a deb
+downloads the new deb.
 
 </details>
 
@@ -442,18 +446,27 @@ computer and opens agentes.chat, signed in.
 - **It runs inside the app.** It starts with the app (Open at login turns on), starts again by itself
   if it stops, and stops when you quit the app (which asks first: nobody can use it until you open the
   app again). Its files come with the app and update with it; the previous version and a copy of the
-  database stay in `~/.agentes`, and an update that doesn't start goes back to them by itself.
+  database stay in `~/.agentes`, and an update that doesn't answer within 3 minutes goes back to them by
+  itself, and stays there until the next version.
+- **Only its own answer counts.** Other programs and accounts on this computer can listen on its port,
+  so the app trusts the server only once its own process answers there (it names itself in
+  `~/.agentes/server.json`, which only you can write). Until then nothing of yours goes to that port: not
+  your sign-in, not this computer's token. If something else holds the port when it starts, it moves to a
+  free one. With reach on, Tailscale shares it only while it runs.
 - **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
   whenever your session ends. For a browser on another device, add one in your account menu, **Add a
   password**.
 - **Preferences › Servers › agentes.chat on this Mac:** reach (Tailscale needs HTTPS turned on for your
-  tailnet, which **Turn it on** opens; on Linux, run `sudo tailscale set --operator=$USER` once), the
-  phone's QR code, usage statistics, **Back up now** (`~/.agentes/backups/agentes-<date>.tar.gz`, with the
-  database, the files and `.env`), Restart, Stop, and **Stop running it here…**, which keeps its data.
+  tailnet, which **Turn it on** opens; on Linux, connect Tailscale with `sudo tailscale up`, and run
+  `sudo tailscale set --operator=$USER` once), the phone's QR code, usage statistics, **Back up now**
+  (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
+  and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
+  brings both back.
 - **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
   `~/.agentes/logs/server.log`.
-- A server you installed in `~/.agentes` from the terminal stays the terminal's: the app offers **Use
-  it** instead, and opens its owner link while it waits for its owner.
+- A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
+  offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
+  running, start it the way you installed it.
 
 **By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
 (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
@@ -680,6 +693,9 @@ party only when you turn that service on:
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.
+
+The desktop app, on its own, asks agentes.chat only for its updates: when it starts and every 6 hours,
+naming its system, processor and version.
 
 </details>
 
