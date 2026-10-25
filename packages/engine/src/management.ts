@@ -223,10 +223,17 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
     })
     .from(usageRecords)
     .where(and(eq(usageRecords.orgId, orgId), eq(usageRecords.agentId, agentId), gte(usageRecords.createdAt, since)));
-  const [runs] = await db
-    .select({ n: sql<number>`count(*)::int` })
+  // Runs and failures per day of the month (UTC, like the month itself): the Atividade tab draws them.
+  const byDay = await db
+    .select({
+      day: sql<number>`extract(day from ${agentRuns.createdAt} at time zone 'UTC')::int`,
+      runs: sql<number>`count(*)::int`,
+      failed: sql<number>`(count(*) filter (where ${agentRuns.status} = 'failed'))::int`,
+    })
     .from(agentRuns)
-    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), gte(agentRuns.createdAt, since)));
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), gte(agentRuns.createdAt, since)))
+    .groupBy(sql`1`)
+    .orderBy(sql`1`);
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
@@ -245,7 +252,10 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
       budgetNanoUsd,
       budgetUsedPercent: budgetPercent(spentNanoUsd, budgetNanoUsd),
       tokens: Number(usage?.tokens ?? 0),
-      runs: runs?.n ?? 0,
+      runs: byDay.reduce((n, d) => n + d.runs, 0),
+      failures: byDay.reduce((n, d) => n + d.failed, 0),
+      /** Only the days with runs. */
+      byDay,
     },
     pendingApprovals: pending?.n ?? 0,
     channels: channelsOf,

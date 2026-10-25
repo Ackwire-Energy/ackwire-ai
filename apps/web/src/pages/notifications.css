@@ -179,6 +179,54 @@
   font-weight: 600;
   color: var(--ink2);
 }
+/* An approval in one sentence (AprovacaoConector B): who wants what. */
+.nt-say {
+  margin: 3px 0 0;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink2);
+}
+.nt-say b {
+  font-weight: 650;
+  color: var(--ink);
+}
+.nt-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.nt-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.nt-why-btn {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink2);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.nt-why-btn:hover {
+  text-decoration-color: currentColor;
+}
+.nt-why {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink2);
+}
 .nt-body {
   grid-column: 2;
   display: flex;
@@ -274,9 +322,6 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.nt-wi .ap-exact {
-  border-radius: 14px;
 }
 .nt-resolved {
   display: flex;

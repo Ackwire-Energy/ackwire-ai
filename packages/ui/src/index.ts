@@ -217,6 +217,8 @@ export {
   BrowserStrip,
   CriteriaPixels,
   ExpiryFuse,
+  type MonthDay,
+  MonthRuns,
   PageSilhouette,
   PlanStrip,
   type PlanStripCell,

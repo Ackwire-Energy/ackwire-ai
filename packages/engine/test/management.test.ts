@@ -135,7 +135,10 @@ describe("agents, runs and usage", () => {
       // No budget of its own: the workspace default counts.
       budgetNanoUsd: DEFAULT_AGENT_BUDGET_NANO_USD,
       budgetUsedPercent: budgetPercent(cost, DEFAULT_AGENT_BUDGET_NANO_USD),
+      failures: 0,
     });
+    // The Atividade tab's month: today's run on today's day (UTC).
+    expect(detail.month.byDay).toEqual([{ day: new Date().getUTCDate(), runs: 1, failed: 0 }]);
     expect(detail.channels.map((c) => c.name)).toEqual(["general"]);
 
     const [run] = await listRuns(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });

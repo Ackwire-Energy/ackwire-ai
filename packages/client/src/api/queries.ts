@@ -623,7 +623,12 @@ export function useCompleteOAuth(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+    // It may finish a catalog connection or a server connected by address (their own list).
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
   });
 }
 
@@ -1143,9 +1148,9 @@ export function useCorrectMessage(orgId: string) {
 
 // ── Invites, custom MCP ─────────────────────────────────────────────────────
 
-export const useCustomServers = (orgId: string) => {
+export const useCustomServers = (orgId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId) });
+  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId), enabled });
 };
 
 export function useCustomServerAction(orgId: string) {

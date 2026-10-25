@@ -6,7 +6,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Fuse, Icon, Text } from "@/ui";
+import { Chip, Fuse, Icon, LineIcon, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useNow } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
@@ -208,7 +208,7 @@ export function ApprovalWhy({
     <View style={styles.why}>
       {origin ? (
         <View style={styles.origin}>
-          <Icon name="clock" size={13} color={c.muted} />
+          <LineIcon name="clock" size={13} color={c.muted} variant="footnote" />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             {tt(origin.key, origin.values)}
           </Text>
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   said: { lineHeight: 20 },
   why: { gap: 4 },
-  origin: { flexDirection: "row", alignItems: "center", gap: 6 },
+  origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10 },
   letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 4, overflow: "hidden" },
   letterHead: { gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },

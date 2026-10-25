@@ -82,6 +82,33 @@ describe("Aprovações", () => {
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
   });
 
+  test("a connector tool that runs another by name reads as that action, in words, with the tool behind Detalhes técnicos", async () => {
+    const state = seedState();
+    const merge = state.approvals[0];
+    if (!merge) throw new Error("no approval");
+    state.approvals = [
+      {
+        ...merge,
+        id: "ap-trace",
+        tool: "sentry_execute_tool",
+        scope: "custom:conn-sentry:write",
+        title: "Sentry: Execute sentry tool",
+        connector: "custom:conn-sentry",
+        params: { name: "get_event_stacktrace", arguments: { issue: "ACME-177" } },
+      },
+    ];
+    await go("approvals", state);
+    const card = screen().getByRole("article", { name: "Ver stack trace do evento" });
+    expect(card.textContent).toContain("Só lê");
+    expect(card.textContent).toContain("Issue: ACME-177");
+    expect(card.textContent).not.toContain("custom:");
+    expect(card.textContent).not.toContain("get_event_stacktrace");
+    await click(within(card).getByRole("button", { name: "Detalhes" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Ver stack trace do evento" });
+    expect(dialog.querySelector(".ap-exact__tech pre")?.textContent).toContain("get_event_stacktrace");
+  });
+
   test("approvals you can't decide show who they wait for, without buttons", async () => {
     const state = seedState();
     for (const a of state.approvals) a.canDecide = false;
