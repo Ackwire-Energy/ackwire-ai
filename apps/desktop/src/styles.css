@@ -954,10 +954,10 @@ body[data-window="popover"] {
   max-width: none;
 }
 .dk-fr__here {
-  margin-top: 18px;
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   max-width: 600px;
 }
 .dk-fr__who {
