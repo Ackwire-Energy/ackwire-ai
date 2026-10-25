@@ -158,13 +158,18 @@ async function heldByAnotherProcess(script: string, signal: string) {
     ],
     { stdout: "pipe" },
   );
+  let opened: ReturnType<typeof openPglite> | undefined;
   try {
     expect(new TextDecoder().decode((await holder.stdout.getReader().read()).value)).toContain(signal);
-    expect(() => openPglite(db)).toThrow(DatabaseInUseError);
+    expect(() => {
+      opened = openPglite(db);
+    }).toThrow(DatabaseInUseError);
   } finally {
-    // Also after a failed check: left running, it would keep the folder, and the test run's output, open.
+    // Also after a failed check: left running, it would keep the folder, and the test run's output, open;
+    // and a database this process opened anyway would keep the folder from the tests after this one.
     holder.kill("SIGKILL");
     await holder.exited;
+    if (opened) await Promise.allSettled([opened.ready, opened.pg.close()]);
   }
   const after = openPglite(db);
   await after.ready;
