@@ -27,7 +27,7 @@ describe("Canal", () => {
     const ask = articles.find((a) => a.textContent?.includes("o login está devolvendo 401"));
     expect(ask?.textContent).toContain("João");
     expect(ask?.querySelector(".ac-mention")?.textContent).toBe("@Ada");
-    // Ada was asked in the channel, so her reply is in the channel (D67).
+    // Ada was asked in the channel, so her reply is in the channel.
     const reply = articles.find((a) => a.textContent?.includes("Achei a causa"));
     expect(reply?.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(reply?.querySelector("code")?.textContent).toBe("expires_at");
@@ -68,7 +68,7 @@ describe("Canal", () => {
     const { socket } = await open();
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    // Asked in the channel: it answers there, its events carry no thread (D67).
+    // Asked in the channel: it answers there, its events carry no thread.
     const run = { threadId: null, runId: "r-9", agentId: ATLAS_ID };
     await ev({ type: "agent.run", ...run, status: "running" });
     await ev({ type: "agent.delta", ...run, seq: 1, text: "Os 401 no Sentry caíram de 312 para" });

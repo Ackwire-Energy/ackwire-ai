@@ -11,6 +11,7 @@ import type { SandboxProvider } from "./sandbox";
 import type { SearchIndexResolver } from "./search";
 
 export * from "./blob";
+export * from "./blob-disk";
 export * from "./blob-postgres";
 export * from "./command-policy";
 export * from "./composio";
@@ -26,6 +27,7 @@ export * from "./presence";
 export * from "./pubsub";
 export * from "./push";
 export * from "./rate-limiter";
+export * from "./redact";
 export * from "./s3";
 export * from "./s3-fake";
 export * from "./sandbox";
@@ -34,7 +36,7 @@ export * from "./secret-box";
 
 /**
  * Infrastructure the core talks to through interfaces, so each edition can
- * plug its own implementation (docs/planejamento.md D18a). The server builds
+ * plug its own implementation (ADR 0002). The server builds
  * core defaults, then applies each module's overrides in order.
  */
 export interface Adapters {
@@ -49,11 +51,11 @@ export interface Adapters {
   /** Transactional email (sent from the `email.send` outbox job). */
   email: EmailSender;
   /**
-   * Platform file storage (our bucket, or Postgres without one). Orgs with
+   * Platform file storage (our bucket, a folder on disk, or Postgres). Orgs with
    * their own bucket are resolved on top of it by the engine.
    */
   platformBlobs: BlobStore;
-  /** Where agents run code (D30): Daytona in the Cloud; null/absent = the sandbox tools are off. */
+  /** Where agents run code (ADR 0021): Daytona in the Cloud; null/absent = the sandbox tools are off. */
   sandbox?: SandboxProvider | null;
   /** Push to the phone app (`push.send` outbox job, ADR 0035); null/absent = no push. */
   push?: PushSender | null;

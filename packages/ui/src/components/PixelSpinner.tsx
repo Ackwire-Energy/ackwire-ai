@@ -4,8 +4,7 @@ import { cx } from "../cx";
 import type { AgentColor } from "./AgentLook";
 
 /**
- * Our working indicator (docs/design/telas/Carregando.html, option A, the
- * pixel orbit): a 3×3 grid where one lit cell walks the ring with a fading
+ * Our working indicator, the pixel orbit: a 3×3 grid where one lit cell walks the ring with a fading
  * trail. Tied to an agent it is drawn in that agent's own `bodyTones`;
  * otherwise in the text color around it (ink, the same tones as the words).
  * Still under prefers-reduced-motion. Decorative unless `label` is given:
@@ -34,7 +33,7 @@ export const ORBIT_RING = [
   [0, 2],
   [0, 1],
 ] as const;
-/** One step of the lit cell (the prototype's 110 ms). */
+/** One step of the lit cell (110 ms). */
 export const ORBIT_STEP_MS = 110;
 /** Neutral trail: the lit cell, two fading ones, then the dim ring. */
 const INK_ALPHA = [1, 0.62, 0.38, 0.16] as const;

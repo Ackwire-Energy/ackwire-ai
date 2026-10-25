@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D2 (Model Gateway), D17 (BYOK in core, platform key in Cloud), D18 (KMS in Cloud).
+- Bring-your-own keys in both editions; a platform key and KMS only on the Cloud.
 
 ## Decision
 

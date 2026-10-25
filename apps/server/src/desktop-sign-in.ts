@@ -5,7 +5,7 @@ import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 
 /**
- * Social sign-in for the Mac app's window (D79). Google and Apple refuse
+ * Social sign-in for the Mac app's window (ADR 0036). Google and Apple refuse
  * embedded web views, so the window opens the sign-in in the person's
  * browser and waits. The window keeps a random verifier and sends only its
  * SHA-256 (the challenge) along; once signed in, the browser registers that
@@ -17,7 +17,7 @@ import { z } from "zod";
  * A handoff needs a fresh sign-in (a session made in the last few minutes),
  * so a link that skips the provider can't hand over an old browser session.
  */
-const HANDOFF_PREFIX = "desktop-handoff:";
+export const HANDOFF_PREFIX = "desktop-handoff:";
 /** How long the window has to pick the session up. */
 const HANDOFF_TTL_MS = 10 * 60_000;
 /** How recent the browser's sign-in must be to hand it over. */

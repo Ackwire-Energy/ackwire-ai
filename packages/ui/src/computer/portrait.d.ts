@@ -1,4 +1,4 @@
-/** Types for portrait.js (plain JavaScript so the HTML prototypes can import it as is). */
+/** Types for portrait.js (plain JavaScript so plain HTML pages can import it as is). */
 
 export type ComputerKind = "mac" | "windows" | "linux" | "cloud";
 export type ComputerState = "online" | "paused" | "offline";

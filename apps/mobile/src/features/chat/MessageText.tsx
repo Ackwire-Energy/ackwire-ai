@@ -157,7 +157,7 @@ function Caret() {
 
 const styles = StyleSheet.create({
   wrap: { gap: 8, marginTop: 1 },
-  /** Readable turns (MobileIntencional.html): 17 with a line-height of ~1.42. */
+  /** Readable turns: 17 with a line-height of ~1.42. */
   line: { lineHeight: 24 },
   flex: { flex: 1 },
   heading: { fontWeight: "700" },

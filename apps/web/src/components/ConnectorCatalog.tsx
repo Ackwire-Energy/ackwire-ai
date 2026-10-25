@@ -115,7 +115,7 @@ const SUGGESTED = ["github", "database", "linear", "notion", "mail-gmail", "driv
 const OTHER = "other";
 
 /**
- * "Adicionar conector" (telas/CatalogoConectores.html, B+C): a gallery with search and one line of
+ * "Adicionar conector": a gallery with search and one line of
  * category filters, three suggestions on top, then every service as an even tile (no tags: a check on
  * the icon when connected). A tile opens the detail beside it (what agents could do, how it connects,
  * Conectar); "Não achou?" connects any service by its address.

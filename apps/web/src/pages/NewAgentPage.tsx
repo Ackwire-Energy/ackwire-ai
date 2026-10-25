@@ -131,7 +131,7 @@ interface Created {
   ownerName: string | null;
 }
 
-/** docs/design/telas/NovoAgente.html — the steps on a rail, a live preview of the agent on the right. */
+/** "Criar agente": the steps on a rail, a live preview of the agent on the right. */
 export function NewAgentPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -195,7 +195,7 @@ function NewAgentFlow() {
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
   const [owner, setOwner] = useState(me.user.id);
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
-  // "Automático" (D83) for every new agent: each task gets its model and effort; a fixed model is one click away.
+  // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
   const [model, setModel] = useState<string>(AUTO);
   const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).

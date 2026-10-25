@@ -9,12 +9,14 @@ import type { BrowserWatcher } from "./watches";
  * `handleMessage` (`RealtimeConnection.onBrowserFrame`).
  */
 
-/** What a frame shows: the viewport in CSS pixels, and the active tab's address. */
+/** What a frame shows: the viewport in CSS pixels, and the active tab's address and title. */
 export interface BrowserFrameMetadata {
   deviceWidth: number;
   deviceHeight: number;
   pageScaleFactor?: number;
   url?: string;
+  /** Written by the site (show it as text); absent from older runners. */
+  title?: string;
 }
 
 export interface BrowserFrame {
@@ -32,13 +34,22 @@ export interface BrowserLiveStatus {
   mode: "watch" | "control";
   controllerUserId: string | null;
   handoff: BrowserHandoff | null;
+  /**
+   * Someone else is in control: no frames reach this view until they hand it back (then the
+   * page comes at once). Drop the frame on screen meanwhile; what they type stays theirs.
+   */
+  hidden: boolean;
 }
 
 /**
  * Why the browser can't be shown now: `reconnecting` (retried here with backoff), `offline`,
- * `no_computer`, `unavailable` (with the computer's `message`), `forbidden` (no longer allowed: stopped).
+ * `no_computer`, `closed` (the agent's browser isn't open; retried with backoff, so the view shows it
+ * once something opens it), `unavailable` (with the computer's `message`), `forbidden` (no longer
+ * allowed: stopped).
  */
-export type BrowserLiveUnavailable = "reconnecting" | "offline" | "no_computer" | "unavailable" | "forbidden";
+export type BrowserLiveUnavailable = (typeof UNAVAILABLE)[number];
+
+const UNAVAILABLE = ["reconnecting", "offline", "no_computer", "closed", "unavailable", "forbidden"] as const;
 
 /** Bits of the modifier mask: Alt 1, Control 2, Meta 4, Shift 8. */
 export type BrowserModifiers = number;
@@ -116,6 +127,7 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
           deviceHeight: m.deviceHeight as number,
           ...(num(m.pageScaleFactor) ? { pageScaleFactor: m.pageScaleFactor as number } : {}),
           ...(typeof m.url === "string" ? { url: m.url } : {}),
+          ...(typeof m.title === "string" && m.title ? { title: m.title } : {}),
         },
       };
     }
@@ -126,14 +138,13 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
         mode: v.mode === "control" ? "control" : "watch",
         controllerUserId: typeof v.controllerUserId === "string" ? v.controllerUserId : null,
         handoff: isObject(v.handoff) ? (v.handoff as unknown as BrowserHandoff) : null,
+        hidden: v.hidden === true,
       };
     case "browser.unavailable":
       return {
         type: "browser.unavailable",
         agentId: v.agentId,
-        reason: (["reconnecting", "offline", "no_computer", "unavailable", "forbidden"] as const).includes(
-          v.reason as BrowserLiveUnavailable,
-        )
+        reason: UNAVAILABLE.includes(v.reason as BrowserLiveUnavailable)
           ? (v.reason as BrowserLiveUnavailable)
           : "unavailable",
         ...(typeof v.message === "string" ? { message: v.message } : {}),
@@ -288,18 +299,24 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
       const m = parseBrowserLiveMessage(raw);
       if (!m || m.agentId !== agentId) return;
       switch (m.type) {
+        // The view works (a closed browser opened meanwhile, say): a pending retry would only restart it.
         case "browser.frame":
           attempt = 0;
+          clearRetry();
           options.onFrame(m);
           return;
+        // A status answers every watch before the stream starts, so only a frame resets the backoff
+        // (else a closed browser is watched again every 500 ms). One sent on its own (a handoff changed,
+        // a page opened) comes with the server restarting the stream itself: the retry isn't needed.
         case "browser.status":
-          attempt = 0;
+          clearRetry();
           options.onStatus(m);
           return;
         case "browser.unavailable":
           options.onUnavailable?.(m.reason, m.message);
-          // The server dropped this watch: try again later unless it can't change by waiting.
-          if (m.reason === "reconnecting" || m.reason === "unavailable" || m.reason === "offline") retryLater();
+          // Try again later unless it can't change by waiting (no computer, no access).
+          // ponytail: a closed browser is polled (backoff up to 10 s); a runner push when it opens if that costs.
+          if (m.reason !== "no_computer" && m.reason !== "forbidden") retryLater();
           return;
         case "browser.ended":
           options.onEnded?.(

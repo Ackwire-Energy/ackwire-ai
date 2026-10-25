@@ -1,6 +1,7 @@
 import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
+  useAiAccounts,
   useConnections,
   useCredentials,
   useInvitations,
@@ -23,6 +24,8 @@ import {
   PROVIDERS,
   type ProviderId,
   providerLabel,
+  providerOf,
+  providersForKey,
 } from "@agenteschat/client/lib/providers";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
@@ -39,22 +42,28 @@ import {
   Input,
   List,
   Meter,
+  ProviderLogo,
   Select,
+  Switch,
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
+import { ImportExportSection } from "@/components/ImportFlow";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { PlanUsageCards } from "@/components/PlanUsage";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
+import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
+import { useSetupView } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
@@ -83,6 +92,7 @@ export function SettingsPage({
   const { org } = useOrg();
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
   const current = visible.some((s) => s.id === section) ? section : "general";
+  const workspaceComputer = useSetupView(org.id);
 
   return (
     <div className="settings">
@@ -129,7 +139,9 @@ export function SettingsPage({
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
             <p className="muted" style={{ margin: 0 }}>
-              {t(`settings.sectionText.${current}`)}
+              {current === "computers" && workspaceComputer
+                ? t("computerSetup.sectionText")
+                : t(`settings.sectionText.${current}`)}
             </p>
           </header>
         )}
@@ -138,17 +150,23 @@ export function SettingsPage({
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}
-        {current === "keys" && <KeysSection />}
+        {current === "keys" && (
+          <>
+            <AiAccountsSection />
+            <KeysSection />
+          </>
+        )}
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
+        {current === "import" && <ImportExportSection />}
       </div>
     </div>
   );
 }
 
 /**
- * Geral (telas/Configuracoes.html, C with A's rows): the org's rows, the context every agent reads, then a
+ * Geral: the org's rows, the context every agent reads, then a
  * tile per area with how it is now. Every change saves by itself: name on blur, zone on pick, context
  * while typing.
  */
@@ -296,6 +314,25 @@ function GeneralSection() {
               />
             </div>
           </div>
+          <div className="settings-row">
+            <div className="settings-row__text">
+              <label className="settings-row__label" htmlFor="set-action-check">
+                {t("settings.actionCheck")}
+              </label>
+              <span className="settings-row__help" id="set-action-check-help">
+                {t("settings.actionCheckHelp")}
+              </span>
+            </div>
+            <div className="settings-row__control">
+              <Switch
+                id="set-action-check"
+                checked={settings.data?.actionCheck ?? true}
+                onCheckedChange={(on) => save({ actionCheck: on })}
+                disabled={!editable || !settings.data}
+                aria-describedby="set-action-check-help"
+              />
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -346,7 +383,9 @@ function SettingsTiles() {
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
   const machines = useMachines(org.id, shown("computers"));
-  const credentials = useCredentials(org.id, shown("keys"));
+  const managesKeys = can(role, "manage_credentials");
+  const credentials = useCredentials(org.id, managesKeys);
+  const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
   const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
 
@@ -384,13 +423,17 @@ function SettingsTiles() {
     usage:
       overview.data &&
       t("settings.tileState.usage", { percent: formatPercent(i18n.language, overview.data.budgetUsedPercent) }),
-    keys:
-      credentials.data &&
-      (keys.length > 0
-        ? t("settings.tileState.keys", { count: keys.length })
-        : platform.data
-          ? t("settings.tileState.platformKey")
-          : t("settings.tileState.noKeys")),
+    keys: managesKeys
+      ? credentials.data &&
+        (keys.length > 0
+          ? t("settings.tileState.keys", { count: keys.length })
+          : platform.data
+            ? t("settings.tileState.platformKey")
+            : t("settings.tileState.noKeys"))
+      : plans.data &&
+        (plans.data.accounts.length > 0
+          ? t("settings.tileState.plans", { count: plans.data.accounts.length })
+          : t("settings.tileState.noPlans")),
     storage: storage.data && t(storage.data.kind === "s3" ? "storage.s3" : "storage.agentes"),
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
@@ -469,6 +512,7 @@ function KeysSection() {
             const isDefault = settings.data?.defaultCredentialId === c.id;
             return (
               <div key={c.id} className="ac-list__row">
+                <ProviderLogo id={c.provider} size="sm" />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>{c.label}</span>
                   <span className="small muted">
@@ -547,14 +591,26 @@ function KeysSection() {
   );
 }
 
-function KeyDialog({
+/**
+ * Adds or rotates a key. The Connect dialog (`ConnectAi`) opens it to add one with the provider it
+ * guessed, or the key a person pasted in the chat, and hears when it was saved (`onAdded`).
+ */
+export function KeyDialog({
   mode,
   cred,
   onClose,
+  provider: suggested,
+  apiKey: pasted,
+  title,
+  onAdded,
 }: {
   mode: "add" | "rotate" | null;
   cred: Credential | undefined;
   onClose: () => void;
+  provider?: string;
+  apiKey?: string;
+  title?: string;
+  onAdded?: (cred: Credential) => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -569,19 +625,31 @@ function KeyDialog({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the form each time it opens
   useEffect(() => {
     setLabel("");
-    setApiKey("");
+    setApiKey(pasted ?? "");
     setWorkspaceId("");
-    setProvider(cred && isProviderId(cred.provider) ? cred.provider : "anthropic");
+    // A pasted key says whose it is when only one provider's keys look like it; else the provider asked for.
+    const fits = pasted ? providersForKey(pasted) : [];
+    const guess = (fits.length === 1 ? fits[0]?.id : undefined) ?? suggested ?? fits[0]?.id ?? cred?.provider;
+    setProvider(guess && isProviderId(guess) ? guess : "anthropic");
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);
-  const error = touched && !valid ? t(`onboarding.keyInvalid.${provider}`) : undefined;
+  const error =
+    !touched || valid ? undefined : mode === "add" ? (
+      <KeyMismatch provider={provider} apiKey={apiKey} onPick={setProvider} />
+    ) : (
+      t(`onboarding.keyInvalid.${provider}`)
+    );
   const pending = add.isPending || rotate.isPending;
   return (
     <Dialog
       open={mode !== null}
       onOpenChange={(o) => !o && onClose()}
-      title={mode === "rotate" ? t("settings.rotateTitle", { label: cred?.label ?? "" }) : t("settings.addKeyTitle")}
+      title={
+        mode === "rotate"
+          ? t("settings.rotateTitle", { label: cred?.label ?? "" })
+          : (title ?? t("settings.addKeyTitle"))
+      }
       description={mode === "rotate" ? t("settings.rotateHelp") : undefined}
       closeLabel={t("common.close")}
       width={440}
@@ -609,7 +677,12 @@ function KeyDialog({
                 apiKey: apiKey.trim(),
                 ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
               },
-              { onSuccess: onClose },
+              {
+                onSuccess: (saved) => {
+                  onAdded?.(saved);
+                  onClose();
+                },
+              },
             );
           }
         }}
@@ -620,7 +693,17 @@ function KeyDialog({
               <Select
                 value={provider}
                 onValueChange={setProvider}
-                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+                options={PROVIDERS.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                  leading: <ProviderLogo id={p.id} size="xs" />,
+                }))}
+                renderValue={(o) => (
+                  <span className="row">
+                    {o.leading}
+                    {o.label}
+                  </span>
+                )}
               />
             </Field>
           )}
@@ -633,11 +716,20 @@ function KeyDialog({
               />
             </Field>
           )}
-          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={t("connectors.apiKeyHelp")}>
+          <Field
+            label={t("settings.keyValue")}
+            id="key-value-set"
+            error={error}
+            help={
+              <>
+                <KeySite provider={provider} /> {t("connectors.apiKeyHelp")}
+              </>
+            }
+          >
             <Input
               type="password"
               autoComplete="off"
-              placeholder={PROVIDERS.find((p) => p.id === provider)?.placeholder}
+              placeholder={providerOf(provider)?.placeholder}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
@@ -663,78 +755,49 @@ function KeyDialog({
   );
 }
 
-/** The one place with money (admins): the default agent budget, this month's spend by kind and per agent. */
+/**
+ * Uso (ADR 0063): the plan accounts by computer and the API per agent for everyone (money only for
+ * admins), then the API's spend by kind and the default budget (admins).
+ */
 function UsageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const allowed = can(org.role, "view_usage");
   const report = useUsageReport(org.id, allowed);
-  if (!allowed) return null;
   return (
     <>
-      <DefaultBudgetCard />
-      <Card aria-labelledby="sec-usage">
-        <h2 id="sec-usage" className="ac-card__title">
-          {t("settings.usageTitle")}
-        </h2>
-        {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
-        {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
-        {report.data && (
-          <>
-            <span className="small muted">
-              {t("settings.usageTotal", {
-                amount: formatUsd(t, i18n.language, report.data.totalUsd),
-                since: formatShortDate(i18n.language, report.data.since),
-              })}
-            </span>
-            <div>
-              {report.data.byKind.map((k) => (
-                <div key={k.kind} className="connector-row">
-                  <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
-                  <span className="connector-row__granted tabular">{t("settings.usageCalls", { count: k.calls })}</span>
-                  <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
-      {report.data && report.data.agents.length > 0 && (
-        <Card aria-labelledby="sec-usage-agents">
-          <h2 id="sec-usage-agents" className="ac-card__title">
-            {t("settings.usageAgents")}
+      <PlanUsageCards />
+      {allowed && (
+        <Card aria-labelledby="sec-usage">
+          <h2 id="sec-usage" className="ac-card__title">
+            {t("settings.usageTitle")}
           </h2>
-          <List>
-            {report.data.agents.map((a) => (
-              <Link
-                key={a.agentId}
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: a.agentId }}
-                className="ac-list__row usage-agent"
-              >
-                <AgentAvatar agentId={a.agentId} size="sm" name={a.name} />
-                <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>{a.name}</span>
-                  <span className="small muted tabular">
-                    {t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
-                      spent: formatUsd(t, i18n.language, a.costUsd),
-                      budget: formatUsd(t, i18n.language, a.monthlyBudgetUsd),
-                    })}
-                  </span>
-                </span>
-                <span className="usage-agent__meter">
-                  <Meter
-                    value={Math.min(100, a.budgetUsedPercent)}
-                    max={100}
-                    label={t("settings.usageAgentMeter", { name: a.name })}
-                  />
-                  <span className="small tabular">{formatPercent(i18n.language, a.budgetUsedPercent)}</span>
-                </span>
-              </Link>
-            ))}
-          </List>
+          {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
+          {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
+          {report.data && (
+            <>
+              <span className="small muted">
+                {t("settings.usageTotal", {
+                  amount: formatUsd(t, i18n.language, report.data.totalUsd),
+                  since: formatShortDate(i18n.language, report.data.since),
+                })}
+              </span>
+              <div>
+                {report.data.byKind.map((k) => (
+                  <div key={k.kind} className="connector-row">
+                    <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
+                    <span className="connector-row__granted tabular">
+                      {t("settings.usageCalls", { count: k.calls })}
+                    </span>
+                    <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </Card>
       )}
+      {allowed && <DefaultBudgetCard />}
     </>
   );
 }

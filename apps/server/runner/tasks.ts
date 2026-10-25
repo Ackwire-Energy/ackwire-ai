@@ -36,6 +36,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
+import { readJson, writeJson } from "./json-file";
 import {
   CODEX_MCP_ENV,
   claudeMcpConfig,
@@ -695,21 +696,6 @@ function readFrom(file: string, offset: number): { text: string; next: number } 
   }
 }
 
-function readJson<T>(file: string): T | null {
-  try {
-    return JSON.parse(readFileSync(file, "utf8")) as T;
-  } catch {
-    return null;
-  }
-}
-
-/** Written whole, then renamed: a crash never leaves half a file. */
-function writeJson(file: string, data: unknown) {
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(data), { mode: 0o600 });
-  renameSync(tmp, file);
-}
-
 interface Watch {
   timer: ReturnType<typeof setInterval>;
   offsets: { stdout: number; stderr: number };
@@ -971,6 +957,7 @@ export class TaskManager {
           token: mcpToken,
           cwd,
           folders: [...new Set([cwd, missionRoot])],
+          runnerHome: path.dirname(this.opts.root),
         });
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
         // What it may run without asking: item tasks work (the main session plans as an engine run, ADR 0032).
@@ -986,6 +973,7 @@ export class TaskManager {
               prefix,
               allow,
               away ? path.resolve(missionRoot) : undefined,
+              { runnerHome: path.dirname(this.opts.root) },
             ),
           ),
           { mode: 0o600 },

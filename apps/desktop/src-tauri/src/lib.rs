@@ -1,5 +1,5 @@
 //! agentes for macOS (ADR 0036): a menu bar icon, a popover and two small windows around the
-//! runners it spawns, one per organization, plus the main window with the whole site (D79, `main_window`).
+//! runners it spawns, one per organization, plus the main window with the whole site (ADR 0036, `main_window`).
 //! Rust stays thin: tray, windows, the runner children, single instance, start at login, notifications,
 //! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
 
@@ -27,13 +27,18 @@ use tauri_plugin_updater::UpdaterExt;
 
 use runners::{RunnerInfo, Runners};
 
-/// The only site the app opens: in its main window (`main_window`), never another site.
+/// agentes.chat: the site the main window loads (`main_window`). Its pages open there; the pages of the other
+/// servers the app signs in to open in the person's browser.
 const SITE: &str = "https://agentes.chat";
 const WINDOWS: &[&str] = &["popover", "welcome", "prefs"];
 
 /// When the popover last hid because it lost focus: a click on the tray icon blurs it first,
 /// and that same click must not open it again.
 struct PopoverClock(Mutex<Option<Instant>>);
+
+/// The server the next sign-in goes to ("Seu servidor" in the welcome window), as an https origin.
+#[derive(Default)]
+struct ChosenServer(Mutex<Option<String>>);
 
 #[derive(Serialize)]
 struct AppInfo {
@@ -42,11 +47,22 @@ struct AppInfo {
     arch: &'static str,
 }
 
-fn is_site_url(url: &str) -> bool {
+/// `https://host[:port]` of an https URL; None for anything else.
+fn https_origin(url: &str) -> Option<String> {
+    let parsed = tauri::Url::parse(url).ok()?;
+    if parsed.scheme() != "https" || parsed.host_str().is_none() {
+        return None;
+    }
+    Some(parsed.origin().ascii_serialization())
+}
+
+/// A page of one of `sites` (https origins): agentes.chat, the servers the organizations here are
+/// signed in to, and the one chosen for the next sign-in.
+fn is_site_url(url: &str, sites: &[String]) -> bool {
     if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return false;
     }
-    url == SITE || url.starts_with("https://agentes.chat/") || url.starts_with("https://agentes.chat?")
+    https_origin(url).is_some_and(|origin| sites.contains(&origin))
 }
 
 /// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
@@ -133,10 +149,18 @@ fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, Stri
 /// The launch argument start at login passes, so a login start stays in the menu bar.
 const AUTOSTART_ARG: &str = "--autostart";
 
-/// "Open the app": the main window, or the welcome while this Mac isn't connected to any organization.
+/// Whether an organization here signs in to agentes.chat, the only site the main window loads.
+fn paired_to_site(app: &AppHandle) -> bool {
+    app.state::<Runners>().paired_servers().iter().any(|s| https_origin(s).as_deref() == Some(SITE))
+}
+
+/// "Open the app": the main window while an organization here is on agentes.chat, Preferences while they all
+/// are on their own servers, the welcome while this Mac isn't connected to any organization.
 fn open_app(app: &AppHandle) {
-    if app.state::<Runners>().any_paired() {
+    if paired_to_site(app) {
         let _ = main_window::open(app, None);
+    } else if app.state::<Runners>().any_paired() {
+        let _ = present(app, "prefs");
     } else {
         let _ = present(app, "welcome");
     }
@@ -206,14 +230,25 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_external(app: AppHandle, url: String) -> Result<(), String> {
-    if is_site_url(&url) {
+    if is_site_url(&url, &[SITE.to_string()]) {
         let page = url.parse().map_err(|_| "not a URL")?;
         return main_window::open(&app, Some(page));
     }
-    if !is_sign_in_url(&url) {
-        return Err("only agentes.chat and sign-in links open from the app".into());
+    let mut sites: Vec<String> =
+        app.state::<Runners>().servers().iter().filter_map(|s| https_origin(s)).collect();
+    let chosen = app.state::<ChosenServer>().0.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    sites.extend(chosen);
+    if !is_site_url(&url, &sites) && !is_sign_in_url(&url) {
+        return Err("only our servers' pages and sign-in links open from the app".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_server(chosen: tauri::State<'_, ChosenServer>, url: String) -> Result<(), String> {
+    let origin = https_origin(&url).ok_or("not an https address")?;
+    *chosen.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(origin);
+    Ok(())
 }
 
 #[tauri::command]
@@ -357,6 +392,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
+        .manage(ChosenServer::default())
         .manage(main_window::Bridge::default())
         .manage(menus::Zoom::default())
         .manage(cover::Cover::default())
@@ -369,6 +405,7 @@ pub fn run() {
             runner_add,
             runner_remove,
             open_external,
+            set_server,
             reveal_folder,
             pick_folder,
             set_tray_state,
@@ -452,11 +489,12 @@ pub fn run() {
             }
             let runners = app.state::<Runners>();
             runners.start_all(&handle);
-            // Started at login: the menu bar only (the welcome while nothing is paired, as before).
+            // Started at login: the menu bar only (the welcome while nothing is paired, as before). Opened by
+            // hand: the main window, but only for an organization on agentes.chat, the one site it loads.
             let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
             if !runners.any_paired() {
                 let _ = present(&handle, "welcome");
-            } else if !at_login {
+            } else if !at_login && paired_to_site(&handle) {
                 let _ = main_window::open(&handle, None);
             }
             // In the Dock from the start, like Slack (the popover then applies the person's choice).

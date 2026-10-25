@@ -1,5 +1,5 @@
 /**
- * The menu bar popover (AppBandeja.html, views "tray" and "ask"): what the agents are doing now on
+ * The menu bar popover: what the agents are doing now on
  * this Mac, grouped by organization, folder requests on top, pause for the whole computer, and the
  * way to Preferences, the site and Quit. This window also owns the tray icon's state and raises the
  * macOS notification for folder requests (it lives, hidden, for as long as the app runs).
@@ -20,11 +20,11 @@ import {
 import { DOCK_PREF } from "../control/dock";
 import { NOTCH_PREF } from "../control/notch";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
+import { openSiteLabel, siteOf } from "../control/server";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
 import { answerThisMac, type PrefsTab } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
-import { SITE_URL } from "../control/version";
-import { agentOf, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import { agentOf, chosenServer, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
 import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
@@ -58,6 +58,7 @@ export function Popover() {
   const refused = homes.find(isRefusedHome);
   const outdated = homes.some((h) => h.status?.connection === "outdated");
   const machine = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? t("desktop.tray.label");
+  const site = siteOf(homes, chosenServer());
 
   // The tray icon follows the aggregate state.
   const tray = trayStateOf(homes, update.state.available || update.state.required || outdated);
@@ -119,7 +120,7 @@ export function Popover() {
     return () => ro.disconnect();
   }, [host, confirmQuit]);
 
-  // The site in the main window asking this Mac (D79): the popover owns the runners, so it answers.
+  // The site in the main window asking this Mac (ADR 0036): the popover owns the runners, so it answers.
   useEffect(() => {
     const off = host.onThisMac((id, request) => {
       const openPrefsOn = async (tab: PrefsTab) => {
@@ -167,7 +168,7 @@ export function Popover() {
   );
 
   const openSite = () => {
-    void host.openExternal(SITE_URL).catch(() => {});
+    void host.openExternal(site).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
   const openPrefs = (tab?: string) => {
@@ -449,7 +450,7 @@ export function Popover() {
               </>
             }
           >
-            {t("desktop.tray.openSite")}
+            {openSiteLabel(site, t)}
           </MenuRow>
           <MenuRow
             icon="settings"
@@ -549,7 +550,7 @@ function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: 
 }
 
 /**
- * An agent in its browser (BandejaNavegador.html, option 2 · Ponto): "Theo no navegador" with the
+ * An agent in its browser: "Theo no navegador" with the
  * site and what it does, Ver and Parar; "Walter está no controle" while a person drives; "Theo
  * precisa de você" with Abrir when it asked for help.
  */
@@ -564,7 +565,7 @@ function BrowserRow({ home, browser }: { home: Home; browser: ControlBrowser }) 
   const color = normalizeAppearance(agent.look).color;
   const state = browserRowState(browser);
   const open = (path?: string) => {
-    void host.openExternal(siteLink(home.status?.server, path, SITE_URL)).catch(() => {});
+    void host.openExternal(siteLink(home.status?.server, path, siteOf([home], chosenServer()))).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
   const stop = async () => {

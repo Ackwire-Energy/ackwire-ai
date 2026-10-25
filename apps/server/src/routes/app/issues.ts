@@ -33,7 +33,7 @@ const Issue = z
     title: z.string(),
     description: z.string(),
     status: Status,
-    columnId: z.uuid().nullable().openapi({ description: "Its board column (D55), always one of its stage." }),
+    columnId: z.uuid().nullable().openapi({ description: "Its board column, always one of its stage." }),
     boardRank: z.number().openapi({ description: "Order inside the column, lowest first." }),
     priority: Priority,
     assignee: Actor.nullable(),
@@ -48,7 +48,7 @@ const Issue = z
     parentIssueId: z
       .uuid()
       .nullable()
-      .openapi({ description: "The issue this one is a sub-issue of (a plan step from the forum, D45)." }),
+      .openapi({ description: "The issue this one is a sub-issue of (a plan step from the forum)." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
     work: z
@@ -109,7 +109,7 @@ const Columns = z.object({
 });
 const ColumnParams = OrgParams.extend({ columnId: z.uuid() });
 
-/** Native issues (D28): numbers per org, acceptance criteria, activity, "ask an agent to implement". */
+/** Native issues: numbers per org, acceptance criteria, activity, "ask an agent to implement". */
 export function issueRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
   const app = createAppRouter(deps);
@@ -253,7 +253,7 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issue-columns",
       tags,
       security,
-      summary: "The board's columns, each in a fixed stage (D55)",
+      summary: "The board's columns, each in a fixed stage",
       request: { params: OrgParams },
       responses: { 200: json(Columns), ...errors },
     }),

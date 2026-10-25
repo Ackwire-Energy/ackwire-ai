@@ -18,7 +18,7 @@ import { agents } from "./agents";
 import { organizations } from "./tenancy";
 
 /**
- * Each agent's computer (D30): one sandbox per agent, created on first use
+ * Each agent's computer (ADR 0021): one sandbox per agent, created on first use
  * and shared by all its conversations, so `/workspace` persists. The
  * provider stops it when idle and archives it after days stopped; it is
  * never deleted on its own. `deleted_at` marks rows whose sandbox is gone
@@ -49,7 +49,7 @@ export const sandboxes = pgTable(
     lastError: text(),
     /** When the org's network setting was last applied to this computer (re-applied on start if older). */
     networkAppliedAt: timestamp({ withTimezone: true }),
-    /** Git proxy credential (D35): bumping it revokes every token issued to this computer. */
+    /** Git proxy credential (ADR 0024): bumping it revokes every token issued to this computer. */
     gitTokenGen: integer().notNull().default(0),
     /** When the computer last got a fresh git proxy token (re-issued on start and every few hours). */
     gitTokenIssuedAt: timestamp({ withTimezone: true }),

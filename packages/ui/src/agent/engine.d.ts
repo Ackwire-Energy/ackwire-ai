@@ -1,4 +1,4 @@
-/** Types for engine.js (plain JavaScript so the HTML prototypes can import it as is). */
+/** Types for engine.js (plain JavaScript so plain HTML pages can import it as is). */
 
 export type AgentColorName = "sky" | "indigo" | "violet" | "rose" | "amber" | "green" | "teal" | "graphite";
 export type EyeStyle = "round" | "dots" | "wide" | "happy" | "sleepy";

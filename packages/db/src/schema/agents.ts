@@ -1,5 +1,17 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  foreignKey,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { machineAccounts, machines } from "./machines";
 import { organizations } from "./tenancy";
@@ -74,7 +86,7 @@ export const agents = pgTable(
     /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = the organization's default (`organization_settings.default_agent_budget_nano_usd`). */
     monthlyBudgetNanoUsd: bigint({ mode: "number" }),
     /**
-     * Who can talk to it (D31): `everyone`, `people` (`audience_user_ids`,
+     * Who can talk to it: `everyone`, `people` (`audience_user_ids`,
      * plus the owner) or `owner`. Enforced wherever a person's message can
      * start a run; nothing else is restricted (it still reads the channel).
      */
@@ -102,6 +114,7 @@ export const agents = pgTable(
      * The account its computer brain runs with (ADR 0041), on its machine and
      * of its brain's kind (checked in code); null = the computer's own sign-in.
      * Cleared when the agent changes computer or brain kind, or the account goes.
+     * An account thinks for one agent at most (ADR 0059 §2).
      */
     brainAccountId: uuid(),
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
@@ -113,6 +126,12 @@ export const agents = pgTable(
      * or its own. The live view, take over and Stop follow it.
      */
     browserMachineId: uuid(),
+    /**
+     * Held by the people who run this server (operator API, ADR 0056): it starts nothing, the rest of the
+     * workspace works (`standing.ts`). The reason is theirs: the workspace only reads that it is paused.
+     */
+    operatorHoldAt: timestamp({ withTimezone: true }),
+    operatorHoldReason: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
@@ -127,6 +146,9 @@ export const agents = pgTable(
       columns: [t.orgId, t.brainAccountId],
       foreignColumns: [machineAccounts.orgId, machineAccounts.id],
     }),
+    uniqueIndex("agents_brain_account_unique")
+      .on(t.orgId, t.brainAccountId)
+      .where(sql`${t.brainAccountId} is not null and ${t.archivedAt} is null`),
   ],
 );
 
@@ -160,5 +182,7 @@ export const organizationSettings = pgTable("organization_settings", {
    * null), in nano-USD. Set by admins; members only ever see percentages.
    */
   defaultAgentBudgetNanoUsd: bigint({ mode: "number" }).notNull().default(50_000_000_000),
+  /** Agents check what the team already did before an outside action (ADR 0064). On unless an admin turns it off. */
+  actionCheck: boolean().notNull().default(true),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

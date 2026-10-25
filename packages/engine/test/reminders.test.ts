@@ -315,7 +315,7 @@ describe("reminders from the chat", () => {
     expect(routines.map((r) => r.target)).toEqual([{ type: "channel", channelId: f.general.id }]);
   });
 
-  test("asked in a channel it lands in the channel itself, flat (D67); ask_agent makes the agent do it then", async () => {
+  test("asked in a channel it lands in the channel itself, flat; ask_agent makes the agent do it then", async () => {
     await world((req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
       if (last.includes("tool_result")) return { chunks: ["Combinado."] };

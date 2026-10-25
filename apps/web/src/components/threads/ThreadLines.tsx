@@ -15,7 +15,7 @@ import { ThreadStatusChip } from "./ThreadBits";
 import "./threads.css";
 
 /**
- * What a channel shows of its threads (ThreadContexto.html, Threads.html):
+ * What a channel shows of its threads:
  * the quiet marker where a range became a thread's context, the stub once it
  * left the channel, one line per closed thread, and "Threads (N)" in the header.
  */
@@ -74,7 +74,7 @@ function OpenThread({
 }
 
 /**
- * Under a message someone answered with "Responder" (telas/ThreadPainel.html, "D · Linha simples"):
+ * Under a message someone answered with "Responder":
  * who is in it, "N respostas", what it needs (Esperando você / Trabalhando) and the last reply's
  * time. Opens the thread in the panel beside the channel; pressed while open there.
  */

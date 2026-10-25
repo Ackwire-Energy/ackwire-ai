@@ -58,7 +58,7 @@ test("approvals API: list, approve (resumes the run), and decisions are final", 
   expect(list.approvals[0]).toMatchObject({ title: "Merge PR #42", canDecide: true, params: { pr: 42 } });
   const id = list.approvals[0]?.id;
 
-  // Asked in the channel: the card is in the main timeline (D67).
+  // Asked in the channel: the card is in the main timeline.
   const messages = (await (await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`)).json()) as {
     messages: { body: string; meta: Record<string, unknown> }[];
   };

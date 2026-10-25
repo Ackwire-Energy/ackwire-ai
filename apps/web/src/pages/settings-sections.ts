@@ -14,11 +14,12 @@ export type SettingsSection =
   | "keys"
   | "storage"
   | "computers"
-  | "usage";
+  | "usage"
+  | "import";
 
 export type SettingsGroup = "org" | "agents" | "costs";
 
-/** The settings sub-nav (telas/Configuracoes.html), in order and in groups, with who can open each. */
+/** The settings sub-nav, in order and in groups, with who can open each. */
 export const SETTINGS_SECTIONS: {
   id: SettingsSection;
   icon: IconName;
@@ -32,9 +33,12 @@ export const SETTINGS_SECTIONS: {
   { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
   // Every member sees the computers and can pair one (ADR 0025); the cloud computer's settings are for admins.
   { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
-  { id: "usage", icon: "wallet", group: "costs", allowed: (r) => can(r, "view_usage") },
-  { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "manage_credentials") },
+  // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
+  { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
+  // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
+  { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
+  { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
 ];
 
 export const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];

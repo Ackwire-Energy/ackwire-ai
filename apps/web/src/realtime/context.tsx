@@ -24,6 +24,7 @@ import {
   applyReactions,
   applyReceiptEvent,
   applyTyping,
+  applyWorkspaceEvent,
   type BrowserFrame,
   type BrowserInputEvent,
   type BrowserLiveStatus,
@@ -398,6 +399,9 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
+      // The workspace's computer on its way and its standing may have moved meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
@@ -458,6 +462,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
+      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);
@@ -670,8 +676,12 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "message.memories")
         cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
       // Act with undo: an agent message's receipts changed (made, undone, redone): replace the list.
-      if (event.type === "message.actions")
+      if (event.type === "message.actions") {
         cacheMessageActions(qc, orgId, event.channelId, event.messageId, event.actions);
+        // A channel an agent created (or its undo archived): the sidebar lists it now, not at the next refetch.
+        if (event.actions.some((a) => a.kind === "channel.created"))
+          void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
@@ -686,6 +696,17 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams]);
+}
+
+/** Each live event of a channel while mounted and `enabled` (the handler is read through a ref). */
+export function useChannelEvents(channelId: string, enabled: boolean, onEvent: (event: ChannelEvent) => void) {
+  const { connection } = useRealtime();
+  const handler = useRef(onEvent);
+  handler.current = onEvent;
+  useEffect(() => {
+    if (!connection || !enabled) return;
+    return connection.subscribe(channelId, (event) => handler.current(event));
+  }, [connection, enabled, channelId]);
 }
 
 /** Same items in the same order (lists), or the same keys with the same values (plain objects). */

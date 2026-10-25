@@ -3,7 +3,7 @@
  * session cookie: nothing auth-related is stored in JavaScript). Pages use
  * this interface; `better-auth.ts` implements it and tests pass a fake.
  */
-export type AuthResult = { ok: true } | { ok: false; status: number; message: string };
+export type AuthResult = { ok: true } | { ok: false; status: number; message: string; code?: string };
 
 export interface AuthClient {
   signIn(input: { email: string; password: string }): Promise<AuthResult>;
@@ -15,7 +15,7 @@ export interface AuthClient {
   /** The new password for the link's token; signs out every other session. */
   resetPassword(input: { token: string; newPassword: string }): Promise<AuthResult>;
   signOut(): Promise<void>;
-  /** In the browser, after a fresh sign-in: hands it to the Mac app's window waiting on `challenge` (D79). */
+  /** In the browser, after a fresh sign-in: hands it to the Mac app's window waiting on `challenge` (ADR 0036). */
   desktopHandoff(challenge: string): Promise<AuthResult>;
   /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
   desktopRedeem(verifier: string): Promise<boolean>;

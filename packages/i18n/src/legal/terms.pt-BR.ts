@@ -2,14 +2,15 @@ import type { LegalDocument } from "./types";
 
 export const termsPtBR: LegalDocument = {
   title: "Termos de uso",
-  summary: "O acordo para usar o agentes.chat: o seu espaço de trabalho, os seus agentes e pelo que cada lado responde.",
+  summary:
+    "O acordo para usar o agentes.chat: o seu espaço de trabalho, os seus agentes e pelo que cada lado responde.",
   updated: "2026-10-23",
   sections: [
     {
       id: "agreement",
       heading: "1. Acordo",
       blocks: [
-        "Estes Termos de uso (os \"Termos\") são um acordo vinculante entre a CODARI GLOBAL, LLC, sociedade de responsabilidade limitada do estado de Wyoming (EUA) que atua sob o nome agentes.chat (\"agentes.chat\", \"nós\"), e a pessoa ou entidade que cria uma conta ou uma organização (\"você\"). Ao criar uma conta, entrar numa organização ou usar de outra forma o agentes.chat na web, no app de Mac ou no app de celular (o \"Serviço\"), você aceita estes Termos e a nossa Política de privacidade. Se você usa o Serviço em nome de uma organização, declara que tem poderes para obrigá-la.",
+        'Estes Termos de uso (os "Termos") são um acordo vinculante entre a CODARI GLOBAL, LLC, sociedade de responsabilidade limitada do estado de Wyoming (EUA) que atua sob o nome agentes.chat ("agentes.chat", "nós"), e a pessoa ou entidade que cria uma conta ou uma organização ("você"). Ao criar uma conta, entrar numa organização ou usar de outra forma o agentes.chat na web, no app de Mac ou no app de celular (o "Serviço"), você aceita estes Termos e a nossa Política de privacidade. Se você usa o Serviço em nome de uma organização, declara que tem poderes para obrigá-la.',
         "Para usar o Serviço, você precisa ter pelo menos 18 anos e capacidade para firmar contratos.",
       ],
     },
@@ -60,7 +61,7 @@ export const termsPtBR: LegalDocument = {
       id: "content",
       heading: "6. O seu conteúdo",
       blocks: [
-        "\"Conteúdo do Espaço de Trabalho\" é o que você e a sua organização colocam no Serviço e o que os seus agentes produzem nele. A sua organização é dona do Conteúdo do Espaço de Trabalho dela e, entre você e nós, o que os agentes produzem para você é seu, sujeito aos termos do provedor de modelo que o produziu. O que um modelo produz pode ser parecido com o que ele produz para outras pessoas.",
+        '"Conteúdo do Espaço de Trabalho" é o que você e a sua organização colocam no Serviço e o que os seus agentes produzem nele. A sua organização é dona do Conteúdo do Espaço de Trabalho dela e, entre você e nós, o que os agentes produzem para você é seu, sujeito aos termos do provedor de modelo que o produziu. O que um modelo produz pode ser parecido com o que ele produz para outras pessoas.',
         "Você nos concede os direitos limitados necessários para operar o Serviço: armazenar, tratar, transmitir e exibir o Conteúdo do Espaço de Trabalho para fazer funcionar o seu espaço de trabalho e os seus agentes, enviá-lo aos provedores que os seus agentes usam conforme a Política de privacidade e prestar suporte. Não vendemos o Conteúdo do Espaço de Trabalho e não o usamos para treinar modelos de aprendizado de máquina.",
         "A sua organização é a controladora dos dados pessoais no Conteúdo do Espaço de Trabalho dela; nós os tratamos conforme as instruções dela, como operador, nos termos da Política de privacidade e do Acordo de Tratamento de Dados.",
       ],
@@ -112,7 +113,7 @@ export const termsPtBR: LegalDocument = {
       id: "disclaimers",
       heading: "13. Isenções",
       blocks: [
-        "O Serviço, incluindo tudo o que os agentes produzem e fazem, é fornecido \"no estado em que se encontra\" e \"conforme disponível\". Não garantimos que o Serviço ou os agentes funcionarão sem interrupções, sem erros, com exatidão ou de forma adequada aos seus fins. Na máxima extensão permitida pela lei, afastamos todas as garantias implícitas, incluindo comerciabilidade, adequação a um fim específico e não violação.",
+        'O Serviço, incluindo tudo o que os agentes produzem e fazem, é fornecido "no estado em que se encontra" e "conforme disponível". Não garantimos que o Serviço ou os agentes funcionarão sem interrupções, sem erros, com exatidão ou de forma adequada aos seus fins. Na máxima extensão permitida pela lei, afastamos todas as garantias implícitas, incluindo comerciabilidade, adequação a um fim específico e não violação.',
       ],
     },
     {

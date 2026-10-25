@@ -1,11 +1,18 @@
 // A fake `claude` for brain tests: speaks stream-json in and out like
 // `claude -p --input-format stream-json --output-format stream-json`.
-// Each start appends its argv and $CLAUDE_CONFIG_DIR to $FAKE_CLAUDE_LOG (one JSON line).
+// Each start appends its argv, $CLAUDE_CONFIG_DIR, its folder, $ANTHROPIC_API_KEY,
+// $ANTHROPIC_AUTH_TOKEN and its `--settings` file's `env` to $FAKE_CLAUDE_LOG
+// (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
-// of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate;
-// "STEER…" and "BGSELF" below (live steering, background tasks).
-import { appendFileSync, existsSync, writeFileSync } from "node:fs";
+// of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
+// "RATE" says the 5-hour window is at 84%; "STEER…" and "BGSELF" below (live
+// steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN (as an
+// agent's shell could print it), "KEY401" is refused by the endpoint and retries for good
+// (as Claude Code 2.1.310 does, ten times with backoff). Control requests: `initialize`, and `get_usage`
+// as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
+// "hang": never).
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
@@ -13,7 +20,17 @@ const args = process.argv.slice(2);
 const log = process.env.FAKE_CLAUDE_LOG;
 if (log) {
   const configDir = process.env.CLAUDE_CONFIG_DIR ?? null;
-  appendFileSync(log, `${JSON.stringify({ pid: process.pid, args, configDir })}\n`);
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN ?? null;
+  const at = args.indexOf("--settings");
+  let settingsEnv = null;
+  try {
+    settingsEnv = at >= 0 ? (JSON.parse(readFileSync(args[at + 1], "utf8")).env ?? null) : null;
+  } catch {}
+  appendFileSync(
+    log,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, settingsEnv })}\n`,
+  );
 }
 const flag = (name) => {
   const i = args.indexOf(name);
@@ -54,6 +71,11 @@ let wake = null;
 let closed = false;
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (line) => {
+  let control = null;
+  try {
+    control = JSON.parse(line);
+  } catch {}
+  if (control?.type === "control_request") return answerControl(control);
   queue.push(line);
   try {
     lifecycleOf(JSON.parse(line).uuid, "queued");
@@ -164,6 +186,17 @@ async function answer(line) {
     process.exit(3);
   }
   if (prompt.includes("SLOW")) await sleep(300);
+  if (prompt.includes("RATE")) {
+    out({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "allowed_warning",
+        rateLimitType: "five_hour",
+        utilization: 0.84,
+        resetsAt: 1900000000,
+      },
+    });
+  }
   if (prompt.includes("LIMIT")) {
     out({ type: "rate_limit_event", rate_limit_info: { status: "rejected", resetsAt: 1900000000 } });
     out({
@@ -173,6 +206,19 @@ async function answer(line) {
       result: "You've hit your limit",
       usage: { input_tokens: 0, output_tokens: 0 },
     });
+    return;
+  }
+  if (prompt.includes("KEY401")) {
+    out({
+      type: "system",
+      subtype: "api_retry",
+      attempt: 1,
+      max_retries: 10,
+      retry_delay_ms: 600,
+      error_status: 401,
+      error: "authentication_failed",
+    });
+    await sleep(60_000);
     return;
   }
   if (prompt.includes("AUTH")) {
@@ -185,7 +231,10 @@ async function answer(line) {
     });
     return;
   }
-  for (const text of ["Hello ", "world"]) {
+  const said = prompt.includes("ECHOKEY")
+    ? [`token ${process.env.ANTHROPIC_AUTH_TOKEN} `, "printed"]
+    : ["Hello ", "world"];
+  for (const text of said) {
     out({
       type: "stream_event",
       event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
@@ -219,7 +268,7 @@ async function answer(line) {
     type: "result",
     subtype: "success",
     is_error: false,
-    result: `echo ${turns}: ${prompt}${steered}`,
+    result: prompt.includes("ECHOKEY") ? said.join("") : `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
     ...(read.length && resultUuids ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),
@@ -234,6 +283,37 @@ async function answer(line) {
   else if (moved) await turnOfItsOwn("bg1", "background finished", 0, prompt.includes("STEERBGSLOW") ? 800 : 100);
   // Its own turn takes 300 ms ("BGSELFSTUCK": never ends).
   if (prompt.includes("BGSELF")) await turnOfItsOwn("self1", "stray", prompt.includes("BGSELFSTUCK") ? 60_000 : 300);
+}
+
+/** A control request on stdin, answered at once (`get_usage` as $FAKE_CLAUDE_USAGE says). */
+function answerControl(req) {
+  const reply = (subtype, body) =>
+    process.stdout.write(
+      `${JSON.stringify({ type: "control_response", response: { subtype, request_id: req.request_id, ...body } })}\n`,
+    );
+  const mode = process.env.FAKE_CLAUDE_USAGE ?? "";
+  if (req.request?.subtype === "initialize") return reply("success", { response: { commands: [] } });
+  if (req.request?.subtype !== "get_usage") return reply("error", { error: "not supported" });
+  if (mode === "hang") return;
+  if (mode === "error") return reply("error", { error: "get_usage failed" });
+  if (mode === "signed_out") {
+    return reply("success", { response: { subscription_type: null, rate_limits_available: false, rate_limits: null } });
+  }
+  reply("success", {
+    response: {
+      subscription_type: "max",
+      rate_limits_available: true,
+      rate_limits: {
+        five_hour: { utilization: 42, resets_at: "2030-01-01T15:40:00.000Z" },
+        seven_day: { utilization: 81.6, resets_at: "2030-01-04T10:00:00.000Z" },
+        seven_day_opus: { utilization: 12, resets_at: null },
+        seven_day_sonnet: null,
+        model_scoped: [{ display_name: "Fable", utilization: 5, resets_at: null }],
+        extra_usage: { is_enabled: false, monthly_limit: null, used_credits: null, utilization: null },
+      },
+      behaviors: null,
+    },
+  });
 }
 
 /** A background task ends `after` ms on: its notice starts a turn nobody sent (it answers `text`, `ms` later). */

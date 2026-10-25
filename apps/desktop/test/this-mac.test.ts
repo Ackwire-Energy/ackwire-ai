@@ -4,7 +4,7 @@ import { DesktopStore } from "../src/control/store";
 import { answerThisMac } from "../src/control/this-mac";
 import type { Host } from "../src/host/types";
 
-/** The site in the main window asking this Mac (D79): status, connect, Preferences. */
+/** The site in the main window asking this Mac (ADR 0036): status, connect, Preferences. */
 
 const paired = (orgId: string, connection: ControlStatus["connection"] = "online"): ControlStatus => ({
   paired: true,

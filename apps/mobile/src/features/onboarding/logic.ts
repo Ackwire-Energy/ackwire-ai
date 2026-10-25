@@ -2,7 +2,7 @@ import { isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
 
 /**
- * The phone's first run (telas/OnboardingMobile.html, A · Passos): one question per full screen, hosted by an
+ * The phone's first run: one question per full screen, hosted by an
  * agent of the team, a strip of sky on top that fills as you go. The web's steps without the computer, which
  * stays for the computer ("Depois, no computador"). Pure: no React Native imports.
  */

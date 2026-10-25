@@ -1,15 +1,16 @@
-import { and, type Executor, eq, schema } from "@agenteschat/db";
+import type { Executor } from "@agenteschat/db";
 import { isAutoModel, MODEL_TIERS, type ModelTier, modelForTier } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { brainOf, CLAUDE_CODE_MODELS } from "./brain-settings";
 import type { BrainPlan } from "./brains/select";
 import type { BrainKind } from "./brains/types";
+import { usableCredentialRow } from "./credentials";
 import type { Judge } from "./judge";
 import { missionOfThread } from "./missions";
 import { orgModelProvider } from "./router";
 
 /**
- * "Automático" (D83): an agent whose model (or effort) is `auto` gets them
+ * "Automático": an agent whose model (or effort) is `auto` gets them
  * picked per run. Before the first model call the judge reads the task and
  * answers two choices, the model tier (small, medium, large) and the effort
  * (low, medium, high); this module maps that one decision onto the brain the
@@ -248,17 +249,13 @@ export function withAuto<A extends AutoAgent>(
 
 /**
  * The provider whose line an `auto` API model comes from: the agent's own
- * key's, else the organization's (`orgModelProvider`: its default key's, its
- * newest key's, else Anthropic).
+ * key's (unless revoked), else the organization's (`orgModelProvider`: its
+ * default key's, its newest key's, else Anthropic).
  */
 export async function autoProvider(db: Executor, agent: Pick<Agent, "orgId" | "credentialId">): Promise<string> {
   if (agent.credentialId) {
-    const c = schema.providerCredentials;
-    const [row] = await db
-      .select({ provider: c.provider })
-      .from(c)
-      .where(and(eq(c.orgId, agent.orgId), eq(c.id, agent.credentialId)));
-    if (row) return row.provider;
+    const own = await usableCredentialRow(db, agent.orgId, agent.credentialId);
+    if (own) return own.provider;
   }
   return orgModelProvider(db, agent.orgId);
 }

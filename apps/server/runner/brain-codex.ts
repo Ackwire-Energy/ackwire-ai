@@ -11,7 +11,7 @@ import {
   isAccountId,
   isBrainEffort,
 } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv } from "./accounts";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { cachedExecutors, resolveCommand } from "./executors";
@@ -549,15 +549,15 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     ...(input.effort ? { effort: input.effort } : {}),
     profile: input.profile ?? "work",
   });
-  const env: Record<string, string | undefined> = {
+  const base: NodeJS.ProcessEnv = {
     ...process.env,
     ...(opts.env ?? {}),
     [CODEX_MCP_ENV[0]]: input.mcp.token,
     ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
     ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
-    // ADR 0041: the account's folder is this turn's Codex home.
-    ...(input.account ? { CODEX_HOME: input.account.home } : {}),
   };
+  // ADR 0041: the account's folder is this turn's Codex home, and nothing else signs it in.
+  const env = input.account ? accountEnv("codex", input.account.home, base) : base;
   const mapper = new CodexEventMapper({
     cwd: input.cwd,
     ...(input.model ? { model: input.model } : {}),

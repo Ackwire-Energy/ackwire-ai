@@ -1,0 +1,54 @@
+/* Above the composer: no AI to think with (the organization's, or this DM's agent). */
+.noai-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 4px 6px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.noai-banner > .ac-icon {
+  flex: none;
+  color: var(--attention);
+}
+.noai-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+.noai-banner__text b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.noai-banner .ac-btn {
+  flex: none;
+}
+
+/* "Sem IA" by an agent's name: the chip opens Connect. */
+.noai-chip {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The Connect dialog's first step: one card per way to connect. */
+.connect-ai__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.connect-ai__key {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink);
+}

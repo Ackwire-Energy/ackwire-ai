@@ -2,7 +2,6 @@
 
 - Status: Accepted (rounds 1 and 2 built)
 - Date: 2026-10-18
-- Planning: D52
 - Extends: ADR 0015 (approvals), ADR 0032 (agent engine), ADR 0034 (agents talk to each other)
 
 ## Context
@@ -13,7 +12,7 @@ Asked about a bug, agents answered with a plan and "can I take a look?" instead 
 2. The base prompt said only "Use your tools when they help", and the `ask_user` rule invited a question whenever "key information is missing", which the model read as "ask before looking".
 3. "What you can do" ended with "Beyond this, you can't", which is wrong for computer brains (Claude Code, Codex): they also have their own read, search, shell and git tools.
 4. Routine runs were framed as status posts: restate, or `NO_REPLY`.
-5. The repositories block (`packages/engine/src/git/repos.ts`) says "When nobody names a repository, ask which repository…": owned by the git workstream, to be revised there in the same spirit.
+5. The repositories block (`packages/engine/src/git/repos.ts`) says "When nobody names a repository, ask which repository…": to be revised in the same spirit (see "Later rounds").
 
 ## Decision
 
@@ -35,8 +34,6 @@ Prompt changes are checked against a behavior eval built from the real failures 
 Scoring is deterministic checks (a reading tool before the answer, no asking permission to look, no "I haven't looked", no false "no access", required tools called, evidence cited, sensitive tools held for approval and never run, `NO_REPLY` only when expected) plus a cheap judge model with a rubric per case (looked first, grounded, concrete next step, asks only the person's decisions, case-specific points). The report (per case and per criterion, cost) goes to `packages/engine/eval/out/`. The checkers are unit-tested and the harness runs with the fake provider in `bun test` (no network).
 
 ## Round 2: act with undo, missions that arrive investigated
-
-Prototype: `docs/design/telas/FazerDesfazer.html` (views `undo` and `mission`), web and app.
 
 **Act with undo.** Internal, reversible changes need no permission: the agent does them and its reply carries one receipt per change with "Desfazer" for `UNDO_WINDOW_MS` (5 minutes; every undo or redo opens the window again), then the receipt stays as history.
 

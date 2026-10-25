@@ -11,7 +11,7 @@ const failed = (error: unknown): ToolOutput => ({
  * Skills through the Tool Gateway (`skills:read`, on by default):
  * `load_skill` returns a skill's instructions and its files, and
  * `read_skill_file` one of its text files. Only skills enabled for the agent;
- * scripts are never shown: `run_skill_script` (sandbox tools, D30) runs them.
+ * scripts are never shown: `run_skill_script` (sandbox tools, ADR 0021) runs them.
  */
 export function createSkillToolSource(deps: SkillDeps): ToolSource {
   const tools: ToolDefinition[] = [

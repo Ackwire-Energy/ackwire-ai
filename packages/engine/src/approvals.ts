@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { MAIL_PRESETS, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
@@ -6,6 +6,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
 import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
+import { type MailPreview, parseMailDetail, withoutReplyPrefix } from "./mail/preview";
 import { enqueue } from "./outbox";
 import type { Approval } from "./tools/gateway";
 import type { ApprovalOrigin } from "./tools/run-policy";
@@ -19,8 +20,17 @@ const {
   agentRunSteps,
   connectorConnections,
   issues,
+  mailAccounts,
   messages,
 } = schema;
+
+/** The email a mail approval would write (a draft, a send, a reply or a forward), as its card shows it. */
+export interface ApprovalEmail extends MailPreview {
+  verb: "draft" | "send" | "reply" | "forward";
+  /** The mailbox it goes through, and its provider's name ("iCloud", "Gmail"; null: unknown). */
+  mailbox: string;
+  provider: string | null;
+}
 
 export interface ApprovalView {
   id: string;
@@ -29,7 +39,7 @@ export interface ApprovalView {
   missionId: string | null;
   agentId: string;
   channelId: string;
-  /** Where its card is: the thread, or null for the main timeline (asked there, D67). */
+  /** Where its card is: the thread, or null for the main timeline (asked there). */
   threadId: string | null;
   messageId: string | null;
   tool: string;
@@ -57,6 +67,8 @@ export interface ApprovalView {
   /** The connector the action goes through (`github`), and its account (`acme`); null for built-in tools. */
   connector: string | null;
   connectorAccount: string | null;
+  /** The email itself (From, To, Subject, text), for mail drafts and sends; null for every other action. */
+  email: ApprovalEmail | null;
   /** The agent's required reason (ADR 0053): what it found and why this action, shown on the card. */
   why: string | null;
   /** Asked while nobody watched: by a routine (its name) or an unattended run; null when a person was behind it. */
@@ -71,6 +83,7 @@ export interface ApprovalView {
 interface ApprovalContext {
   connector: string | null;
   connectorAccount: string | null;
+  email: ApprovalEmail | null;
   issue: { id: string; number: number; title: string } | null;
   trail: { text: string; at: string }[];
 }
@@ -101,7 +114,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
   // Mission approvals (ADR 0029) have no run.
   const runIds = [...new Set(rows.map((r) => r.runId).filter((id): id is string => !!id))];
   const connectionIds = [...new Set(rows.map((r) => r.connectionId).filter((id): id is string => !!id))];
-  const [connections, steps, runs] = await Promise.all([
+  const [connections, mailboxes, steps, runs] = await Promise.all([
     connectionIds.length
       ? db
           .select({
@@ -111,6 +124,18 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
           })
           .from(connectorConnections)
           .where(inArray(connectorConnections.id, connectionIds))
+      : Promise.resolve([]),
+    // A mail tool's connection is the mailbox (ADR 0038).
+    connectionIds.length
+      ? db
+          .select({
+            id: mailAccounts.id,
+            address: mailAccounts.address,
+            provider: mailAccounts.provider,
+            preset: mailAccounts.preset,
+          })
+          .from(mailAccounts)
+          .where(inArray(mailAccounts.id, connectionIds))
       : Promise.resolve([]),
     runIds.length
       ? db
@@ -137,6 +162,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
         .where(inArray(issues.id, issueIds))
     : [];
   const connectionOf = new Map(connections.map((c) => [c.id, c]));
+  const mailboxOf = new Map(mailboxes.map((m) => [m.id, m]));
   const issueOfRun = new Map(runs.map((r) => [r.id, issueRows.find((i) => i.id === r.issueId) ?? null]));
   for (const row of rows) {
     // The narration of every turn before this approval's step.
@@ -147,9 +173,11 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
       if (s.kind === "model_call" && s.narration) trail.push({ text: s.narration, at: s.createdAt.toISOString() });
     }
     const connection = row.connectionId ? connectionOf.get(row.connectionId) : undefined;
+    const mailbox = row.connectionId ? mailboxOf.get(row.connectionId) : undefined;
     out.set(row.id, {
-      connector: connection?.connector ?? null,
-      connectorAccount: connection?.account ?? null,
+      connector: connection?.connector ?? (mailbox ? "email" : null),
+      connectorAccount: connection?.account ?? mailbox?.address ?? null,
+      email: mailbox ? approvalEmail(row, mailbox) : null,
       issue: row.runId ? (issueOfRun.get(row.runId) ?? null) : null,
       trail: trail.slice(-12),
     });
@@ -157,10 +185,50 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
   return out;
 }
 
+const MAIL_VERBS = ["draft", "send", "reply", "forward"] as const;
+
+/** The provider's name for people: "Gmail", "Outlook", the IMAP preset's ("iCloud"); null for a custom server. */
+function mailProviderName(m: { provider: string; preset: string | null }) {
+  if (m.provider === "gmail") return "Gmail";
+  if (m.provider === "outlook") return "Outlook";
+  const preset = m.preset && m.preset !== "custom" ? MAIL_PRESETS.find((p) => p.id === m.preset) : undefined;
+  return preset ? preset.label.replace(/\s*\(.*\)$/, "") : null;
+}
+
+/**
+ * The email a mail approval writes: from its detail (`mailDetail`), else from the call's own values (a draft
+ * or a send carry them all). Null for the other mail actions (organizing, deleting).
+ */
+export function approvalEmail(
+  row: Pick<Approval, "tool" | "detail" | "params">,
+  mailbox: { address: string; provider: string; preset: string | null },
+): ApprovalEmail | null {
+  const verb = MAIL_VERBS.find((v) => row.tool.startsWith("mail_") && row.tool.endsWith(`_${v}`));
+  if (!verb) return null;
+  const preview = parseMailDetail(row.detail) ?? previewFromParams(row.params, mailbox.address, verb);
+  return preview ? { ...preview, verb, mailbox: mailbox.address, provider: mailProviderName(mailbox) } : null;
+}
+
+function previewFromParams(params: Record<string, unknown>, address: string, verb: ApprovalEmail["verb"]) {
+  if (verb !== "draft" && verb !== "send") return null;
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  const subject = text(params.subject);
+  return {
+    from: text(params.from) || address,
+    to: list(params.to),
+    cc: list(params.cc),
+    bcc: list(params.bcc),
+    subject,
+    body: text(params.body),
+    original: text(params.in_reply_to) ? { subject: withoutReplyPrefix(subject), from: null } : null,
+  } satisfies MailPreview;
+}
+
 /**
  * Where each approval's card is: its message's thread (null: the main timeline).
  * `thread_root_id` is the run's conversation, which for a run asked in the main
- * timeline is its trigger, not a thread (D67). No card yet: that conversation.
+ * timeline is its trigger, not a thread. No card yet: that conversation.
  */
 export async function approvalCardThreads(db: Executor, rows: Pick<Approval, "id" | "messageId" | "threadRootId">[]) {
   const ids = [...new Set(rows.flatMap((r) => (r.messageId ? [r.messageId] : [])))];
@@ -186,6 +254,7 @@ async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval
     const { trail: steps, ...context } = contexts.get(r.id) ?? {
       connector: null,
       connectorAccount: null,
+      email: null,
       issue: null,
       trail: [],
     };
@@ -232,6 +301,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   result: resultOf(a),
   connector: null,
   connectorAccount: null,
+  email: null,
   why: a.why.trim() || null,
   origin: approvalOriginOf(a.origin),
   issue: null,
@@ -266,7 +336,7 @@ export async function publishApproval(
   for (const userId of deciders) {
     await publishUserEvent(deps.pubsub, approval.orgId, userId, { type, approval: { ...view, canDecide: true } });
   }
-  // The inbox (D46): waiting for whoever may decide; out of it once decided or expired.
+  // The inbox: waiting for whoever may decide; out of it once decided or expired.
   if (type === "approval.created" && approval.status === "pending") {
     await notifyApproval(deps, approval, deciders).catch(() => {});
   } else if (type === "approval.decided") {

@@ -2,7 +2,6 @@
 
 - Status: Accepted (read-only first: `pg_execute` and `database:write` come later, after real use)
 - Date: 2026-10-19
-- Planning: D56
 - Extends: ADR 0015 (Tool Gateway and approvals), ADR 0016 (connectors), ADR 0007 (credentials), ADR 0037 (reads never ask)
 - Out of scope: MySQL, SQL Server, BigQuery and other warehouses (the same shape later, one driver each); databases only reachable from a private network (see "Private networks")
 
@@ -12,7 +11,7 @@ People want agents that answer from their own data: "how many orders yesterday",
 
 What we already have:
 
-- The Tool Gateway takes any number of `ToolSource`s (`createToolGateway({ sources })`, `packages/engine/src/tools/types.ts`). Sources only offer tools; the gateway alone decides (scopes from `agent_scopes`, re-read per call; sensitive calls become approvals with the exact parameters and an action hash; D53).
+- The Tool Gateway takes any number of `ToolSource`s (`createToolGateway({ sources })`, `packages/engine/src/tools/types.ts`). Sources only offer tools; the gateway alone decides (scopes from `agent_scopes`, re-read per call; sensitive calls become approvals with the exact parameters and an action hash).
 - Per-org encrypted credentials (`sealSecret`, ADR 0007) and connector connections (`connector_connections`).
 - The address guard used for MCP URLs (`isBlockedAddress`, `assertPublicHttpsUrl` in `net-guard.ts`).
 - The `postgres` driver is already a dependency (`packages/db`), and tests run on PGlite.
@@ -30,7 +29,7 @@ So the plumbing is there. The work is making SQL safe to hand to a model.
 
 - **Cloud agents** (the engine's tool loop) see the `pg_*` tools like any granted connector tool.
 - **Computer brains** (Claude Code, Codex on a connected computer, ADR 0032) get them through the runner's `agentes` MCP bridge: `bridgeToolsFor` lists the run's gateway tools, connector tools included, and each call comes back to `invokeToolForRun`, i.e. the same gateway, grants, approvals and limits. The SQL still runs from our server, not from the machine; the credential never reaches the machine.
-- What we do not control: a computer brain can also run `psql` or its own tools on that machine with whatever credentials the person keeps there. That path is governed by the machine's command policy and folders (D53, gap 3), not by this connector. The connect screen doesn't change that; it is the person's machine.
+- What we do not control: a computer brain can also run `psql` or its own tools on that machine with whatever credentials the person keeps there. That path is governed by the machine's command policy and folders, not by this connector. The connect screen doesn't change that; it is the person's machine.
 
 ### Tools and scopes
 
@@ -53,7 +52,7 @@ Layered, because no single check is enough:
 3. **One statement.** The statement is parsed (a real Postgres parser, not a regex) and must be a single `SELECT`/`WITH`/`EXPLAIN` (no `ANALYZE`). Rejected: multiple statements, `COPY`, `DO`, `CALL`, `SET`/`RESET` of session settings, `LISTEN`/`NOTIFY`, `pg_sleep` and the admin functions (`pg_read_file`, `pg_terminate_backend`, `lo_*`, `dblink*`).
 4. **Limits per call.** `statement_timeout` 15 s (org setting up to 60 s), `idle_in_transaction_session_timeout`, `lock_timeout` 2 s. The server streams rows and stops at 500 rows or 64 KB of text, whichever comes first, and tells the model the result was cut (with the total when cheap). Values longer than 2 KB are truncated; `bytea` is never returned.
 
-Writes (`pg_execute`) run in a normal transaction after approval, with the same timeouts, one statement, and `RETURNING` capped like reads. The approval card shows the SQL and the rows it would touch (`EXPLAIN` estimate). The gateway re-checks the grant and the action hash before executing (D53), and it runs at most once.
+Writes (`pg_execute`) run in a normal transaction after approval, with the same timeouts, one statement, and `RETURNING` capped like reads. The approval card shows the SQL and the rows it would touch (`EXPLAIN` estimate). The gateway re-checks the grant and the action hash before executing, and it runs at most once.
 
 ### Connection and network
 
@@ -63,9 +62,9 @@ Writes (`pg_execute`) run in a normal transaction after approval, with the same 
 - **Pool:** at most 2 connections per org connection, opened on first use and closed after 5 minutes idle. `application_name = agentes.chat` so the database owner can see and kill our sessions.
 - "Test connection" in the app runs `select version()` plus a check of what the role can do (to set the "can change data" mark).
 
-### Per-call checks (`checkCall`, D53)
+### Per-call checks (`checkCall`)
 
-This connector is the second user of the per-call hook proposed in D53 (after GitHub). Optional rules per agent:
+This connector is the second user of the per-call hook (ADR 0038; after GitHub). Optional rules per agent:
 
 - Allowed schemas or tables (the parser lists the relations a statement touches; anything outside is refused).
 - Hidden columns (e.g. `users.password_hash`, `cpf`): refused in `SELECT` lists and `*` expansion is rewritten to exclude them.

@@ -14,8 +14,16 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Chip, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
-import { approvalRisk } from "../approvals/logic";
-import { ApprovalDetails, ApprovalFuse, ApprovalTraits, ApprovalWhy } from "../approvals/parts";
+import { approvalAction, approvalRisk } from "../approvals/logic";
+import {
+  ApprovalDetails,
+  ApprovalEmailLetter,
+  ApprovalFuse,
+  ApprovalSaid,
+  ApprovalTraits,
+  approvalTitleText,
+  useOriginShort,
+} from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -187,7 +195,7 @@ export function ConsultationCard({
 // ── Approval ─────────────────────────────────────────────────────────────────
 
 /**
- * "Pede sua aprovação" in the conversation (MobileConversas.html): the exact action, its values, the
+ * "Pede sua aprovação" in the conversation: the exact action, its values, the
  * fuse until it expires, Recusar and Aprovar (held for a second when the risk is high). After, one line
  * with what happened. Someone who can't decide sees the request and opens it.
  */
@@ -202,6 +210,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   const approval = useApproval(orgId, approvalId);
   const decide = useDecideApproval(orgId);
   const a = approval.data;
+  const origin = useOriginShort({ origin: a?.origin ?? null });
   if (!a) return null;
   if (a.status !== "pending") {
     const ok = a.status === "approved";
@@ -209,7 +218,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
       <View style={[styles.done, surface]}>
         <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
-          {t(`mobile.chat.approval.${a.status}`, { title: a.title })}
+          {t(`mobile.chat.approval.${a.status}`, { title: approvalTitleText(t, a) })}
         </Text>
       </View>
     );
@@ -236,18 +245,18 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
     <View style={[styles.askcard, raised]}>
       <View style={styles.label}>
         <Icon name="shield" size={15} color={c.amber} />
-        <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]}>
-          {t("mobile.chat.approval.asks")}
+        <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]} numberOfLines={1}>
+          {origin ? `${t("mobile.chat.approval.asks")} · ${origin}` : t("mobile.chat.approval.asks")}
         </Text>
         {high ? <Chip label={t("mobile.approval.highRisk")} /> : null}
       </View>
-      <ApprovalWhy approval={a} name={name} />
       <Text variant="title" style={styles.h4}>
-        {a.title}
+        {approvalTitleText(t, a)}
       </Text>
       <View style={styles.askBody}>
+        {a.email ? <ApprovalEmailLetter email={a.email} /> : <ApprovalDetails approval={a} />}
+        <ApprovalSaid approval={a} name={name} />
         <ApprovalTraits approval={a} />
-        <ApprovalDetails approval={a} />
         <ApprovalFuse approval={a} />
       </View>
       {a.canDecide ? (
@@ -269,7 +278,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
                 variant="primary"
                 wide
                 icon="check"
-                label={t("mobile.approval.approve")}
+                label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
                 disabled={decide.isPending}
                 onPress={approve}
               />

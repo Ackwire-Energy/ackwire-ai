@@ -115,6 +115,8 @@ export interface ToolSideEffects {
   deniedRepo?: string;
   /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
   browser?: BrowserTrailStep[];
+  /** Its desktop calls since the last post (`meta.desktop`, ADR 0062), the same shape: the app an open started. */
+  desktop?: BrowserTrailStep[];
 }
 
 /**
@@ -128,22 +130,33 @@ export interface BrowserTrailStep {
   failed?: true;
 }
 
-/** The most browser steps one message keeps (the latest ones). */
+/** The most browser steps one message keeps (the latest ones); as many desktop steps. */
 export const BROWSER_TRAIL_MAX = 200;
 
-/** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`). */
-const browserTool = (name: string) => {
+/** The screens whose calls a message keeps as a trail, by their tools' prefix. */
+type TrailScreen = "browser" | "desktop";
+
+/** A plan's result carries its steps (`browserTrail`, `desktopTrail`): the plan call itself isn't one. */
+const TRAIL_DATA: Record<TrailScreen, { data: string; plan: string }> = {
+  browser: { data: "browserTrail", plan: "browser_do" },
+  desktop: { data: "desktopTrail", plan: "desktop_do" },
+};
+
+/** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`); the screen whose trail it joins. */
+const screenTool = (name: string): { tool: string; screen: TrailScreen } | null => {
   const tool = name.replace(/^mcp__agentes__/, "");
-  return tool.startsWith("browser_") ? tool : null;
+  if (tool.startsWith("browser_")) return { tool, screen: "browser" };
+  if (tool.startsWith("desktop_")) return { tool, screen: "desktop" };
+  return null;
 };
 
 const withTrail = (list: BrowserTrailStep[] | undefined, more: BrowserTrailStep[]) =>
   [...(list ?? []), ...more].slice(-BROWSER_TRAIL_MAX);
 
 /**
- * Adds a browser call to `t`'s trail; any other tool leaves it as it is. A
- * `browser_do` isn't one step: its steps come in its result (`absorbToolData`,
- * `browserTrail`), each as the tool it stands for.
+ * Adds a browser or desktop call to `t`'s trail of that screen; any other tool
+ * leaves it as it is. A plan (`browser_do`, `desktop_do`) isn't one step: its
+ * steps come in its result (`absorbToolData`), each as the tool it stands for.
  */
 export function absorbBrowserCall(
   t: ToolSideEffects,
@@ -151,10 +164,11 @@ export function absorbBrowserCall(
   failed: boolean,
   at = new Date(),
 ) {
-  const tool = browserTool(call.name);
-  if (!tool || tool === "browser_do") return;
+  const found = screenTool(call.name);
+  if (!found || found.tool === TRAIL_DATA[found.screen].plan) return;
+  const { tool, screen } = found;
   const detail = toolDetail(tool, call.input as Record<string, unknown> | undefined);
-  t.browser = withTrail(t.browser, [
+  t[screen] = withTrail(t[screen], [
     { tool, ...(detail ? { detail } : {}), at: at.toISOString(), ...(failed ? { failed: true as const } : {}) },
   ]);
 }
@@ -188,11 +202,13 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
   if (passed) t.passed = { reason: typeof passed.reason === "string" ? passed.reason : "" };
   if (typeof data.repo === "string") t.repo = data.repo;
   if (typeof data.deniedRepo === "string") t.deniedRepo = data.deniedRepo;
-  if (Array.isArray(data.browserTrail)) {
-    const at = new Date().toISOString();
-    const steps = data.browserTrail.flatMap((s): BrowserTrailStep[] => {
+  const at = new Date().toISOString();
+  for (const screen of ["browser", "desktop"] as const) {
+    const list = data[TRAIL_DATA[screen].data];
+    if (!Array.isArray(list)) continue;
+    const steps = list.flatMap((s): BrowserTrailStep[] => {
       const step = s as { tool?: unknown; detail?: unknown; failed?: unknown };
-      if (typeof step.tool !== "string" || !step.tool.startsWith("browser_")) return [];
+      if (typeof step.tool !== "string" || !step.tool.startsWith(`${screen}_`)) return [];
       return [
         {
           tool: step.tool,
@@ -202,7 +218,7 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
         },
       ];
     });
-    if (steps.length > 0) t.browser = withTrail(t.browser, steps);
+    if (steps.length > 0) t[screen] = withTrail(t[screen], steps);
   }
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
@@ -221,6 +237,7 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.repo) t.repo = e.repo;
   if (e.deniedRepo) t.deniedRepo = e.deniedRepo;
   if (e.browser?.length) t.browser = withTrail(t.browser, e.browser);
+  if (e.desktop?.length) t.desktop = withTrail(t.desktop, e.desktop);
 }
 
 const hasEffects = (e: ToolSideEffects) =>
@@ -233,7 +250,8 @@ const hasEffects = (e: ToolSideEffects) =>
       e.passed ||
       e.repo ||
       e.deniedRepo ||
-      e.browser?.length,
+      e.browser?.length ||
+      e.desktop?.length,
   );
 
 /** The transcript key where the bridge leaves a computer-brain turn's side effects for the engine. */
@@ -350,10 +368,10 @@ export async function invokeWithChip(
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
   const input = use.input as Record<string, unknown> | undefined;
   const builtIn = scope.turnTools !== null && !(connector || def?.connectionId);
-  // The agent browser is ours on every brain: a computer brain's open names its site too.
-  const browser = browserTool(use.name);
-  const detail = browser
-    ? toolDetail(browser, input)
+  // The agent's browser and desktop are ours on every brain: a computer brain's open names its site too.
+  const screen = screenTool(use.name)?.tool;
+  const detail = screen
+    ? toolDetail(screen, input)
     : builtIn
       ? (toolDetail(use.name, input) ??
         (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
@@ -419,14 +437,14 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       threadRootId: run.threadRootId,
       triggerMessageId: run.triggerMessageId,
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
-      // Tools on demand (D65): the same list the run's turns see.
+      // Tools on demand (ADR 0043): the same list the run's turns see.
       loadedGroups: loadedGroupsOf(run.transcript),
       ...(run.background ? { background: true } : {}),
     },
   };
 }
 
-/** The tool groups a run listed up front (`Transcript.toolGroups`, D65); null = every tool. */
+/** The tool groups a run listed up front (`Transcript.toolGroups`, ADR 0043); null = every tool. */
 const loadedGroupsOf = (transcript: unknown): string[] | null => {
   const groups = (transcript as { toolGroups?: unknown } | null)?.toolGroups;
   return Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : null;
@@ -559,7 +577,7 @@ export async function runTriggerOf(
 /**
  * What every message a run posts carries, on every brain: the routine that called it (`viaRoutine`, a
  * small tag, since the routine's own call isn't shown) and whether the router brought it in after another
- * agent spoke (`joined`, D49). Only a person-authored trigger is a routine's call.
+ * agent spoke (`joined`, ADR 0034). Only a person-authored trigger is a routine's call.
  */
 export function runMessageMeta(
   run: Pick<AgentRun, "trigger">,

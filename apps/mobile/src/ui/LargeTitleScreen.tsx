@@ -39,9 +39,9 @@ export interface LargeTitleScreenProps {
 
 /**
  * A tab's root screen (Conversas, Agentes, Atividade): the large title in Funnel Display is part of the
- * content and scrolls away with it; the bar's own title fades in as it goes (like Mail's, and like the
- * prototype). We draw it rather than using the native large title: on iOS 26 inside the system tabs the
- * native one stayed expanded while the list scrolled under it. The bar is clear over the large title and
+ * content and scrolls away with it; the bar's own title fades in as it goes (like Mail's). We draw it
+ * rather than using the native large title: on iOS 26 inside the system tabs the native one stayed
+ * expanded while the list scrolled under it. The bar is clear over the large title and
  * turns into the system glass (iOS 26 scroll edge; a blur before; opaque on Android) once content passes
  * under it. Agents inside stop moving while the screen is not showing.
  */

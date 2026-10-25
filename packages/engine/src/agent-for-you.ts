@@ -9,7 +9,7 @@ import { requirePermission } from "./organizations";
 const { agentActions } = schema;
 
 /**
- * "O que fez por você" (MobileIntencional, agent profile): what one agent did
+ * "O que fez por você" (the agent's profile in the phone app): what one agent did
  * that involves this person, newest first. Three sources that already exist:
  * - receipts (`agent_actions`) of runs this person asked for, not undone
  *   (memory receipts stay out: "O que sabe sobre você" lists those);
@@ -33,7 +33,7 @@ export type ForYouItem =
         title: string;
         status: ApprovalView["status"];
         channelId: string;
-        /** Where its card is; null: the main timeline (D67). */
+        /** Where its card is; null: the main timeline. */
         threadId: string | null;
         /** Pending and this person may decide it ("espera seu ok"). */
         waitingOnYou: boolean;

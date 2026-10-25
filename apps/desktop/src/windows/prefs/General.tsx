@@ -5,10 +5,10 @@ import { useHost, useSnapshot, useStore } from "../../app";
 import { BROWSER_NOTIFY_PREF } from "../../control/browser";
 import { DOCK_PREF } from "../../control/dock";
 import { NOTCH_PREF } from "../../control/notch";
+import { siteOf } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
-import { SITE_URL } from "../../control/version";
-import { usePref } from "../../hooks";
+import { chosenServer, usePref } from "../../hooks";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
@@ -28,7 +28,7 @@ export function General() {
   const [notify, setNotify] = usePref("notify", true);
   // Off by default: the request already comes by push and in the site's "Esperando você".
   const [notifyBrowser, setNotifyBrowser] = usePref(BROWSER_NOTIFY_PREF, false);
-  // Off by default (telas/NotchAgente.html): the window only exists while it's on.
+  // Off by default: the window only exists while it's on.
   const [notch, setNotch] = usePref(NOTCH_PREF, false);
   const [dock, setDock] = usePref(DOCK_PREF, true);
   const [leaving, setLeaving] = useState<Home | null>(null);
@@ -151,7 +151,7 @@ export function General() {
               }
               end={
                 <>
-                  <Button size="sm" variant="ghost" onClick={() => void host.openExternal(SITE_URL)}>
+                  <Button size="sm" variant="ghost" onClick={() => void host.openExternal(siteOf([h], chosenServer()))}>
                     {t("desktop.common.open")}
                   </Button>
                   <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setLeaving(h)}>

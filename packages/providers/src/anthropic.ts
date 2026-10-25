@@ -16,7 +16,11 @@ import {
   type PartialUsage,
   ProviderError,
   type StopReason,
+  type ToolSpec,
 } from "./types";
+
+/** The tool a compatible endpoint gives structured output through: its input is the reply. */
+const STRUCTURED_OUTPUT = "structured_output";
 
 /**
  * Anthropic Messages API, streaming. A client is created per call with the
@@ -28,15 +32,35 @@ import {
  *   are sorted by name so their prefix is deterministic.
  * - Tool use: client tools with `eager_input_streaming`; inputs are validated
  *   by the Tool Gateway before anything runs. Thinking and other provider
- *   blocks come back as `opaque` and are replayed unchanged.
+ *   blocks come back as `opaque` and are replayed unchanged, only to the
+ *   provider that wrote them.
  * - Structured output: `outputSchema` maps to `output_config.format`.
  * - Models flagged `serverSideFallback` opt into Anthropic's server-side
  *   refusal fallback; the answering model is reported back for pricing.
  * - Mid-stream failures carry the usage seen so far (`ProviderError.partial`).
+ *
+ * `compat` points it at another company's Anthropic-compatible endpoint
+ * (`baseURL`, `id`). It keeps the beta client and the system blocks' cache
+ * breakpoints, and leaves out what they don't all take: top-level caching
+ * (each caches prompt prefixes by itself), fallbacks, eager input
+ * streaming, `countTokens` and `output_config.format`. Structured output is a
+ * `structured_output` tool, forced where `tool_choice: any` is honored, and
+ * its input comes back as the reply's JSON text. Medium effort is sent as
+ * `high`: Kimi and GLM take only low, high and max.
  */
 export function createAnthropicProvider(
-  options: { baseURL?: string; maxRetries?: number /** Tests only: scripted transport. */; fetch?: typeof fetch } = {},
+  options: {
+    /** The provider's id in `PROVIDERS`. */
+    id?: string;
+    baseURL?: string;
+    compat?: { toolChoiceAny: boolean };
+    maxRetries?: number;
+    /** Tests only: scripted transport. */
+    fetch?: typeof fetch;
+  } = {},
 ): ModelProvider {
+  const id = options.id ?? "anthropic";
+  const { compat } = options;
   const client = (apiKey: string, workspaceId?: string) =>
     new Anthropic({
       apiKey,
@@ -48,9 +72,25 @@ export function createAnthropicProvider(
     });
 
   return {
-    id: "anthropic",
+    id,
     async stream(request, { apiKey, workspaceId, onDelta }): Promise<ModelResult> {
-      const fallback = MODEL_CATALOG[request.model]?.serverSideFallback === true;
+      const fallback = !compat && MODEL_CATALOG[request.model]?.serverSideFallback === true;
+      const format = compat ? undefined : request.outputSchema;
+      const answerSchema = compat ? request.outputSchema : undefined;
+      const tools = [
+        ...toTools(request.tools ?? [], !compat),
+        ...(answerSchema
+          ? [
+              {
+                name: STRUCTURED_OUTPUT,
+                description:
+                  "Answer by calling this tool once, with your whole answer as its input. Don't answer in text.",
+                input_schema: answerSchema as BetaTool["input_schema"],
+              },
+            ]
+          : []),
+      ];
+      const effort = compat && request.effort === "medium" ? "high" : request.effort;
       const partial: PartialUsage = {
         inputTokens: null,
         cacheReadTokens: 0,
@@ -64,16 +104,15 @@ export function createAnthropicProvider(
             model: request.model,
             max_tokens: request.maxTokens,
             system: toSystem(request),
-            messages: request.messages.map(toMessageParam),
-            cache_control: { type: "ephemeral" },
-            ...(request.tools && request.tools.length > 0 ? { tools: toTools(request) } : {}),
-            ...(request.outputSchema || request.effort
+            messages: request.messages.map((m) => toMessageParam(m, id)),
+            ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
+            ...(tools.length > 0 ? { tools } : {}),
+            ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
+            ...(format || effort
               ? {
                   output_config: {
-                    ...(request.outputSchema
-                      ? { format: { type: "json_schema" as const, schema: request.outputSchema } }
-                      : {}),
-                    ...(request.effort ? { effort: request.effort } : {}),
+                    ...(format ? { format: { type: "json_schema" as const, schema: format } } : {}),
+                    ...(effort ? { effort } : {}),
                   },
                 }
               : {}),
@@ -97,12 +136,17 @@ export function createAnthropicProvider(
           onDelta(delta);
         });
         const message = await stream.finalMessage();
-        const content = message.content.map(fromContentBlock);
+        const blocks = message.content.map((b) => fromContentBlock(b, id));
+        const answer = answerSchema ? blocks.find(isAnswer) : undefined;
+        // The answer as `output_config.format` gives it: the JSON as the only text, after any thinking.
+        const content: ContentBlock[] = answer
+          ? [...blocks.filter((b) => b.type === "opaque"), { type: "text", text: JSON.stringify(answer.input) }]
+          : blocks;
         return {
           text: content.map((b) => (b.type === "text" ? b.text : "")).join(""),
           content,
           model: message.model,
-          stopReason: mapStopReason(message.stop_reason),
+          stopReason: answer ? "end_turn" : mapStopReason(message.stop_reason),
           usage: {
             inputTokens: message.usage.input_tokens,
             outputTokens: message.usage.output_tokens,
@@ -117,21 +161,28 @@ export function createAnthropicProvider(
       }
     },
 
-    async countTokens(request, { apiKey, workspaceId }) {
-      try {
-        const result = await client(apiKey, workspaceId).beta.messages.countTokens({
-          model: request.model,
-          system: toSystem(request),
-          messages: request.messages.map(toMessageParam),
-          ...(request.tools && request.tools.length > 0 ? { tools: toTools(request) } : {}),
-        });
-        return result.input_tokens;
-      } catch (error) {
-        throw toProviderError(error);
-      }
-    },
+    ...(compat
+      ? {}
+      : {
+          async countTokens(request: ModelRequest, { apiKey, workspaceId }: { apiKey: string; workspaceId?: string }) {
+            try {
+              const result = await client(apiKey, workspaceId).beta.messages.countTokens({
+                model: request.model,
+                system: toSystem(request),
+                messages: request.messages.map((m) => toMessageParam(m, id)),
+                ...(request.tools && request.tools.length > 0 ? { tools: toTools(request.tools, true) } : {}),
+              });
+              return result.input_tokens;
+            } catch (error) {
+              throw toProviderError(error);
+            }
+          },
+        }),
   };
 }
+
+const isAnswer = (b: ContentBlock): b is Extract<ContentBlock, { type: "tool_use" }> =>
+  b.type === "tool_use" && b.name === STRUCTURED_OUTPUT;
 
 function toSystem(request: ModelRequest): BetaTextBlockParam[] {
   if (typeof request.system === "string") {
@@ -146,46 +197,48 @@ function toSystem(request: ModelRequest): BetaTextBlockParam[] {
     }));
 }
 
-function toTools(request: ModelRequest): BetaTool[] {
-  return [...(request.tools ?? [])]
+function toTools(tools: ToolSpec[], eager: boolean): BetaTool[] {
+  return [...tools]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((t) => ({
       name: t.name,
       description: t.description,
       input_schema: t.inputSchema as BetaTool["input_schema"],
-      eager_input_streaming: true,
+      ...(eager ? { eager_input_streaming: true } : {}),
     }));
 }
 
-function toMessageParam(message: ModelMessage): BetaMessageParam {
+function toMessageParam(message: ModelMessage, provider: string): BetaMessageParam {
   if (typeof message.content === "string") return { role: message.role, content: message.content };
-  return { role: message.role, content: message.content.map(toBlockParam) };
+  return { role: message.role, content: message.content.flatMap((b) => toBlockParam(b, provider)) };
 }
 
-function toBlockParam(block: ContentBlock): BetaContentBlockParam {
+function toBlockParam(block: ContentBlock, provider: string): BetaContentBlockParam[] {
   switch (block.type) {
     case "text":
-      return { type: "text", text: block.text };
+      return [{ type: "text", text: block.text }];
     case "tool_use":
-      return { type: "tool_use", id: block.id, name: block.name, input: block.input };
+      return [{ type: "tool_use", id: block.id, name: block.name, input: block.input }];
     case "tool_result":
-      return {
-        type: "tool_result",
-        tool_use_id: block.toolUseId,
-        content: block.content,
-        ...(block.isError ? { is_error: true } : {}),
-      };
+      return [
+        {
+          type: "tool_result",
+          tool_use_id: block.toolUseId,
+          content: block.content,
+          ...(block.isError ? { is_error: true } : {}),
+        },
+      ];
     case "opaque":
-      // Replayed exactly as received (thinking blocks keep their signature).
-      return block.data as unknown as BetaContentBlockParam;
+      // Replayed exactly as received (thinking keeps its signature); another provider's would be refused.
+      return block.provider === provider ? [block.data as unknown as BetaContentBlockParam] : [];
   }
 }
 
-function fromContentBlock(block: BetaContentBlock): ContentBlock {
+function fromContentBlock(block: BetaContentBlock, provider: string): ContentBlock {
   if (block.type === "text") return { type: "text", text: block.text };
   if (block.type === "tool_use")
     return { type: "tool_use", id: block.id, name: block.name, input: (block.input ?? {}) as Record<string, unknown> };
-  return { type: "opaque", provider: "anthropic", data: block as unknown as Record<string, unknown> };
+  return { type: "opaque", provider, data: block as unknown as Record<string, unknown> };
 }
 
 function mapStopReason(reason: string | null): StopReason {

@@ -2,11 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-10-16
-- Refines 0012 (budget reservation). Planejamento D39.
+- Refines 0012 (budget reservation).
 
 ## Context
 
-Every member saw dollars: the sidebar showed what their agents spent ("US$ 1.56 this month"), each agent reply carried `usage.costUsd`, and the agent page, routines, forum topics, the agent's computer and the 80%/100% alerts all showed amounts. Budgets were optional (`agents.monthly_budget_nano_usd` null = no cap). For the Cloud we want to sell a ready AI with fair use later, so the product has to speak in shares of a budget, not in our cost.
+Every member saw dollars: the sidebar showed what their agents spent ("US$ 1.56 this month"), each agent reply carried `usage.costUsd`, and the agent page, routines, forum topics, the agent's computer and the 80%/100% alerts all showed amounts. Budgets were optional (`agents.monthly_budget_nano_usd` null = no cap). Members need to know how much of a budget is left, not what it cost: money is for whoever manages usage, so the product speaks in shares of a budget.
 
 ## Decision
 
@@ -22,10 +22,10 @@ Every member saw dollars: the sidebar showed what their agents spent ("US$ 1.56 
 - Members can't set money: a member's `budgetUsd` on a forum topic is ignored (the topic gets the default cap).
 - Admins see amounts in one place: `GET …/usage/report` (Settings → Usage) adds `defaultAgentBudgetUsd` and, per agent, the effective `monthlyBudgetUsd`, `budgetIsDefault` and `budgetUsedPercent`. `GET/PATCH …/settings` carries `defaultAgentBudgetUsd` for admins.
 
-Tokens stay visible: with BYOK and no fair use yet, hiding them buys nothing.
+Tokens stay visible: hiding them buys nothing.
 
 ## Consequences
 
 - Agents that had no cap now stop at the workspace default; the default is generous on purpose and admins can raise it.
 - `apps/server/test/cost-visibility.test.ts` fails if a member's response for the overview, agents, agent detail, settings, messages or routines mentions `usd` or `cost`.
-- Fair use on the Cloud (an org-level cap from the plan) can sit on top later: the gateway would reserve against an org counter before the agent's, and members would still see percentages.
+- An org-level cap can sit on top later: the gateway would reserve against an org counter before the agent's, and members would still see percentages.

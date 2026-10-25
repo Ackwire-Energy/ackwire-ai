@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D77
 - Extends: `fitContextWindow` (`packages/engine/src/context-budget.ts`), thread summaries (`context/summaries.ts`, ADR 0017)
 - Related: ADR 0050 (anchor and epoch), ADR 0045 (background work up to 100 steps)
 

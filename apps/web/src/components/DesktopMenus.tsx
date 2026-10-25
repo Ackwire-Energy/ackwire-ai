@@ -19,7 +19,7 @@ import { useOrg } from "./org-context";
 import { NEW_CHANNEL_EVENT, toggleSidebar } from "./Sidebar";
 
 /**
- * The desktop app's right click (telas/MenusDesktop.html): draws our menu when a screen opens one, and gives
+ * The desktop app's right click: draws our menu when a screen opens one, and gives
  * links and empty space theirs. Mounted only in the app (__root.tsx); typing and selected text keep the
  * system's menu.
  */

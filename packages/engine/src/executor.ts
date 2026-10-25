@@ -12,6 +12,7 @@ import {
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { type Agent, getAgentCached } from "./agents";
+import { agentAiState, type NoAiReason, noAiReasonOf } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { runAuthority } from "./authority";
 import {
@@ -33,6 +34,7 @@ import type { ComputerTurn } from "./brains/prompt";
 import {
   type BrainPlan,
   mayFallBack,
+  NO_AI_CODES,
   notePlanLimit,
   recordRunBrain,
   resolveBrain,
@@ -76,6 +78,7 @@ import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import type { MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
@@ -117,6 +120,7 @@ import {
   type AgentRun,
   addRunStep,
   isTerminal,
+  NO_AI,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
@@ -124,7 +128,9 @@ import {
 } from "./runs";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
+import { standingErrorDetail, standingRefusal } from "./standing";
 import { FIND_AGENT_TOOL } from "./team";
+import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import { presentTools } from "./tools/directory";
@@ -158,7 +164,7 @@ export interface EngineDeps {
   tools?: ToolGateway;
   /** Model calls one run may make (tool loops). */
   maxToolTurns?: number;
-  /** Memory and summaries (D9 layers 3–4). Without it the context is the recent conversation only. */
+  /** Memory and summaries (ADR 0017). Without it the context is the recent conversation only. */
   context?: ContextDeps;
   /** Latency measurements (`trigger_to_claim_ms`, `claim_to_first_delta_ms`, `run_ms`), for logs. */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
@@ -176,7 +182,7 @@ export interface EngineDeps {
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
   /**
-   * Tools on demand (D65): each run lists the core tools and the groups the
+   * Tools on demand (ADR 0043): each run lists the core tools and the groups the
    * judge (`context.judge`) expects it to need; the rest go behind
    * `find_tools` / `use_tool`. Off: every granted tool is listed (tests).
    */
@@ -202,9 +208,9 @@ export type RunExecutorDeps = EngineDeps;
 export interface Transcript {
   system: SystemBlock[];
   messages: ModelMessage[];
-  /** Tools on demand (D65): the tool groups this run listed up front; absent = every tool. */
+  /** Tools on demand (ADR 0043): the tool groups this run listed up front; absent = every tool. */
   toolGroups?: string[];
-  /** "Automático" (D83): the model tier and effort chosen for this run; a resume thinks with the same. */
+  /** "Automático": the model tier and effort chosen for this run; a resume thinks with the same. */
   autoModel?: AutoModelRecord;
   /** Assistant text before this index was already posted to the chat (or was history). */
   postedUpTo: number;
@@ -221,6 +227,8 @@ export interface Transcript {
   consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
   /** Its browser calls since the last post, for the card of where it browsed (`meta.browser`). */
   browser?: BrowserTrailStep[];
+  /** Its desktop calls since the last post, for the card of what it did there (`meta.desktop`). */
+  desktop?: BrowserTrailStep[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
@@ -459,7 +467,7 @@ async function executeRunInner(
   // status is `running` here.
   prof.mark("claim");
   const claimedAt = Date.now();
-  // Asked in the main timeline, the run answers there; asked in a thread, in that thread (D67).
+  // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
   const [channelRow, topTrigger] = await Promise.all([
@@ -523,10 +531,11 @@ async function executeRunInner(
       agentId: run.agentId,
       runId: run.id,
       status,
+      ...(error === NO_AI ? { reason: NO_AI } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
-    // A forum turn ended: announce the post and move the topic on (D33). A question to people
-    // (`waiting_input`) doesn't hold the discussion either (D45).
+    // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
+    // (`waiting_input`) doesn't hold the discussion either.
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
@@ -577,9 +586,28 @@ async function executeRunInner(
     if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
-    // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
-    if (reason !== "agent_archived") await redispatchPending("failed");
+    // An archived agent answers nobody, nor does a paused workspace or agent; any other failure leaves the
+    // waiting messages a run of their own.
+    if (reason !== "agent_archived" && !standingErrorDetail(reason)) await redispatchPending("failed");
   };
+  /**
+   * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
+   * card with Connect. Background work only fails (its routine says why).
+   */
+  const failNoAi = async (why: NoAiReason) => {
+    if (!run.background) {
+      const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
+      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why)
+        .catch((error) => addRunStep(db, run, "error", { reason: "no_ai_card", message: String(error) }))
+        .catch(() => {});
+    }
+    await fail(NO_AI);
+  };
+
+  // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
+  // before it starts anything.
+  const refusal = await standingRefusal(db, run.orgId, run.agentId);
+  if (refusal) return fail(refusal.message);
 
   const ctx: ToolContext = {
     db,
@@ -613,8 +641,14 @@ async function executeRunInner(
   if (fresh && trigger)
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
   if (!agent || agent.archivedAt) return fail("agent_archived");
+  // A new run that can't think (no key, a computer brain signed out or missing, and no fallback) fails here,
+  // before the judges below, any context or a model call.
+  if (needsContext) {
+    const ai = await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, agent, run);
+    if (ai.state === "no_ai") return failNoAi(ai.reason ?? "no_key");
+  }
   await publishChannelEvent(deps.pubsub, event("running"));
-  // Tools on demand (D65): a new run lists the core tools and the groups the judge expects it to need.
+  // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
   const judge = deps.context?.judge;
   /** The latest messages where the run answers, read once for every judge that needs them. */
@@ -623,7 +657,7 @@ async function executeRunInner(
     recentRead ??= recentForJudge(db, run).catch(() => [] as string[]);
     return recentRead;
   };
-  // "Automático" (D83): the judge picks the run's model tier and effort while the context is built; the
+  // "Automático": the judge picks the run's model tier and effort while the context is built; the
   // choice is applied once the brain is known, before the first model call. Never blocks: no answer in time
   // is medium/medium.
   const askAuto = (): Promise<AutoChoice> => {
@@ -669,7 +703,7 @@ async function executeRunInner(
   // agent's message, since the routine's own call isn't shown), and it may end in silence.
   const triggerMessage = trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId));
   // The routine that called it (`viaRoutine`) and whether the router brought it in after another agent
-  // spoke (`joined`, D49): every message it posts says so, cards included (`runMessageMeta`).
+  // spoke (`joined`, ADR 0034): every message it posts says so, cards included (`runMessageMeta`).
   const runMeta = runMessageMeta(run, triggerMessage);
   const viaRoutine = (runMeta.viaRoutine as { id: string; name: string } | undefined) ?? null;
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
@@ -696,7 +730,22 @@ async function executeRunInner(
       !note && carriesCredential(body) && (await runAuthority(tx, current)).kind !== "person"
         ? maskCredentials(body)
         : body;
-    const m = await postAgentMessage(tx, run, threadId, said, { ...meta, ...runMeta, ...tagged }, createdAt);
+    // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
+    const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
+    const m = await postAgentMessage(
+      tx,
+      run,
+      threadId,
+      said,
+      { ...meta, ...runMeta, ...tagged, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
+      createdAt,
+    );
+    await linkRunChecks(
+      tx,
+      run.orgId,
+      teamChecks.map((c) => c.id),
+      m.id,
+    );
     if (report && !note && !reportMessage) {
       reportMessage = {
         routineRunId: report.runId,
@@ -970,8 +1019,9 @@ async function executeRunInner(
       const { restartAfterStopAndSend } = await import("./continue-run");
       await restartAfterStopAndSend(deps, run.id, { id: message.id, threadId: message.threadId }, t).catch(() => null);
     }
-    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`).
-    await redispatchPending("canceled");
+    // Anything else sent to it and not read gets a run of its own (the "stop" itself was dropped by `stopRun`),
+    // unless its workspace stopped it.
+    if (!standingErrorDetail(row?.error ?? "")) await redispatchPending("canceled");
   };
 
   /** Messages this run already read (a "stop and send" for one of them has nothing to interrupt). */
@@ -1080,7 +1130,7 @@ async function executeRunInner(
         .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.orgId, run.orgId)));
     }
   }
-  // "Automático" (D83): the model and effort this run thinks with, the same decision mapped onto its brain (the
+  // "Automático": the model and effort this run thinks with, the same decision mapped onto its brain (the
   // brain itself never changes). A resumed run keeps its choice; a run that couldn't ask is medium/medium.
   /** The agent as this run's model brain sees it: its `auto` model replaced by the one chosen. */
   let thinker: Agent = agent;
@@ -1214,12 +1264,15 @@ async function executeRunInner(
     await redispatchPending("done");
   };
 
-  /** The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the computer. */
+  /**
+   * The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the
+   * computer, or (nothing to think with) it fails with `no_ai`.
+   */
   const brainUnavailable = async (u: {
     code: string;
     message: string;
     resetsAt?: string;
-  }): Promise<"fallback" | "waited" | "no"> => {
+  }): Promise<"fallback" | "waited" | "failed" | "no"> => {
     const from = plan.kind;
     if (from === "model") return "no";
     const t = transcript as Transcript;
@@ -1233,7 +1286,7 @@ async function executeRunInner(
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
       t.fallback = { from, code: u.code, message: u.message };
-      // On "Automático" the API answers with the model and effort chosen for this run (D83).
+      // On "Automático" the API answers with the model and effort chosen for this run.
       const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
       plan = {
         kind: "model",
@@ -1246,6 +1299,12 @@ async function executeRunInner(
       run = { ...run, brain: "model" };
       await addRunStep(db, run, "context", { brainFallback: { from, code: u.code, message: u.message } });
       return "fallback";
+    }
+    // Signed out, the command-line tool missing, no computer: nothing signals that it's fixed (only the
+    // computer coming back online would), so a wait would never end.
+    if (!onlyThisComputer && NO_AI_CODES.has(u.code)) {
+      await failNoAi(noAiReasonOf(u.code));
+      return "failed";
     }
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
@@ -1471,7 +1530,7 @@ async function executeRunInner(
 
   if (plan.unavailable) {
     const handled = await brainUnavailable(plan.unavailable);
-    if (handled === "waited") return;
+    if (handled === "waited" || handled === "failed") return;
     if (handled === "no") {
       return fail(`brain_unavailable: ${plan.unavailable.message}`, {
         code: plan.unavailable.code,
@@ -1625,6 +1684,9 @@ async function executeRunInner(
                   agentId: run.agentId,
                   runId: run.id,
                   provider: brain.kind,
+                  ...(turnPlan.session?.machineId
+                    ? { machineId: turnPlan.session.machineId, accountId: turnPlan.account?.id ?? null }
+                    : {}),
                   ...(u.model ? { model: u.model } : {}),
                   inputTokens: u.input,
                   outputTokens: u.output,
@@ -1718,8 +1780,11 @@ async function executeRunInner(
             ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
           });
           if (handled === "fallback") continue;
-          if (handled === "waited") return;
+          if (handled === "waited" || handled === "failed") return;
         }
+        // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
+        const paused = await standingRefusal(db, run.orgId, run.agentId);
+        if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) return fail(reason);
         if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);
@@ -2444,9 +2509,9 @@ function createDeltaPublisher(
 
 /**
  * Moves pending memory updates, artifacts, a proposed mission's link, the
- * agents it consulted and where it browsed onto the message being posted (the
- * "memory updated", file preview, mission link, "message from @agent" and
- * browser cards).
+ * agents it consulted, where it browsed and what it did on its desktop onto the
+ * message being posted (the "memory updated", file preview, mission link,
+ * "message from @agent", browser and desktop cards).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
@@ -2454,19 +2519,29 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const link = t.missionLink ?? null;
   const consulted = t.consulted ?? [];
   const browser = t.browser ?? [];
-  if (updates.length === 0 && files.length === 0 && !link && consulted.length === 0 && browser.length === 0)
+  const desktop = t.desktop ?? [];
+  if (
+    updates.length === 0 &&
+    files.length === 0 &&
+    !link &&
+    consulted.length === 0 &&
+    browser.length === 0 &&
+    desktop.length === 0
+  )
     return undefined;
   t.memoryUpdates = [];
   t.artifacts = [];
   t.missionLink = null;
   t.consulted = [];
   t.browser = [];
+  t.desktop = [];
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
   if (link) meta.missionLink = link;
   if (consulted.length > 0) meta.consulted = consulted;
   if (browser.length > 0) meta.browser = { steps: browser };
+  if (desktop.length > 0) meta.desktop = { steps: desktop };
   return meta;
 }
 

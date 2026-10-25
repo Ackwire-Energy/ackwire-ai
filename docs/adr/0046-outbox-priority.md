@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D72
 - Extends: ADR 0005 (Postgres outbox)
 
 ## Context

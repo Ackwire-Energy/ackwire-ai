@@ -1,4 +1,5 @@
 import type { ActiveRun, ChannelEvent, RunStatus } from "../api/types";
+import { NO_AI } from "../lib/no-ai";
 
 /**
  * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
@@ -128,6 +129,9 @@ export interface LiveRun {
   text: string;
   lastSeq: number;
   error?: string;
+  /** `run.finished`'s code for the error (`run.org_paused`…) and its values. */
+  errorCode?: string;
+  errorParams?: Record<string, string>;
   /** Added by the client on send; no server event yet. */
   provisional?: boolean;
   /** The tool it is calling right now ("github_list_prs"), from `agent.tool`. */
@@ -563,6 +567,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         const settled = settleProvisional(s, event.agentId, event.threadId);
         return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
       }
+      // No AI to think with: nothing ran, and its card (or the receipt under the message) says why.
+      if (event.status === "failed" && event.error === NO_AI) return finish(settleAfterRun(s, event), event.runId);
       // Started but nothing written yet: thinking.
       const current = s.runs[event.runId];
       const status: LiveStatus =
@@ -596,7 +602,11 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return finish(settleAfterRun(state, event), event.runId);
     case "run.finished": {
       const settled = settleAfterRun(state, event);
-      if (event.status === "failed") return upsert(settled, event, { status: "failed", error: event.error });
+      if (event.status === "failed" && event.error === NO_AI) return finish(settled, event.runId);
+      if (event.status === "failed") {
+        const { error, errorCode, errorParams } = event;
+        return upsert(settled, event, { status: "failed", error, errorCode, errorParams });
+      }
       // done: the message replaces the row; waiting_approval: the approval card does.
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }
@@ -723,7 +733,7 @@ export function dismissRun(state: StreamsState, runId: string): StreamsState {
 
 /**
  * Shown in the channel itself, not in a thread: a run asked there (it answers
- * there, D67: its events carry no thread), or a "pensando…" the app guessed
+ * there: its events carry no thread), or a "pensando…" the app guessed
  * for a message sent there (`topLevelIds`: the channel's own messages).
  */
 export const inMainTimeline = (

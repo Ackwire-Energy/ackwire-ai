@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D18. Same approach as Tierbird ADR 0010. Supersedes the BullMQ mention in D3 and in the "Infra" table of planejamento.
+- Supersedes an earlier plan to run jobs on Redis/BullMQ.
 
 ## Decision
 
@@ -17,4 +17,4 @@
 
 - Self-host stays one container + Postgres.
 - Handlers must be idempotent (a job can run twice after a lease expiry). Ours are: runs are unique per (trigger, agent) and the run state machine uses compare-and-set.
-- If Cloud ever needs more throughput: tune batch size, adopt pg-boss, or add a Redis-backed module in the cloud repo. The `outbox` contract stays.
+- If Cloud ever needs more throughput: tune batch size, adopt pg-boss, or add a Redis-backed adapter switched on by an env var (ADR 0002). The `outbox` contract stays.

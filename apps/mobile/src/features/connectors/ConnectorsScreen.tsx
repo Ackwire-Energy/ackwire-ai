@@ -17,7 +17,7 @@ import { AddressSheet, ConnectSheet } from "./ConnectSheet";
 import { brandOf, brandTones, CATEGORIES, connectionOf, searchConnectors, suggestionsOf } from "./logic";
 
 /**
- * Conectores on the phone (telas/ConectoresMobile.html, B · Galeria): what is connected as a row of icons
+ * Conectores on the phone: what is connected as a row of icons
  * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
  * brand's tone, then every service as even tiles in two columns, filtered by category. A tile opens a sheet
  * over the gallery with the whole flow in three steps: what agents could do → connect → who uses it.

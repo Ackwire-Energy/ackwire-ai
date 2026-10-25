@@ -31,13 +31,13 @@ export interface OptionListProps<V extends string> {
   disabled?: boolean;
   /**
    * `rows` (default): full-width rows. `cards`: side by side, the illustration
-   * on top (telas/IconesMotor.html: the agent's "Motor"); the chosen card's
+   * on top; the chosen card's
    * settings go under all of them. One column on narrow screens. `tiles`: two
-   * per row, the leading icon on the title's line (telas/Tarefas.html: the stage).
+   * per row, the leading icon on the title's line.
    */
   layout?: "rows" | "cards" | "tiles";
   /**
-   * Rows only: the chosen row and its settings are one card (telas/QuemPensa.html "C"), the
+   * Rows only: the chosen row and its settings are one card, the
    * settings full width under a hairline; rows with a leading keep their radio dot too.
    */
   attached?: boolean;
@@ -46,7 +46,7 @@ export interface OptionListProps<V extends string> {
 
 /**
  * A vertical list of choices as full-width rows of the same height, one left
- * edge, neutral selection (telas/MissaoConfig.html: Autonomia, Quem faz o
+ * edge, neutral selection (e.g. a mission's Autonomia and Quem faz o
  * trabalho). Radix RadioGroup: `role="radio"` rows, one tab stop, arrow
  * keys move and select. A row leads with its illustration, or a radio dot.
  * The chosen row can carry its own settings (`children`) right under it.

@@ -1,5 +1,6 @@
 import { createInviteLink, requestNewInvitation } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { requestIp } from "../../http/client-ip";
 import { apiError } from "../../http/errors";
 import { type AppDeps, createAppRouter, errors, json, noContent, OrgParams, requireSession, security } from "./context";
 
@@ -41,7 +42,7 @@ export function inviteRoutes(deps: AppDeps) {
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
-      const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+      const ip = requestIp(c.req.raw.headers);
       const limit = await adapters.rateLimiter.consume(`invite-request:${ip}`, { limit: 10, windowMs: 3600_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
       await requestNewInvitation({ db, pubsub: adapters.pubsub }, config.PUBLIC_URL, c.req.valid("param").token);

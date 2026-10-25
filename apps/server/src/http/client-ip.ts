@@ -1,10 +1,13 @@
 /**
- * The client's address behind our proxies (Railway appends its own hops to
- * `x-forwarded-for`, and its last hop is internal). Shared by every route
- * that rate limits or records where a request came from.
+ * The client's address behind a reverse proxy. Shared by every route that
+ * rate limits or records where a request came from.
  */
 
-/** Loopback, private, CGNAT (Railway's internal network) and link-local addresses: proxies, never a client. */
+/**
+ * Loopback, private, shared (CGNAT, 100.64.0.0/10) and link-local addresses:
+ * where a hosting platform's own proxies sit. Tailnet and LAN clients have
+ * them too, so `clientIp` skips them only while a public hop is left.
+ */
 export function isInternal(ip: string): boolean {
   const v4 = ip.replace(/^::ffff:/, "").match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
   if (v4) {
@@ -23,10 +26,12 @@ export function isInternal(ip: string): boolean {
 }
 
 /**
- * The client's address: walking `x-forwarded-for` from the right (what our
- * proxies appended), the first one that isn't internal. Entries further left
- * come from the client and can be anything, so they never key a limit.
- * Without a public hop, the `x-real-ip` our host sets.
+ * The client's address: walking `x-forwarded-for` from the right (what
+ * proxies appended), the first one that isn't internal. When every hop is
+ * internal, as for a tailnet client behind `tailscale serve`, the last one:
+ * the address the nearest proxy saw. Entries further left, and `x-real-ip`
+ * while that header exists, come from the client and can be anything, so they
+ * never key a limit. Without the header, the `x-real-ip` a proxy may set.
  */
 export function clientIp(forwardedFor: string | undefined, realIp: string | undefined): string {
   const hops = (forwardedFor ?? "")
@@ -37,7 +42,7 @@ export function clientIp(forwardedFor: string | undefined, realIp: string | unde
     const hop = hops[i] as string;
     if (!isInternal(hop)) return hop;
   }
-  return realIp?.trim() || hops[0] || "unknown";
+  return hops.at(-1) ?? (realIp?.trim() || "unknown");
 }
 
 /** `clientIp` of a request's headers. */

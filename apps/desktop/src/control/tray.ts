@@ -19,7 +19,7 @@ export const isPaired = (h: TrayInput) => h.status?.paired === true;
 /** Connected and listening for work. */
 export const isOnline = (h: TrayInput) => h.running && h.status?.connection === "online";
 
-/** This Mac's portrait (telas/IconesComputador.html): any organization paused → paused; any online → online. */
+/** This Mac's portrait: any organization paused → paused; any online → online. */
 export function macStateOf(homes: readonly TrayInput[]): "online" | "paused" | "offline" {
   const paired = homes.filter(isPaired);
   if (paired.some((h) => h.status?.paused.paused)) return "paused";

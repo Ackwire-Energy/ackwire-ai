@@ -98,7 +98,7 @@ interface DragProps {
 }
 
 /**
- * The board (telas/Tarefas.html): the org's columns, each in a fixed stage.
+ * The board: the org's columns, each in a fixed stage.
  * Stage headers group the columns only when the board is customized; cards
  * drag between and inside columns with an insertion line.
  */

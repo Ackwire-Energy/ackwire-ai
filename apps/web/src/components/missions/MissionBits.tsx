@@ -5,8 +5,9 @@ import type {
   MissionFileName,
   ThreadMissionSummary,
 } from "@agenteschat/client";
-import { executorIcon, executorOnText, type PlanCell, tickFor } from "@agenteschat/client/lib/missions";
-import { Chip, Icon, type IconName, PlanStrip, Select } from "@agenteschat/ui";
+import { engineOfExecutor } from "@agenteschat/client/lib/brain";
+import { executorOnText, type PlanCell, tickFor } from "@agenteschat/client/lib/missions";
+import { Chip, type IconName, PlanStrip, ProviderLogo, Select } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,7 +26,7 @@ import "./missions.css";
  */
 
 /**
- * Who programs, as a mark: Claude Code's and Codex's own icons, or the
+ * Who programs, as a mark: Claude Code's and Codex's makers' marks, or the
  * agent's small pixel avatar when it does the work itself.
  */
 export function ExecutorMark({
@@ -37,8 +38,8 @@ export function ExecutorMark({
   agentId?: string;
   agentName?: string;
 }) {
-  const icon = executorIcon(executor);
-  if (icon) return <Icon name={icon} size={14} className="mi-exec__icon" />;
+  const engine = engineOfExecutor(executor);
+  if (engine !== "agent") return <ProviderLogo id={engine} size="xs" />;
   return <AgentAvatar agentId={agentId} name={agentName ?? ""} size="xs" />;
 }
 
@@ -74,7 +75,7 @@ export function executorOptions(t: TFunction, executors: MissionExecutor[], agen
   }));
 }
 
-/** Autonomia, from asking the most to asking nothing (telas/MissaoConfig.html); the middle one is recommended. */
+/** Autonomia, from asking the most to asking nothing; the middle one is recommended. */
 export const COMMAND_APPROVALS: readonly CommandApproval[] = ["always", "low_risk_auto", "never"];
 
 export function commandApprovalOptions(t: TFunction) {

@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -15,15 +16,26 @@ import {
   isAccountId,
   isBrainEffort,
   isRunToolToken,
+  OWN_USAGE_ID,
   PERMISSION_PROMPT_TOOL,
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE } from "./accounts";
+import { redactSecrets } from "@agenteschat/adapters/secret-box";
+import {
+  type CodingPlan,
+  PLAN_ALIASES,
+  type PlanAlias,
+  type PlanId,
+  planModel,
+  planOf,
+} from "@agenteschat/providers/plans";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
+import { resetIso } from "./plan-usage";
 import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
 
 /**
@@ -55,7 +67,12 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  * - ADR 0041: a turn with an `account` runs with `CLAUDE_CONFIG_DIR` set to
  *   that account's folder (its sessions live there too; a missing folder is
  *   `account_missing`, never another account), and `effort` is `--effort`.
- *   A change of either starts the process again.
+ *   A change of either starts the process again. Where requests go is pinned
+ *   in the runner's own `--settings` (`accountSettingsEnv`), which outranks
+ *   the project's settings the agent can write. A key account (protocol 20)
+ *   thinks through its plan's endpoint: its key in the process env (never in
+ *   a file the CLI reads, and redacted from everything sent), its model
+ *   aliases mapped to the plan's models, no fallback model.
  * - Protocol 15 (live steering): `steer` writes messages into the turn in
  *   progress as stream-json user lines (each with its `uuid`); Claude Code
  *   reads them at its next tool boundary (`priority: "next"`; "now" for an
@@ -174,13 +191,6 @@ const readUuids = (ev: Record<string, unknown>): string[] => {
   return typeof ev.user_message_uuid === "string" ? [ev.user_message_uuid] : [];
 };
 
-const secondsToIso = (v: unknown) => {
-  const n = num(v);
-  if (n <= 0) return undefined;
-  // Seconds (Claude Code's `resetsAt`); a value in milliseconds is taken as is.
-  return new Date(n < 1e12 ? n * 1000 : n).toISOString();
-};
-
 /** What one line meant for the turn: events to send now, and the turn's end. */
 export interface ParsedBrainLine {
   events: WireBrainEvent[];
@@ -190,8 +200,12 @@ export interface ParsedBrainLine {
   task?: ParsedTask;
   /** `system` `init`: a turn starts. */
   turnStart?: boolean;
+  /** A `rate_limit_event`'s `rate_limit_info` (plan usage, protocol 19), whatever its status. */
+  rateLimit?: Record<string, unknown>;
   /** Tool results went back to the model (a tool boundary: queued messages and task notices are read there). */
   boundary?: boolean;
+  /** The endpoint refused the sign-in or key, and the CLI is retrying (`api_retry`, 401). */
+  authRetry?: boolean;
 }
 
 /** A task of Claude Code's (`system/task_*`: a Bash command, a subagent…). */
@@ -265,7 +279,10 @@ export class ClaudeStreamParser {
     const main = ev.parent_tool_use_id === null || ev.parent_tool_use_id === undefined;
     switch (ev.type) {
       case "system": {
-        if (ev.subtype === "api_retry" && ev.error === "authentication_failed") this.authFailed = true;
+        if (ev.subtype === "api_retry" && (ev.error === "authentication_failed" || ev.error_status === 401)) {
+          this.authFailed = true;
+          return { events: [], authRetry: true };
+        }
         if (ev.subtype === "api_retry" && ev.error === "rate_limit") this.limited = true;
         // Claude Code says `init` as each turn starts (also one it starts by itself).
         if (ev.subtype === "init") return { events: [], turnStart: true };
@@ -340,12 +357,12 @@ export class ClaudeStreamParser {
       }
       case "rate_limit_event": {
         const info = isObj(ev.rate_limit_info) ? ev.rate_limit_info : {};
-        if (info.status !== "rejected") return { events: [] };
+        if (info.status !== "rejected") return { events: [], rateLimit: info };
         this.limited = true;
-        this.resetsAt = secondsToIso(info.resetsAt);
-        if (this.limitSent) return { events: [] };
+        this.resetsAt = resetIso(info.resetsAt);
+        if (this.limitSent) return { events: [], rateLimit: info };
         this.limitSent = true;
-        return { events: [{ type: "limit", ...(this.resetsAt ? { resetsAt: this.resetsAt } : {}) }] };
+        return { events: [{ type: "limit", ...(this.resetsAt ? { resetsAt: this.resetsAt } : {}) }], rateLimit: info };
       }
       case "result":
         return this.result(ev);
@@ -387,7 +404,7 @@ export class ClaudeStreamParser {
     if (ev.is_error === true || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
       if (this.limited || LIMIT_TEXT.test(text)) {
         const legacy = /\|(\d{10})\b/.exec(text)?.[1];
-        const resetsAt = this.resetsAt ?? (legacy ? secondsToIso(Number(legacy)) : undefined);
+        const resetsAt = this.resetsAt ?? (legacy ? resetIso(Number(legacy)) : undefined);
         if (!this.limitSent) events.push({ type: "limit", ...(resetsAt ? { resetsAt } : {}) });
         this.limitSent = true;
         return {
@@ -453,17 +470,19 @@ export interface ClaudeLaunch {
   /** Protocol 13: `--effort` (anything else is left out). */
   effort?: BrainEffort;
   /**
-   * D60: which settings files load (`--setting-sources`). "project" leaves out the computer owner's own
+   * Which settings files load (`--setting-sources`). "project" leaves out the computer owner's own
    * CLAUDE.md, skills and plugins, which every agent there paid for on every step; "" (a plan turn) loads
    * none, so a folder's own settings can't allow it anything.
    */
   settingSources?: string;
-  /** D60: Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
+  /** Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
   builtinTools?: readonly string[];
+  /** No `--fallback-model` (a plan's aliases may all be one model). */
+  noFallback?: boolean;
 }
 
 /**
- * Claude Code's own tools a brain keeps (D60): reading, searching, editing and running code in its folder,
+ * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder,
  * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
  */
 export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
@@ -497,7 +516,7 @@ export function brainProfileLaunch(
     strictMcp: !personalMcp,
     promptTool: true,
     permissionMode: "acceptEdits",
-    // D60: with the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
+    // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
     ...(personalMcp ? {} : { settingSources: "project", builtinTools: BRAIN_BUILTIN_TOOLS }),
   };
 }
@@ -505,10 +524,60 @@ export function brainProfileLaunch(
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
 export const fallbackModelFor = (model: string | undefined) => (model && /opus/i.test(model) ? "sonnet" : undefined);
 
+const API_ANTHROPIC = "https://api.anthropic.com";
+
+/** What sends requests elsewhere besides the base URL: proxies and the certificates trusted on the way. */
+const NETWORK_ENV = [
+  "HTTPS_PROXY",
+  "https_proxy",
+  "HTTP_PROXY",
+  "http_proxy",
+  "ALL_PROXY",
+  "all_proxy",
+  "NO_PROXY",
+  "no_proxy",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_TLS_REJECT_UNAUTHORIZED",
+] as const;
+
+/** Claude Code's switches to another company's cloud. */
+const CLOUD_ENV = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"] as const;
+
+/**
+ * The `env` of a Claude Code turn's own `--settings`, which outranks the project's settings (the agent can
+ * write those, and a cloned repo can bring them): the endpoint (the plan's, else Anthropic's), no other
+ * cloud, and the runner's own proxies and certificates (or none), so the sign-in or key goes nowhere else;
+ * for a plan, what each model alias runs. The key itself stays in the process env (the CLI doesn't sign in
+ * with one given only here). `own` (the computer's own sign-in): the endpoint and cloud the runner itself
+ * runs with, whatever its owner set there, still out of a project's reach.
+ */
+export function accountSettingsEnv(
+  plan: CodingPlan | undefined,
+  model: string | undefined,
+  runner = process.env,
+  own = false,
+) {
+  const env: Record<string, string> = {
+    ANTHROPIC_BASE_URL: plan?.claudeCode.baseUrl ?? (own ? runner.ANTHROPIC_BASE_URL : undefined) ?? API_ANTHROPIC,
+  };
+  for (const k of CLOUD_ENV) env[k] = own ? (runner[k] ?? "") : "";
+  for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
+  if (!plan) return env;
+  for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
+  env.CLAUDE_CODE_SUBAGENT_MODEL = planModel(plan, model).id;
+  env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  return { ...env, ...plan.claudeCode.env };
+}
+
+/** A plan turn's `--model`: its alias (the plan names the model), `sonnet` for anything else. */
+export const planAlias = (model: unknown): PlanAlias => PLAN_ALIASES.find((a) => a === model) ?? "sonnet";
+
 /** The argv of a brain turn's Claude Code (spawned without a shell: nothing needs quoting). */
 export function claudeBrainArgs(l: ClaudeLaunch): string[] {
   const model = l.model && MODEL.test(l.model) ? l.model : undefined;
-  const fallback = fallbackModelFor(model);
+  const fallback = l.noFallback ? undefined : fallbackModelFor(model);
   return [
     "-p",
     "--input-format",
@@ -774,6 +843,13 @@ export function runTurnOnProcess(
     followUpMs?: number;
     /** How long work moved to the background may run on after a result (`STEER_BACKGROUND_WAIT_MS`). */
     backgroundWaitMs?: number;
+    /** Each `rate_limit_event` of the turn (`rate_limit_info`). */
+    onRateLimit?: (info: Record<string, unknown>) => void;
+    /**
+     * A coding plan's key: refused once is refused (Claude Code would retry for minutes), so the turn ends
+     * at once as `not_logged_in`.
+     */
+    keyAccount?: boolean;
   },
 ): Promise<TurnOutcome> {
   const redact = opts.redact ?? ((s: string) => s);
@@ -880,6 +956,18 @@ export function runTurnOnProcess(
       if (followUp) clearTimeout(followUp);
       followUp = null;
       const parsed = proc.parser.push(line);
+      if (parsed.authRetry && opts.keyAccount) {
+        proc.kill();
+        finish({
+          final: {
+            type: "error",
+            code: "not_logged_in",
+            message: "The plan refused its key. Paste a new key in AI accounts.",
+            retryable: true,
+          },
+        });
+        return;
+      }
       // The next turn began: it reads the notices that came before it.
       if (between && (parsed.turnStart || parsed.events.length > 0)) {
         between = false;
@@ -887,6 +975,7 @@ export function runTurnOnProcess(
       }
       if (parsed.boundary) unheard = 0;
       if (parsed.task) noteTask(parsed.task);
+      if (parsed.rateLimit) opts.onRateLimit?.(parsed.rateLimit);
       // Past a result, the work moved aside is over: Claude Code answers it in a turn of its own, about to start.
       if (backgroundWait && !movedRunning()) {
         clearTimeout(backgroundWait);
@@ -961,10 +1050,18 @@ export interface BrainManagerOptions {
   claudeCommand?: string[];
   /** Where Claude Code keeps sessions (default `$CLAUDE_CONFIG_DIR` or `~/.claude`). */
   claudeHome?: string;
-  /** Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`. */
-  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
+  /**
+   * Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`.
+   * Protocol 19: what each turn's `rate_limit_event` says, for its account (or `OWN_USAGE_ID`).
+   */
+  accounts?: {
+    accountDir(kind: AccountKind, id: string): string | null;
+    noteRateLimit?(key: string, info: unknown): void;
+  };
   /** The local MCP bridge (where the daemon listens and how to start `agentes-runner mcp`). */
   mcp?: { socketPath: string; command: string[] };
+  /** The runner's home (its accounts among it): turns never read it. */
+  runnerHome?: string;
   idleMs?: number;
   maxProcesses?: number;
   deltaMs?: number;
@@ -1014,6 +1111,8 @@ export interface BrainTurnContext {
   grants?: string[];
   /** Set by the manager (ADR 0041): the turn's account folder, its Claude Code home. */
   accountHome?: string;
+  /** Set by the manager (protocol 20): that folder's coding plan and key. */
+  planKey?: { provider: PlanId; key: string };
 }
 
 /** A session is remembered per account: the same id in another account's folder is another session. */
@@ -1046,6 +1145,19 @@ export function carryClaudeSession(claudeHome: string, cwd: string, session: str
   } catch {
     // no projects folder, or unreadable: Claude Code decides as before
   }
+}
+
+/** The turn's redaction also hides the plan's key (an agent's shell could print it: it is in the env). */
+function withKeyRedacted(
+  secrets: TaskSecrets | null | undefined,
+  plan: { provider: PlanId; key: string },
+): TaskSecrets {
+  const name = planOf(plan.provider)?.claudeCode.tokenEnv ?? "PLAN_KEY";
+  const before = secrets?.redact ?? ((text: string) => text);
+  return {
+    env: secrets?.env ?? {},
+    redact: (text) => redactSecrets(before(text), [{ name, value: plan.key }]),
+  };
 }
 
 const errorEvent = (code: string, message: string, retryable: boolean): WireBrainEvent => ({
@@ -1152,7 +1264,12 @@ export class BrainManager {
       if (!isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
       const home = this.opts.accounts?.accountDir("claude_code", account);
       if (!home) return errorEvent("account_missing", ACCOUNT_MISSING_MESSAGE.claude_code, false);
-      ctx = { ...ctx, accountHome: home };
+      const planKey = await planKeyOf(home);
+      ctx = {
+        ...ctx,
+        accountHome: home,
+        ...(planKey ? { planKey, secrets: withKeyRedacted(ctx.secrets, planKey) } : {}),
+      };
     }
     const key = `${ctx.agent.id}:${session}`;
     const prev = this.chains.get(key) ?? Promise.resolve();
@@ -1173,8 +1290,9 @@ export class BrainManager {
       perm: req.permissions ?? null,
       // Folders allowed or removed on the machine: the process restarts (resumed) with the new `--add-dir`s.
       dirs: ctx.grants ?? [],
-      // Another account or effort: a new process (in the other account, a new session).
+      // Another account or effort: a new process (in the other account, a new session); a new key too.
       account: ctx.accountHome ? (req.account ?? null) : null,
+      key: ctx.planKey ? createHash("sha256").update(ctx.planKey.key).digest("hex").slice(0, 16) : null,
       effort: isBrainEffort(req.effort) ? req.effort : null,
     });
   }
@@ -1280,6 +1398,8 @@ export class BrainManager {
       bridge.runToken = typeof req.mcp?.token === "string" ? req.mcp.token : null;
     }
     this.running.set(req.runId, live);
+    // Usage goes to the account the turn thinks with, or to the computer's own sign-in.
+    const usageKey = ctx.accountHome && typeof req.account === "string" ? req.account : OWN_USAGE_ID.claude_code;
     try {
       const out = await runTurnOnProcess(live.proc, req.prompt, {
         emit: ctx.emit,
@@ -1287,6 +1407,8 @@ export class BrainManager {
         deltaMs: this.opts.deltaMs,
         redact: ctx.secrets?.redact,
         endInput: !live.persistent,
+        onRateLimit: (info) => this.opts.accounts?.noteRateLimit?.(usageKey, info),
+        ...(ctx.planKey ? { keyAccount: true } : {}),
         ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
@@ -1366,12 +1488,12 @@ export class BrainManager {
     writeFileSync(systemFile, typeof req.system === "string" ? req.system : "", { mode: 0o600 });
     const mode = req.permissions?.mode === "plan" ? "plan" : "work";
     let mcpConfigFile: string | undefined;
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      ...(ctx.secrets?.env ?? {}),
-      // ADR 0041: the account's folder is this process's Claude Code home.
-      ...(ctx.accountHome ? { CLAUDE_CONFIG_DIR: ctx.accountHome } : {}),
-    };
+    const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
+    // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
+    const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
+    const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
+    if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
+    const model = plan ? planAlias(req.model) : typeof req.model === "string" ? req.model : undefined;
     if (this.opts.mcp) {
       const token = newMcpToken();
       mcpConfigFile = path.join(dir, "mcp.json");
@@ -1385,10 +1507,11 @@ export class BrainManager {
             token,
             cwd,
             folders: [...new Set([cwd, ctx.folder])],
-            // D60: our tools always loaded (no ToolSearch call before each one; the list is short since D65).
+            // Our tools always loaded (no ToolSearch call before each one; the list is short since ADR 0043).
             alwaysLoad: true,
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
             profile: mode,
+            ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
           }),
         ),
         { mode: 0o600 },
@@ -1410,16 +1533,22 @@ export class BrainManager {
       : [];
     writeFileSync(
       settingsFile,
-      JSON.stringify(
-        claudePermissionSettings(
+      JSON.stringify({
+        ...claudePermissionSettings(
           mode,
           missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix),
           allow,
           undefined,
           // Every command reaches our prompt tool: plain reads pass there at once, secrets never.
-          { promptReads: true },
+          { promptReads: true, ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}) },
         ),
-      ),
+        // With the owner's own settings loaded (`personalMcp`), theirs decide the computer's own sign-in.
+        ...(ctx.accountHome
+          ? { env: accountSettingsEnv(plan, model) }
+          : req.personalMcp === true
+            ? {}
+            : { env: accountSettingsEnv(undefined, model, process.env, true) }),
+      }),
       { mode: 0o600 },
     );
     // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
@@ -1430,7 +1559,8 @@ export class BrainManager {
     const args = claudeBrainArgs({
       session,
       resume,
-      ...(typeof req.model === "string" ? { model: req.model } : {}),
+      ...(model ? { model } : {}),
+      ...(plan ? { noFallback: true } : {}),
       systemFile,
       ...(mcpConfigFile ? { mcpConfigFile } : {}),
       settingsFile,

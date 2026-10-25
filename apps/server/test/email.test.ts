@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -40,4 +40,34 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   expect(reset.status).toBe(200);
   await t.drain();
   expect(t.email.sent.at(-1)).toMatchObject({ to: ["owner@example.com"], subject: "Redefinir sua senha do agentes" });
+});
+
+test("password reset: the email's link lands on the web's /reset-password with a token, once", async () => {
+  t = await createTestServer();
+  await signUp(browser(t), "owner@example.com");
+  await t.drain();
+  const anon = browser(t);
+  const asked = await anon("/api/auth/request-password-reset", {
+    json: { email: "owner@example.com", redirectTo: "/reset-password" },
+  });
+  expect(asked.status).toBe(200);
+  await t.drain();
+  const link = /https?:\/\/\S+\/api\/auth\/reset-password\/\S+/.exec(t.email.sent.at(-1)?.text ?? "")?.[0] ?? "";
+  const open = async () =>
+    new URL((await t.app.request(link.replace(ORIGIN, ""))).headers.get("location") ?? "", ORIGIN);
+
+  const landed = await open();
+  expect(landed.pathname).toBe("/reset-password");
+  const token = landed.searchParams.get("token") ?? "";
+  expect(token).not.toBe("");
+  const reset = await anon("/api/auth/reset-password", { json: { token, newPassword: "a brand new password" } });
+  expect(reset.status).toBe(200);
+  const signIn = await anon("/api/auth/sign-in/email", {
+    json: { email: "owner@example.com", password: "a brand new password" },
+  });
+  expect(signIn.status).toBe(200);
+
+  // A used (or expired) link comes back with the error the page shows.
+  const used = await open();
+  expect([used.pathname, used.searchParams.get("error")]).toEqual(["/reset-password", "INVALID_TOKEN"]);
 });

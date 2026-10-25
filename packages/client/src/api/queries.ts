@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { artifactRefs } from "../lib/artifacts";
+import { newerSetup } from "../lib/computer";
 import {
   allItems,
   matchesFilter,
@@ -191,7 +192,7 @@ export const useAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
 };
 
-/** The team screen (D54): refetched every 30 s and on focus, so new consultations show up. */
+/** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();
   return useQuery({
@@ -863,6 +864,21 @@ export const useUsageReport = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
 };
 
+/** Configurações › Uso: every plan account by computer and the API per agent (ADR 0063). */
+export const usePlanUsage = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.planUsage(orgId), queryFn: () => api.orgs.planUsage(orgId) });
+};
+
+/** The agent's "Uso" tab: its month by account and day, and the account it thinks with now. */
+export const useAgentPlanUsage = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentPlanUsage(orgId, agentId),
+    queryFn: () => api.agents.planUsage(orgId, agentId),
+  });
+};
+
 export const usePlatformKey = (orgId: string) => {
   const api = useApi();
   return useQuery({
@@ -870,6 +886,12 @@ export const usePlatformKey = (orgId: string) => {
     queryFn: () => api.agents.platformKeyAvailable(orgId),
     staleTime: 10 * 60_000,
   });
+};
+
+/** Whether each agent has an AI to think with (the no-AI banner, card and chip). */
+export const useAiStatus = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.aiStatus(orgId), queryFn: () => api.agents.aiStatus(orgId), staleTime: 30_000 });
 };
 
 export function useRotateCredential(orgId: string) {
@@ -1416,7 +1438,7 @@ export function useIssueAction(orgId: string) {
   });
 }
 
-/** The board's columns (D55); they live under the issues key, so any issue change refreshes them too. */
+/** The board's columns; they live under the issues key, so any issue change refreshes them too. */
 export const useIssueColumns = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.issueColumns(orgId), queryFn: () => api.issues.columns(orgId) });
@@ -1706,6 +1728,12 @@ export const useAgentBrain = (orgId: string, agentId: string, enabled = true) =>
   });
 };
 
+/** "Contas de IA": the viewer's AI accounts on every computer, and where they can add one. */
+export const useAiAccounts = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.aiAccounts(orgId), queryFn: () => api.machines.aiAccounts(orgId), enabled });
+};
+
 /** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
 export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
   const api = useApi();
@@ -1910,6 +1938,52 @@ export function useMachineAction(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
       // Agents on a removed machine go back to the cloud; a renamed one shows its new name.
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+    },
+  });
+}
+
+/** The server's own computer in this organization; null when the server has none or doesn't serve it. */
+export const useHostComputer = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.hostComputer(orgId),
+    queryFn: () => api.machines.host(orgId),
+    enabled,
+    retry: false,
+    meta: { quiet: true },
+  });
+};
+
+/**
+ * The workspace's own computer on its way (ADR 0056 §10): `machine.provisioning` events keep it live in the
+ * org shell; `pollMs` where no socket is open (the onboarding).
+ */
+export const useComputerSetup = (orgId: string, enabled = true, pollMs: number | false = false) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: keys.computerSetup(orgId),
+    queryFn: async () =>
+      newerSetup(qc.getQueryData(keys.computerSetup(orgId)), await api.machines.computerSetup(orgId)),
+    enabled: enabled && orgId.length > 0,
+    retry: false,
+    refetchInterval: pollMs,
+    // Events keep it current; a reconnect asks again (what came while offline is gone).
+    staleTime: 5 * 60_000,
+    meta: { quiet: true },
+  });
+};
+
+/** "Usar o computador deste servidor": it comes back in the list and connects at its next sync. */
+export function useHostComputerOn(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.machines.hostOn(orgId),
+    meta: { silent: true },
+    onSuccess: (state) => {
+      qc.setQueryData(keys.hostComputer(orgId), state);
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
     },
   });
 }

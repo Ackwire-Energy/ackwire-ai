@@ -11,12 +11,18 @@ import { BROWSER_LIMITS, type BrowserInputEvent, parseBrowserInputEvent } from "
  *   key, touch, and `text` for the app's own text field).
  *
  * Server frames (not wrapped, unlike channel events): `browser.frame`
- * (`{agentId, seq, data: base64 JPEG, metadata}`), `browser.status`
- * (`{agentId, mode, controllerUserId, handoff}`), `browser.unavailable`
- * (`{agentId, reason: reconnecting | offline | no_computer | unavailable,
- * message?}`: send `browser.watch` again with backoff on `reconnecting`; a
- * repeated watch restarts the view, so it also recovers after `offline`, an
- * ended stream or `forbidden`),
+ * (`{agentId, seq, data: base64 JPEG, metadata: {deviceWidth, deviceHeight,
+ * pageScaleFactor?, url?, title?}}`; a watch on a running stream gets its
+ * newest frame at once), `browser.status` (`{agentId, mode,
+ * controllerUserId, handoff, hidden}`; `hidden`: someone else is in control,
+ * so no frames reach this viewer until they hand it back, then the newest
+ * comes at once),
+ * `browser.unavailable` (`{agentId, reason: reconnecting | offline |
+ * no_computer | closed | unavailable | forbidden, message?}`: send
+ * `browser.watch` again with backoff on `reconnecting`, and on `closed` (the
+ * agent's browser isn't open; it shows once something opens it); a repeated
+ * watch restarts the view, so it also recovers after `offline`, an ended
+ * stream or `forbidden`),
  * `browser.ended` (`{agentId, reason, message?}`), and `error` with
  * `code` and `agentId` (`forbidden`, `not_found`, `too_many_browsers`,
  * `not_in_control`, `rate_limited`).

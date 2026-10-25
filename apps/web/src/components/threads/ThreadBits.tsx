@@ -12,7 +12,7 @@ import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
 /**
- * Pieces every thread screen shares (docs/design/telas/Threads.html): the
+ * Pieces every thread screen shares: the
  * state chip, and closing / archiving with a toast and "Desfazer" (plus the
  * question when an agent is still working there).
  */

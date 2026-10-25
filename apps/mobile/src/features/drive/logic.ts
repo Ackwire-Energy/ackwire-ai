@@ -4,7 +4,7 @@ import { fileIcon, previewKind } from "@agenteschat/client/lib/files";
 import { daysBetween } from "@agenteschat/client/lib/format";
 
 /**
- * The Drive on the phone (MobileDriveIssues.html, "Grade com prévia"): the type chips, the sections by day
+ * The Drive on the phone: the type chips, the sections by day
  * (Hoje, Esta semana, then by month) and what each card's real preview shows. Pure: the screen draws it.
  */
 

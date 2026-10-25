@@ -2,7 +2,7 @@ import type { Config } from "@agenteschat/config";
 import type { Hono } from "hono";
 
 /**
- * Links that open the phone app (D88): an invitation (`/invite/{token}`) and "Esqueci a senha"
+ * Links that open the phone app: an invitation (`/invite/{token}`) and "Esqueci a senha"
  * (`/reset-password?token=`) open straight in the app when it is installed (iOS universal links, Android App
  * Links); without the app they stay links to the website, which handles both. The files below are what iOS
  * and Android fetch from our domain to trust the app with those paths.

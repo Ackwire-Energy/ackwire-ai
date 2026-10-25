@@ -271,7 +271,7 @@ test("executor arguments: Claude Code gets our MCP config, our tools allowed and
       },
     },
   });
-  // D60: a brain's tools are always loaded (no ToolSearch call before each one).
+  // A brain's tools are always loaded (no ToolSearch call before each one).
   expect(
     claudeMcpConfig({ command: ["node", "r.mjs"], taskId: TASK, socketPath: "/s", token: "t", alwaysLoad: true })
       .mcpServers.agentes,

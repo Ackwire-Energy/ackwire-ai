@@ -31,12 +31,12 @@
 
 ## Logo
 
-A marca é **agentes**; o domínio é agentes.chat. O logo principal é o símbolo do agente colado a "agentes" em Onest 700. A versão expandida acrescenta um balão pequeno "chat" em `agent`, no alto à direita, para quando o domínio importa (site, lançamentos). Em texto corrido, escreva "agentes" (minúsculo); "agentes.chat" só como endereço. Use o componente Logo; arquivos do símbolo em `assets/Logos/`. Abaixo de 18px, só o símbolo.
+A marca é **agentes**; o domínio é agentes.chat. O logo principal é o símbolo do agente colado a "agentes" em Onest 700. A versão expandida acrescenta um balão pequeno "chat" em `agent`, no alto à direita, para quando o domínio importa (site, lançamentos). Em texto corrido, escreva "agentes" (minúsculo); "agentes.chat" só como endereço. Use o componente Logo; arquivos do símbolo em `docs/design/icons/`. Abaixo de 18px, só o símbolo.
 
 ## Iconografia
 
-Ícones próprios, desenhados num grid de 20px com traço de 1.6, pontas e junções arredondadas. Formas que fecham (mensagem, agente, aprovar) repetem o canto vivo inferior esquerdo. Nos arquivos em `assets/Icons/` a tinta é `ink` do tema claro (`#151a17`); no produto, use o mesmo desenho inline com `stroke: currentColor` (classe `ac-icon`). Sem emoji como ícone. Chips e badges de estado levam ícone, nunca bolinha colorida.
+Ícones próprios, desenhados num grid de 20px com traço de 1.6, pontas e junções arredondadas. Formas que fecham (mensagem, agente, aprovar) repetem o canto vivo inferior esquerdo. Nos arquivos em `docs/design/icons/` a tinta é `ink` do tema claro (`#151a17`); no produto, use o mesmo desenho inline com `stroke: currentColor` (classe `ac-icon`). Sem emoji como ícone. Chips e badges de estado levam ícone, nunca bolinha colorida.
 
 ## Componentes
 
-Os estilos estão em `components/bundle.css`, com prefixo `ac-`, e leem apenas os tokens. Controles são sempre nossos: select, menu, checkbox e diálogos não usam o visual nativo do sistema. Por enquanto são classes CSS sobre HTML semântico; a implementação em React com primitivos headless vem no pacote `packages/ui` do app.
+Os estilos estão em `bundle.css`, com prefixo `ac-`, e leem apenas os tokens. Controles são sempre nossos: select, menu, checkbox e diálogos não usam o visual nativo do sistema. Por enquanto são classes CSS sobre HTML semântico; a implementação em React com primitivos headless vem no pacote `packages/ui` do app.

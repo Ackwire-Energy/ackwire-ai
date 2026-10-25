@@ -38,8 +38,7 @@ const SECTIONS = [
 ] as const;
 const hash = (id: string) => `#${id}`;
 /**
- * The public landing page (signed-out `/`), ported from the approved
- * prototype docs/design/telas/LandingNova.html. Dark by default; the only call to
+ * The public landing page (signed-out `/`). Dark by default; the only call to
  * action is the waiting list. Everything is scoped under `.lp`.
  */
 export function LandingPage() {
@@ -315,7 +314,17 @@ export function LandingPage() {
             <nav className="lp-footer__legal">
               <a href="/terms">{legalDocument("terms", "en").title}</a>
               <a href="/privacy">{legalDocument("privacy", "en").title}</a>
+              <a
+                href="https://x.com/agentes_chat"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("landing.footerX")}
+                title={t("landing.footerX")}
+              >
+                𝕏
+              </a>
             </nav>
+            <p className="lp-footer__company">{t("landing.footerCompany")}</p>
           </div>
         </footer>
       </div>

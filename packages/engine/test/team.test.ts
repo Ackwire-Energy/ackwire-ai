@@ -36,7 +36,7 @@ test("a big team is only a count with a pointer to find_agent", () => {
   expect(text).not.toContain("@a1");
 });
 
-test("an agent knows the org's other agents it can work with, even outside its channels (D54)", async () => {
+test("an agent knows the org's other agents it can work with, even outside its channels", async () => {
   const requests: ModelRequest[] = [];
   f = await setup({
     askAgent: true,

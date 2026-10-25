@@ -1,5 +1,5 @@
 /**
- * Mention hand-off eval (D49): when an agent's message @mentions another
+ * Mention hand-off eval (ADR 0034): when an agent's message @mentions another
  * agent, is it handing that agent something to do now (it gets a run) or only
  * naming it (no run)? Scores every case with the production judge and the
  * production threshold (`mentionThreshold`, 0.6).

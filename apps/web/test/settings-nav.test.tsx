@@ -84,10 +84,11 @@ describe("finding the settings", () => {
       ["access", "Agentes e acesso"],
       ["connectors", "Conectores"],
       ["skills", "Skills"],
-      ["keys", "Chaves de API"],
+      ["keys", "Contas de IA"],
       ["storage", "Armazenamento"],
       ["computers", "Computadores"],
       ["usage", "Orçamento e uso"],
+      ["import", "Importar e exportar"],
     ];
     for (const [id, heading] of sections) {
       await go(`settings/${id}`);

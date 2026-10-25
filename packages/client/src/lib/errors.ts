@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
+import type { OrgStanding } from "../api/types";
 import { MAX_UPLOAD_MB } from "./files";
 
 /**
@@ -64,12 +65,48 @@ const KNOWN = {
   "run.not_continuable": "errors.run.notContinuable",
   "run.agent_busy": "errors.run.agentBusy",
   "run.continue_forbidden": "errors.run.continueForbidden",
+  "run.not_restartable": "errors.run.notRestartable",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
   "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
+  "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
+  "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
+  "org.create_refused": "standing.createRefused",
+  "machine.managed": "computerSetup.managedNotRemovable",
+  "machine.managed_access": "computerSetup.managedAccess",
 } as const;
+
+/** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */
+const STANDING_REFUSALS = {
+  "org.paused": ["standing.paused", "standing.onHold"],
+  "org.suspended": ["standing.suspended", "standing.suspendedFor"],
+  "agent.paused": ["standing.agentPaused", "standing.agentPaused"],
+} as const;
+
+/**
+ * A refusal by the workspace's standing in the person's words, with the reason when the workspace is told
+ * one: the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`… Null for any
+ * other code.
+ */
+export function standingRefusalText(
+  t: TFunction,
+  code: string | null | undefined,
+  params?: Record<string, unknown> | null,
+): string | null {
+  const plain = code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code;
+  const keys = plain ? STANDING_REFUSALS[plain as keyof typeof STANDING_REFUSALS] : undefined;
+  if (!keys) return null;
+  const reason = typeof params?.reason === "string" ? params.reason.trim() : "";
+  return reason ? t(keys[1], { reason }) : t(keys[0]);
+}
+
+/** The hold banner's line: the reason when the workspace is told one, else what a refused run says. Null unless on hold. */
+export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
+  if (standing?.state !== "hold") return null;
+  return standingRefusalText(t, "org.paused", { reason: standing.reason });
+}
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */
 export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
@@ -80,9 +117,14 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
+/** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
+export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
 /** A known server code in the person's language; null for anything else (the caller keeps its own words). */
 export function knownErrorText(t: TFunction, error: unknown): string | null {
   if (!(error instanceof ApiError)) return null;
+  const standing = standingRefusalText(t, error.code, error.params);
+  if (standing) return standing;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
 }
@@ -90,8 +132,8 @@ export function knownErrorText(t: TFunction, error: unknown): string | null {
 /** Translated text for a failed request. */
 export function errorText(t: TFunction, error: unknown): string {
   if (error instanceof ApiError) {
-    const key = KNOWN[error.code as keyof typeof KNOWN];
-    if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
+    const known = knownErrorText(t, error);
+    if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");
   }

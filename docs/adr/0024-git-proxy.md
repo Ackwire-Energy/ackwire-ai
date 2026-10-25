@@ -2,11 +2,10 @@
 
 - Status: Accepted
 - Date: 2026-10-15
-- Planning: D35
 
 ## Decision
 
-Agents use real `git clone/commit/push` against private repositories from their computer (D30), but GitHub's credential stays on our server. The computer talks smart-HTTP git to **our** endpoint, which checks policy and forwards to GitHub with the org's token added server-side.
+Agents use real `git clone/commit/push` against private repositories from their computer (ADR 0021), but GitHub's credential stays on our server. The computer talks smart-HTTP git to **our** endpoint, which checks policy and forwards to GitHub with the org's token added server-side.
 
 **Endpoint.** `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/{info/refs | git-upload-pack | git-receive-pack}`. It uses no session cookie and no CSRF: the computer signs in with HTTP Basic, and the password is our credential.
 
@@ -25,7 +24,7 @@ Agents use real `git clone/commit/push` against private repositories from their 
 
 **Policy (checked in the proxy on every request):**
 - The agent needs `github:git.read` (fetch/clone) or `github:git.write` (push, which implies read) on that GitHub connection. These are grants of the connection, deniable like any other.
-- Optional repository list (`agent_repositories`, D48): `owner/name` or `owner/*`, in order. When an agent has any, only those repositories work, here and in the Tool Gateway for every GitHub tool (reads included). It replaced the `github:git.repo:…` grants (migration 0063).
+- Optional repository list (`agent_repositories`): `owner/name` or `owner/*`, in order. When an agent has any, only those repositories work, here and in the Tool Gateway for every GitHub tool (reads included). It replaced the `github:git.repo:…` grants (migration 0063).
 - Push commands are read from the receive-pack request (pkt-lines) before anything is sent:
   - only `refs/heads/agentes/{handle}/…`;
   - no tags and no deletes;

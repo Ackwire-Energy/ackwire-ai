@@ -22,7 +22,7 @@ const issue = (number: number, status: IssueStatus, columnId: string | null, boa
   boardRank,
 });
 
-describe("the task board (D55)", () => {
+describe("the task board", () => {
   test("a default board is not customized; a second column or a name makes it so", () => {
     expect(isCustomBoard(defaults)).toBe(false);
     expect(isCustomBoard([...defaults, col("week", "todo", 1)])).toBe(true);

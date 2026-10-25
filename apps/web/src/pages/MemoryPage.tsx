@@ -73,7 +73,7 @@ export function usageLabel(t: TFunction, m: Memory, now = new Date()) {
   return m.uses === 0 ? t("memory.used_zero") : t("memory.used", { count: m.uses });
 }
 
-/** telas/Memoria.dc.html — "O que a Ada sabe". */
+/** An agent's memory: "O que a Ada sabe". */
 export function MemoryPage({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();

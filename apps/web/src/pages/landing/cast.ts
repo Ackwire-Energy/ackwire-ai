@@ -1,7 +1,7 @@
 import type { AgentAppearance, AgentColor } from "@agenteschat/ui";
 
 /**
- * The landing page's sample workspace (docs/design/telas/LandingNova.html):
+ * The landing page's sample workspace:
  * the agents, their people and the two sample companies. Names stay as they
  * are in every language; every sentence lives in i18n (`landing.*`).
  */

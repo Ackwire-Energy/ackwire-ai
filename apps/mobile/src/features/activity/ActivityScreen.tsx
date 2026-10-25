@@ -47,7 +47,7 @@ import {
 } from "./logic";
 
 /**
- * Atividade (D46; MobileIntencional.html): on the grouped gray, what waits on you on top as cards (who asks,
+ * Atividade: on the grouped gray, what waits on you on top as cards (who asks,
  * the kind, the exact request, the deadline and one button: Revisar or Responder), or, with nothing
  * waiting, "Nada esperando você" and the next real event (a routine's next run); then the rest by day in
  * white inset cards. Swipe a row right to mark read or unread, left for "Feito". Tapping opens where it
@@ -285,7 +285,7 @@ const SWIPE = 72;
 const NAMES = "\u2063names\u2063";
 
 /**
- * One item, in Conversas' row (MobileConversas.html, S.activity): the faces, who did what (the names bold)
+ * One item, in Conversas' row: the faces, who did what (the names bold)
  * and when, the snippet and where; a dot on the left while unread. Swipe right to mark read or unread,
  * left for "Feito"; tapping opens where it happened.
  */
@@ -308,7 +308,8 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
       ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
       : t("mobile.names.two", { first: who.first, second: who.second })
     : who.first;
-  const template = t(`mobile.activity.kind.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
+  const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
+  const template = t(`mobile.activity.kind.${kind}`, { names: NAMES, count: who.total, defaultValue: NAMES });
   const parts = template.split(NAMES);
   const title = parts.join(names);
   // Coded words in the person's language: why a routine paused or failed, who asked for an approval.

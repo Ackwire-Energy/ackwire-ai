@@ -1,5 +1,5 @@
 /*
- * Page layout of the approved screens (docs/design/telas), as classes.
+ * Page layout of the app's screens, as classes.
  * Only structure and spacing: colors, shapes and type come from tokens and
  * the @agenteschat/ui components.
  */
@@ -33,7 +33,7 @@ p {
   background: var(--line);
 }
 
-/* Centered single card (telas/Convite, Onboarding) */
+/* Centered single card */
 .center {
   min-height: 100vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
@@ -110,6 +110,10 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
+/* A provider by its mark and name: one line, centered on the mark. */
+.onb__provider {
+  align-items: center;
+}
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
@@ -144,7 +148,7 @@ p {
   border-radius: var(--radius-sm);
 }
 
-/* Workspace shell (telas/Sidebar + main) */
+/* Workspace shell */
 .shell {
   position: relative;
   display: flex;
@@ -159,7 +163,7 @@ p {
 }
 /*
  * The work area is its own surface (`--pane`: white in light, the page in dark), beside the sidebar's paper
- * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (telas/RefinoUI.html: no
+ * (`--side`). Pages inside paint `--bg`/`--surface`, so both point at the pane here (no
  * gray panel around the work).
  */
 .shell__main {
@@ -176,24 +180,9 @@ p {
   flex-direction: column;
   overflow: hidden;
 }
+/* Every page sits on the same white as the conversations: no grayer desk. */
 /*
- * Pages that aren't a conversation (telas/Cards.html "B · Mesa"): the work area is a paper a shade
- * darker, so the cards on it stand out. Conversations stay white. A page laid out like a chat but not
- * one (the calendar) says so with `--desk`.
- */
-:root,
-[data-theme="light"] {
-  --desk: #f5f5f2;
-}
-[data-theme="dark"] {
-  --desk: #0b0b0a;
-}
-.shell__main:not(.shell__main--chat),
-.shell__main--desk {
-  --pane: var(--desk);
-}
-/*
- * The work area beside the sidebar: an app-wide notice on top when there is one (telas/ComputadorOffline.html),
+ * The work area beside the sidebar: an app-wide notice on top when there is one,
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */
 .shell__work {
@@ -346,9 +335,15 @@ p {
   color: var(--success);
 }
 .waitcard p {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-muted);
+}
+.waitcard p > .ac-brand {
+  margin-top: 2px;
 }
 .waitcard__acts {
   display: flex;
@@ -524,12 +519,36 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The label grows from nothing (`flex: 1`), so a long agent role would take the whole row and hide the name: it gets
+   at most half, on one line (the row's title has it whole). */
 .sidebar__item-meta {
   font-size: 12px;
   color: var(--ink-muted);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar__channel-icon {
   color: var(--ink-muted);
+}
+/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials). */
+.sidebar__channel-abbr {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__item:has(> .sidebar__channel-abbr) > .sidebar__channel-icon {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__channel-abbr {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink-muted);
+}
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"] .sidebar__channel-abbr {
+  color: var(--ink);
 }
 .sidebar__foot {
   margin-top: auto;
@@ -617,7 +636,7 @@ p {
   }
 }
 
-/* Page container (telas/Aprovacoes, Agente, Membros, NovoAgente) */
+/* Page container */
 .page {
   max-width: 920px;
   margin: 0 auto;
@@ -747,7 +766,7 @@ p {
   gap: var(--space-3);
 }
 
-/* Channel (telas/Main) */
+/* Channel */
 .channel__header {
   display: flex;
   flex-wrap: wrap;
@@ -780,7 +799,9 @@ p {
   gap: 6px;
   vertical-align: top;
 }
-.profile-card__brain > .ac-icon {
+.profile-card__brain > .ac-icon,
+.profile-card__brain > .ac-brand,
+.channel__brain > .ac-brand {
   flex: none;
   margin-top: 2px;
 }
@@ -794,7 +815,7 @@ p {
   gap: 4px;
   padding: 16px 8px 24px;
 }
-/* Turns are told apart by space (RefinoUI "Nova leitura"): ~10px between messages; the same author
+/* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: 6px;
@@ -967,7 +988,7 @@ p {
   flex-direction: column;
 }
 
-/* Memory (telas/Memoria) and proposals (telas/Propostas) */
+/* Memory and proposals */
 .tabs-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1873,7 +1894,7 @@ p {
   }
 }
 
-/* ── Issues, routines, calendar (telas/Issues, Issue, Rotinas, Calendario) ── */
+/* ── Issues, routines, calendar ── */
 .grid-fields--3 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
 }
@@ -1910,7 +1931,7 @@ p {
 }
 
 /*
- * Markdown inside chat messages, styled for reading (telas/RefinoUI.html, "Nova leitura"): line breaks
+ * Markdown inside chat messages, styled for reading: line breaks
  * kept (white-space from .ac-msg__text), 14px between paragraphs, 8px into a list and between its items,
  * a heading opens a section, bold marks without shouting, links in the text's own color.
  */
@@ -2133,6 +2154,7 @@ p {
 }
 .level-matrix {
   overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
@@ -2368,7 +2390,7 @@ p {
   border-radius: inherit;
 }
 
-/* Settings (telas/Configuracoes.html): a grouped left sub-nav + one section. */
+/* Settings: a grouped left sub-nav + one section. */
 .settings {
   display: flex;
   gap: 40px;
@@ -2614,6 +2636,7 @@ p {
     margin: 0 -16px;
     padding: 2px 16px 6px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   .settings__group-label {
     display: none;
@@ -2669,7 +2692,7 @@ p {
 }
 
 /*
- * "Adicionar conector" (telas/CatalogoConectores.html, B+C): a gallery with a big title, search and one
+ * "Adicionar conector": a gallery with a big title, search and one
  * line of filters; suggestions with the brand's pixel sky; even tiles with no tags (a check on the icon
  * when connected); a tile opens the detail pane beside the grid (a bottom sheet on phones).
  */
@@ -3453,7 +3476,7 @@ p {
   box-shadow: none;
 }
 
-/* Connector tool review (telas/ConectorFerramentas.html): one grouped list, pending decisions first. */
+/* Connector tool review: one grouped list, pending decisions first. */
 .tr-body {
   gap: 24px;
 }
@@ -4014,10 +4037,16 @@ p {
   }
 }
 
-/* Sidebar 2026-10: soft pill for the active item (one indicator slides between items), neutral badges. */
+/* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
+   white with a hairline (one indicator slides between items); counts are plain numbers. */
 .sidebar {
   position: relative;
   background: var(--side);
+  /* The chosen item and the ⌘K field: the page's white in light; a lighter step of the paper in dark. */
+  --side-active: var(--pane);
+}
+[data-theme="dark"] .sidebar {
+  --side-active: color-mix(in srgb, var(--ink) 7%, var(--side));
 }
 /* Light: the paper and the white work area meet on a hairline (dark keeps the step in tone; the drawer has its shadow). */
 @media (min-width: 761px) {
@@ -4036,8 +4065,8 @@ p {
   left: 0;
   z-index: 0;
   border-radius: var(--control-r-md);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
   pointer-events: none;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -4074,17 +4103,14 @@ p {
   color: var(--faint);
 }
 .sidebar__unread {
-  background: var(--raised);
-  color: var(--ink);
-  box-shadow: var(--e1);
+  background: none;
+  color: var(--muted);
+  box-shadow: none;
   font-weight: 650;
 }
-/* The workspace header: a raised card with the org's name. */
+/* The workspace header: the org's name, no card (a soft fill on hover). */
 .sidebar__org {
-  padding: 6px;
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  border-radius: 12px;
 }
 .sidebar__org-name {
   font-size: 15.5px;
@@ -4101,8 +4127,8 @@ p {
   padding: 0 10px 0 var(--control-px-md);
   border: 0;
   border-radius: var(--control-r-md);
-  background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--field-line);
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);
   color: var(--faint);
@@ -4787,7 +4813,7 @@ button.live-call__head:hover {
   color: var(--ink2);
   font-weight: 600;
 }
-/* "Leu seu recado · …" inside the work: a well, like the prototype's mark. */
+/* "Leu seu recado · …" inside the work: a well, like the design's mark. */
 .live-work__steer {
   display: flex;
   align-items: center;
@@ -4912,7 +4938,7 @@ button.live-call__head:hover {
   padding: 0;
   gap: 0;
 }
-/* The bell's badge bumps when a notification arrives (telas/Notificacoes.html). */
+/* The bell's badge bumps when a notification arrives. */
 .sidebar__bump {
   animation: sidebar-bump 0.5s var(--spring);
 }
@@ -5184,7 +5210,7 @@ button.live-call__head:hover {
   color: var(--muted);
 }
 
-/* ---------- The pixel sky in the app (docs/design/telas/CeuNoApp.html) ----------
+/* ---------- The pixel sky in the app ----------
  * The sky is the agents' world: the same blue in both themes, ink on it is
  * the deep sky ink. It shows only where the subject is the agents. */
 :root {
@@ -5322,21 +5348,14 @@ button.live-call__head:hover {
   text-shadow: 0 1px 6px rgba(4, 32, 63, 0.6);
 }
 
-/* Sidebar: the workspace's little sky, working agents, the horizon */
+/* Sidebar: the workspace's header, working agents, the horizon */
 .sidebar__org {
   position: relative;
   overflow: hidden;
-  min-height: 56px;
-  /* The whole card is the menu button: no inset, so every pixel of it opens the menu. */
+  min-height: 48px;
+  /* The whole header is the menu button: no inset, so every pixel of it opens the menu. */
   padding: 0;
-  border-radius: 14px;
-  /* The sky is light tones faded from this surface, so the text keeps the theme's own ink. */
-  border: 1px solid var(--line);
-  background: var(--sunken);
   color: var(--ink);
-}
-.sidebar__org > :not(.ac-sky) {
-  position: relative;
 }
 .sidebar__org .sidebar__org-button,
 .sidebar__org .sidebar__org-button > .ac-icon,
@@ -5345,7 +5364,7 @@ button.live-call__head:hover {
 }
 .sidebar__org .sidebar__org-button {
   align-self: stretch;
-  padding: 8px 12px 8px 10px;
+  padding: 6px 10px 6px 8px;
   border-radius: inherit;
 }
 .sidebar__org .sidebar__org-meta {
@@ -5353,7 +5372,7 @@ button.live-call__head:hover {
 }
 .sidebar__org .sidebar__org-button:hover,
 .sidebar__org .ac-btn:hover {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--plate);
 }
 .sidebar__item[data-busy="true"] {
   position: relative;
@@ -5394,14 +5413,18 @@ button.live-call__head:hover {
   overflow: hidden;
   pointer-events: none;
 }
-/* The whole card is the account button (no inner margin it doesn't answer to). Solid like the busy
-   chip: the moving sky behind would make a blur redo itself on every frame. */
+/* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
   border-radius: 12px;
-  background: var(--glass-solid);
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 8px 20px -12px rgba(0, 0, 0, 0.35);
+}
+.sidebar__me > .sidebar__user:hover {
+  background: var(--plate);
+}
+/* "Criar agente": a plain row (a ghost button), not a raised one. */
+.sidebar__create.ac-btn {
+  justify-content: flex-start;
+  color: var(--ink2);
+  font-weight: 500;
 }
 .sidebar[data-rail="true"] .sidebar__org {
   min-height: 0;
@@ -5646,7 +5669,7 @@ button.live-call__head:hover {
     display: none;
   }
 }
-/* The computer's portrait (IconesComputador.html) sits on the surface, no tile. */
+/* The computer's portrait sits on the surface, no tile. */
 .machine-row__icon {
   flex: none;
 }
@@ -5674,6 +5697,7 @@ button.live-call__head:hover {
   margin: 0;
   padding: 10px 44px 10px 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
@@ -5710,6 +5734,29 @@ button.live-call__head:hover {
   gap: 8px;
   margin: 0;
   font-weight: 600;
+}
+/* Abrir no celular: the QR code stays dark on white in both themes (cameras read that best), then the steps. */
+.phone-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.phone-code__qr {
+  width: 216px;
+  height: 216px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.phone-code__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.phone-code .machine-pair__steps {
+  align-self: stretch;
 }
 a.machine-row__name:hover {
   text-decoration: underline;
@@ -5775,7 +5822,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores (Computadores.html): the two kinds, the cloud card, your computers, each agent's. */
+/* Configurações → Computadores: the two kinds, the cloud card, your computers, each agent's. */
 .computers-kinds {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5832,6 +5879,9 @@ a.machine-row__name:hover {
   margin-top: 3px;
   color: var(--ok);
 }
+.computers-kind__points .ac-brand {
+  margin-top: 3px;
+}
 .computers-kind__head {
   display: flex;
   align-items: center;
@@ -5881,6 +5931,63 @@ a.machine-row__name:hover {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size and users. */
+.setup-progress {
+  margin: 0;
+}
+.setup-progress--line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.setup-progress--line > :first-child {
+  flex: none;
+  margin-top: 1px;
+}
+.setup-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.setup-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
+.hold-banner .outage__text {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  white-space: normal;
+}
+/* Where to write for help: the address reads as part of the sentence. */
+.support-line a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. */
+.suspended-page .support-line {
+  display: block;
+  margin-top: 6px;
+}
+.suspended-page__others {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.suspended-page__others > h2 {
+  flex-basis: 100%;
 }
 .computers-note {
   display: flex;
@@ -5937,7 +6044,7 @@ a.machine-row__name:hover {
   font-size: 12.5px;
 }
 
-/* The computer page (PastasComputador.html, view "computer"). */
+/* The computer page. */
 .machine-page__back {
   align-self: flex-start;
 }
@@ -5974,7 +6081,16 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
+.machine-page__agent-row {
+  display: flex;
+  align-items: center;
+}
+.machine-page__agent-row + .machine-page__agent-row {
+  border-top: 1px solid var(--line);
+}
 .machine-page__agent {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -5983,8 +6099,9 @@ a.machine-row__name:hover {
   text-decoration: none;
   transition: background 0.12s;
 }
-.machine-page__agent + .machine-page__agent {
-  border-top: 1px solid var(--line);
+.machine-page__screen {
+  flex: none;
+  margin-right: 10px;
 }
 .machine-page__agent:hover {
   background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
@@ -6081,7 +6198,7 @@ a.machine-row__name:hover {
   text-underline-offset: 2px;
 }
 
-/* ---------- Onboarding (docs/design/telas/OnboardingEtapas.html) ----------
+/* ---------- Onboarding ----------
  * A rail like the app's sidebar (its surface, the steps), a strip of pixel sky
  * on top for the progress and the sky as a horizon at its bottom; on the right,
  * one calm screen per step hosted by an agent of the team. */
@@ -6286,6 +6403,7 @@ a.machine-row__name:hover {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
   .onb__step {
     width: auto;
@@ -6303,7 +6421,7 @@ a.machine-row__name:hover {
   }
 }
 
-/* ---------- Criar agente (docs/design/telas/NovoAgente.html) ----------
+/* ---------- Criar agente ----------
  * The onboarding's shell (`.onb`: the rail on the sidebar surface, its steps
  * and horizon) with a live preview of the agent on the right. The page is the
  * scroll container: the rail, the preview and the bar at the bottom stick. */
@@ -6898,6 +7016,9 @@ a.machine-row__name:hover {
   font-size: 15px;
 }
 .newag__model-prov {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
   color: var(--faint);
   font-size: 12px;
@@ -7049,6 +7170,7 @@ a.machine-row__name:hover {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
     padding: 2px;
   }
@@ -7093,6 +7215,7 @@ a.machine-row__name:hover {
     margin: 14px -16px 0;
     padding: 2px 16px 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
   }
   .newag__tip {
@@ -7142,23 +7265,6 @@ a.machine-row__name:hover {
   }
 }
 
-/* Settings → Usage: one agent's spend against its budget (admins only). */
-.usage-agent__meter {
-  flex: 0 0 160px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.usage-agent__meter .ac-meter {
-  flex: 1;
-  height: 6px;
-}
-@media (max-width: 640px) {
-  .usage-agent__meter {
-    flex-basis: 96px;
-  }
-}
-
 /* Secrets (ADR 0027): the card's private field and the agent page's list. */
 .secret-card__form {
   display: grid;
@@ -7191,13 +7297,16 @@ a.machine-row__name:hover {
   min-width: 0;
 }
 
-/* ---------- The agent page (docs/design/telas/AgentePerfil.html) ----------
+/* ---------- The agent page ----------
  * The agent alive on its own-color sky, its numbers, sticky tabs, inline
  * editing and one save bar that sticks to the bottom while something is
  * unsaved. Cards stay neutral; only the cover and running states use color. */
 .agp {
+  /* Open sky: the page is the cover's width; what is under it keeps a gutter. */
+  --agp-gutter: 40px;
+  max-width: none;
   gap: 0;
-  padding-bottom: 24px;
+  padding: 0 0 24px;
 }
 .agp-hero {
   display: flex;
@@ -7205,12 +7314,10 @@ a.machine-row__name:hover {
 }
 .agp-cover {
   position: relative;
-  height: 128px;
-  border-radius: 24px;
+  height: 176px;
   overflow: hidden;
   isolation: isolate;
   background: var(--sunken);
-  box-shadow: var(--e1);
 }
 .agp-cover__sky {
   position: absolute;
@@ -7222,96 +7329,42 @@ a.machine-row__name:hover {
   width: 100%;
   height: 100%;
 }
-/* telas/AgenteTopo.html, D: the agent in the middle, over the cover's edge, cut out by a ring of the page. */
+/* The agent on the cover's left edge, cut out by a ring of the page. */
 .agp-face {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 96px;
-  height: 96px;
-  margin: -48px auto 0;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 var(--agp-gutter);
   /* The avatar's own tile (radius 30%) is the face: the ring follows it. */
   border-radius: 30%;
-  box-shadow:
-    0 0 0 5px var(--bg),
-    var(--e1);
+  box-shadow: 0 0 0 6px var(--bg);
 }
 .agp-face .ac-avatar {
   width: 100%;
   height: 100%;
 }
-/*
- * telas/AgenteFundo.html, B: the agent's page sits on a grayer desk (full page and the panel beside its DM),
- * and who the agent is (cover, face, name, how it works) lives in one white card, so it never blends
- * with the cards of the tabs.
- */
-:root,
-[data-theme="light"] {
-  --agp-desk: #efefec;
-}
-[data-theme="dark"] {
-  --agp-desk: #080807;
-}
-.shell__main:not(.shell__main--chat):has(> .agp),
-.thread-panel--wide {
-  --pane: var(--agp-desk);
-  --bg: var(--agp-desk);
-  --surface: var(--agp-desk);
-}
+/* Who the agent is (cover, face, name) is no card: it sits on the page's own white. */
 .agp-idcard {
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
-  background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
-  box-shadow: var(--card-shadow);
 }
-/* Concentric with the card. */
-.agp-idcard .agp-cover {
-  border-radius: calc(var(--radius-section) - 8px);
-  box-shadow: none;
-}
-.agp-idcard .agp-face {
-  box-shadow:
-    0 0 0 5px var(--surface-raised),
-    var(--e1);
-}
-.agp-idcard .agp-work {
-  padding-top: 14px;
-}
-/* The three cells are part of the card: a hairline above them, no card of their own. */
-.agp-idcard .agp-workcard {
-  padding: 6px 0 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-/* The tabs as a segmented control under the card, centered; it sticks to the top while the page scrolls. */
-.agp-tabs .ac-tabs--seg {
-  position: sticky;
-  top: 8px;
-  z-index: var(--z-sticky);
-  display: flex;
-  width: max-content;
-  margin: 16px auto 0;
-  box-shadow:
-    inset 0 0 0 1px var(--line),
-    inset 0 1px 2px rgba(0, 0, 0, 0.06),
-    0 6px 16px -10px rgba(0, 0, 0, 0.25);
+/* How it works under the name, where the overview's side column is gone (AgentPage: workInAside). */
+.agp-hero__work {
+  padding: 18px var(--agp-gutter) 0;
 }
 .agp-ident {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 10px 4px 0;
-  text-align: center;
+  padding: 12px var(--agp-gutter) 0;
 }
 .agp-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: 40px;
   font-weight: var(--font-display-weight, 300);
   line-height: 1;
   letter-spacing: -0.03em;
@@ -7346,7 +7399,7 @@ a.machine-row__name:hover {
   color: var(--sky-ink);
 }
 
-/* Como trabalha (telas/AgenteTopo.html, D): three cells in one card, no shadow, a hairline; the numbers below. */
+/* Como trabalha: three cells in one card, no shadow, a hairline; the numbers below. */
 .agp-work {
   display: flex;
   flex-direction: column;
@@ -7354,11 +7407,8 @@ a.machine-row__name:hover {
   padding-top: 16px;
 }
 .agp-workcard {
-  padding: 6px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
-  /* Raised off the page (white in light) so it reads as one card. */
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  padding: 4px 0;
+  border-block: 1px solid var(--line);
 }
 .agp-cells {
   display: grid;
@@ -7407,8 +7457,7 @@ a.machine-row__name:hover {
   width: 30px;
   height: 30px;
   border-radius: 10px 10px 10px 3px;
-  background: var(--sunken);
-  color: var(--ink2);
+  color: var(--muted);
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;
@@ -7531,7 +7580,7 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa" (telas/QuemPensa.html "C"): the opened brain's settings full width, a small label above each. */
+/* "Quem pensa": the opened brain's settings full width, a small label above each. */
 .agp-brainfield {
   display: flex;
   flex-direction: column;
@@ -7573,6 +7622,18 @@ a.machine-row__name:hover {
 .agp-brainoff span {
   color: var(--muted);
   font-size: 12.5px;
+}
+/* "Só responde a você", under the account: what it means now, the switch at the end. */
+.agp-brainshare {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+/* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
+.agp-planoffer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 /* "Adicionar conta": the provider's own sign-in, in numbered steps. */
 .agp-addacct {
@@ -7667,9 +7728,10 @@ a.machine-row__name:hover {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  margin: 14px -8px 0;
-  padding: 0 8px;
+  margin: 18px 0 0;
+  padding: 0 calc(var(--agp-gutter) - 12px);
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   -webkit-backdrop-filter: blur(14px);
@@ -7685,6 +7747,13 @@ a.machine-row__name:hover {
   gap: 7px;
   height: 48px;
   white-space: nowrap;
+}
+/* Inside the sideways scroller: the tab and its underline stay within it (1px past the edge made it scroll up and down). */
+.agp-tabs .ac-tab {
+  margin-bottom: 0;
+}
+.agp-tabs .ac-tab[data-state="active"]::after {
+  bottom: 0;
 }
 .agp-badge {
   display: inline-flex;
@@ -7706,7 +7775,7 @@ a.machine-row__name:hover {
   color: var(--warn);
 }
 .agp-view {
-  padding-top: 22px;
+  padding: 8px var(--agp-gutter) 0;
   animation: agp-in 0.3s var(--out) both;
 }
 @keyframes agp-in {
@@ -7721,27 +7790,82 @@ a.machine-row__name:hover {
 }
 .agp-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   align-items: start;
-  gap: 18px;
+  gap: 48px;
 }
 .agp-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-width: 0;
 }
+/* No cards on the agent's page: sections on the white, a hairline between them. */
 .agp-card.ac-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  --card-pad: 18px;
+  padding: 26px 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
+.agp-card.ac-card + .agp-card.ac-card,
+.agp-attns + .agp-card.ac-card,
+.agp-aside__work + .agp-card.ac-card {
+  border-top: 1px solid var(--line);
+}
+.agp-card.ac-card > .ac-card__foot {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* Something changed in it: a bar on its left edge. */
 .agp-card[data-changed] {
-  box-shadow:
-    0 0 0 1.5px var(--ink),
-    var(--card-shadow);
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+/* The side column: quiet, smaller headings. */
+.agp-aside__work {
+  padding: 26px 0;
+}
+.agp-aside__h {
+  margin: 0 0 6px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.agp-aside .agp-work {
+  padding-top: 0;
+}
+.agp-aside .agp-workcard {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.agp-aside .agp-cells {
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 -12px;
+}
+.agp-aside .agp-cell + .agp-cell::before {
+  display: none;
+}
+.agp-aside .agp-workcard__foot {
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+}
+.agp-aside .agp-numbers {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.agp-aside .agp-number {
+  font-size: 14px;
+  white-space: normal;
+  text-align: left;
 }
 .agp-changed {
   display: inline-flex;
@@ -8050,7 +8174,7 @@ a.machine-row__name:hover {
   width: 12px;
   height: 12px;
 }
-/* RepositoriosAgente.html: which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
+/* Which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
 .level-row__below {
   flex-basis: 100%;
   min-width: 0;
@@ -8111,7 +8235,7 @@ a.machine-row__name:hover {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list (telas/RepositoriosDialogo.html, B). */
+/* "Todos os repositórios" on top of the list. */
 .agp-repodialog__all {
   flex: 1;
   display: flex;
@@ -8435,7 +8559,7 @@ a.machine-row__name:hover {
   align-items: center;
   gap: 12px;
 }
-/* The computer's portrait (IconesComputador.html), on the surface. */
+/* The computer's portrait, on the surface. */
 .agp-pc__logo {
   flex: none;
 }
@@ -8456,8 +8580,9 @@ a.machine-row__name:hover {
 .agp-secrets h3 {
   margin: 0;
 }
-.agp-danger.ac-card {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+/* The danger zone is a section like the others (no box on the agent's page): its icon says it. */
+.agp-danger.ac-card .ac-card__key {
+  color: var(--danger);
 }
 .agp-dz {
   display: flex;
@@ -8631,7 +8756,7 @@ a.machine-row__name:hover {
   min-width: 0;
 }
 
-/* The memory mark (telas/ReacoesAgente.html): same height as a pill, another shape (not an emoji anyone can add) */
+/* The memory mark: same height as a pill, another shape (not an emoji anyone can add) */
 .msg-mem__sep {
   width: 1px;
   height: 16px;
@@ -8754,7 +8879,7 @@ a.machine-row__name:hover {
   }
 }
 
-/* ── The agent's identity, compact (telas/PerfilAgente.html): the agent on its color beside name and role;
+/* ── The agent's identity, compact: the agent on its color beside name and role;
    then the colors, and the eyes and what it wears as one sliding row each (Carousel). ── */
 .agp-id {
   display: flex;
@@ -8874,7 +8999,7 @@ html[data-menu-overlay] .shell {
   margin-left: var(--space-2);
 }
 
-/* ── Sidebar (telas/SidebarAPartirDaD.html, option 5) ─────────────
+/* ── Sidebar ──────────────────────────────────────────────────────
    The main tools are plain rows; the rest open beside the sidebar from More. Conversations sit in
    categories that open and close; closed, one shows only the open page's row and a count.
    The icon rail ignores the headers. */
@@ -8884,7 +9009,7 @@ html[data-menu-overlay] .shell {
 .sidebar__section {
   gap: 2px;
 }
-/* Rows (telas/SidebarLinhas.html, "B · Mais ar"): 36px, 14px text; 18px muted icons 9px in, the 24px
+/* Rows: 36px, 14px text; 18px muted icons 9px in, the 24px
    avatar (accessories need 24) 6px from the edge on three sides, centred on the icons, every name in
    one column. */
 .sidebar:not([data-rail="true"]) .sidebar__item {
@@ -9049,7 +9174,7 @@ html[data-menu-overlay] .shell {
   display: flex;
 }
 
-/* A streaming answer: each word fades in as it is revealed (Mensagens.html, the `.w` words); still with reduced motion. */
+/* A streaming answer: each word fades in as it is revealed; still with reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   .ac-word {
     animation: ac-word-in 280ms ease-out both;
@@ -9061,7 +9186,7 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* ── Messages fluidity (telas/Mensagens.html, option C) ── */
+/* ── Messages fluidity ── */
 
 /* Steps: the pixel mark in a fixed 16px box; a stopped step is struck through. */
 .live-call__mark {
@@ -9309,7 +9434,7 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* Arquivos on the agent's page (telas/AgenteArquivos.html, A): the Drive's preview, title, one line, Abrir. */
+/* Arquivos on the agent's page: the Drive's preview, title, one line, Abrir. */
 .agp-file {
   display: flex;
   align-items: center;
@@ -9353,4 +9478,38 @@ html[data-menu-overlay] .shell {
   align-items: center;
   gap: 6px;
   margin: 12px 0 0;
+}
+
+/* Contas de IA: the connect choices (one that no computer of the person's can take says why) and the rows. */
+.ai-connect__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ai-connect__choices legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+.ai-connect__choices .ac-option {
+  align-items: center;
+}
+.ai-connect__choices .ac-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+  box-shadow: none;
+}
+.ai-accounts__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ai-accounts__row .ac-planmeter {
+  margin-top: 4px;
+  max-width: 320px;
 }

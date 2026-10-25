@@ -1,8 +1,8 @@
 # agentes (phone app)
 
-Expo + React Native app for agentes.chat (ADR 0035, D50). Flows and look: `docs/design/telas/Mobile.html`.
+Expo + React Native app for agentes.chat (ADR 0035).
 
-**Nothing runs on a developer's machine.** Code is checked in CI (`.github/workflows/ci.yml`: lint, typecheck,
+Code is checked in CI (`.github/workflows/ci.yml`: lint, typecheck,
 unit tests of the pure logic in `apps/mobile/test`). Builds and installs go through EAS
 (`.github/workflows/mobile.yml`).
 
@@ -26,7 +26,7 @@ Set per profile in `eas.json` (`build.<profile>.env`) or on expo.dev (EAS enviro
 
 | Variable | What | Default |
 | --- | --- | --- |
-| `EXPO_PUBLIC_API_URL` | The backend. **Must be the server's `PUBLIC_URL` host** (see below). | `https://agentes.chat` |
+| `EXPO_PUBLIC_API_URL` | The default server. **Must be the server's `PUBLIC_URL` host** (see below). | `https://agentes.chat` |
 | `EAS_PROJECT_ID` | EAS project, for push tokens. | ours (`8514d5b3-…`) |
 | `APP_VARIANT` | `development` / `preview` / `production`: name and bundle id suffix, so all three install side by side. | `production` |
 
@@ -35,6 +35,12 @@ Why the API URL must equal the public URL: React Native's WebSocket adds an `Ori
 `X-Agentes-Client: mobile`, and refuses a foreign `Origin` even with the header. So the app's host must be the
 one the server considers its own.
 
+People can point the app at their own server ("Servidor: agentes.chat · Trocar" on sign-in, a QR code from the web
+app's "Abrir no celular", or an `agenteschat://connect?server=…` link). The app checks `GET /api/instance` first and,
+for the same reason, uses the address the server gives there (its `PUBLIC_URL`); when that address doesn't answer from
+the phone, the server is refused with that host in the message. Switching signs out of the previous server. Pushes from
+a self-hosted server reach the app only while the Expo project keeps "enhanced push security" off.
+
 Server side (not in this folder): Better Auth's Expo plugin trusts `agenteschat://`; Sign in with Apple needs
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and the native iOS button sends an ID
 token whose audience is the bundle id `chat.agentes.app` (the server's Apple provider must accept it).
@@ -42,7 +48,8 @@ token whose audience is the bundle id `chat.agentes.app` (the server's Apple pro
 ## How it fits together
 
 - `app/_layout.tsx`: providers + the session gate (signed out → `app/(auth)`, signed in with an organization →
-  `app/(app)`). `app/(auth)`: sign in, sign up, forgot password.
+  `app/(app)`). `app/(auth)`: sign in and sign up (forgot password in place), your server and the QR scanner.
+  `app/connect.tsx`: the `agenteschat://connect` confirmation, in either state. The current server: `src/lib/server.ts`.
 - `src/providers`: theme, i18n (`@agenteschat/i18n` + `src/i18n/keys.*.ts` under `mobile.*`), React Query, API
   (`useApi()` from `@agenteschat/client`), session (`useSession`), organization (`useOrg`), realtime
   (`useRealtime` → `{ connection, status }`), push (`usePush().ask()`), fonts.

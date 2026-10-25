@@ -1,8 +1,7 @@
 /*
- * The landing page (signed-out `/`), ported from the approved prototype
- * docs/design/telas/LandingNova.html. Every rule is scoped under `.lp` so nothing
+ * The landing page (signed-out `/`). Every rule is scoped under `.lp` so nothing
  * leaks into the app. Design system components keep their markup; the rules
- * on `.ac-*` here only tune them to the prototype inside the landing page.
+ * on `.ac-*` here only tune them for the landing page.
  */
 .lp {
   /* The landing keeps the face it was approved with; the app reads in Source Sans 3. */
@@ -117,7 +116,7 @@
   white-space: nowrap;
 }
 
-/* Design system pieces, tuned to the prototype */
+/* Design system pieces, tuned for the landing */
 .lp .ac-chip {
   height: 24px;
   padding: 0 9px 0 7px;
@@ -646,7 +645,7 @@
   height: 100%;
   pointer-events: none;
 }
-/* The giant stands whole in the right column, on its halo (the approved prototype HeroLP.html, variant 2). */
+/* The giant stands whole in the right column, on its halo. */
 .lp .lp-giant {
   --s: clamp(260px, 30vw, 420px);
   position: absolute;
@@ -778,7 +777,7 @@
 }
 
 /* Sections */
-/* Space only above each section (the prototype's rhythm); the closing sky keeps the same gap above it. */
+/* Space only above each section; the closing sky keeps the same gap above it. */
 .lp .lp-sec {
   padding-block: clamp(72px, 10vw, 140px) 0;
 }
@@ -935,4 +934,11 @@
   justify-content: space-between;
   font-size: 13px;
   color: var(--faint);
+}
+/* Who makes it, on its own line at the very bottom, smaller than the rest. */
+.lp .lp-footer__company {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
 }

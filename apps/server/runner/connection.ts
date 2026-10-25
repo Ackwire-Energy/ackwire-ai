@@ -74,9 +74,12 @@ export interface ConnectionOutcome {
   message: string;
 }
 
+/** `start`'s exit code when the server refuses the token (unknown or revoked): only a new token helps. */
+export const TOKEN_REFUSED_EXIT = 2;
+
 const REFUSED_EXIT: Record<Exclude<ConnectionOutcome["reason"], "stopped">, number> = {
-  invalid_token: 2,
-  revoked: 2,
+  invalid_token: TOKEN_REFUSED_EXIT,
+  revoked: TOKEN_REFUSED_EXIT,
   outdated: 3,
   replaced: 0,
 };
@@ -91,7 +94,7 @@ export interface ConnectionOptions {
   dial?: Dial;
   log?: (line: string) => void;
   random?: () => number;
-  /** Tests: run requests with a fake. */
+  /** Runs requests instead of `handleRequest` (tests: a fake; a worker: only its own agent's). */
   handler?: typeof handleRequest;
   /**
    * Background tasks (protocol 4): `hello` carries their journal, each

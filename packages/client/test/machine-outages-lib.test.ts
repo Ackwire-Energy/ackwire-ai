@@ -50,7 +50,7 @@ const office: OutageTargetLike = {
 };
 const codexOnly: OutageTargetLike = { ...pro, machineId: "linux", name: "Servidor", brains: ["codex"] };
 
-describe("offline computers (ComputadorOffline)", () => {
+describe("offline computers", () => {
   test("counts: the server's task count, else the agents' sum; each agent's phrase", () => {
     expect(outageTaskCount(air)).toBe(3);
     expect(outageTaskCount({ ...air, waitingRuns: 0 })).toBe(3);

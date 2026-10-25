@@ -16,6 +16,42 @@ describe("loadConfig", () => {
     expect(config.AGENT_DEFAULT_MODEL).toBe("claude-sonnet-5-5");
     expect(config.ROUTER_MODEL).toBe("claude-haiku-5-5");
     expect(config.AGENT_MAX_HOPS).toBe(3);
+    expect(config.LANDING_PAGE).toBe(false);
+    expect(config.S3_PATH_STYLE).toBe(false);
+    expect(config.MILLIONSEND_API_URL).toBe("https://api.millionsend.com");
+    // Unset: the email senders use ola@ on the host of PUBLIC_URL.
+    expect(config.EMAIL_FROM).toBeUndefined();
+  });
+
+  test("FILES_DIR must be absolute; SMTP_URL must be smtp:// or smtps://", () => {
+    expect(loadConfig({ ...valid, FILES_DIR: "/data/files" }).FILES_DIR).toBe("/data/files");
+    expect(() => loadConfig({ ...valid, FILES_DIR: "data/files" })).toThrow(/FILES_DIR/);
+    expect(loadConfig({ ...valid, SMTP_URL: "smtps://u:p@smtp.example.com:465" }).SMTP_URL).toBe(
+      "smtps://u:p@smtp.example.com:465",
+    );
+    expect(() => loadConfig({ ...valid, SMTP_URL: "https://smtp.example.com" })).toThrow(/SMTP_URL/);
+    // An unencoded / in the password (AWS SES passwords are base64) fails here, not inside nodemailer at boot.
+    const unencoded = "smtps://AKIA:abc/def+ghi@email-smtp.us-east-1.amazonaws.com:465";
+    expect(() => loadConfig({ ...valid, SMTP_URL: unencoded })).toThrow(/SMTP_URL: .*percent-encoded/);
+    expect(loadConfig({ ...valid, SMTP_URL: "smtp://u:abc%2Fdef@smtp.example.com:587" }).SMTP_URL).toBe(
+      "smtp://u:abc%2Fdef@smtp.example.com:587",
+    );
+  });
+
+  test("agentes.chat's own site keeps its landing page and legal links without extra settings", () => {
+    const site = loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat" });
+    expect(site.LANDING_PAGE).toBe(true);
+    expect(site.TERMS_URL).toBe("https://agentes.chat/terms");
+    expect(site.PRIVACY_URL).toBe("https://agentes.chat/privacy");
+    expect(loadConfig({ ...valid, PUBLIC_URL: "https://agentes.chat", LANDING_PAGE: "false" }).LANDING_PAGE).toBe(
+      false,
+    );
+    const selfHosted = loadConfig({ ...valid, PUBLIC_URL: "https://chat.example.com" });
+    expect([selfHosted.LANDING_PAGE, selfHosted.TERMS_URL, selfHosted.PRIVACY_URL]).toEqual([
+      false,
+      undefined,
+      undefined,
+    ]);
   });
 
   test("treats empty strings as unset", () => {
@@ -51,6 +87,15 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, AGENT_DEFAULT_MODEL: "Claude Sonnet" })).toThrow(/AGENT_DEFAULT_MODEL/);
   });
 
+  test("external provisioning needs the operator API, which serves its requests", () => {
+    expect(loadConfig(valid).MACHINE_PROVISIONING).toBe("off");
+    expect(() => loadConfig({ ...valid, MACHINE_PROVISIONING: "external" })).toThrow(/OPERATOR_API_TOKEN/);
+    const token = "t".repeat(32);
+    expect(
+      loadConfig({ ...valid, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: token }).MACHINE_PROVISIONING,
+    ).toBe("external");
+  });
+
   test("ignores variables that are not in the schema", () => {
     const config = loadConfig({ ...valid, SOMETHING_ELSE: "1" }) as Record<string, unknown>;
     expect(config.SOMETHING_ELSE).toBeUndefined();
@@ -59,10 +104,13 @@ describe("loadConfig", () => {
 
 describe("redactConfig", () => {
   test("masks every secret", () => {
-    const redacted = redactConfig(loadConfig({ ...valid, GITHUB_CLIENT_SECRET: "gh" }));
+    const redacted = redactConfig(
+      loadConfig({ ...valid, GITHUB_CLIENT_SECRET: "gh", SMTP_URL: "smtps://u:p@smtp.example.com" }),
+    );
     expect(redacted.DATABASE_URL).toBe("********");
     expect(redacted.AGENTES_SECRET).toBe("********");
     expect(redacted.GITHUB_CLIENT_SECRET).toBe("********");
+    expect(redacted.SMTP_URL).toBe("********");
     expect(redacted.PORT).toBe(3000);
   });
 

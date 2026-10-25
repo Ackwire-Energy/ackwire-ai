@@ -23,7 +23,7 @@ import { useOrg } from "./org-context";
 import "./agent-actions.css";
 
 /**
- * Act with undo (ADR 0037 round 2, telas/FazerDesfazer.html "undo"): what an
+ * Act with undo (ADR 0037 round 2): what an
  * agent changed with this reply, under the message. One change: a quiet
  * sunken row with Desfazer and the time left (A). Several: "3 mudanças · há
  * 1 min" with Desfazer tudo and one row each (B). Undone: struck through,
@@ -49,6 +49,7 @@ const ICONS: Record<AgentAction["kind"], IconName> = {
   "routine.created": "routines",
   "routine.updated": "routines",
   "channel.agent_added": "channel",
+  "channel.created": "channel",
   "wiki.page_created": "page",
   "wiki.page_edited": "page",
   "thread.renamed": "thread",

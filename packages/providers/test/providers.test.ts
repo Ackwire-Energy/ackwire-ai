@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { costNanoUsd, isKnownModel, MODEL_CATALOG, usdToNanoUsd } from "../src";
+import {
+  cheapModelOf,
+  costNanoUsd,
+  isKnownModel,
+  MODEL_CATALOG,
+  MODEL_TIERS,
+  modelForTier,
+  PROVIDER_IDS,
+  PROVIDERS,
+  summedCostNanoUsd,
+  usdToNanoUsd,
+} from "../src";
 import { createFakeProvider } from "../src/fake";
 
 const usage = (inputTokens: number, outputTokens: number, cacheReadTokens = 0, cacheWriteTokens = 0) => ({
@@ -10,15 +21,84 @@ const usage = (inputTokens: number, outputTokens: number, cacheReadTokens = 0, c
 });
 
 describe("pricing", () => {
-  test("Sonnet 5.5: $2 / $10 per million tokens", () => {
+  test("Sonnet 5.5: $2 / $10 per million tokens, $0.10 cache reads", () => {
     expect(costNanoUsd("claude-sonnet-5-5", usage(1_000_000, 0))).toBe(usdToNanoUsd(2));
     expect(costNanoUsd("claude-sonnet-5-5", usage(0, 1_000_000))).toBe(usdToNanoUsd(10));
-    expect(costNanoUsd("claude-sonnet-5-5", usage(0, 0, 1_000_000))).toBe(usdToNanoUsd(0.2));
+    expect(costNanoUsd("claude-sonnet-5-5", usage(0, 0, 1_000_000))).toBe(usdToNanoUsd(0.1));
   });
 
   test("Haiku 5.5 switches to long-context prices above 100K prompt tokens", () => {
     expect(costNanoUsd("claude-haiku-5-5", usage(100_000, 1000))).toBe(100_000 * 100 + 1000 * 500);
     expect(costNanoUsd("claude-haiku-5-5", usage(90_000, 1000, 20_000))).toBe(90_000 * 500 + 1000 * 2500 + 20_000 * 50);
+    // Many calls' tokens added up never cross it: the sum is no one call's prompt.
+    expect(summedCostNanoUsd("claude-haiku-5-5", usage(90_000, 1000, 20_000))).toBe(
+      90_000 * 100 + 1000 * 500 + 20_000 * 10,
+    );
+  });
+
+  test("GPT-6.1 Sol: $2 / $0.10 / $2.50 / $10, and $4 / $0.20 / $5 / $15 above 272K prompt tokens", () => {
+    // 272,000 prompt tokens exactly: still the base prices.
+    expect(costNanoUsd("gpt-6.1-sol", usage(100_000, 1000, 100_000, 72_000))).toBe(
+      100_000 * 2000 + 1000 * 10000 + 100_000 * 100 + 72_000 * 2500,
+    );
+    expect(costNanoUsd("gpt-6.1-sol", usage(100_001, 1000, 100_000, 72_000))).toBe(
+      100_001 * 4000 + 1000 * 15000 + 100_000 * 200 + 72_000 * 5000,
+    );
+  });
+
+  test("GPT-6 Sol and Luna: input, cached input and cache writes 2×, output 1.5× above 272K prompt tokens", () => {
+    expect(costNanoUsd("gpt-6-sol", usage(272_000, 1000))).toBe(272_000 * 2000 + 1000 * 10000);
+    expect(costNanoUsd("gpt-6-sol", usage(200_000, 1000, 72_001))).toBe(200_000 * 4000 + 1000 * 15000 + 72_001 * 400);
+    expect(costNanoUsd("gpt-6-luna", usage(272_001, 1000, 0, 10))).toBe(272_001 * 200 + 1000 * 750 + 10 * 250);
+  });
+
+  test("every model's provider exists, and each provider has one recommended model", () => {
+    for (const m of Object.values(MODEL_CATALOG)) expect(PROVIDER_IDS).toContain(m.provider);
+    const recommended = Object.keys(PROVIDERS).map((provider) =>
+      Object.entries(MODEL_CATALOG)
+        .filter(([, m]) => m.provider === provider && m.recommended)
+        .map(([id]) => id),
+    );
+    expect(recommended).toEqual([
+      ["claude-sonnet-5-5"],
+      ["gpt-6.1-sol"],
+      ["deepseek-flash"],
+      ["kimi-k3.1-pro"],
+      ["glm-5.3"],
+      ["MiniMax-M3"],
+    ]);
+  });
+
+  test("DeepSeek (its peak rates), Kimi, GLM and MiniMax at their published USD per million tokens", () => {
+    // Input, output, cache read, cache write.
+    const perMTok = (model: string) =>
+      [usage(1e6, 0), usage(0, 1e6), usage(0, 0, 1e6), usage(0, 0, 0, 1e6)].map((u) => costNanoUsd(model, u) / 1e9);
+    expect(perMTok("deepseek-flash")).toEqual([0.3, 1.2, 0.006, 0.3]);
+    expect(perMTok("deepseek-v4-pro")).toEqual([1.32, 3.96, 0.044, 1.32]);
+    expect(perMTok("kimi-k3.1-pro")).toEqual([2, 10, 0.2, 2]);
+    expect(perMTok("kimi-k3")).toEqual([3, 15, 0.3, 3]);
+    expect(perMTok("glm-5.3")).toEqual([1.4, 4.4, 0.26, 1.4]);
+    expect(perMTok("glm-5.3-flash")).toEqual([0.15, 0.5, 0.03, 0.15]);
+    expect(perMTok("MiniMax-M3.1-Flash")).toEqual([0.15, 0.6, 0.015, 0.15]);
+    // MiniMax M3: $0.30 / $1.20 / $0.06 up to 512K prompt tokens, double above.
+    expect(costNanoUsd("MiniMax-M3", usage(500_000, 1000, 12_000))).toBe(500_000 * 300 + 1000 * 1200 + 12_000 * 60);
+    expect(costNanoUsd("MiniMax-M3", usage(500_000, 1000, 12_001))).toBe(500_000 * 600 + 1000 * 2400 + 12_001 * 120);
+  });
+
+  test("system tasks use a provider's cheap model, else its recommended one; Automático's tiers per line", () => {
+    expect(PROVIDER_IDS.map((p) => cheapModelOf(p))).toEqual([
+      "claude-haiku-5-5",
+      "gpt-6-luna",
+      "deepseek-flash",
+      "kimi-k3.1-pro",
+      "glm-5.3-flash",
+      "MiniMax-M3.1-Flash",
+    ]);
+    const line = (provider: string) => MODEL_TIERS.map((tier) => modelForTier(provider, tier));
+    expect(line("deepseek")).toEqual(["deepseek-flash", "deepseek-flash", "deepseek-v4-pro"]);
+    expect(line("moonshot")).toEqual(["kimi-k3.1-pro", "kimi-k3.1-pro", "kimi-k3.1-pro"]);
+    expect(line("zai")).toEqual(["glm-5.3-flash", "glm-5.3", "glm-5.3"]);
+    expect(line("minimax")).toEqual(["MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M3"]);
   });
 
   test("costs are exact integers", () => {

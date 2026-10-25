@@ -624,6 +624,97 @@
       "when": 1792732262676,
       "tag": "0088_routines_unattended",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1792799371683,
+      "tag": "0089_blobs_person_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1792800091667,
+      "tag": "0090_import_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1792813616839,
+      "tag": "0091_operator_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1792816161896,
+      "tag": "0092_org_standing",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792818524301,
+      "tag": "0093_user_block_agent_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792820665374,
+      "tag": "0094_managed_machines",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792842956318,
+      "tag": "0095_handoff_screen",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792842961842,
+      "tag": "0096_desktop_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792848909133,
+      "tag": "0097_ai_accounts_people",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792851366514,
+      "tag": "0098_setup_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1792851370991,
+      "tag": "0099_host_computer",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1792856168749,
+      "tag": "0100_usage_plan_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792866168749,
+      "tag": "0101_team_actions",
+      "breakpoints": true
     }
   ]
 }

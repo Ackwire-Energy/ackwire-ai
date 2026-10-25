@@ -16,10 +16,13 @@ import type {
   AgentDetail,
   AgentForYou,
   AgentMailbox,
+  AgentPlanUsage,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiAccounts,
+  AiStatus,
   AppNotification,
   Approval,
   Artifact,
@@ -33,6 +36,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -42,6 +46,7 @@ import type {
   DatabaseConnection,
   DatabaseTable,
   DesktopRelease,
+  DesktopStatus,
   DeviceRequest,
   DirectMessage,
   DmRead,
@@ -52,6 +57,8 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  HostComputer,
+  ImportPlan,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -60,6 +67,7 @@ import type {
   IssueColumn,
   Machine,
   MachineAccess,
+  MachineAccount,
   MachineOutages,
   MachineTask,
   MailAccount,
@@ -91,8 +99,10 @@ import type {
   NotificationPage,
   Organization,
   OrgOverview,
+  OrgPlanUsage,
   OrgSettings,
   Person,
+  PhoneSignIn,
   Proposal,
   ReactionCount,
   Reminder,
@@ -250,25 +260,34 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "PUT",
           json: { allowedDomains },
         }),
-      agentHandoff: async (orgId, agentId) =>
-        (await request<{ handoff: BrowserHandoff | null }>(`${org(orgId)}/agents/${enc(agentId)}/browser/handoff`))
+      agentHandoff: async (orgId, agentId, screen = "browser") =>
+        (await request<{ handoff: BrowserHandoff | null }>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/handoff`))
           .handoff,
       handoff: (orgId, handoffId) => request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}`),
       takeControl: (orgId, handoffId) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/control`, { json: {} }),
-      done: (orgId, handoffId) =>
-        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/done`, { json: {} }),
+      done: (orgId, handoffId, note) =>
+        request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/done`, {
+          json: note ? { note } : {},
+        }),
       failed: (orgId, handoffId, note) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/failed`, {
           json: note ? { note } : {},
         }),
       cancel: (orgId, handoffId) =>
         request<BrowserHandoff>(`${org(orgId)}/browser/handoffs/${enc(handoffId)}/cancel`, { json: {} }),
-      takeover: (orgId, agentId, runId) =>
-        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/browser/takeover`, {
+      takeover: (orgId, agentId, runId, screen = "browser") =>
+        request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/takeover`, {
           json: runId ? { runId } : {},
         }),
-      stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
+      open: (orgId, agentId, url) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
+      stop: (orgId, agentId, screen = "browser") =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/stop`, { json: {} }),
+    },
+    desktop: {
+      status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
+      start: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/desktop/start`, { json: {} }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),
@@ -300,6 +319,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       signInOptions: (input) => request<SignInOptions>("/api/app/sign-in-options", { json: input }),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
+      phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
     },
     orgs: {
       create: (input) =>
@@ -336,9 +356,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       resendInvitation: (orgId, id) =>
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
+      planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
+      planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
       update: (orgId, agentId, input) =>
@@ -357,8 +379,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
+      aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
       importFromGithub: (orgId, url) =>
-        request<{ files: { path: string; text: string }[] }>(`${org(orgId)}/agent-imports/github`, { json: { url } }),
+        request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
+          json: { url },
+        }),
       detail: (orgId, agentId) => request<AgentDetail>(`${org(orgId)}/agents/${enc(agentId)}`),
       channels: async (orgId, agentId) =>
         (await request<{ channels: AgentChannel[] }>(`${org(orgId)}/agents/${enc(agentId)}/channels`)).channels,
@@ -392,6 +417,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         return res ? res.usage : null;
       },
     },
+    imports: {
+      apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
+      exportUrl: (orgId) => `${base}${org(orgId)}/export`,
+    },
     chat: {
       channels: async (orgId) => (await request<{ channels: Channel[] }>(`${org(orgId)}/channels`)).channels,
       createChannel: (orgId, input) => request<Channel>(`${org(orgId)}/channels`, { json: input }),
@@ -416,6 +445,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       correct: async (orgId, messageId, body) => {
         await request<unknown>(`${org(orgId)}/messages/${enc(messageId)}/correction`, { json: { body } });
       },
+      answerNow: (orgId, messageId) =>
+        request<{ runs: { agentId: string; runId: string }[] }>(`${org(orgId)}/messages/${enc(messageId)}/answer-now`, {
+          json: {},
+        }),
       roster: async (orgId, channelId) =>
         (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>
@@ -532,6 +565,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           json: { name },
         }),
       remove: (orgId, machineId) => request<void>(`${org(orgId)}/machines/${enc(machineId)}`, { method: "DELETE" }),
+      host: (orgId) => nullOn(404, () => request<HostComputer>(`${org(orgId)}/machines/host`)),
+      hostOn: (orgId) => request<HostComputer>(`${org(orgId)}/machines/host`, { json: {} }),
+      computerSetup: (orgId) => request<ComputerSetup>(`${org(orgId)}/computer-setup`),
       device: (userCode) => request<DeviceRequest>(`/api/app/machines/device/${enc(userCode)}`),
       confirmDevice: (orgId, userCode, input) =>
         request<Machine>(`${org(orgId)}/machines/device/${enc(userCode)}/confirm`, { json: input }),
@@ -549,9 +585,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
-      beginAccountLogin: (orgId, machineId, kind, accountId) =>
+      beginAccountLogin: (orgId, machineId, kind, options = {}) =>
         request<AccountLoginStart>(`${org(orgId)}/machines/${enc(machineId)}/account-logins`, {
-          json: { kind, ...(accountId ? { accountId } : {}) },
+          json: {
+            kind,
+            ...(options.accountId ? { accountId: options.accountId } : {}),
+            ...(options.email ? { email: options.email } : {}),
+            ...(options.provider ? { provider: options.provider } : {}),
+          },
         }),
       sendAccountCode: (orgId, machineId, loginId, box) =>
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}/code`, {
@@ -563,6 +604,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/machines/${enc(machineId)}/account-logins/${enc(loginId)}`, {
           method: "DELETE",
         }),
+      refreshAccountUsage: (orgId) => request<void>(`${org(orgId)}/ai-accounts/refresh`, { json: {} }),
+      aiAccounts: (orgId) => request<AiAccounts>(`${org(orgId)}/ai-accounts`),
+      renameAccount: (orgId, machineId, accountId, label) =>
+        request<MachineAccount>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, {
+          method: "PATCH",
+          json: { label },
+        }),
+      removeAccount: (orgId, machineId, accountId) =>
+        request<void>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, { method: "DELETE" }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

@@ -7,7 +7,7 @@ import { AuthShell } from "@/components/AuthLayout";
 import { BROWSER_SIGN_IN_PATH, browserChallenge } from "@/lib/desktop";
 
 /**
- * In the browser, for the Mac app's window (D79): goes to the provider, and
+ * In the browser, for the Mac app's window (ADR 0036): goes to the provider, and
  * when it comes back (`done`), hands the fresh sign-in to the window waiting
  * on `challenge`. The challenge must be the one this tab started with, so a
  * link straight to `done` hands nothing over.

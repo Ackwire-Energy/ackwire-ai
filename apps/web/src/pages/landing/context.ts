@@ -10,7 +10,7 @@ export interface AimRegistry {
 }
 
 export interface LandingContextValue {
-  /** `prefers-reduced-motion: reduce`, read once like the prototype. */
+  /** `prefers-reduced-motion: reduce`, read once. */
   reduced: boolean;
   aim: AimRegistry;
   /** Scrolls to a section of the page by id. */

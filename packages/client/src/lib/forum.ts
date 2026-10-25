@@ -1,5 +1,5 @@
 /**
- * The forum's pure rules (telas/Forum.html, D45): what the round track draws,
+ * The forum's pure rules: what the round track draws,
  * which list a topic goes to, what needs me, where each agent stands, posts by
  * round, the synthesis' issues. No React, no i18n: components turn these into
  * words and pixels.

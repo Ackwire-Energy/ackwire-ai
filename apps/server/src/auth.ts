@@ -1,16 +1,28 @@
-import { sign as signWithKey } from "node:crypto";
+import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
-import { deriveSecret, emailLocale, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
+import {
+  deriveSecret,
+  emailLocale,
+  isSignupAllowed,
+  isUserBlocked,
+  onUserCreated,
+  queueEmail,
+  recordSession,
+  recordSignUp,
+  sha256,
+} from "@agenteschat/engine";
 import { expo } from "@better-auth/expo";
-import { betterAuth } from "better-auth";
+import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware } from "better-auth/api";
+import { setSessionCookie } from "better-auth/cookies";
+import { z } from "zod";
 import { desktopSignIn } from "./desktop-sign-in";
 import type { Logger } from "./logger";
 
 /**
- * Sign-in for people, built on Better Auth (same split as Tierbird):
+ * Sign-in for people, built on Better Auth (ADR 0006):
  * Better Auth owns users, sessions, passwords and social sign-in; agentes.chat
  * owns organizations, memberships, roles and invitations
  * (`@agenteschat/engine` organizations). Agents are not users.
@@ -22,7 +34,7 @@ import type { Logger } from "./logger";
  * `agenteschat://` is trusted, it keeps the cookie in the device's secure
  * store and sends it back in a `Cookie` header with `X-Agentes-Client: mobile`.
  * The Mac app's window loads the site itself and signs in like the web; for
- * Google and Apple it borrows the browser (`desktop-sign-in.ts`, D79).
+ * Google and Apple it borrows the browser (`desktop-sign-in.ts`, ADR 0036).
  */
 export function createAuth(deps: { db: Database; config: Config; log: Logger; emailDelivers?: boolean }) {
   const { db, config, log } = deps;
@@ -57,7 +69,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
-    plugins: [expo(), desktopSignIn()],
+    plugins: [expo(), phoneSignIn, desktopSignIn()],
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
@@ -82,7 +94,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       minPasswordLength: 8,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      // Only when a real email sender is configured (MILLIONSEND_API_KEY); sent through the outbox.
+      // Only when a real email sender is configured (MillionSend or SMTP); sent through the outbox.
       ...(emailEnabled
         ? {
             sendResetPassword: async ({
@@ -190,6 +202,33 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
           },
         },
       },
+      // The operator API's events feed (ADR 0056). These run after the sign-in has committed: a failure
+      // here is logged and never fails the sign-in.
+      account: {
+        create: {
+          after: async (account) => {
+            await recordSignUp(db, account).catch((error) =>
+              log.error("operator event failed", { type: "user.signed_up", error: String(error) }),
+            );
+          },
+        },
+      },
+      session: {
+        create: {
+          // A blocked account (ADR 0056 §9) gets no session, whatever the sign-in method. The code also
+          // makes a social sign-in's callback send the person back to the sign-in page.
+          before: async (session) => {
+            if (await isUserBlocked(db, session.userId)) {
+              throw new APIError("FORBIDDEN", { code: "ACCOUNT_BLOCKED", message: "This account can't sign in." });
+            }
+          },
+          after: async (session) => {
+            await recordSession(db, session).catch((error) =>
+              log.error("operator event failed", { type: "session.created", error: String(error) }),
+            );
+          },
+        },
+      },
     },
   });
 }
@@ -204,7 +243,7 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
   return session ? (session.user as SessionUser) : null;
 }
 
-/** Sign-in options the login page needs to render. */
+/** Sign-in options the login and sign-up pages need to render. */
 export function authUiConfig(config: Config) {
   return {
     socialProviders: {
@@ -212,8 +251,54 @@ export function authUiConfig(config: Config) {
       github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET),
       apple: appleConfigured(config),
     },
+    landing: config.LANDING_PAGE,
+    termsUrl: config.TERMS_URL ?? null,
+    privacyUrl: config.PRIVACY_URL ?? null,
+    supportEmail: config.SUPPORT_EMAIL ?? null,
   };
 }
+
+/** How long the sign-in in "Abrir no celular" (the web app's QR code) lasts. */
+const PHONE_SIGN_IN_TTL_MS = 3 * 60_000;
+const phoneSignInKey = (token: string) => `phone-sign-in:${sha256(token)}`;
+
+/**
+ * A one-time sign-in for the phone, minted from a signed-in session: single use, a few minutes long, stored
+ * as a hash, and void once that session ends (signing out on the web voids a QR code still on screen).
+ */
+export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + PHONE_SIGN_IN_TTL_MS);
+  const { internalAdapter } = await auth.$context;
+  await internalAdapter.createVerificationValue({ identifier: phoneSignInKey(token), value: sessionToken, expiresAt });
+  return { token, expiresIn: PHONE_SIGN_IN_TTL_MS / 1000 };
+}
+
+/**
+ * `POST /api/auth/sign-in/one-time-token { token }`: the phone trades the token for a session of its own.
+ * Better Auth's `oneTimeToken` plugin would hand it the browser's session instead, so signing out on one
+ * device would sign out the other.
+ */
+const phoneSignIn = {
+  id: "phone-sign-in",
+  endpoints: {
+    signInOneTimeToken: createAuthEndpoint(
+      "/sign-in/one-time-token",
+      { method: "POST", body: z.object({ token: z.string().min(1).max(200) }), use: [formCsrfMiddleware] },
+      async (ctx) => {
+        const { internalAdapter } = ctx.context;
+        const minted = await internalAdapter.consumeVerificationValue(phoneSignInKey(ctx.body.token));
+        const from = minted ? await internalAdapter.findSession(minted.value) : null;
+        if (!from || from.session.expiresAt < new Date()) {
+          throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
+        }
+        const session = await internalAdapter.createSession(from.user.id);
+        await setSessionCookie(ctx, { session, user: from.user });
+        return ctx.json({ user: { id: from.user.id, name: from.user.name, email: from.user.email } });
+      },
+    ),
+  },
+} satisfies BetterAuthPlugin;
 
 /** The phone app's URL scheme (deep links back from social sign-in). */
 export const APP_SCHEME = "agenteschat://";

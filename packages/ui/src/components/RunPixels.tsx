@@ -4,7 +4,7 @@ import { cx } from "../cx";
 import type { AgentColor, AgentEyes } from "./AgentLook";
 
 /**
- * A routine's runs in pixels (telas/Rotinas.html): each run is a dithered
+ * A routine's runs in pixels: each run is a dithered
  * column in the agent's own tones on a 2px grid. Height is the run's cost
  * (`weight`, 0–1, a share of the priciest recent run); nothing new is a
  * stub; a failure a column in the danger tone; a skip a short warm one.
@@ -319,7 +319,7 @@ export function RunKey({ status }: { status: RunPixelStatus | "next" }) {
 }
 
 /**
- * An agent's browser steps in pixels (telas/NavegadorResumo.html, B): one dithered column per
+ * An agent's browser steps in pixels: one dithered column per
  * step in the agent's tones, as a routine's runs. The height says what it was: an open the whole
  * column, reading most of it, an action a stub, a print two cells; a failure the whole column in
  * the danger tone.
@@ -406,7 +406,7 @@ export function BrowserMark({
 }
 
 /**
- * Acceptance criteria as pixel blocks (telas/Issues.html): one block per
+ * Acceptance criteria as pixel blocks: one block per
  * criterion, done ones dithered in the assignee's tones (an agent's color;
  * a person or nobody: neutral ink), open ones a dotted outline.
  */
@@ -546,7 +546,7 @@ export function planCellPixel(
 }
 
 /**
- * A mission's plan as a pixel strip (telas/ThreadContexto.html): one square
+ * A mission's plan as a pixel strip: one square
  * cell per checklist item, all the same size, in the agent's own tones. To do
  * is a faint solid cell, doing an animated dithered one, done a full dithered
  * one, waiting for a person a faint cell outlined in the agent's mid tone
@@ -615,7 +615,7 @@ export function PlanStrip({
 }
 
 /**
- * A request's fuse (telas/Aprovacoes.html): a pixel line along the bottom of
+ * A request's fuse: a pixel line along the bottom of
  * its holder (`position: relative`) that burns down to the deadline. What is
  * left (`left`, 0–1) is in the agent's tones with a flickering edge; the
  * spent part is a sparse dotted trail.
@@ -666,7 +666,7 @@ export function ExpiryFuse({
 }
 
 /**
- * A thin edge of the agent's pixel sky (telas/NavegadorNoChat.html, header "Céu"): two rows
+ * A thin edge of the agent's pixel sky: two rows
  * of its tones drifting slowly along the top of a card, its identity there. `muted` greys
  * it (a person is in control). Decorative.
  */
@@ -722,7 +722,7 @@ const PAGE_BLOCKS: [number, number, number, number][] = [
 ];
 
 /**
- * The agent's browser after it closed (telas/NavegadorDepois.html, "Página em silhueta"): the
+ * The agent's browser after it closed: the
  * shape of a page, never the real one, fading into the agent's tone toward the bottom. Still.
  */
 export function PageSilhouette({ color = "sky", className }: { color?: AgentColor; className?: string }) {

@@ -42,6 +42,7 @@ import {
 } from "./machine-tasks";
 import { MachineOfflineError, pausedMessage } from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
+import { recordTaskFinished } from "./operator-events";
 import { replyThreadOf } from "./runs";
 import {
   agentComputerInfo,
@@ -49,6 +50,7 @@ import {
   getSandboxSettings,
   NO_COMPUTER_MESSAGE,
   ownComputerStatus,
+  PREPARING_COMPUTER_MESSAGE,
   SANDBOX_LIMITS,
   SANDBOX_SCOPE,
   type SandboxDeps,
@@ -221,7 +223,7 @@ export function computerSentence(info: ComputerInfo, network: Network) {
     return "Your connected computer was removed; ask an admin or your owner to choose another one (calls fail until then).";
   }
   if (info.kind === "cloud") {
-    if (!info.available) return NO_COMPUTER_MESSAGE;
+    if (!info.available) return info.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE;
     return `Runs on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)}`;
   }
   const os = info.os === "darwin" ? "macOS" : info.os === "windows" ? "Windows" : info.os === "linux" ? "Linux" : "";
@@ -395,7 +397,7 @@ const slug = (s: string) =>
 
 /**
  * Sandbox tools through the Tool Gateway (scope `sandbox:run`, on by
- * default (D61) and not part of "all tools"): `run_code`, `write_file`,
+ * default and not part of "all tools"): `run_code`, `write_file`,
  * `read_file`, `list_files`, `export_file` (text to a native Drive kind),
  * `upload_file` (any file or folder as is, ADR 0025), `import_file` (from
  * the Drive) and `run_skill_script`. One computer per agent, shared
@@ -730,7 +732,9 @@ export function createSandboxToolSource(
               },
             };
           }
-          if (!target.available) return { content: NO_COMPUTER_MESSAGE, isError: true };
+          if (!target.available) {
+            return { content: target.preparing ? PREPARING_COMPUTER_MESSAGE : NO_COMPUTER_MESSAGE, isError: true };
+          }
           const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
           return {
             content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; network: ${s.network ?? "none yet"}.`,
@@ -1230,7 +1234,10 @@ export function createSandboxToolSource(
             .set({ status: "canceled", endedAt: new Date(), updatedAt: new Date() })
             .where(and(eq(schema.machineTasks.id, row.id), eq(schema.machineTasks.canceledBy, by)))
             .returning();
-          if (ended) await publishTaskEvent(deps.pubsub, ended);
+          if (ended) {
+            await recordTaskFinished(ctx.db, ended);
+            await publishTaskEvent(deps.pubsub, ended);
+          }
           // A mission's task still gets its end handled (notes, inbox), even canceled by the agent.
           if (ended?.missionId) await enqueueWake(ctx.db, ended);
           await audit();

@@ -38,6 +38,15 @@ describe("Configurações da organização", () => {
     });
   });
 
+  test("agents check what the team already did: on by default, one switch turns it off", async () => {
+    const { state } = await go();
+    const toggle = screen().getByRole("switch", { name: "Agentes conferem o que o time já fez" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await click(toggle);
+    await settle(4);
+    expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({ actionCheck: false });
+  });
+
   test("connected connectors are listed; disconnect asks first", async () => {
     const { state } = await go(seedState(), "settings/connectors");
     const section = screen().getByRole("region", { name: "Conectores" });
@@ -104,6 +113,45 @@ describe("Configurações da organização", () => {
     expect(connect.textContent).toContain("Use um endereço que comece com https://.");
   });
 
+  test("a key that isn't the chosen provider's: it asks whose it is (any sk- key could be several) and saves it there", async () => {
+    const { state } = await go(seedState(), "settings/keys");
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    const choose = async (name: string) => {
+      const trigger = within(add).getByRole("combobox", { name: "Provedor" });
+      trigger.focus();
+      await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+      await act(async () => fireEvent.click(screen().getByRole("option", { name })));
+      await settle();
+    };
+    const field = within(add).getByLabelText("Chave da API");
+
+    // MiniMax also sells a plan: the help says its key won't do, and its sk-cp- keys are refused.
+    await choose("MiniMax");
+    expect(add.textContent).toContain("Use uma chave de pagamento por uso");
+    await type(field, "sk-cp-abcdefghijklmnopqrst");
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    expect(add.textContent).toContain("As que começam com sk-cp- são do plano");
+
+    // A DeepSeek key while Anthropic is chosen: whose is it?
+    await choose("Anthropic");
+    await type(field, "sk-0123456789abcdef0123456789abcdef");
+    expect(add.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
+    expect(add.textContent).toContain("É de outro provedor?");
+    for (const name of ["OpenAI", "DeepSeek", "Kimi", "MiniMax"])
+      expect(within(add).getByRole("button", { name })).toBeTruthy();
+    await click(within(add).getByRole("button", { name: "DeepSeek" }));
+    expect(add.textContent).not.toContain("É de outro provedor?");
+    expect(within(add).getByRole("link", { name: "Crie a chave em platform.deepseek.com/api_keys." })).toBeTruthy();
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
+      provider: "deepseek",
+      label: "DeepSeek",
+    });
+  });
+
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
@@ -160,15 +208,24 @@ describe("Configurações da organização", () => {
       router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "usage" } }),
     );
     await settle(4);
-    const usage = screen().getByRole("region", { name: "Uso deste mês" });
+    // The plan accounts by computer, each window with every agent's part, then the API per agent (ADR 0063).
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    expect(plans.textContent).toContain("MacBook");
+    expect(plans.textContent).toContain("Conta deste MacBookMax");
+    expect(plans.textContent).toContain("Claude Code · de Walter");
+    expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
+    expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");
+    expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$ 92,00 pela API");
+    const api = screen().getByRole("region", { name: "API da organização" });
+    expect(api.textContent).toContain("23% do orçamento");
+    expect(api.textContent).toContain("US$ 11,50 de US$ 50,00 (padrão do workspace)");
+    expect(within(api).getByRole("meter", { name: "Orçamento usado de Atlas" }).getAttribute("aria-valuenow")).toBe(
+      "23",
+    );
+    // Admins also see the API's spend by kind, and the default budget.
+    const usage = screen().getByRole("region", { name: "Gastos da API por tipo" });
     expect(usage.textContent).toContain("Agentes154 chamadasUS$ 15,40");
     expect(usage.textContent).toContain("Roteador80 chamadasUS$ 0,50");
-    // The one place with money: each agent's spend against its budget, and the default budget.
-    const byAgent = screen().getByRole("region", { name: "Por agente" });
-    expect(byAgent.textContent).toContain("US$ 12,30 de US$ 40,00");
-    expect(within(byAgent).getByRole("meter", { name: "Orçamento usado de Ada" }).getAttribute("aria-valuenow")).toBe(
-      "30.8",
-    );
     const fallback = screen().getByRole("region", { name: "Orçamento padrão dos agentes" });
     const field = within(fallback).getByLabelText("Orçamento mensal por agente (US$)") as HTMLInputElement;
     expect(field.value).toBe("50");
@@ -182,7 +239,7 @@ describe("Configurações da organização", () => {
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
 
-  test("members see settings read-only, without keys or usage", async () => {
+  test("members see settings read-only, without the workspace's keys or money (their own plans, usage in percentages)", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
@@ -193,15 +250,29 @@ describe("Configurações da organização", () => {
       within(nav)
         .getAllByRole("link")
         .map((l) => l.textContent),
-    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores"]);
+    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores", "Orçamento e uso", "Contas de IA"]);
     cleanup();
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
     cleanup();
-    // A section they can't open falls back to Geral.
+    // Contas de IA: their own plans, never the workspace's keys.
     await go(state, "settings/keys");
+    expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
-    expect(screen().queryByRole("region", { name: "Uso deste mês" })).toBeNull();
+    cleanup();
+    // Orçamento e uso: the plans and the API in tokens and percentages, never money.
+    await go(state, "settings/usage");
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
+    expect(screen().getByRole("region", { name: "API da organização" }).textContent).toContain("23% do orçamento");
+    expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
+    expect(document.body.textContent).not.toContain("US$");
+    cleanup();
+    // A section they can't open falls back to Geral.
+    await go(state, "settings/storage");
+    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
+    expect(document.querySelector("#sec-storage")).toBeNull();
   });
 });
 
@@ -228,17 +299,41 @@ describe("budget alerts over the WebSocket", () => {
 
 describe("Buscar no workspace", () => {
   test("search as you type: results grouped by kind, with channel and author, linking to the channel", async () => {
-    const { state } = await go(seedState(), "search");
+    const seeded = seedState();
+    seeded.teamActions = [
+      {
+        kind: "action",
+        sourceId: "00000000-0000-4000-8000-0000000000a1",
+        channelIds: ["00000000-0000-4000-8000-0000000000c2"],
+        title: "open_pull_request",
+        snippet: "GitHub · Corrige o login com Google",
+        score: 1,
+        createdAt: new Date().toISOString(),
+        author: { type: "agent", id: "agent-ada", name: "Ada" },
+      },
+    ];
+    const { state } = await go(seeded, "search");
     const box = screen().getByRole("searchbox", { name: "Buscar" });
-    expect(document.body.textContent).toContain("Busque mensagens, decisões, fatos e resumos");
+    expect(document.body.textContent).toContain(
+      "Busque mensagens, decisões, fatos, resumos e o que os agentes já fizeram",
+    );
     await type(box, "login");
     await act(() => new Promise((r) => setTimeout(r, 300)));
     await settle(4);
     expect(state.calls.find((c) => c.method === "search.query")?.args[1]).toEqual({
       q: "login",
-      kinds: ["message", "context_item"],
+      kinds: ["action", "message", "context_item"],
       limit: 50,
     });
+    // What the team already did comes first: who did it, where, never the tool's id.
+    const regions = screen()
+      .getAllByRole("region")
+      .map((r) => r.getAttribute("aria-label"));
+    expect(regions.indexOf("Ações do time")).toBeLessThan(regions.indexOf("Mensagens"));
+    const done = screen().getByRole("region", { name: "Ações do time" });
+    expect(done.textContent).toContain("GitHub · Corrige o login com Google");
+    expect(done.textContent).toContain("Ada · em #eng");
+    expect(done.textContent).not.toContain("open_pull_request");
     const messages = screen().getByRole("region", { name: "Mensagens" });
     const link = within(messages).getAllByRole("link")[0] as HTMLElement;
     expect(link.textContent).toContain("o login está devolvendo 401");

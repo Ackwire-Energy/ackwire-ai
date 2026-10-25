@@ -19,7 +19,9 @@ import {
   listCredentials,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
+  orgAiStatus,
   publishMachineAgentsChanged,
+  requirePermission,
   revokeCredential,
   setAgentAppearance,
   setAgentAudience,
@@ -31,6 +33,7 @@ import { MODEL_CATALOG, nanoUsdToUsd, usdToNanoUsd } from "@agenteschat/provider
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
+  aiStatusDeps,
   body,
   createAppRouter,
   errors,
@@ -50,6 +53,7 @@ import {
   BrainKind,
   Credential,
   Model,
+  ProviderId,
   Usage,
 } from "./schemas";
 
@@ -84,7 +88,7 @@ const AgentFields = z.object({
   role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
   model: z.string().optional().openapi({
-    description: "A catalog model id, or `auto` (each run picks the model tier and effort, D83). Defaults to `auto`.",
+    description: "A catalog model id, or `auto` (each run picks the model tier and effort). Defaults to `auto`.",
   }),
   credentialId: z
     .uuid()
@@ -125,9 +129,7 @@ export function agentRoutes(deps: AppDeps) {
         200: json(
           z.object({
             models: z.array(Model),
-            defaultModel: z
-              .string()
-              .openapi({ description: "What a new agent gets when no model is chosen: `auto` (D83)." }),
+            defaultModel: z.string().openapi({ description: "What a new agent gets when no model is chosen: `auto`." }),
           }),
         ),
         401: errors[401],
@@ -181,7 +183,7 @@ export function agentRoutes(deps: AppDeps) {
         params: OrgParams,
         body: body(
           z.object({
-            provider: z.enum(["anthropic", "openai"]),
+            provider: ProviderId,
             label: z.string().trim().min(1).max(80),
             apiKey: z.string().min(8).max(500),
             workspaceId: z
@@ -263,6 +265,39 @@ export function agentRoutes(deps: AppDeps) {
     },
   );
 
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/ai-status",
+      tags,
+      security,
+      summary: "Whether each agent has an AI to think with, and whether the organization has any",
+      description:
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. Computed on each request; no key is read.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            any: z.boolean(),
+            agents: z.array(
+              z.object({
+                agentId: z.uuid(),
+                state: z.enum(["ready", "no_ai", "waiting"]),
+                reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "read");
+      return c.json(await orgAiStatus(aiStatusDeps(deps), orgId), 200);
+    },
+  );
+
   const TeamAgent = z.object({
     id: z.uuid(),
     name: z.string(),
@@ -337,11 +372,13 @@ export function agentRoutes(deps: AppDeps) {
         c.get("user").id,
         orgId,
         { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
-        // New agents start on "Automático" (D83).
+        // New agents start on "Automático".
         NEW_AGENT_DEFAULTS,
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
+      // Born on the workspace's own computer: it lists its agents again.
+      if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
     },
   );
@@ -354,12 +391,22 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Edit an agent",
-      request: { params: AgentParams, body: body(AgentFields.partial()) },
+      request: {
+        params: AgentParams,
+        body: body(
+          AgentFields.partial().extend({
+            acceptPlanTerms: z.boolean().optional().openapi({
+              description:
+                "The agent's owner takes the risk of answering other people on their personal plan: needed the first time an agent that thinks with one lets anyone else talk to it (`audience.plan_terms_required`).",
+            }),
+          }),
+        ),
+      },
       responses: { 200: json(Agent), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, audience, appearance, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, acceptPlanTerms, ...input } = c.req.valid("json");
       const actor = c.get("user").id;
       // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
       const other =
@@ -369,14 +416,17 @@ export function agentRoutes(deps: AppDeps) {
       let agent = other
         ? await updateAgent(db, actor, orgId, agentId, { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) })
         : null;
-      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
+      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, { acceptPlanTerms });
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      // Its computer shows its name and look (the desktop app, ADR 0036).
-      if (agent.machineId && (input.name !== undefined || appearance !== undefined)) {
+      // Its computer shows its name and look (the desktop app, ADR 0036), and a new owner may take its plan away.
+      if (
+        agent.machineId &&
+        (input.name !== undefined || appearance !== undefined || input.ownerUserId !== undefined)
+      ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
       const [seesCost, brains] = await Promise.all([
@@ -448,7 +498,7 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Choose who thinks for the agent (an admin or the agent's owner; audited). Switching to Claude Code or Codex needs `acceptPlanTerms: true` (the person read that the subscription is personal and takes the risk); only what its computer has can be chosen.",
+        "Choose who thinks for the agent (an admin or the agent's owner; audited); only what its computer has can be chosen. A plan (Claude Code or Codex) answers only the agent's owner at first; letting others talk to it is the owner's choice (`onlyOwner: false` with `acceptPlanTerms: true`).",
       request: {
         params: AgentParams,
         body: body(
@@ -456,17 +506,27 @@ export function agentRoutes(deps: AppDeps) {
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
-                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier, D83). Null = the brain's default; omitted = keep (reset when the brain changes).",
+                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
-            acceptPlanTerms: z.boolean().optional(),
+            onlyOwner: z.boolean().optional().openapi({
+              description:
+                "\"Só responde a você\" (ADR 0059): true, only its owner talks to it; false, on a plan everyone does (only its owner, `audience.plan_owner_only`), on the API whoever did before a plan made it the owner's only. Omitted = keep; switching onto a plan makes it the owner's only.",
+            }),
+            acceptPlanTerms: z.boolean().optional().openapi({
+              description:
+                "The owner takes the risk of answering other people on their personal plan: needed with `onlyOwner: false` the first time (`audience.plan_terms_required`).",
+            }),
             account: z.uuid().nullable().optional().openapi({
               description:
-                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the person who connected the computer may change it (`account.not_owner`).",
+                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the owner of both the agent and the account chooses it (`account.not_owner`).",
+            }),
+            moveAccount: z.boolean().optional().openapi({
+              description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",
             }),
             effort: BrainEffortSetting.nullable()
               .optional()
-              .openapi({ description: "`auto` = picked per run (D83); null = the CLI's default; omitted = keep." }),
+              .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
           }),
         ),
       },
@@ -474,7 +534,10 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json")), 200);
+      const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json"));
+      // Its computer hears which account each agent thinks with (system mode lends the folders by it).
+      if (view.computer) await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      return c.json(view, 200);
     },
   );
 

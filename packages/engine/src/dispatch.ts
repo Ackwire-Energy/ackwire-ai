@@ -45,7 +45,7 @@ export async function createAgentRuns(
 export interface StartRunOptions {
   /**
    * A person's new message in the channel (the router picked the agent): it also joins the agent's
-   * run that answers in the channel itself (D62), so two people calling one agent get one answer.
+   * run that answers in the channel itself (ADR 0029), so two people calling one agent get one answer.
    * Routines, agents' messages and consultations keep one run per message.
    */
   joinChannelRun?: boolean;
@@ -176,7 +176,7 @@ export async function eligibleChannelAgents(
         inArray(agents.id, agentIds),
         isNull(agents.archivedAt),
         options.autoReplyOnly ? eq(channelMembers.autoReply, true) : undefined,
-        // Who can talk to the agent (D31), for the person behind the message.
+        // Who can talk to the agent, for the person behind the message.
         options.requesterUserId !== undefined
           ? audienceSql("agents", sql`${options.requesterUserId}::text`)
           : undefined,

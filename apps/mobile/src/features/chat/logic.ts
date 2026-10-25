@@ -287,13 +287,13 @@ export function workingEntries(
   consults: LiveConsult[],
   agentName: (id: string) => string,
 ): ActivityEntry[] {
-  // Writing agents stay in: the line above the box is on while they work (CardTrabalhando.html, A).
+  // Writing agents stay in: the line above the box is on while they work.
   return barEntries(runs, [], agentName, () => undefined, consults, true);
 }
 
 /**
  * Still working (thinking, queued, running a tool or writing): what "Parar" stops, right away, also while
- * the words arrive (Mensagens.html). A guessed "pensando…" has no run to stop yet.
+ * the words arrive. A guessed "pensando…" has no run to stop yet.
  */
 export const stoppableInLine = (runs: LiveRun[]) =>
   runs.filter((r) => !r.provisional && (r.status === "thinking" || r.status === "queued" || r.status === "running"));

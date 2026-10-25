@@ -10,7 +10,7 @@ import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * The desktop app's right click (telas/MenusDesktop.html): one list of choices per thing, drawn as our menu
+ * The desktop app's right click: one list of choices per thing, drawn as our menu
  * (the default) or the system's (`context_menu` in menus.rs); the browser keeps its own menu.
  */
 

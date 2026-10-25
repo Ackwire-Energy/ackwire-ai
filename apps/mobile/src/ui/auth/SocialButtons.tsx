@@ -62,7 +62,7 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient.signIn.social({
+      const res = await authClient().signIn.social({
         provider,
         callbackURL: "/",
         fetchOptions: { headers: inviteHeaders() },
@@ -87,7 +87,7 @@ export function SocialButtons({
       setBusy(true);
       rememberSignIn("apple");
       // From an invitation: its token lets a closed server create the account (the server's user-create hook).
-      const res = await authClient.signIn.social({
+      const res = await authClient().signIn.social({
         provider: "apple",
         idToken: { token: credential.identityToken },
         fetchOptions: { headers: inviteHeaders() },

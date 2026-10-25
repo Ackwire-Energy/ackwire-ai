@@ -44,7 +44,7 @@ describe("shared helpers", () => {
     expect(joinNames(["Ana", "Theo", "Iris"], " e ")).toBe("Ana, Theo e Iris");
     expect(initialOf(" walter")).toBe("W");
     expect(initialOf("")).toBe("?");
-    expect(firstName("Walter Caldas")).toBe("Walter");
+    expect(firstName("Walter Nogueira")).toBe("Walter");
   });
 
   test("times in lists", () => {

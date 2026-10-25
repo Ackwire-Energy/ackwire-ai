@@ -1,5 +1,5 @@
 /*
- * agentes for Mac (D79, telas/AppDesktop.html B): the site in the app's window. `html[data-desktop]` is set
+ * agentes for Mac (ADR 0036): the site in the app's window. `html[data-desktop]` is set
  * by main.tsx when the app loaded it. The window has no title bar of its own: its three buttons float over
  * the top-left corner (main_window.rs puts them in the middle of these 40px).
  */
@@ -101,7 +101,7 @@ html[data-desktop] .auth__logo {
 }
 
 /*
- * An app, not a page (telas/MenusDesktop.html): the interface's own words don't select (messages, pages and
+ * An app, not a page: the interface's own words don't select (messages, pages and
  * fields still do), buttons keep the Mac's arrow (links keep the hand), nothing of the interface drags out
  * as a picture of the page, and scrolling past the end doesn't bounce the whole window.
  */

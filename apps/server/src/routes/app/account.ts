@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  addHostComputer,
   appleSignInTokens,
   avatarFile,
   changeMemberRole,
@@ -24,12 +25,13 @@ import {
   setMyLocale,
   setOrgLogo,
   signInOptions,
+  toldReason,
   USER_LOCALES,
   updateOrganization,
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig } from "../../auth";
+import { authUiConfig, mintPhoneSignIn } from "../../auth";
 import { clientIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import {
@@ -59,6 +61,7 @@ export function accountRoutes(deps: AppDeps) {
   const session = requireSession(deps.auth);
   for (const path of [
     "/me",
+    "/phone-sign-in",
     "/account",
     "/avatars/*",
     "/org-logos/*",
@@ -84,6 +87,20 @@ export function accountRoutes(deps: AppDeps) {
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
             firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
             passwordReset: z.boolean().openapi({ description: 'Offer "forgot password" (e-mail is configured).' }),
+            landing: z
+              .boolean()
+              .openapi({ description: "Signed out, `/` shows the marketing page (LANDING_PAGE); else sign-in." }),
+            termsUrl: z
+              .string()
+              .nullable()
+              .openapi({ description: "Terms of service linked on the sign-in screen (TERMS_URL)." }),
+            privacyUrl: z
+              .string()
+              .nullable()
+              .openapi({ description: "Privacy policy linked on the sign-in screen (PRIVACY_URL)." }),
+            supportEmail: z.string().nullable().openapi({
+              description: "Where people write to whoever runs this server (SUPPORT_EMAIL): hold, suspension.",
+            }),
           }),
         ),
       },
@@ -205,6 +222,7 @@ export function accountRoutes(deps: AppDeps) {
             name: m.orgName,
             role: m.role,
             logo: m.orgLogo ?? null,
+            ...(m.standing ? { standing: { state: m.standing.state, reason: toldReason(m.standing) } } : {}),
           })),
         },
         200,
@@ -226,6 +244,44 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       await setMyLocale(db, c.get("user").id, c.req.valid("json").locale);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/phone-sign-in",
+      tags,
+      security,
+      summary: "A one-time sign-in for the phone app",
+      description:
+        "For the QR code of “Abrir no celular”: `agenteschat://connect?server=…&token=…`. The phone trades the token at `POST /api/auth/sign-in/one-time-token` for a session of its own: once, within a few minutes, and only while this session lasts.",
+      responses: {
+        201: json(
+          z.object({
+            token: z.string(),
+            server: z.string(),
+            expiresIn: z.number().int().openapi({ description: "Seconds the token lasts, from this answer." }),
+          }),
+          "Created",
+        ),
+        401: errors[401],
+        429: errorResponse("Too many codes"),
+      },
+    }),
+    async (c) => {
+      const current = await deps.auth.api.getSession({
+        headers: c.req.raw.headers,
+        query: { disableCookieCache: true },
+      });
+      if (!current) return apiError(c, 401, "unauthorized", "Sign in to continue");
+      const limit = await deps.adapters.rateLimiter.consume(`phone-sign-in:${current.user.id}`, {
+        limit: 30,
+        windowMs: 3600_000,
+      });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many codes; try again later");
+      const { token, expiresIn } = await mintPhoneSignIn(deps.auth, current.session.token);
+      return c.json({ token, server: new URL(config.PUBLIC_URL).origin, expiresIn }, 201);
     },
   );
 
@@ -433,6 +489,7 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
       const { organization, general } = await createOrganization(db, c.get("user").id, input);
+      if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
       if (teamSize || (timezone && isValidTimeZone(timezone))) {
         await updateOrgSettings(db, c.get("user").id, organization.id, {
           ...(teamSize ? { teamSize } : {}),

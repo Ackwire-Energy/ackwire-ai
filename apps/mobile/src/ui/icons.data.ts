@@ -1,5 +1,5 @@
 /**
- * The icons from Mobile.html (`I`), same names and geometry: 24×24, stroke 1.7, round caps and joins.
+ * The phone app's line icons: 24×24, stroke 1.7, round caps and joins.
  * Pure data (react-native-svg draws it in ./Icon.tsx); `fill` marks the few filled dots, `sw` a
  * different stroke width.
  */
@@ -74,7 +74,7 @@ export const ICONS = {
   ],
   smile: [c(12, 12, 8.5), p("M8.5 14c.8 1.4 2 2 3.5 2s2.7-.6 3.5-2M9 9.5h.01M15 9.5h.01", 2)],
   laptop: [r(5, 5, 14, 10, 1.8), p("M3 18.5h18")],
-  // IconesComputador.html: each computer's line icon (the small form of its portrait, `ComputerIcon`).
+  // Each computer's line icon (the small form of its portrait, `ComputerIcon`).
   computerMac: [
     r(4, 4.5, 16, 11, 2),
     p("M10.4 4.5h3.2v.7a.9.9 0 0 1-.9.9h-1.4a.9.9 0 0 1-.9-.9Z"),
@@ -96,26 +96,26 @@ export const ICONS = {
   archive: [r(3.5, 5, 17, 4, 1.2), p("M5 9v9a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V9M10 13h4")],
   circle: [c(12, 12, 7)],
   pause: [p("M9 6v12M15 6v12")],
-  // From NavegadorCardScroll.html: the agent's browser card (Senha, the keys, Parar).
+  // The agent's browser card (Senha, the keys, Parar).
   lock: [r(5, 11, 14, 9.5, 2.5), p("M8.5 11V8a3.5 3.5 0 0 1 7 0v3")],
   keyboard: [r(3, 6, 18, 12, 2.5), p("M7 10h.01M10.5 10h.01M14 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14.5h4", 2)],
   stop: [r(7, 7, 10, 10, 2)],
   flag: [p("M6 21V4M6 4h11l-2 4 2 4H6")],
-  // From MobileConversas.html: the question card, "Conversa com…" and "Livre".
+  // The question card, "Conversa com…" and "Livre".
   help: [c(12, 12, 8.5), p("M9.6 9.5a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01", 2)],
   compose: [
     p("M12 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"),
     p("M16.5 4.5a2 2 0 0 1 3 3L12 15l-3.5.5L9 12Z"),
   ],
   checkc: [c(12, 12, 8.5), p("m8.5 12 2.5 2.5 4.5-5")],
-  // From MobileRefinos.html ("Arquivos"): the file viewer's actions.
+  // The file viewer's actions.
   share: [
     p("M12 3.5v11M8 7.5l4-4 4 4"),
     p("M6.5 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-.5"),
   ],
   photos: [r(3.5, 5, 17, 14, 3), c(9, 10, 1.6), p("m4 17 5-4.5 4 3.5 3-2.5 4 3.5")],
   drive: [p("M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z")],
-  // From FazerDesfazer.html: the receipts of what an agent did (Desfazer, issue, memory).
+  // The receipts of what an agent did (Desfazer, issue, memory).
   undo: [p("M9 7 4.5 11.5 9 16"), p("M5 11.5h9.5a5 5 0 0 1 0 10H11")],
   issue: [c(12, 12, 8.5), c(12, 12, 2.2, true)],
   brain: [
@@ -123,7 +123,7 @@ export const ICONS = {
       "M9 5.5a3 3 0 0 0-3 3v.5a3 3 0 0 0-1.5 5.3A3 3 0 0 0 9 18.5h1V5.5ZM15 5.5a3 3 0 0 1 3 3v.5a3 3 0 0 1 1.5 5.3A3 3 0 0 1 15 18.5h-1V5.5Z",
     ),
   ],
-  // From Mensagens.html: talking to an agent while it works, the "↓ novas" pill and the connection banner.
+  // Talking to an agent while it works, the "↓ novas" pill and the connection banner.
   bolt: [p("M13 3 5 13.5h6L10 21l8-10.5h-6Z")],
   join: [p("M5 12h11M12 7l5 5-5 5"), p("M19 5v14")],
   play: [p("M8 5.5v13l10.5-6.5Z")],

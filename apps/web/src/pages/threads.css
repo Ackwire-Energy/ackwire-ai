@@ -1,5 +1,5 @@
 /*
- * Threads (telas/Threads.html): header, tabs, search and filters, one row per
+ * Threads: header, tabs, search and filters, one row per
  * thread in aligned columns (stacked cards on a phone, by container query),
  * the floating selection bar (Drive's) and the details panel (Rotinas').
  * Neutral selection (ink and gray); brand blue only on agents' avatars.
@@ -44,7 +44,7 @@
   align-self: center;
 }
 
-/* ── Rows (ThreadsRefino.html "Por canal") ───────────────────────────────
+/* ── Rows ────────────────────────────────────────────────────────────────
  * Grouped by channel; one line each: who carries it, title + last line, then
  * fixed columns (tag right-aligned, people, time) so they line up row to row.
  */

@@ -63,6 +63,8 @@ export type ActivityKind =
   | "readingWiki"
   | "linkingWiki"
   | "readingForum"
+  | "creatingChannel"
+  | "offeringConnectAi"
   | "usingTool";
 
 export interface Activity {
@@ -137,6 +139,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   read_wiki_page: "readingWiki",
   search_wiki: "readingWiki",
   link_to_wiki: "linkingWiki",
+  // Setting up the workspace.
+  create_channel: "creatingChannel",
+  offer_connect_ai: "offeringConnectAi",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -378,7 +383,7 @@ export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: M
 /** The bar's sentence as plain text (see `activitySentence`). */
 export const activityText = (t: TFunction, entries: ActivityEntry[]) => activitySentence(t, entries);
 
-/** How often the card's phrase turns (telas/CardTrabalhando.html, A). */
+/** How often the card's phrase turns. */
 export const PHRASE_TURN_MS = 2600;
 /** A step running this long gets an aside in turn ("Isso leva um minutinho…"). */
 export const LONG_STEP_MS = 4000;

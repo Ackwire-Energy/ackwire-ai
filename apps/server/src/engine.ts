@@ -4,6 +4,7 @@ import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   agentScopeFromDb,
+  authorizeStream,
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
@@ -21,6 +22,8 @@ import {
   createConnectorToolSource,
   createContextToolSource,
   createDatabaseToolSource,
+  createDesktopControl,
+  createDesktopToolSource,
   createFindAgentToolSource,
   createForumToolSource,
   createGitToolSource,
@@ -40,26 +43,33 @@ import {
   createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
+  createSetupToolSource,
   createSkillToolSource,
+  createStreamBroker,
   createTalker,
   createToolGateway,
   createWikiToolSource,
   createWorkspaceToolSource,
   type GitProxyDeps,
   hubBrainLink,
+  type JobDeps,
   type Judge,
   type MailDeps,
   type McpConnect,
+  messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
   prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
   type RunExecutorDeps,
+  recheckStream,
   resolveSummaryModel,
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  standingJudge,
+  streamClosed,
   type ToolSource,
   withJudgeFallback,
 } from "@agenteschat/engine";
@@ -95,7 +105,7 @@ export interface EngineOptions {
   github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
   /** Tests: this process's replica id for the machine hub (default: random). */
   replicaId?: string;
-  /** Tools on demand (D65; default on). Tests turn it off: every granted tool is listed. */
+  /** Tools on demand (ADR 0043; default on). Tests turn it off: every granted tool is listed. */
   toolsOnDemand?: boolean;
 }
 
@@ -155,6 +165,8 @@ export function buildEngine(o: EngineOptions) {
         )
       : llmJudge;
   }
+  // Nothing is judged for a workspace on hold or suspended: Jev bills the server, not the workspace.
+  context.judge = standingJudge(db, context.judge);
   // The agents' conversation layer: a fast reply on the org's cheap model while a task works or waits.
   const talker = createTalker({
     db,
@@ -178,7 +190,7 @@ export function buildEngine(o: EngineOptions) {
     resolveHost: o.resolveHost,
   };
   const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
-  // Code sandbox (D30): cloud computers only when a provider is configured (Daytona in the Cloud);
+  // Code sandbox (ADR 0021): cloud computers only when a provider is configured (Daytona in the Cloud);
   // connected machines (ADR 0025) always, through the hub that holds their sockets.
   const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
   const machineHub = createMachineHub({ db, pubsub: adapters.pubsub, replicaId: o.replicaId });
@@ -193,7 +205,7 @@ export function buildEngine(o: EngineOptions) {
     },
     autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
     archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
-    // Git through our proxy (D35): the computer never gets a GitHub token.
+    // Git through our proxy (ADR 0024): the computer never gets a GitHub token.
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
   };
@@ -231,6 +243,8 @@ export function buildEngine(o: EngineOptions) {
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
+      // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo.
+      createSetupToolSource({ pubsub: adapters.pubsub }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
@@ -267,6 +281,13 @@ export function buildEngine(o: EngineOptions) {
         judge: context.judge,
         vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
       }),
+      // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
+      createDesktopToolSource({
+        machines: { hub: machineHub },
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        vision: Boolean(config.TYPESAFE_API_KEY) && !o.judge,
+      }),
       // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
       createGitToolSource({
@@ -284,6 +305,16 @@ export function buildEngine(o: EngineOptions) {
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
   const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
   machineHub.setBrowserHooks(browserLive.hubHooks);
+  // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
+  // its access checked again while open; control changing hands closes the views it hides.
+  const streams = createStreamBroker({
+    db,
+    hub: machineHub,
+    authorize: (input) => authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
+    recheck: (stream) => recheckStream(db, stream),
+    onClosed: (stream) => streamClosed(db, stream),
+  });
+  const desktops = createDesktopControl({ db, pubsub: adapters.pubsub, hub: machineHub, streams });
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
   // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
   const agentScope = agentScopeFromDb(db);
@@ -333,7 +364,7 @@ export function buildEngine(o: EngineOptions) {
         prepare: prepareCode,
       }),
   };
-  const handlers = createJobHandlers({
+  const jobDeps: JobDeps = {
     db,
     gateway,
     pubsub: adapters.pubsub,
@@ -346,7 +377,7 @@ export function buildEngine(o: EngineOptions) {
     artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
-    // Tools on demand (D65): each run lists what the judge expects it to need; the rest behind `find_tools`.
+    // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     brains,
     machines: machineHub,
@@ -367,7 +398,8 @@ export function buildEngine(o: EngineOptions) {
         ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
         : {}),
     },
-  });
+  };
+  const handlers = createJobHandlers(jobDeps);
   // Mail accounts, inbound mail and polling (routes and workers).
   const mail: MailDeps = {
     db,
@@ -381,6 +413,8 @@ export function buildEngine(o: EngineOptions) {
     tools,
     context,
     handlers,
+    /** The same router as `message.posted`'s, for "Responder agora" (null: routing is off). */
+    router: messageRouter(jobDeps),
     connectorDeps,
     storage,
     artifacts,
@@ -388,6 +422,8 @@ export function buildEngine(o: EngineOptions) {
     gitProxy,
     machineHub,
     browserLive,
+    streams,
+    desktops,
     mail,
     talker,
   };

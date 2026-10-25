@@ -3,7 +3,7 @@ import type { IconName } from "@/ui";
 import { approvalIdOf, artifactsOf, questionOf } from "./logic";
 
 /**
- * What the conversation offers next (MobileIntencional.html, "Conversa" and "Primeiro dia"): the
+ * What the conversation offers next: the
  * composer's suggestions come from the latest card in the conversation, not a fixed list; an agent's
  * first conversation introduces it in plain words and offers three first requests tied to what it does.
  * Pure: the screen turns the keys into text (`mobile.chat.intent.*`).

@@ -3,6 +3,9 @@ import { type Config, configSchema, envVars } from "./schema";
 export { connectorOAuthApps, githubAppConfig } from "./connectors";
 export { type Config, type EnvVarDefinition, type EnvVarName, envVars } from "./schema";
 
+/** agentes.chat's own site: its signed-out `/` is the marketing page and its legal pages are its own. */
+const OFFICIAL_HOSTS = new Set(["agentes.chat", "www.agentes.chat"]);
+
 export class ConfigError extends Error {
   constructor(public readonly issues: string[]) {
     super(`Invalid configuration:\n${issues.map((i) => `  - ${i}`).join("\n")}`);
@@ -28,7 +31,23 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       }),
     );
   }
-  return result.data;
+  const config = result.data;
+  if (config.HOST_COMPUTER_TOKEN && config.ALLOW_SIGNUP) {
+    throw new ConfigError([
+      "HOST_COMPUTER_TOKEN can't be set with ALLOW_SIGNUP=true: this server's computer runs agents on the machine itself, so people join only by invitation",
+    ]);
+  }
+  // Its requests are read only through the operator API: without it every workspace would wait forever.
+  if (config.MACHINE_PROVISIONING === "external" && !config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["MACHINE_PROVISIONING=external needs OPERATOR_API_TOKEN"]);
+  }
+  const site = new URL(config.PUBLIC_URL);
+  if (OFFICIAL_HOSTS.has(site.hostname)) {
+    if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;
+    config.TERMS_URL ??= `${site.origin}/terms`;
+    config.PRIVACY_URL ??= `${site.origin}/privacy`;
+  }
+  return config;
 }
 
 /** Returns a copy of the config safe to log: secret values are masked. */

@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:preview": "eas build --profile preview --platform all --non-interactive --no-wait"
   },
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "@agenteschat/client": "workspace:*",
     "@agenteschat/i18n": "workspace:*",
@@ -23,6 +23,7 @@
     "expo": "~58.0.14",
     "expo-apple-authentication": "~58.0.2",
     "expo-blur": "~58.0.4",
+    "expo-camera": "58.0.9",
     "expo-clipboard": "~58.0.3",
     "expo-constants": "~58.0.12",
     "expo-dev-client": "~58.0.14",

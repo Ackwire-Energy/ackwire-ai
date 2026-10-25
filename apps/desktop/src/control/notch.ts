@@ -31,7 +31,7 @@ export interface NotchHelp {
 }
 
 /**
- * What the notch shows (telas/NotchAgente.html): a person needed wins, even paused (as the tray's
+ * What the notch shows: a person needed wins, even paused (as the tray's
  * dot); then paused; then work; nothing going on hides it.
  */
 export interface NotchState {

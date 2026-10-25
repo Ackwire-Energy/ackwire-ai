@@ -2,7 +2,7 @@ import type { Agent } from "@agenteschat/client";
 import type { ConversationRow } from "../chats/logic";
 
 /**
- * The pure part of "Novo" (MobileIntencional.html, variant A): who a request from the "+" goes to, the
+ * The pure part of "Novo": who a request from the "+" goes to, the
  * request itself, and the name suggested for a new agent.
  */
 

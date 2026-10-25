@@ -15,7 +15,7 @@ import { FileTile, useFileLine } from "./MessageFiles";
 import { fileText, useRemoteFile } from "./source";
 
 /**
- * A file opened from a message (MobileRefinos.html, "Documento aberto"): Markdown and text drawn by the
+ * A file opened from a message: Markdown and text drawn by the
  * app, PDF in a web view (iOS draws PDFs natively there), anything else as its card. Top: close, the
  * name and "Documento · 4 KB · Theo". Bottom: Ver no Drive and Compartilhar.
  */

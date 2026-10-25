@@ -3,7 +3,7 @@ import type { ConnectedItem } from "@agenteschat/client/lib/connected";
 import { mixHex } from "@agenteschat/ui/agent/engine";
 
 /**
- * The connectors gallery on the phone (telas/ConectoresMobile.html, B · Galeria): pure pieces the screen and
+ * The connectors gallery on the phone: pure pieces the screen and
  * the tests share. No React Native imports.
  */
 

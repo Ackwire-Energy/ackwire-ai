@@ -599,7 +599,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
       agentId: f.agent.id,
       machineId: paired.machineId,
       channelId: f.general.id,
-      threadRootId: null, // asked in the channel: the notes land there (D67)
+      threadRootId: null, // asked in the channel: the notes land there
       runId: ctx.runId,
       requestedByUserId: f.owner.id,
       status: "pending",

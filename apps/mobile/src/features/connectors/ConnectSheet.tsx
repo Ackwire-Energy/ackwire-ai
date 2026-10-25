@@ -48,7 +48,7 @@ const RETURN_URL = "agenteschat://connectors/oauth";
 type Step = "about" | "connect" | "who";
 
 /**
- * One service in a sheet over the gallery, in three steps (telas/ConectoresMobile.html, B): what agents could
+ * One service in a sheet over the gallery, in three steps: what agents could
  * do there (what always asks marked "pede sua aprovação") → connect (sign in in the browser and come back,
  * or paste a key) → who uses it and how far. A connected one opens on who uses it.
  */

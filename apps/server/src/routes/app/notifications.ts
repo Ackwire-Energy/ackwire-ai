@@ -1,3 +1,4 @@
+import { SCREEN_KINDS } from "@agenteschat/adapters";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -37,6 +38,7 @@ const Notification = z
       routineId: z.string().optional(),
       machineId: z.string().optional(),
       handoffId: z.string().optional(),
+      screen: z.enum(SCREEN_KINDS).optional(),
       label: z.string().optional(),
     }),
     latest: z.object({
@@ -80,7 +82,7 @@ const Counts = z.object({
 const NotificationParams = OrgParams.extend({ notificationId: z.uuid() });
 
 /**
- * The person's inbox (D46): mentions, thread replies, DMs, agents' questions,
+ * The person's inbox: mentions, thread replies, DMs, agents' questions,
  * issues, forum turns, approvals, missions, routines, reactions. Live
  * updates arrive on the WebSocket as user events (`notification.upserted`,
  * `notification.removed`, `notification.counts`).

@@ -1,6 +1,15 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { keys } from "../api/keys";
-import type { AgentComputer, ComputerTarget, Machine, MachineAccess, MachinePause } from "../api/types";
+import type {
+  AgentComputer,
+  ComputerSetup,
+  ComputerTarget,
+  Machine,
+  MachineAccess,
+  MachinePause,
+  Me,
+  OrgStanding,
+} from "../api/types";
 
 const MACHINE_EVENTS = new Set([
   "machine.status",
@@ -90,6 +99,8 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined || accounts) {
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
     void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
+    void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
+    void qc.invalidateQueries({ queryKey: keys.planUsage(orgId) });
   }
   switch (e.type) {
     case "machine.status": {
@@ -134,6 +145,8 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       qc.setQueryData<Machine[]>(list, (old) => old?.filter((m) => m.id !== machineId));
       // Its agents went back to the cloud (`agent.computer` events follow; refetch anyway).
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+      // The server's own computer, stopped here, offers to come back.
+      void qc.invalidateQueries({ queryKey: keys.hostComputer(orgId) });
       break;
   }
   return true;
@@ -166,4 +179,36 @@ export function applyComputerEvent(qc: QueryClient, orgId: string, event: { type
   // A new computer changes what can think and whether the browser is there.
   void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, e.agentId) });
   void qc.invalidateQueries({ queryKey: keys.agentBrowser(orgId, e.agentId) });
+}
+
+const SETUP_FIELDS = ["state", "step", "reason", "since", "etaSeconds", "specs", "machineId"] as const;
+
+/**
+ * The workspace's own computer and standing (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
+ * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
+ * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
+ * and the suspended screen follow without a reload. Returns whether the event was one of these.
+ */
+export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
+  if (event.type === "machine.provisioning") {
+    const e = event as Partial<Record<(typeof SETUP_FIELDS)[number], unknown>>;
+    const next = Object.fromEntries(SETUP_FIELDS.map((k) => [k, e[k] ?? null])) as Omit<ComputerSetup, "mode">;
+    qc.setQueryData<ComputerSetup>(keys.computerSetup(orgId), { mode: "external", ...next });
+    if (next.state === "ready") {
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+    }
+    return true;
+  }
+  if (event.type === "org.standing") {
+    const e = event as { orgId?: unknown; state?: unknown; reason?: unknown };
+    const state = e.state === "hold" || e.state === "suspended" ? e.state : "active";
+    const standing: OrgStanding = { state, reason: typeof e.reason === "string" && e.reason ? e.reason : null };
+    const target = typeof e.orgId === "string" ? e.orgId : orgId;
+    qc.setQueryData<Me>(keys.me, (me) =>
+      me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, standing } : o)) } : me,
+    );
+    return true;
+  }
+  return false;
 }

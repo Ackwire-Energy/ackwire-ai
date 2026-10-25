@@ -3,7 +3,7 @@ import { type Activity, toolActivity } from "@agenteschat/client/lib/activity";
 import { foldLiveWork } from "@agenteschat/client/lib/work";
 
 /**
- * An agent's turn in the conversation as one block (Mensagens.html, the base rules): from "pensando" through
+ * An agent's turn in the conversation as one block: from "pensando" through
  * its steps and the words it writes to the saved reply, in the same place. Pure, so it is tested: what the
  * header says, the lines of its work, which runs draw as a block, and how the words fade in as they arrive.
  */

@@ -2,7 +2,7 @@ import type { OutcomeKind } from "../context/outcomes";
 
 /**
  * Connector catalog: which MCP servers agentes.chat knows, and how each of
- * their tools maps to one of OUR scopes (D7: MCP has no standard scopes).
+ * their tools maps to one of OUR scopes (ADR 0016: MCP has no standard scopes).
  * A tool the server offers but this catalog doesn't list is never exposed.
  * `sensitive` tools always need a person's approval (merge, deploy and
  * rollback are sensitive whatever this says; see `isSensitive`).

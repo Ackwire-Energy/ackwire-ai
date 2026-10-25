@@ -43,17 +43,17 @@ describe("credentials per provider", () => {
     expect(usage).toMatchObject({ provider: "openai", model: "gpt-6-sol", costNanoUsd: 1000 * 2000 + 100 * 10000 });
   });
 
-  test("no key for the model's provider: the run fails with a clear message", async () => {
+  test("no key for the model's provider: the run fails with no_ai and the agent's card says so", async () => {
     f = await setup();
     const gpt = await createAgent(f.db, f.owner.id, f.org.id, { name: "Gpt", handle: "gpt" }, { model: "gpt-6-luna" });
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: gpt.id });
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@gpt hi" });
     await drainOutbox(f.db, f.handlers);
     const [run] = await f.db.select().from(schema.agentRuns);
-    expect(run).toMatchObject({
-      status: "failed",
-      error: "Add an API key for OpenAI in the workspace settings",
-    });
+    expect(run).toMatchObject({ status: "failed", error: "no_ai" });
+    expect(f.openaiProvider.calls).toHaveLength(0);
+    const card = (await f.db.select().from(schema.messages)).find((m) => m.authorAgentId === gpt.id);
+    expect(card?.meta).toMatchObject({ bodyCode: "no_ai", noAi: { agentId: gpt.id, reason: "no_key" } });
   });
 
   test("an agent's key must match its model's provider", async () => {
@@ -102,5 +102,34 @@ describe("credentials per provider", () => {
     expect(await resolveSummaryModel({ ...f.context, cheapModels: { openai: "gpt-6-luna" } }, f.org.id)).toBe(
       "gpt-6-luna",
     );
+  });
+
+  test("a DeepSeek-only workspace: its agent thinks with the DeepSeek key, priced at DeepSeek's rates; system tasks on DeepSeek Flash, on Kimi's recommended model for Kimi", async () => {
+    f = await setup({ reply: () => ({ chunks: ["oi"], usage: { inputTokens: 1000, outputTokens: 100 } }) });
+    await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+    const key = (provider: "deepseek" | "moonshot", apiKey: string) =>
+      createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+        provider,
+        label: provider,
+        apiKey,
+        makeDefault: true,
+      });
+    await key("deepseek", "sk-deepseek-9999");
+    const ds = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ds", handle: "ds" }, { model: "deepseek-flash" });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ds.id });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@ds oi" });
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls[0]).toMatchObject({ apiKey: "sk-deepseek-9999", request: { model: "deepseek-flash" } });
+    const usage = (await f.db.select().from(schema.usageRecords)).find((u) => u.kind === "agent");
+    expect(usage).toMatchObject({
+      provider: "deepseek",
+      model: "deepseek-flash",
+      costNanoUsd: 1000 * 300 + 100 * 1200,
+    });
+    expect(await resolveRouterModel(f.db, f.org.id, "claude-haiku-5-5")).toBe("deepseek-flash");
+    expect(await resolveSummaryModel(f.context, f.org.id)).toBe("deepseek-flash");
+
+    await key("moonshot", "sk-kimi-9999");
+    expect(await resolveRouterModel(f.db, f.org.id, "claude-haiku-5-5")).toBe("kimi-k3.1-pro");
   });
 });

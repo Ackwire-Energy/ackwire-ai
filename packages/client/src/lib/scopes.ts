@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { Connection, ConnectorCatalog, ConnectorDef, CustomServer, ScopeGrant, ScopeInfo } from "../api/types";
 
 /**
- * Agent permissions in two layers (D7): built-in scopes, plus the scopes of
+ * Agent permissions in two layers (ADR 0016): built-in scopes, plus the scopes of
  * each connector the organization connected. The server checks every grant
  * against its catalog; this only shapes it for the screens.
  */

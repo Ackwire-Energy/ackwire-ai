@@ -32,7 +32,7 @@ describe("Bayer thresholds", () => {
   });
 });
 
-/** Runs the web's loop (Mobile.html `drawDithers`) and the shader's steps over a whole drawing. */
+/** Runs the web's loop and the shader's steps over a whole drawing. */
 function compare(field: Field, width: number, height: number, pixel: number, tones: number, times: number[]) {
   const { w, h } = gridOf(width, height, pixel);
   let checked = 0;

@@ -3,7 +3,7 @@
  * to the foundation's (`src/i18n/keys.pt-BR.ts`: `common`, `auth`, `account`,
  * `theme`, `push`, `a11y`, `composer`, `search`), which these never repeat.
  * They merge into the same `mobile` object; `keys.en.ts` has exactly this
- * shape (typed below). Copy as in docs/design/telas/Mobile.html.
+ * shape (typed below).
  */
 export const featureKeysPtBR = {
   app: {
@@ -72,6 +72,11 @@ export const featureKeysPtBR = {
     refusedSubM: "O {{name}} vai lembrar disso da próxima vez.",
     via: "Por onde",
     why: "{{name}} disse antes: “{{text}}”",
+    saidText: "“{{text}}”",
+    answers: "Responde a “{{subject}}”",
+    answersFrom: "Responde a “{{subject}}”, de {{from}}",
+    forwards: "Encaminha “{{subject}}”",
+    forwardsFrom: "Encaminha “{{subject}}”, de {{from}}",
     onlyOwner: "Só {{name}} ou quem administra pode decidir.",
     onlyAdmins: "Só quem administra pode decidir.",
     notFound: "Este pedido não existe mais ou você não tem acesso.",
@@ -80,6 +85,8 @@ export const featureKeysPtBR = {
       irreversible: "Não dá para desfazer",
       reversible: "Dá para desfazer",
       external: "Sai da empresa",
+      unsent: "Nada é enviado",
+      deletable: "Dá para apagar",
     },
     status: {
       approved: "Já foi aprovado.",
@@ -285,7 +292,7 @@ export const featureKeysPtBR = {
     fileDeleted: "Arquivo removido",
     fileFailed: "Não deu para abrir o arquivo.",
     approval: {
-      asks: "Precisa da sua aprovação",
+      asks: "Pede seu ok",
       see: "Ver pedido",
       approved: "Aprovado: {{title}}",
       refused: "Recusado: {{title}}",
@@ -676,6 +683,12 @@ export const featureKeysPtBR = {
       reaction_other: "{{names}} reagiram",
       browser_handoff_one: "{{names}} precisa de você no navegador",
       browser_handoff_other: "{{names}} precisam de você no navegador",
+      desktop_handoff_one: "{{names}} precisa de você no computador",
+      desktop_handoff_other: "{{names}} precisam de você no computador",
+      org_standing_one: "O status do workspace mudou",
+      org_standing_other: "O status do workspace mudou",
+      computer_ready_one: "O computador do seu workspace está pronto",
+      computer_ready_other: "O computador do seu workspace está pronto",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
@@ -1031,6 +1044,7 @@ export const featureKeysPtBR = {
       saved: "Memória corrigida",
       forgotten: "Esquecido",
     },
+    thinks: "Pensa com",
     uses: {
       title: "O que pode usar",
       level: { read: "Ler", write: "Ler e escrever", some: "Em parte" },
@@ -1085,6 +1099,7 @@ export const featureKeysPtBR = {
       on: "Ligado",
       cloud: "Computador na nuvem",
       cloudTag: "Sempre ligado",
+      managedDesc: "Só deste workspace · um usuário para cada agente",
       cloudDesc: "Sem as pastas do seu computador; o repositório vem pelo GitHub",
       has: "Tem o {{brains}}",
       and: " e o ",
@@ -1132,7 +1147,7 @@ export const featureKeysPtBR = {
       movedBody: "O que esperava o {{computer}} segue no novo computador.",
     },
   },
-  // The agent's browser (ADR 0040, NavegadorAgente.html).
+  // The agent's browser (ADR 0040).
   browser: {
     card: {
       needs: "{{name}} precisa de ajuda",
@@ -1155,6 +1170,7 @@ export const featureKeysPtBR = {
       failedNote: "Não deu: {{note}}",
       expired: "Ninguém abriu a tempo: {{title}}",
       cancelled: "Cancelado: {{title}}",
+      computer: "Abra num computador para ver a tela: {{title}}",
     },
     live: {
       inControl: "Você está no controle",
@@ -1162,6 +1178,7 @@ export const featureKeysPtBR = {
       watchOnly: "{{name}} está no controle. Você só assiste.",
       takeOver: "Assumir",
       done: "Pronto",
+      handBack: "Devolver",
       couldnt: "Não consegui",
       typeHere: "Digite aqui",
       typeMarked: "Digite no campo marcado",
@@ -1174,6 +1191,9 @@ export const featureKeysPtBR = {
       page: "A página do navegador. Toque para clicar.",
       graceF: "Se você sair, a {{name}} espera 2 min.",
       graceM: "Se você sair, o {{name}} espera 2 min.",
+      closedHelpF: "Abre quando a {{name}} navegar de novo. Os logins continuam salvos.",
+      closedHelpM: "Abre quando o {{name}} navegar de novo. Os logins continuam salvos.",
+      hidden: "{{name}} está no controle · tela oculta",
       key: {
         Tab: "Tab",
         Enter: "Enter",
@@ -1193,12 +1213,20 @@ export const featureKeysPtBR = {
         endedM: "O navegador do {{name}} fechou.",
         forbiddenF: "Você não pode ver este navegador.",
         forbiddenM: "Você não pode ver este navegador.",
+        closedF: "O navegador da {{name}} está fechado.",
+        closedM: "O navegador do {{name}} está fechado.",
       },
     },
     profile: {
       title: "Navegador",
       waitingF: "A {{name}} precisa de você",
       waitingM: "O {{name}} precisa de você",
+    },
+    done: {
+      title: "Algum recado?",
+      introF: "Opcional. A {{name}} lê isso antes de seguir.",
+      introM: "Opcional. O {{name}} lê isso antes de seguir.",
+      placeholder: "Ex.: entrei com a conta de teste",
     },
     failed: {
       title: "O que aconteceu?",

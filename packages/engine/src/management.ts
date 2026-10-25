@@ -48,6 +48,8 @@ export interface OrgSettings {
   teamSize: TeamSize | null;
   /** Monthly budget of agents without their own (nano-USD). Routes show it to admins only. */
   defaultAgentBudgetNanoUsd: number;
+  /** Agents check what the team already did before an outside action (ADR 0064). On by default. */
+  actionCheck: boolean;
 }
 
 export const TEAM_SIZES = ["solo", "small", "medium", "large"] as const;
@@ -68,6 +70,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     timezone: s?.timezone ?? "UTC",
     teamSize: TEAM_SIZES.includes(s?.teamSize as TeamSize) ? (s?.teamSize as TeamSize) : null,
     defaultAgentBudgetNanoUsd: s?.defaultAgentBudgetNanoUsd ?? DEFAULT_AGENT_BUDGET_NANO_USD,
+    actionCheck: s?.actionCheck ?? true,
   };
 }
 
@@ -155,6 +158,7 @@ export async function updateOrgSettings(
       ...(input.defaultAgentBudgetNanoUsd !== undefined
         ? { defaultAgentBudgetNanoUsd: Math.round(input.defaultAgentBudgetNanoUsd) }
         : {}),
+      ...(input.actionCheck !== undefined ? { actionCheck: input.actionCheck } : {}),
     };
     if (Object.keys(settings).length > 0) {
       await tx
@@ -165,6 +169,7 @@ export async function updateOrgSettings(
   });
   caches.orgs.delete(`${orgId}:`);
   caches.orgs.delete(`${orgId}:agent-budget`);
+  caches.orgs.delete(`${orgId}:action-check`);
   caches.zones.deletePrefix(`${orgId}:`);
   invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);

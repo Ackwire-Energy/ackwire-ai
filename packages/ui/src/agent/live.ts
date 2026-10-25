@@ -24,7 +24,7 @@ export interface LiveAgent {
     seed: number;
     /** Plays the transient face started by `playAgentReaction` with this key (e.g. a message id). */
     reactionKey?: string;
-    /** Stands in its tile: its own pixel sky fills the box and the agent stands inside it (telas/RefinoUI.html). */
+    /** Stands in its tile: its own pixel sky fills the box and the agent stands inside it. */
     framed?: boolean;
   };
 }
@@ -37,7 +37,7 @@ const reactions = new Map<string, { kind: AgentReaction; t0: number }>();
 const clock = () => (typeof performance === "object" ? performance.now() : Date.now());
 
 /**
- * The face for a reaction `e` seconds in (telas/ReacoesAgente.html): 👍 is
+ * The face for a reaction `e` seconds in: 👍 is
  * happy, then hearts, with a small hop at the start; 👎 is surprised, then a
  * thoughtful look up and aside. With reduced motion only the expression
  * changes (no hop, no turn). `hop` is a fraction of the body's size.
@@ -144,7 +144,7 @@ export function setGaze(point: { x: number; y: number } | null) {
 /** In the app expressions are rare (one every ~18 s per agent); thinking speeds the head up. */
 function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, gazing: boolean): Pose {
   if (a.state === "writing") return { writing: true, turn: [Math.sin(t * 1.3 + a.seed) * 0.15, 0.1] };
-  // Waiting on you: looking up out of its card, blinking, now and then a glance aside (telas/Aprovacoes.html).
+  // Waiting on you: looking up out of its card, blinking, now and then a glance aside.
   if (a.state === "waiting") {
     const pose: Pose = idlePose(t, a.seed, { every: 99, expressions: [] });
     const g = Math.sin(t * 0.35 + a.seed * 2);
@@ -233,7 +233,7 @@ function livePose(agent: LiveAgent, t: number): { pose: Pose; hop: number } {
 }
 
 /**
- * The tile (telas/RefinoUI.html, "Céu"): the agent's pixel sky fills the
+ * The tile: the agent's pixel sky fills the
  * canvas; the agent stands centered, feet near the bottom edge, smaller with
  * an accessory so it has room above (accessories from 24px, the sidebar size).
  */

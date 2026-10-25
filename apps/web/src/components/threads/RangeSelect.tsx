@@ -32,7 +32,7 @@ import { useThreadFlows } from "./ThreadBits";
 import "./threads.css";
 
 /**
- * "Ajustar trecho" (ThreadContexto.html, step 3): the selection in place on
+ * "Ajustar trecho": the selection in place on
  * the channel. The range is one continuous band; a thin rail in the gutter
  * joins it, with small start/end caps showing the time (drag them, or focus
  * one and use the arrow keys). Every row has a small outline checkbox; rows

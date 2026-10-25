@@ -87,7 +87,7 @@ const AgentBrowser = z
   .openapi("AgentBrowser");
 
 /**
- * Each agent's computer (D30): status, start, stop and delete (the agent's
+ * Each agent's computer (ADR 0021): status, start, stop and delete (the agent's
  * owner or admins), and the org's settings (on/off, allowed domains, limits).
  */
 export function sandboxRoutes(deps: AppDeps) {

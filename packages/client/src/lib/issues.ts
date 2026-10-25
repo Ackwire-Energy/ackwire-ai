@@ -4,7 +4,7 @@ export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"]
 export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
 export const PRIORITIES: IssuePriority[] = ["low", "normal", "high"];
 
-/** Tarefas.html: a circle that fills as the work goes. */
+/** A circle that fills as the work goes. */
 export const STATUS_ICON: Record<IssueStatus, "stageTodo" | "stageProgress" | "stageReview" | "stageDone" | "close"> = {
   todo: "stageTodo",
   in_progress: "stageProgress",

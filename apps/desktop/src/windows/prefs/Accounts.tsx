@@ -1,5 +1,5 @@
 /**
- * Preferências > Ferramentas, under the tools card (ContaClaudeBandeja.html, ADR 0041): one "Contas"
+ * Preferências > Ferramentas, under the tools card: one "Contas"
  * card per CLI found on this Mac. "Conta deste Mac" is the sign-in already in the CLI (not removable
  * here); each added account has its email, plan and "Remover"; "Adicionar conta" opens the CLI's own
  * sign-in in the browser and waits. Accounts belong to one organization's home, so with several
@@ -16,6 +16,7 @@ import {
   DialogFooter,
   Icon,
   PixelSpinner,
+  ProviderLogo,
   Segmented,
 } from "@agenteschat/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -141,7 +142,10 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
     <>
       {kinds.map((kind, i) => (
         <section key={kind} aria-busy={loaded.state === "loading" || undefined}>
-          <CardTitle>{t(KINDS[kind].title)}</CardTitle>
+          <CardTitle>
+            <ProviderLogo id={kind} size="xs" />
+            {t(KINDS[kind].title)}
+          </CardTitle>
           {i === 0 && homes.length > 1 && (
             <div className="dk-orgpick">
               <Segmented

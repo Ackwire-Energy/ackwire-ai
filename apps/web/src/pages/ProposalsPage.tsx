@@ -20,7 +20,7 @@ export function sortProposals(list: Proposal[]) {
   });
 }
 
-/** telas/Propostas.dc.html — list + detail with evidence and a neutral before/after diff. */
+/** Proposals: list + detail with evidence and a neutral before/after diff. */
 export function ProposalsPage({ agentId }: { agentId?: string }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();

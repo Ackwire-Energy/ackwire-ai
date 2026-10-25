@@ -31,7 +31,7 @@ function waitingFromIssues(list: Issue[]): WaitingItem[] {
 }
 
 /**
- * Issues (MobileDriveIssues.html, "Lista"), pushed from Você: the filters (Abertas and Com você with their
+ * Issues, pushed from Você: the filters (Abertas and Com você with their
  * counts, Dos agentes, Concluídas), what waits on you as the dark strip, then the sections by stage
  * (Em andamento, Em revisão, A fazer), each with its board columns named where the board is customized.
  * "+" opens "Nova tarefa". Columns are edited on the web only.

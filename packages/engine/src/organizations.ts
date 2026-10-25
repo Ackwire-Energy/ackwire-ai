@@ -1,9 +1,13 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { followWorkspaceName } from "./machine-provisioning";
+import { addressDomain } from "./mail/text";
+import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
+import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
 
 const {
   organizations,
@@ -61,6 +65,8 @@ export interface Membership {
   role: MemberRole;
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
+  /** The workspace's standing (`standing.ts`). */
+  standing?: WorkspaceStanding;
 }
 
 export async function listMemberships(db: Database, userId: string): Promise<Membership[]> {
@@ -70,32 +76,76 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
+      standing: STANDING_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(eq(organizationMembers.userId, userId))
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.userId, userId), isNull(users.blockedAt)))
     .orderBy(asc(organizations.createdAt));
 }
 
-export async function getMembership(db: Database, userId: string, orgId: string): Promise<Membership | null> {
+/**
+ * A person's membership, or null. A blocked account (`standing.ts`) has none, so every permission check
+ * refuses it at once; `includeBlocked` is for acting on them (removing them, changing their role).
+ */
+export async function getMembership(
+  db: Database,
+  userId: string,
+  orgId: string,
+  options: { includeBlocked?: boolean } = {},
+): Promise<Membership | null> {
   const [row] = await db
-    .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
+    .select({
+      orgId: organizations.id,
+      orgName: organizations.name,
+      role: organizationMembers.role,
+      standing: STANDING_COLUMNS,
+    })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(
+      and(
+        eq(organizationMembers.userId, userId),
+        eq(organizationMembers.orgId, orgId),
+        options.includeBlocked ? undefined : isNull(users.blockedAt),
+      ),
+    );
   return row ?? null;
 }
 
-/** Throws ForbiddenError unless the user is a member with `permission`. Returns the membership. */
+/**
+ * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` for anyone in a
+ * suspended workspace. Returns the membership.
+ */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
   if (!can(membership.role, permission)) throw new ForbiddenError();
   return membership;
 }
 
-/** Creates an organization owned by `userId`, with a `general` channel. */
+/** Invitations go out only from an active workspace (`standing.ts`). */
+function assertInviting(membership: Membership) {
+  if (membership.standing && membership.standing.state !== "active") throw new OrgPausedError(membership.standing);
+}
+
+/**
+ * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
+ * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
+ * (`org.create_refused`, the same words whatever the cause).
+ */
 export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
+  const [paused] = await db
+    .select({ id: organizations.id })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+    .limit(1);
+  if (paused || (await isUserBlocked(db, userId)))
+    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
@@ -110,6 +160,12 @@ export async function createOrganization(db: Database, userId: string, input: { 
       .returning();
     if (!general) throw new Error("channel insert returned nothing");
     await tx.insert(channelMembers).values({ orgId: organization.id, channelId: general.id, userId });
+    await recordOperatorEvent(tx, {
+      type: "organization.created",
+      orgId: organization.id,
+      userId,
+      data: { name: organization.name },
+    });
     return { organization, general };
   });
 }
@@ -120,8 +176,9 @@ export async function updateOrganization(
   orgId: string,
   input: { name?: string; context?: string },
 ) {
-  await requirePermission(db, actorId, orgId, "configure");
+  const before = await requirePermission(db, actorId, orgId, "configure");
   const [row] = await db.update(organizations).set(input).where(eq(organizations.id, orgId)).returning();
+  if (row && row.name !== before.orgName) await followWorkspaceName(db, orgId, before.orgName, row.name);
   caches.orgs.delete(`${orgId}:`);
   return row;
 }
@@ -131,7 +188,7 @@ export async function getOrganization(db: Database, orgId: string) {
   return row ?? null;
 }
 
-// ── Sign-up policy (same model as Tierbird, ADR 0011 there) ──────────────────
+// ── Sign-up policy (ADR 0006) ────────────────────────────────────────────────
 
 export async function countUsers(db: Database): Promise<number> {
   const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(users);
@@ -376,7 +433,7 @@ export async function changeMemberRole(
   role: MemberRole,
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
-  const target = await getMembership(db, targetUserId, orgId);
+  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
   if (!target) throw new ConflictError("That user is not a member");
   if ((target.role === "owner" || role === "owner") && !can(actor.role, "manage_owners")) {
     throw new ForbiddenError("Only owners can grant or revoke ownership");
@@ -401,14 +458,17 @@ export async function removeMember(
   targetUserId: string,
   options: { pubsub?: PubSub } = {},
 ) {
-  const target = await getMembership(db, targetUserId, orgId);
+  // Admins can remove a blocked member; a blocked person can't act, not even to leave.
+  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: actorId !== targetUserId });
   if (!target) return;
   if (actorId !== targetUserId) {
     const actor = await requirePermission(db, actorId, orgId, "manage_members");
     if (target.role === "owner" && !can(actor.role, "manage_owners"))
       throw new ForbiddenError("Only owners can remove owners");
   }
-  await db.transaction(async (tx) => {
+  // Loaded here: the accounts module builds on this one.
+  const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
+  const released = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -420,7 +480,10 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
+    return releaseMemberAccounts(tx, targetUserId, orgId);
   });
+  await announceReleasedAccounts(options.pubsub, released);
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
@@ -434,17 +497,21 @@ export async function removeMember(
  * they are the only owner of an organization that has other members
  * (`sole_owner`, with the organizations' names: make someone else an owner
  * first). Organizations where they are the only member go with them, with
- * everything in them. The rest follows the foreign keys: sessions, sign-in
- * methods, memberships, channel memberships, notifications and phones are
- * deleted; messages and records they authored stay without an author (the
- * same as any deleted user).
+ * everything in them. Their AI accounts on computers are signed out and
+ * removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
+ * sessions, sign-in methods, memberships, channel memberships, notifications
+ * and phones are deleted; messages and records they authored stay without an
+ * author (the same as any deleted user). Not for a blocked account: it can't
+ * act, and its workspaces would go with it.
  */
 export async function deleteAccount(
   db: Database,
   userId: string,
   options: { pubsub?: PubSub } = {},
 ): Promise<{ deletedOrgIds: string[] }> {
-  const { left, deleted } = await db.transaction(async (tx) => {
+  if (await isUserBlocked(db, userId)) throw new ForbiddenError();
+  const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
+  const { left, deleted, released } = await db.transaction(async (tx) => {
     const mine = await tx
       .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
       .from(organizationMembers)
@@ -477,9 +544,17 @@ export async function deleteAccount(
         { organizations: blocking },
       );
     }
+    // Before the user row: `created_by` would turn null, and a null owner is nobody's.
+    const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
     await tx.delete(users).where(eq(users.id, userId));
-    return { left: leaving, deleted: alone };
+    const gone = alone.map((orgId): OperatorEvent => ({ type: "organization.deleted", orgId, userId }));
+    await recordOperatorEvent(tx, ...gone, { type: "user.deleted", userId });
+    return { left: leaving, deleted: alone, released };
+  });
+  await announceReleasedAccounts(options.pubsub, {
+    machines: released.machines.filter((m) => left.includes(m.orgId)),
+    agents: released.agents.filter((a) => left.includes(a.orgId)),
   });
   // Their open WebSocket connections lose every subscription now.
   for (const orgId of left) await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
@@ -520,6 +595,7 @@ export async function createInvitation(
   now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  assertInviting(actor);
   if (input.role === "owner" && !can(actor.role, "manage_owners"))
     throw new ForbiddenError("Only owners can invite owners");
   const email = input.email.trim().toLowerCase();
@@ -544,6 +620,12 @@ export async function createInvitation(
     })
     .returning();
   if (!invitation) throw new Error("invitation insert returned nothing");
+  await recordOperatorEvent(db, {
+    type: "invitation.created",
+    orgId,
+    userId: actorId,
+    data: { emailDomain: addressDomain(email), role: input.role },
+  });
   /** `token` goes in the link and is never stored. */
   return { invitation, token };
 }
@@ -581,7 +663,7 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
  * endpoint as email invitations.
  */
 export async function createInviteLink(db: Database, actorId: string, orgId: string, now = new Date()) {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  assertInviting(await requirePermission(db, actorId, orgId, "manage_members"));
   const token = randomToken(32);
   const [link] = await db
     .insert(organizationInviteLinks)
@@ -594,6 +676,7 @@ export async function createInviteLink(db: Database, actorId: string, orgId: str
     })
     .returning();
   if (!link) throw new Error("invite link insert returned nothing");
+  await recordOperatorEvent(db, { type: "invitation.created", orgId, userId: actorId, data: { link: true } });
   return { link, token };
 }
 
@@ -664,13 +747,17 @@ export async function previewInvitation(db: Database, token: string, now = new D
   };
 }
 
-/** Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. */
+/**
+ * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
+ * a blocked account, nor into a workspace on hold or suspended.
+ */
 export async function acceptInvitation(
   db: Database,
   user: { id: string; email: string },
   token: string,
   now = new Date(),
 ) {
+  if (await isUserBlocked(db, user.id)) throw new ForbiddenError();
   return db.transaction(async (tx) => {
     const [invitation] = await tx
       .select()
@@ -687,6 +774,8 @@ export async function acceptInvitation(
       if (!link || link.revokedAt || link.expiresAt <= now) {
         throw new ConflictError("This invitation is invalid or has expired");
       }
+      // Nobody joins a workspace on hold or suspended.
+      await assertCanWork(tx, link.orgId);
       await joinOrganization(tx, link.orgId, user.id, link.role);
       await tx
         .update(organizationInviteLinks)
@@ -702,6 +791,7 @@ export async function acceptInvitation(
         `This invitation was sent to ${invitation.email}. Sign in with that address to accept it.`,
       );
     }
+    await assertCanWork(tx, invitation.orgId);
     await joinOrganization(tx, invitation.orgId, user.id, invitation.role);
     await tx
       .update(organizationInvitations)
@@ -793,6 +883,7 @@ export async function resendInvitation(
   now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  assertInviting(actor);
   const [existing] = await db
     .select()
     .from(organizationInvitations)
@@ -811,6 +902,12 @@ export async function resendInvitation(
     .where(eq(organizationInvitations.id, invitationId))
     .returning();
   if (!invitation) throw new ConflictError("This invitation can't be resent");
+  await recordOperatorEvent(db, {
+    type: "invitation.created",
+    orgId,
+    userId: actorId,
+    data: { emailDomain: addressDomain(invitation.email), role: invitation.role, resent: true },
+  });
   return { invitation, token };
 }
 

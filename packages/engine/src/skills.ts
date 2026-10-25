@@ -41,18 +41,36 @@ function unquote(v: string) {
   return t;
 }
 
-/**
- * Parses a `SKILL.md`: YAML frontmatter (top-level `key: value`, quoted
- * strings, `|`/`>` blocks and `- item` lists) and the Markdown body. `name`
- * and `description` are required (kebab-case ≤ 64; ≤ 1024 characters); other
- * fields are kept as metadata.
- */
-export function parseSkillMarkdown(text: string): ParsedSkill {
-  const src = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
-  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(src);
-  if (!m) throw new ValidationError("SKILL.md needs a frontmatter block (--- name/description ---)");
+/** Past this many values a frontmatter is refused as YAML (aliases can make a few lines stand for millions). */
+const FRONTMATTER_MAX_NODES = 10_000;
+
+/** The frontmatter as YAML (nested maps such as `metadata.openclaw`, block scalars, lists); null when it isn't. */
+function yamlFields(yaml: string): Record<string, unknown> | null {
+  let parsed: unknown;
+  try {
+    parsed = Bun.YAML.parse(yaml);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  // Every alias is the same object (possibly cyclic): a plain copy, within the budget, is what gets stored.
+  let nodes = 0;
+  try {
+    return JSON.parse(
+      JSON.stringify(parsed, (_key, value) => {
+        if (++nodes > FRONTMATTER_MAX_NODES) throw new Error("frontmatter too large");
+        return value;
+      }),
+    ) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Top-level `key: value`, quoted strings, `|`/`>` blocks and `- item` lists, line by line. */
+function lineFields(yaml: string): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
-  const lines = (m[1] ?? "").split("\n");
+  const lines = yaml.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
     const kv = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
@@ -71,10 +89,27 @@ export function parseSkillMarkdown(text: string): ParsedSkill {
       fields[key] = items.length > 0 ? items : "";
     } else fields[key] = unquote(value);
   }
-  const { name, description, ...metadata } = fields;
+  return fields;
+}
+
+/**
+ * Parses a `SKILL.md`: YAML frontmatter and the Markdown body. `name` and
+ * `description` are required (kebab-case ≤ 64; ≤ 1024 characters); other
+ * fields are kept as metadata, nested ones included.
+ */
+export function parseSkillMarkdown(text: string): ParsedSkill {
+  const src = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(src);
+  if (!m) throw new ValidationError("SKILL.md needs a frontmatter block (--- name/description ---)");
+  const lines = lineFields(m[1] ?? "");
+  // Many published skills aren't valid YAML (`description: Use when: …`): they keep the line reading.
+  const { name, description, ...metadata } = yamlFields(m[1] ?? "") ?? lines;
+  // YAML reads `description: Yes` as a boolean and `name: 1.0` as a number: then the text as written.
+  const written = (value: unknown, key: "name" | "description") =>
+    (typeof value === "string" ? value : typeof lines[key] === "string" ? (lines[key] as string) : "").trim();
   const parsed = {
-    name: typeof name === "string" ? name.trim() : "",
-    description: typeof description === "string" ? description.trim() : "",
+    name: written(name, "name"),
+    description: written(description, "description"),
     body: (m[2] ?? "").trim(),
     metadata,
   };
@@ -95,7 +130,7 @@ export function validateSkill(s: { name: string; description: string; body: stri
   if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
 }
 
-/** Scripts we keep (never shown to the model) so `run_skill_script` can run them in a sandbox (D30). */
+/** Scripts we keep (never shown to the model) so `run_skill_script` can run them in a sandbox (ADR 0021). */
 export const SKILL_SCRIPTS: Record<string, string> = {
   py: "text/x-python",
   sh: "text/x-shellscript",

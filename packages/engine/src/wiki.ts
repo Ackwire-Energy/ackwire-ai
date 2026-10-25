@@ -1763,7 +1763,7 @@ export async function retrieveWikiForRun(
   const lines: string[] = [];
   const ids: string[] = [];
   let used = 0;
-  // Context on demand (D65): pages the message names and the best match go in (cut at `WIKI_PAGE_CHARS`);
+  // Context on demand (ADR 0043): pages the message names and the best match go in (cut at `WIKI_PAGE_CHARS`);
   // the other matches only as an index line, read with read_wiki_page when the run needs them.
   const full = new Set([...namedRows.map((p) => p.id), ...found.slice(0, 1).map((p) => p.id)]);
   for (const p of [...namedRows, ...found]) {
@@ -1782,7 +1782,7 @@ export async function retrieveWikiForRun(
   return { text: lines.join("\n\n"), pageIds: ids };
 }
 
-/** A page the run's message names, or its best match, goes in up to this much (D65). */
+/** A page the run's message names, or its best match, goes in up to this much (ADR 0043). */
 const WIKI_PAGE_CHARS = 1500;
 /** Any other match goes in as one index line this long. */
 const WIKI_INDEX_CHARS = 200;

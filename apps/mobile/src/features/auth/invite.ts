@@ -1,7 +1,7 @@
 import { readValue, readValueSync, STORED, writeValue } from "@/lib/storage";
 
 /**
- * An invitation opened in the app (its link, D88) before the person is signed in: kept until they are in, then
+ * An invitation opened in the app (its link) before the person is signed in: kept until they are in, then
  * accepted (`InviteAcceptor` in the root layout). While it waits, sign-up and the social sign-in send its token
  * (`x-invite-token`), so a closed server lets the invited person create their account.
  */

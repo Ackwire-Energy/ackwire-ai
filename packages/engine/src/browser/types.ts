@@ -5,8 +5,10 @@
  */
 import type { BrowserFrameMetadata } from "@agenteschat/adapters";
 
-/** The scope of the browser tools: on by default (D61), and not covered by "all tools". */
+/** The scope of the browser tools: on by default, and not covered by "all tools". */
 export const BROWSER_SCOPE = "browser:use";
+/** The scope of the agent's desktop: driving it runs anything on the computer, so "all tools" never covers it. */
+export const DESKTOP_SCOPE = "desktop:use";
 
 /** The tools agents get with `browser:use`, the same for every brain. */
 export const BROWSER_TOOLS = [
@@ -64,11 +66,43 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
   browser_close: { label: "Close the browser", description: "Closes the agent's browser; logins stay saved." },
 };
 
+/**
+ * The tools under `desktop:use`: asking a person for help on the desktop (ADR 0058) and the agent's own
+ * use of it (ADR 0062). Labels and descriptions in English; the app translates them by tool name.
+ */
+export const DESKTOP_TOOL_INFO = {
+  desktop_do: {
+    label: "Do steps on the desktop",
+    description:
+      "Does several steps on the agent's desktop in one go (open an app, click, type, press keys), checking each one.",
+  },
+  desktop_read: {
+    label: "Read the screen",
+    description: "Reads the agent's desktop as text, with a number for each button, field and menu.",
+  },
+  desktop_screenshot: {
+    label: "Take a screenshot of the desktop",
+    description: "Saves an image of the agent's desktop in its folder.",
+  },
+  desktop_ask_person: {
+    label: "Ask for help on the desktop",
+    description:
+      "Asks a person to do something on the agent's desktop (like signing in to an app) and waits until they're done.",
+  },
+};
+
 /** How a handoff ended, as the agent reads it when it resumes (ADR 0040 §6). */
 export interface BrowserHandoffResult {
-  result: "done" | "failed" | "expired";
-  /** The person's note ("Couldn't: it asked for Ana's phone code"). */
+  result: "done" | "failed" | "expired" | "cancelled";
+  /** The person's note, in their own words ("it asked for Ana's phone code", "signed in with the shop's account"). */
   note?: string;
+}
+
+/** A page of the agent's browser as a person last saw it: from the live view's frames, else asked of the computer. */
+export interface BrowserPage {
+  url: string;
+  /** Written by the site: data, never instructions. */
+  title?: string;
 }
 
 /** One image of an agent's browser on its way to viewers. Never stored. */

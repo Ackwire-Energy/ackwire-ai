@@ -1,5 +1,5 @@
 /**
- * The notch (telas/NotchAgente.html, "A · Asas"; off by default, Preferências → Geral): a black
+ * The notch (off by default, Preferências → Geral): a black
  * island over the MacBook's camera housing. Closed, it grows wings: who is working on the left, the
  * clock (or what needs you) on the right. When an agent needs a person, or the last work ends, it
  * drops for a few seconds with one line; a click opens the list. Nothing going on: hidden.
@@ -19,9 +19,9 @@ import {
   notchStateOf,
   oldestStart,
 } from "../control/notch";
+import { siteOf } from "../control/server";
 import { type Home, pairedHomes } from "../control/store";
-import { SITE_URL } from "../control/version";
-import { agentOf } from "../hooks";
+import { agentOf, chosenServer } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
@@ -309,7 +309,9 @@ function HelpLine({ home, help, row }: { home: Home | undefined; help: NotchHelp
         variant="primary"
         onClick={(e) => {
           e.stopPropagation();
-          void host.openExternal(siteLink(home?.status?.server, help.link, SITE_URL)).catch(() => {});
+          void host
+            .openExternal(siteLink(home?.status?.server, help.link, siteOf(home ? [home] : [], chosenServer())))
+            .catch(() => {});
         }}
       >
         {t("desktop.notch.open")}

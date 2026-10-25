@@ -1,5 +1,13 @@
-import { describe, expect, test } from "bun:test";
-import { createFakeEmailSender, createLogEmailSender, createMillionSendSender, EmailError } from "../src";
+import { describe, expect, spyOn, test } from "bun:test";
+import nodemailer from "nodemailer";
+import type Mail from "nodemailer/lib/mailer";
+import {
+  createFakeEmailSender,
+  createLogEmailSender,
+  createMillionSendSender,
+  createSmtpEmailSender,
+  EmailError,
+} from "../src";
 
 const msg = { to: ["ana@example.com"], subject: "Oi", html: "<p>Oi</p>", text: "Oi", idempotencyKey: "invite:1" };
 
@@ -98,5 +106,96 @@ describe("MillionSend sender", () => {
     const fake = createFakeEmailSender();
     await fake.send(msg);
     expect(fake.sent).toEqual([msg]);
+  });
+
+  test("the base URL is configurable (any Resend-compatible API)", async () => {
+    const urls: string[] = [];
+    const sender = createMillionSendSender({
+      apiKey: "k",
+      from: "f@x.y",
+      baseURL: "https://mail.example.com/api/",
+      fetch: (async (url: string) => {
+        urls.push(url);
+        return Response.json({ id: "e1" });
+      }) as unknown as typeof fetch,
+    });
+    await sender.send(msg);
+    expect(urls).toEqual(["https://mail.example.com/api/emails"]);
+  });
+});
+
+describe("SMTP sender", () => {
+  test("sends html and text from the configured sender, with the reply-to", async () => {
+    const mails: Mail.Options[] = [];
+    const sender = createSmtpEmailSender({
+      url: "smtps://u:p@smtp.example.com",
+      from: "agentes <ola@example.com>",
+      replyTo: "suporte@example.com",
+      transport: {
+        sendMail: async (mail: Mail.Options) => {
+          mails.push(mail);
+          return { messageId: "<m1@example.com>", envelope: { from: "ola@example.com", to: ["ana@example.com"] } };
+        },
+      },
+    });
+    expect(sender.delivers).toBe(true);
+    expect(await sender.send(msg)).toEqual({ id: "<m1@example.com>" });
+    expect(mails).toEqual([
+      {
+        from: "agentes <ola@example.com>",
+        to: ["ana@example.com"],
+        subject: "Oi",
+        html: "<p>Oi</p>",
+        text: "Oi",
+        replyTo: "suporte@example.com",
+      },
+    ]);
+    // nodemailer builds a valid message from it.
+    const json = createSmtpEmailSender({
+      url: "smtp://unused",
+      from: "agentes <ola@example.com>",
+      transport: nodemailer.createTransport({ jsonTransport: true }),
+    });
+    expect((await json.send(msg)).id).toMatch(/^<.+>$/);
+  });
+
+  test("5xx answers (recipient refused, bad login) don't retry; 4xx and connection failures do", async () => {
+    // nodemailer's errors carry the server's reply code as `responseCode`; a dropped connection has none.
+    for (const [responseCode, retryable] of [
+      [550, false],
+      [535, false],
+      [451, true],
+      [undefined, true],
+    ] as const) {
+      const error = Object.assign(new Error(`server said ${responseCode}`), { responseCode });
+      const sender = createSmtpEmailSender({
+        url: "smtp://unused",
+        from: "f@x.y",
+        transport: {
+          sendMail: async () => {
+            throw error;
+          },
+        },
+      });
+      const failure = await sender.send(msg).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(EmailError);
+      expect((failure as EmailError).retryable).toBe(retryable);
+      expect((failure as EmailError).message).toBe(`SMTP send failed: server said ${responseCode}`);
+    }
+  });
+
+  test("smtp:// requires STARTTLS unless the URL opts out", () => {
+    const created = spyOn(nodemailer, "createTransport");
+    try {
+      createSmtpEmailSender({ url: "smtp://u:p@smtp.example.com:587", from: "f@x.y" });
+      createSmtpEmailSender({ url: "smtp://relay.internal:25?requireTLS=false", from: "f@x.y" });
+      const requireTLS = created.mock.results.map(
+        (r) =>
+          (r.value as unknown as { transporter: { options: { requireTLS?: boolean } } }).transporter.options.requireTLS,
+      );
+      expect(requireTLS).toEqual([true, false]);
+    } finally {
+      created.mockRestore();
+    }
   });
 });

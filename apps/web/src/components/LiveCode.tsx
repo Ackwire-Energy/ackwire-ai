@@ -237,7 +237,7 @@ function LiveCallBlock({
             size: formatBytes(i18n.language, outputBytes(call.output)),
           })
         : t(`chat.work.step.${activity.kind}`, { app: activity.app ?? "", tool: call.tool });
-  // Pixel marks (telas/Mensagens.html): the orbit while it runs, one green pixel when done, a dim square if stopped.
+  // Pixel marks: the orbit while it runs, one green pixel when done, a dim square if stopped.
   const mark = call.running ? (
     <AgentSpinner agentId={agentId} size={14} />
   ) : stopped ? (

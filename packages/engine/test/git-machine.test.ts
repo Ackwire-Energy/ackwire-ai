@@ -153,7 +153,7 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
     const w = await world({ scopes: ["github:git.read", "github:git.write"] });
     const setupFor = await machineGitSetup(w.machineDeps, f.org.id, f.agent.id, w.paired.machineId);
     expect(setupFor?.proxy.base).toBe(`${PUBLIC_URL}/api/git/${f.org.id}/${w.connection.id}/`);
-    expect(setupFor?.author).toEqual({ name: "Dev (agentes)", email: "dev@agents.agentes.chat" });
+    expect(setupFor?.author).toEqual({ name: "Dev (agentes)", email: "dev@agents.agentes.test" });
     const claims = verifyGitToken(SECRET, setupFor?.proxy.token ?? "");
     expect(claims).toMatchObject({ kind: "machine", sandboxId: w.paired.machineId, agentId: f.agent.id });
     expect(setupFor?.proxy.token).not.toContain(GH_TOKEN);
@@ -233,7 +233,7 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
       op: "git.sync",
       agent: { id: f.agent.id, handle: "dev" },
       repos: [{ repo: "acme/app", dir: "repos/acme/app", clone: true }],
-      author: { email: "dev@agents.agentes.chat" },
+      author: { email: "dev@agents.agentes.test" },
       stream: true,
     });
     expect(sync?.timeoutSeconds).toBeGreaterThanOrEqual(1800);

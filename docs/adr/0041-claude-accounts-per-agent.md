@@ -1,8 +1,7 @@
 # 0041. Claude and Codex accounts on a connected computer, chosen per agent; effort per agent
 
-- Status: Accepted (2026-10-20)
+- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing)
 - Date: 2026-10-20
-- Planning: D63
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets, end to end), ADR 0032 (Claude Code and Codex as brains), ADR 0036 (desktop app)
 - Out of scope for now: cloud computers, switching accounts by itself when a plan runs out
 
@@ -31,7 +30,7 @@ What the CLIs do (checked 2026-10-20, Claude Code 2.1.304, Codex 0.163.0):
 - Each account is `<runner home>/accounts/<kind>/<accountId>/`, used as `CLAUDE_CONFIG_DIR` (Claude Code) or `CODEX_HOME` (Codex). The CLI writes and keeps its own sign-in there; the runner never reads, copies or sends it. Folder mode 700, outside every agent workspace (the runner refuses `read` and `push` inside `<runner home>`).
 - There is always **"Conta deste computador"**: no folder, the sign-in already in `~/.claude` / `~/.codex`, exactly as today. It is the default.
 - An account's sessions live in its folder. Changing an agent's account starts a new CLI session for its threads (the conversation itself is ours and continues). Rare, and accepted.
-- The person's personal CLAUDE.md, skills and plugins don't load in an account folder. That matches D60, which wants `--setting-sources project` anyway.
+- The person's personal CLAUDE.md, skills and plugins don't load in an account folder. That matches the runner's `--setting-sources project` (`apps/server/runner/brain.ts`) anyway.
 
 ### 2. Adding an account from the web or the phone
 

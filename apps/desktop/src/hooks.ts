@@ -1,6 +1,7 @@
 import type { ControlAgent } from "@agenteschat/adapters/runner-control";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHost } from "./app";
+import { SERVER_PREF, serverFromPref } from "./control/server";
 import type { Home } from "./control/store";
 import {
   CHECK_EVERY_MS,
@@ -142,3 +143,6 @@ export function writePref<T>(key: string, value: T) {
     // ignore
   }
 }
+
+/** The server the next sign-in goes to ("Seu servidor"); agentes.chat until one is chosen. */
+export const chosenServer = () => serverFromPref(readPref<string | null>(SERVER_PREF, null));

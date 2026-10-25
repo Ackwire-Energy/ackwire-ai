@@ -4,9 +4,11 @@ import type {
   AgentBrain,
   AgentQuestion,
   AgentSecret,
+  AiStatus,
   ApiClient,
   AppNotification,
   Approval,
+  AuthConfig,
   Channel,
   ChannelMember,
   Connection,
@@ -16,16 +18,20 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
+  ImportItemKind,
+  ImportItemResult,
   InvitationWithStatus,
   Me,
   Member,
   Memory,
   Message,
+  PlanAccountUsage,
   Proposal,
   ReactionCount,
   Role,
   Run,
   ScopeGrant,
+  SearchHit,
   SecretRequest,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -56,8 +62,61 @@ export const ATLAS_ID = "00000000-0000-4000-8000-0000000000a2";
 
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
 
+/** Real-time based (a plan window that reset reads as empty again): the usage views' windows. */
+const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+
+/** The MacBook's own Claude Code sign-in, shared by Ada and Atlas (the usage views, ADR 0063). */
+function fakePlanAccount(money: boolean): PlanAccountUsage {
+  const machineId = "00000000-0000-4000-8000-0000000000d1";
+  return {
+    key: `${machineId}:claude_code:computer`,
+    machineId,
+    machineName: "MacBook",
+    kind: "claude_code",
+    accountId: null,
+    label: null,
+    plan: "max",
+    provider: null,
+    ownerName: "Walter Lima",
+    mine: true,
+    email: null,
+    signedOut: false,
+    usage: {
+      windows: [
+        {
+          kind: "five_hour",
+          usedPercent: 62,
+          resetsAt: hoursFromNow(2),
+          agents: [{ agentId: ADA_ID, name: "Ada", percent: 62 }],
+        },
+        {
+          kind: "seven_day",
+          usedPercent: 41,
+          resetsAt: hoursFromNow(72),
+          agents: [
+            { agentId: ADA_ID, name: "Ada", percent: 30 },
+            { agentId: ATLAS_ID, name: "Atlas", percent: 11 },
+          ],
+        },
+      ],
+      source: "turn",
+      at: new Date().toISOString(),
+    },
+    agents: [
+      { agentId: ADA_ID, name: "Ada", tokens: 4_500_000, now: true },
+      { agentId: ATLAS_ID, name: "Atlas", tokens: 600_000, now: true },
+    ],
+    monthTokens: 5_100_000,
+    ...(money ? { equivalentUsd: 92 } : {}),
+  };
+}
+
 export interface FakeState {
   me: Me | null;
+  /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
+  authConfig?: Partial<AuthConfig>;
+  /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
+  phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
@@ -95,6 +154,10 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
+  actionCheck?: boolean;
+  /** What agents did outside (search kind `action`), as the search returns it. */
+  teamActions?: SearchHit[];
   /** My inbox (`notifications.*`); empty unless a test fills it. */
   notifications?: AppNotification[];
   /** `actions.undo`/`redo`/`undoMessage` fail for these receipt ids with this error (`action.changed_since`…). */
@@ -109,9 +172,13 @@ export interface FakeState {
   waitlistError?: ApiError;
   /** Make `waitlist.confirm` fail with this error (invalid_token…). */
   waitlistConfirmError?: ApiError;
+  /** `agents.aiStatus`; unset = every agent ready. */
+  aiStatus?: AiStatus;
+  /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
+  answerNowError?: ApiError;
 }
 
-/** A small in-memory backend with the data of the approved screens ("Acme"). */
+/** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   const walter: Member = {
     userId: "u-walter",
@@ -186,7 +253,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       {
         id: "m-2",
         channelId: ENG_ID,
-        // Asked in the channel, answered in the channel (D67).
+        // Asked in the channel, answered in the channel.
         threadId: null,
         author: { type: "agent", id: ADA_ID },
         body: "Achei a causa: o refresh compara `expires_at` em segundos com milissegundos.",
@@ -227,7 +294,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
           2,
           "msg-card",
         ),
-        // Its card is in the channel itself (D67).
+        // Its card is in the channel itself.
         threadId: null,
       },
       approval(
@@ -609,7 +676,8 @@ type FakedParts =
   | "customConnectors"
   | "mail"
   | "databases"
-  | "browser";
+  | "browser"
+  | "desktop";
 
 /** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
@@ -632,6 +700,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
   const seesCost = () => state.me?.organizations[0]?.role !== "member";
+  // A new `me` with the org's logo changed, as the server answers: what the app read before stays as it was.
+  const setOrgLogo = (orgId: string, logo: string | null) => {
+    if (!state.me) return;
+    state.me = { ...state.me, organizations: state.me.organizations.map((o) => (o.id === orgId ? { ...o, logo } : o)) };
+  };
   const spentOf = (agentId: string) => (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
   const budgetOf = (a: Agent) => a.monthlyBudgetUsd ?? state.defaultAgentBudgetUsd ?? 50;
   const percentOf = (a: Agent) => Math.round((spentOf(a.id) / budgetOf(a)) * 1000) / 10;
@@ -653,11 +726,25 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     account: {
-      authConfig: async () => ({ socialProviders: { google: false, github: true }, signupOpen: true, firstRun: false }),
+      authConfig: async () => ({
+        socialProviders: { google: false, github: true },
+        signupOpen: true,
+        firstRun: false,
+        landing: true,
+        ...state.authConfig,
+      }),
       signInOptions: async () => ({ account: false, password: false, providers: [], canSignUp: true }),
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
+      },
+      phoneSignIn: async () => {
+        log("account.phoneSignIn");
+        return {
+          token: `tok-${state.calls.filter((c) => c.method === "account.phoneSignIn").length}`,
+          server: state.phoneServer ?? "https://agentes.chat",
+          expiresIn: 180,
+        };
       },
     },
     orgs: {
@@ -704,15 +791,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       setLogo: async (orgId, input) => {
         log("orgs.setLogo", orgId, { contentType: input.contentType });
-        const o = state.me?.organizations.find((x) => x.id === orgId);
-        if (!o) throw new ApiError(404, "not_found", "Organization not found");
-        o.logo = `data:${input.contentType};base64,${input.imageBase64}`;
-        return { logo: o.logo };
+        if (!state.me?.organizations.some((x) => x.id === orgId)) {
+          throw new ApiError(404, "not_found", "Organization not found");
+        }
+        const logo = `data:${input.contentType};base64,${input.imageBase64}`;
+        setOrgLogo(orgId, logo);
+        return { logo };
       },
       removeLogo: async (orgId) => {
         log("orgs.removeLogo", orgId);
-        const o = state.me?.organizations.find((x) => x.id === orgId);
-        if (o) o.logo = null;
+        setOrgLogo(orgId, null);
       },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
@@ -747,6 +835,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         routerModel: null,
         summaryModel: null,
         timezone: "America/Sao_Paulo",
+        actionCheck: state.actionCheck ?? true,
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
@@ -755,6 +844,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.context !== undefined) state.context = input.context;
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
+        if (input.actionCheck !== undefined) state.actionCheck = input.actionCheck;
         return {
           name: input.name ?? "Acme",
           context: state.context ?? "",
@@ -762,6 +852,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           routerModel: null,
           summaryModel: null,
           timezone: input.timezone ?? "America/Sao_Paulo",
+          actionCheck: state.actionCheck ?? true,
         };
       },
       overview: async () => ({
@@ -803,6 +894,20 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         }
         return { url: `http://localhost:3000/invite/tok-new-${invitationId}`, expiresAt: inv?.expiresAt ?? "" };
       },
+      planUsage: async () => ({
+        month: new Date().toISOString().slice(0, 7),
+        money: seesCost(),
+        accounts: [fakePlanAccount(seesCost())],
+        api: [
+          {
+            agentId: ATLAS_ID,
+            name: "Atlas",
+            tokens: 1_100_000,
+            budgetPercent: 23,
+            ...(seesCost() ? { costUsd: 11.5, budgetUsd: 50, budgetIsDefault: true } : {}),
+          },
+        ],
+      }),
       usageReport: async () => ({
         since: minutesAgo(60 * 24 * 14),
         defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50,
@@ -826,6 +931,51 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       }),
     },
     agents: {
+      planUsage: async (_orgId, agentId) => {
+        const money = seesCost();
+        const account = fakePlanAccount(money);
+        const { usage: _u, agents: _a, monthTokens: _m, equivalentUsd: _e, ...info } = account;
+        const today = new Date().toISOString().slice(0, 10);
+        const day = Number(today.slice(8, 10));
+        return {
+          month: today.slice(0, 7),
+          money,
+          tokens: 3_900_000,
+          ...(money ? { equivalentUsd: 77 } : {}),
+          sources: [
+            {
+              key: account.key,
+              type: "plan" as const,
+              kind: "claude_code" as const,
+              account: info,
+              removed: false,
+              tokens: 3_800_000,
+              share: 97.4,
+              lastDay: today,
+              now: true,
+              ...(money ? { equivalentUsd: 76 } : {}),
+            },
+            {
+              key: "api",
+              type: "api" as const,
+              kind: null,
+              account: null,
+              removed: false,
+              tokens: 100_000,
+              share: 2.6,
+              lastDay: today,
+              now: false,
+              budgetPercent: 2,
+              ...(money ? { costUsd: 0.8 } : {}),
+            },
+          ],
+          days: Array.from({ length: day }, (_, i) => ({
+            date: `${today.slice(0, 8)}${String(i + 1).padStart(2, "0")}`,
+            tokens: (i + 1 === day ? { [account.key]: 250_000, api: 10_000 } : {}) as Record<string, number>,
+          })),
+          current: agentId === ADA_ID ? account : null,
+        };
+      },
       team: async () => ({
         agents: state.agents.map((a) => ({
           id: a.id,
@@ -884,7 +1034,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
-        Object.assign(agent, input);
+        const { acceptPlanTerms: _, ...fields } = input;
+        Object.assign(agent, fields);
         return { ...agent };
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
@@ -941,6 +1092,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.credentials = state.credentials.filter((c) => c.id !== credentialId);
       },
       platformKeyAvailable: async () => state.platformKey,
+      aiStatus: async () =>
+        structuredClone(
+          state.aiStatus ?? {
+            any: true,
+            agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })),
+          },
+        ),
       importFromGithub: async (orgId, url) => {
         log("agents.importFromGithub", orgId, url);
         const files = state.githubFiles?.[url];
@@ -999,9 +1157,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.setBrain", orgId, agentId, input);
         const b = brainOf(agentId);
         const brain = input.brain ?? b.brain;
-        if (brain !== b.brain && brain !== "model" && !input.acceptPlanTerms)
-          throw new ApiError(400, "brain.terms_required", "Confirm the warning");
         const changed = brain !== b.brain;
+        // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's, with the terms.
+        const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
+        if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner)) {
+          if (!b.canUsePlans) throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
+          if (!input.acceptPlanTerms) throw new ApiError(400, "audience.plan_terms_required", "Confirm the warning");
+        }
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
         const option = b.options.find((o) => o.kind === brain);
         const next: AgentBrain = {
@@ -1013,6 +1175,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           // ADR 0041: another brain kind starts on the computer's own account.
           account: input.account !== undefined ? input.account : changed ? null : b.account,
           effort: input.effort !== undefined ? input.effort : b.effort,
+          onlyOwner,
         };
         brains.set(agentId, next);
         return structuredClone(next);
@@ -1057,6 +1220,49 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
                 costUsd: 3.1,
               },
             ],
+    },
+    // Like the backend on an empty workspace: every picked item is new; a taken handle gets the next free one.
+    imports: {
+      apply: async (orgId, input) => {
+        log("imports.apply", orgId, input);
+        if (state.me?.organizations[0]?.role === "member") {
+          throw new ApiError(403, "forbidden", "You don't have permission to do this");
+        }
+        const { bundle } = input;
+        const items: ImportItemResult[] = [];
+        const add = (kind: ImportItemKind, key: string, label: string, extra: Partial<ImportItemResult> = {}) => {
+          if (input.pick && !input.pick.includes(`${kind}:${key}`)) return;
+          items.push({ kind, key, label, action: "create", ...extra, ...(input.dryRun ? {} : { targetId: id(kind) }) });
+        };
+        for (const s of bundle.skills) add("skill", s.key, /^name:\s*(.+)$/m.exec(s.markdown)?.[1]?.trim() ?? s.key);
+        const taken = new Set(state.agents.map((a) => a.handle));
+        for (const a of bundle.agents) {
+          let handle = a.handle;
+          for (let i = 2; taken.has(handle); i++) handle = `${a.handle}${i}`;
+          taken.add(handle);
+          add("agent", a.key, a.name, handle === a.handle ? {} : { renamedTo: handle });
+          const created = items.at(-1);
+          if (input.dryRun || created?.kind !== "agent" || created.key !== a.key) continue;
+          state.agents.push({
+            id: created.targetId ?? id("agent"),
+            name: a.name,
+            handle,
+            role: a.role,
+            instructions: a.instructions,
+            model: a.model ?? "claude-sonnet-5-5",
+            ownerUserId: state.me?.user.id ?? null,
+            hasCredential: false,
+            monthlyBudgetUsd: null,
+            createdAt: NOW.toISOString(),
+            audience: { mode: "everyone", userIds: [] },
+          });
+        }
+        for (const c of bundle.channels) add("channel", c.key, c.name);
+        for (const r of bundle.routines) add("routine", r.key, r.name);
+        for (const n of bundle.notes) add("note", n.key, n.title || n.content.split("\n")[0]?.slice(0, 80) || n.key);
+        return { items };
+      },
+      exportUrl: (orgId) => `/api/app/organizations/${orgId}/export`,
     },
     chat: {
       channels: async () => state.channels,
@@ -1114,6 +1320,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       correct: async (orgId, messageId, body) => {
         log("chat.correct", orgId, messageId, body);
+      },
+      answerNow: async (orgId, messageId) => {
+        log("chat.answerNow", orgId, messageId);
+        if (state.answerNowError) throw state.answerNowError;
+        return { runs: [] };
       },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>
@@ -1294,7 +1505,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             score: 0.5,
             createdAt: m.updatedAt,
           }));
-        return [...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+        const actions = (state.teamActions ?? []).filter((h) => h.snippet.toLowerCase().includes(q));
+        return [...actions, ...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
       },
     },
     memory: {
@@ -1607,6 +1819,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     mail: mail.client,
     databases: databases.client,
     browser: browser.client,
+    desktop: browser.desktop,
   };
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);
@@ -1653,9 +1866,12 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     account: null,
     effort: null,
     accounts: [],
-    accountsOwner: { id: "u-walter", name: "Walter Caldas" },
     canManageAccounts: true,
     accountsSupported: true,
+    onlyOwner: false,
+    canUsePlans: true,
+    ownSignIn: true,
+    ownUsage: {},
     ...patch,
   };
   // The computers the person may give the agent: the MacBook, with what it offers.

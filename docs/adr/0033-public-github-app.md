@@ -2,7 +2,6 @@
 
 - Status: Accepted (built)
 - Date: 2026-10-17
-- Planning: D47
 - Extends: ADR 0024 (git proxy), ADR 0007 (credentials)
 
 ## Context

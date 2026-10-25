@@ -1,11 +1,11 @@
 /**
- * The engines' portraits, defined once (telas/IconesMotor.html, direction C
- * "Objeto + agente", approved): what an agent thinks and works with (ADR 0032).
+ * The engines' portraits, defined once: what an agent thinks and works with
+ * (ADR 0032).
  * Every place that shows an engine at 48 px and up draws it from here: the
- * agent page's "Motor", the desktop app's Ferramentas, the phone app, and the
- * HTML prototype in docs/design/telas (which imports this file as is, so it
- * stays plain JavaScript with types in portrait.d.ts; its only import is the
- * agent engine, by a relative path).
+ * agent page's "Motor", the desktop app's Ferramentas, the phone app, and
+ * plain HTML pages that import this file as is (so it stays plain JavaScript
+ * with types in portrait.d.ts; its only import is the agent engine, by a
+ * relative path).
  *
  * Our own drawings, never the vendors' marks: each engine is told apart by its
  * tool, its temperature and what the screen shows, with the agent's own small
@@ -17,7 +17,7 @@
  * accessory) when one is given, the default look otherwise.
  * States: idle · working (the line writes / the code types / the agent looks
  * around and thinks) · off (not installed or computer offline: the screen goes
- * dark and the agent sleeps; the caller also desaturates, as the prototype).
+ * dark and the agent sleeps; the caller also desaturates).
  * Drawn on a 48×48 grid (one canvas pixel per cell), scaled by whole numbers so
  * every pixel stays crisp.
  */

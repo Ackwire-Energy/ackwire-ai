@@ -4,7 +4,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 /**
- * In-app notifications (D46): one inbox per person per organization. People
+ * In-app notifications: one inbox per person per organization. People
  * only, never agents. A row may stand for several events of one `group_key`
  * (thread replies, issue comments, reactions): while it is unread and not
  * done, new events merge into it (`actors`, `count`, `latest`).

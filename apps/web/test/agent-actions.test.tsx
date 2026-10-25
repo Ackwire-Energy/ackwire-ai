@@ -82,7 +82,7 @@ const click = async (el: HTMLElement) => {
   await settle(4);
 };
 
-describe("receipts under the agent's reply (FazerDesfazer A/B)", () => {
+describe("receipts under the agent's reply", () => {
   test("one change: a quiet row with the sentence, the target links to the issue, Desfazer with the time in tabular figures", async () => {
     await open(withActions([action()]));
     const group = receipts();

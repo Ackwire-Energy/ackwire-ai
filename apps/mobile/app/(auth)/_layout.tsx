@@ -1,7 +1,7 @@
 import { Stack } from "expo-router";
 import { useTheme } from "@/ui/theme";
 
-/** Sign in, sign up and forgot password: one question per screen, the platform's push between them. */
+/** Sign in and sign up (forgot password in place), your server and the QR scanner: the platform's push between them. */
 export default function AuthLayout() {
   const { colors } = useTheme();
   return (

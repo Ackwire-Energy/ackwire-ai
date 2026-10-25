@@ -1,10 +1,9 @@
 /**
- * The connected computers' portraits, defined once (telas/IconesComputador.html).
+ * The connected computers' portraits, defined once.
  * Every place that shows a computer at 48 px and up draws it from here: the
  * computers list, the computer page, `/conectar`, the agent's computer, the
- * desktop app, and the HTML prototypes in docs/design/telas (which import this
- * file as is, so it stays plain JavaScript with types in portrait.d.ts and no
- * imports).
+ * desktop app, and plain HTML pages that import this file as is (so it stays
+ * plain JavaScript with types in portrait.d.ts and no imports).
  *
  * Our own drawings, never the vendors' marks: each system is told apart by its
  * device and what its screen shows.

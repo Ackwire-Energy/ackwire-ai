@@ -1,8 +1,11 @@
+import type { ScreenKind } from "./types";
+
 /** React Query keys. Everything under ["org", orgId] is dropped when switching organizations. */
 export const keys = {
   health: ["health"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
+  phoneSignIn: ["phone-sign-in"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
@@ -11,6 +14,8 @@ export const keys = {
   agents: (orgId: string) => ["org", orgId, "agents"] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
+  /** Under `credentials`: a key added, rotated or removed refreshes it too. */
+  aiStatus: (orgId: string) => ["org", orgId, "credentials", "ai-status"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
@@ -30,6 +35,7 @@ export const keys = {
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,
+  aiAccounts: (orgId: string) => ["org", orgId, "ai-accounts"] as const,
   accountLogin: (orgId: string, machineId: string, loginId: string) =>
     ["org", orgId, "machine", machineId, "account-login", loginId] as const,
   agentChannels: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "channels"] as const,
@@ -38,6 +44,9 @@ export const keys = {
   people: (orgId: string) => ["org", orgId, "people"] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
+  /** The usage views; an agent's sits under it, so one invalidation refreshes both. */
+  planUsage: (orgId: string) => ["org", orgId, "plan-usage"] as const,
+  agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
@@ -56,8 +65,12 @@ export const keys = {
   computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
   agentSecrets: (orgId: string, agentId: string) => ["org", orgId, "agent-secrets", agentId] as const,
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
+  /** The server's own computer here (under `machines`: a machines refetch refreshes it too). */
+  hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
   machineOutages: (orgId: string) => ["org", orgId, "machines", "outages"] as const,
+  /** The workspace's own computer on its way (ADR 0056 §10); `machine.provisioning` events set it. */
+  computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
   machineDevice: (userCode: string) => ["machine-device", userCode] as const,
   desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,
@@ -127,10 +140,12 @@ export const keys = {
   databaseList: (orgId: string) => ["org", orgId, "databases", "list"] as const,
   databaseTables: (orgId: string, connectionId: string) => ["org", orgId, "databases", "tables", connectionId] as const,
   agentDatabases: (orgId: string, agentId: string) => ["org", orgId, "databases", "agent", agentId] as const,
-  /** The agent browser (ADR 0040): an agent's settings, its open request, one request (prefix). */
+  /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,
   agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
-  agentBrowserHandoff: (orgId: string, agentId: string) =>
-    ["org", orgId, "browser", "agent", agentId, "handoff"] as const,
+  agentBrowserHandoff: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
+    ["org", orgId, "browser", "agent", agentId, "handoff", screen] as const,
   browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
+  /** The agent's desktop (ADR 0058): its state as this person sees it. */
+  agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
 };

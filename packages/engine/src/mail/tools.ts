@@ -10,6 +10,7 @@ import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
 import { runAuthorityById } from "../authority";
+import { recordOperatorEvent } from "../operator-events";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
@@ -23,7 +24,9 @@ import {
   orgMailAccounts,
 } from "./accounts";
 import { agentMailPolicies, type MailPolicy } from "./policies";
+import { type MailPreview, mailDetail, withoutReplyPrefix } from "./preview";
 import {
+  addressDomain,
   cutBody,
   formatAddress,
   isEmailAddress,
@@ -479,6 +482,15 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       };
     };
 
+    const detailBody = (body: string) =>
+      body.length > DETAIL_BODY_CHARS ? `${body.slice(0, DETAIL_BODY_CHARS)}\n[…]` : body;
+    /** The message a reply, forward or reply draft answers, when `checkCall` read it. */
+    const originalOf = (id: string): MailPreview["original"] => {
+      if (!id) return null;
+      const m = recalled(account.id, id);
+      return m ? { subject: m.subject, from: m.from?.address ?? null } : null;
+    };
+
     const describeSend = (verb: "send" | "reply" | "forward") => (input: Record<string, unknown>) => {
       const p = plan(verb, input);
       if (!p) {
@@ -488,18 +500,39 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         };
       }
       const action = verb === "send" ? "Send email to" : verb === "reply" ? "Reply by email to" : "Forward email to";
-      const body = p.body.length > DETAIL_BODY_CHARS ? `${p.body.slice(0, DETAIL_BODY_CHARS)}\n[…]` : p.body;
       return {
         title: `${action} ${[...p.to, ...p.cc, ...p.bcc].join(", ")}: "${oneLine(p.subject, 120)}"`,
-        detail: [
-          `From: ${p.from}`,
-          `To: ${p.to.join(", ")}`,
-          ...(p.cc.length > 0 ? [`Cc: ${p.cc.join(", ")}`] : []),
-          ...(p.bcc.length > 0 ? [`Bcc: ${p.bcc.join(", ")}`] : []),
-          `Subject: ${p.subject}`,
-          "",
-          body,
-        ].join("\n"),
+        detail: mailDetail({
+          from: p.from,
+          to: p.to,
+          cc: p.cc,
+          bcc: p.bcc,
+          subject: p.subject,
+          body: detailBody(p.body),
+          original: verb === "send" ? null : originalOf(str(input.message_id)),
+        }),
+      };
+    };
+
+    /** A draft as its card shows it: From, To, Subject, the text and the message it answers. */
+    const describeDraft = (input: Record<string, unknown>) => {
+      const to = [...addresses(input.to), ...addresses(input.cc), ...addresses(input.bcc)];
+      const replyTo = str(input.in_reply_to);
+      const original = replyTo
+        ? (originalOf(replyTo) ?? { subject: withoutReplyPrefix(str(input.subject)), from: null })
+        : null;
+      const verb = replyTo ? "Save a draft reply" : "Save a draft";
+      return {
+        title: `${verb}${to.length > 0 ? ` to ${to.join(", ")}` : ""} in ${account.address}: "${oneLine(str(input.subject), 120)}"`,
+        detail: mailDetail({
+          from: fromAddress,
+          to: addresses(input.to),
+          cc: addresses(input.cc),
+          bcc: addresses(input.bcc),
+          subject: str(input.subject),
+          body: detailBody(str(input.body)),
+          original,
+        }),
       };
     };
 
@@ -589,6 +622,17 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
             target: { type: "mail_account", id: account.id },
             details: { kind: verb, recipients, subject: p.subject.slice(0, 200), runId: ctx.runId },
           });
+          await recordOperatorEvent(ctx.db, {
+            type: "mail.sent",
+            orgId: ctx.orgId,
+            data: {
+              agentId: ctx.agentId,
+              runId: ctx.runId || null,
+              kind: verb,
+              recipients: recipients.length,
+              domains: [...new Set(recipients.map(addressDomain))],
+            },
+          });
           return {
             content: `Sent "${oneLine(p.subject, 120)}" to ${recipients.join(", ")} from ${p.from}.`,
             data: { mailAccountId: account.id, recipients, providerMessageId: sent.id },
@@ -642,14 +686,17 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       "Save a draft in the mailbox for a person to review and send (never sends).",
       { properties: { ...outgoingProps, in_reply_to: MESSAGE_ID }, required: ["subject", "body"] },
       {
-        checkCall: async (input) => {
+        describe: describeDraft,
+        checkCall: async (input, ctx) => {
           const from = str(input.from) ? normalizeAddress(str(input.from)) : null;
-          return from && from !== fromAddress
-            ? {
-                ok: false,
-                message: `Not allowed: drafts are from ${fromAddress} (the only From address this agent may use).`,
-              }
-            : { ok: true };
+          if (from && from !== fromAddress) {
+            return {
+              ok: false,
+              message: `Not allowed: drafts are from ${fromAddress} (the only From address this agent may use).`,
+            };
+          }
+          // A reply draft answers a message this agent may read (and its card says which one).
+          return str(input.in_reply_to) ? checkMessage(ctx.db, str(input.in_reply_to)) : { ok: true };
         },
         execute: async (input, ctx) => {
           try {

@@ -155,7 +155,7 @@ export interface ForumSynthesisView {
   createdIssues: { id: string; number: number; title: string }[];
 }
 
-/** The app's `ForumTopic`. No money: everyone in the org reads the forum (D39). */
+/** The app's `ForumTopic`. No money: everyone in the org reads the forum (ADR 0026). */
 export interface ForumTopicView {
   id: string;
   title: string;
@@ -694,8 +694,8 @@ function tableOrder(agentIds: string[], seats: ForumSeat[] | undefined): ForumSe
 /**
  * Opens a topic: its channel (kind `forum`, everyone in the org reads it),
  * participants and seats, and round 1 (queued). Agents must answer the
- * responsible person (D31); at most 8 agents and 10 rounds. No spend cap of
- * its own (D45): each agent runs on its own budget.
+ * responsible person; at most 8 agents and 10 rounds. No spend cap of
+ * its own: each agent runs on its own budget.
  */
 export async function createForumTopic(
   deps: ForumDeps,
@@ -1292,7 +1292,7 @@ export async function cancelForumTopic(deps: ForumDeps, userId: string, orgId: s
 
 /**
  * Adds or removes participants (manager of the topic). Agents must answer
- * the topic's person (D31). `seatUserIds` sit people at the table (at the
+ * the topic's person. `seatUserIds` sit people at the table (at the
  * end of the order); `unseatUserIds` take them out of the order.
  */
 export async function setForumParticipants(
@@ -1396,8 +1396,8 @@ const FINISHED = new Set(["done", "failed", "canceled"]);
  *   out), or, when a person stopped it (or it failed), the topic stalls
  *   until someone resumes it.
  * - An agent's question to people (`waiting_input`) doesn't hold the topic.
- * - Next seat in the round: an agent whose own budget is out skips its turn
- *   (D45); a seated person's turn waits for them ("Sua vez"), and the deadline
+ * - Next seat in the round: an agent whose own budget is out skips its turn;
+ *   a seated person's turn waits for them ("Sua vez"), and the deadline
  *   or "Concluir" goes on without them.
  * - A new round (early when a person posted); after the last round, the
  *   deadline or "Concluir", the synthesis by the owner agent.
@@ -1450,7 +1450,7 @@ export async function advanceForumTopic(deps: ForumDeps, topicId: string, now = 
         .select({ id: agentRuns.id, status: agentRuns.status, error: agentRuns.error, agentId: agentRuns.agentId })
         .from(agentRuns)
         .where(eq(agentRuns.id, topic.currentRunId));
-      // Someone is working (a question to people doesn't hold a discussion turn: D45; the synthesis waits).
+      // Someone is working (a question to people doesn't hold a discussion turn; the synthesis waits).
       const asking = run?.status === "waiting_input" && topic.phase !== "synthesizing";
       if (run && !FINISHED.has(run.status) && !asking) return { kind: "none" };
       const stoppedBy = run?.status === "canceled" ? canceledByUser(run.error) : null;
@@ -1688,7 +1688,7 @@ export async function advanceForumTopic(deps: ForumDeps, topicId: string, now = 
     return outcome.kind;
   }
   const { topic } = outcome;
-  // The inbox (D46): a seated person's turn is over once the table moves on.
+  // The inbox: a seated person's turn is over once the table moves on.
   await resolveForumTurns(deps, topic.orgId, topic.id).catch(() => {});
   if (outcome.kind === "stalled" || outcome.kind === "done") {
     await topicEvent(deps, topic.orgId, {
@@ -1843,7 +1843,7 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
   const link = `/org/${topic.orgId}/forum/${topic.id}`;
   if (topic.originChannelId && run && artifact) {
     // Back where it was asked: the agent's message with the synthesis card, in the message's thread
-    // when it has one, else in the channel (asked there, D67).
+    // when it has one, else in the channel (asked there).
     const [inThread] = topic.originMessageId
       ? await db
           .select({ id: messages.id })
@@ -2111,7 +2111,7 @@ export async function forumTopicOfChannel(db: Database, orgId: string, channelId
   return row ?? null;
 }
 
-// ── Suggestions: an agent suggests, a person opens (D45) ─────────────────────
+// ── Suggestions: an agent suggests, a person opens ───────────────────────────
 
 export interface ForumSuggestion {
   title: string;

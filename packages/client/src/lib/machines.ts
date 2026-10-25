@@ -40,7 +40,13 @@ export const installCommand = (origin: string) =>
 export const allowFolderCommand = (path: string, handle?: string) =>
   `agentes-runner folders allow ${shellQuote(path)}${handle ? ` --agent ${handle}` : ""}`;
 
-/** The last part of a path: "/Users/walter/Projects/loja-v5" → "loja-v5". */
+/** The first command in a runner's own words ("…run `agentes-runner browser install --with-deps`"), to copy. */
+export function commandInReason(reason: string | null | undefined): string | null {
+  const m = reason ? /`([^`]+)`/.exec(reason) : null;
+  return m?.[1] ?? null;
+}
+
+/** The last part of a path: "/Users/you/Projects/loja-v5" → "loja-v5". */
 export function folderName(path: string): string {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || path;
@@ -68,7 +74,7 @@ export const downloadHref = (url: string, origin = "") => (/^https?:\/\//.test(u
 /** Where the browser runs: Apple Silicon or Intel is unknowable from the page, so Macs get the arm build. */
 export const DESKTOP_TARGET = { target: "darwin", arch: "aarch64" } as const;
 
-/** Which portrait a computer gets (telas/IconesComputador.html); same names as `ComputerKind` in @agenteschat/ui. */
+/** Which portrait a computer gets; same names as `ComputerKind` in @agenteschat/ui. */
 export type ComputerKind = "mac" | "windows" | "linux" | "cloud";
 export type ComputerState = "online" | "paused" | "offline";
 
@@ -81,8 +87,44 @@ export function computerKind(os: string | null | undefined, cloud = false): Comp
   return "linux";
 }
 
+/**
+ * Who may turn a tool off or take a folder away here: an admin or whoever connected it, never on the
+ * workspace's own computer, where nobody in the workspace could turn them back on (ADR 0056 §10).
+ */
+export const canReduceAccess = (m: Pick<Machine, "canManage" | "kind">) => m.canManage && m.kind !== "managed";
+
 /** Paused wins over online (a paused machine is still connected); otherwise online or offline. */
 export function computerState(m: Pick<Machine, "online" | "paused">, now = Date.now()): ComputerState {
   if (isPaused(m, now)) return "paused";
   return m.online ? "online" : "offline";
+}
+
+/**
+ * Which `machines.host.*` line says what the server's own computer is: one
+ * user per agent on Linux (the runner's system mode there), the installer's
+ * own user on a Mac, neither said until it first connects.
+ */
+export function hostDescKey(os: string): "descUsers" | "descShared" | "desc" {
+  if (os === "linux") return "descUsers";
+  return os === "darwin" ? "descShared" : "desc";
+}
+
+/** What a computer is called on screen: its name, or `hostLabel` for the server's own until its runner names it. */
+export const machineTitle = (m: Pick<Machine, "name" | "kind">, hostLabel: string) =>
+  m.name || (m.kind === "host" ? hostLabel : "");
+
+/**
+ * A code pasted for a Claude sign-in is this sign-in's when it ends with `#<state>` of its link (what
+ * Claude's page shows). Only then does a paste go to the computer without a tap: anything else from the
+ * clipboard (a password) waits for the person.
+ */
+export function isSignInCode(text: string, signInUrl: string): boolean {
+  let state: string | null = null;
+  try {
+    state = new URL(signInUrl).searchParams.get("state");
+  } catch {
+    return false;
+  }
+  const code = text.trim();
+  return Boolean(state) && code.length > (state?.length ?? 0) + 1 && code.endsWith(`#${state}`) && !/\s/.test(code);
 }

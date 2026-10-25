@@ -7,7 +7,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Icon, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Card, Chip, Icon, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -16,7 +16,7 @@ import { computerIcon, type MachineOutage, moveToast, sheetDesc, targetText, wai
 import { useMachineOutages, useMoveAgents } from "./queries";
 
 /**
- * "Trocar o computador" (ComputadorOffline.html, Celular `.sheet`), a native form sheet: "Para onde" (only the
+ * "Trocar o computador", a native form sheet: "Para onde" (only the
  * targets that can run the waiting agents' brains; one that can't take them now is disabled with the reason),
  * "Quem troca" (a check per agent with what it has waiting), the plain hint that a task that already changed
  * files on the old computer waits for it, then "Trocar N agentes" and "Agora não". The result is a toast.
@@ -245,9 +245,13 @@ function TargetRow({
           {text.tag ? <Chip label={text.tag} /> : null}
         </View>
         {text.desc ? (
-          <Text variant="small" tone="faint" numberOfLines={2}>
-            {text.desc}
-          </Text>
+          <View style={styles.descLine}>
+            {/* Only "Tem o Claude Code e o Codex" names the brains: each gets its maker's mark. */}
+            {x.enabled && x.kind === "machine" ? x.brains.map((b) => <ProviderLogo key={b} id={b} size="xs" />) : null}
+            <Text variant="small" tone="faint" numberOfLines={2} style={styles.shrink}>
+              {text.desc}
+            </Text>
+          </View>
         ) : null}
       </View>
       {selected ? <Icon name="check" size={18} color={c.ink} /> : null}
@@ -266,6 +270,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   titleLine: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  descLine: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 0 },
   off: { opacity: 0.5 },
   hint: { flexDirection: "row", gap: 8, padding: 12, borderRadius: 14 },
   acts: { gap: 8, marginTop: 4 },

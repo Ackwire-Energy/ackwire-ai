@@ -1,4 +1,4 @@
-import { isBrowserTool, useRun } from "@agenteschat/client";
+import { isScreenTool, type ScreenKind, useRun } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   formatDuration,
@@ -23,24 +23,23 @@ export function MessageWork({
   runId,
   meta,
   agentName,
-  skipBrowser = false,
+  skipScreens = [],
 }: {
   runId: string;
   meta: Record<string, unknown> | undefined;
   agentName: string;
-  /** Its browser calls have their own card on the message (`BrowserTrailCard`): left out here. */
-  skipBrowser?: boolean;
+  /** Screens whose calls have their own card on the message (`BrowserTrailCard`): left out here. */
+  skipScreens?: ScreenKind[];
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
   const run = useRun(org.id, open ? runId : null);
   const compact = workMeta(meta);
+  const onCard = (name: unknown) => skipScreens.some((screen) => isScreenTool(String(name ?? ""), screen));
   const work = run.data
     ? workFromSteps(
-        skipBrowser
-          ? run.data.steps.filter((s) => !(s.kind === "tool_call" && isBrowserTool(String(s.data.name ?? ""))))
-          : run.data.steps,
+        run.data.steps.filter((s) => !(s.kind === "tool_call" && onCard(s.data.name))),
         run.data.run,
       )
     : null;

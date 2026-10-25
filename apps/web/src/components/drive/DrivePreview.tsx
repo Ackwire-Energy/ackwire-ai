@@ -42,7 +42,7 @@ function useSeen<T extends Element>() {
 const extensionOf = (name: string) => (/\.([a-z0-9]{1,8})$/i.exec(name)?.[1] ?? "").slice(0, 4).toUpperCase();
 
 /**
- * A real preview of a Drive item (docs/design/telas/Drive.html): the first
+ * A real preview of a Drive item: the first
  * lines of a document, a mini table, the diff's first lines, the diagram,
  * a page's frame, an image's thumbnail, a PDF's sheet or the file's type.
  * Scales with its box (container units). Neutral placeholder until loaded.

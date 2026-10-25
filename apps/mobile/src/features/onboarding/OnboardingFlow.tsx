@@ -38,7 +38,7 @@ import {
 } from "./logic";
 
 /**
- * The first run on the phone (telas/OnboardingMobile.html, A · Passos): signed in with no workspace yet, one
+ * The first run on the phone: signed in with no workspace yet, one
  * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
  * (optional; on the computer for now) → Agentes (they think with the workspace's key or a subscription, set on the
@@ -119,7 +119,7 @@ export function OnboardingFlow() {
           handle: handleFrom(t(`onboarding.presets.${p}.name`)),
           role: t(`onboarding.presets.${p}.role`),
           instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
-          // "Automático" (D83): each task gets its model and effort.
+          // "Automático": each task gets its model and effort.
           model: AUTO,
           // null = the workspace's default key (or a subscription, connected on the computer).
           credentialId: null,

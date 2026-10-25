@@ -10,8 +10,8 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * What another agent told this one before it answered (`meta.consulted`,
- * docs/design/telas/ConversaAgentes.html, variant B): a neutral one-line card
+ * What another agent told this one before it answered (`meta.consulted`):
+ * a neutral one-line card
  * on top of the reply, "Infra respondeu" with a faded preview, that opens to
  * the question and the full answer. Expired or failed: the same card, calm,
  * with an icon instead of the agent.

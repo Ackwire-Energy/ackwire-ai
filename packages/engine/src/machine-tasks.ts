@@ -19,6 +19,7 @@ import { getMachineById, MachineOfflineError, MachinePausedError, machineOnline 
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
+import { recordTaskFinished } from "./operator-events";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import { issueRunToolToken } from "./run-tool-tokens";
@@ -384,6 +385,7 @@ export async function launchTask(
       })
       .where(and(eq(machineTasks.id, row.id), eq(machineTasks.status, "queued")))
       .returning();
+    if (failed) await recordTaskFinished(deps.db, failed);
     if (failed && options.requeue) {
       // A queued task started by the server: its end is told like any other (the mission hears it failed).
       await enqueueWake(deps.db, failed);
@@ -650,6 +652,7 @@ export async function applyTaskDone(
       )
       .returning();
     if (!ended) return null;
+    await recordTaskFinished(tx, ended);
     // Commands it was refused with nobody to ask: its end notice lists them ("Liberar e repetir").
     await recordTaskDenials(tx, ended, frame.denials);
     // A task the agent canceled itself wakes nobody; a mission's still gets its end handled (notes, inbox).
@@ -673,7 +676,7 @@ export const enqueueWake = (tx: Executor, row: Pick<MachineTaskRow, "id" | "orgI
  * A task the agent started itself with `start_task` (a shell command, or
  * Claude Code in the conversation's session), not one of a mission
  * executor's sessions (those have their own session id, in the mission's
- * thread). Started from the main timeline (D67), it reports to no thread.
+ * thread). Started from the main timeline, it reports to no thread.
  */
 export const isAgentTask = (row: Pick<MachineTaskRow, "sessionId" | "threadRootId">) =>
   !row.sessionId || row.threadRootId === null || row.sessionId === row.threadRootId;
@@ -713,6 +716,7 @@ export async function settleInterruptedTask(
     .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt), inArray(machineTasks.status, ACTIVE)))
     .returning();
   if (!claimed) return null;
+  await recordTaskFinished(deps.db, claimed);
   const machine = await getMachineById(deps.db, claimed.machineId);
   // A mission's task resumes when the mission says so and still runs (ADR 0029).
   const [mission] = claimed.missionId
@@ -895,6 +899,47 @@ export async function interruptOfflineMachineTasks(deps: TaskDeps, machineId: st
 }
 
 /**
+ * Stops every live task of a workspace (it was suspended), all at once: its computer stops each one it
+ * runs, and that task's `task.done` ends the row; one it doesn't run (queued here, its computer offline or
+ * not answering) ends `canceled` now, and an interrupted one never resumes. Returns how many.
+ */
+export async function cancelOrgTasks(deps: TaskDeps & { call?: TaskCall }, orgId: string, canceledBy: string) {
+  const rows = await deps.db
+    .select({ task: machineTasks, handle: schema.agents.handle })
+    .from(machineTasks)
+    .innerJoin(schema.agents, eq(schema.agents.id, machineTasks.agentId))
+    .where(and(eq(machineTasks.orgId, orgId), liveTaskWhere()));
+  await Promise.all(
+    rows.map(async ({ task, handle }) => {
+      await deps.db.update(machineTasks).set({ canceledBy, updatedAt: new Date() }).where(eq(machineTasks.id, task.id));
+      // A task with a start request still waits in our queue: its computer never had it.
+      const reply =
+        deps.call && !task.startRequest
+          ? await deps
+              .call<"task.cancel">(task.machineId, {
+                agent: { id: task.agentId, handle },
+                op: "task.cancel",
+                taskId: task.id,
+              })
+              .catch(() => null)
+          : null;
+      if (reply?.canceled) return;
+      const now = new Date();
+      const [ended] = await deps.db
+        .update(machineTasks)
+        .set({ status: "canceled", endedAt: now, wokeAt: now, updatedAt: now })
+        .where(and(eq(machineTasks.id, task.id), isNull(machineTasks.endedAt)))
+        .returning();
+      if (ended) {
+        await recordTaskFinished(deps.db, ended);
+        await publishTaskEvent(deps.pubsub, ended);
+      }
+    }),
+  );
+  return rows.length;
+}
+
+/**
  * On `hello` from a runner with tasks: what the server thinks runs is
  * checked against the runner's journal. Running there: running here (an
  * offline grace may have said interrupted). Ended there: its `task.done`
@@ -983,7 +1028,7 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
  * `machine.task_done`: wakes the conversation once per task. A notice in the
  * task's thread (as its agent) carries the result for the model
  * (`meta.machineTask`), and a run of that agent starts on it, unless the hop
- * limit or the agent's audience (D31) says no, or the agent left the
+ * limit or the agent's audience says no, or the agent left the
  * channel. A run of that agent already active in the thread gets it as a
  * new message instead (one run per agent and conversation).
  */

@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Same as Tierbird ADR 0008.
 
 ## Decision
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 /**
  * "Open this agent's browser card" from elsewhere (the activity bar, a notification): the
  * card in the conversation opens in place (and scrolls into view) instead of a page of its
- * own (telas/NavegadorNoChat.html, A). A request waits for the card that matches it, so a
+ * own. A request waits for the card that matches it, so a
  * notification can ask before the conversation has rendered.
  */
 export interface BrowserCardRequest {

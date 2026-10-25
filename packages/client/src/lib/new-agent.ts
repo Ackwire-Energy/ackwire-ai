@@ -2,7 +2,7 @@ import type { AgentAudience } from "../api/types";
 import { handleFrom, parseAmount } from "./text";
 
 /**
- * "Criar agente" in steps (docs/design/telas/NovoAgente.html): the pure part
+ * "Criar agente" in steps: the pure part
  * (steps, roles, handle and budget rules, what each step needs). The role
  * presets, with their icon and look, live with each platform.
  */

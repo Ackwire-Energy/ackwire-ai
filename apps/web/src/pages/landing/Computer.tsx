@@ -22,7 +22,7 @@ import { LpAvatar } from "./LpAvatar";
 import "./computer.css";
 
 /**
- * "02 · Computador" (telas/LandingNova.html): Camila asks Nina for September's
+ * "02 · Computador": Camila asks Nina for September's
  * invoices; Nina's browser plays inside her message. She needs a login, you
  * take over (the password stays masked) and hand it back; she downloads,
  * checks against the sheet and saves to Drive. The point on the left follows.

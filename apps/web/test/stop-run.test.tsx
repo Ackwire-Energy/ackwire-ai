@@ -30,7 +30,7 @@ const open = async (configure?: (s: ReturnType<typeof seedState>) => void) => {
 const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) => c.method === "agents.cancelRun");
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
-describe("Parar is immediate (telas/Mensagens.html)", () => {
+describe("Parar is immediate", () => {
   test("the card above the box: living avatar with its look, the words, 'Ver' out of view and its stop", async () => {
     const { state, ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);

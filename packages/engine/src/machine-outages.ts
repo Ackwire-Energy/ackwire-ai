@@ -2,7 +2,8 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
-import { brainOf, brainOptions, isComputerBrain } from "./brain-settings";
+import { brainOf, brainOptions } from "./brain-settings";
+import { isComputerBrain } from "./brains/types";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { getMachine, type MachineRow, machineOnline, machinePause, setAgentComputerTarget } from "./machines";
@@ -14,7 +15,7 @@ import { missStaleRoutineRun } from "./routine-firing";
 const { machines, agents, agentRuns, routineRuns } = schema;
 
 /*
- * "Computador desconectado" (docs/design/telas/ComputadorOffline.html): the
+ * "Computador desconectado": the
  * computers that run some agents' brain (Claude Code, Codex) and are offline,
  * who is waiting for them, where those agents could go instead, and the move
  * itself ("Trocar computador"): the agents point at another computer and the
@@ -35,6 +36,8 @@ export interface MachineOutage {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10): its platform reads `other`, like its OS everywhere people look. */
+  managed: boolean;
   /** ISO: the last sign of life. */
   offlineSince: string;
   agents: OutageAgent[];
@@ -48,6 +51,7 @@ export type OutageTarget =
       machineId: string;
       name: string;
       platform: string;
+      managed: boolean;
       online: boolean;
       brains: ComputerBrainKind[];
       /** Why it can't take agents now: `offline`, `paused`; null when it can. */
@@ -64,8 +68,9 @@ export interface OutageDeps {
   now?: () => Date;
 }
 
-/** `mac`, `windows`, `linux` from the runner's `os`; anything else as reported. */
-export function machinePlatform(os: string): string {
+/** `mac`, `windows`, `linux` from the runner's `os`; anything else as reported; `other` for a managed computer. */
+export function machinePlatform(os: string, kind?: MachineRow["kind"]): string {
+  if (kind === "managed") return "other";
   if (os === "darwin" || os === "mac" || os === "macos") return "mac";
   if (os === "windows" || os === "win32") return "windows";
   return os;
@@ -196,7 +201,8 @@ export async function listMachineOutages(
     outages.push({
       machineId: m.id,
       name: m.name,
-      platform: machinePlatform(m.os),
+      platform: machinePlatform(m.os, m.kind),
+      managed: m.kind === "managed",
       offlineSince: (m.lastSeenAt ?? m.updatedAt).toISOString(),
       agents: [...list.values()].sort((a, b) => order(a.agentId) - order(b.agentId)),
       waitingRuns,
@@ -212,7 +218,8 @@ export async function listMachineOutages(
         kind: "machine" as const,
         machineId: m.id,
         name: m.name,
-        platform: machinePlatform(m.os),
+        platform: machinePlatform(m.os, m.kind),
+        managed: m.kind === "managed",
         online,
         brains: computerBrains(m),
         reasonOff: !online ? "offline" : machinePause(m, now) ? "paused" : null,

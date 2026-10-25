@@ -50,7 +50,7 @@ const sharedVars = block((s) => s.includes("[data-theme]") && !s.includes("="));
 
 const camel = (name: string) => name.replace(/-([a-z0-9])/g, (_, c: string) => c.toUpperCase());
 const SHADOWS = ["e1", "e2", "e3", "top"] as const;
-/** CSS-only state tokens (the web's chosen state, telas/Selecao.html): composite values with no RN equivalent. */
+/** CSS-only state tokens (the web's chosen state): composite values with no RN equivalent. */
 const CSS_ONLY = ["chosen-bg", "chosen-shadow", "chosen-lift", "unchosen-shadow"];
 const resolve = (value: string, theme: Vars) =>
   value.replace(/var\(--([\w-]+)\)/g, (_, n: string) => theme.get(n) ?? "");

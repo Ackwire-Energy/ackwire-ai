@@ -1,13 +1,16 @@
-import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
+import { recordAudit } from "./audit";
+import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { recordOperatorEvent } from "./operator-events";
 import { getMembership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 
-const { agents, providerCredentials } = schema;
+const { agents, machines, providerCredentials } = schema;
 
 export type Agent = typeof agents.$inferSelect;
 
@@ -28,7 +31,7 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
-  // "auto" (D83): each run picks the model from the line of the agent's key (any provider).
+  // "auto": each run picks the model from the line of the agent's key (any provider).
   if (input.model !== undefined && !isAutoModel(input.model) && !isKnownModel(input.model)) {
     throw new ValidationError(`model must be ${AUTO_MODEL} or one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
   }
@@ -59,7 +62,7 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
   }
 }
 
-/** What a person's new agent thinks with when nobody picks a model: "Automático" (D83). */
+/** What a person's new agent thinks with when nobody picks a model: "Automático". */
 export const NEW_AGENT_DEFAULTS = { model: AUTO_MODEL } as const;
 
 export async function createAgent(
@@ -73,14 +76,30 @@ export async function createAgent(
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validate(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
-  // starts with the model and effort picked per run (written here, so agents made before D83 keep theirs).
+  // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
+  // The workspace's own computer (managed, else the server's own) once it has connected (ADR 0056 §10); one
+  // still being prepared gives itself to the agents with none when it is ready.
+  const [home] = await db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(
+      and(
+        eq(machines.orgId, orgId),
+        inArray(machines.kind, ["managed", "host"]),
+        isNotNull(machines.tokenHash),
+        isNull(machines.deletedAt),
+      ),
+    )
+    .orderBy(sql`${machines.kind} = 'managed' desc`, asc(machines.createdAt))
+    .limit(1);
   try {
     const [agent] = await db
       .insert(agents)
       .values({
         ...values,
         ...brainAuto,
+        machineId: home?.id ?? null,
         orgId,
         ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId,
       })
@@ -114,11 +133,28 @@ export async function createAgent(
     // from the start, so the first call reserves in one statement.
     caches.agents.delete(`${orgId}:team`);
     await resyncBudgetCounter(db, orgId, agent.id);
+    await recordOperatorEvent(db, { type: "agent.created", orgId, userId: actorId, data: { agentId: agent.id } });
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);
     throw error;
   }
+}
+
+/** Whose plan the agent's computer brain thinks with: its account's owner, else whoever connected its computer. */
+async function planOwner(db: Database, agent: Agent): Promise<string | null> {
+  if (!agent.machineId) return null;
+  const { machineAccounts, machines } = schema;
+  const [row] = agent.brainAccountId
+    ? await db
+        .select({ owner: machineAccounts.createdBy })
+        .from(machineAccounts)
+        .where(and(eq(machineAccounts.orgId, agent.orgId), eq(machineAccounts.id, agent.brainAccountId)))
+    : await db
+        .select({ owner: machines.pairedByUserId })
+        .from(machines)
+        .where(and(eq(machines.orgId, agent.orgId), eq(machines.id, agent.machineId)));
+  return row?.owner ?? null;
 }
 
 export async function updateAgent(
@@ -130,14 +166,37 @@ export async function updateAgent(
 ): Promise<Agent> {
   await requirePermission(db, actorId, orgId, "manage_agents");
   await validate(db, orgId, input);
+  const owner = input.ownerUserId;
+  const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
+  // A plan thinks only for its owner's agents (ADR 0059 §3): a new owner who doesn't own it sends the agent back
+  // to the API; one who does decides for themselves whether anyone else talks to it.
+  const handover =
+    before && before.ownerUserId !== owner && isComputerBrain(before.brain)
+      ? owner && (await planOwner(db, before)) === owner
+        ? { audienceMode: "owner" as const }
+        : { brain: "model", brainAccountId: null }
+      : {};
   const [agent] = await db
     .update(agents)
-    .set({ ...input, updatedAt: new Date() })
+    .set({ ...input, ...handover, updatedAt: new Date() })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
+  if (before && "brain" in handover) {
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.brain",
+      target: { type: "agent", id: agentId },
+      details: {
+        from: { brain: before.brain, account: before.brainAccountId },
+        to: { brain: "model", account: null },
+        reason: "owner_changed",
+      },
+    });
+  }
   if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
   return agent;
 }
@@ -184,6 +243,22 @@ export const agentView = (a: Agent) => ({
   appearance: (a.appearance ?? null) as AgentAppearance | null,
   createdAt: a.createdAt,
 });
+
+/** `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. */
+export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
+  const handles = [
+    ...new Set((Array.isArray(raw) ? raw : []).map((h) => String(h).replace(/^@/, "").trim().toLowerCase())),
+  ];
+  const rows =
+    handles.length === 0
+      ? []
+      : await db
+          .select({ id: agents.id, handle: agents.handle, name: agents.name })
+          .from(agents)
+          .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
+  const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
+  return { handles, rows, missing };
+}
 
 /** `getAgent` through the per-process cache (run path). */
 export function getAgentCached(db: Database, orgId: string, agentId: string): Promise<Agent | null> {

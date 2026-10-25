@@ -29,7 +29,7 @@ import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
 
 /*
- * The pixel sky inside the app (prototype: docs/design/telas/CeuNoApp.html). The sky is the
+ * The pixel sky inside the app. The sky is the
  * agents' world: it shows only where the subject is the agents, in the sky
  * blue or in one agent's own color. Everything around it stays neutral.
  */
@@ -138,7 +138,7 @@ export function ChannelWelcome({
 /* ---------- Agent page: the cover in the agent's color ---------- */
 
 /**
- * The agent page's cover (docs/design/telas/AgentePerfil.html): a sky in the
+ * The agent page's cover: a sky in the
  * agent's own color, lighter behind the agent (at `at`, 0..1 across) so its
  * body reads; faster and busier while it works.
  */
@@ -170,7 +170,7 @@ export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy:
 /* ---------- Sign in and sign up ---------- */
 
 /**
- * The sign-in screen's horizon (telas/EntrarCadastro.html, C): soft tones rising from the page
+ * The sign-in screen's horizon: soft tones rising from the page
  * at the bottom, a few agents passing. Calm, so the one question above stays the subject.
  */
 export function AuthHorizon() {
@@ -319,31 +319,6 @@ export function prepareBurst(from: HTMLElement): () => void {
 
 /* ---------- Sidebar ---------- */
 
-/** The workspace header's little sky: light tones, a touch deeper at the right (calm behind its name). */
-export function SidebarOrgSky({ calm }: { calm: () => (Element | null)[] }) {
-  return (
-    <PixelSky
-      className="sidebar__org-sky"
-      options={{
-        pixel: 3,
-        surface: "--sunken",
-        // Soft tones run from the surface (0) toward the color: low values stay light.
-        palette: (bg) => softTones("sky", bg),
-        body: spriteTone("sky"),
-        // No pixel agents here: the strip is too small, they would pass behind the logo.
-        sprites: 0,
-        near: 0,
-        calm,
-        calmV: 0,
-        calmPad: 10,
-        light: 0,
-        base: (u, v) => 0.36 * u * u * u * (0.6 + 0.4 * v),
-        blobs: (tt) => [[0.9 + 0.04 * S(tt * 0.3), 0.75, 0.07, 0.08]],
-      }}
-    />
-  );
-}
-
 /** Behind a working agent's row: a light sweep in its color, stronger on the right. */
 export function AgentTrail({ color }: { color: AgentColor }) {
   return (
@@ -351,7 +326,7 @@ export function AgentTrail({ color }: { color: AgentColor }) {
       <PixelSky
         options={{
           pixel: 3,
-          surface: "--sunken",
+          surface: "--side",
           palette: (bg) => softTones(color, bg),
           light: 0,
           base: (u, _v, tt) => {
@@ -372,7 +347,7 @@ export function AgentGlow({ color }: { color: AgentColor }) {
       <PixelSky
         options={{
           pixel: 2,
-          surface: "--sunken",
+          surface: "--side",
           palette: (bg) => softTones(color, bg),
           light: 0,
           base: (u, v, tt) => {
@@ -396,7 +371,7 @@ export function SidebarHorizon({ working, total }: { working: number; total: num
   if (prefersReducedMotion()) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
-    surface: "--sunken",
+    surface: "--side",
     palette: (bg) => softTones("sky", bg),
     body: spriteTone("sky"),
     near: 0,
@@ -461,7 +436,7 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
   if (prefersReducedMotion()) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
-    surface: "--sunken",
+    surface: "--side",
     palette: (bg) => softTones("sky", bg),
     body: spriteTone("sky"),
     near: 0,
@@ -490,7 +465,7 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
 }
 
 /**
- * The onboarding's progress at the top of the rail (telas/OnboardingEtapas.html): a strip of pixel
+ * The onboarding's progress at the top of the rail: a strip of pixel
  * sky that fills as steps get done, with a pixel agent walking at its front. `progress` is 0..1.
  */
 export function OnboardingProgress({ progress }: { progress: number }) {

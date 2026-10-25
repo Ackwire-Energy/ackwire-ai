@@ -10,6 +10,25 @@ export const ApprovalOrigin = z.union([
   z.object({ kind: z.literal("unattended") }),
 ]);
 
+/** The email a mail approval writes, as its card shows it. */
+export const ApprovalEmail = z
+  .object({
+    verb: z.enum(["draft", "send", "reply", "forward"]),
+    mailbox: z.string().openapi({ example: "support@acme.com" }),
+    provider: z.string().nullable().openapi({ example: "iCloud" }),
+    from: z.string(),
+    to: z.array(z.string()),
+    cc: z.array(z.string()),
+    bcc: z.array(z.string()),
+    subject: z.string(),
+    body: z.string().openapi({ description: "The text, cut after 1500 characters." }),
+    original: z
+      .object({ subject: z.string(), from: z.string().nullable() })
+      .nullable()
+      .openapi({ description: "The message it answers or forwards." }),
+  })
+  .openapi("ApprovalEmail");
+
 export const Approval = z
   .object({
     id: z.uuid(),
@@ -39,6 +58,9 @@ export const Approval = z
       .openapi({ description: "What the action returned once it ran (raw, short)." }),
     connector: z.string().nullable().openapi({ example: "github" }),
     connectorAccount: z.string().nullable().openapi({ example: "acme" }),
+    email: ApprovalEmail.nullable().openapi({
+      description: "The email itself, for mail drafts and sends (From, To, Subject, text); null otherwise.",
+    }),
     why: z
       .string()
       .nullable()
@@ -58,7 +80,7 @@ const ApprovalParams = OrgParams.extend({ approvalId: z.uuid() });
 const Decision = z.object({ reason: z.string().max(1000).optional() });
 
 /**
- * Sensitive actions agents asked for (D4). Decisions resume the run; events
+ * Sensitive actions agents asked for (ADR 0015). Decisions resume the run; events
  * `approval.created` / `approval.decided` go to the channel and to approvers
  * over the WebSocket.
  */

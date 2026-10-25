@@ -2,7 +2,7 @@ import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
 
 /**
- * Big connectors as a directory (D58): a connector with more tools than the
+ * Big connectors as a directory (ADR 0043): a connector with more tools than the
  * model can take in at once (TikTok Ads: 382) is listed as two tools of ours,
  * `<prefix>_find_tools` (a local search over its tools, no model call) and
  * `<prefix>_use_tool` (runs one of them by its real name). Same for every
@@ -138,7 +138,7 @@ function directoryTools(
  * as its two directory tools. Order is kept (a big connector's pair sits where
  * its first tool was).
  *
- * Tools on demand (`loaded`, a run's tool groups, D65): only the core groups
+ * Tools on demand (`loaded`, a run's tool groups, ADR 0043): only the core groups
  * and the loaded ones go as they are; the rest sit behind one directory of
  * their own, `find_tools` / `use_tool`, at the end of the list. Without
  * `loaded` every tool goes.
@@ -190,7 +190,7 @@ export function presentTools(
   return out;
 }
 
-// ── Tools on demand (D65) ────────────────────────────────────────────────────
+// ── Tools on demand (ADR 0043) ───────────────────────────────────────────────
 
 /** A tool's group: its scope's prefix (`drive:write` → `drive`), each custom connector on its own; "" = conversation. */
 export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId">) {
@@ -219,6 +219,7 @@ const GROUP_LABELS: Record<string, string> = {
   wiki: "Organization wiki (writing)",
   sandbox: "Computer and code",
   browser: "Browser",
+  setup: "Workspace setup (connect an AI, create channels)",
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",

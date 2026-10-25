@@ -1,8 +1,9 @@
 import { ApiError, type SignInOptions, type SignInProvider, useApi, useAuthConfig } from "@agenteschat/client";
+import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,12 +15,12 @@ import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/
 import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH } from "@/lib/desktop";
 
 /**
- * Sign in and sign up in one flow (telas/EntrarCadastro.html, C): the e-mail
+ * Sign in and sign up in one flow: the e-mail
  * first, then the one next step the server says it needs (the password, the
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.
  * In the Mac app, Google/GitHub/Apple open in the browser and the window
- * waits for the sign-in to come back ("browser", D79).
+ * waits for the sign-in to come back ("browser", ADR 0036).
  */
 type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent" | "browser";
 
@@ -85,6 +86,8 @@ export function AuthPage({
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  const termsUrl = config.data?.termsUrl;
+  const privacyUrl = config.data?.privacyUrl;
   const desktop = inDesktopApp();
   const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
     null,
@@ -136,7 +139,14 @@ export function AuthPage({
     setPending(false);
     if (!result.ok) {
       setWrong(result.status === 401);
-      setError(result.status === 401 ? null : result.message || t("common.unknownError"));
+      // Checked by code: a refused origin is a 403 too, and its own words tell an admin what to fix.
+      setError(
+        result.status === 401
+          ? null
+          : result.code === ACCOUNT_BLOCKED
+            ? t("auth.accountBlocked")
+            : result.message || t("common.unknownError"),
+      );
       return;
     }
     rememberSignIn("email");
@@ -478,12 +488,12 @@ export function AuthPage({
             </>
           )}
 
-          {(step === "email" || step === "newPassword") && (
+          {(step === "email" || step === "newPassword") && termsUrl && privacyUrl && (
             <p className="auth__fine">
               {t("auth.termsBefore")}
-              <Link to="/terms">{t("auth.terms")}</Link>
+              <a href={termsUrl}>{t("auth.terms")}</a>
               {t("auth.termsMiddle")}
-              <Link to="/privacy">{t("auth.privacy")}</Link>
+              <a href={privacyUrl}>{t("auth.privacy")}</a>
               {t("auth.termsAfter")}
             </p>
           )}

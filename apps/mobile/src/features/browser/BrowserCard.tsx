@@ -10,10 +10,20 @@ import {
   useAgentBrowserHandoff,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { TFunction } from "i18next";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  type StyleProp,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from "react-native";
 import { Sky } from "@/sky/Sky";
 import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -21,10 +31,10 @@ import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, siteOf } from "./logic";
+import { FAILED_REASONS, NOTE_MAX, pageNoteOf, siteOf } from "./logic";
 import { FrameView, TypeBar, useLiveConnection } from "./parts";
 
-/** The log's last lines under the page (the prototype shows three). */
+/** The log's last lines under the page (the design shows three). */
 const LOG_LINES = 3;
 
 /** One line of the log, in the person's words ("Abriu loja.exemplo", "Preencheu um campo"), as on the web. */
@@ -40,24 +50,29 @@ export function stepText(t: TFunction, s: Pick<BrowserStep, "tool" | "detail">):
 }
 
 /**
- * The agent's browser as its card in the conversation (NavegadorNoChat.html, A "No card" with the
- * "Céu" header): a thin sky in the agent's color on top, the site's letter and host, and what the agent
- * does now. Open, the same card shows the page live with the last steps; Assumir (or Abrir on a request)
+ * The agent's browser as its card in the conversation, under a "Céu" header: a thin sky in the agent's
+ * color on top, the site's letter and host, and what the agent does now. Open, the same card shows the page live with the last steps; Assumir (or Abrir on a request)
  * turns it into control right there: the request as the title, Pronto in the header, the app's own
- * field ("Digite aqui", Senha for saved passwords) and Não consegui. Nothing leaves the conversation.
- * The page streams only while the card is open.
+ * field ("Digite aqui", Senha for saved passwords) and Não consegui; a take over ends with Devolver.
+ * Pronto and Devolver take an optional note. Nothing leaves the conversation. The page streams only
+ * while the card is open, the agent works or I'm in control; while someone else is, it stays theirs.
  */
 export function BrowserCard({
   agentId,
   run,
+  busy = false,
   handoff: given,
   open: openProp,
   onToggle,
   claim = false,
+  computer,
+  style,
 }: {
   agentId: string;
   /** The agent's run in its browser (what it does now, the log). */
   run?: LiveRun | null;
+  /** At work with no run to show here (its profile): closed, the card still shows its small live picture. */
+  busy?: boolean;
   /** A request for help this card answers (the request's own message). */
   handoff?: BrowserHandoff | null;
   /** Controlled open state (the conversation opens the card from the working line); else its own. */
@@ -65,6 +80,9 @@ export function BrowserCard({
   onToggle?: (open: boolean) => void;
   /** Opened from a push or the inbox: open and take the control once. */
   claim?: boolean;
+  /** The computer the browser runs on (its profile): what an idle card says. */
+  computer?: string | null;
+  style?: StyleProp<ViewStyle>;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -93,7 +111,9 @@ export function BrowserCard({
   // Open, or closed while the agent works in it (its small live picture); a finished one keeps the last frame.
   // The person in control keeps watching even closed: their watching is what keeps their control.
   const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
-  const live = useLiveConnection(agentId, open || Boolean(run) || holding);
+  const working = Boolean(run) || busy;
+  const watching = open || working || holding;
+  const live = useLiveConnection(agentId, watching);
   const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
@@ -101,6 +121,11 @@ export function BrowserCard({
   const host = siteOf(live.frame?.metadata.url, steps);
   const doing = steps.at(-1);
   const helper = controller && !mine ? dir.nameOf({ type: "person", id: controller }) : "";
+  const closed = live.unavailable === "closed";
+  // Assumir and Parar need a live page to drive (the phone has no address field to open one).
+  const ready = watching && Boolean(live.frame) && !live.unavailable;
+  const note = pageNoteOf(live.unavailable, live.hidden, mine);
+  const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
 
   // A push or the inbox opened this request: the card opens and takes the control (first one wins).
   const claimed = useRef(false);
@@ -137,15 +162,34 @@ export function BrowserCard({
       else failedToast();
     }
   };
-  const finish = async (ok: boolean, note?: string) => {
+  const finish = async (ok: boolean, said?: string) => {
     if (!handoff) return;
+    const text = said?.slice(0, NOTE_MAX) || undefined;
     try {
-      if (ok) await actions.done(handoff.id);
-      else await actions.failed(handoff.id, note);
+      if (ok) await actions.done(handoff.id, text);
+      else await actions.failed(handoff.id, text);
       successHaptic();
     } catch {
       failedToast();
     }
+  };
+  // Pronto / Devolver: what the person wants the agent to know, which it reads as their own words.
+  const handBack = () => {
+    tapHaptic();
+    sheet.open(
+      <PromptForm
+        title={t("mobile.browser.done.title")}
+        intro={t(`mobile.browser.done.intro${g}`, { name })}
+        placeholder={t("mobile.browser.done.placeholder")}
+        submitLabel={doneLabel}
+        icon="check"
+        allowEmpty
+        onSubmit={async (text) => {
+          sheet.close();
+          await finish(true, text);
+        }}
+      />,
+    );
   };
   const stop = () => {
     tapHaptic();
@@ -193,7 +237,9 @@ export function BrowserCard({
   // ── The header: what the card says it is ──
   // A take over asks nothing: its title is the site, as while watching.
   const asked = (mine || waiting) && handoff?.instructions ? handoff.instructions : "";
-  const title = asked || host || t("browser.watch.title");
+  // Nothing going on (its profile, the agent idle): the agent's browser and where it runs, not "in the browser".
+  const idle = !working && !handoff && !host;
+  const title = asked || host || (idle ? t("browser.inCard.group", agentGrammar(t, name)) : t("browser.watch.title"));
   const minutes = waiting ? handoffMinutesLeft(handoff, now) : null;
   const subtitle = mine
     ? host
@@ -205,12 +251,16 @@ export function BrowserCard({
         : t("mobile.browser.card.needs", { name })
       : helper
         ? t("mobile.browser.live.helping", { name: helper })
-        : doing
-          ? t("mobile.browser.card.doing", { name, doing: stepText(t, doing) })
-          : t(`mobile.browser.card.where${g}`, { name });
+        : closed
+          ? t(`mobile.browser.live.unavailable.closed${g}`, { name })
+          : doing
+            ? t("mobile.browser.card.doing", { name, doing: stepText(t, doing) })
+            : idle && computer
+              ? t("browser.now.ready", { computer })
+              : t(`mobile.browser.card.where${g}`, { name });
 
   return (
-    <View style={[styles.card, raised]}>
+    <View style={[styles.card, raised, style]}>
       <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
       <Pressable
         onPress={() => {
@@ -223,7 +273,7 @@ export function BrowserCard({
         style={styles.head}
       >
         {!open ? (
-          // Closed: the page's small live picture (NavegadorCardScroll.html, 4).
+          // Closed: the page's small live picture.
           <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
             {live.frame ? (
               <Image
@@ -232,7 +282,9 @@ export function BrowserCard({
                 resizeMode="cover"
                 fadeDuration={0}
               />
-            ) : null}
+            ) : (
+              <Icon name={live.hidden ? "eyeoff" : "globe"} size={18} color={c.faint} />
+            )}
           </View>
         ) : null}
         <View style={styles.grow}>
@@ -240,7 +292,7 @@ export function BrowserCard({
             {title}
           </Text>
           <View style={styles.subRow}>
-            {!mine && !waiting && !helper ? <PixelOrbit color={color} size={10} /> : null}
+            {working && !mine && !waiting && !helper && !closed ? <PixelOrbit color={color} size={10} /> : null}
             <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
               {subtitle}
             </Text>
@@ -252,30 +304,24 @@ export function BrowserCard({
           ) : null}
         </View>
         {mine && handoff ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            icon="check"
-            label={t("mobile.browser.live.done")}
-            onPress={() => void finish(true)}
-          />
+          <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
         ) : waiting ? (
           <Button variant="primary" size="sm" label={t("mobile.browser.card.open")} onPress={answer} />
         ) : (
           <View style={styles.acts}>
-            {!controller ? (
-              <Button variant="secondary" size="sm" label={t("mobile.browser.live.takeOver")} onPress={takeover} />
-            ) : null}
-            {!controller ? (
-              <Pressable
-                onPress={stop}
-                accessibilityRole="button"
-                accessibilityLabel={t("mobile.browser.card.stop")}
-                hitSlop={8}
-                style={styles.icon}
-              >
-                <Icon name="stop" size={16} color={c.muted} />
-              </Pressable>
+            {!controller && ready ? (
+              <>
+                <Button variant="secondary" size="sm" label={t("mobile.browser.live.takeOver")} onPress={takeover} />
+                <Pressable
+                  onPress={stop}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("mobile.browser.card.stop")}
+                  hitSlop={8}
+                  style={styles.icon}
+                >
+                  <Icon name="stop" size={16} color={c.muted} />
+                </Pressable>
+              </>
             ) : null}
             <View style={open ? styles.flip : undefined}>
               <Icon name="chev" size={14} color={c.faint} />
@@ -290,17 +336,21 @@ export function BrowserCard({
             {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
             {!live.frame || live.unavailable ? (
               <View style={[styles.center, live.frame ? styles.overlay : null]}>
-                {!live.unavailable || live.unavailable === "reconnecting" ? (
+                {note.spin ? (
                   <ActivityIndicator color={c.muted} />
+                ) : note.say === "hidden" ? (
+                  <Icon name="eyeoff" size={18} color={c.muted} />
                 ) : null}
                 <Text variant="small" tone="ink" style={[styles.semibold, styles.centerText]}>
-                  {live.unavailable
-                    ? t(`mobile.browser.live.unavailable.${live.unavailable}${g}`, { name })
-                    : t(`mobile.browser.card.starting${g}`, { name })}
+                  {note.say === "starting"
+                    ? t(`mobile.browser.card.starting${g}`, { name })
+                    : note.say === "hidden"
+                      ? t("mobile.browser.live.hidden", { name: helper })
+                      : t(`mobile.browser.live.unavailable.${note.say}${g}`, { name })}
                 </Text>
-                {live.unavailable === "reconnecting" && mine ? (
+                {note.help ? (
                   <Text variant="caption" tone="muted" style={styles.centerText}>
-                    {t(`mobile.browser.live.grace${g}`, { name })}
+                    {t(`mobile.browser.live.${note.help}${g}`, { name })}
                   </Text>
                 ) : null}
               </View>
@@ -309,7 +359,8 @@ export function BrowserCard({
           {mine ? (
             <View style={styles.control}>
               <TypeBar onInput={live.sendInput} />
-              {handoff ? (
+              {/* A take over asked for nothing: it only hands back. */}
+              {handoff?.kind === "ask" ? (
                 <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>
                   <Text variant="small" tone="muted" style={styles.medium}>
                     {t("mobile.browser.live.couldnt")}
@@ -318,9 +369,11 @@ export function BrowserCard({
               ) : null}
             </View>
           ) : helper ? (
-            <Text variant="small" tone="muted" style={styles.note}>
-              {t("mobile.browser.live.watchOnly", { name: helper })}
-            </Text>
+            live.hidden ? null : (
+              <Text variant="small" tone="muted" style={styles.note}>
+                {t("mobile.browser.live.watchOnly", { name: helper })}
+              </Text>
+            )
           ) : steps.length > 0 ? (
             <View style={styles.log}>
               {steps.slice(-LOG_LINES).map((s, i, shown) => (
@@ -387,6 +440,8 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
   },
   hint: { marginTop: 2 },
   flip: { transform: [{ rotate: "180deg" }] },

@@ -157,7 +157,7 @@ describe("readable names, subjects and search", () => {
   });
 });
 
-describe("the tools step (ConectorFerramentas.html)", () => {
+describe("the tools step", () => {
   test("the pending group comes first: illustration, suggestion preselected, reason and OK", async () => {
     await mount();
     const g = group() as HTMLElement;

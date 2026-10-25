@@ -2,7 +2,7 @@ import { ApiError } from "@agenteschat/client";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /**
- * Same policy as Tierbird's dashboard: queries show their errors inline; a
+ * Queries show their errors inline; a
  * 401 anywhere means the session ended (back to sign-in); every failed write
  * gets a toast with the server's message.
  */

@@ -4,7 +4,7 @@ import { Fragment, useMemo } from "react";
 /**
  * Translated sample text with a few tags: <b>, <code> and <m> (a mention).
  * Split into tokens (a word with its space, or a whole tag) so agents can
- * "type" it token by token, like the prototype.
+ * "type" it token by token.
  */
 export interface RichToken {
   id: number;
