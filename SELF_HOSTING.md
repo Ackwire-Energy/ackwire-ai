@@ -20,6 +20,8 @@ never sent to browsers.
 - A 64-bit Linux server (amd64 or arm64), or a Mac with Docker Desktop, OrbStack or Colima for
   trying it. It runs on Docker Engine with the Compose v2 plugin (`docker compose`), 2.23.1 or
   newer, and on Linux the installer below installs both when they're missing (Docker after asking).
+  Without Docker, it also runs as one program with its database built in (On this computer, without
+  Docker).
 - Nothing else: the installer fetches the Bun it runs the setup on. With Node.js 18 or newer,
   `npx @agenteschat/setup` is the same setup, and it also runs from the app's image.
 - Sizing has not been measured yet. As a starting point for a small team: 2 vCPUs, 4 GB of RAM and
@@ -387,6 +389,112 @@ port past the host's firewall.
 </details>
 
 <details>
+<summary><b>On this computer, without Docker</b></summary>
+
+agentes.chat also runs as one program with its database built in, with nothing else to install: no
+Docker, no Postgres to set up. The desktop app's **Run agentes.chat on this computer** does it with no
+terminal (coming with the next version of the app), and on a computer without a screen the installer
+will do it with `install.sh --native`. By hand, from a release package, below.
+
+- **The database is PGlite:** real Postgres compiled to WebAssembly, running inside that program,
+  with pgvector. It's the same engine the tests run on, so the migrations and the queries are the
+  same as with Docker.
+- **Everything lives in one folder,** `~/.agentes`: the database in `db/`, uploaded files in `files/`
+  (`FILES_DIR`), the settings in `.env`, the log in `logs/server.log`. Jobs already live in the
+  database, and live updates run in memory.
+- **Its limits:** one process, which answers queries one at a time, for a person or a small team,
+  while that computer is on. It takes about 0.5 to 1 GB of memory. Each change reaches the disk before
+  it's confirmed, as with Postgres, but nothing makes backups for you: copy the folder now and then,
+  with it stopped (Backing up, below). Moving the database or upgrading it takes memory of about ten
+  times its size (`du -sh ~/.agentes/db`): with 8 GB, up to about 500 MB. For a bigger team or a
+  server that's always on, use the one-command install with Docker and full Postgres. Moving there
+  later is a dump and a restore (below).
+
+It listens on this computer only (`127.0.0.1`), and answers only at its own address (opened as
+`localhost`, it sends the browser there). To reach it from your phone or a teammate's computer, put it
+on your tailnet with `tailscale serve` (on this computer:
+`tailscale serve --bg --https=443 http://127.0.0.1:4310`) and set `PUBLIC_URL` in `~/.agentes/.env` to
+the `https://…ts.net` address it prints, then start it again.
+
+**Usage statistics.** Like any self-hosted install, it sends agentes.chat an anonymous usage report
+once a day (Optional services and what they receive lists every field in it). To turn it off, put
+`TELEMETRY=off` in `~/.agentes/.env` and start it again, or use the switch in **Settings → General →
+Usage statistics**. `agentes-server telemetry` prints the next report and sends nothing (with the
+server stopped; while it runs, **See what is sent** there shows the same).
+
+**By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
+(`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
+names each package's SHA-256. Check it, then:
+
+```sh
+mkdir -p ~/.agentes/app
+tar -xzf agentes-native-1.4.0-linux-x64.tar.gz -C ~/.agentes/app --strip-components 1
+~/.agentes/app/1.4.0/bin/agentes-server --data ~/.agentes
+```
+
+The first start makes the folder (readable by you only) and its `.env`, with a new `AGENTES_SECRET`
+and a free port from 4310, migrates the database and answers at `http://127.0.0.1:4310` (it prints the
+address; `PORT` in `.env` changes it). Open it and create the owner account: the first account owns the
+installation, unless an installer left an owner link (Configuration, Sign-up). `AGENTES_SECRET`
+encrypts the keys organizations store: it travels with the folder in a backup, and changing it makes
+them unreadable.
+
+| Command (each takes `--data <folder>`, default `~/.agentes`) | Does |
+| --- | --- |
+| `agentes-server` | Runs it until Ctrl-C. In-progress agent runs get 20 seconds to finish. |
+| `agentes-server service install` | Starts it with this computer: at login on macOS (launchd), from boot on Linux (a systemd user unit, kept after you log out). `uninstall` and `status` too. |
+| `agentes-server migrate` | Updates the database to this version, then exits (every start does it too). |
+| `agentes-server db dump --out agentes.sql` | The whole database as SQL. |
+| `agentes-server db restore --in agentes.sql` | A dump into a folder with no database yet (or the upgrade, below). If it fails, the folder stays as it was. |
+| `agentes-server db check` | Opens the database and prints what wrote it. |
+| `agentes-server telemetry` | Prints the next usage report, exactly, and sends nothing. |
+| `agentes-server version` | Its version, and its PGlite's and Postgres's. |
+
+When it stops at once, its exit code says why: 3, another `agentes-server` (or another program) uses
+that folder (the message names its process); 4, the database needs an upgrade (below); 5, another
+program uses the port (set `PORT` in `.env`). Its log, `~/.agentes/logs/server.log`, says it too.
+
+**Backing up.** Stop it (Ctrl-C, or `agentes-server service uninstall`), copy the whole folder
+(`~/.agentes`, with the `AGENTES_SECRET` of its `.env`, which the keys stored in the database need),
+then start it again (`service install`). To restore, put the folder back. A dump (`db dump`) is the
+other way, for moving the data elsewhere; it holds the database, without `files/` or `.env`.
+
+**Upgrading** is extracting the new version beside the old one, then running its `service install`
+once, so the service starts the new version (by hand, start the new one on the same folder):
+
+```sh
+~/.agentes/app/1.5.0/bin/agentes-server service install --data ~/.agentes
+```
+
+When a version moves PGlite to a new Postgres major (its release notes say so), the new one refuses
+the old folder with exit 4 until it is upgraded, with the server stopped: `db dump` with the old
+version, then `db restore` with the new one, which keeps the old database in `backups/`, then the new
+version's `service install`:
+
+```sh
+~/.agentes/app/1.4.0/bin/agentes-server service uninstall
+~/.agentes/app/1.4.0/bin/agentes-server db dump --data ~/.agentes --out ~/agentes-upgrade.sql
+~/.agentes/app/1.5.0/bin/agentes-server db restore --data ~/.agentes --in ~/agentes-upgrade.sql
+~/.agentes/app/1.5.0/bin/agentes-server service install --data ~/.agentes
+```
+
+**Moving to Docker.** The dump restores into the Docker install's Postgres 18:
+
+1. Stop it (`agentes-server service uninstall`, or Ctrl-C), then dump:
+   `agentes-server db dump --data ~/.agentes --out agentes.sql`.
+2. Install with Docker (Quick start, or This machine only, by hand), but don't start the app yet: in
+   the new install's `.env`, put the `AGENTES_SECRET` of `~/.agentes/.env`, then start only the
+   database, `docker compose up -d postgres`.
+3. Restore into it, still empty:
+   `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.
+4. Start the app, `docker compose up -d`, copy the uploaded files into its volume, and give them to
+   the app's user (the copy arrives as root's):
+   `docker compose cp ~/.agentes/files/. agentes:/data/files/`, then
+   `docker compose exec -u root agentes chown -R bun:bun /data/files`. Sign in as before.
+
+</details>
+
+<details>
 <summary><b>What needs a public URL</b></summary>
 
 On Tailscale, only devices in your tailnet reach the instance. Everything people do in the apps works
@@ -441,6 +549,7 @@ ones a self-hosted instance usually touches:
 | `TS_EXTRA_ARGS` | | More `tailscale up` flags. The setup puts `--advertise-tags` here for an OAuth client secret. |
 | `TAILSCALE_FUNNEL` | `false` | `true` opens the instance to the internet at the same address (What needs a public URL). Only `true` or `false`. |
 | `ALLOW_SIGNUP` | `false` | `true` lets anyone create an account. |
+| `OWNER_CLAIM_SHA256` | | Set by the setup: while no account exists, only its owner link creates the first one (Sign-up, below). `OWNER_KEY_SHA256` is the desktop app's. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
 | `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. |
@@ -460,7 +569,10 @@ MiniMax) in **Settings → API keys**, and each agent uses one of them. Usage an
 **Sign-up.** The first account is always allowed. After it, with `ALLOW_SIGNUP=false` (the default),
 only invited people get in: invited by email from **Settings → Members and invitations**, or through
 an invite link, which works without email. Keep sign-up closed on an instance reachable from the
-internet.
+internet. An installer can keep the first account for its owner: with `OWNER_CLAIM_SHA256` set, only
+the owner link it printed (`<PUBLIC_URL>/owner#claim=…`) creates it, with a password, and every other
+sign-up waits until it has. The link works once, so treat it like a password until you've used it.
+`OWNER_KEY_SHA256` does the same for the desktop app that runs the server on its own computer.
 
 **Email.** Without `SMTP_URL` or `MILLIONSEND_API_KEY`, the app writes each email to its log instead
 of sending it (`docker compose logs agentes | grep 'email (not sent'`), so an invitation link can
@@ -527,12 +639,12 @@ about 2.5 hours, then dropped: the next day's report replaces it. These are all 
 
 It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
 workspaces, people or computers (the request itself comes from your server's address, as any request
-does). `docker compose run --rm agentes telemetry` prints exactly the next
-report, whether it is on or off, and sends nothing; in the app, **Settings → General → Usage
-statistics → See what is sent** shows the same. Turn it off either way:
+does). `docker compose run --rm agentes telemetry` (without Docker, `agentes-server telemetry`) prints
+exactly the next report, whether it is on or off, and sends nothing; in the app, **Settings → General →
+Usage statistics → See what is sent** shows the same. Turn it off either way:
 
-- `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts). This wins
-  over the switch below.
+- `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts); without
+  Docker, in `~/.agentes/.env`, then start it again. This wins over the switch below.
 - The switch in **Settings → General → Usage statistics**. Only the installation's first account (the
   person who set it up) sees it.
 

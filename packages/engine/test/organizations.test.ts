@@ -141,15 +141,20 @@ describe("invitations", () => {
 });
 
 describe("self-host sign-up policy", () => {
+  const closed = { allowSignup: false, ownerByLink: false };
   test("closed after the first account unless ALLOW_SIGNUP or a pending invitation", async () => {
-    expect(await isSignupAllowed(f.db, "new@example.com", false)).toBe(false);
-    expect(await isSignupAllowed(f.db, "new@example.com", true)).toBe(true);
+    expect(await isSignupAllowed(f.db, "new@example.com", closed)).toBe(false);
+    expect(await isSignupAllowed(f.db, "new@example.com", { ...closed, allowSignup: true })).toBe(true);
     await createInvitation(f.db, f.owner.id, f.org.id, { email: "new@example.com", role: "member" });
-    expect(await isSignupAllowed(f.db, "NEW@example.com", false)).toBe(true);
+    expect(await isSignupAllowed(f.db, "NEW@example.com", closed)).toBe(true);
+    // An owner link only decides the first account.
+    expect(await isSignupAllowed(f.db, "NEW@example.com", { ...closed, ownerByLink: true })).toBe(true);
   });
 
-  test("the very first account may always sign up", async () => {
+  test("the very first account may always sign up, unless it waits for its owner's link", async () => {
     await f.db.delete(schema.users);
-    expect(await isSignupAllowed(f.db, "first@example.com", false)).toBe(true);
+    expect(await isSignupAllowed(f.db, "first@example.com", closed)).toBe(true);
+    expect(await isSignupAllowed(f.db, "first@example.com", { ...closed, ownerByLink: true })).toBe(false);
+    expect(await isSignupAllowed(f.db, "first@example.com", { allowSignup: true, ownerByLink: true })).toBe(false);
   });
 });

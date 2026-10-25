@@ -68,21 +68,30 @@ export function parseSha256(text: string): string | null {
   return text.match(/\b([0-9a-f]{64})\b/i)?.[1]?.toLowerCase() ?? null;
 }
 
-/**
- * Reads releases with the token (`fetch` injectable: tests use a fake
- * GitHub). The latest answer is cached 5 minutes, per process.
- */
-export function createDesktopReleases(options: {
+interface ReleaseSource {
   token: string | undefined;
   repo: string;
-  publicUrl: string;
   fetch?: typeof fetch;
   now?: () => number;
-}) {
+}
+
+/** A release being read: its version (the tag without its prefix), its assets, and how to read a small one. */
+interface ReleaseFiles {
+  release: GitHubRelease;
+  version: string;
+  assets: GitHubAsset[];
+  text: (asset: GitHubAsset) => Promise<string>;
+}
+
+/**
+ * Reads one kind of release, by tag prefix (`desktop-v*`, or `v*` for the server), with the token
+ * (`fetch` injectable: tests use a fake GitHub). The newest one, as `read` makes it, is cached 5
+ * minutes per process.
+ */
+function releaseReader<T>(options: ReleaseSource & { prefix: string; read: (r: ReleaseFiles) => Promise<T | null> }) {
   const http = options.fetch ?? fetch;
   const now = options.now ?? Date.now;
-  let latest: { at: number; value: DesktopRelease | null } | null = null;
-  const base = options.publicUrl.replace(/\/+$/, "");
+  let latest: { at: number; value: T | null } | null = null;
   const headers = () => ({
     authorization: `Bearer ${options.token}`,
     accept: "application/vnd.github+json",
@@ -90,11 +99,11 @@ export function createDesktopReleases(options: {
     "user-agent": "agentes.chat",
   });
 
-  async function getJson<T>(path: string): Promise<T | null> {
+  async function getJson<R>(path: string): Promise<R | null> {
     const res = await http(`${GITHUB_API}${path}`, { headers: headers() });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
-    return (await res.json()) as T;
+    return (await res.json()) as R;
   }
 
   /** An asset's bytes: GitHub redirects to a signed URL, which must not get our token. */
@@ -108,44 +117,22 @@ export function createDesktopReleases(options: {
     return first;
   }
 
-  const versionOf = (tag: string) => tag.slice(DESKTOP_TAG_PREFIX.length);
+  const versionOf = (tag: string) => tag.slice(options.prefix.length);
+  const ours = (r: GitHubRelease) => r.tag_name.startsWith(options.prefix) && SEMVER.test(versionOf(r.tag_name));
 
-  async function readLatest(): Promise<DesktopRelease | null> {
+  async function readLatest(): Promise<T | null> {
     const releases = await getJson<GitHubRelease[]>(`/repos/${options.repo}/releases?per_page=30`);
-    const release = (releases ?? []).find(
-      (r) =>
-        !r.draft && !r.prerelease && r.tag_name.startsWith(DESKTOP_TAG_PREFIX) && SEMVER.test(versionOf(r.tag_name)),
-    );
+    const release = (releases ?? []).find((r) => !r.draft && !r.prerelease && ours(r));
     if (!release) return null;
-    const version = versionOf(release.tag_name);
-    const assets = release.assets ?? [];
-    const dmg = assets.find((a) => a.name === dmgName(version));
-    if (!dmg) return null;
-    const sumAsset = assets.find((a) => a.name === `${dmgName(version)}.sha256`);
-    const sha256 = sumAsset ? parseSha256(await (await assetResponse(sumAsset)).text()) : null;
-    if (!sha256) return null;
-    const { notes, minVersion } = parseReleaseBody(release.body);
-    const bundle = assets.find((a) => a.name === updaterName(version));
-    const sigAsset = assets.find((a) => a.name === `${updaterName(version)}.sig`);
-    const signature = bundle && sigAsset ? (await (await assetResponse(sigAsset)).text()).trim() : "";
-    return {
-      version,
-      url: `${base}/api/desktop/download/${version}/${dmg.name}`,
-      sha256,
-      notes,
-      publishedAt: release.published_at ?? release.created_at ?? "",
-      ...(minVersion ? { minVersion } : {}),
-      ...(bundle && signature
-        ? { updater: { url: `${base}/api/desktop/download/${version}/${bundle.name}`, signature } }
-        : {}),
-    };
+    const text = async (asset: GitHubAsset) => (await assetResponse(asset)).text();
+    return options.read({ release, version: versionOf(release.tag_name), assets: release.assets ?? [], text });
   }
 
   return {
     enabled: Boolean(options.token),
 
-    /** The newest `desktop-v*` release with its `.dmg` and checksum; null when there is none. */
-    async latest(): Promise<DesktopRelease | null> {
+    /** The newest published release of this kind, as `read` makes it; null when there is none. */
+    async latest(): Promise<T | null> {
       if (!options.token) return null;
       if (latest && now() - latest.at < LATEST_TTL_MS) return latest.value;
       const value = await readLatest();
@@ -153,13 +140,13 @@ export function createDesktopReleases(options: {
       return value;
     },
 
-    /** The bytes of one asset of the `desktop-v<version>` release; null when it isn't one. */
+    /** The bytes of one asset of the release of this kind and version; null when it isn't one. */
     async download(version: string, file: string): Promise<{ response: Response; name: string } | null> {
       if (!options.token || !SEMVER.test(version) || !FILE_NAME.test(file)) return null;
       const release = await getJson<GitHubRelease>(
-        `/repos/${options.repo}/releases/tags/${encodeURIComponent(`${DESKTOP_TAG_PREFIX}${version}`)}`,
+        `/repos/${options.repo}/releases/tags/${encodeURIComponent(`${options.prefix}${version}`)}`,
       );
-      if (!release || release.draft || !release.tag_name.startsWith(DESKTOP_TAG_PREFIX)) return null;
+      if (!release || release.draft || !ours(release)) return null;
       const asset = (release.assets ?? []).find((a) => a.name === file);
       if (!asset) return null;
       const response = await assetResponse(asset);
@@ -168,7 +155,68 @@ export function createDesktopReleases(options: {
   };
 }
 
+/** The newest `desktop-v*` release with its `.dmg` and checksum (and the updater bundle, when signed). */
+export function createDesktopReleases(options: ReleaseSource & { publicUrl: string }) {
+  const base = options.publicUrl.replace(/\/+$/, "");
+  return releaseReader<DesktopRelease>({
+    ...options,
+    prefix: DESKTOP_TAG_PREFIX,
+    read: async ({ release, version, assets, text }) => {
+      const dmg = assets.find((a) => a.name === dmgName(version));
+      if (!dmg) return null;
+      const sumAsset = assets.find((a) => a.name === `${dmgName(version)}.sha256`);
+      const sha256 = sumAsset ? parseSha256(await text(sumAsset)) : null;
+      if (!sha256) return null;
+      const { notes, minVersion } = parseReleaseBody(release.body);
+      const bundle = assets.find((a) => a.name === updaterName(version));
+      const sigAsset = assets.find((a) => a.name === `${updaterName(version)}.sig`);
+      const signature = bundle && sigAsset ? (await text(sigAsset)).trim() : "";
+      return {
+        version,
+        url: `${base}/api/desktop/download/${version}/${dmg.name}`,
+        sha256,
+        notes,
+        publishedAt: release.published_at ?? release.created_at ?? "",
+        ...(minVersion ? { minVersion } : {}),
+        ...(bundle && signature
+          ? { updater: { url: `${base}/api/desktop/download/${version}/${bundle.name}`, signature } }
+          : {}),
+      };
+    },
+  });
+}
+
+/**
+ * The server's own releases (`v<version>`) carry the native packages (ADR 0060 §2): `native.json`,
+ * which names each computer's package with its SHA-256, and `native.json.sig`, its minisign
+ * signature. The installer checks that signature with the key pinned in it, so this route needn't
+ * be trusted.
+ */
+export const NATIVE_TAG_PREFIX = "v";
+export const NATIVE_MANIFEST = "native.json";
+
+export interface NativeRelease {
+  version: string;
+  /** `native.json`, byte for byte as published (the signature is over these bytes). */
+  manifest: string;
+  signature: string;
+}
+
+export function createNativeReleases(options: ReleaseSource) {
+  return releaseReader<NativeRelease>({
+    ...options,
+    prefix: NATIVE_TAG_PREFIX,
+    read: async ({ version, assets, text }) => {
+      const manifest = assets.find((a) => a.name === NATIVE_MANIFEST);
+      const signature = assets.find((a) => a.name === `${NATIVE_MANIFEST}.sig`);
+      if (!manifest || !signature) return null;
+      return { version, manifest: await text(manifest), signature: (await text(signature)).trim() };
+    },
+  });
+}
+
 export type DesktopReleases = ReturnType<typeof createDesktopReleases>;
+export type NativeReleases = ReturnType<typeof createNativeReleases>;
 
 /** Light limits: the app checks every 6 hours; downloads are people clicking. */
 /** Mac architectures, as Rust (`aarch64`, `x86_64`) and Node (`arm64`, `x64`) name them. */
@@ -260,11 +308,22 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
     );
   });
 
-  api.get("/desktop/download/:version/:file", async (c) => {
-    const limit = await rateLimiter.consume(`desktop-download:${requestIp(c.req.raw.headers)}`, DOWNLOAD_LIMIT);
+  registerDownload(api, deps, "desktop", releases);
+}
+
+/** `GET /api/<kind>/download/{version}/{file}`: one asset of a release, streamed under our own headers. */
+function registerDownload(
+  api: OpenAPIHono,
+  deps: AppDeps,
+  kind: "desktop" | "native",
+  releases: DesktopReleases | NativeReleases,
+) {
+  api.get(`/${kind}/download/:version/:file`, async (c) => {
+    const ip = requestIp(c.req.raw.headers);
+    const limit = await deps.adapters.rateLimiter.consume(`${kind}-download:${ip}`, DOWNLOAD_LIMIT);
     if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
     const found = await releases.download(c.req.param("version"), c.req.param("file")).catch(() => null);
-    if (!found) return apiError(c, 404, "desktop.not_found", "This build is not available");
+    if (!found) return apiError(c, 404, `${kind}.not_found`, "This build is not available");
     const upstream = found.response;
     const headers = new Headers({
       "content-type": upstream.headers.get("content-type") || "application/octet-stream",
@@ -276,4 +335,44 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
     if (length) headers.set("content-length", length);
     return new Response(upstream.body, { status: 200, headers });
   });
+}
+
+const NativeLatest = z
+  .object({
+    version: z.string().openapi({ example: "1.4.0" }),
+    manifest: z.string().openapi({
+      description:
+        '`native.json` as published: `{ version, pgMajor, pglite, files: { "<os>-<arch>": { name, sha256, size } } }`.',
+    }),
+    signature: z.string().openapi({ description: "`native.json.sig`: its minisign signature (the updater's key)." }),
+  })
+  .openapi("NativeRelease");
+
+/**
+ * `GET /api/native/latest` and `GET /api/native/download/{version}/{file}` (ADR 0060 §2): the packages
+ * of agentes.chat without Docker, for the installer. Public, no session; 404 without `DESKTOP_RELEASES_TOKEN`.
+ */
+export function registerNativeRoutes(api: OpenAPIHono, deps: AppDeps, releases: NativeReleases) {
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/native/latest",
+      tags: ["Native install"],
+      summary: "The newest agentes.chat packages that run without Docker, and their signature",
+      responses: {
+        200: json(NativeLatest),
+        404: errorResponse("No packages yet (or releases are not configured)"),
+        429: errorResponse("Too many requests"),
+      },
+    }),
+    async (c) => {
+      const ip = requestIp(c.req.raw.headers);
+      const limit = await deps.adapters.rateLimiter.consume(`native-latest:${ip}`, LATEST_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
+      const release = await releases.latest().catch(() => null);
+      if (!release) return apiError(c, 404, "native.no_release", "No packages of this version yet");
+      return c.json(release, 200);
+    },
+  );
+  registerDownload(api, deps, "native", releases);
 }

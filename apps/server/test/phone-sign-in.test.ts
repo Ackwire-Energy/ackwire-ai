@@ -114,6 +114,7 @@ describe("GET /api/instance", () => {
       signIn: { email: true, google: true, github: false, apple: false },
       // Nobody yet: the first account signs up.
       signup: "open",
+      ownerClaim: false,
     });
     await signUp(browser(t), "owner@example.com");
     const after = (await (await t.app.request("/api/instance")).json()) as { signup: string };

@@ -321,6 +321,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
+      addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
     },
     orgs: {
       create: (input) =>

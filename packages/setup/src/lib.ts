@@ -240,16 +240,21 @@ export const ENV_HEADER = `# agentes.chat settings, written by npx @agenteschat/
 const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/;
 
 /**
- * The value of `KEY=` as Compose reads it: the last line wins, as in `cp .env.example .env` followed by
- * appended values. Null when the line is absent, "" when it is empty.
+ * Every `KEY=value` of a .env as Compose reads them: the last line of a key wins, as in
+ * `cp .env.example .env` followed by appended values.
  */
-export function envValue(content: string | null, key: string): string | null {
-  let value: string | null = null;
-  for (const line of content?.split("\n") ?? []) {
+export function envEntries(content: string): Map<string, string> {
+  const entries = new Map<string, string>();
+  for (const line of content.split("\n")) {
     const match = ENV_LINE.exec(line);
-    if (match?.[1] === key) value = unquoteEnvValue((match[2] ?? "").trim());
+    if (match?.[1]) entries.set(match[1], unquoteEnvValue((match[2] ?? "").trim()));
   }
-  return value;
+  return entries;
+}
+
+/** The value of `KEY=` (`envEntries`). Null when the line is absent, "" when it is empty. */
+export function envValue(content: string | null, key: string): string | null {
+  return envEntries(content ?? "").get(key) ?? null;
 }
 
 /**

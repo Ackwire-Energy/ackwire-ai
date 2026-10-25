@@ -269,3 +269,88 @@ test("its service: the root unit runs `host` (the token from a file), starts wit
   ]);
   expect(readStoredConfig(state)).toBeNull();
 });
+
+test("once: the homes written, every tool off, nothing started; what is new and what is gone", async () => {
+  const { host, server, children, home } = makeHost({ exec: false, rotate: [B] });
+  server.answer([org(A, MA, "agm_a"), org(B, MB, "agm_b")]);
+  expect(await host.once()).toEqual({
+    status: "on",
+    homes: [
+      { orgId: A, orgName: "Acme", machineId: MA, home: home(A), new: true },
+      { orgId: B, orgName: "Beta", machineId: MB, home: home(B), new: true },
+    ],
+    gone: [],
+  });
+  expect(server.sent[0]?.body.rotate).toEqual([B]);
+  expect(children.started).toEqual([]);
+  expect(readStoredConfig(home(A))).toMatchObject({
+    managedBy: "host",
+    exec: false,
+    access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+  });
+
+  // The next round: nothing new, and an organization it no longer serves is named, its home left alone.
+  server.answer([org(A, MA)]);
+  const next = await host.once();
+  expect(next).toMatchObject({ status: "on", homes: [{ orgId: A, new: false }], gone: [B] });
+  expect(existsSync(home(B))).toBe(true);
+  expect(children.started).toEqual([]);
+});
+
+test("once: says why it wrote nothing", async () => {
+  const { host, server } = makeHost({ exec: false });
+  server.answer(404);
+  expect(await host.once()).toEqual({ status: "off", homes: [], gone: [] });
+  server.answer(401);
+  expect(await host.once()).toEqual({ status: "refused", homes: [], gone: [] });
+  server.answer(502);
+  expect(await host.once()).toEqual({ status: "unreachable", homes: [], gone: [] });
+  expect((await makeHost({ token: () => null }).host.once()).status).toBe("no_token");
+});
+
+test("host --once from the command line: one JSON line, as this computer's user", async () => {
+  const state = tempDir("host-once-");
+  dirs.push(state);
+  writeFileSync(path.join(state, "token"), "host-token\n", { mode: 0o600 });
+  const seen: unknown[] = [];
+  const fake = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: async (req) => {
+      seen.push(await req.json());
+      return Response.json({ orgs: [org(A, MA, "agm_a")] });
+    },
+  });
+  try {
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        path.join(import.meta.dir, "../../runner/main.ts"),
+        "host",
+        "--once",
+        "--server",
+        `http://127.0.0.1:${fake.port}`,
+        "--token-file",
+        path.join(state, "token"),
+        "--state",
+        state,
+        "--name",
+        "Ana's Mac",
+        "--rotate",
+        A,
+      ],
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, AGENTES_RUNNER_HOME: state } },
+    );
+    const [code, out] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    expect(code).toBe(0);
+    expect(out.trim().split("\n")).toHaveLength(1);
+    expect(JSON.parse(out)).toMatchObject({ status: "on", homes: [{ orgId: A, new: true }], gone: [] });
+    expect(seen[0]).toMatchObject({ name: "Ana's Mac", rotate: [A] });
+    // Single-user, on Linux too: no system mode, no uid block.
+    const stored = readStoredConfig(path.join(state, "orgs", A));
+    expect(stored?.mode).toBeUndefined();
+    expect(stored?.agentUidRange).toBeUndefined();
+  } finally {
+    await fake.stop(true);
+  }
+});
