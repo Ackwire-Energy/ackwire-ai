@@ -92,6 +92,11 @@ Usage:
       user on Linux (run it as root). Organizations come and go with the server, checked every minute.
       --state    where it keeps each organization's connection (default: the home)
       --no-exec  agents can't run commands here (files and uploads only)
+  agentes-runner host --once --server <url> --token-file <path> [--state <dir>] [--name <name>] [--rotate <orgId>]...
+      One sync for a program that runs the organizations' connections itself (the agentes.chat app):
+      writes them, every tool off, as this computer's user (Linux included), starts nothing, and prints
+      one JSON line: {"status", "homes": [{"orgId", "orgName", "machineId", "home", "new"}], "gone": [orgId]}.
+      --rotate   asks for a new token for that organization's connection (the server refused its own)
   agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
       Runs host as this computer's service (Linux: the root unit, from boot; macOS: at login).
   agentes-runner update
@@ -146,8 +151,9 @@ const VALUE_FLAGS = new Set([
   "token-file",
   "state",
   "enroll-file",
+  "rotate",
 ]);
-const LIST_FLAGS = new Set(["agent"]);
+const LIST_FLAGS = new Set(["agent", "rotate"]);
 
 function parseArgs(argv: string[]): Parsed {
   const positional: string[] = [];
@@ -420,7 +426,7 @@ async function worker(p: Parsed): Promise<number> {
 }
 
 const HOST_USAGE =
-  "Usage: agentes-runner host --server <url> --token-file <path> | --token-env <NAME> [--state <dir>] [--name <name>] [--no-exec]";
+  "Usage: agentes-runner host [--once] --server <url> --token-file <path> | --token-env <NAME> [--state <dir>] [--name <name>] [--no-exec] [--rotate <orgId>]...";
 
 /** `host`'s own flags, checked, for the command and for its service. */
 function hostFlags(p: Parsed) {
@@ -454,6 +460,7 @@ async function host(p: Parsed): Promise<number> {
     console.error(HOST_USAGE);
     return 1;
   }
+  if (p.flags.has("once")) return hostOnce(flags, p.lists.get("rotate") ?? []);
   const refusal = hostRefusal();
   if (refusal) {
     console.error(refusal);
@@ -492,6 +499,35 @@ async function host(p: Parsed): Promise<number> {
     guard?.stop();
     lock.release();
   }
+}
+
+/**
+ * `host --once`: the sync of the desktop app, which runs the homes' runners itself. Single-user homes
+ * everywhere, so as the person on Linux too (system mode stays root's service).
+ */
+async function hostOnce(flags: NonNullable<ReturnType<typeof hostFlags>>, rotate: string[]): Promise<number> {
+  if (process.platform === "win32") {
+    console.error("The server's computer runs on Linux or macOS.");
+    return 1;
+  }
+  const envToken = flags.tokenEnv ? process.env[flags.tokenEnv]?.trim() || null : null;
+  const computer = new HostComputer({
+    server: flags.server,
+    token: () => (flags.tokenFile ? readTokenFile(flags.tokenFile) : envToken),
+    state: flags.state,
+    name: flags.name ?? os.hostname(),
+    system: false,
+    // Every tool off: the app turns its defaults on in each new home.
+    exec: false,
+    rotate,
+    // stdout is the one JSON line.
+    log: (line) => console.error(stamp(line)),
+    start: () => {
+      throw new Error("host --once starts nothing");
+    },
+  });
+  console.log(JSON.stringify(await computer.once()));
+  return 0;
 }
 
 /** `service install --host`: `agentes-runner host` as this computer's service (the token from a file). */
