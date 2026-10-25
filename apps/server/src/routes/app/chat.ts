@@ -8,6 +8,7 @@ import {
   listChannels,
   listMessages,
   listWorkingRuns,
+  openConsultationsIn,
   postPersonMessage,
   requireChannelAccess,
 } from "@agenteschat/engine";
@@ -250,6 +251,23 @@ export function chatRoutes(deps: AppDeps) {
                 }),
               }),
             ),
+            consults: z
+              .array(
+                z.object({
+                  runId: z
+                    .uuid()
+                    .openapi({ description: "The asking run (it may have ended: the answer wakes the agent)." }),
+                  agentId: z.uuid(),
+                  consultedAgentId: z.uuid(),
+                  channelId: z.uuid(),
+                  threadId: z.uuid().nullable(),
+                  since: z.string(),
+                }),
+              )
+              .openapi({
+                description:
+                  "Questions agents asked from here (`ask_agent`) still without an answer: the working line says one agent is asking another until `agent.consulted`.",
+              }),
           }),
         ),
         ...errors,
@@ -258,13 +276,17 @@ export function chatRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
       await requireChannelAccess(db, c.get("user").id, orgId, channelId);
-      const runs = await activeRunsIn(db, orgId, channelId);
+      const [runs, consults] = await Promise.all([
+        activeRunsIn(db, orgId, channelId),
+        openConsultationsIn(db, orgId, channelId),
+      ]);
       return c.json(
         {
           runs: runs.map((r) => ({
             ...r,
             status: r.status as "queued" | "running" | "waiting_approval" | "waiting_input",
           })),
+          consults: consults.map((q) => ({ ...q, since: q.since.toISOString() })),
         },
         200,
       );

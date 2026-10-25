@@ -164,9 +164,6 @@ function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, 
   return pose;
 }
 
-/** Smallest framed tile (CSS px) that still shows the accessory. */
-const FRAMED_ACCESSORY_MIN = 24;
-
 const isDark = (el: Element) => {
   let dark = darkCache.get(el);
   if (dark === undefined) {
@@ -235,7 +232,7 @@ function livePose(agent: LiveAgent, t: number): { pose: Pose; hop: number } {
 /**
  * The tile: the agent's pixel sky fills the
  * canvas; the agent stands centered, feet near the bottom edge, smaller with
- * an accessory so it has room above (accessories from 24px, the sidebar size).
+ * an accessory so it has room above (at every size: the agent is always itself).
  */
 function drawFramed(agent: LiveAgent, ctx: CanvasRenderingContext2D, size: number, dpr: number, t: number) {
   const { canvas, box } = agent;
@@ -251,7 +248,7 @@ function drawFramed(agent: LiveAgent, ctx: CanvasRenderingContext2D, size: numbe
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(sky, 0, 0, s, s);
   }
-  const accessory = size >= FRAMED_ACCESSORY_MIN ? look.accessory : undefined;
+  const accessory = look.accessory;
   const inner = s * (accessory ? 0.6 : 0.66);
   const x = (s - inner) / 2;
   const y = s - inner - s * (accessory ? 0.1 : 0.14);

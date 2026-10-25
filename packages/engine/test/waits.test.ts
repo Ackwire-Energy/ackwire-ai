@@ -16,6 +16,7 @@ import {
   type JobHandlers,
   type MachineCaller,
   type MachineStatus,
+  openConsultationsIn,
   postPersonMessage,
   resumeRunWithResult,
   stopChecksSettled,
@@ -176,15 +177,15 @@ describe("a person's message while a run waits for help in the browser", () => {
   });
 });
 
-describe("approvals and secrets hold", () => {
-  test("a message never decides an approval: the run keeps waiting, the message stays queued", async () => {
+describe("approvals hold the run, never the agent (D97)", () => {
+  test("a message never decides an approval, nor waits behind it: the agent answers it in a run of its own", async () => {
     const github = fakeGithub();
     f = await setup({
       toolSources: [github.source],
       reply: (req) =>
         lastText(req).includes("tool_result")
           ? { chunks: ["Merged."] }
-          : lastText(req).includes("merge")
+          : lastText(req).includes("merge the fix") && !lastText(req).includes("approved")
             ? {
                 chunks: [],
                 toolUses: [
@@ -198,21 +199,25 @@ describe("approvals and secrets hold", () => {
                   },
                 ],
               }
-            : { chunks: ["ok"] },
+            : { chunks: ["Use the card to approve it."] },
     });
     await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
     const ask = await say("@dev merge the fix");
     await drainOutbox(f.db, f.handlers);
     expect((await runs())[0]?.status).toBe("waiting_approval");
     const events = f.listen(f.general.id);
+    // A reply in its thread, no mention: the waiting run takes nothing new.
     const sent = await say("yes go ahead, approved", ask.id);
     await stopChecksSettled();
     await drainOutbox(f.db, f.handlers);
 
-    expect(waitMessages(events)).toEqual([expect.objectContaining({ waitKind: "approval", outcome: "held" })]);
-    const [run] = await runs();
-    expect(run?.status).toBe("waiting_approval");
-    expect(run?.pendingMessageIds).toEqual([sent.id]);
+    expect(waitMessages(events)).toEqual([]);
+    const all = (await runs()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    expect(all).toHaveLength(2);
+    expect(all[0]?.status).toBe("waiting_approval");
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+    expect(all[1]?.triggerMessageId).toBe(sent.id);
+    expect(all[1]?.status).toBe("done");
     expect(github.executed).toHaveLength(0);
     expect((await f.db.select().from(schema.approvals))[0]?.status).toBe("pending");
   });
@@ -361,6 +366,52 @@ describe("ask_agent", () => {
     expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(
       "[Reply to your question to @infra]: Staging deploys with deploy.sh",
     );
+  });
+
+  test("a question to an agent whose run waits on an approval doesn't wait behind it; the asker's line stays (D97)", async () => {
+    f = await setup({
+      askAgent: true,
+      reply: (req) => {
+        if (inAgentDm(req)) return { chunks: ["Answer from Infra"] };
+        const last = lastText(req);
+        if (last.includes("tool_result")) return { chunks: ["I asked Infra; I'll tell you."] };
+        if (last.includes("deployed"))
+          return {
+            chunks: [],
+            toolUses: [{ name: "ask_agent", input: { agent: "@infra", question: "How is it deployed?" } }],
+          };
+        return { chunks: ["ok"] };
+      },
+    });
+    const infra = await addInfra();
+    const hold = holdInfra(infra.id);
+    await say("@dev how is staging deployed?");
+    await drainOutbox(f.db, hold.handlers);
+    const [first] = await f.db.select().from(schema.agentConsultations);
+    if (!first?.targetRunId) throw new Error("no consultation");
+    expect(first.status).toBe("open");
+    // The asking turn ended ("I'll tell you"): the question is still out, and the conversation says so.
+    expect(await openConsultationsIn(f.db, f.org.id, f.general.id)).toEqual([
+      expect.objectContaining({ runId: first.askerRunId, agentId: f.agent.id, consultedAgentId: infra.id }),
+    ]);
+    // Infra's run there now waits on an approval (from the person's earlier request).
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "waiting_approval" })
+      .where(eq(schema.agentRuns.id, first.targetRunId));
+
+    await say("@dev and how is production deployed?");
+    await drainOutbox(f.db, hold.handlers);
+    const asked = (await f.db.select().from(schema.agentConsultations)).sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    );
+    expect(asked).toHaveLength(2);
+    expect(asked[1]?.targetRunId).not.toBeNull();
+    expect(asked[1]?.targetRunId).not.toBe(first.targetRunId);
+    const held = (await runs()).find((r) => r.id === first.targetRunId);
+    expect(held?.status).toBe("waiting_approval");
+    expect(held?.pendingMessageIds).toEqual([]);
+    expect(await openConsultationsIn(f.db, f.org.id, f.general.id)).toHaveLength(2);
   });
 
   test("an answer while the asker is still active is read by that run at its next step", async () => {

@@ -8,6 +8,8 @@ import { isStopRequest, type Judge } from "./judge";
 import { deliverLive } from "./live-steer";
 import type { Message } from "./messages";
 import { enqueue } from "./outbox";
+import { holdsMessages } from "./run-hold";
+import { handOnMessages } from "./run-inbox";
 import { type AgentRun, replyThreadOf } from "./runs";
 import type { Talker } from "./talker";
 import { onMessageWhileWaiting, type WaitMessageOutcome } from "./waits";
@@ -23,10 +25,12 @@ const { agentRuns } = schema;
  * 1. "Parar e mandar" (`now`): the model call stops and the loop reads it.
  * 2. Live delivery (`live-steer.ts`): a computer brain mid-turn gets it at its
  *    next tool boundary instead of at the end of the turn.
- * 3. A run waiting (`waits.ts`): browser help, another agent's answer, an
- *    approval. The message may end the wait ("pronto, loguei"), wake the run
- *    (the wait stays open; its result comes later as a notice) or be held for
- *    the decision on a card. Parked waiting for its computer: look again now.
+ * 3. A run waiting (`waits.ts`): browser help, another agent's answer. The
+ *    message may end the wait ("pronto, loguei") or wake the run (the wait
+ *    stays open; its result comes later as a notice). Parked waiting for its
+ *    computer: look again now. Waiting on something the message can't move
+ *    (a secret, a mission's decision; `holdsMessages`): the message leaves it
+ *    for a run of its own (D97); an approval never takes it at all.
  * 4. The fast reply (`talker.ts`): when the run can't answer soon (waiting, or
  *    deep in a long turn), the agent's conversation layer may answer in a
  *    second or two, or pass.
@@ -102,7 +106,13 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     // What it does to a wait, then the fast reply: after the response (the judge may take a moment), in order.
     const waiting =
       !active.waitingMachineId && (active.status === "waiting_input" || active.status === "waiting_approval");
-    if (waiting || (deps.talker && !now)) {
+    // Waiting on something the message can't move (a secret, a mission's decision; an approval never takes
+    // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own (D97).
+    const handed =
+      waiting &&
+      (await holdsMessages(deps.db, active)) &&
+      (await handOnMessages(deps.db, deps.pubsub, active, [message.id]).catch(() => null)) !== null;
+    if (!handed && (waiting || (deps.talker && !now))) {
       const followUp = async () => {
         let waited: WaitMessageOutcome | null = null;
         if (waiting) {

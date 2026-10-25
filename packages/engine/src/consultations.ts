@@ -565,6 +565,62 @@ async function noteReply(deps: { db: Database; pubsub?: PubSub }, run: { id: str
   return delivered.message;
 }
 
+/** A question an agent asked from a conversation that is still out (the working line: one agent asking another). */
+export interface OpenConsultation {
+  /** The asking run (it may have ended: `ask_agent` never waits; the answer wakes the agent). */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  channelId: string;
+  /** Null: asked in the conversation's main timeline. */
+  threadId: string | null;
+  /** When the question went out (the line's clock). */
+  since: Date;
+}
+
+/**
+ * Questions agents asked from this conversation that have no answer yet, oldest first: the app shows
+ * that one agent is asking another until the answer comes (`agent.consulted`), even after a reload and
+ * after the asking turn ended. Only what people see live already; no question, no answer.
+ */
+export async function openConsultationsIn(
+  db: Executor,
+  orgId: string,
+  channelId: string,
+  now = new Date(),
+): Promise<OpenConsultation[]> {
+  const rows = await db
+    .select({
+      runId: agentConsultations.askerRunId,
+      agentId: agentConsultations.askerAgentId,
+      consultedAgentId: agentConsultations.targetAgentId,
+      since: agentConsultations.createdAt,
+      threadRootId: agentRuns.threadRootId,
+      triggerMessageId: agentRuns.triggerMessageId,
+    })
+    .from(agentConsultations)
+    .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
+    .where(
+      and(
+        eq(agentConsultations.orgId, orgId),
+        eq(agentConsultations.status, "open"),
+        gte(agentConsultations.expiresAt, now),
+        eq(agentRuns.orgId, orgId),
+        eq(agentRuns.channelId, channelId),
+      ),
+    )
+    .orderBy(agentConsultations.createdAt)
+    .limit(20);
+  return rows.map((r) => ({
+    runId: r.runId,
+    agentId: r.agentId,
+    consultedAgentId: r.consultedAgentId,
+    channelId,
+    threadId: replyThreadOf(r),
+    since: r.since,
+  }));
+}
+
 /** Closes consultations past their deadline and resumes the asking runs (worker, every minute). */
 export async function expireConsultations(deps: { db: Database; pubsub?: PubSub }, now = new Date()) {
   const rows = await deps.db
