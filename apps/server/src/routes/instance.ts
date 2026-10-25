@@ -1,6 +1,6 @@
 import { countUsers } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { authUiConfig } from "../auth";
+import { authUiConfig, signupPolicy } from "../auth";
 import type { AppDeps } from "./app/context";
 
 /**
@@ -22,6 +22,10 @@ const InstanceResponse = z
       .openapi({ description: "This server's own address (`PUBLIC_URL`).", example: "https://chat.example.com" }),
     signIn: z.object({ email: z.boolean(), google: z.boolean(), github: z.boolean(), apple: z.boolean() }),
     signup: z.enum(["open", "invite"]).openapi({ description: "`invite`: only people with an invitation sign up." }),
+    ownerClaim: z.boolean().openapi({
+      description:
+        "No account yet, and only the owner link its installer printed creates the first one (`/owner#claim=…`).",
+    }),
   })
   .openapi("Instance");
 
@@ -44,7 +48,9 @@ export function registerInstance(api: OpenAPIHono, deps: AppDeps, version: strin
 
   api.openapi(route, async (c) => {
     const { config } = deps;
-    const open = config.ALLOW_SIGNUP || (await countUsers(deps.db)) === 0;
+    const users = await countUsers(deps.db);
+    const ownerWaits = users === 0 && signupPolicy(config).ownerByLink;
+    const open = !ownerWaits && (config.ALLOW_SIGNUP || users === 0);
     return c.json(
       {
         name: "agentes.chat" as const,
@@ -54,6 +60,7 @@ export function registerInstance(api: OpenAPIHono, deps: AppDeps, version: strin
         url: new URL(config.PUBLIC_URL).origin,
         signIn: { email: true, ...authUiConfig(config).socialProviders },
         signup: open ? ("open" as const) : ("invite" as const),
+        ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
       },
       200,
     );

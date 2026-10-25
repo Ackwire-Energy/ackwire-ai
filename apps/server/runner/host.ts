@@ -72,7 +72,7 @@ export interface HostOptions {
   name: string;
   /** Linux as root: every child in system mode. */
   system: boolean;
-  /** Commands on in new homes (`--no-exec`: off). Claude Code, Codex and the browser are on in them either way. */
+  /** Commands on in the homes `sync` makes (`--no-exec`: off); Claude Code, Codex and the browser are on either way. */
   exec: boolean;
   log: (line: string) => void;
   start: StartChild;
@@ -82,6 +82,17 @@ export interface HostOptions {
   /** Where agents work outside system mode: a folder per organization in it (default `~/agentes`). */
   workspaceBase?: string;
   intervalMs?: number;
+  /** Organizations whose token the first sync replaces (`--rotate`: the server refused it). */
+  rotate?: string[];
+}
+
+export type HostStatus = "on" | "off" | "refused" | "no_token" | "unreachable";
+
+/** What `once()` did: the homes of the organizations served (`new`: made now), and those it no longer serves. */
+export interface HostSyncResult {
+  status: HostStatus;
+  homes: { orgId: string; orgName: string; machineId: string; home: string; new: boolean }[];
+  gone: string[];
 }
 
 interface SyncedOrg {
@@ -128,14 +139,16 @@ const tag = (name: string, orgId: string) =>
 export class HostComputer {
   private readonly children = new Map<string, Child>();
   /** Organizations whose token the server refused: the next sync asks for new ones. */
-  private readonly rotate = new Set<string>();
-  private status: "starting" | "on" | "off" | "refused" | "no_token" | "unreachable" = "starting";
+  private readonly rotate: Set<string>;
+  private status: "starting" | HostStatus = "starting";
   private failures = 0;
   private stopped = false;
   private again = false;
   private wake: (() => void) | null = null;
 
-  constructor(private readonly opts: HostOptions) {}
+  constructor(private readonly opts: HostOptions) {
+    this.rotate = new Set(opts.rotate ?? []);
+  }
 
   private get orgsDir() {
     return path.join(this.opts.state, "orgs");
@@ -176,10 +189,35 @@ export class HostComputer {
 
   /** One round: what the server says, then the homes and children to match. */
   async sync() {
+    const orgs = await this.ask();
+    if (orgs) this.reconcile(orgs);
+  }
+
+  /**
+   * One round that writes the homes and starts nothing (`host --once`, for a program that runs their
+   * runners itself, the desktop app). A new home has every tool off: that program turns on its own.
+   * `gone`: this server's homes here that it no longer serves; they stay until their owner removes them.
+   */
+  async once(): Promise<HostSyncResult> {
+    const before = this.homes().filter((h) => h.config.managedBy === "host" && h.config.server === this.opts.server);
+    const orgs = await this.ask();
+    if (!orgs) return { status: this.status === "starting" ? "unreachable" : this.status, homes: [], gone: [] };
+    const homes = orgs.flatMap((org) => {
+      const home = path.join(this.orgsDir, org.orgId);
+      if (!this.writeHome(home, org, false)) return [];
+      const fresh = !before.some((h) => h.orgId === org.orgId);
+      return [{ orgId: org.orgId, orgName: org.orgName, machineId: org.machineId, home, new: fresh }];
+    });
+    const gone = before.filter((h) => !orgs.some((o) => o.orgId === h.orgId)).map((h) => h.orgId);
+    return { status: "on", homes, gone };
+  }
+
+  /** The organizations the server serves here, with new tokens where it sent them; null when it says no. */
+  private async ask(): Promise<SyncedOrg[] | null> {
     const token = this.opts.token();
     if (!token) {
       this.idle("no_token", "no HOST_COMPUTER_TOKEN to show the server: waiting for it");
-      return;
+      return null;
     }
     let res: Response;
     try {
@@ -199,24 +237,24 @@ export class HostComputer {
       });
     } catch (err) {
       this.unreachable(err instanceof Error ? err.message : String(err));
-      return;
+      return null;
     }
     if (res.status === 404) {
       this.idle("off", "the server has this computer turned off (no HOST_COMPUTER_TOKEN there): waiting");
-      return;
+      return null;
     }
     if (res.status === 401) {
       this.idle("refused", "the server refused this computer's token (HOST_COMPUTER_TOKEN): waiting for the right one");
-      return;
+      return null;
     }
     const orgs = res.ok ? parseOrgs(await res.json().catch(() => null)) : null;
     if (!orgs) {
       this.unreachable(res.ok ? "an answer it doesn't understand" : `HTTP ${res.status}`);
-      return;
+      return null;
     }
     this.failures = 0;
     this.setStatus("on", `serving ${orgs.length} organization${orgs.length === 1 ? "" : "s"}`);
-    this.reconcile(orgs);
+    return orgs;
   }
 
   private reconcile(orgs: SyncedOrg[]) {
@@ -242,8 +280,11 @@ export class HostComputer {
     }
   }
 
-  /** Brings the organization's home up to date (mode 600, written only when it changes). False: it can't run yet. */
-  private writeHome(home: string, org: SyncedOrg): boolean {
+  /**
+   * Brings the organization's home up to date (mode 600, written only when it changes). False: it can't run yet.
+   * A new home gets Claude Code, Codex, the browser and commands (`exec`), or with `tools` false none of them.
+   */
+  private writeHome(home: string, org: SyncedOrg, tools = true): boolean {
     let prev: StoredConfig = {};
     try {
       prev = readStoredConfig(home) ?? {};
@@ -257,7 +298,7 @@ export class HostComputer {
       this.opts.log(`[${tag(org.orgName, org.orgId)}] no agent uids left on this computer for another organization`);
       return false;
     }
-    const exec = this.opts.exec;
+    const exec = tools && this.opts.exec;
     const next: StoredConfig = {
       ...prev,
       server: this.opts.server,
@@ -275,7 +316,7 @@ export class HostComputer {
             exec,
             access: {
               folders: [],
-              tools: { claude: true, codex: true, commands: exec, browser: true },
+              tools: { claude: tools, codex: tools, commands: exec, browser: tools },
             },
           }),
       ...(uids ? { mode: "system" as const, agentUidRange: uids } : {}),
@@ -384,7 +425,7 @@ export class HostComputer {
   }
 
   /** The server says no (or there's no token): nothing runs until it says yes. */
-  private idle(status: "off" | "refused" | "no_token", message: string) {
+  private idle(status: Exclude<HostStatus, "on" | "unreachable">, message: string) {
     this.setStatus(status, message);
     if (this.children.size > 0) this.opts.log(`stopping ${this.children.size} runner(s)`);
     this.stopAll();

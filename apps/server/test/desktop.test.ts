@@ -15,6 +15,7 @@ const server = () => {
 };
 
 const SUM = "a".repeat(64);
+const MANIFEST = '{"version":"1.4.0","pgMajor":18,"pglite":"0.5.8","files":{}}\n';
 const ASSETS = "https://api.github.com/repos/agentes-chat/agentes.chat/releases/assets";
 const asset = (name: string) => ({ name, url: `${ASSETS}/${name}` });
 const release = (version: string, extra: Record<string, unknown> = {}) => ({
@@ -37,6 +38,7 @@ function fakeGithub(releases: Record<string, unknown>[]) {
       const name = url.slice("https://signed.example/".length);
       if (name.endsWith(".sha256")) return new Response(`${SUM}  agentes.dmg\n`);
       if (name.endsWith(".sig")) return new Response("SIGNATURE-BASE64\n");
+      if (name.endsWith(".json")) return new Response(MANIFEST);
       const headers = { "content-type": "application/x-apple-diskimage", "content-length": "9" };
       return new Response("DMG-BYTES", { headers });
     }
@@ -151,6 +153,40 @@ test("download streams an asset of a desktop-v* release, as an attachment; nothi
   expect((await server().app.request("/api/desktop/download/0.2.0/other.dmg")).status).toBe(404);
   expect((await server().app.request("/api/desktop/download/1.0.0/secret.txt")).status).toBe(404);
   expect((await server().app.request("/api/desktop/download/..%2F..%2Fx/a.dmg")).status).toBe(404);
+});
+
+test("native packages: the newest v* release's manifest and signature, never a desktop-v* one", async () => {
+  const nativeRelease = (version: string, extra: Record<string, unknown> = {}) => ({
+    tag_name: `v${version}`,
+    assets: [asset("native.json"), asset("native.json.sig"), asset(`agentes-native-${version}-linux-x64.tar.gz`)],
+    ...extra,
+  });
+  const github = fakeGithub([
+    release("9.0.0", { assets: [...release("9.0.0").assets, asset("native.json"), asset("native.json.sig")] }),
+    nativeRelease("1.5.0", { draft: true }),
+    nativeRelease("1.4.0"),
+    nativeRelease("1.3.0"),
+  ]);
+  const first = await createTestServer({ desktopFetch: github.fetch });
+  expect((await first.app.request("/api/native/latest")).status).toBe(404);
+  first.close();
+  expect(github.calls).toEqual([]);
+
+  t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
+  const res = await server().app.request("/api/native/latest");
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ version: "1.4.0", manifest: MANIFEST, signature: "SIGNATURE-BASE64" });
+  await server().app.request("/api/native/latest");
+  expect(github.calls.filter((c) => c.url.endsWith("/releases?per_page=30"))).toHaveLength(1);
+
+  const tarball = await server().app.request("/api/native/download/1.4.0/agentes-native-1.4.0-linux-x64.tar.gz");
+  expect(tarball.status).toBe(200);
+  expect(tarball.headers.get("content-disposition")).toBe(
+    'attachment; filename="agentes-native-1.4.0-linux-x64.tar.gz"',
+  );
+  // The desktop app's releases aren't the server's, and the other way round.
+  expect((await server().app.request("/api/native/download/9.0.0/native.json")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/download/1.4.0/native.json")).status).toBe(404);
 });
 
 test("reduce over HTTP: admins or the pairer, only removing or turning off", async () => {

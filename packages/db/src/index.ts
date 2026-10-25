@@ -28,5 +28,6 @@ export {
 } from "drizzle-orm";
 export * from "./client";
 export * from "./migration-guard";
+export * from "./pglite";
 export * as schema from "./schema";
 export * from "./trace";
