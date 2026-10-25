@@ -22,6 +22,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
+  type AgentColor,
   Alert,
   Avatar,
   Button,
@@ -42,12 +43,13 @@ import {
   modKey,
   Popover,
   Segmented,
+  selectionSkyUrl,
   Skeleton,
   SkeletonGroup,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -81,6 +83,10 @@ import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
+
+/** The chosen item's sky (telas/SelecaoPixel.html, B): both themes, the CSS picks one. */
+const selectionSky = (color: AgentColor = "sky") =>
+  ({ "--sel-sky": selectionSkyUrl(color), "--sel-sky-dark": selectionSkyUrl(color, true) }) as CSSProperties;
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
 function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
@@ -258,7 +264,13 @@ export function Sidebar() {
   }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
+    <nav
+      className="sidebar"
+      aria-label={t("shell.nav")}
+      data-rail={rail}
+      style={selectionSky()}
+      {...drawer?.navProps}
+    >
       <div className="sidebar__top">
         <div className="sidebar__org">
           <WorkspaceMenu
@@ -694,6 +706,7 @@ function AgentRow({
       onClick={onOpen}
       data-unread={unread > 0}
       data-busy={busy}
+      style={selectionSky(color)}
     >
       {busy && <AgentTrail color={color} />}
       {busy && <AgentGlow color={color} />}

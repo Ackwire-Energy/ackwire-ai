@@ -328,6 +328,7 @@ export {
 } from "./recurrence";
 export { pixelBurst } from "./sky/burst";
 export { ditherCells, ditherSvg, ditherTones, ditherUrl } from "./sky/dither";
+export { selectionSkyUrl } from "./sky/selection";
 export {
   drawSprite,
   prefersReducedMotion,

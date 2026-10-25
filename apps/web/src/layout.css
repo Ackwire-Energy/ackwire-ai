@@ -4043,12 +4043,25 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
+/* The chosen item: its own white with a hairline, and a small dithered sky rising from the right
+   (telas/SelecaoPixel.html, B · Horizonte; an agent's row in its color). Rounded like any item. */
 .sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
-  background: var(--side-active);
+  background-color: var(--side-active);
+  background-image: var(--sel-sky, none);
+  background-position: right center;
+  background-size: auto 100%;
+  background-repeat: no-repeat;
   box-shadow: inset 0 0 0 1px var(--line);
   font-weight: 600;
   transition: none;
+}
+[data-theme="dark"] .sidebar__item[data-status="active"] {
+  background-image: var(--sel-sky-dark, none);
+}
+/* The icon rail is too narrow for a horizon. */
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
+  background-image: none;
 }
 .sidebar__label {
   font-size: 11.5px;
