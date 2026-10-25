@@ -8,7 +8,7 @@ import {
   type MailProvider,
   type MailTestError,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, like, ne, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, eq, inArray, isNull, like, ne, notInArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, sealSecret, sha256 } from "../crypto";
@@ -17,7 +17,7 @@ import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard
 import { requirePermission } from "../organizations";
 import { isEmailAddress, normalizeAddress } from "./text";
 
-const { mailAccounts, mailWatches, agentScopes } = schema;
+const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes } = schema;
 
 export type MailAccountRow = typeof mailAccounts.$inferSelect;
 
@@ -49,6 +49,10 @@ export interface MailAccountView {
   offActions: MailAction[];
   /** Actions that always ask a person in this mailbox (only `draft` and `organize` can; sends and deletes always do). */
   askActions: MailAction[];
+  /** Other addresses of this mailbox (replies go out from the one a message arrived at). */
+  aliases: string[];
+  /** What new mail goes out from; null = `address`. */
+  defaultFrom: string | null;
   agents: { agentId: string; level: "read" | "read_write"; canDelete: boolean }[];
 }
 
@@ -134,8 +138,33 @@ export function mailAccountView(row: MailAccountRow, grants?: Map<string, Set<st
     createdAt: row.createdAt.toISOString(),
     offActions: row.offActions.filter((a): a is MailAction => (MAIL_ACTIONS as readonly string[]).includes(a)),
     askActions: row.askActions.filter((a): a is MailAction => (ASKABLE_MAIL_ACTIONS as readonly string[]).includes(a)),
+    aliases: row.aliases,
+    defaultFrom: row.defaultFrom,
     agents,
   };
+}
+
+/** Every address a mailbox sends as: its own first, then its aliases. */
+export const mailboxAddresses = (row: Pick<MailAccountRow, "address" | "aliases">) => [
+  ...new Set([row.address, ...row.aliases].filter(Boolean)),
+];
+
+/** At most this many aliases per mailbox. */
+export const MAX_MAIL_ALIASES = 20;
+
+/** Aliases as stored: lowercase, valid, without the mailbox's own address, no repeats; throws on an invalid one. */
+export function normalizeAliases(address: string, input: string[]) {
+  const out: string[] = [];
+  for (const raw of input) {
+    const a = normalizeAddress(raw);
+    if (!a) continue;
+    if (!isEmailAddress(a))
+      throw new ValidationError(`"${raw}" is not an email address`, "mail.invalid_alias", { value: raw });
+    if (a !== address && !out.includes(a)) out.push(a);
+  }
+  if (out.length > MAX_MAIL_ALIASES)
+    throw new ValidationError(`At most ${MAX_MAIL_ALIASES} addresses`, "mail.too_many_aliases");
+  return out;
 }
 
 /** The org's mailboxes (not disconnected), oldest first. */
@@ -490,18 +519,41 @@ export async function completeComposioConnect(
 
 // ── Changes ─────────────────────────────────────────────────────────────────
 
-/** Renames, or (IMAP) replaces the app password after testing it. */
+/**
+ * Renames, turns actions on or off, sets the mailbox's other addresses and
+ * the one new mail goes out from, or (IMAP) replaces the app password after
+ * testing it. An agent pinned to an address the mailbox no longer has goes
+ * back to the default.
+ */
 export async function updateMailAccount(
   deps: MailDeps,
   actorId: string,
   orgId: string,
   accountId: string,
-  input: { label?: string; password?: string; offActions?: string[]; askActions?: string[] },
+  input: {
+    label?: string;
+    password?: string;
+    offActions?: string[];
+    askActions?: string[];
+    aliases?: string[];
+    defaultFrom?: string | null;
+  },
 ): Promise<{ ok: true; account: MailAccountView } | { ok: false; error: MailTestError }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const row = await loadAccount(deps.db, orgId, accountId);
   const set: Partial<typeof mailAccounts.$inferInsert> = {};
   if (input.label !== undefined) set.label = input.label.trim().slice(0, 80) || row.address;
+  const aliases = input.aliases !== undefined ? normalizeAliases(row.address, input.aliases) : row.aliases;
+  const addresses = mailboxAddresses({ address: row.address, aliases });
+  if (input.aliases !== undefined) set.aliases = aliases;
+  if (input.defaultFrom !== undefined) {
+    const from = input.defaultFrom ? normalizeAddress(input.defaultFrom) : null;
+    if (from && !addresses.includes(from))
+      throw new ValidationError("defaultFrom must be one of the mailbox's addresses", "mail.from_not_mailbox");
+    set.defaultFrom = from === row.address ? null : from;
+  } else if (row.defaultFrom && !addresses.includes(row.defaultFrom)) {
+    set.defaultFrom = null;
+  }
   if (input.offActions !== undefined) {
     const unknown = input.offActions.filter((a) => !(MAIL_ACTIONS as readonly string[]).includes(a));
     if (unknown.length > 0) throw new ValidationError(`Unknown mail actions: ${unknown.join(", ")}`, "mail.action");
@@ -539,6 +591,19 @@ export async function updateMailAccount(
       .update(mailAccounts)
       .set({ ...set, updatedAt: new Date() })
       .where(eq(mailAccounts.id, row.id));
+    if (input.aliases !== undefined || input.defaultFrom !== undefined) {
+      await deps.db
+        .update(mailAgentPolicies)
+        .set({ fromAddress: null, updatedAt: new Date() })
+        .where(and(eq(mailAgentPolicies.accountId, row.id), notInArray(mailAgentPolicies.fromAddress, addresses)));
+      await recordAudit(deps.db, {
+        orgId,
+        actor: { type: "person", id: actorId },
+        action: "mail_account.addresses_changed",
+        target: { type: "mail_account", id: row.id },
+        details: { aliases, defaultFrom: "defaultFrom" in set ? set.defaultFrom : row.defaultFrom },
+      });
+    }
     if (input.password !== undefined) {
       // Watches stopped by the old password start again.
       await deps.db
@@ -666,6 +731,30 @@ export async function listMailFolders(deps: MailDeps, actorId: string, orgId: st
     return await provider.listFolders();
   } finally {
     await provider.close().catch(() => {});
+  }
+}
+
+/**
+ * Addresses this mailbox has sent from, newest first (the From of its sent
+ * folder's recent mail): the aliases the connect flow offers. Best effort:
+ * empty when the mailbox can't be read.
+ */
+export async function suggestMailAddresses(deps: MailDeps, actorId: string, orgId: string, accountId: string) {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const row = await loadAccount(deps.db, orgId, accountId);
+  let provider: MailProvider | null = null;
+  try {
+    provider = await openAccount(deps, row);
+    const folders = await provider.listFolders();
+    const sent = folders.find((f) => f.role === "sent")?.id ?? row.sentFolder;
+    if (!sent) return [];
+    const recent = await provider.search({ folder: sent, limit: 50 });
+    const found = recent.map((m) => m.from?.address).filter((a): a is string => !!a && isEmailAddress(a));
+    return [...new Set(found.map(normalizeAddress))].filter((a) => a !== row.address).slice(0, MAX_MAIL_ALIASES);
+  } catch {
+    return [];
+  } finally {
+    await provider?.close().catch(() => {});
   }
 }
 

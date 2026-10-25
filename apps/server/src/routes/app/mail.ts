@@ -10,6 +10,7 @@ import {
   revokeMailAccount,
   setAgentMail,
   startComposioConnect,
+  suggestMailAddresses,
   updateMailAccount,
   ValidationError,
 } from "@agenteschat/engine";
@@ -63,6 +64,8 @@ const MailAccount = z
     createdAt: z.string(),
     offActions: z.array(MailActionName),
     askActions: z.array(MailActionName),
+    aliases: z.array(z.string()).openapi({ description: "Other addresses of this mailbox (lowercase)." }),
+    defaultFrom: z.string().nullable().openapi({ description: "What new mail goes out from; null = `address`." }),
     agents: z.array(z.object({ agentId: z.uuid(), level: z.enum(["read", "read_write"]), canDelete: z.boolean() })),
   })
   .openapi("MailAccount");
@@ -235,7 +238,9 @@ export function mailRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Rename a mailbox, turn its actions on or off for every agent, or replace an IMAP mailbox's app password (tested first) (admins)",
+        "Rename a mailbox, turn its actions on or off for every agent, set its other addresses, or replace an IMAP mailbox's app password (tested first) (admins)",
+      description:
+        "Replies go out from the address a message arrived at (`address` or one of `aliases`); new mail from `defaultFrom`. 400 `mail.from_not_mailbox` when `defaultFrom` isn't one of them.",
       request: {
         params: AccountParams,
         body: body(
@@ -247,6 +252,8 @@ export function mailRoutes(deps: AppDeps) {
               .array(z.enum(["draft", "organize"]))
               .max(2)
               .optional(),
+            aliases: z.array(z.string().max(320)).max(20).optional(),
+            defaultFrom: z.string().max(320).nullable().optional(),
           }),
         ),
       },
@@ -291,6 +298,23 @@ export function mailRoutes(deps: AppDeps) {
       const { orgId, accountId } = c.req.valid("param");
       const folders = await listMailFolders(mailDeps, c.get("user").id, orgId, accountId);
       return c.json({ folders }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/mail/accounts/{accountId}/suggested-addresses",
+      tags,
+      security,
+      summary: "Addresses this mailbox has sent from (its sent folder), to offer as its other addresses (admins)",
+      request: { params: AccountParams },
+      responses: { 200: json(z.object({ addresses: z.array(z.string()) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, accountId } = c.req.valid("param");
+      const addresses = await suggestMailAddresses(mailDeps, c.get("user").id, orgId, accountId);
+      return c.json({ addresses }, 200);
     },
   );
 

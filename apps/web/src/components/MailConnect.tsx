@@ -1,5 +1,12 @@
 import type { Agent, MailAccount, MailConnectError, MailPolicy, MailProviders } from "@agenteschat/client";
-import { keys, useAgentMail, useAgents, useMailAction, useMailProviders } from "@agenteschat/client";
+import {
+  keys,
+  useAgentMail,
+  useAgents,
+  useMailAction,
+  useMailProviders,
+  useMailSuggestedAddresses,
+} from "@agenteschat/client";
 import { LEVELS, type Level } from "@agenteschat/client/lib/access-levels";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
@@ -13,6 +20,7 @@ import {
   mailErrorOf,
   mailReviewTools,
   normalizePolicy,
+  splitEmails,
   toMailLevel,
 } from "@agenteschat/client/lib/mail";
 import {
@@ -35,6 +43,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { AddressList } from "@/components/AddressList";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
@@ -48,7 +57,8 @@ import { useToast } from "@/lib/toast";
  * catalog cards (Gmail, Outlook, iCloud, Outro email), the same 3-step
  * connect flow (conectar → o que faz → quem pode usar), a connected row and
  * "Reconectar". Gmail/Outlook sign in on the provider's page; iCloud and
- * the rest take an app password.
+ * the rest take an app password, then say which other addresses the
+ * mailbox has (replies go out from the one the email arrived at).
  */
 
 /** Brand masks (Simple Icons, CC0). Outlook was removed from Simple Icons at Microsoft's request: monogram, like Canva. */
@@ -89,7 +99,8 @@ export const mailAuthKind = (choice: MailChoice) =>
   choice === "gmail" || choice === "outlook" ? "oneClick" : "appPassword";
 
 export type MailFlowState =
-  | { step: 0; choice: MailChoice }
+  /** `connected`: the app password worked; now the mailbox's other addresses. */
+  | { step: 0; choice: MailChoice; connected?: MailAccount }
   | { step: 1 | 2; account: MailAccount }
   | { step: 3; account: MailAccount; agentIds: string[] };
 
@@ -109,7 +120,9 @@ export function MailConnectFlow({
   const name = flow.step === 0 ? mailChoiceName(t, choice) : flow.account.address;
   const title =
     flow.step === 0
-      ? t("connectFlow.connectTitle", { name })
+      ? flow.connected
+        ? t("mail.addresses.title", { address: flow.connected.address })
+        : t("connectFlow.connectTitle", { name })
       : flow.step === 1
         ? t("connectFlow.toolsTitle", { name })
         : flow.step === 2
@@ -137,10 +150,20 @@ export function MailConnectFlow({
         ))}
       </ol>
       {flow.step === 0 &&
-        (choice === "gmail" || choice === "outlook" ? (
+        (flow.connected ? (
+          <AddressesStep
+            account={flow.connected}
+            onNext={(account) => onChange({ step: 1, account })}
+            onClose={onClose}
+          />
+        ) : choice === "gmail" || choice === "outlook" ? (
           <OAuthStep provider={choice} onClose={onClose} />
         ) : (
-          <ImapStep choice={choice} onConnected={(account) => onChange({ step: 1, account })} onClose={onClose} />
+          <ImapStep
+            choice={choice}
+            onConnected={(account) => onChange({ step: 0, choice, connected: account })}
+            onClose={onClose}
+          />
         ))}
       {flow.step === 1 && (
         <ActionsStep
@@ -402,6 +425,164 @@ export function ImapStep({
   );
 }
 
+/**
+ * The mailbox's other addresses and the one new emails go out from, as a
+ * draft: starts from what is saved plus the addresses its sent folder shows
+ * (pre-filled until the person edits the list).
+ */
+function useAddressesDraft(account: MailAccount) {
+  const { org } = useOrg();
+  const suggested = useMailSuggestedAddresses(org.id, account.id);
+  const [edited, setEdited] = useState<string[] | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const found = (suggested.data ?? []).filter((a) => a !== account.address && !account.aliases.includes(a));
+  const aliases = edited ?? [...account.aliases, ...found];
+  const addresses = [account.address, ...aliases];
+  const chosen = picked ?? account.defaultFrom ?? account.address;
+  const defaultFrom = addresses.includes(chosen) ? chosen : account.address;
+  const savedFrom = account.defaultFrom ?? account.address;
+  const same = aliases.length === account.aliases.length && aliases.every((a) => account.aliases.includes(a));
+  return {
+    searching: suggested.isLoading,
+    found: edited === null && found.length > 0,
+    aliases,
+    addresses,
+    defaultFrom,
+    setAliases: (list: string[]) => setEdited(list.filter((a) => a !== account.address)),
+    setDefaultFrom: setPicked,
+    changed: !same || defaultFrom !== savedFrom,
+    input: { aliases, defaultFrom: defaultFrom === account.address ? null : defaultFrom },
+  };
+}
+
+/** "Outros endereços desta caixa" and "Emails novos saem de", for the step and the dialog. */
+function AddressesFields({ account, draft }: { account: MailAccount; draft: ReturnType<typeof useAddressesDraft> }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <p className="small muted">{t("mail.addresses.main", { address: account.address })}</p>
+      <AddressList
+        id={`mail-aliases-${account.id}`}
+        label={t("mail.addresses.others")}
+        help={
+          draft.searching
+            ? t("mail.addresses.searching")
+            : draft.found
+              ? t("mail.addresses.found")
+              : t("mail.addresses.othersHelp")
+        }
+        values={draft.aliases}
+        onChange={draft.setAliases}
+        split={splitEmails}
+        placeholder={t("mail.addresses.placeholder")}
+        invalidText={t("mail.addresses.invalid")}
+      />
+      {draft.addresses.length > 1 && (
+        <Field
+          label={t("mail.addresses.newFrom")}
+          id={`mail-new-from-${account.id}`}
+          help={t("mail.addresses.newFromHelp")}
+        >
+          <Select
+            value={draft.defaultFrom}
+            onValueChange={draft.setDefaultFrom}
+            options={draft.addresses.map((a) => ({ value: a, label: a }))}
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+/** Step 1 (IMAP), after connecting: which other addresses the mailbox has. Nothing changed = straight on. */
+function AddressesStep({
+  account,
+  onNext,
+  onClose,
+}: {
+  account: MailAccount;
+  onNext: (account: MailAccount) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { update } = useMailAction(org.id);
+  const draft = useAddressesDraft(account);
+  const next = () => {
+    if (!draft.changed) return onNext(account);
+    update.mutate({ accountId: account.id, ...draft.input }, { onSuccess: onNext });
+  };
+  return (
+    <>
+      <DialogBody className="cflow__body">
+        <p className="muted cflow__text">{t("mail.addresses.lead")}</p>
+        <AddressesFields account={account} draft={draft} />
+        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
+      </DialogBody>
+      <DialogFooter bar note={t("mail.addresses.later")}>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={next}>
+          {t("connectFlow.next")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+/** "Endereços" on a connected mailbox: its other addresses and the one new emails go out from. */
+export function MailAddressesDialog({ account, onClose }: { account: MailAccount | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Dialog
+      open={account !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("mail.addresses.title", { address: account?.address ?? "" })}
+      description={t("mail.addresses.lead")}
+      closeLabel={t("common.close")}
+      width={520}
+    >
+      {account && <AddressesDialogBody key={account.id} account={account} onClose={onClose} />}
+    </Dialog>
+  );
+}
+
+function AddressesDialogBody({ account, onClose }: { account: MailAccount; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const { update } = useMailAction(org.id);
+  const draft = useAddressesDraft(account);
+  const save = () =>
+    update.mutate(
+      { accountId: account.id, ...draft.input },
+      {
+        onSuccess: () => {
+          toast.show(t("mail.addresses.saved", { address: account.address }));
+          onClose();
+        },
+      },
+    );
+  return (
+    <>
+      <DialogBody className="cflow__body">
+        <AddressesFields account={account} draft={draft} />
+        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
+      </DialogBody>
+      <DialogFooter>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button
+          variant="primary"
+          disabled={!draft.changed || update.isPending}
+          loading={update.isPending}
+          onClick={save}
+        >
+          {t("common.save")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
 /** Step 2: what agents may do in this mailbox, in the standard tool review (Consulta · Muda · Aprovação · Desligada). */
 function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNext: () => void; onClose: () => void }) {
   const { t } = useTranslation();
@@ -656,7 +837,7 @@ function AgentRules({
         <AgentAvatar agentId={agentId} name={name} size="sm" />
         <b>{name}</b>
       </span>
-      <MailRulesPanel accountId={account.id} address={account.address} policy={shown} onChange={onChange} />
+      <MailRulesPanel account={account} policy={shown} onChange={onChange} />
     </div>
   );
 }
@@ -668,6 +849,7 @@ export function MailRow({
   admin,
   onTools,
   onWho,
+  onAddresses,
   onReconnect,
   onDisconnect,
 }: {
@@ -676,6 +858,7 @@ export function MailRow({
   admin: boolean;
   onTools: () => void;
   onWho: () => void;
+  onAddresses: () => void;
   onReconnect: () => void;
   onDisconnect: () => void;
 }) {
@@ -735,6 +918,9 @@ export function MailRow({
           </Button>
           <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
             {t("connectors.tools")}
+          </Button>
+          <Button size="sm" variant="ghost" aria-label={t("mail.addresses.buttonName", { name })} onClick={onAddresses}>
+            {t("mail.addresses.button")}
           </Button>
           <Button
             size="sm"
