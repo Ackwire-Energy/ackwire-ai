@@ -560,6 +560,7 @@ export function MachinesSection() {
   const { org } = useOrg();
   const machines = useMachines(org.id);
   const canPair = can(org.role, "post");
+  const agentsHere = useAgentsHere();
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
   // This server's computer and the workspace's own have cards of their own: this list is people's.
@@ -586,7 +587,7 @@ export function MachinesSection() {
             <span className="computers-empty__text">
               <b>{t("computers.other.emptyTitle")}</b>
               <span className="small muted">
-                {inDesktopApp() ? t("machines.thisMac.emptyText") : t("computers.other.emptyText")}
+                {agentsHere ? t("machines.thisMac.emptyText") : t("computers.other.emptyText")}
               </span>
             </span>
           </div>

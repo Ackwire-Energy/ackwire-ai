@@ -167,7 +167,7 @@ export const desktopEn: DesktopTranslations = {
     httpRefused:
       "{{host}} uses plain http, which only works on this {{device}}. Use its Tailscale address or one with https.",
     noOwner:
-      "{{host}} has no owner account yet. Open the link its installer showed at the end, on this {{device}} or on your phone. To see it again, run the install command there once more.",
+      "{{host}} has no owner account yet. Open its owner link (it ends in /owner#claim=…), on this {{device}} or on your phone.",
     unreachable:
       "We can't reach {{host}}. If it's on Tailscale, open Tailscale on this {{device}}, connect and try again.",
     unreachableHere: "Nothing answers at {{host}} on this {{device}}. Start agentes.chat here, then try again.",
@@ -197,7 +197,7 @@ export const desktopEn: DesktopTranslations = {
     usage: "Send anonymous usage statistics to agentes.chat",
     usageText: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
     agents:
-      "Your agents work here too, in folders of their own, with a browser. Commands stay off until you turn them on.",
+      "Your agents work here too, in folders of their own, with a browser, and with Claude Code or Codex when they're on this {{device}}. Commands stay off until you turn them on.",
     limits:
       "Made for you or a small team, while this {{device}} is on. For a bigger team or a server that's always on, install it on a server and choose Connect to my server; your data can move there later.",
     start: "Start agentes.chat",

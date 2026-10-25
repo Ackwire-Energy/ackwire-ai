@@ -33,7 +33,7 @@ export const desktopPtBR = {
     paused: "Pausado",
     refused: "Desconectado",
     outdated: "Precisa atualizar",
-    starting: "Abrindo",
+    starting: "Iniciando",
   },
   orgCount_one: "{{count}} organização",
   orgCount_other: "{{count}} organizações",
@@ -171,7 +171,7 @@ export const desktopPtBR = {
     httpRefused:
       "{{host}} usa http sem cadeado, que só funciona neste {{device}}. Use o endereço do Tailscale ou um com https.",
     noOwner:
-      "{{host}} ainda não tem a conta de dono. Abra o link que o instalador mostrou no fim, neste {{device}} ou no celular. Para ver de novo, rode o comando de instalação lá mais uma vez.",
+      "{{host}} ainda não tem a conta de dono. Abra o link de dono dele (termina em /owner#claim=…), neste {{device}} ou no celular.",
     unreachable:
       "Não conseguimos acessar {{host}}. Se ele está no Tailscale, abra o Tailscale neste {{device}}, conecte e tente de novo.",
     unreachableHere: "Nada responde em {{host}} neste {{device}}. Inicie o agentes.chat aqui e tente de novo.",
@@ -203,7 +203,7 @@ export const desktopPtBR = {
     usageText:
       "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
     agents:
-      "Os agentes também trabalham aqui, em pastas só deles, com um navegador. Comandos ficam desligados até você ligar.",
+      "Os agentes também trabalham aqui, em pastas só deles, com um navegador e com o Claude Code ou o Codex quando estão neste {{device}}. Comandos ficam desligados até você ligar.",
     limits:
       "Feito para você ou uma equipe pequena, enquanto este {{device}} estiver ligado. Para uma equipe maior ou um servidor sempre ligado, instale num servidor e escolha Conectar ao meu servidor; os dados podem ir para lá depois.",
     start: "Iniciar o agentes.chat",

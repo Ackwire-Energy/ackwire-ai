@@ -325,7 +325,7 @@ describe("Configurações → Computadores", () => {
     expect(card.textContent).toMatch(/Versão 0\.2\.0 · 12\sMB/);
     expect(card.querySelector(".machine-connect__hash")?.textContent).toBe(sha);
     expect(within(card).getByRole("button", { name: "Copiar SHA-256" })).toBeTruthy();
-    expect(card.textContent).toContain("arraste o agentes para Aplicativos");
+    expect(card.textContent).toContain("arraste o agentes.chat para Aplicativos");
     // Signed and notarized: no Terminal unlock on first run.
     expect(card.textContent).not.toContain("xattr");
     // The old flow is gone: no code made on the site, no install command with a code.

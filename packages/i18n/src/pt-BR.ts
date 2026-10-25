@@ -6899,25 +6899,25 @@ export const ptBR = {
     thisMac: {
       text: "Este {{device}} pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
       connect: "Usar este {{device}}",
-      connected: "Este Mac está conectado. Escolha as pastas que os agentes podem usar.",
-      failed: "Não deu para conectar este Mac. Tente de novo.",
+      connected: "Este {{device}} está conectado. Escolha as pastas que os agentes podem usar.",
+      failed: "Não deu para conectar este {{device}}. Tente de novo.",
       folders: "Pastas deste {{device}}",
       // `{{device}}` in these strings, inside the desktop app (lib/desktop.ts).
       device: { mac: "Mac", windows: "PC", linux: "computador" },
-      grantHere: "É este Mac: libere pastas nas Preferências do app.",
+      grantHere: "É este {{device}}: libere pastas nas Preferências do app.",
       openFolders: "Abrir Pastas",
-      toolsHere: "É este Mac: ligue o navegador nas Preferências do app, em Ferramentas.",
+      toolsHere: "É este {{device}}: ligue o navegador nas Preferências do app, em Ferramentas.",
       openTools: "Abrir Ferramentas",
       reconnect: "Reconectar",
-      reconnecting: "Reconectando este Mac…",
+      reconnecting: "Reconectando este {{device}}…",
       seeRequest: "Ver no app",
-      emptyText: "Nenhum computador ainda. Este Mac conecta com um clique.",
-      offline: "Este Mac está sem conexão agora.",
-      outageTitle: "Este Mac perdeu a conexão {{ago}}",
-      toolsOff: "Desligado neste Mac. Ligue nas Preferências do app, em Ferramentas.",
-      browserTitle: "Ligue o navegador neste Mac",
+      emptyText: "Nenhum computador ainda. Este {{device}} conecta com um clique.",
+      offline: "Este {{device}} está sem conexão agora.",
+      outageTitle: "Este {{device}} perdeu a conexão {{ago}}",
+      toolsOff: "Desligado neste {{device}}. Ligue nas Preferências do app, em Ferramentas.",
+      browserTitle: "Ligue o navegador neste {{device}}",
       browserText: "Um clique nas Preferências do app, em Ferramentas. A página percebe sozinha.",
-      noReport: "Este Mac ainda não informou o que libera. Atualize o app.",
+      noReport: "Este {{device}} ainda não informou o que libera. Atualize o app.",
       update: "Atualizar o app",
     },
     // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
@@ -6937,7 +6937,7 @@ export const ptBR = {
     },
     download: {
       title: "Conectar outro computador",
-      text: "Baixe o app agentes no Mac. Ele fica na barra de menus: mostra o que os agentes fazem ali e pausa quando você quiser.",
+      text: "Baixe o app do agentes.chat no Mac. Ele abre este servidor numa janela própria e, com um clique, os agentes dele trabalham nesse Mac, em pastas só deles.",
       mac: "Baixar o app para Mac",
       version: "Versão {{version}}",
       versionSize: "Versão {{version}} · {{size}}",
@@ -6947,8 +6947,9 @@ export const ptBR = {
       shaHelp: "Confira se é o mesmo do arquivo baixado: o app só é publicado aqui.",
       unavailable: "O app para Mac ainda não está disponível. Por enquanto, use o Terminal (abaixo).",
       firstTime: "Na primeira vez",
-      step1: "Abra o arquivo baixado e arraste o agentes para Aplicativos.",
-      step2: "Entre com a sua conta. O navegador abre com um código: confira e clique em Conectar.",
+      step1: "Abra o arquivo baixado e arraste o agentes.chat para Aplicativos.",
+      step2:
+        "Abra o app, clique em Usar o seu próprio servidor, depois em Conectar ao meu servidor, e digite o endereço desta página. Entre e clique em Usar este Mac em Configurações → Computadores.",
       other: "Outras formas: servidor ou Linux",
       otherText:
         "Rode no terminal do computador. Ele mostra um código e um link: abra o link, confira o código e confirme com a sua conta.",
@@ -8001,7 +8002,7 @@ export const ptBR = {
         machine_removed: "O computador {{of}} {{name}} foi removido.",
         outdated: "<b>Atualize o app agentes no {{machine}}.</b> A versão dele ainda não tem o navegador.",
         switched_off:
-          "<b>Ligue o navegador no {{machine}}.</b> Só quem está no computador pode ligar: no app agentes da barra de menus, abra <b>Preferências → Ferramentas</b>. Depois disso, a opção abre aqui.",
+          "<b>Ligue o navegador no {{machine}}.</b> Só quem está no computador pode ligar: no app agentes desse computador, abra <b>Preferências → Ferramentas</b>. Depois disso, a opção abre aqui.",
         not_installed:
           "<b>Este computador ainda não tem o navegador.</b> Ele baixa sozinho na primeira vez; se faltar algo, aparece aqui o que fazer.",
         not_reported:

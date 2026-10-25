@@ -234,6 +234,12 @@ export function Popover() {
     [host],
   );
 
+  /** Asks first only while agents work here or agentes.chat runs here; otherwise quits at once, like any app. */
+  const quit = () => {
+    if (busyHere) setConfirmQuit(true);
+    else void host.quit().catch(() => {});
+  };
+
   /** The main window on the server open now; the first run while there is none. */
   const openMain = () => {
     void (current ? host.openExternal(current) : host.showWindow("welcome")).catch(() => {});
@@ -273,7 +279,7 @@ export function Popover() {
         openPrefs();
       } else if (k === "q") {
         e.preventDefault();
-        setConfirmQuit(true);
+        quit();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -380,7 +386,7 @@ export function Popover() {
     <section className="dk-psec">
       <MenuRow
         icon="stop"
-        onClick={() => setConfirmQuit(true)}
+        onClick={quit}
         trailing={
           <>
             <Kbd>{mod}</Kbd>

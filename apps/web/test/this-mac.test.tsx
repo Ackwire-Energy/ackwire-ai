@@ -116,6 +116,9 @@ describe("Configurações → Computadores, in the app", () => {
     const i18n = createI18n("pt-BR");
     applyDesktopDevice(i18n, "linux");
     expect(i18n.t("machines.thisMac.connect")).toBe("Usar este computador");
+    expect(i18n.t("machines.thisMac.connected")).toBe(
+      "Este computador está conectado. Escolha as pastas que os agentes podem usar.",
+    );
     void i18n.changeLanguage("en");
     expect(i18n.t("machines.thisMac.connect")).toBe("Use this computer");
     expect(createI18n("en").t("machines.thisMac.connect")).toBe("Use this Mac");
