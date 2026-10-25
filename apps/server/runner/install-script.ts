@@ -42,6 +42,36 @@ export const DESKTOP_APT_PACKAGES = [
   "fonts-noto-core",
 ] as const;
 
+/**
+ * Debian/Ubuntu packages with the shared libraries the agents' Chrome for
+ * Testing links (`--system`, with or without `--desktop`): what `ldd chrome`
+ * finds missing on a bare Debian 12 or 13, or Ubuntu 22.04 or 24.04. Where
+ * apt has a package's `t64` name (Debian 13, Ubuntu 24.04), the script takes it.
+ */
+export const BROWSER_APT_PACKAGES = [
+  "libasound2",
+  "libatk-bridge2.0-0",
+  "libatk1.0-0",
+  "libatspi2.0-0",
+  "libcairo2",
+  "libcups2",
+  "libdbus-1-3",
+  "libexpat1",
+  "libgbm1",
+  "libglib2.0-0",
+  "libnspr4",
+  "libnss3",
+  "libpango-1.0-0",
+  "libx11-6",
+  "libxcb1",
+  "libxcomposite1",
+  "libxdamage1",
+  "libxext6",
+  "libxfixes3",
+  "libxkbcommon0",
+  "libxrandr2",
+] as const;
+
 /** System mode: the runner and its Bun (root's, readable by the agents' users), and the command on the PATH. */
 export const SYSTEM_RUNNER_DIR = "/opt/agentes-runner";
 export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
@@ -67,7 +97,8 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * runner lacks.
  *
  * `--system` (Linux, root) installs the runner for the whole computer, each
- * agent as its own OS user: the pinned Bun and the bundle in
+ * agent as its own OS user: `BROWSER_APT_PACKAGES` (without apt it names
+ * them), the pinned Bun and the bundle in
  * `SYSTEM_RUNNER_DIR`, the launcher at `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
@@ -105,6 +136,7 @@ set -eu
 
 SERVER=${server}
 BUN_VERSION=${shQuote(RUNNER_BUN_VERSION)}
+BROWSER_PACKAGES=${shQuote(BROWSER_APT_PACKAGES.join(" "))}
 DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
 
 DIR=""
@@ -194,7 +226,30 @@ apt_install() {
   export DEBIAN_FRONTEND
   # A fresh server may be updating itself: wait for its lock instead of failing.
   apt-get -qq -o DPkg::Lock::Timeout=600 update || true
+  # Debian 13 and Ubuntu 24.04 renamed some libraries with a t64 suffix, and Ubuntu 24.04's apt
+  # won't pick libasound2t64 for libasound2 itself. One apt-cache call for them all: without its
+  # cache file (as in containers), each call takes seconds.
+  T64=$(printf '%st64\\n' "$@" | xargs apt-cache show 2>/dev/null | sed -n 's/^Package: //p')
+  for PKG in "$@"; do
+    shift
+    if printf '%s\\n' "$T64" | grep -qxF "\${PKG}t64"; then PKG="\${PKG}t64"; fi
+    set -- "$@" "$PKG"
+  done
   apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "$@"
+}
+
+# The libraries the agents' browser loads, and with --desktop the packages for their screens.
+system_packages() {
+  PACKAGES=$BROWSER_PACKAGES WHAT="the agents' browser"
+  if [ "$DESKTOP" -eq 1 ]; then PACKAGES="$PACKAGES $DESKTOP_PACKAGES" WHAT="the agents' browser and screens"; fi
+  if command -v apt-get >/dev/null 2>&1; then
+    say "Installing the packages for $WHAT ..."
+    # shellcheck disable=SC2086
+    apt_install $PACKAGES || die "installing the packages for $WHAT failed"
+  else
+    say "For $WHAT, install these packages (Debian names) with this computer's package manager:"
+    say "  $PACKAGES"
+  fi
 }
 
 unpack() {
@@ -258,16 +313,7 @@ install_system() {
   [ "$(id -u)" -eq 0 ] ||
     die "--system installs the runner for the whole computer: run it as root (curl -fsSL $SERVER/api/machines/install.sh | sudo sh -s -- --system)"
   [ "$(uname -s)" = Linux ] || die "--system is for Linux"
-  if [ "$DESKTOP" -eq 1 ]; then
-    if command -v apt-get >/dev/null 2>&1; then
-      say "Installing the packages for the agents' screens ..."
-      # shellcheck disable=SC2086
-      apt_install $DESKTOP_PACKAGES || die "installing the packages for the agents' screens failed"
-    else
-      say "For the agents' screens, install these packages (Debian names) with this computer's package manager:"
-      say "  $DESKTOP_PACKAGES"
-    fi
-  fi
+  system_packages
   SYSTEM_DIR=${shQuote(SYSTEM_RUNNER_DIR)}
   RUNNER_HOME=${shQuote(SYSTEM_RUNNER_HOME)}
   BUNDLE="$SYSTEM_DIR/agentes-runner.mjs"

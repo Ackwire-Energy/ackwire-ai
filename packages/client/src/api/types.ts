@@ -20,6 +20,8 @@ export interface AuthConfig {
   /** Linked on the sign-in screen; the line shows only when both are set. */
   termsUrl?: string | null;
   privacyUrl?: string | null;
+  /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
+  supportEmail?: string | null;
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -65,12 +67,23 @@ export interface User {
   image: string | null;
 }
 
+/** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
+export type StandingState = "active" | "hold" | "suspended";
+
+/** What a member is told of the workspace's standing: `reason` only when the people who run the server show it. */
+export interface OrgStanding {
+  state: StandingState;
+  reason: string | null;
+}
+
 export interface OrgSummary {
   id: string;
   name: string;
   role: Role;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
+  /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
+  standing?: OrgStanding;
 }
 
 export interface Me {
@@ -494,6 +507,9 @@ export type ChannelEvent =
       runId: string;
       status: "done" | "failed" | "waiting_approval";
       error?: string;
+      /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
     }
   // ── Chat delivery (packages/engine/src/events.ts) ───────────────────────────
   /**
@@ -2050,6 +2066,8 @@ export interface Machine {
   /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */
   os: string;
   arch: string;
+  /** `system`: each agent works as its own OS user, in its own folder (ADR 0057). Absent on older servers: `single`. */
+  mode?: "system" | "single";
   runnerVersion: string;
   /** `false`: started with `--no-exec` (files and uploads only). */
   execAllowed: boolean;
@@ -2078,6 +2096,28 @@ export interface HostComputer {
   machineId: string;
   /** false: an admin stopped it in this organization. */
   on: boolean;
+}
+
+/** The provisioner's steps while the workspace's own computer is being prepared (ADR 0056 §10), in order. */
+export type ComputerSetupStep = "reserving" | "starting" | "installing" | "connecting";
+
+/**
+ * `GET …/computer-setup` (every member): `pair` where people connect their own computers (the rest null);
+ * `external` where the workspace gets its own computer, and how far it is. `machine.provisioning` events carry
+ * the same fields but `mode`.
+ */
+export interface ComputerSetup {
+  mode: "external" | "pair";
+  state: "preparing" | "waiting" | "problem" | "ready" | null;
+  /** While `preparing`. */
+  step: ComputerSetupStep | null;
+  /** While `waiting`: `approval` (soon) or `capacity` (taking longer than usual). */
+  reason: "approval" | "capacity" | null;
+  since: string | null;
+  etaSeconds: number | null;
+  specs: { cpus: number; memoryGb: number; diskGb: number } | null;
+  /** The computer itself, once the provisioner made it. */
+  machineId: string | null;
 }
 
 /** The agent browser on a computer, as its runner reports it. Turned on at the computer (`access.tools.browser`). */
@@ -2169,8 +2209,10 @@ export interface OutageAgent {
 export interface MachineOutage {
   machineId: string;
   name: string;
-  /** The machine's `os` (`darwin`, `windows`, `linux`…). */
+  /** The machine's `os` (`darwin`, `windows`, `linux`…); `other` for the workspace's own computer. */
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: OutageAgent[];
   /** Runs parked until the computer (or another one) can take them. */
@@ -2184,6 +2226,8 @@ export type OutageTarget =
       machineId: string;
       name: string;
       platform: string;
+      /** The workspace's own computer (ADR 0056 §10). */
+      managed?: boolean;
       online: boolean;
       brains: ComputerBrain[];
       /** Why it can't take them now, or null. */
@@ -4107,4 +4151,99 @@ export interface DesktopStatus {
   /** This person may turn it on ("Ligar") and off ("Desligar"). */
   canStart: boolean;
   terminal: { available: boolean; reason: string | null; allowed: boolean };
+}
+
+/** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */
+export interface PlanWindowParts extends PlanWindow {
+  /**
+   * The window's percent × each agent's API-priced share of the account's use since it started, biggest
+   * first; null for a window of unknown length (no estimate).
+   */
+  agents: { agentId: string; name: string; percent: number }[] | null;
+}
+
+/** A plan account as the usage views name it. */
+export interface PlanAccountInfo {
+  /** `machineId:kind:accountId`, or `…:computer` for the computer's own sign-in. */
+  key: string;
+  machineId: string;
+  machineName: string;
+  kind: MachineAccountKind;
+  /** Null: the computer's own sign-in ("Conta deste computador"). */
+  accountId: string | null;
+  label: string | null;
+  plan: string | null;
+  /** A key account's coding plan (`zai`, `kimi`…). */
+  provider: string | null;
+  /** Its owner, or the person who connected the computer for its own sign-in. */
+  ownerName: string | null;
+  /** The viewer owns it. */
+  mine: boolean;
+  /** Only for its owner. */
+  email: string | null;
+  signedOut: boolean;
+}
+
+export interface PlanAccountUsage extends PlanAccountInfo {
+  /** Its windows as last reported, each with the agents' parts; null: not known yet. */
+  usage: (Omit<PlanUsage, "windows"> & { windows: PlanWindowParts[] }) | null;
+  /** This month per agent; `now`: it thinks with this account today. */
+  agents: { agentId: string; name: string; tokens: number; now: boolean }[];
+  monthTokens: number;
+  /** `view_usage` only: what the month's tokens would cost through the API (null: no price). */
+  equivalentUsd?: number | null;
+}
+
+/** `GET …/usage/plans`: every plan account by computer, and the API per agent this month. */
+export interface OrgPlanUsage {
+  /** `YYYY-MM`. */
+  month: string;
+  /** The viewer sees money. */
+  money: boolean;
+  accounts: PlanAccountUsage[];
+  api: {
+    agentId: string;
+    name: string;
+    tokens: number;
+    budgetPercent: number;
+    costUsd?: number;
+    budgetUsd?: number;
+    budgetIsDefault?: boolean;
+  }[];
+}
+
+export interface AgentUsageSource {
+  /** An account's key, `plan:<kind>` (before accounts were recorded) or `api`. */
+  key: string;
+  type: "plan" | "api";
+  kind: MachineAccountKind | null;
+  /** Null: the API, a removed account, or plan usage from before accounts were recorded. */
+  account: PlanAccountInfo | null;
+  /** A plan account that is no longer there. */
+  removed: boolean;
+  tokens: number;
+  /** Share of the agent's month, 0–100. */
+  share: number;
+  /** `YYYY-MM-DD`. */
+  lastDay: string | null;
+  /** The account it thinks with now. */
+  now: boolean;
+  /** Plan: what it would cost through the API (money only). */
+  equivalentUsd?: number | null;
+  /** API: what it cost (money only). */
+  costUsd?: number;
+  /** API: this month's spend over the agent's budget. */
+  budgetPercent?: number;
+}
+
+/** `GET …/agents/{id}/usage`: an agent's month by account and day, and the account it thinks with now. */
+export interface AgentPlanUsage {
+  month: string;
+  money: boolean;
+  tokens: number;
+  equivalentUsd?: number | null;
+  sources: AgentUsageSource[];
+  /** Every day of the month so far: tokens per source key. */
+  days: { date: string; tokens: Record<string, number> }[];
+  current: PlanAccountUsage | null;
 }

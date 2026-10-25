@@ -3,13 +3,14 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { decodeCursor, encodeCursor } from "./cursor";
+import { type EmailLocale, emailLocale } from "./email";
 import { ConflictError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { DEVICE_CODE_TTL_MS, generateUserCode } from "./machine-device";
 import { cleanMachineName, type MachineRow, machineOnline, removeMachine, sha256Hex } from "./machines";
 import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
-import { requirePermission } from "./organizations";
+import { requirePermission, USER_LOCALES } from "./organizations";
 import { assertCanWork } from "./standing";
 
 const { organizations, organizationMembers, users, machines, machineProvisioning, machineDeviceCodes, agents } = schema;
@@ -189,6 +190,33 @@ export async function setProvisioning(
   return true;
 }
 
+/**
+ * The workspace's computer's name until someone renames it, in its first owner's language: what the apps call
+ * it (mirrors `computerSetup.title` in packages/i18n). A name like any computer's, so every message that names
+ * it says a computer, never the bare workspace.
+ */
+export const managedMachineName = (orgName: string, locale: EmailLocale) =>
+  cleanMachineName(locale === "en" ? `${orgName}'s computer` : `Computador da ${orgName}`);
+
+/** The workspace was renamed: its computer, still under the name it got for the old one, takes the new one. */
+export async function followWorkspaceName(db: Executor, orgId: string, from: string, to: string) {
+  for (const locale of USER_LOCALES) {
+    const [old, next] = [managedMachineName(from, locale), managedMachineName(to, locale)];
+    if (old === next) continue;
+    await db
+      .update(machines)
+      .set({ name: next, updatedAt: new Date() })
+      .where(
+        and(
+          eq(machines.orgId, orgId),
+          eq(machines.kind, "managed"),
+          eq(machines.name, old),
+          isNull(machines.deletedAt),
+        ),
+      );
+  }
+}
+
 /** Codes issued for this computer and not redeemed yet stop working (a poll with one gets `access_denied`). */
 async function supersedeCodes(tx: Executor, machineId: string, now: Date) {
   await tx
@@ -216,6 +244,13 @@ export async function issueManagedMachine(
     .where(eq(organizations.id, orgId));
   if (!org) return null;
   await assertCanWork(db, orgId);
+  const [owner] = await db
+    .select({ locale: users.locale })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")))
+    .orderBy(asc(organizationMembers.createdAt))
+    .limit(1);
   const now = deps.now?.() ?? new Date();
   const enrollCode = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + DEVICE_CODE_TTL_MS);
@@ -226,7 +261,7 @@ export async function issueManagedMachine(
       .values({
         orgId,
         kind: "managed",
-        name: name || cleanMachineName(org.name) || "Computer",
+        name: name || managedMachineName(org.name, emailLocale(owner?.locale)),
         createdAt: now,
         updatedAt: now,
       })

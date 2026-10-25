@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
@@ -76,6 +76,8 @@ import { agentFolderName, isInside } from "./paths";
  *   command that may start one (same profile, same page), never while someone
  *   watches it or a person's turn is open. While it is in use there, its
  *   desktop doesn't stop as idle; while its desktop is watched, it is in use.
+ *   In system mode this runs in the agent's worker, as the agent's own user,
+ *   on the desktop root starts for it (`WorkerLink.desktop`).
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -477,6 +479,42 @@ export interface OwnChrome {
 }
 
 /**
+ * Chrome didn't start. The message is for people; `detail` (what Chrome
+ * printed meanwhile) is for the logs; `missing` lists the libraries this
+ * computer lacks, when that is why.
+ */
+export class ChromeStartError extends Error {
+  constructor(
+    message: string,
+    readonly detail: string,
+    readonly missing: string[] = [],
+  ) {
+    super(message);
+    this.name = "ChromeStartError";
+  }
+}
+
+/**
+ * When Chrome's output says it exited for a library the dynamic loader
+ * couldn't find: every library `ldd` finds missing (the loader stops at the
+ * first), else the ones the loader named. Empty for any other exit.
+ */
+function missingLibraries(exe: string, output: string): string[] {
+  const named = [...output.matchAll(/error while loading shared libraries: ([^:\s]+)/g)].map((m) => m[1] as string);
+  if (named.length === 0) return [];
+  const ldd = spawnSync("ldd", [exe], { encoding: "utf8", timeout: 5000 });
+  const all = [...(ldd.stdout ?? "").matchAll(/^\s*(\S+) => not found$/gm)].map((m) => m[1] as string);
+  return all.length > 0 ? all : named;
+}
+
+/** For people: the missing libraries, the first few by name when there are many. */
+function missingLibrariesText(missing: string[]): string {
+  const names =
+    missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
+  return `the agent's computer is missing system libraries Chrome needs (${names}); install them on it, then try again`;
+}
+
+/**
  * Starts Chrome and waits for its debugging port (Chrome writes it to
  * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`).
  */
@@ -488,7 +526,17 @@ export async function launchChrome(
 ): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
   await rm(portFile, { force: true });
-  const child = spawn(exe, args, { stdio: "ignore", windowsHide: true, ...(env ? { env } : {}) });
+  const child = spawn(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
+  let output = "";
+  let started = false;
+  // Read for as long as Chrome runs, since a full pipe would stall it; only what it says while starting is kept.
+  child.stderr?.on("data", (chunk: Buffer) => {
+    if (!started) output = (output + chunk.toString()).slice(-4000);
+  });
+  const outputClosed = new Promise<void>((resolve) => {
+    if (child.stderr) child.stderr.once("close", () => resolve());
+    else resolve();
+  });
   const events = child as unknown as EventEmitter;
   let gone = false;
   const exited = new Promise<void>((resolve) => {
@@ -520,17 +568,35 @@ export async function launchChrome(
   };
   const deadline = Date.now() + CHROME_START_MS;
   while (Date.now() < deadline) {
-    if (gone) throw new Error("Chrome closed while starting (another Chrome may be using this profile)");
+    if (gone) {
+      // Its last words can arrive after its exit; a process it started may hold the pipe open, so not for long.
+      await Promise.race([outputClosed, new Promise((r) => setTimeout(r, 500))]);
+      const detail = output.trim();
+      const missing = missingLibraries(exe, output);
+      if (missing.length > 0) {
+        throw new ChromeStartError(missingLibrariesText(missing), `missing ${missing.join(", ")}: ${detail}`, missing);
+      }
+      // 21 is Chrome's exit code for a profile another Chrome holds (RESULT_CODE_PROFILE_IN_USE).
+      const inUse = child.exitCode === 21;
+      throw new ChromeStartError(
+        inUse ? "Chrome closed while starting (another Chrome is using this profile)" : "Chrome closed while starting",
+        detail,
+      );
+    }
     const text = await readFile(portFile, "utf8").catch(() => "");
     const port = Number(text.split("\n")[0]);
     if (Number.isInteger(port) && port > 0 && port < 65536) {
       if (!child.pid) break;
+      started = true;
       return { pid: child.pid, port, kill, exited };
     }
     await new Promise((r) => setTimeout(r, 100));
   }
   kill();
-  throw new Error("Chrome didn't open its debugging port in time");
+  // Gone before anyone starts another Chrome on this profile (the headless retry of a headed start that hung):
+  // one still running would hold the profile.
+  await exited;
+  throw new ChromeStartError("Chrome didn't open its debugging port in time", output.trim());
 }
 
 /** "Google Chrome", "Chrome for Testing"… for `hello.browser`. */
@@ -682,8 +748,8 @@ export interface BrowserManagerOptions {
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
   startChrome?: (exe: string, args: string[], profile: string, env?: Record<string, string>) => Promise<OwnChrome>;
-  /** The agents' desktops (ADR 0058 §7): without them every Chrome is headless. */
-  desktops?: Pick<DesktopSessions, "ensure" | "session" | "status">;
+  /** The agents' desktops (ADR 0058 §7; a worker's are root's): without them every Chrome is headless. */
+  desktops?: Pick<DesktopSessions, "ensure" | "status"> & { session(agentId: string): ChromeDisplay | null };
   /** Tests: whether a pid left in `chromes.json` is still that Chrome (default: asks the system). */
   isOurChrome?: (pid: number, profile: string) => Promise<boolean>;
   /** What `states()` returns may have changed (the desktop app's tray shows it). */
@@ -889,8 +955,13 @@ export class BrowserManager {
   /** The Chrome for Testing executable every session launches. */
   private chromePath: string | null = null;
   private ready: Promise<string> | null = null;
+  private chromeInstall: Promise<void> | null = null;
+  /** Each agent's session while it opens: commands that come meanwhile get the same one (one queue, one Chrome). */
+  private readonly opening = new Map<string, Promise<Session>>();
   private failure: { reason: string; at: number } | null = null;
   private closed = false;
+  /** Every `closeAll` still running; a new session starts only after them. */
+  private closing: Promise<void> = Promise.resolve();
   /** `<runner home>/browser/chromes.json`: the Chromes this runner home started (pid and profile). */
   private readonly pidFile: string;
   /** Writes to the pid file, one at a time. */
@@ -1014,8 +1085,19 @@ export class BrowserManager {
     await rename(tmp, file);
   }
 
-  /** Chrome for Testing to drive: found, or installed once (`agent-browser install`). */
-  private async ensureChrome(command: string[]) {
+  /**
+   * Chrome for Testing to drive: found, or installed once (`agent-browser install`). Commands that find none at
+   * the same time share one install: two would write the same folder, and one would start `chrome` while the
+   * other still writes it (ETXTBSY).
+   */
+  private ensureChrome(command: string[]): Promise<void> {
+    this.chromeInstall ??= this.findOrInstallChrome(command).finally(() => {
+      this.chromeInstall = null;
+    });
+    return this.chromeInstall;
+  }
+
+  private async findOrInstallChrome(command: string[]) {
     const find = this.opts.chrome ?? (() => findChrome(this.userHome));
     this.chromePath = find();
     if (this.chromePath) return;
@@ -1283,6 +1365,9 @@ export class BrowserManager {
 
   /** The agent's session (created on first use, within the per-machine cap). */
   private async session(agent: AgentScope, folder: string): Promise<Session> {
+    // A runner or worker that just started closes what an earlier run left: its `close --all` would let go of a
+    // session opened meanwhile, and a leftover Chrome still holds the profile until it is killed.
+    await this.closing;
     if (this.closed) throw new RunnerError("browser_unavailable", "The runner is stopping");
     const agentId = String(agent.id ?? "");
     const existing = this.sessions.get(agentId);
@@ -1290,6 +1375,15 @@ export class BrowserManager {
       existing.lastUsed = this.now();
       return existing;
     }
+    let opening = this.opening.get(agentId);
+    if (!opening) {
+      opening = this.openSession(agentId, agent, folder).finally(() => this.opening.delete(agentId));
+      this.opening.set(agentId, opening);
+    }
+    return opening;
+  }
+
+  private async openSession(agentId: string, agent: AgentScope, folder: string): Promise<Session> {
     const live = [...this.sessions.values()].filter((s) => this.now() - s.lastUsed < this.idleMs);
     if (live.length >= this.maxSessions) {
       throw new RunnerError(
@@ -1354,18 +1448,39 @@ export class BrowserManager {
       const exe = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
-      const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), where !== null, page);
-      if (where) useOwnFrame(profile);
+      const launch = async (on: ChromeDisplay | null) => {
+        if (on) useOwnFrame(profile);
+        const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page);
+        try {
+          const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
+          if (on) started.display = on.display;
+          return started;
+        } catch (err) {
+          if (err instanceof ChromeStartError && err.detail) {
+            this.opts.log(`the browser of ${agent.handle} didn't start: ${err.detail}`);
+          }
+          throw err;
+        }
+      };
       let chrome: OwnChrome;
       try {
-        chrome = await start(exe, args, profile, where ? chromeEnv(where) : undefined);
+        chrome = await launch(where).catch((err: unknown) => {
+          // Libraries Chrome can't load fail a headless start just the same, and aren't the desktop's doing.
+          if (!where || (err instanceof ChromeStartError && err.missing.length > 0)) throw err;
+          // A headed start failed (its desktop went away or hung under it): headless for now, like a desktop that
+          // can't start.
+          session.desktopFailedAt = this.now();
+          this.opts.log(
+            `the browser of ${agent.handle} runs headless: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return launch(null);
+        });
       } catch (err) {
         throw new RunnerError(
           "internal",
           `Couldn't start the agent's browser: ${err instanceof Error ? err.message : String(err)}`.slice(0, 400),
         );
       }
-      if (where) chrome.display = where.display;
       session.chrome = chrome;
       session.aliveAt = null;
       await this.rememberChrome(chrome.pid, profile, chrome.display);
@@ -1812,16 +1927,20 @@ export class BrowserManager {
     for (const s of sessions) this.endStream(s, "closed");
     this.sessions.clear();
     this.changed();
-    const command = this.presentCommand();
-    if (command) {
-      // The daemons let go first (and any Chrome an older runner had `agent-browser` launch closes).
-      await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
-        timeoutMs: QUICK_TIMEOUT_MS,
-        cwd: this.opts.home,
-      }).catch(() => undefined);
-    }
-    await Promise.all(sessions.map((s) => this.stopChrome(s).catch(() => undefined)));
-    await this.killLeftovers().catch(() => undefined);
+    const run = (async () => {
+      const command = this.presentCommand();
+      if (command) {
+        // The daemons let go first (and any Chrome an older runner had `agent-browser` launch closes).
+        await this.spawn(command, ["--namespace", this.namespace, "--json", "close", "--all"], {
+          timeoutMs: QUICK_TIMEOUT_MS,
+          cwd: this.opts.home,
+        }).catch(() => undefined);
+      }
+      await Promise.all(sessions.map((s) => this.stopChrome(s).catch(() => undefined)));
+      await this.killLeftovers().catch(() => undefined);
+    })();
+    this.closing = Promise.all([this.closing, run.catch(() => undefined)]).then(() => undefined);
+    await run;
   }
 
   /** The runner stops: streams end, browsers close, nothing new starts. */

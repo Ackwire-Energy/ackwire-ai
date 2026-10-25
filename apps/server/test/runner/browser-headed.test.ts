@@ -5,6 +5,7 @@ import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adap
 import {
   BrowserManager,
   type BrowserManagerOptions,
+  ChromeStartError,
   chromeEnv,
   chromeLaunchArgs,
   type OwnChrome,
@@ -61,10 +62,17 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const log: string[] = [];
   const chromes: FakeChrome[] = [];
   const desk = fakeDesktops(log);
+  /**
+   * Headed starts still to fail, as a Chrome does when its display goes away under it; and whether every start
+   * fails as one missing a library does.
+   */
+  const fails = { headed: 0, libraries: false };
   let clock = 1_000_000;
   const manager = new BrowserManager({
     home,
-    log: () => {},
+    log: (line) => {
+      if (line.includes("didn't start")) log.push(line);
+    },
     send: () => true,
     secret: async () => null,
     command: [process.execPath, FAKE],
@@ -74,6 +82,19 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
     now: () => clock,
     idleMs: 60_000,
     async startChrome(_exe, args, _profile, env): Promise<OwnChrome> {
+      if (fails.libraries) {
+        log.push("chrome failed");
+        throw new ChromeStartError(
+          "the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
+          `missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+          ["libnspr4.so"],
+        );
+      }
+      if (fails.headed > 0 && !args.includes("--headless=new")) {
+        fails.headed--;
+        log.push("chrome failed");
+        throw new Error("Chrome closed while starting");
+      }
       const c: FakeChrome = { args, env, killed: false };
       chromes.push(c);
       log.push("chrome");
@@ -113,7 +134,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const tick = (ms: number) => {
     clock += ms;
   };
-  return { ws, home, manager, log, chromes, desk, act, pids, tick };
+  return { ws, home, manager, log, chromes, desk, fails, act, pids, tick };
 }
 
 const last = (t: { chromes: FakeChrome[] }) => t.chromes.at(-1) as FakeChrome;
@@ -256,6 +277,49 @@ test.if(posix)(
     t.tick(5 * 60_000);
     await t.act("click", ["@e1"], true);
     expect(t.log).toEqual(["desktop dev", "chrome", "desktop dev", "chrome"]);
+    expect(headed(last(t))).toBe(true);
+  },
+);
+
+test.if(posix)(
+  "a Chrome whose desktop goes away while it starts there runs headless, the desktop tried later",
+  async () => {
+    const t = setup();
+    t.fails.headed = 1;
+    expect(await t.act("open", ["https://shop.example/"], true)).toMatchObject({ success: true });
+    expect(t.log).toEqual(["desktop dev", "chrome failed", "chrome"]);
+    expect(headed(last(t))).toBe(false);
+    expect(t.pids()).toEqual([expect.objectContaining({ pid: 40_001 })]);
+    expect(t.pids()[0].display).toBeUndefined();
+    await t.act("click", ["@e1"], true);
+    expect(t.chromes).toHaveLength(1);
+    t.tick(5 * 60_000);
+    await t.act("click", ["@e1"], true);
+    expect(t.log).toEqual(["desktop dev", "chrome failed", "chrome", "desktop dev", "chrome"]);
+    expect(headed(last(t))).toBe(true);
+  },
+);
+
+test.if(posix)(
+  "a Chrome missing libraries says so, isn't tried headless, and its desktop isn't blamed for it",
+  async () => {
+    const t = setup();
+    t.fails.libraries = true;
+    const failed = await t.act("open", ["https://shop.example/"], true).then(
+      () => null,
+      (e: unknown) => e as RunnerError,
+    );
+    expect(failed?.message).toBe(
+      "Couldn't start the agent's browser: the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
+    );
+    expect(t.log).toEqual([
+      "desktop dev",
+      "chrome failed",
+      `the browser of dev didn't start: missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+    ]);
+    // Once they're installed, the next command starts it on its desktop.
+    t.fails.libraries = false;
+    expect(await t.act("open", ["https://shop.example/"], true)).toMatchObject({ success: true });
     expect(headed(last(t))).toBe(true);
   },
 );

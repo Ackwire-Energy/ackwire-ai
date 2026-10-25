@@ -52,7 +52,7 @@ const updates = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2]);
 
 describe("agent page: tabs and the URL", () => {
-  test("seven tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
+  test("eight tabs; the chosen one goes to ?tab=; a link opens a tab; the memory tab counts the proposal", async () => {
     const { router } = await go();
     const tabs = screen().getByRole("tablist", { name: "Seções da Ada" });
     expect(
@@ -65,6 +65,7 @@ describe("agent page: tabs and the URL", () => {
       "Ferramentas e acesso",
       "Memória1",
       "Arquivos",
+      "Uso",
       "Atividade",
       "Configurações",
     ]);
@@ -114,6 +115,41 @@ describe("agent page: its files", () => {
     expect(card.textContent).not.toContain("Organograma do time");
     expect(card.textContent).toContain("Só aparecem arquivos de conversas que você vê.");
     expect(within(card).getByRole("radiogroup", { name: "Tipo" })).toBeTruthy();
+  });
+});
+
+describe("agent page: its usage (ADR 0063)", () => {
+  test("Uso: the month by account, the account it thinks with now with its part, and by account", async () => {
+    await go("?tab=usage");
+    const month = screen().getByRole("region", { name: "Uso da Ada" });
+    expect(month.textContent).toContain("97% na conta deste MacBook e 2,6% pela API.");
+    expect(month.textContent).toContain("Pelo preço da API, seria ≈ US$ 77,00.");
+    expect(within(month).getByRole("img", { name: /^Tokens por dia em / })).toBeTruthy();
+    const now = screen().getByRole("region", { name: "Agora" });
+    expect(now.textContent).toContain("Conta deste MacBook");
+    expect(now.textContent).toContain("divide com Atlas");
+    // Its part of each window in full ink, and in words; the estimate says so.
+    const week = within(now).getByRole("meter", { name: "Semana" });
+    expect(week.getAttribute("aria-valuenow")).toBe("41");
+    expect(week.querySelector(".ac-meter__part")?.getAttribute("style")).toContain("width: 30%");
+    expect(now.textContent).toContain("Parte da Ada: ≈ 30%");
+    expect(now.textContent).toContain("é uma estimativa");
+    // It informs: changing the account is "Quem pensa"'s.
+    expect(within(now).queryByRole("button")).toBeNull();
+    const sources = screen().getByRole("region", { name: "Por conta, este mês" });
+    expect(sources.textContent).toContain("≈ US$ 76,00 pela API");
+    expect(sources.textContent).toContain("US$ 0,80 pagos");
+  });
+
+  test("a member sees the tokens and the percentages, never money", async () => {
+    await go("?tab=usage", asMember());
+    const month = screen().getByRole("region", { name: "Uso da Ada" });
+    expect(month.textContent).toContain("97% na conta deste MacBook");
+    expect(screen().getByRole("region", { name: "Por conta, este mês" }).textContent).toContain("2% do orçamento");
+    const shown = ["Uso da Ada", "Agora", "Por conta, este mês"].map(
+      (name) => screen().getByRole("region", { name }).textContent,
+    );
+    expect(shown.join(" ")).not.toContain("US$");
   });
 });
 

@@ -8,6 +8,7 @@ import {
   modelForTier,
   PROVIDER_IDS,
   PROVIDERS,
+  summedCostNanoUsd,
   usdToNanoUsd,
 } from "../src";
 import { createFakeProvider } from "../src/fake";
@@ -29,6 +30,10 @@ describe("pricing", () => {
   test("Haiku 5.5 switches to long-context prices above 100K prompt tokens", () => {
     expect(costNanoUsd("claude-haiku-5-5", usage(100_000, 1000))).toBe(100_000 * 100 + 1000 * 500);
     expect(costNanoUsd("claude-haiku-5-5", usage(90_000, 1000, 20_000))).toBe(90_000 * 500 + 1000 * 2500 + 20_000 * 50);
+    // Many calls' tokens added up never cross it: the sum is no one call's prompt.
+    expect(summedCostNanoUsd("claude-haiku-5-5", usage(90_000, 1000, 20_000))).toBe(
+      90_000 * 100 + 1000 * 500 + 20_000 * 10,
+    );
   });
 
   test("GPT-6.1 Sol: $2 / $0.10 / $2.50 / $10, and $4 / $0.20 / $5 / $15 above 272K prompt tokens", () => {

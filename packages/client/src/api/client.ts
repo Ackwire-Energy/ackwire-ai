@@ -18,6 +18,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AgentPlanUsage,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -43,6 +44,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -128,6 +130,7 @@ import type {
   NotificationPage,
   Organization,
   OrgOverview,
+  OrgPlanUsage,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -241,9 +244,13 @@ export interface ApiClient {
     /** New link (the old one stops working), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
+    /** Every plan account by computer and the API per agent, this month (ADR 0063). */
+    planUsage(orgId: string): Promise<OrgPlanUsage>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
+    /** Its month by account and day, and the account it thinks with now (ADR 0063). */
+    planUsage(orgId: string, agentId: string): Promise<AgentPlanUsage>;
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
@@ -425,6 +432,8 @@ export interface ApiClient {
     host(orgId: string): Promise<HostComputer | null>;
     /** Uses the server's computer again (admins); `remove` is how it stops. */
     hostOn(orgId: string): Promise<HostComputer>;
+    /** ADR 0056 §10: whether the workspace gets its own computer, and how far it is (every member). */
+    computerSetup(orgId: string): Promise<ComputerSetup>;
     /**
      * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
      * (`machine.device_not_found` once expired, used or unknown).

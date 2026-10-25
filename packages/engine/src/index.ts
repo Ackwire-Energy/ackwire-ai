@@ -140,6 +140,7 @@ export * from "./organizations";
 export * from "./outbox";
 export * from "./pdf";
 export * from "./pins";
+export * from "./plan-usage";
 export * from "./profile";
 export * from "./push";
 export * from "./push-messages";

@@ -1678,6 +1678,18 @@ textarea.ac-input {
   background: var(--ink);
   border-radius: var(--radius-full);
 }
+/* One part in full ink over the rest of the use (an agent's share of its plan's window). */
+.ac-meter--parts .ac-meter__bar {
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.ac-meter__part {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--ink);
+  border-radius: var(--radius-full);
+}
 
 /* Plan usage: a bar per window (ink, like every meter); the state in words above */
 .ac-planmeter {
@@ -1714,6 +1726,7 @@ textarea.ac-input {
   color: var(--ink-muted);
 }
 .ac-planmeter__reset,
+.ac-planmeter__note,
 .ac-planmeter__at {
   grid-column: 1 / -1;
   font-size: 12px;
@@ -1724,6 +1737,48 @@ textarea.ac-input {
 }
 .ac-planmeter--compact .ac-planmeter__window {
   font-size: 12px;
+}
+
+/* A month day by day (UsageDays.tsx): a column per day stacked by source, in 1-px rows; days ahead dotted. */
+.ac-usage-days {
+  --dot: color-mix(in srgb, var(--line-strong) 45%, transparent);
+  display: grid;
+  grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 150px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.ac-usage-days__day {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  height: 100%;
+}
+.ac-usage-days__day > i {
+  --c: var(--part, var(--ink));
+  display: block;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--c) 0 2px,
+    color-mix(in srgb, var(--c) 60%, var(--raised)) 2px 3px
+  );
+}
+.ac-usage-days__day--ahead {
+  align-self: end;
+  height: 14px;
+  opacity: 0.7;
+  background-image: radial-gradient(circle, var(--dot) 0.7px, transparent 0.85px);
+  background-size: 3px 3px;
+}
+.ac-usage-swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--part, var(--ink));
 }
 
 /* Cards and sections */

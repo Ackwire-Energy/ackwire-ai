@@ -307,6 +307,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       hostname: managed ? "" : m.hostname,
       os: managed ? "other" : m.os,
       arch: managed ? "" : m.arch,
+      /** `system`: each agent works as its own OS user (ADR 0057); `single`: all as the runner's user. */
+      mode: m.executors?.mode === "system" ? ("system" as const) : ("single" as const),
       runnerVersion: m.runnerVersion,
       /** The runner's machine protocol (9+: pause; 10+: access on the machine). */
       protocol: m.protocol,

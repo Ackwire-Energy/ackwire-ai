@@ -18,6 +18,7 @@ import {
   BrowserManager,
   type BrowserManagerOptions,
   CHROME_ARGS,
+  ChromeStartError,
   captureMarks,
   chromeLabel,
   chromeLaunchArgs,
@@ -28,6 +29,7 @@ import {
   type InputState,
   isWebPage,
   jpegSize,
+  launchChrome,
   type OwnChrome,
   relayCommands,
   type StreamSocket,
@@ -368,6 +370,70 @@ test("a normal Chrome user agent for the platform, and the whole launch line", (
   );
 });
 
+/** Starts a fake Chrome that runs `body` (sh) and exits; what `launchChrome` threw. */
+async function failedStart(body: string): Promise<ChromeStartError> {
+  const dir = tempDir("chrome-");
+  dirs.push(dir);
+  const exe = path.join(dir, "chrome");
+  writeFileSync(exe, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+  const err = await launchChrome(exe, ["--headless=new"], dir).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(ChromeStartError);
+  return err as ChromeStartError;
+}
+
+test.if(posix)(
+  "a Chrome that can't load its libraries says which, in words for people; a profile in use only when Chrome says so",
+  async () => {
+    const loader = `echo "$0: error while loading shared libraries: libnspr4.so: cannot open shared object file: No such file or directory" >&2; exit 127`;
+    let err = await failedStart(loader);
+    expect(err.missing).toEqual(["libnspr4.so"]);
+    expect(err.message).toBe(
+      "the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
+    );
+    expect(err.detail).toMatch(
+      /^missing libnspr4\.so: \/.+\/chrome: error while loading shared libraries: libnspr4\.so:/,
+    );
+
+    // The loader stops at the first one: ldd lists them all, and people read the first few.
+    const bin = tempDir("ldd-");
+    dirs.push(bin);
+    const libs = ["libglib-2.0.so.0", "libnss3.so", "libnssutil3.so", "libsmime3.so", "libnspr4.so", "libX11.so.6"];
+    const all = [...libs, "libasound.so.2"];
+    writeFileSync(
+      path.join(bin, "ldd"),
+      `#!/bin/sh\nprintf '\\tlibc.so.6 => /lib/libc.so.6 (0x7f00)\\n'\nfor l in ${all.join(" ")}; do printf '\\t%s => not found\\n' "$l"; done\n`,
+      { mode: 0o755 },
+    );
+    const PATH = process.env.PATH;
+    process.env.PATH = `${bin}:${PATH}`;
+    try {
+      err = await failedStart(loader);
+    } finally {
+      process.env.PATH = PATH;
+    }
+    expect(err.missing).toEqual(all);
+    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more); install them on it`);
+    expect(err.detail).toStartWith(`missing ${all.join(", ")}: `);
+
+    // A profile another Chrome holds, as Chrome for Testing says it and exits.
+    const held =
+      "Failed to create a ProcessSingleton for your profile directory. Aborting now to avoid profile corruption.";
+    err = await failedStart(`echo "${held}" >&2; exit 21`);
+    expect(err.missing).toEqual([]);
+    expect(err.message).toBe("Chrome closed while starting (another Chrome is using this profile)");
+    expect(err.detail).toBe(held);
+
+    // Any other exit, a loader error among them, gets no guess at why; what Chrome said goes to the logs.
+    err = await failedStart(`echo "$0: /lib/libc.so.6: version 'GLIBC_2.38' not found (required by $0)" >&2; exit 1`);
+    expect(err.missing).toEqual([]);
+    expect(err.message).toBe("Chrome closed while starting");
+    expect(err.detail).toContain("version 'GLIBC_2.38' not found");
+  },
+);
+
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
   const t = setup();
   expect(await errorCode(() => t.act("open", ["https://x.com", "--profile", "Default"]))).toBe("bad_request");
@@ -682,6 +748,59 @@ test.if(posix)(
     expect(JSON.parse(readFileSync(path.join(home, "browser", "chromes.json"), "utf8"))).toEqual([]);
   },
 );
+
+test.if(posix)("a command while the browsers close (a runner that just started) starts its Chrome after", async () => {
+  const chromes = fakeChromes();
+  let closing = true;
+  const startedWhileClosing: boolean[] = [];
+  const t = setup({
+    startChrome: (exe, args, profile) => {
+      startedWhileClosing.push(closing);
+      return chromes.start(exe, args, profile);
+    },
+  });
+  const closed = t.manager.closeAll().then(() => {
+    closing = false;
+  });
+  expect(await t.act("open", ["https://a.example/"])).toMatchObject({ success: true });
+  await closed;
+  expect(startedWhileClosing).toEqual([false]);
+  expect(t.logged().map((l) => l.args.at(-1))).toEqual(["--all", "https://a.example/"]);
+});
+
+/** A computer without Chrome for Testing until the fake's `install` ran. */
+function setupWithoutChrome() {
+  const box: { t?: ReturnType<typeof setup> } = {};
+  const installs = () => box.t?.logged().filter((l) => l.args[0] === "install").length ?? 0;
+  box.t = setup({
+    chrome: () => (installs() > 0 ? "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome" : null),
+  });
+  return { t: box.t, installs };
+}
+
+test.if(posix)("an agent's first two commands at once share its new session and one Chrome install", async () => {
+  const { t, installs } = setupWithoutChrome();
+  const folder = await t.folder();
+  const act = (command: string, args: string[]) =>
+    t.manager.act(dev, folder, { op: "browser.act", command, args, timeoutSeconds: 30 });
+  // The person's open and the live view's `get url` right after it, as the app sends them.
+  const [opened, url] = await Promise.all([act("open", ["https://a.example/"]), act("get", ["url"])]);
+  expect(opened).toMatchObject({ success: true });
+  // In the same session's queue, behind the open (a second session has no Chrome: "the browser isn't open").
+  expect(url).toMatchObject({ success: true, data: { url: "https://a.example/" } });
+  expect(installs()).toBe(1);
+  expect(t.chromes).toHaveLength(1);
+});
+
+test.if(posix)("two agents' first commands at once install Chrome once", async () => {
+  const { t, installs } = setupWithoutChrome();
+  const answers = await Promise.all([
+    t.act("open", ["https://a.example/"]),
+    t.act("open", ["https://b.example/"], { agent: ops }),
+  ]);
+  expect(answers).toMatchObject([{ success: true }, { success: true }]);
+  expect(installs()).toBe(1);
+});
 
 // ── Live view ────────────────────────────────────────────────────────────────
 

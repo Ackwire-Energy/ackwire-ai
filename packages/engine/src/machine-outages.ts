@@ -36,6 +36,8 @@ export interface MachineOutage {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10): its platform reads `other`, like its OS everywhere people look. */
+  managed: boolean;
   /** ISO: the last sign of life. */
   offlineSince: string;
   agents: OutageAgent[];
@@ -49,6 +51,7 @@ export type OutageTarget =
       machineId: string;
       name: string;
       platform: string;
+      managed: boolean;
       online: boolean;
       brains: ComputerBrainKind[];
       /** Why it can't take agents now: `offline`, `paused`; null when it can. */
@@ -65,8 +68,9 @@ export interface OutageDeps {
   now?: () => Date;
 }
 
-/** `mac`, `windows`, `linux` from the runner's `os`; anything else as reported. */
-export function machinePlatform(os: string): string {
+/** `mac`, `windows`, `linux` from the runner's `os`; anything else as reported; `other` for a managed computer. */
+export function machinePlatform(os: string, kind?: MachineRow["kind"]): string {
+  if (kind === "managed") return "other";
   if (os === "darwin" || os === "mac" || os === "macos") return "mac";
   if (os === "windows" || os === "win32") return "windows";
   return os;
@@ -197,7 +201,8 @@ export async function listMachineOutages(
     outages.push({
       machineId: m.id,
       name: m.name,
-      platform: machinePlatform(m.os),
+      platform: machinePlatform(m.os, m.kind),
+      managed: m.kind === "managed",
       offlineSince: (m.lastSeenAt ?? m.updatedAt).toISOString(),
       agents: [...list.values()].sort((a, b) => order(a.agentId) - order(b.agentId)),
       waitingRuns,
@@ -213,7 +218,8 @@ export async function listMachineOutages(
         kind: "machine" as const,
         machineId: m.id,
         name: m.name,
-        platform: machinePlatform(m.os),
+        platform: machinePlatform(m.os, m.kind),
+        managed: m.kind === "managed",
         online,
         brains: computerBrains(m),
         reasonOff: !online ? "offline" : machinePause(m, now) ? "paused" : null,

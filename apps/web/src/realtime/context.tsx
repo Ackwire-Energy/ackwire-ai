@@ -24,6 +24,7 @@ import {
   applyReactions,
   applyReceiptEvent,
   applyTyping,
+  applyWorkspaceEvent,
   type BrowserFrame,
   type BrowserInputEvent,
   type BrowserLiveStatus,
@@ -398,6 +399,9 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
+      // The workspace's computer on its way and its standing may have moved meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
@@ -458,6 +462,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
+      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);

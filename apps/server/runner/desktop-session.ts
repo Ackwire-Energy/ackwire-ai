@@ -102,14 +102,18 @@ const INSTALL = `sudo apt install --no-install-recommends ${[
 ].join(" ")}`;
 
 /**
- * Run as the agent: its desktop folder (0700), HOME and XFCE's session
- * settings there when it has none (`$3`), and a fresh cookie file. The cookie
- * comes on stdin (`xauth source -`), never in an argument.
+ * Run as the agent: its desktop folder (0700), HOME and XFCE's settings
+ * there (the session's when it has none, `$3`; xfwm4's vblank off, `$4`, or
+ * that one setting changed in the file xfwm4 keeps), and a fresh cookie file.
+ * The cookie comes on stdin (`xauth source -`), never in an argument.
  */
 const PREPARE = [
   'umask 077 && mkdir -p "$1" "$2" && chmod 700 "$1"',
-  'x="$2/.config/xfce4/xfconf/xfce-perchannel-xml"',
-  '{ [ -e "$x/xfce4-session.xml" ] || { mkdir -p "$x" && printf %s "$3" > "$x/xfce4-session.xml"; }; }',
+  'x="$2/.config/xfce4/xfconf/xfce-perchannel-xml" && w="$x/xfwm4.xml" && mkdir -p "$x"',
+  '{ [ -e "$x/xfce4-session.xml" ] || printf %s "$3" > "$x/xfce4-session.xml"; }',
+  // xfwm4 writes every one of its settings to its file on its first start, so a desktop that ran before has it.
+  // A failure here only leaves the vblank on: the desktop still starts.
+  String.raw`{ if [ -e "$w" ]; then sed 's/\(name="vblank_mode" type="string" value="\)[^"]*/\1off/' "$w" > "$w.new" && mv "$w.new" "$w"; else printf %s "$4" > "$w"; fi || true; }`,
   'rm -f "$1/Xauthority" && exec xauth -q -f "$1/Xauthority" source -',
 ].join(" && ");
 
@@ -123,6 +127,21 @@ const XFCE_SESSION_SETTINGS = `<?xml version="1.0" encoding="UTF-8"?>
     <property name="ssh-agent" type="empty">
       <property name="enabled" type="bool" value="false"/>
     </property>
+  </property>
+</channel>
+`;
+
+/**
+ * xfwm4's compositor shows nothing new before the screen's next vblank, and
+ * Xtigervnc's vblank clock ticks once a second while no viewer is connected:
+ * with nobody watching, what an app drew reached the agent's screen (and its
+ * screenshots) up to 2 s late. A virtual screen has no refresh to wait for:
+ * off.
+ */
+const XFWM4_SETTINGS = `<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="vblank_mode" type="string" value="off"/>
   </property>
 </channel>
 `;
@@ -316,6 +335,8 @@ export interface DesktopSessionsOptions {
   now?: () => number;
   /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): not idle then. */
   inUse?: (agentId: string) => boolean;
+  /** A viewer of the agent's desktop came or went (`status().streams`). */
+  onViewers?: (agentId: string) => void;
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -446,12 +467,14 @@ export class DesktopSessions {
     if (!d) return null;
     d.streams++;
     d.lastUsed = this.now();
+    this.opts.onViewers?.(agentId);
     let held = true;
     return () => {
       if (!held) return;
       held = false;
       d.streams--;
       d.lastUsed = this.now();
+      this.opts.onViewers?.(agentId);
     };
   }
 
@@ -575,9 +598,25 @@ export class DesktopSessions {
       };
       mkdirSync(this.dir, { recursive: true, mode: 0o700 });
       const logFile = path.join(this.dir, `${id8(agent)}.log`);
+      // A desktop that ended by itself starts again at once: the log of the start that ended stays (`.log.1`).
+      try {
+        renameSync(logFile, `${logFile}.1`);
+      } catch {
+        // no earlier start
+      }
       const log = openSync(logFile, "w", 0o600);
       try {
-        const script = [...user.prefix, "/bin/sh", "-c", PREPARE, "sh", user.dir, user.home, XFCE_SESSION_SETTINGS];
+        const script = [
+          ...user.prefix,
+          "/bin/sh",
+          "-c",
+          PREPARE,
+          "sh",
+          user.dir,
+          user.home,
+          XFCE_SESSION_SETTINGS,
+          XFWM4_SETTINGS,
+        ];
         const prepare = this.sys.spawn(script, {
           cwd: "/",
           env: user.env,

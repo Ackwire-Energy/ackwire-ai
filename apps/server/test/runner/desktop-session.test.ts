@@ -72,7 +72,7 @@ function fakeComputer(lockDir: string) {
       procs.push(p);
       const command = commandOf(p);
       if (command === "sh") {
-        for (const dir of argv.slice(-3, -1)) mkdirSync(dir, { recursive: true });
+        for (const dir of argv.slice(-4, -2)) mkdirSync(dir, { recursive: true });
         queueMicrotask(() => p.exit(0));
       } else if (command === "Xtigervnc" && xvncFails !== null) {
         if (opts.log !== undefined) writeSync(opts.log, `${xvncFails}\n`);
@@ -203,8 +203,9 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
 
   // The cookie goes to xauth on stdin; the folder and HOME are made by the agent's user.
   expect(prepare.opts.input).toMatch(/^add :20 \. [0-9a-f]{32}\n$/);
-  expect(prepare.argv.slice(-3, -1)).toEqual([dir, path.join(t.folders, "dev", ".agentes", "home")]);
-  expect(prepare.argv.at(-1)).toContain('<property name="ssh-agent" type="empty">');
+  expect(prepare.argv.slice(-4, -2)).toEqual([dir, path.join(t.folders, "dev", ".agentes", "home")]);
+  expect(prepare.argv.at(-2)).toContain('<property name="ssh-agent" type="empty">');
+  expect(prepare.argv.at(-1)).toContain('<property name="vblank_mode" type="string" value="off"/>');
   const cookie = prepare.opts.input?.split(" ")[3]?.trim() ?? "";
   expect(cookie).toMatch(/^[0-9a-f]{32}$/);
 
@@ -283,6 +284,48 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
     streams: 0,
   });
   t.desktops.close();
+});
+
+test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settings file xfwm4 already wrote", async () => {
+  // The real script, with an xauth that only takes its cookie.
+  const bin = tempDir("desk-bin-");
+  dirs.push(bin);
+  writeFileSync(path.join(bin, "xauth"), "#!/bin/sh\ncat > /dev/null\n", { mode: 0o755 });
+  const t = setup();
+  const system: DesktopSystem = {
+    ...t.fake.system,
+    spawn(argv, opts) {
+      if (path.basename(argv[0] ?? "") !== "sh") return t.fake.system.spawn(argv, opts);
+      const run = Bun.spawnSync(argv, { env: { PATH: `${bin}:/usr/bin:/bin` }, stdin: Buffer.from(opts.input ?? "") });
+      return { pid: 1, exited: Promise.resolve(run.exitCode) };
+    },
+  };
+  const desktops = new DesktopSessions({ ...t.opts, system });
+  const xfconf = path.join(t.folders, "dev", ".agentes", "home", ".config", "xfce4", "xfconf", "xfce-perchannel-xml");
+  const settings = path.join(xfconf, "xfwm4.xml");
+
+  await desktops.ensure(dev);
+  expect(readFileSync(settings, "utf8")).toContain('<property name="vblank_mode" type="string" value="off"/>');
+  expect(readFileSync(path.join(xfconf, "xfce4-session.xml"), "utf8")).toContain('name="ssh-agent"');
+
+  // xfwm4 writes every setting it has on its first start; the next start changes that one only.
+  const own = [
+    '<?xml version="1.1" encoding="UTF-8"?>',
+    "",
+    '<channel name="xfwm4" version="1.0">',
+    '  <property name="general" type="empty">',
+    '    <property name="use_compositing" type="bool" value="true"/>',
+    '    <property name="vblank_mode" type="string" value="auto"/>',
+    '    <property name="workspace_count" type="int" value="4"/>',
+    "  </property>",
+    "</channel>",
+    "",
+  ].join("\n");
+  writeFileSync(settings, own);
+  await desktops.stop(dev);
+  await desktops.ensure(dev);
+  expect(readFileSync(settings, "utf8")).toBe(own.replace('value="auto"', 'value="off"'));
+  desktops.close();
 });
 
 test("system mode: every process as the agent, and the password file root's (readable by the agent's group only)", async () => {
@@ -417,7 +460,9 @@ test("restore: a desktop left running is taken back only when its pid is still t
 });
 
 test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer or a use keeps it", async () => {
-  const t = setup();
+  // Each viewer that comes or goes is told (system mode: the agent's worker learns it).
+  const viewers: number[] = [];
+  const t = setup({ onViewers: (agentId) => viewers.push(t.desktops.status({ id: agentId }).streams) });
   await t.desktops.ensure(dev);
   const release = t.desktops.hold(dev.id);
   expect(t.desktops.status(dev).streams).toBe(1);
@@ -428,6 +473,7 @@ test("idle: a desktop with no viewer and no use stops after 15 minutes; a viewer
   release?.();
   release?.();
   expect(t.desktops.status(dev).streams).toBe(0);
+  expect(viewers).toEqual([1, 0]);
   t.clock.now += DESKTOP_IDLE_MS - 1;
   await t.desktops.ensure(dev);
   t.clock.now += DESKTOP_IDLE_MS - 1;
@@ -508,6 +554,8 @@ test("limits and failures: the memory cap, Xvnc that doesn't start, a computer w
   expect(t.desktops.status(ops).running).toBe(false);
   t.fake.failXvnc(null);
   expect((await t.desktops.ensure(ops)).started).toBe(true);
+  // The failed start's log is kept beside the new one's.
+  expect(readFileSync(path.join(t.home, "desktop", "9f00aa11.log.1"), "utf8")).toContain("Failed to bind socket");
   await t.desktops.stop(ops);
 
   const bare = new DesktopSessions({ ...t.opts, system: { ...t.fake.system, which: () => null } });

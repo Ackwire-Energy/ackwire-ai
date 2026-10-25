@@ -1,4 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
+import { STANDING_STATES } from "@agenteschat/engine";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -23,6 +24,13 @@ export const Organization = z
       .nullable()
       .optional()
       .openapi({ description: "The workspace logo (`/api/app/org-logos/…`); null = the agent mark." }),
+    standing: z
+      .object({
+        state: z.enum(STANDING_STATES),
+        reason: z.string().nullable().openapi({ description: "Only when the workspace is told why; else null." }),
+      })
+      .optional()
+      .openapi({ description: "In `GET /me` (ADR 0056 §8). Changes come as `org.standing` org events." }),
   })
   .openapi("Organization");
 
@@ -394,16 +402,16 @@ export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("Br
 
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
+export const PlanWindow = z.object({
+  kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
+  label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
+  usedPercent: z.number().openapi({ description: "0–100." }),
+  resetsAt: z.string().optional(),
+});
+
 export const PlanUsage = z
   .object({
-    windows: z.array(
-      z.object({
-        kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
-        label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
-        usedPercent: z.number().openapi({ description: "0–100." }),
-        resetsAt: z.string().optional(),
-      }),
-    ),
+    windows: z.array(PlanWindow),
     limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
     source: z.enum(["turn", "probe"]),
     at: z.string().openapi({ description: "When the computer learned it." }),

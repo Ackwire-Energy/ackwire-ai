@@ -1,6 +1,15 @@
-import type { MachineAccount, MachineAccountKind, PlanUsage } from "@agenteschat/client";
-import { daysBetween, formatShortDate, formatTime, relativeTime } from "@agenteschat/client/lib/format";
-import { type PlanMeterText, planState } from "@agenteschat/ui";
+import type {
+  AgentUsageSource,
+  MachineAccount,
+  MachineAccountKind,
+  PlanAccountInfo,
+  PlanAccountUsage,
+  PlanUsage,
+  PlanWindowParts,
+} from "@agenteschat/client";
+import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "@agenteschat/client/lib/format";
+import { planOf } from "@agenteschat/client/lib/plans";
+import { type PlanMeterText, type PlanMeterUsage, planState } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 
 const WINDOW_NAMES = ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly"] as const;
@@ -74,4 +83,58 @@ export function limitOffers(
     .filter((o) => o.plan?.state !== "limited")
     .map((o) => ({ account: o.account, used: o.plan?.used ?? null }))
     .sort((a, b) => (a.used ?? 101) - (b.used ?? 101));
+}
+
+/**
+ * An account's windows for `PlanMeter` with whose use they are (the usage views): `note` says each
+ * window's parts in words; `focus` draws that agent's part in full ink (none where it has no estimate).
+ */
+export function partedUsage(
+  usage: Omit<PlanUsage, "windows"> & { windows: PlanWindowParts[] },
+  note: (parts: NonNullable<PlanWindowParts["agents"]>) => string | undefined,
+  focus?: string,
+): PlanMeterUsage {
+  return {
+    ...usage,
+    windows: usage.windows.map(({ agents, ...w }) => ({
+      ...w,
+      ...(agents && agents.length > 0 ? { note: note(agents) } : {}),
+      ...(agents && focus ? { part: agents.find((a) => a.agentId === focus)?.percent ?? 0 } : {}),
+    })),
+  };
+}
+
+/** What people call a plan account: its label, or "Conta deste MacBook" for the computer's own sign-in. */
+export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "machineName">) =>
+  a.label ?? t("agentPage.work.brain.thisComputer", { computer: a.machineName });
+
+/** Who makes what an account thinks with: a coding plan's maker, else Claude Code or Codex. */
+export const brandOf = (a: Pick<PlanAccountInfo, "kind" | "provider">) =>
+  planOf(a.provider)?.maker ?? (a.kind === "codex" ? "Codex" : "Claude Code");
+
+/** Why an account shows no windows: its maker doesn't tell them here, nobody used it yet, or nobody uses it. */
+export function noWindowsText(t: TFunction, account: Pick<PlanAccountUsage, "provider" | "agents">) {
+  const plan = planOf(account.provider);
+  if (plan && !plan.usage) return t("aiAccounts.usage.notShared", { maker: plan.maker });
+  return account.agents.length ? t("usageViews.noWindows") : t("usageViews.unused");
+}
+
+/** Where an agent's tokens went, by name: the account, "API", a removed account or the plan before accounts were recorded. */
+export function usageSourceName(t: TFunction, s: AgentUsageSource) {
+  if (s.type === "api") return t("usageViews.agent.api");
+  if (s.account) return accountName(t, s.account);
+  if (s.removed) return t("usageViews.agent.removed");
+  return t("usageViews.agent.old", { brand: brandOf({ kind: s.kind ?? "claude_code", provider: null }) });
+}
+
+/** A source's share of the agent's month in a sentence: "97% na conta deste MacBook", "3% pela API". */
+export function usageSourcePart(t: TFunction, locale: string, s: AgentUsageSource) {
+  const percent = formatPercent(locale, s.share);
+  if (s.type === "api") return t("usageViews.agent.apiPart", { percent });
+  if (s.account?.accountId === null) {
+    return t("usageViews.agent.computerPart", { percent, computer: s.account.machineName });
+  }
+  if (s.account) return t("usageViews.agent.accountPart", { percent, account: accountName(t, s.account) });
+  if (s.removed) return t("usageViews.agent.removedPart", { percent });
+  return t("usageViews.agent.oldPart", { percent, brand: brandOf({ kind: s.kind ?? "claude_code", provider: null }) });
 }

@@ -16,6 +16,7 @@ import type {
   AgentDetail,
   AgentForYou,
   AgentMailbox,
+  AgentPlanUsage,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -35,6 +36,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -97,6 +99,7 @@ import type {
   NotificationPage,
   Organization,
   OrgOverview,
+  OrgPlanUsage,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -353,9 +356,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       resendInvitation: (orgId, id) =>
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
+      planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
+      planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
       update: (orgId, agentId, input) =>
@@ -558,6 +563,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       remove: (orgId, machineId) => request<void>(`${org(orgId)}/machines/${enc(machineId)}`, { method: "DELETE" }),
       host: (orgId) => nullOn(404, () => request<HostComputer>(`${org(orgId)}/machines/host`)),
       hostOn: (orgId) => request<HostComputer>(`${org(orgId)}/machines/host`, { json: {} }),
+      computerSetup: (orgId) => request<ComputerSetup>(`${org(orgId)}/computer-setup`),
       device: (userCode) => request<DeviceRequest>(`/api/app/machines/device/${enc(userCode)}`),
       confirmDevice: (orgId, userCode, input) =>
         request<Machine>(`${org(orgId)}/machines/device/${enc(userCode)}/confirm`, { json: input }),
