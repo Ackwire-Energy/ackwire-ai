@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { DESKTOP_SIZE } from "@agenteschat/adapters/machine-protocol";
@@ -110,6 +111,20 @@ test("the images ship as committed: the wallpaper the desktop's exact size, the 
   // Shown 1:1: a desktop of another size needs the wallpaper rendered again (docs/design/desktop/render.sh).
   expect(pngSize(wallpaper)).toEqual({ ...DESKTOP_SIZE });
   expect(pngSize(mark)).toEqual({ width: 32, height: 32 });
+  // Every file goes to the script as one argument: Linux takes at most 128 KiB in one.
+  for (const arg of lookCommand("/home/ag-01a142cb", "orchis")) expect(arg.length).toBeLessThan(128 * 1024);
+});
+
+test("files that change come with a new LOOK_VERSION: desktops that have the look get it again only then", () => {
+  const hash = createHash("sha256");
+  for (const theme of ["orchis", "stock"] as const) {
+    for (const f of lookFiles("/HOME", theme)) hash.update(f.path).update(f.data);
+  }
+  // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
+  expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
+    version: 1,
+    files: "74699bd5ebdb5e75",
+  });
 });
 
 test("the theme: Orchis only with its xfwm4 theme and gdk-pixbuf's SVG loader (its window buttons are SVG)", () => {
