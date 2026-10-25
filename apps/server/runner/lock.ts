@@ -6,7 +6,8 @@ import { errnoCode } from "./errors";
  * One runner per home (ADR 0036 §4): `<home>/runner.lock` holds the PID of
  * the runner that took it (`start` or `app`). A second runner on the same
  * home finds a live PID and stops with a clear message; a lock whose PID is
- * gone (a crash, a reboot) is stale and taken over.
+ * gone (a crash, a reboot) is stale and taken over. A native server's data
+ * folder is locked the same way, in its own file (`server.lock`).
  */
 
 export const LOCK_FILE = "runner.lock";
@@ -30,9 +31,9 @@ export function pidAlive(pid: number): boolean {
   }
 }
 
-export function readLock(home: string): LockInfo | null {
+export function readLock(home: string, file = LOCK_FILE): LockInfo | null {
   try {
-    const v = JSON.parse(readFileSync(path.join(home, LOCK_FILE), "utf8")) as Partial<LockInfo>;
+    const v = JSON.parse(readFileSync(path.join(home, file), "utf8")) as Partial<LockInfo>;
     if (typeof v.pid !== "number") return null;
     return {
       pid: v.pid,
@@ -48,11 +49,12 @@ export function readLock(home: string): LockInfo | null {
 export function acquireLock(
   home: string,
   mode: string,
-  opts: { pid?: number; alive?: (pid: number) => boolean } = {},
+  opts: { pid?: number; alive?: (pid: number) => boolean; file?: string } = {},
 ): LockResult {
   const pid = opts.pid ?? process.pid;
   const alive = opts.alive ?? pidAlive;
-  const file = path.join(home, LOCK_FILE);
+  const name = opts.file ?? LOCK_FILE;
+  const file = path.join(home, name);
   mkdirSync(home, { recursive: true, mode: 0o700 });
   const info: LockInfo = { pid, mode, startedAt: new Date().toISOString() };
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -67,18 +69,18 @@ export function acquireLock(
         ok: true,
         release: () => {
           // Only our own lock: a runner that took over a lock we thought stale keeps its own.
-          if (readLock(home)?.pid === pid) rmSync(file, { force: true });
+          if (readLock(home, name)?.pid === pid) rmSync(file, { force: true });
         },
       };
     } catch (err) {
       if (errnoCode(err) !== "EEXIST") throw err;
     }
-    const holder = readLock(home);
+    const holder = readLock(home, name);
     if (holder && holder.pid !== pid && alive(holder.pid)) return { ok: false, holder };
     // Stale (its process is gone), unreadable, or our own PID from before a restart: take it over.
     rmSync(file, { force: true });
   }
-  const holder = readLock(home);
+  const holder = readLock(home, name);
   return { ok: false, holder: holder ?? { pid: 0, mode: "", startedAt: "" } };
 }
 

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConectarRouteImport } from './routes/conectar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as OwnerRouteImport } from './routes/owner'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -71,6 +72,11 @@ const LoginRoute = LoginRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OwnerRoute = OwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
@@ -277,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -322,6 +329,7 @@ export interface FileRoutesByTo {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -367,6 +375,7 @@ export interface FileRoutesById {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -414,6 +423,7 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
+    | '/owner'
     | '/privacidade'
     | '/privacy'
     | '/reset-password'
@@ -459,6 +469,7 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
+    | '/owner'
     | '/privacidade'
     | '/privacy'
     | '/reset-password'
@@ -503,6 +514,7 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
+    | '/owner'
     | '/privacidade'
     | '/privacy'
     | '/reset-password'
@@ -549,6 +561,7 @@ export interface RootRouteChildren {
   ConectarRoute: typeof ConectarRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  OwnerRoute: typeof OwnerRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -591,6 +604,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/owner': {
+      id: '/owner'
+      path: '/owner'
+      fullPath: '/owner'
+      preLoaderRoute: typeof OwnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacidade': {
@@ -939,6 +959,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConectarRoute: ConectarRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  OwnerRoute: OwnerRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,

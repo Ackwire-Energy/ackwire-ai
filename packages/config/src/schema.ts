@@ -77,9 +77,14 @@ export const envVars = {
     section: "Server",
   },
   DATABASE_URL: {
-    schema: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
+    schema: z
+      .string()
+      .regex(
+        /^(postgres(ql)?:\/\/|pglite:\/\/\/)/,
+        "must be a postgres:// or postgresql:// URL, or pglite:/// and an absolute folder",
+      ),
     description:
-      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS.",
+      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS. Native mode (`agentes-server`, no Docker) sets it to `pglite:///<folder>`: the database built into the server, in that folder, for one process.",
     section: "Database",
     example: "postgres://agenteschat:password@db.example.com:5432/agenteschat?sslmode=require",
     secret: true,
@@ -107,6 +112,24 @@ export const envVars = {
     schema: z.stringbool().default(false),
     description:
       "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
+    section: "Sign-in",
+  },
+  OWNER_CLAIM_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner link's token)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the token in the owner link the setup prints. While no account exists, only that link (`/owner#claim=…`) creates the first account, the installation's owner; every other sign-up waits. Unset (an install by hand): the first account to sign up owns the installation.",
+    section: "Sign-in",
+  },
+  OWNER_KEY_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner key)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the key the agentes.chat desktop app keeps when it runs this server on the same computer. Only that key creates the first account (the owner, with no password), and the app signs that owner in with it again whenever the session ends. Set by the desktop app.",
     section: "Sign-in",
   },
   TERMS_URL: {
@@ -627,7 +650,7 @@ export const envVars = {
   DESKTOP_RELEASES_TOKEN: {
     schema: z.string().optional(),
     description:
-      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`). Unset: those endpoints answer 404.",
+      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases and the server's. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`), and the packages that run agentes.chat without Docker from the latest `v*` one (`/api/native/latest`, `/api/native/download/...`). Unset: those endpoints answer 404.",
     section: "Sandbox",
     secret: true,
   },
@@ -636,7 +659,8 @@ export const envVars = {
       .string()
       .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
       .default("agentes-chat/agentes.chat"),
-    description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
+    description:
+      "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app, and `v<version>` the packages without Docker.",
     section: "Sandbox",
   },
   OPERATOR_API_TOKEN: {

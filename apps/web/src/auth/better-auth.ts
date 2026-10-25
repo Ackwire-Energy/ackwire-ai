@@ -34,5 +34,6 @@ export function createBetterAuthClient(origin = window.location.origin): AuthCli
       const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
       return res.data?.signedIn === true;
     },
+    ownerClaim: async (input) => toResult((await client.$fetch("/owner-claim", { method: "POST", body: input })).error),
   };
 }

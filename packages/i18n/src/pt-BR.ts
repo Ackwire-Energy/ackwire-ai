@@ -113,6 +113,12 @@ export const ptBR = {
       sent: "Pronto. Mandei o link para {{email}}.",
       sentLead: "Vale por 1 hora. Não chegou em 1 minuto? Veja o spam.",
       openMail: "Abrir o {{app}}",
+      ownerWaits: "Este servidor espera o seu dono.",
+      ownerWaitsLead:
+        "Abra o link que o instalador mostrou no fim, neste computador ou no celular. Para ver de novo, rode o comando de instalação no servidor mais uma vez.",
+      noPassword: "Esta conta entra pelo app do agentes.chat.",
+      noPasswordLead:
+        "Abra o app no computador onde este servidor roda. Lá, no menu da sua conta, escolha Adicionar uma senha: aí você entra por aqui também.",
       backToSignIn: "Voltar para entrar",
     },
     desktop: {
@@ -138,6 +144,18 @@ export const ptBR = {
       expired: "Esse link expirou.",
       expiredLead: "Os links valem por 1 hora. Peça outro na tela de entrar.",
       askAgain: "Pedir outro link",
+    },
+    owner: {
+      title: "Configurar este servidor",
+      lead: "Crie a conta de dono. Depois você convida a sua equipe.",
+      create: "Criar a conta de dono",
+      noLink: "Abra o link do instalador",
+      noLinkLead:
+        "Esta página precisa do link que o instalador mostrou no fim. Para ver de novo, rode o comando de instalação no servidor mais uma vez.",
+      wrongLink: "Este link não é deste servidor.",
+      wrongLinkLead: "Abra o link mais recente que o instalador mostrou.",
+      taken: "Este servidor já tem dono.",
+      takenLead: "Entre com a sua conta.",
     },
   },
   invite: {
@@ -640,6 +658,11 @@ export const ptBR = {
     profileHint: "Nome, foto e @",
     openOnPhone: "Abrir no celular",
     openOnPhoneHint: "Entre no app com um QR code",
+    addPassword: "Adicionar uma senha",
+    addPasswordHint: "Para entrar por outros navegadores e aparelhos",
+    addPasswordText: "Com ela você também entra com o seu e-mail, de qualquer navegador.",
+    addPasswordLabel: "Nova senha",
+    addPasswordSaved: "Senha adicionada.",
     thisMonth: "Este mês",
     budgetOf: "Orçamento de {{name}}",
     yourWorkspaces: "Seus workspaces",

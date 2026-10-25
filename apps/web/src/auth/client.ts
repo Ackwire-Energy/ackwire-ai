@@ -21,4 +21,6 @@ export interface AuthClient {
   desktopRedeem(verifier: string): Promise<boolean>;
   /** In the app's window: a one-time sign-in from another device's link, traded once for a session of its own. */
   signInOneTime(token: string): Promise<AuthResult>;
+  /** The installation's owner, from the installer's link (`/owner#claim=`): made once, then signed in. */
+  ownerClaim(input: { token: string; name: string; email: string; password: string }): Promise<AuthResult>;
 }
