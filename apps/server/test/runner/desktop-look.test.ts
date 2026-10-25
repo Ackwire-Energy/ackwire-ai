@@ -125,6 +125,40 @@ test("the dock with docklike: Browser, Files and Terminal pinned, each app's win
   expect(dockPlugins(panel)).toEqual(["applicationsmenu-1", "separator-2", "docklike-7"]);
   expect(panel).not.toContain('value="launcher"');
   expect(panel).not.toContain('value="tasklist"');
+  // The whole panel, as the desktop reads it.
+  expect(panel).toBe(`<?xml version="1.0" encoding="UTF-8"?>
+
+<channel name="xfce4-panel" version="1.0">
+  <property name="configver" type="int" value="2"/>
+  <property name="panels" type="array">
+    <value type="int" value="1"/>
+    <property name="dark-mode" type="bool" value="false"/>
+    <property name="panel-1" type="empty">
+      <property name="position" type="string" value="p=0;x=640;y=869"/>
+      <property name="length" type="uint" value="1"/>
+      <property name="length-adjust" type="bool" value="true"/>
+      <property name="position-locked" type="bool" value="true"/>
+      <property name="size" type="uint" value="48"/>
+      <property name="icon-size" type="uint" value="32"/>
+      <property name="plugin-ids" type="array">
+        <value type="int" value="1"/>
+        <value type="int" value="2"/>
+        <value type="int" value="7"/>
+      </property>
+    </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="applicationsmenu">
+      <property name="button-icon" type="string" value="/home/ag-01a142cb/.local/share/agentes/mark.png"/>
+      <property name="show-button-title" type="bool" value="false"/>
+    </property>
+    <property name="plugin-2" type="string" value="separator">
+      <property name="style" type="uint" value="1"/>
+    </property>
+    <property name="plugin-7" type="string" value="docklike"/>
+  </property>
+</channel>
+`);
   expect(textOf(home, o, ".config/xfce4/panel/docklike-7.rc")).toBe(
     [
       "[user]",
