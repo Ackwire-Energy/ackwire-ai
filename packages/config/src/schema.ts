@@ -711,7 +711,7 @@ export const envVars = {
   INSTALL_MODE: {
     schema: z.enum(["docker", "native", "desktop"]).optional(),
     description:
-      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it. Unset: `docker` inside a container, else `native`.",
+      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it, and `agentes-server` (no Docker) when it isn't set. Unset: `docker` inside a container, else `native`.",
     section: "Usage report",
   },
   LOG_LEVEL: {

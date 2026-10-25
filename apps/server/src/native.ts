@@ -143,6 +143,7 @@ async function nativeEnv(dir: string, env: NodeJS.ProcessEnv = process.env) {
   for (const [key, value] of envEntries(readFileSync(files.env, "utf8"))) env[key] ??= value;
   env.PORT ??= String(NATIVE_PORTS.first);
   env.PUBLIC_URL ??= `http://127.0.0.1:${env.PORT}`;
+  env.INSTALL_MODE ??= "native";
   env.WEB_DIR ??= join(PACKAGE, "web");
   env.DATABASE_URL = `pglite://${files.db}`;
   env.FILES_DIR = files.files;
