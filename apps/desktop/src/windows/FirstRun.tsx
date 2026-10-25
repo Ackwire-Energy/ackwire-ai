@@ -50,6 +50,8 @@ export function FirstRun() {
   const [trail, setTrail] = useState<FirstScreen[]>([]);
   const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView } | null>(null);
   const linkSeq = useRef(0);
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
 
   const go = useCallback(
     (next: FirstScreen) => {
@@ -98,6 +100,9 @@ export function FirstRun() {
       const parsed = parseConnectLink(raw, { allowHttp: "loopback" });
       const list = await host.servers();
       setLink({ raw, parsed, view: linkView(parsed, "checking", list.current) });
+      // Cancel comes back to where the person was.
+      const from = screenRef.current;
+      if (from !== "link") setTrail((t) => [...t, from]);
       setScreen("link");
       if (!parsed) return;
       const check = await host.checkServer(parsed.server);
