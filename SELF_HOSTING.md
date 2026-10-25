@@ -155,7 +155,8 @@ one's container (Caddy or Tailscale), which `docker compose up` alone would leav
    web app, **Open on your phone** (**Abrir no celular** in Portuguese) in the account menu shows
    one that also signs you in. Or, on the app's sign-in screen, tap the server line
    (**Server: agentes.chat · Change**, or **Servidor: agentes.chat · Trocar**), then
-   **Scan QR code**, or type the address and tap **Use this server**.
+   **Scan QR code** (**Escanear QR code**), or type the address and tap **Use this server**
+   (**Usar este servidor**).
 4. The app shows your server's address. Confirm, then sign in (the web app's code signs you in by
    itself).
 
