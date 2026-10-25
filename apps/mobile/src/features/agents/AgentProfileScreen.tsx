@@ -249,7 +249,7 @@ function Profile({ id }: { id: string }) {
           ) : null}
           {waitingNow ? (
             <NowPill
-              leading={<Icon name="shield" size={15} color={c.amber} />}
+              leading={<Icon name="wait" size={15} color={c.amber} />}
               label={t("mobile.intentAgents.nowWaiting", { title: waitingNow.title })}
               onPress={() => router.push(`/approval/${waitingNow.id}`)}
             />

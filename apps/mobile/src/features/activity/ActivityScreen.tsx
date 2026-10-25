@@ -207,7 +207,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   );
 }
 
-const KIND_ICON = { approval: "shield", question: "help", forum: "chat", browser: "globe" } as const;
+const KIND_ICON = { approval: "wait", question: "help", forum: "chat", browser: "globe" } as const;
 
 /** Faces of the crew drawn over "Nada esperando você". */
 const CREW = 3;

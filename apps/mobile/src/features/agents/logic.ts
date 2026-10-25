@@ -324,7 +324,7 @@ export function dayWord(iso: string, now = new Date()): DayWord {
 /** One line of "O que fez por você": what to say (an i18n key under `mobile.intentAgents.did` + values), the icon, where it opens. */
 export interface DidLine {
   key: string;
-  icon: "issue" | "doc" | "code" | "shield" | "check" | "x" | "pen" | "chat" | "clock" | "hash";
+  icon: "issue" | "doc" | "code" | "wait" | "check" | "x" | "pen" | "chat" | "clock" | "hash";
   /** i18n key (relative to `mobile.intentAgents.did`) and its values for line 1. */
   title: { key: string; values: Record<string, string> };
   /** Line 2: a literal (a title) or an i18n key (relative to `mobile.intentAgents.did`). */
@@ -378,7 +378,7 @@ export function didLines(items: AgentForYouItem[] | undefined): DidLine[] {
       return [
         {
           key: `a:${a.id}`,
-          icon: a.waitingOnYou ? "shield" : a.status === "refused" ? "x" : "check",
+          icon: a.waitingOnYou ? "wait" : a.status === "refused" ? "x" : "check",
           title: { key: "approval", values: { title: a.title } },
           sub: sub ? { key: sub } : null,
           href: { kind: "approval", id: a.id },
