@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { mobileEn } from "../../../apps/mobile/src/i18n/keys.en";
+import { mobilePtBR } from "../../../apps/mobile/src/i18n/keys.pt-BR";
 import {
   appLink,
   appOnThisMachine,
@@ -33,11 +35,15 @@ import {
   PROBLEMS,
   parseOptions,
   planSteps,
+  privateStart,
   qrCode,
   quoteEnvValue,
   readTailscaleStatus,
   resolveChoice,
   secretEntries,
+  sshAddress,
+  sshTunnel,
+  sshUser,
   stopCommand,
   type ThisMachine,
   tailscaleKeyEntries,
@@ -53,6 +59,7 @@ import {
 const root = join(import.meta.dir, "../../..");
 const AUTH_KEY = "tskey-auth-kAbC123CNTRL-SECRETabc123";
 const CLIENT_SECRET = "tskey-client-kXyZ789CNTRL-SECRETxyz789";
+const SSH = { user: "ana", host: "203.0.113.7" };
 
 describe("options", () => {
   const parse = (argv: string[], env: Record<string, string> = {}) => parseOptions(argv, env);
@@ -779,6 +786,7 @@ describe("the end", () => {
       keyExpiry: null,
       choices,
       failed: null,
+      ssh: SSH,
     });
     expect(tailnet.link).toBe("agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net");
     expect(tailnet.result).toEqual({
@@ -801,6 +809,7 @@ describe("the end", () => {
       keyExpiry: null,
       choices,
       failed: null,
+      ssh: SSH,
     });
     expect(local.link).toBeNull();
     expect(local.result).toMatchObject({ appLink: null, phoneLink: null });
@@ -810,8 +819,15 @@ describe("the end", () => {
       fix: "Run it again.",
     };
     expect(
-      theEnd({ network: "tailscale", url: "https://agentes.tail1234.ts.net", app, keyExpiry: null, choices, failed })
-        .result,
+      theEnd({
+        network: "tailscale",
+        url: "https://agentes.tail1234.ts.net",
+        app,
+        keyExpiry: null,
+        choices,
+        failed,
+        ssh: SSH,
+      }).result,
     ).toMatchObject({ ok: false, ...failed, url: "https://agentes.tail1234.ts.net", appLink: tailnet.link });
     expect(
       theEnd({
@@ -822,6 +838,7 @@ describe("the end", () => {
         choices: null,
         first: ["Run it."],
         failed: null,
+        ssh: SSH,
       }),
     ).toMatchObject({ steps: expect.arrayContaining(["Run it."]), result: { ownerExists: null, health: null } });
   });
@@ -832,24 +849,76 @@ describe("the end", () => {
       url: "https://agentes.tail1234.ts.net",
       firstRun: true,
       keyExpiry: "2027-04-19T12:00:00Z",
+      ssh: SSH,
     });
     expect(steps[0]).toBe(
       "On a computer or phone signed in to your tailnet, open https://agentes.tail1234.ts.net and create your account: the first one owns this instance.",
     );
     expect(steps.join("\n")).toContain('"Disable Key Expiry", or it leaves your tailnet on 2027-04-19');
-    // The apps' English labels, with the Portuguese the phone may show.
-    expect(steps[1]).toContain('tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code"');
-    const local = nextSteps({ network: "local", url: "http://localhost:3001", firstRun: false, keyExpiry: null });
+    const local = nextSteps({
+      network: "local",
+      url: "http://localhost:3001",
+      firstRun: false,
+      keyExpiry: null,
+      ssh: SSH,
+    });
     expect(local).toEqual([
       "Open http://localhost:3001 and sign in.",
-      "On a server, open it from your computer through an SSH tunnel: ssh -L 3001:localhost:3001 you@your-server",
+      "On a server, open it from your computer through an SSH tunnel: ssh -L 3001:localhost:3001 ana@203.0.113.7",
     ]);
-    const proxy = nextSteps({ network: "proxy", url: "https://chat.example.com", firstRun: false, keyExpiry: null });
+    const proxy = nextSteps({
+      network: "proxy",
+      url: "https://chat.example.com",
+      firstRun: false,
+      keyExpiry: null,
+      ssh: SSH,
+    });
     expect(proxy[0]).toBe("Open https://chat.example.com and sign in.");
     expect(proxy[1]).toStartWith("Phone: point the camera at the QR code above");
     // An http proxy has no QR code to point at.
-    expect(nextSteps({ network: "proxy", url: "http://192.168.1.5:3000", firstRun: false, keyExpiry: null })).toEqual([
-      "Open http://192.168.1.5:3000 and sign in.",
+    expect(
+      nextSteps({ network: "proxy", url: "http://192.168.1.5:3000", firstRun: false, keyExpiry: null, ssh: SSH }),
+    ).toEqual(["Open http://192.168.1.5:3000 and sign in."]);
+  });
+
+  test("the phone app's sign-in screen, in the words it shows in English and in Portuguese", () => {
+    const labels = [mobileEn.auth.server, mobilePtBR.auth.server].flatMap((s) => [s.change, s.scan]);
+    const phone = [
+      nextSteps({ network: "tailscale", url: "https://a.tail1234.ts.net", firstRun: true, keyExpiry: null, ssh: SSH }),
+      nextSteps({ network: "domain", url: "https://chat.example.com", firstRun: false, keyExpiry: null, ssh: SSH }),
+    ].map((steps) => steps[1]);
+    for (const step of phone) for (const label of labels) expect(step).toContain(`"${label}"`);
+  });
+});
+
+describe("an SSH tunnel", () => {
+  test("as the person behind sudo, else this user, root as a last resort", () => {
+    expect(sshUser({ SUDO_USER: "ana", USER: "root" })).toBe("ana");
+    expect(sshUser({ USER: "ana", LOGNAME: "ana" })).toBe("ana");
+    expect(sshUser({ LOGNAME: "ana" })).toBe("ana");
+    expect(sshUser({})).toBe("root");
+  });
+
+  test("to the address the SSH session came in on, unless that one is behind NAT", () => {
+    expect(sshAddress("198.51.100.20 51234 203.0.113.7 22")).toBe("203.0.113.7");
+    expect(sshAddress("192.168.1.20 51234 192.168.1.50 22")).toBe("192.168.1.50");
+    expect(sshAddress("100.101.102.103 51234 100.64.0.5 22")).toBe("100.64.0.5");
+    expect(sshAddress("2001:db8::1 51234 2001:db8::7 22")).toBe("2001:db8::7");
+    // A cloud's 1:1 NAT: the session came in on a public address this server never sees.
+    expect(sshAddress("198.51.100.20 51234 172.31.5.6 22")).toBeNull();
+    expect(sshAddress(undefined)).toBeNull();
+    expect(sshAddress("")).toBeNull();
+    expect(sshTunnel("3000", { user: "ana", host: null })).toBe("ssh -L 3000:localhost:3000 ana@<server-address>");
+  });
+
+  test("a public domain starts privately: the owner's account through a tunnel to the domain, on the same port", () => {
+    const start = privateStart({ domain: "chat.example.com", port: "3000", user: "ana" });
+    expect(start.note).toBe(
+      "Starting agentes.chat privately first (docker compose up -d): chat.example.com goes live once your account exists. The first time downloads about 2 GB…",
+    );
+    expect(start.steps).toEqual([
+      "From your computer, open a tunnel to this server: ssh -L 3000:localhost:3000 ana@chat.example.com",
+      "Open http://localhost:3000 and create your account: the first one owns the instance. It has to be port 3000 on your computer too: until chat.example.com goes live, sign-up works only at that address.",
     ]);
   });
 });
@@ -862,7 +931,7 @@ describe("the plan", () => {
     commands: true,
   });
   const base: PlanInput = {
-    docker: "Docker 27.3.1 with Compose 2.29.7",
+    docker: null,
     questions: [],
     envExists: false,
     newSecrets: ["AGENTES_SECRET", "POSTGRES_PASSWORD"],
@@ -884,7 +953,6 @@ describe("the plan", () => {
 
   test("an empty directory on a tailnet: every step, in order", () => {
     expect(planSteps(base)).toEqual([
-      "Docker 27.3.1 with Compose 2.29.7",
       ".env: create it, readable by you only, with AGENTES_SECRET and POSTGRES_PASSWORD generated",
       "network: Tailscale, COMPOSE_PROFILES=tailscale, device name agentes",
       "Tailscale: show the admin console steps and ask for an auth key",
@@ -962,13 +1030,22 @@ describe("the plan", () => {
 
   test("a dry run lists the questions the real run asks", () => {
     const steps = planSteps({ ...base, questions: ["how people reach it", "email"] });
-    expect(steps[1]).toBe("asks: how people reach it; email");
+    expect(steps[0]).toBe("asks: how people reach it; email");
+  });
+
+  test("Docker is in the plan only when it's not fine: the run says it is, once, above the plan", () => {
+    expect(planSteps(base).some((s) => s.includes("Docker"))).toBe(false);
+    const missing = "Docker isn't installed. Install Docker: https://docs.docker.com/engine/install/";
+    expect(planSteps({ ...base, docker: missing })[0]).toBe(missing);
   });
 
   test("a public domain waits for the owner before going live", () => {
     const steps = planSteps({ ...base, network: "domain", domain: "chat.example.com" });
     expect(steps).toContain("network: public domain chat.example.com, HTTPS by Caddy on ports 80 and 443");
     expect(steps.some((s) => s.startsWith("owner: wait for the first account"))).toBe(true);
+    expect(steps).toContain(
+      "PUBLIC_URL: https://chat.example.com, COMPOSE_PROFILES=https, then wait for the certificate",
+    );
     const live = planSteps({
       ...base,
       network: "domain",
@@ -1010,7 +1087,7 @@ describe("the plan", () => {
   });
 
   test("inside the image, and without starting: the commands to run", () => {
-    const image = planSteps({ ...base, docker: null, image: true });
+    const image = planSteps({ ...base, image: true });
     expect(image[0]).toBe("Docker: not checked here (setup inside the image)");
     expect(image.at(-1)).toBe("start: print the commands to run (docker compose up -d) and how to finish");
     expect(planSteps({ ...base, start: false }).at(-1)).toBe(image.at(-1));

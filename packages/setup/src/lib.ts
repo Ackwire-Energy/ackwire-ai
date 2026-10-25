@@ -955,6 +955,53 @@ export const COMPUTER_PROBLEMS = {
   },
 } satisfies Record<string, Problem>;
 
+// ── An SSH tunnel ───────────────────────────────────────────────────────────
+
+/** Where an SSH tunnel to this server logs in: a user, and the domain or this server's address when known. */
+export interface SshTarget {
+  user: string;
+  host: string | null;
+}
+
+/** The user an SSH tunnel to this server logs in as: the person behind sudo, else this user, root as a last resort. */
+export const sshUser = (env: Record<string, string | undefined>) => env.SUDO_USER || env.USER || env.LOGNAME || "root";
+
+/** RFC 1918, Tailscale's 100.64.0.0/10, and IPv6 unique local and link-local addresses. */
+const PRIVATE_ADDRESS =
+  /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/i;
+
+/**
+ * This server's address as the SSH session running the setup reached it (SSH_CONNECTION is "client port
+ * server port"). Null without a session, and behind NAT, where a public client reached a private address it
+ * never typed.
+ */
+export function sshAddress(connection: string | undefined): string | null {
+  const [client, , server] = connection?.trim().split(/\s+/) ?? [];
+  if (!client || !server) return null;
+  return PRIVATE_ADDRESS.test(server) && !PRIVATE_ADDRESS.test(client) ? null : server;
+}
+
+/**
+ * The tunnel from the person's computer to the app on this server's localhost. The same port on both ends:
+ * the browser's address has to be PUBLIC_URL, http://localhost:<port>, the only origin the app accepts.
+ */
+export const sshTunnel = (port: string, to: SshTarget) =>
+  `ssh -L ${port}:localhost:${port} ${to.user}@${to.host ?? "<server-address>"}`;
+
+/**
+ * A public domain's first start: private (PUBLIC_URL http://localhost:<port>) until the owner's account
+ * exists, created through an SSH tunnel so nobody else can claim the instance; then the domain goes live.
+ */
+export function privateStart(p: { domain: string; port: string; user: string }) {
+  return {
+    note: `Starting agentes.chat privately first (docker compose up -d): ${p.domain} goes live once your account exists. The first time downloads about 2 GB…`,
+    steps: [
+      `From your computer, open a tunnel to this server: ${sshTunnel(p.port, { user: p.user, host: p.domain })}`,
+      `Open http://localhost:${p.port} and create your account: the first one owns the instance. It has to be port ${p.port} on your computer too: until ${p.domain} goes live, sign-up works only at that address.`,
+    ],
+  };
+}
+
 // ── The end ─────────────────────────────────────────────────────────────────
 
 /**
@@ -975,11 +1022,18 @@ export function theEnd(p: {
   choices: { computer: ComputerPlan["state"]; telemetry: OnOff } | null;
   first?: string[];
   failed: Problem | null;
+  ssh: SshTarget;
 }) {
   const link = hasAppLink(p.url) ? appLink(p.url) : null;
   const steps = [
     ...(p.first ?? []),
-    ...nextSteps({ network: p.network, url: p.url, firstRun: p.app?.firstRun ?? null, keyExpiry: p.keyExpiry }),
+    ...nextSteps({
+      network: p.network,
+      url: p.url,
+      firstRun: p.app?.firstRun ?? null,
+      keyExpiry: p.keyExpiry,
+      ssh: p.ssh,
+    }),
   ];
   return {
     link,
@@ -1004,7 +1058,7 @@ export function theEnd(p: {
 export const qrCode = (text: string) => renderUnicodeCompact(text, { border: 2 });
 
 export interface PlanInput {
-  /** "Docker 27.3.1 with Compose 2.29.7", or what's wrong and its fix. Null: not checked (inside the image). */
+  /** What's wrong with Docker, and its fix. Null when it's fine (the run says so above the plan) or not checked. */
   docker: string | null;
   /** What a run without --dry-run asks, when nothing else answers it. */
   questions: string[];
@@ -1050,7 +1104,8 @@ function telemetryStep(t: PlanInput["telemetry"]): string {
 /** What the setup is about to do, step by step: the --dry-run output and the live run say the same. */
 export function planSteps(p: PlanInput): string[] {
   const steps: string[] = [];
-  steps.push(p.docker ?? "Docker: not checked here (setup inside the image)");
+  if (p.image) steps.push("Docker: not checked here (setup inside the image)");
+  else if (p.docker) steps.push(p.docker);
   if (p.questions.length) steps.push(`asks: ${p.questions.join("; ")}`);
   steps.push(
     p.envExists
@@ -1103,7 +1158,7 @@ export function planSteps(p: PlanInput): string[] {
   } else if (p.network === "domain") {
     steps.push("start: docker compose up -d on localhost first, wait for /api/health");
     steps.push("owner: wait for the first account (through an SSH tunnel), so nobody else can take the instance");
-    steps.push("PUBLIC_URL: https://<domain>, COMPOSE_PROFILES=https, then wait for the certificate");
+    steps.push(`PUBLIC_URL: https://${p.domain ?? "<domain>"}, COMPOSE_PROFILES=https, then wait for the certificate`);
   } else {
     steps.push("start: docker compose up -d, wait for /api/health");
   }
@@ -1121,19 +1176,23 @@ export function planSteps(p: PlanInput): string[] {
   return steps;
 }
 
+/** The phone app's sign-in screen (apps/mobile i18n, `auth.server`): its English labels and the Portuguese ones. */
+const SCAN_IN_APP = `tap "Change" next to the server, then "Scan QR code" ("Trocar" and "Escanear QR code" in Portuguese)`;
+
 /** What the person does once the setup is done. */
 export function nextSteps(p: {
   network: Network;
   url: string;
   firstRun: boolean | null;
   keyExpiry: string | null;
+  ssh: SshTarget;
 }): string[] {
   const steps: string[] = [];
   const account = p.firstRun === false ? "sign in" : "create your account: the first one owns this instance";
   if (p.network === "tailscale") {
     steps.push(`On a computer or phone signed in to your tailnet, open ${p.url} and ${account}.`);
     steps.push(
-      `Phone: install Tailscale (${TS.download}), sign in to your tailnet, and install the agentes.chat app. Then point the camera at the QR code above, or on the app's sign-in screen tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code".`,
+      `Phone: install Tailscale (${TS.download}), sign in to your tailnet, and install the agentes.chat app. Then point the camera at the QR code above, or on the app's sign-in screen ${SCAN_IN_APP}.`,
     );
     steps.push(
       `People you invite need your tailnet too: invite them to it (${TS.users}, "Invite users"), or share this server with theirs (its … menu in ${TS.machines}, "Share").`,
@@ -1147,15 +1206,13 @@ export function nextSteps(p: {
     steps.push(`Open ${p.url} and ${account}.`);
     if (hasAppLink(p.url)) {
       steps.push(
-        `Phone: point the camera at the QR code above, or on the agentes.chat app's sign-in screen tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code".`,
+        `Phone: point the camera at the QR code above, or on the agentes.chat app's sign-in screen ${SCAN_IN_APP}.`,
       );
     }
   } else {
     const port = new URL(p.url).port || "80";
     steps.push(`Open ${p.url} and ${account}.`);
-    steps.push(
-      `On a server, open it from your computer through an SSH tunnel: ssh -L ${port}:localhost:${port} you@your-server`,
-    );
+    steps.push(`On a server, open it from your computer through an SSH tunnel: ${sshTunnel(port, p.ssh)}`);
   }
   return steps;
 }

@@ -66,12 +66,15 @@ import {
   type Problem,
   parseOptions,
   planSteps,
+  privateStart,
   qrCode,
   readTailscaleStatus,
   resolveChoice,
   SYSTEM_RUNNER_HOME,
   secretEntries,
   smtpUrlProblem,
+  sshAddress,
+  sshUser,
   stopCommand,
   TELEMETRY_TEXT,
   type ThisMachine,
@@ -540,12 +543,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   const choices: Choices = { computer, telemetry: telemetry.value };
 
   const plan = planSteps({
-    docker:
-      dockerCheck === null
-        ? null
-        : "label" in dockerCheck
-          ? dockerCheck.label
-          : `${dockerCheck.problem.error} ${dockerCheck.problem.fix}`,
+    docker: dockerCheck && "problem" in dockerCheck ? `${dockerCheck.problem.error} ${dockerCheck.problem.fix}` : null,
     questions,
     envExists: content !== null,
     newSecrets,
@@ -844,7 +842,7 @@ function printCommands(
       : image && network === "domain"
         ? [
             "docker compose up -d",
-            `Create your account first, through an SSH tunnel from your computer (ssh -L ${port}:localhost:${port} you@this-server, then open http://localhost:${port}): the first account owns the instance.`,
+            ...privateStart({ domain: domain as string, port, user: sshUser(process.env) }).steps,
             `Then in .env set PUBLIC_URL=https://${domain} and add https to COMPOSE_PROFILES, and run docker compose up -d.`,
           ]
         : [
@@ -997,15 +995,12 @@ async function waitForCertificate(opts: Options, ui: Ui, host: string) {
 async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choices: Choices): Promise<Result> {
   const url = `https://${domain}`;
   if (envValue(env.read(), "PUBLIC_URL") !== url) {
-    ui.note("Starting agentes.chat on this machine only (docker compose up -d). The first time downloads about 2 GB…");
+    const port = envValue(env.read(), "HOST_PORT") || "3000";
+    const { note, steps } = privateStart({ domain, port, user: sshUser(process.env) });
+    ui.note(note);
     await composeUp(ui);
     const app = await waitForApp(opts.timeout);
     if (app.firstRun) {
-      const port = envValue(env.read(), "HOST_PORT") || "3000";
-      const steps = [
-        `From your computer, open a tunnel to this server: ssh -L ${port}:localhost:${port} you@this-server`,
-        `Open http://localhost:${port} and create your account: the first one owns the instance.`,
-      ];
       if (!ui.interactive) {
         const again =
           choices.computer.state === "on"
@@ -1232,7 +1227,16 @@ async function finish(
       ui.fail(failed);
     }
   }
-  const end = theEnd({ network, url, app, keyExpiry, choices: choices ? results(choices) : null, first, failed });
+  const end = theEnd({
+    network,
+    url,
+    app,
+    keyExpiry,
+    choices: choices ? results(choices) : null,
+    first,
+    failed,
+    ssh: { user: sshUser(process.env), host: sshAddress(process.env.SSH_CONNECTION) },
+  });
   ui.write("");
   ui.write(`  ${url}`);
   if (end.link) {
