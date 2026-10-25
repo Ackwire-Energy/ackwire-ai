@@ -554,6 +554,16 @@ Commands run as the user that runs the runner, so give it a dedicated user or a 
 `agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
+On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
+installer's `--system` option (below) installs them; with the command above, install them once
+(Debian and Ubuntu names; on Debian 13 and Ubuntu 24.04, `libasound2t64` in place of `libasound2`):
+
+```sh
+sudo apt install --no-install-recommends libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
+  libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2
+```
+
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a
 hand (to sign in, say); and people can open a terminal there, a shell as the agent. Both need the
@@ -862,6 +872,11 @@ for the agents' desktops and terminals), HTTP/1.1 to the app, and a read timeout
 **An agent's desktop or terminal "isn't available on this computer".** Run `agentes-runner status` on
 that computer: its `Desktops` and `Terminal` lines say what is missing (the runner on Bun 1.3.5 or
 newer, the packages, or the switch), as in Agent computers above.
+
+**An agent's browser "is missing system libraries".** Chrome for Testing can't load them on that
+computer. The message names the first few and the runner's log all of them; install the packages
+under Agent computers above. On a computer installed with `--system`, running that same install
+command again installs them.
 
 **`extension "vector" is not available` at the first start.** The database is a Postgres without
 pgvector. Use the compose file's `pgvector/pgvector` image; on a database of your own, install
