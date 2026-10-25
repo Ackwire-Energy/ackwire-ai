@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, writeSync
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
+import { LOOK_MARKER, LOOK_SCRIPT, lookFiles, lookId } from "../../runner/desktop-look";
 import {
   DesktopSessions,
   type DesktopSessionsOptions,
@@ -34,11 +35,14 @@ interface FakeProc {
 }
 
 const commandOf = (p: FakeProc) =>
-  p.argv.map((a) => path.basename(a)).find((a) => a === "sh" || a === "Xtigervnc" || a === "dbus-launch");
+  p.argv.includes("agentes-look")
+    ? "agentes-look"
+    : p.argv.map((a) => path.basename(a)).find((a) => a === "sh" || a === "Xtigervnc" || a === "dbus-launch");
 
 /**
- * A computer with no X: the prepare script makes its folders, "Xtigervnc"
- * takes its display's lock and socket, and every process lives until killed.
+ * A computer with no X: the prepare script makes its folders, the look's
+ * script only answers, "Xtigervnc" takes its display's lock and socket, and
+ * every process lives until killed (`hangs`: the prepare's or the look's too).
  */
 function fakeComputer(lockDir: string) {
   const procs: FakeProc[] = [];
@@ -47,12 +51,16 @@ function fakeComputer(lockDir: string) {
   const kills: [number, string][] = [];
   let nextPid = 4000;
   let xvncFails: string | null = null;
+  let lookFails = false;
+  const files = new Set<string>();
+  const hangs = new Set<string>();
   const system: DesktopSystem = {
     platform: "linux",
     pty: true,
     runtime: "Bun 1.4.4",
     uid: 1000,
     which: (command) => `/usr/bin/${command}`,
+    exists: (file) => files.has(file),
     spawn(argv, opts) {
       let settle: (code: number | null) => void = () => undefined;
       const exited = new Promise<number | null>((resolve) => {
@@ -71,7 +79,11 @@ function fakeComputer(lockDir: string) {
       };
       procs.push(p);
       const command = commandOf(p);
-      if (command === "sh") {
+      if (hangs.has(command ?? "")) {
+        // held up: it ends only when killed
+      } else if (command === "agentes-look") {
+        queueMicrotask(() => p.exit(lookFails ? 1 : 0));
+      } else if (command === "sh") {
         for (const dir of argv.slice(-4, -2)) mkdirSync(dir, { recursive: true });
         queueMicrotask(() => p.exit(0));
       } else if (command === "Xtigervnc" && xvncFails !== null) {
@@ -104,6 +116,13 @@ function fakeComputer(lockDir: string) {
     failXvnc(message: string | null) {
       xvncFails = message;
     },
+    failLook(fails: boolean) {
+      lookFails = fails;
+    },
+    /** Files the computer has (`exists`). */
+    files,
+    /** Commands that never end by themselves ("sh": the prepare, "agentes-look"). */
+    hangs,
   };
 }
 
@@ -289,7 +308,7 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
 });
 
 test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settings file xfwm4 already wrote", async () => {
-  // The real script, with an xauth that only takes its cookie.
+  // The real scripts (the prepare and the look's), with an xauth that only takes its cookie.
   const bin = tempDir("desk-bin-");
   dirs.push(bin);
   writeFileSync(path.join(bin, "xauth"), "#!/bin/sh\ncat > /dev/null\n", { mode: 0o755 });
@@ -309,6 +328,10 @@ test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settin
   await desktops.ensure(dev);
   expect(readFileSync(settings, "utf8")).toContain('<property name="vblank_mode" type="string" value="off"/>');
   expect(readFileSync(path.join(xfconf, "xfce4-session.xml"), "utf8")).toContain('name="ssh-agent"');
+  // The look's own xfwm4 settings came after, the vblank still off.
+  expect(readFileSync(settings, "utf8")).toContain('name="margin_bottom"');
+  const home = path.join(t.folders, "dev", ".agentes", "home");
+  expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId("stock", home)}\n`);
 
   // xfwm4 writes every setting it has on its first start; the next start changes that one only.
   const own = [
@@ -328,6 +351,68 @@ test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settin
   await desktops.ensure(dev);
   expect(readFileSync(settings, "utf8")).toBe(own.replace('value="auto"', 'value="off"'));
   desktops.close();
+});
+
+test("the look: written as the agent into its desktop's HOME, after the prepare and before X starts", async () => {
+  const t = setup();
+  await t.desktops.ensure(dev);
+  const [prepare] = t.fake.of("sh");
+  const [look] = t.fake.of("agentes-look");
+  const [xvnc] = t.fake.of("Xtigervnc");
+  if (!prepare || !look || !xvnc) throw new Error("not started");
+  expect(t.fake.procs.indexOf(prepare)).toBeLessThan(t.fake.procs.indexOf(look));
+  expect(t.fake.procs.indexOf(look)).toBeLessThan(t.fake.procs.indexOf(xvnc));
+  const home = path.join(t.folders, "dev", ".agentes", "home");
+  const count = String(lookFiles(home, "stock").length);
+  expect(look.argv).toEqual([
+    "/bin/sh",
+    "-c",
+    LOOK_SCRIPT,
+    "agentes-look",
+    home,
+    lookId("stock", home),
+    LOOK_MARKER,
+    count,
+  ]);
+  expect(look.opts).toMatchObject({ cwd: "/", env: { HOME: home } });
+  expect(look.opts.input?.startsWith(".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml ")).toBe(true);
+  await t.desktops.stop(dev);
+
+  // A computer with Orchis and gdk-pixbuf's SVG loader gets its theme.
+  t.fake.files.add("/usr/share/themes/Orchis-Light/xfwm4/themerc");
+  t.fake.files.add("/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader_svg.so");
+  await t.desktops.ensure(dev);
+  expect(t.fake.of("agentes-look").at(-1)?.argv[5]).toBe(lookId("orchis", home));
+  t.desktops.close();
+});
+
+test("a look that can't be written never stops the desktop: it starts as its HOME has it", async () => {
+  const t = setup();
+  t.fake.failLook(true);
+  expect(await t.desktops.ensure(dev)).toMatchObject({ started: true });
+  expect(t.desktops.status(dev).running).toBe(true);
+  expect(t.logs.some((l) => l.includes("keeps the look its home has"))).toBe(true);
+  t.desktops.close();
+});
+
+test("a step before X that is held up (a pipe in the HOME, a hung disk) is stopped: never the agent's desktop", async () => {
+  const t = setup({ stepMs: 30 });
+  t.fake.hangs.add("agentes-look");
+  expect(await t.desktops.ensure(dev)).toMatchObject({ started: true });
+  const [look] = t.fake.of("agentes-look");
+  expect(t.fake.kills).toContainEqual([look?.pid ?? 0, "SIGTERM"]);
+  expect(t.logs).toContainEqual(expect.stringContaining("writing the agentes.chat look was stopped after 0.03 s"));
+  await t.desktops.stop(dev);
+
+  // The prepare held up: that start fails, the display is free again, and the next start goes on.
+  t.fake.hangs.clear();
+  t.fake.hangs.add("sh");
+  expect(await errorCode(() => t.desktops.ensure(dev))).toBe("internal");
+  const [, prepare] = t.fake.of("sh");
+  expect(t.fake.kills).toContainEqual([prepare?.pid ?? 0, "SIGTERM"]);
+  t.fake.hangs.clear();
+  expect(await t.desktops.ensure(dev)).toMatchObject({ display: 20, started: true });
+  t.desktops.close();
 });
 
 test("system mode: every process as the agent, and the password file root's (readable by the agent's group only)", async () => {
@@ -354,6 +439,8 @@ test("system mode: every process as the agent, and the password file root's (rea
   const t = setup({ user: async () => user, runDir });
   await t.desktops.ensure(dev);
   for (const p of t.fake.procs) expect(p.argv.slice(0, prefix.length)).toEqual(prefix);
+  // The look goes into the agent's own home, written by the agent.
+  expect(t.fake.of("agentes-look")[0]?.argv[prefix.length + 4]).toBe(home);
   const [xvnc] = t.fake.of("Xtigervnc");
   const passwd = path.join(runDir, "21001", "passwd");
   expect(flagValue(xvnc?.argv ?? [], "-PasswordFile")).toBe(passwd);

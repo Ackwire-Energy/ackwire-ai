@@ -24,7 +24,7 @@ export const pt = {
       },
       where: {
         q: "Onde o agente trabalha?",
-        a: "Num computador na nuvem ou no seu Mac, pelo app da barra de menus. Pastas do seu computador só com a sua liberação, e só se ampliam ali mesmo na máquina.",
+        a: "No computador do próprio workspace, na nuvem e sempre ligado, com um navegador só dele. Num servidor seu, também num Mac ou Linux que você conectar; pastas ali só com a sua liberação, dada nesse computador.",
       },
       data: {
         q: "O que acontece com os nossos dados?",
@@ -65,7 +65,7 @@ export const en: Widen<typeof pt> = {
       },
       where: {
         q: "Where does the agent work?",
-        a: "On a cloud computer or on your Mac, through the menu bar app. Folders on your computer only with your permission, and access only widens right there on the machine.",
+        a: "On your workspace's own computer in the cloud, always on, with a browser of its own. On a server you run yourself, also on a Mac or Linux computer you connect; folders there only with your permission, granted on that computer.",
       },
       data: {
         q: "What happens to our data?",

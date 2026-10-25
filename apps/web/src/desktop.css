@@ -12,8 +12,10 @@
   /* The window's close, minimize and zoom buttons. */
   --titlebar-lights: calc(78px / var(--app-zoom, 1));
 }
-/* Full screen: the buttons hide, so does their room. */
-html[data-fullscreen] {
+/* Full screen: the buttons hide, so does their room. Windows and Linux keep the system's own title bar. */
+html[data-fullscreen],
+html[data-desktop="windows"],
+html[data-desktop="linux"] {
   --titlebar-lights: 12px;
 }
 

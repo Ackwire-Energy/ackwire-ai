@@ -16,15 +16,21 @@ import {
   startVersionWatch,
   VERSION_CHECK_MS,
 } from "./lib/app-version";
-import { inDesktopApp } from "./lib/desktop";
+import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
 import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
 const i18n = await loadI18n(savedLocale());
 document.documentElement.lang = i18n.language;
-// In agentes for Mac (ADR 0036): the site draws the window's title bar (desktop.css).
-if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";
+// In the desktop app (ADR 0036): the site draws the window's title bar (desktop.css), with room for a Mac's
+// buttons only there; and "this Mac" is this computer's own name.
+const platform = desktopPlatform();
+if (platform) {
+  document.documentElement.dataset.desktop = platform;
+  applyDesktopDevice(i18n, platform);
+  if (asksForPhone(window.location.search)) askForPhone();
+}
 const toasts = createToastStore();
 const api = createApiClient();
 

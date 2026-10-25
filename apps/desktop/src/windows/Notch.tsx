@@ -19,9 +19,9 @@ import {
   notchStateOf,
   oldestStart,
 } from "../control/notch";
-import { siteOf } from "../control/server";
+import { homeServer } from "../control/server";
 import { type Home, pairedHomes } from "../control/store";
-import { agentOf, chosenServer } from "../hooks";
+import { agentOf } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
@@ -309,9 +309,8 @@ function HelpLine({ home, help, row }: { home: Home | undefined; help: NotchHelp
         variant="primary"
         onClick={(e) => {
           e.stopPropagation();
-          void host
-            .openExternal(siteLink(home?.status?.server, help.link, siteOf(home ? [home] : [], chosenServer())))
-            .catch(() => {});
+          const server = home ? homeServer(home) : null;
+          if (server) void host.openExternal(siteLink(server, help.link, server)).catch(() => {});
         }}
       >
         {t("desktop.notch.open")}

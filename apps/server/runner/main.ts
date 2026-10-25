@@ -43,7 +43,7 @@ import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, Runn
 import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
-import { HostComputer, readTokenFile, runnerChild } from "./host";
+import { defaultHostState, HostComputer, readTokenFile, runnerChild } from "./host";
 import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
@@ -90,8 +90,14 @@ Usage:
       This server's own computer (HOST_COMPUTER_TOKEN on the server, the same token here): one
       connection per organization of the person who installed the server, each agent as its own
       user on Linux (run it as root). Organizations come and go with the server, checked every minute.
-      --state    where it keeps each organization's connection (default: the home)
-      --no-exec  agents can't run commands here (files and uploads only)
+      --state    where it keeps each organization's connection (default: the home; on a Mac, <home>/host)
+      --no-exec  agents can't run commands here (Claude Code, Codex and the browser stay on)
+  agentes-runner host --once --server <url> --token-file <path> [--state <dir>] [--name <name>] [--rotate <orgId>]...
+      One sync for a program that runs the organizations' connections itself (the agentes.chat app):
+      writes them, every tool off, as this computer's user (Linux included), starts nothing, and prints
+      one JSON line: {"status", "homes": [{"orgId", "orgName", "machineId", "home", "new"}], "gone": [orgId]}.
+      --state    where it writes them (default: the home, on a Mac too, where the app keeps its own)
+      --rotate   asks for a new token for that organization's connection (the server refused its own)
   agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
       Runs host as this computer's service (Linux: the root unit, from boot; macOS: at login).
   agentes-runner update
@@ -101,7 +107,8 @@ Usage:
   agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...]
       Folders agents may use besides their own (an agent's handle, as on the site).
   agentes-runner tools [list | enable <tool> | disable <tool>]
-      Turns claude (Claude Code), codex (Codex) or commands on or off on this computer.
+      Turns claude (Claude Code), codex (Codex), commands, browser, desktop or terminal on or off on
+      this computer.
   agentes-runner desktop-check --agent <handle>
       Checks an agent's desktop and terminal here (Linux): starts its desktop, logs in to it as the
       person in control and as a watcher (who can't move the pointer), reads it and acts on it the
@@ -146,8 +153,9 @@ const VALUE_FLAGS = new Set([
   "token-file",
   "state",
   "enroll-file",
+  "rotate",
 ]);
-const LIST_FLAGS = new Set(["agent"]);
+const LIST_FLAGS = new Set(["agent", "rotate"]);
 
 function parseArgs(argv: string[]): Parsed {
   const positional: string[] = [];
@@ -420,10 +428,10 @@ async function worker(p: Parsed): Promise<number> {
 }
 
 const HOST_USAGE =
-  "Usage: agentes-runner host --server <url> --token-file <path> | --token-env <NAME> [--state <dir>] [--name <name>] [--no-exec]";
+  "Usage: agentes-runner host [--once] --server <url> --token-file <path> | --token-env <NAME> [--state <dir>] [--name <name>] [--no-exec] [--rotate <orgId>]...";
 
 /** `host`'s own flags, checked, for the command and for its service. */
-function hostFlags(p: Parsed) {
+function hostFlags(p: Parsed, defaultState = defaultHostState()) {
   const server = flagString(p, "server");
   const tokenFile = flagString(p, "token-file");
   const tokenEnv = flagString(p, "token-env");
@@ -432,7 +440,7 @@ function hostFlags(p: Parsed) {
     server: normalizeServerUrl(server),
     tokenFile: tokenFile === undefined ? undefined : path.resolve(expandHome(tokenFile)),
     tokenEnv,
-    state: path.resolve(expandHome(flagString(p, "state") ?? runnerHome())),
+    state: path.resolve(expandHome(flagString(p, "state") ?? defaultState)),
     name: flagString(p, "name"),
     exec: !p.flags.has("no-exec"),
   };
@@ -449,11 +457,14 @@ function hostRefusal(): string | null {
 
 /** `agentes-runner host`: this server's own computer (`host.ts`). */
 async function host(p: Parsed): Promise<number> {
-  const flags = hostFlags(p);
+  const once = p.flags.has("once");
+  // `--once` writes the homes the agentes app runs itself, and the app keeps those in the home on a Mac too.
+  const flags = once ? hostFlags(p, runnerHome()) : hostFlags(p);
   if (!flags) {
     console.error(HOST_USAGE);
     return 1;
   }
+  if (once) return hostOnce(flags, p.lists.get("rotate") ?? []);
   const refusal = hostRefusal();
   if (refusal) {
     console.error(refusal);
@@ -492,6 +503,34 @@ async function host(p: Parsed): Promise<number> {
     guard?.stop();
     lock.release();
   }
+}
+
+/**
+ * `host --once`: the sync of the desktop app, which runs the homes' runners itself. Single-user homes
+ * everywhere, so as the person on Linux too (system mode stays root's service).
+ */
+async function hostOnce(flags: NonNullable<ReturnType<typeof hostFlags>>, rotate: string[]): Promise<number> {
+  if (process.platform === "win32") {
+    console.error("The server's computer runs on Linux or macOS.");
+    return 1;
+  }
+  const envToken = flags.tokenEnv ? process.env[flags.tokenEnv]?.trim() || null : null;
+  const computer = new HostComputer({
+    server: flags.server,
+    token: () => (flags.tokenFile ? readTokenFile(flags.tokenFile) : envToken),
+    state: flags.state,
+    name: flags.name ?? os.hostname(),
+    system: false,
+    exec: false,
+    rotate,
+    // stdout is the one JSON line.
+    log: (line) => console.error(stamp(line)),
+    start: () => {
+      throw new Error("host --once starts nothing");
+    },
+  });
+  console.log(JSON.stringify(await computer.once()));
+  return 0;
 }
 
 /** `service install --host`: `agentes-runner host` as this computer's service (the token from a file). */

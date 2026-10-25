@@ -15,6 +15,7 @@ const server = () => {
 };
 
 const SUM = "a".repeat(64);
+const MANIFEST = '{"version":"1.4.0","pgMajor":18,"pglite":"0.5.8","files":{}}\n';
 const ASSETS = "https://api.github.com/repos/agentes-chat/agentes.chat/releases/assets";
 const asset = (name: string) => ({ name, url: `${ASSETS}/${name}` });
 const release = (version: string, extra: Record<string, unknown> = {}) => ({
@@ -37,6 +38,7 @@ function fakeGithub(releases: Record<string, unknown>[]) {
       const name = url.slice("https://signed.example/".length);
       if (name.endsWith(".sha256")) return new Response(`${SUM}  agentes.dmg\n`);
       if (name.endsWith(".sig")) return new Response("SIGNATURE-BASE64\n");
+      if (name.endsWith(".json")) return new Response(MANIFEST);
       const headers = { "content-type": "application/x-apple-diskimage", "content-length": "9" };
       return new Response("DMG-BYTES", { headers });
     }
@@ -140,6 +142,57 @@ test("update: Tauri's format for signed builds, 204 when the release has no upda
   expect((await server().app.request("/api/desktop/update?target=darwin&arch=x86_64")).status).toBe(204);
 });
 
+test("Windows and Linux: each platform's own files, from the newest release that has them", async () => {
+  const all = (v: string) => [
+    asset(`agentes_${v}_universal.dmg`),
+    asset(`agentes_${v}_universal.dmg.sha256`),
+    asset(`agentes_${v}_x64-setup.exe`),
+    asset(`agentes_${v}_x64-setup.exe.sha256`),
+    asset(`agentes_${v}_x64-setup.exe.sig`),
+    asset(`agentes_${v}_amd64.deb`),
+    asset(`agentes_${v}_amd64.deb.sha256`),
+    asset(`agentes_${v}_amd64.AppImage`),
+    asset(`agentes_${v}_amd64.AppImage.sha256`),
+    asset(`agentes_${v}_amd64.AppImage.sig`),
+  ];
+  // 0.4.0 was a Mac-only build: Windows and Linux keep 0.3.0.
+  const github = fakeGithub([release("0.4.0"), release("0.3.0", { assets: all("0.3.0") })]);
+  t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
+  const latest = async (query: string) => {
+    const res = await server().app.request(`/api/desktop/latest?${query}`);
+    return res.status === 200 ? ((await res.json()) as { version: string; url: string }) : res.status;
+  };
+  expect(await latest("target=darwin&arch=arm64")).toMatchObject({ version: "0.4.0" });
+  expect(await latest("target=windows&arch=x86_64")).toMatchObject({
+    version: "0.3.0",
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_x64-setup.exe",
+  });
+  // A deb is what a person downloads on Linux; the AppImage updates itself.
+  expect(await latest("target=linux&arch=x64")).toMatchObject({
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_amd64.deb",
+  });
+  expect(await latest("target=windows&arch=arm64")).toBe(404);
+  expect(await latest("target=freebsd&arch=x64")).toBe(404);
+
+  const update = async (query: string) => {
+    const res = await server().app.request(`/api/desktop/update?${query}`);
+    return res.status === 200 ? ((await res.json()) as { url: string; signature: string }) : res.status;
+  };
+  expect(await update("target=windows&arch=x86_64&current=0.2.0")).toMatchObject({
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_x64-setup.exe",
+    signature: "SIGNATURE-BASE64",
+  });
+  expect(await update("target=linux&arch=x86_64&current=0.2.0&bundle=appimage")).toMatchObject({
+    url: "http://localhost:3000/api/desktop/download/0.3.0/agentes_0.3.0_amd64.AppImage",
+  });
+  // A deb install can't take the AppImage (the updater would refuse it after the whole download): it downloads
+  // the new deb instead, and so does an app that doesn't say which it is.
+  expect(await update("target=linux&arch=x86_64&current=0.2.0&bundle=deb")).toBe(204);
+  expect(await update("target=linux&arch=x86_64&current=0.2.0")).toBe(204);
+  // The Mac's newest release has no updater bundle: nothing to install.
+  expect(await update("target=darwin&arch=aarch64&current=0.2.0")).toBe(204);
+});
+
 test("download streams an asset of a desktop-v* release, as an attachment; nothing else", async () => {
   const github = fakeGithub([release("0.2.0"), { tag_name: "v1.0.0", assets: [asset("secret.txt")] }]);
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
@@ -151,6 +204,40 @@ test("download streams an asset of a desktop-v* release, as an attachment; nothi
   expect((await server().app.request("/api/desktop/download/0.2.0/other.dmg")).status).toBe(404);
   expect((await server().app.request("/api/desktop/download/1.0.0/secret.txt")).status).toBe(404);
   expect((await server().app.request("/api/desktop/download/..%2F..%2Fx/a.dmg")).status).toBe(404);
+});
+
+test("native packages: the newest v* release's manifest and signature, never a desktop-v* one", async () => {
+  const nativeRelease = (version: string, extra: Record<string, unknown> = {}) => ({
+    tag_name: `v${version}`,
+    assets: [asset("native.json"), asset("native.json.sig"), asset(`agentes-native-${version}-linux-x64.tar.gz`)],
+    ...extra,
+  });
+  const github = fakeGithub([
+    release("9.0.0", { assets: [...release("9.0.0").assets, asset("native.json"), asset("native.json.sig")] }),
+    nativeRelease("1.5.0", { draft: true }),
+    nativeRelease("1.4.0"),
+    nativeRelease("1.3.0"),
+  ]);
+  const first = await createTestServer({ desktopFetch: github.fetch });
+  expect((await first.app.request("/api/native/latest")).status).toBe(404);
+  first.close();
+  expect(github.calls).toEqual([]);
+
+  t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
+  const res = await server().app.request("/api/native/latest");
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ version: "1.4.0", manifest: MANIFEST, signature: "SIGNATURE-BASE64" });
+  await server().app.request("/api/native/latest");
+  expect(github.calls.filter((c) => c.url.endsWith("/releases?per_page=30"))).toHaveLength(1);
+
+  const tarball = await server().app.request("/api/native/download/1.4.0/agentes-native-1.4.0-linux-x64.tar.gz");
+  expect(tarball.status).toBe(200);
+  expect(tarball.headers.get("content-disposition")).toBe(
+    'attachment; filename="agentes-native-1.4.0-linux-x64.tar.gz"',
+  );
+  // The desktop app's releases aren't the server's, and the other way round.
+  expect((await server().app.request("/api/native/download/9.0.0/native.json")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/download/1.4.0/native.json")).status).toBe(404);
 });
 
 test("reduce over HTTP: admins or the pairer, only removing or turning off", async () => {

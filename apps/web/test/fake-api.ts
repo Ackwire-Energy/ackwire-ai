@@ -34,6 +34,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SignInOptions,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -116,6 +117,8 @@ export interface FakeState {
   me: Me | null;
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
   authConfig?: Partial<AuthConfig>;
+  /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
+  signInOptions?: SignInOptions;
   /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
   phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
@@ -745,10 +748,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         landing: true,
         ...state.authConfig,
       }),
-      signInOptions: async () => ({ account: false, password: false, providers: [], canSignUp: true }),
+      signInOptions: async () =>
+        state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true },
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
+      },
+      addPassword: async (password) => {
+        log("account.addPassword", { password });
+        if (state.me) state.me.user.hasPassword = true;
       },
       phoneSignIn: async () => {
         log("account.phoneSignIn");

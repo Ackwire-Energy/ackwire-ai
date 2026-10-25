@@ -80,6 +80,34 @@ describe("the desktop as screen text", () => {
     expect(Object.keys(l.targets).sort()).toEqual(o.elements.map((e) => e.ref).sort());
   });
 
+  test("the agentes.chat dock (ADR 0058 §15): the mark's menu, the pinned apps, then a button for each window", () => {
+    // On the 1280×900 desktop with the look: Chrome in front, a terminal and Thunar behind, the mark's menu open.
+    const snap = fixture("dock");
+    const chrome = snap.windows.find((w) => w.class[1] === "Chromium-browser");
+    const l = desktopLook(snap, desktopRefs(), { browserPids: [chrome?.pid ?? 0] });
+    expect(l.snapshot.split("\n").slice(0, 13)).toEqual([
+      '- toolbar "Panel"',
+      '  - button "Applications" [pressed, ref=e1]',
+      '  - button "Files" [ref=e2]',
+      '  - button "Terminal" [ref=e3]',
+      '  - button "Wikipedia - Google Chrome for Testing" [window, active, ref=e4]',
+      '  - button "Terminal - agent@desktop: ~" [window, ref=e5]',
+      '  - button "agent - Thunar" [window, ref=e6]',
+      '- menu "Applications"',
+      '  - menuitem "Terminal Emulator" [ref=e7]',
+      '  - menuitem "File Manager" [ref=e8]',
+      '  - menu "Settings" [ref=e9]',
+      '  - menu "Accessories" [ref=e10]',
+      '  - menu "System" [ref=e11]',
+    ]);
+    // Log Out is out of the menu; the dock's buttons for windows stand for them.
+    expect(l.snapshot).not.toContain("Log Out");
+    const thunar = snap.windows.find((w) => w.class[1] === "Thunar");
+    expect(l.targets.e6).toMatchObject({ role: "button", app: "xfce4-panel", xid: thunar?.xid });
+    expect(l.targets.e2).toMatchObject({ role: "button", app: "xfce4-panel" });
+    expect(l.targets.e2?.xid).toBeUndefined();
+  });
+
   test("what the runner keeps to act: the element on the bus, its window, the window a button stands for", () => {
     const snap = fixture("menu");
     const l = look(snap);

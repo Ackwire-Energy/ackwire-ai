@@ -51,18 +51,27 @@ describe("live consultations (agent.consulting / agent.consulted)", () => {
     expect(s["r-dev"]).toBeUndefined();
   });
 
-  test("a word while asking doesn't drop it; the final message, a failure or a stop do", () => {
+  test("ask_agent never waits: the asking turn's message and its ending keep the line until the answer", () => {
     const asking = applyConsultEvent({}, ev({ type: "agent.consulting", consultedAgentId: "infra" }), 0);
     expect(applyConsultEvent(asking, ev({ type: "agent.delta", seq: 0, text: "x" }), 1)["r-dev"]).toBeDefined();
+    // "Perguntei pro Infra… te aviso quando ele responder."
     const created = {
       type: "message.created",
       channelId: "c",
       messageId: "m9",
       message: { agentRunId: "r-dev", channelId: "c", author: { type: "agent", id: "dev" } } as Message,
     } as ChannelEvent;
-    expect(applyConsultEvent(asking, created, 2)["r-dev"]).toBeUndefined();
-    expect(applyConsultEvent(asking, ev({ type: "run.finished", status: "failed" }), 2)["r-dev"]).toBeUndefined();
-    expect(applyConsultEvent(asking, ev({ type: "run.canceled" }), 2)["r-dev"]).toBeUndefined();
+    expect(applyConsultEvent(asking, created, 2)["r-dev"]?.status).toBe("asking");
+    for (const status of ["done", "failed", "canceled"])
+      expect(applyConsultEvent(asking, ev({ type: "run.finished", status }), 2)["r-dev"]?.status).toBe("asking");
+    expect(applyConsultEvent(asking, ev({ type: "run.canceled" }), 2)["r-dev"]?.status).toBe("asking");
+    // Once back, the turn's ending drops it.
+    const answered = applyConsultEvent(
+      asking,
+      ev({ type: "agent.consulted", consultedAgentId: "infra", status: "answered" }),
+      3,
+    );
+    expect(applyConsultEvent(answered, ev({ type: "run.finished", status: "done" }), 4)["r-dev"]).toBeUndefined();
     // Back with an answer, then another tool: the line says that tool now.
     const back = applyConsultEvent(
       asking,

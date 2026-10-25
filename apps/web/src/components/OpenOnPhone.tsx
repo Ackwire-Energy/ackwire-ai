@@ -66,7 +66,7 @@ function PhoneCode() {
     <div className="phone-code">
       <div className="phone-code__qr">
         {code.data ? (
-          <QrCode text={connectLink(code.data.server, code.data.token)} label={t("openOnPhone.qr")} />
+          <QrCode text={connectLink(code.data.server, { token: code.data.token })} label={t("openOnPhone.qr")} />
         ) : null}
       </div>
       {code.data && (

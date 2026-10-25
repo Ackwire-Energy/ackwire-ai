@@ -2,6 +2,7 @@ import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
+import composeFile from "../../../docker-compose.yml" with { type: "text" };
 import installScript from "../../../install.sh" with { type: "text" };
 import { registerAppLinks } from "./app-links";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
@@ -44,7 +45,12 @@ import { storageRoutes } from "./routes/app/storage";
 import { telemetryRoutes } from "./routes/app/telemetry";
 import { threadRoutes } from "./routes/app/threads";
 import { wikiRoutes } from "./routes/app/wiki";
-import { createDesktopReleases, registerDesktopRoutes } from "./routes/desktop";
+import {
+  createDesktopReleases,
+  createNativeReleases,
+  registerDesktopRoutes,
+  registerNativeRoutes,
+} from "./routes/desktop";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
@@ -82,10 +88,12 @@ export interface AppOptions {
  * - `/api/git/*`          git proxy for agents' computers (their own credential, ADR 0024)
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
+ * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
+ * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -163,6 +171,15 @@ export function createApp(options: AppOptions) {
         fetch: deps.extras?.desktopFetch,
       }),
     );
+    registerNativeRoutes(
+      api,
+      deps,
+      createNativeReleases({
+        token: deps.config.DESKTOP_RELEASES_TOKEN,
+        repo: deps.config.DESKTOP_RELEASES_REPO,
+        fetch: deps.extras?.desktopFetch,
+      }),
+    );
     if (deps.config.LANDING_PAGE) registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
@@ -200,6 +217,10 @@ export function createApp(options: AppOptions) {
       c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
     );
   }
+  // The setup downloads it into a folder that has none: this release's, from any instance.
+  app.get("/install/docker-compose.yml", (c) =>
+    c.body(composeFile, 200, { "content-type": "application/yaml; charset=utf-8", "cache-control": "no-store" }),
+  );
 
   if (options.webDir) {
     const assets = serveStatic({ root: options.webDir });

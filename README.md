@@ -27,16 +27,17 @@ Cloud: both run this same codebase.
 | Tasks | ✅ | A board with your own columns. A task given to an agent moves on its own as the agent starts and opens a pull request, with its current step in view. |
 | Forum | ✅ | For a decision that needs several views: agents and people post in rounds, and a synthesis lands in the Drive. |
 | Notifications | ✅ | One inbox for mentions, replies, approvals and agents' questions, grouped, with push on the phone app. |
-| Agent computers | ✅ | Agents run commands and code on a cloud computer (Daytona, with `DAYTONA_API_KEY`) or on a server, VM or laptop you connect with the runner. |
+| Agent computers | ✅ | Agents run commands and code on a cloud computer (Daytona, with `DAYTONA_API_KEY`), on a server, VM or laptop you connect with the runner, or on the server itself (the setup makes it the agents' computer by default). |
 | Agent browser | Beta | On connected computers, agents open sites, fill in forms and read pages through `agent-browser`. Watch it live in the chat, on the agent's page or in the phone app, take over for a login or a captcha (or to open a site yourself), and hand it back with a note. |
 | Claude Code and Codex | ✅ | On a connected computer, an agent can think with Claude Code or Codex, on the plan signed in there, instead of through the API. Codex is still in testing. |
 | Postgres connector | Beta | Agents query your database with SQL, read-only: one parsed statement in a read-only transaction, with time and row limits. |
 | Agent mailboxes | Beta | Agents read, draft and send from mailboxes the organization connects: Gmail and Outlook through Composio, any other over IMAP/SMTP. Sending asks for approval by default. |
 | Phone app | Beta | iPhone and Android (Expo), on agentes.chat Cloud or your own instance: scan the QR code from "Open on your phone" in the web app, which signs you in, or change the server on the sign-in screen. |
-| Desktop app (macOS) | Beta | A menu bar app that connects your Mac as an agent computer, to agentes.chat Cloud or your own instance. |
+| Desktop app (macOS, Windows, Linux) | Beta | agentes.chat Cloud in a window of its own, with nothing running on your computer; or your own server: connect to it (by address, by what the app finds, or by the link the setup prints) or run agentes.chat on this computer with no Docker (Mac and Linux). On your own server, its agents can also work on that Mac or Linux computer, after the app asks. |
 | Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from OpenClaw, Hermes Agent, OpenBot.Run, Paperclip, OpenMausBot, OpenBot or another agentes.chat workspace, as a file, a folder, an archive or a GitHub link; other apps answer an export prompt. A preview comes first; skills arrive off, routines paused, and keys never. A workspace exports as one file. |
 | English and Portuguese | ✅ | The whole app in English and Brazilian Portuguese. |
 | Self-host (Docker) | ✅ | One command (`curl -fsSL https://agentes.chat/install \| sh`) and one compose file: the app and Postgres with pgvector, migrations on boot, and private HTTPS on your Tailscale network, or a public domain with Caddy. |
+| Self-host without Docker | Beta | `agentes-server`: one program with its database built in, for a person or a small team, or the desktop app's Run agentes.chat on this computer. |
 
 ## Run it
 

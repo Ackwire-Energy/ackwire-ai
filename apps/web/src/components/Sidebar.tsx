@@ -63,13 +63,14 @@ import {
   onMenuLookChange,
   setMenuLook,
 } from "@/lib/context-menu";
-import { inDesktopApp } from "@/lib/desktop";
+import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { markOpen } from "@/lib/perf";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
+import { AddPasswordDialog } from "./AddPassword";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
@@ -788,6 +789,15 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
+  const [addPassword, setAddPassword] = useState(false);
+  // The app's "Show QR code" for this server (Preferences › Servers).
+  useEffect(() => {
+    if (takePhoneAsk()) setPhone(true);
+    return onPhoneAsk(() => {
+      takePhoneAsk();
+      setPhone(true);
+    });
+  }, []);
   const mine = dir.memberById.get(me.user.id);
   const photo = mine?.image ?? me.user.image;
   const zone = mine?.timezone || browserTimezone() || "UTC";
@@ -858,6 +868,15 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
           >
             {t("shell.openOnPhone")}
           </MenuOverlayItem>
+          {me.user.hasPassword === false && (
+            <MenuOverlayItem
+              icon="key"
+              description={t("shell.addPasswordHint")}
+              onSelect={pick(() => setAddPassword(true))}
+            >
+              {t("shell.addPassword")}
+            </MenuOverlayItem>
+          )}
           <MenuOverlayRow icon="bulb" label={t("shell.theme")}>
             <Segmented
               size="sm"
@@ -929,6 +948,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
+      <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
     </>
   );
 }

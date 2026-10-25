@@ -2,6 +2,7 @@ import type { ControlAgent, ControlStatus } from "@agenteschat/adapters/runner-c
 import {
   type AgentState,
   Avatar,
+  Button,
   Chip,
   ComputerPortrait,
   type ComputerState,
@@ -11,8 +12,59 @@ import {
   type IconName,
   normalizeAppearance,
 } from "@agenteschat/ui";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/**
+ * A command to copy, with Copy turning into Copied. `inline`: a short one inside a line of text, with an icon
+ * button (a row that has no room for a box of its own).
+ */
+export function CommandCopy({ command, inline = false }: { command: string; inline?: boolean }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  const copy = () =>
+    void navigator.clipboard
+      .writeText(command)
+      .then(() => setCopied(true))
+      .catch(() => {});
+  if (inline) {
+    return (
+      <span className="dk-fr__cmd dk-fr__cmd--inline">
+        <code>{command}</code>
+        <button
+          type="button"
+          className="dk-iconbtn"
+          aria-label={copied ? t("desktop.common.copied") : t("desktop.common.copy")}
+          onClick={copy}
+        >
+          <Icon name={copied ? "check" : "copy"} size={14} />
+        </button>
+      </span>
+    );
+  }
+  return (
+    <div className="dk-fr__cmd">
+      {/* Breaks only between words: a flag like `--network` never splits (selecting it copies the same text). */}
+      <code>
+        {command.split(" ").map((word, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, in order
+          <span key={i}>
+            {i > 0 && " "}
+            <span className="dk-fr__word">{word}</span>
+          </span>
+        ))}
+      </code>
+      <Button size="sm" icon={copied ? "check" : "copy"} onClick={copy}>
+        {copied ? t("desktop.common.copied") : t("desktop.common.copy")}
+      </Button>
+    </div>
+  );
+}
 
 /**
  * An organization's tile: its logo when it has one (a `data:` URL from the runner), otherwise its
@@ -80,23 +132,6 @@ export function BrandFace({ size = "sm", state }: { size?: "xs" | "sm" | "md" | 
 /** This Mac's portrait: the screen lit, dimmed (paused) or dark (offline). */
 export function MacPortrait({ state, size = 48 }: { state: ComputerState; size?: 48 | 96 | 144 }) {
   return <ComputerPortrait kind="mac" state={state} size={size} />;
-}
-
-/** The device code, `K7Q·4ZP`, in Doto. */
-export function CodeDigits({ code }: { code: string }) {
-  const { t } = useTranslation();
-  const clean = code.replace(/[^0-9A-Z]/gi, "").toUpperCase();
-  return (
-    <span
-      className="dk-code"
-      role="img"
-      aria-label={t("desktop.welcome.codeAria", { code: clean.split("").join(" ") })}
-    >
-      {clean.slice(0, 3)}
-      <span className="dk-code__dot">·</span>
-      {clean.slice(3)}
-    </span>
-  );
 }
 
 /** A number with − and + (custom, never a native input). */

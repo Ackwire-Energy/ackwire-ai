@@ -28,9 +28,12 @@ export function createBetterAuthClient(origin = window.location.origin): AuthCli
     },
     desktopHandoff: async (challenge) =>
       toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { challenge } })).error),
+    signInOneTime: async (token) =>
+      toResult((await client.$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })).error),
     desktopRedeem: async (verifier) => {
       const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
       return res.data?.signedIn === true;
     },
+    ownerClaim: async (input) => toResult((await client.$fetch("/owner-claim", { method: "POST", body: input })).error),
   };
 }

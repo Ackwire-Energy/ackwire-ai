@@ -57,7 +57,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenComputer } from "@/components/computer/open";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { OpenPrefsButton, ThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
@@ -181,7 +181,8 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
   const otherId = useId();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const release = latest.data ?? null;
-  const app = inDesktopApp() && !download;
+  // In the app where agents may work on this computer: "Use this Mac" in place of the download.
+  const app = useAgentsHere() && !download;
   return (
     <div className="machine-connect">
       <p className="small muted" style={{ margin: 0 }}>
@@ -559,6 +560,7 @@ export function MachinesSection() {
   const { org } = useOrg();
   const machines = useMachines(org.id);
   const canPair = can(org.role, "post");
+  const agentsHere = useAgentsHere();
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
   // This server's computer and the workspace's own have cards of their own: this list is people's.
@@ -585,7 +587,7 @@ export function MachinesSection() {
             <span className="computers-empty__text">
               <b>{t("computers.other.emptyTitle")}</b>
               <span className="small muted">
-                {inDesktopApp() ? t("machines.thisMac.emptyText") : t("computers.other.emptyText")}
+                {agentsHere ? t("machines.thisMac.emptyText") : t("computers.other.emptyText")}
               </span>
             </span>
           </div>

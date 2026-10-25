@@ -23,6 +23,8 @@ export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
   firstRun: boolean;
+  /** No account yet, and the first one only through the owner link (`/owner#claim=…`; absent: false). */
+  ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
   /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
@@ -59,6 +61,8 @@ export interface Instance {
   url: string;
   signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
   signup: "open" | "invite";
+  /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
+  ownerClaim?: boolean;
 }
 
 /** "Abrir no celular": a sign-in for the phone, single use, a few minutes long. */
@@ -75,6 +79,8 @@ export interface User {
   name: string;
   email: string;
   image: string | null;
+  /** Signs in with a password (false: only Google or Apple, or the desktop app that runs the server). */
+  hasPassword?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
@@ -393,6 +399,18 @@ export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "fa
 export type WaitMessageOutcome = "resolved" | "woke" | "held";
 
 /** A run the server still considers active in a channel (`GET …/channels/{id}/active-runs`). */
+/** A question an agent asked from a conversation, still out (`GET …/active-runs`): the working line's "asking…". */
+export interface OpenConsult {
+  /** The asking run (it may have ended: the answer wakes the agent). */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  channelId: string;
+  threadId: string;
+  /** When the question went out (ISO). */
+  since: string;
+}
+
 export interface ActiveRun {
   runId: string;
   agentId: string;

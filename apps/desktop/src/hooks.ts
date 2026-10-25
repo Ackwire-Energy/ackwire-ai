@@ -1,7 +1,7 @@
 import type { ControlAgent } from "@agenteschat/adapters/runner-control";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHost } from "./app";
-import { SERVER_PREF, serverFromPref } from "./control/server";
+import { type LocalServerStatus, NO_SERVER } from "./control/local-server";
 import type { Home } from "./control/store";
 import {
   CHECK_EVERY_MS,
@@ -51,13 +51,14 @@ export function useUpdateCheck(auto: boolean): UpdateCheck {
   const [failed, setFailed] = useState(false);
   const version = info?.version ?? null;
   const arch = info?.arch ?? null;
+  const os = info?.os ?? null;
 
   const check = useCallback(async (): Promise<UpdateState | null> => {
-    if (!version || !arch) return null;
+    if (!version || !arch || !os) return null;
     setChecking(true);
     setFailed(false);
     try {
-      const res = await fetch(latestUrl(arch), { headers: { accept: "application/json" } });
+      const res = await fetch(latestUrl(os, arch), { headers: { accept: "application/json" } });
       // 404: no release published yet (or the server can't read them): nothing to offer.
       const found = res.ok ? parseLatest(await res.json()) : null;
       if (!res.ok && res.status !== 404) throw new Error(String(res.status));
@@ -70,7 +71,7 @@ export function useUpdateCheck(auto: boolean): UpdateCheck {
     } finally {
       setChecking(false);
     }
-  }, [version, arch]);
+  }, [version, arch, os]);
 
   useEffect(() => {
     if (!auto || !version) return;
@@ -80,6 +81,25 @@ export function useUpdateCheck(auto: boolean): UpdateCheck {
   }, [auto, version, check]);
 
   return { state: updateStateOf(version ?? "0.0.0", latest), checkedAt, checking, failed, check, version };
+}
+
+/** The server here (`local_server.rs`), kept current. */
+export function useLocalServer(): LocalServerStatus {
+  const host = useHost();
+  const [local, setLocal] = useState<LocalServerStatus>(NO_SERVER);
+  useEffect(() => {
+    let live = true;
+    host
+      .localServer()
+      .then((s) => live && setLocal(s))
+      .catch(() => {});
+    const off = host.onLocalServer(setLocal);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [host]);
+  return local;
 }
 
 /** Runs `fn` whenever the shell brings this window up. */
@@ -143,6 +163,3 @@ export function writePref<T>(key: string, value: T) {
     // ignore
   }
 }
-
-/** The server the next sign-in goes to ("Seu servidor"); agentes.chat until one is chosen. */
-export const chosenServer = () => serverFromPref(readPref<string | null>(SERVER_PREF, null));

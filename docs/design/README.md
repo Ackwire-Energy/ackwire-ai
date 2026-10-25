@@ -9,6 +9,7 @@ Fonte de verdade visual para o frontend.
 - `design-system/bundle.css`: estilos de referência dos componentes (classes `ac-*`).
 - `design-system/<Componente>.md`: diretrizes por componente.
 - `icons/`: ícones próprios (grid 20px, traço 1.6) e o símbolo do logo.
+- `desktop/`: o papel de parede dos desktops dos agentes (`render.sh` gera os PNGs que o runner leva, ADR 0058 §15).
 
 ## Regras que não podem quebrar
 - Azul (`agent`) só na identidade dos agentes: avatar, símbolo do logo, anel de "trabalhando", cursor de streaming.

@@ -41,18 +41,11 @@ export const isPairedHome = (h: Home) => h.status?.paired === true;
 export const orgName = (h: Home) => h.status?.org?.name ?? "";
 
 /**
- * The organization refused this Mac (it was removed there, or its token revoked or
- * taken over): "Reconectar este Mac" pairs that home again as the same computer.
+ * The organization refused this computer (it was removed there, or its token revoked or taken over):
+ * "Reconnect this Mac" opens its Computers settings, where pairing again brings that home back as the same
+ * computer.
  */
 export const isRefusedHome = (h: Home) => isPairedHome(h) && h.status?.connection === "refused";
-
-/** Popover → Welcome: the home "Reconectar este Mac" was clicked for (a pref, read once). */
-export const RECONNECT_PREF = "reconnectHome";
-
-/** The paired home `id` names (Welcome reconnects it); undefined when it is gone. */
-export function reconnectTarget(snap: Snapshot, id: unknown): Home | undefined {
-  return typeof id === "string" && id ? snap.homes.find((h) => h.homeId === id && isPairedHome(h)) : undefined;
-}
 
 /** Paired homes, sorted by organization name (the order everything is shown in). */
 export function pairedHomes(snap: Snapshot): Home[] {

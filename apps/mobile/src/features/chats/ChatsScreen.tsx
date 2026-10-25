@@ -11,7 +11,7 @@ import { SetupNotice } from "../computer/SetupWait";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { useConversations, useWorkingNow } from "../shared/queries";
+import { useActiveWork, useConversations, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
@@ -46,6 +46,8 @@ export function ChatsScreen() {
   const dir = useDirectory();
   const list = useConversations();
   const work = useWorkingNow();
+  // A run that stops on your ok hasn't finished: "terminou" is told from all the work, waiting included.
+  const active = useActiveWork();
   const waiting = useWaitingItems();
   const { collapsed, toggle } = useCollapsedSections();
   const [waitOpen, setWaitOpen] = useState(false);
@@ -62,7 +64,7 @@ export function ChatsScreen() {
   const working = workByAgent(work)
     .map((w) => w.agentId)
     .filter((id) => dir.agentById.has(id) && !offline.has(id));
-  const finished = useFinished(work, list.rows);
+  const finished = useFinished(active, list.rows);
   const agentStates = useAgentRowStates(list.rows, work, waiting.items, offline);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
   const sections = homeSections(list.rows);

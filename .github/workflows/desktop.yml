@@ -1,16 +1,18 @@
 name: Desktop
 
-# The macOS app (ADR 0036): compile the runner for both architectures, fetch the pinned agent-browser
-# (ADR 0040), build a universal .app + .dmg
-# with Tauri, signed with our Developer ID and notarized, plus the updater bundle
-# signed with the updater key. Started by hand on a `desktop-v*` tag, it publishes a GitHub Release with
-# `agentes_<version>_universal.dmg`, its `.sha256`, `…universal.app.tar.gz` and its `.sig`
-# (the server reads those names).
-# Testing means installing this build.
-# macOS runners cost about 10x Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
-# Run by hand on main with `release` = fix/feature/major: bumps the version (patch/minor/major) in
-# tauri.conf.json, package.json, Cargo.toml and Cargo.lock, commits and tags `desktop-v<version>` on main,
-# then builds and publishes the release. `none` only builds the current version as an artifact.
+# The desktop app for macOS, Windows and Linux. Started by hand on main with `release` = fix/feature/major: one
+# job bumps the version (patch/minor/major) in tauri.conf.json, package.json and Cargo.toml, commits and tags
+# `desktop-v<version>` on main; three jobs build it (macOS universal, signed with our Developer ID and
+# notarized; Windows NSIS; Linux AppImage and deb), each with the updater bundle signed with the updater key;
+# one job publishes every file in the GitHub Release (the server reads those names, apps/server
+# routes/desktop.ts):
+#   macOS    agentes_<v>_universal.dmg (+ .sha256), agentes_<v>_universal.app.tar.gz (+ .sig)
+#   Windows  agentes_<v>_x64-setup.exe (+ .sha256, + .sig: the installer is its own updater bundle)
+#   Linux    agentes_<v>_amd64.deb (+ .sha256), agentes_<v>_amd64.AppImage (+ .sha256, + .sig)
+# The macOS and Linux apps carry the runner and agent-browser (ADR 0040), and the server's own files, built
+# from the same commit, for "Run agentes.chat on this computer" (ADR 0066; tauri.native.conf.json adds them to
+# the resources); Windows carries none of them (no agents or server on a Windows computer yet). `none` only builds the current version as artifacts. macOS runners cost
+# about 10x Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
 on:
   workflow_dispatch:
     inputs:
@@ -32,53 +34,22 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
-    runs-on: macos-15-intel
-    timeout-minutes: 60
+  version:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
     permissions:
       contents: write
-    env:
-      BIN_DIR: apps/desktop/src-tauri/binaries
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      ref: ${{ steps.version.outputs.ref }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1 # v4.4.0
         with:
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: apps/desktop/src-tauri -> target
-
-      - run: bun install --frozen-lockfile
-
-      # Signing and notarization (Developer ID .p12 + App Store Connect API key) and the updater key.
-      - name: Signing secrets
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          for name in APPLE_CERTIFICATE APPLE_API_KEY_P8 TAURI_SIGNING_PRIVATE_KEY; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Secret $name is missing"
-              exit 1
-            fi
-          done
-          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-          printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
-          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
-
-      # Before any build step, so a failed bump costs no macOS minutes. Pushes made with the workflow token
-      # don't start other workflows.
+      # Before any build, so a failed bump costs no build minutes. Pushes made with the workflow token don't
+      # start other workflows.
       - name: Bump the version, commit and tag
         if: ${{ inputs.release && inputs.release != 'none' }}
         shell: bash
@@ -137,15 +108,58 @@ jobs:
             echo "::error::Versions differ: tauri.conf.json $VERSION, package.json $PKG, Cargo.toml $CARGO"
             exit 1
           fi
-          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
-            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
-            RELEASE_TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          if [ -n "$RELEASE_TAG" ] && [ "${RELEASE_TAG#desktop-v}" != "$VERSION" ]; then
+          if [ -n "${RELEASE_TAG:-}" ] && [ "${RELEASE_TAG#desktop-v}" != "$VERSION" ]; then
             echo "::error::Tag $RELEASE_TAG doesn't match the app version $VERSION"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=${RELEASE_TAG:-}" >> "$GITHUB_OUTPUT"
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: version
+    # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
+    runs-on: blacksmith-6vcpu-macos-15
+    timeout-minutes: 60
+    env:
+      BIN_DIR: apps/desktop/src-tauri/binaries
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - run: bun install --frozen-lockfile
+
+      # Signing and notarization (Developer ID .p12 + App Store Connect API key) and the updater key.
+      - name: Signing secrets
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_API_KEY_P8 TAURI_SIGNING_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is missing"
+              exit 1
+            fi
+          done
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       # The runner ships inside the app as a Tauri sidecar: `binaries/agentes-runner-<target triple>`.
       # A universal build needs both arch binaries (one per cargo build) and the lipo'd universal one.
@@ -174,20 +188,31 @@ jobs:
               console.log([AGENT_BROWSER_VERSION, agentBrowserAsset(target), AGENT_BROWSER_SHA256[target]].join(" "));
             }
           ' > "$RUNNER_TEMP/agent-browser.txt"
-          while read -r VERSION ASSET SHA; do
+          while read -r AB_VERSION ASSET SHA; do
             case "$ASSET" in
               *darwin-arm64) TRIPLE=aarch64-apple-darwin ;;
               *darwin-x64) TRIPLE=x86_64-apple-darwin ;;
             esac
             OUT="$BIN_DIR/agent-browser-$TRIPLE"
             curl -fsSL --retry 3 -o "$OUT" \
-              "https://github.com/vercel-labs/agent-browser/releases/download/v$VERSION/$ASSET"
+              "https://github.com/vercel-labs/agent-browser/releases/download/v$AB_VERSION/$ASSET"
             echo "$SHA  $OUT" | shasum -a 256 -c -
           done < "$RUNNER_TEMP/agent-browser.txt"
           lipo -create -output "$BIN_DIR/agent-browser-universal-apple-darwin" \
             "$BIN_DIR/agent-browser-aarch64-apple-darwin" "$BIN_DIR/agent-browser-x86_64-apple-darwin"
           chmod +x "$BIN_DIR"/agent-browser-*
           lipo -info "$BIN_DIR/agent-browser-universal-apple-darwin"
+
+      # "Run agentes.chat on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit,
+      # ship among the app's resources (tauri.native.conf.json), signed with the app.
+      - name: Build the server's files
+        shell: bash
+        run: |
+          bun scripts/native-package.ts folders --out "$RUNNER_TEMP/native"
+          rm -rf apps/desktop/src-tauri/native
+          mv "$RUNNER_TEMP"/native/agentes/* apps/desktop/src-tauri/native
+          test -s apps/desktop/src-tauri/native/server/native.js
+          du -sh apps/desktop/src-tauri/native/server apps/desktop/src-tauri/native/web
 
       - name: Icons
         working-directory: apps/desktop
@@ -202,7 +227,7 @@ jobs:
         run: rm -rf apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle
 
       - name: Build the app (universal, signed, notarized)
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -214,7 +239,7 @@ jobs:
         with:
           projectPath: apps/desktop
           tauriScript: bun run tauri
-          args: --target universal-apple-darwin
+          args: --target universal-apple-darwin --config src-tauri/tauri.native.conf.json
 
       - name: Check the signature and the notarization
         shell: bash
@@ -228,6 +253,8 @@ jobs:
           test -s "$APP/Contents/Resources/licenses/bun/LICENSE.md"
           test -s "$APP/Contents/Resources/LICENSE"
           test -s "$APP/Contents/Resources/NOTICE"
+          test -s "$APP/Contents/Resources/server/native.js"
+          test -s "$APP/Contents/Resources/web/index.html"
           # Apple may take a moment to hand out the ticket after accepting the notarization, and the build's
           # own stapling then gives up quietly (0.5.4): staple again for a few minutes before checking. The
           # .dmg and the update keep the app as built; without a ticket, the Mac checks it online.
@@ -241,19 +268,16 @@ jobs:
       - name: Name the build files and the checksum
         shell: bash
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           BUNDLE=apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle
-          DMG_DIR=$BUNDLE/dmg
-          SRC=$(ls "$DMG_DIR"/*.dmg | head -1)
+          SRC=$(ls "$BUNDLE"/dmg/*.dmg | head -1)
           if [ -z "$SRC" ]; then
-            echo "::error::No .dmg in $DMG_DIR"
+            echo "::error::No .dmg in $BUNDLE/dmg"
             exit 1
           fi
           NAME="agentes_${VERSION}_universal.dmg"
           mkdir -p out
           cp "$SRC" "out/$NAME"
           (cd out && shasum -a 256 "$NAME" > "$NAME.sha256")
-          cat "out/$NAME.sha256"
           TGZ=$(ls "$BUNDLE"/macos/*.app.tar.gz | head -1)
           if [ -z "$TGZ" ] || [ ! -s "$TGZ.sig" ]; then
             echo "::error::No signed updater bundle in $BUNDLE/macos"
@@ -261,31 +285,207 @@ jobs:
           fi
           cp "$TGZ" "out/agentes_${VERSION}_universal.app.tar.gz"
           cp "$TGZ.sig" "out/agentes_${VERSION}_universal.app.tar.gz.sig"
+          ls -l out
 
-      - name: Keep the build
-        if: ${{ env.RELEASE_TAG == '' }}
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: agentes-${{ steps.version.outputs.version }}-universal
+          name: desktop-macos
           path: out/*
           retention-days: 14
 
-      # Release notes = the annotated tag's message (`git tag -a desktop-v0.2.0 -m "- Pastas…"`).
+  windows:
+    needs: version
+    runs-on: blacksmith-4vcpu-windows-2025
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - run: bun install --frozen-lockfile
+
+      - name: Icons
+        working-directory: apps/desktop
+        run: |
+          bun scripts/icons.ts
+          bun run tauri icon app-icon.png
+
+      # No runner and no agent-browser on Windows (tauri.windows.conf.json): the Cloud and your own server
+      # only. Unsigned for now: SmartScreen asks once ("More info › Run anyway") until a code-signing certificate.
+      - name: Build the app (NSIS)
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: bun run tauri
+
+      - name: Name the build files and the checksum
+        shell: bash
+        run: |
+          BUNDLE=apps/desktop/src-tauri/target/release/bundle/nsis
+          SRC=$(ls "$BUNDLE"/*-setup.exe | head -1)
+          if [ -z "$SRC" ] || [ ! -s "$SRC.sig" ]; then
+            echo "::error::No signed installer in $BUNDLE"
+            exit 1
+          fi
+          NAME="agentes_${VERSION}_x64-setup.exe"
+          mkdir -p out
+          cp "$SRC" "out/$NAME"
+          cp "$SRC.sig" "out/$NAME.sig"
+          (cd out && sha256sum "$NAME" > "$NAME.sha256")
+          ls -l out
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-windows
+          path: out/*
+          retention-days: 14
+
+  linux:
+    needs: version
+    # 22.04: an older glibc, so the app runs on more distributions.
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    timeout-minutes: 60
+    env:
+      BIN_DIR: apps/desktop/src-tauri/binaries
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: useblacksmith/checkout@v1 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          # libfuse2: the AppImage bundler's own tool is an AppImage.
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev patchelf file libfuse2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - run: bun install --frozen-lockfile
+
+      # The baseline build: some x64 CPUs lack AVX2.
+      - name: Compile the runner
+        shell: bash
+        run: |
+          mkdir -p "$BIN_DIR"
+          bun build --compile --target=bun-linux-x64-baseline apps/server/runner/main.ts \
+            --outfile "$BIN_DIR/agentes-runner-x86_64-unknown-linux-gnu"
+          chmod +x "$BIN_DIR/agentes-runner-x86_64-unknown-linux-gnu"
+
+      - name: Fetch agent-browser
+        shell: bash
+        run: |
+          read -r AB_VERSION ASSET SHA < <(bun -e '
+            import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserAsset } from "./packages/adapters/src/machine-protocol.ts";
+            console.log([AGENT_BROWSER_VERSION, agentBrowserAsset("linux-x64"), AGENT_BROWSER_SHA256["linux-x64"]].join(" "));
+          ')
+          OUT="$BIN_DIR/agent-browser-x86_64-unknown-linux-gnu"
+          curl -fsSL --retry 3 -o "$OUT" \
+            "https://github.com/vercel-labs/agent-browser/releases/download/v$AB_VERSION/$ASSET"
+          echo "$SHA  $OUT" | sha256sum -c -
+          chmod +x "$OUT"
+
+      # "Run agentes.chat on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit,
+      # ship among the app's resources (tauri.native.conf.json), signed with the app.
+      - name: Build the server's files
+        shell: bash
+        run: |
+          bun scripts/native-package.ts folders --out "$RUNNER_TEMP/native"
+          rm -rf apps/desktop/src-tauri/native
+          mv "$RUNNER_TEMP"/native/agentes/* apps/desktop/src-tauri/native
+          test -s apps/desktop/src-tauri/native/server/native.js
+          du -sh apps/desktop/src-tauri/native/server apps/desktop/src-tauri/native/web
+
+      - name: Icons
+        working-directory: apps/desktop
+        run: |
+          bun scripts/icons.ts
+          bun run tauri icon app-icon.png
+
+      - name: Build the app (AppImage, deb)
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: bun run tauri
+          args: --config src-tauri/tauri.native.conf.json
+
+      - name: Name the build files and the checksums
+        shell: bash
+        run: |
+          BUNDLE=apps/desktop/src-tauri/target/release/bundle
+          DEB=$(ls "$BUNDLE"/deb/*.deb | head -1)
+          APPIMAGE=$(ls "$BUNDLE"/appimage/*.AppImage | head -1)
+          if [ -z "$DEB" ] || [ -z "$APPIMAGE" ] || [ ! -s "$APPIMAGE.sig" ]; then
+            echo "::error::No deb, AppImage or its updater signature in $BUNDLE"
+            exit 1
+          fi
+          mkdir -p out
+          cp "$DEB" "out/agentes_${VERSION}_amd64.deb"
+          cp "$APPIMAGE" "out/agentes_${VERSION}_amd64.AppImage"
+          cp "$APPIMAGE.sig" "out/agentes_${VERSION}_amd64.AppImage.sig"
+          (cd out && for f in "agentes_${VERSION}_amd64.deb" "agentes_${VERSION}_amd64.AppImage"; do sha256sum "$f" > "$f.sha256"; done)
+          ls -l out
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-linux
+          path: out/*
+          retention-days: 14
+
+  # Release notes = the annotated tag's message (`git tag -a desktop-v0.2.0 -m "- Folders…"`).
+  publish:
+    needs: [version, macos, windows, linux]
+    if: ${{ needs.version.outputs.tag != '' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: useblacksmith/checkout@v1 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: out
+          merge-multiple: true
+
       - name: Publish the release
-        if: ${{ env.RELEASE_TAG != '' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          TAG="$RELEASE_TAG"
-          VERSION="${{ steps.version.outputs.version }}"
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP SIGNATURE-----/,$d' > notes.txt
-          if [ ! -s notes.txt ] || ! grep -q '[^[:space:]]' notes.txt; then echo "agentes $VERSION" > notes.txt; fi
-          gh release create "$TAG" \
-            "out/agentes_${VERSION}_universal.dmg" \
-            "out/agentes_${VERSION}_universal.dmg.sha256" \
-            "out/agentes_${VERSION}_universal.app.tar.gz" \
-            "out/agentes_${VERSION}_universal.app.tar.gz.sig" \
-            --title "agentes $VERSION" \
-            --notes-file notes.txt
+          if [ ! -s notes.txt ] || ! grep -q '[^[:space:]]' notes.txt; then echo "agentes.chat $VERSION" > notes.txt; fi
+          ls -l out
+          gh release create "$TAG" out/* --title "agentes.chat $VERSION" --notes-file notes.txt
