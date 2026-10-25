@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Connection, ConnectorDef } from "@agenteschat/client";
+import type { Connection, ConnectorDef, CustomServer } from "@agenteschat/client";
+import { connectedItems } from "@agenteschat/client/lib/connected";
 import {
   authAnswerOf,
   brandOf,
@@ -48,18 +49,35 @@ const conn = (connector: string, over: Partial<Connection> = {}): Connection => 
   ...over,
 });
 
+const server = (serverUrl: string): CustomServer => ({
+  id: "s-1",
+  serverUrl,
+  label: "Sentry",
+  authType: "oauth",
+  tools: [],
+  reviewedAt: "2026-10-23T12:00:00.000Z",
+  createdAt: "2026-10-23T12:00:00.000Z",
+});
+
 describe("connectors gallery", () => {
-  test("a connection is matched by service, or by address for a vendor's own server; revoked ones don't count", () => {
-    const linear = def("linear", { kind: "remote_mcp", serverUrl: "https://mcp.linear.app/sse" });
-    expect(connectionOf(def("github"), [conn("github")])?.id).toBe("c-github");
-    expect(connectionOf(linear, [conn("custom", { serverUrl: "https://mcp.linear.app/sse" })])).toBeDefined();
-    expect(connectionOf(def("github"), [conn("github", { revokedAt: "2026-10-23T13:00:00.000Z" })])).toBeUndefined();
+  test("connected as the web counts it: our connector's connection, or a vendor's server by its address", () => {
+    const github = def("github");
+    const sentry = def("sentry", { kind: "remote_mcp", serverUrl: "https://mcp.sentry.dev/mcp" });
+    const catalog = [github, sentry];
+    expect(connectionOf(github, connectedItems([conn("github")], [], catalog))?.id).toBe("c-github");
+    // Sentry connected on the web lives in the servers' list (its address may differ by a slash or case).
+    const items = connectedItems([], [server("https://MCP.sentry.dev/mcp/")], catalog);
+    expect(connectionOf(sentry, items)?.id).toBe("s-1");
+    expect(connectionOf(github, items)).toBeUndefined();
+    const revoked = conn("github", { revokedAt: "2026-10-23T13:00:00.000Z" });
+    expect(connectionOf(github, connectedItems([revoked], [], catalog))).toBeUndefined();
   });
 
   test("suggestions: the first three ready here and not connected, in our order", () => {
     const catalog = ["github", "linear", "notion", "drive", "sentry"].map((id) => def(id));
     catalog[2] = def("notion", { available: false });
-    expect(suggestionsOf(catalog, [conn("github")]).map((d) => d.id)).toEqual(["linear", "drive", "sentry"]);
+    const items = connectedItems([conn("github")], [], catalog);
+    expect(suggestionsOf(catalog, items).map((d) => d.id)).toEqual(["linear", "drive", "sentry"]);
   });
 
   test("search covers the name, id, description and the translated text", () => {

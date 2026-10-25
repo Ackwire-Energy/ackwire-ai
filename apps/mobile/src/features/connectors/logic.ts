@@ -1,4 +1,5 @@
-import type { Connection, ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import type { ConnectedItem } from "@agenteschat/client/lib/connected";
 import { mixHex } from "@agenteschat/ui/agent/engine";
 
 /**
@@ -20,19 +21,20 @@ export const CATEGORIES: ConnectorCategory[] = [
   "automation",
 ];
 
-/** The organization's live connection to a catalog service (a vendor's server is matched by its address). */
-export function connectionOf(def: ConnectorDef, connections: Connection[]): Connection | undefined {
-  const byAddress = (c: Connection) =>
-    def.kind === "remote_mcp" && def.serverUrl !== null && c.serverUrl === def.serverUrl;
-  return connections.find((c) => !c.revokedAt && (c.connector === def.id || byAddress(c)));
+/**
+ * The organization's live connection to a catalog service, counted as the web counts it (`connectedItems`:
+ * our connector's connection, or a vendor's server connected by its address, like Sentry's or Linear's).
+ */
+export function connectionOf(def: ConnectorDef, items: ConnectedItem[]): ConnectedItem | undefined {
+  return items.find((i) => i.def?.id === def.id);
 }
 
 /** The first three suggestions that can be connected here and aren't yet. */
-export function suggestionsOf(catalog: ConnectorDef[], connections: Connection[], count = 3): ConnectorDef[] {
+export function suggestionsOf(catalog: ConnectorDef[], items: ConnectedItem[], count = 3): ConnectorDef[] {
   const out: ConnectorDef[] = [];
   for (const id of SUGGESTED) {
     const def = catalog.find((d) => d.id === id);
-    if (def?.available && !connectionOf(def, connections)) out.push(def);
+    if (def?.available && !connectionOf(def, items)) out.push(def);
     if (out.length === count) break;
   }
   return out;
