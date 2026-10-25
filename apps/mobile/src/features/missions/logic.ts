@@ -95,3 +95,7 @@ export const planRows = (items: Mission["plan"]["items"]) => (items ?? []).filte
 /** The recommended option of a decision (by text), if any. */
 export const recommendedOption = (d: Pick<MissionDecision, "recommendation" | "options">) =>
   d.recommendation && d.options.includes(d.recommendation) ? d.recommendation : null;
+
+/** "MacBook do Walter · ligado": where a mission works. The Cloud's computer is never off: it isn't answering. */
+export const missionComputerKey = (online: boolean, cloud: boolean) =>
+  online ? "mobile.mission.computerOn" : cloud ? "mobile.mission.computerNotAnswering" : "mobile.mission.computerOff";

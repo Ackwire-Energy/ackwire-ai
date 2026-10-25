@@ -231,6 +231,8 @@
   .ac-dialog.cmp-dialog {
     --cmp-room: 190px;
     top: 0;
+    left: 0;
+    transform: none;
     width: 100%;
     height: 100dvh;
     max-height: none;

@@ -14,7 +14,7 @@ import {
   liveSubLine,
   surfaceOf,
 } from "@agenteschat/client/lib/agent-computer";
-import { READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { computerName, READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
@@ -73,12 +73,15 @@ function useFullScreen(full: boolean, setFull: (full: boolean) => void) {
   }, [full, setFull]);
 }
 
-/** "Pronto" for a moment when the computer it was waiting for gets ready, then it opens by itself. */
+/**
+ * "Pronto" for a moment when the computer it was waiting for gets ready, then it opens by itself. A hold also
+ * ends the wait's stage, and the computer isn't ready then.
+ */
 function useReadyFlash(surface: ComputerSurface | null) {
   const [flashing, setFlashing] = useState(false);
   const was = useRef(surface);
   useEffect(() => {
-    if (was.current === "preparing" && surface && surface !== "preparing") setFlashing(true);
+    if (was.current === "preparing" && surface && surface !== "preparing" && surface !== "held") setFlashing(true);
     was.current = surface;
   }, [surface]);
   useEffect(() => {
@@ -186,7 +189,7 @@ function ComputerStage({
   const flashing = useReadyFlash(surface);
   const reader = useWaitReader();
   const machine = view.machine;
-  const computer = machine?.name ?? t("computerSetup.title", { org: org.name });
+  const computer = computerName(t, org.name, machine);
   const manages = can(org.role, "manage_agents") || agent.ownerUserId === me.user.id;
   const person = (id: string | null) => (id ? dir.memberById.get(id)?.name : undefined) ?? t("channel.unknownPerson");
   const paused = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
@@ -429,6 +432,21 @@ function ComputerStage({
                 </Button>
               )
             }
+          />
+        </Stage>
+      </>
+    );
+  } else if (computerKind(machine.os) === "mac" && view.browserSettings?.reason === "switched_off") {
+    // A Mac shows no screen, only the agent's page: what's missing is its browser, which only the Mac turns on.
+    body = (
+      <>
+        <DialogHead sub="" />
+        <Stage>
+          <Cover
+            color={color}
+            icon="globe"
+            text={t("agentComputer.state.browserOff", { ...g, computer })}
+            help={t("browser.machine.offHelp")}
           />
         </Stage>
       </>

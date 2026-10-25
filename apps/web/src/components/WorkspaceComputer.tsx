@@ -3,6 +3,7 @@ import { useAgents, useComputerSetup, useMachines } from "@agenteschat/client";
 import {
   agentsWaitingForComputer,
   computerEdition,
+  computerName,
   etaLine,
   etaTickMs,
   promisesEmail,
@@ -207,8 +208,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { org } = useOrg();
   const reader = useWaitReader();
   const machine = managedOf(useMachines(org.id).data);
-  // Its own name once it exists ("Computador da Acme" until someone renames it).
-  const title = machine?.name ?? t("computerSetup.title", { org: org.name });
+  const title = computerName(t, org.name, machine);
   return (
     <Card aria-labelledby="sec-workspace-computer" className="setup-card" data-phase={view.phase}>
       <div className="computers-card__head">

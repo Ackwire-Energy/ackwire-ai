@@ -1,5 +1,6 @@
 import { isWaitingHandoff, useBrowserHandoffActions } from "@agenteschat/client";
 import { entryKind, entryLine, entryPortrait, entryState } from "@agenteschat/client/lib/agent-computer";
+import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -40,7 +41,7 @@ export function AgentComputerRow({ agentId }: { agentId: string }) {
   const line = entryLine(t, state, {
     edition: f.edition,
     locale: i18n.language,
-    computer: view.machine?.name ?? t("computerSetup.title", { org: org?.name ?? "" }),
+    computer: computerName(t, org?.name ?? "", view.machine),
     lastSeenAt: view.machine?.lastSeenAt ?? null,
     person: (id) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson"),
     step: null,

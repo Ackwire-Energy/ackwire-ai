@@ -6969,7 +6969,7 @@ export const ptBR = {
   },
   computers: {
     cloud: {
-      cardText: "Internet, tempo de uso e aprovação. Valem só para ele.",
+      cardText: "Internet, tempo de uso e aprovação. Valem só para as sandboxes.",
       note: "Estas regras valem só para as sandboxes da Daytona.",
       adjust: "Ajustar",
       summary: "{{network}} · até {{minutes}} min por dia",
@@ -6995,7 +6995,7 @@ export const ptBR = {
       always: "Sempre ligado, dia e noite",
     },
     hostMissing:
-      "Este servidor também pode ser o computador dos agentes: rode <code>sh install.sh --computer yes</code> onde o agentes.chat está instalado.",
+      "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no <code>SELF_HOSTING.md</code>.",
     other: {
       title: "Outros computadores",
       text: "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
@@ -8428,6 +8428,7 @@ export const ptBR = {
       noScreen: "{{The}} {{name}} não tem tela para mostrar aqui",
       noScreenHelp: "Libere a tela ou o navegador em Ferramentas e acesso.",
       noComputer: "Escolha um computador para {{article}} {{name}}.",
+      browserOff: "O navegador {{of}} {{name}} está desligado no {{computer}}",
       forbidden: "Você não pode ver este computador.",
     },
     closeAsk: "{{The}} {{name}} espera 2 min você voltar.",
@@ -8435,6 +8436,7 @@ export const ptBR = {
     phone: {
       otherApp: "{{The}} {{name}} está usando outro app na própria tela",
       fromComputer: "Para ver a tela, abra o agentes.chat num notebook",
+      chooseOnWeb: "Escolha no agentes.chat, em Configurações › Computadores.",
     },
   },
 };

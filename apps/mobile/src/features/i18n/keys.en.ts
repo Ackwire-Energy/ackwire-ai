@@ -482,8 +482,6 @@ export const featureKeysEn: FeatureTranslations = {
     submit: "Ask for a plan",
     created: "{{name}} is making the plan",
     noAgents: "No agent can run missions yet. Connect a computer on the website.",
-    computerOn: "{{name}} · on",
-    computerOff: "{{name}} · off",
     reason: {
       no_computer: "Needs a connected computer",
       cloud_computer: "Missions on Daytona sandboxes are coming soon",
@@ -507,6 +505,7 @@ export const featureKeysEn: FeatureTranslations = {
     itemsDone: "of {{total}} items done",
     computerOn: "{{name}} · on",
     computerOff: "{{name}} · off",
+    computerNotAnswering: "{{name}} · not answering",
     running_one: "{{count}} item in progress",
     running_other: "{{count}} items in progress",
     conversation: "Mission chat",

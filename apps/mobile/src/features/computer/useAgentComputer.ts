@@ -9,6 +9,7 @@ import {
   useComputerSetup,
   useDesktopStatus,
   useMachines,
+  useWorkingRuns,
 } from "@agenteschat/client";
 import type { AgentComputerFacts } from "@agenteschat/client/lib/agent-computer";
 import { computerEdition, setupView } from "@agenteschat/client/lib/computer";
@@ -50,7 +51,8 @@ export function useAgentComputer(agentId: string, poll: number | false = false) 
     retry: false,
     refetchInterval: HANDOFF_POLL_MS,
   });
-  const working = useWorkingNow().some((w) => w.agentId === agentId);
+  // A run going now, as the web says it: an active mission between its runs isn't at work on the computer.
+  const working = (useWorkingRuns(orgId).data ?? []).some((r) => r.agentId === agentId && r.status === "running");
   const desktop = desktopQ.data ?? null;
   const browserOpen = handoffQ.data && isOpenHandoff(handoffQ.data) ? handoffQ.data : null;
   // The screen's own request or take over, or the browser's when its window is on the screen.

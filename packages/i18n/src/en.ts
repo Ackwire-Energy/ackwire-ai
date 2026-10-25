@@ -6946,7 +6946,7 @@ export const en: Translations = {
   },
   computers: {
     cloud: {
-      cardText: "Internet, usage time and approval. They apply only to it.",
+      cardText: "Internet, usage time and approval. They apply only to the sandboxes.",
       note: "These rules apply only to Daytona sandboxes.",
       adjust: "Adjust",
       summary: "{{network}} · up to {{minutes}} min a day",
@@ -6972,7 +6972,7 @@ export const en: Translations = {
       always: "Always on, day and night",
     },
     hostMissing:
-      "This server can be your agents' computer too: run <code>sh install.sh --computer yes</code> where agentes.chat is installed.",
+      "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>.",
     other: {
       title: "Other computers",
       text: "Connected with a code, like a Mac mini at home or another server. What each one allows is set on that computer.",
@@ -8397,6 +8397,7 @@ export const en: Translations = {
       noScreen: "{{name}} has no screen to show here",
       noScreenHelp: "Let it use its screen or its browser in Tools and access.",
       noComputer: "Choose a computer for {{name}}.",
+      browserOff: "{{name}}'s browser is off on {{computer}}",
       forbidden: "You can't see this computer.",
     },
     closeAsk: "{{name}} waits 2 min for you to come back.",
@@ -8404,6 +8405,7 @@ export const en: Translations = {
     phone: {
       otherApp: "{{name}} is using another app on its screen",
       fromComputer: "To watch its screen, open agentes.chat on a laptop",
+      chooseOnWeb: "Choose it on agentes.chat, in Settings › Computers.",
     },
   },
 };

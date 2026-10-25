@@ -11,17 +11,19 @@ import {
   useComputerSetup,
   useDesktopStatus,
   useMachines,
-  useRuns,
   usesScreen,
 } from "@agenteschat/client";
 import type { AgentComputerFacts } from "@agenteschat/client/lib/agent-computer";
 import { computerEdition, setupView } from "@agenteschat/client/lib/computer";
+import { can } from "@agenteschat/client/lib/permissions";
 import { useQuery } from "@tanstack/react-query";
 import { useOrg } from "@/components/org-context";
 import { useStreams } from "@/realtime/context";
 
 /** Outside the agent's conversations no event says when its request changes: it's asked again this often. */
 const HANDOFF_POLL_MS = 30_000;
+/** Nor when it starts or ends a run elsewhere: whether one is going is asked again this often. */
+const RUNNING_POLL_MS = 30_000;
 
 /** The agent's run at work on its computer now, among the conversations this tab listens to. */
 function useScreenRun(agentId: string): LiveRun | undefined {
@@ -37,9 +39,13 @@ function useScreenRun(agentId: string): LiveRun | undefined {
  * What the entry, the DM's button and the dialog know of an agent's computer: the edition (from the
  * workspace's computer setup), its screen as this person may see it (`GET …/desktop`: a 403 means they may
  * not watch it, and see no entry), its computer, browser, open request and live work. `poll`: how often the
- * screen's state is asked again; `runs`: also read the agent's runs list (its page already does).
+ * screen's state is asked again; `runs`: also ask whether the agent has a run going (its runs list, which
+ * admins and its owner may read).
  */
-export function useAgentComputer(agent: Pick<Agent, "id">, options: { poll?: number | false; runs?: boolean } = {}) {
+export function useAgentComputer(
+  agent: Pick<Agent, "id" | "ownerUserId">,
+  options: { poll?: number | false; runs?: boolean } = {},
+) {
   const { org, me } = useOrg();
   const api = useApi();
   const setupQ = useComputerSetup(org.id);
@@ -64,7 +70,14 @@ export function useAgentComputer(agent: Pick<Agent, "id">, options: { poll?: num
     retry: false,
     refetchInterval: HANDOFF_POLL_MS,
   });
-  const runs = useRuns(org.id, agent.id, watches && options.runs === true);
+  const readsRuns = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
+  const runningQ = useQuery({
+    queryKey: keys.runningRuns(org.id, agent.id),
+    queryFn: () => api.agents.runs(org.id, { agentId: agent.id, status: "running", limit: 1 }),
+    enabled: watches && options.runs === true && readsRuns,
+    retry: false,
+    refetchInterval: RUNNING_POLL_MS,
+  });
   const run = useScreenRun(agent.id);
   const desktop = desktopQ.data ?? null;
   const browserOpen = handoffQ.data && isOpenHandoff(handoffQ.data) ? handoffQ.data : null;
@@ -81,7 +94,7 @@ export function useAgentComputer(agent: Pick<Agent, "id">, options: { poll?: num
         browserGranted: (scopesQ.data ?? []).some((s) => s.connectionId === null && s.scope === BROWSER_TOOL_SCOPE),
         handoff: browserOpen ?? screenOpen,
         userId: me.user.id,
-        working: Boolean(run) || (runs.data ?? []).some((r) => r.status === "running"),
+        working: Boolean(run) || (runningQ.data?.length ?? 0) > 0,
       }
     : null;
   return {

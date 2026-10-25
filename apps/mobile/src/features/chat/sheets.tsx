@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
+import { missionComputerKey } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
@@ -568,6 +569,7 @@ export function NewMissionForm({
   const eligible = useEligibleAgents(orgId);
   // On the Cloud missions wait for the workspace's own computer: nobody connects one.
   const waitCloud = useCloudMissionWait();
+  const cloud = useEdition() === "cloud";
   const create = useCreateMission(orgId);
   const [goal, setGoal] = useState(initialGoal);
   const [picked, setPicked] = useState<string | null>(null);
@@ -615,7 +617,7 @@ export function NewMissionForm({
               key: a.agentId,
               leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
               label: a.name,
-              hint: waitCloud && !a.machine ? waitCloud : whereText(t, a),
+              hint: waitCloud && !a.machine ? waitCloud : whereText(t, a, cloud),
               disabled: a.eligible === false,
               trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
               onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
@@ -648,13 +650,11 @@ function useCloudMissionWait() {
   return t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org?.name ?? "" }) });
 }
 
-/** "MacBook do Walter · ligado", or why it can't do a mission for you. */
-function whereText(t: TFunction, a: MissionEligibleAgent) {
+/** "MacBook do Walter · ligado", or why it can't do a mission for you; the Cloud's computer is never off. */
+function whereText(t: TFunction, a: MissionEligibleAgent, cloud: boolean) {
   if (a.eligible === false && a.reason) return t(`mobile.newMission.reason.${a.reason}`);
   if (!a.machine) return t("mobile.newMission.reason.no_computer");
-  return a.machine.online
-    ? t("mobile.newMission.computerOn", { name: a.machine.name })
-    : t("mobile.newMission.computerOff", { name: a.machine.name });
+  return t(missionComputerKey(a.machine.online, cloud), { name: a.machine.name });
 }
 
 // ── /summary of a mission ────────────────────────────────────────────────────

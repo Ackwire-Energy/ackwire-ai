@@ -3,6 +3,7 @@ import {
   useAgents,
   useAuthConfig,
   useDesktopLatest,
+  useDesktopStatus,
   useHostComputer,
   useHostComputerOn,
   useMachineAction,
@@ -917,10 +918,15 @@ function OnThisComputerCard() {
   );
 }
 
-/** Open beside each agent on a computer's page: the agent's computer in its dialog, in place. */
+/**
+ * Open beside each agent on a computer's page: the agent's computer in its dialog, in place. Only for whoever may
+ * watch it (its screen's state answers them; anyone else gets a 403), as on the agent's page.
+ */
 function OpenComputerButton({ agentId, name }: { agentId: string; name: string }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const openComputer = useOpenComputer();
+  if (!useDesktopStatus(org.id, agentId).isSuccess) return null;
   return (
     <Button
       size="sm"
@@ -1066,7 +1072,8 @@ export function MachinePage({ machineId }: { machineId: string }) {
           </div>
         )}
       </Card>
-      {!m.canManage && (
+      {/* Nobody in the workspace changes what its own computer allows, admins included. */}
+      {!m.canManage && !managed && (
         <p className="page__note">
           {m.pairedBy ? t("machines.page.readOnly", { name: m.pairedBy.name }) : t("machines.page.readOnlyNobody")}
         </p>

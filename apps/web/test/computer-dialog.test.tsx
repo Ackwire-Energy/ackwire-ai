@@ -3,7 +3,16 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Agent, BrowserHandoff, ComputerSetup, DesktopStatus, Machine, SocketFactory } from "@agenteschat/client";
+import type {
+  Agent,
+  AgentBrowserSettings,
+  BrowserHandoff,
+  ComputerSetup,
+  DesktopStatus,
+  Machine,
+  SocketFactory,
+} from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
@@ -65,6 +74,8 @@ interface Options {
   desktop?: Partial<DesktopStatus>;
   /** Ada may use her browser. */
   browser?: boolean;
+  /** What her computer says of her browser (with `browser`: ready). */
+  settings?: AgentBrowserSettings;
   handoff?: BrowserHandoff;
   forbidden?: boolean;
 }
@@ -90,6 +101,7 @@ async function backend(o: Options = {}) {
   if (o.forbidden) fake.forbidden.add(ADA_ID);
   if (o.browser)
     fake.settings.set(ADA_ID, { allowedDomains: null, available: true, reason: null, detail: null, machine: null });
+  if (o.settings) fake.settings.set(ADA_ID, o.settings);
   return { state, api, fake, machines, machine, sockets: socketsFor() };
 }
 
@@ -206,6 +218,21 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).not.toContain("min");
   });
 
+  test("a hold that arrives during the wait: the pause at once, never a Pronto it isn't", async () => {
+    const t = await dialog({
+      setup: { step: "installing", secondsLeft: 330 },
+      machine: null,
+      desktop: { available: false, reason: "no_computer" },
+    });
+    expect(sub()).toBe("Sendo preparado");
+    t.fake.desktops.set(ADA_ID, { available: false, reason: "no_computer", held: true });
+    await act(async () => t.services.queryClient.invalidateQueries({ queryKey: keys.agentDesktop(ORG_ID, ADA_ID) }));
+    await settle(8);
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    expect(box().textContent).not.toContain("Pronto");
+    expect(box().textContent).toContain("A Ada está em pausa por enquanto");
+  });
+
   test("its computer not answering: said by name, looked after, nothing to do and no other computer", async () => {
     // Its browser was there before it stopped answering: no page to show from a computer that doesn't answer.
     const t = await dialog({
@@ -221,6 +248,36 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     );
     expect(view().queryByRole("button", { name: "Trocar computador" })).toBeNull();
     expect(t.sockets.screens).toHaveLength(0);
+  });
+
+  test("named in this reader's words, though its first owner's language named it in English", async () => {
+    await dialog({
+      setup: { state: "ready" },
+      machine: { name: "Acme's computer", kind: "managed", os: "other", online: false },
+      desktop: { available: false, reason: "offline" },
+    });
+    expect(box().textContent).toContain("O Computador da Acme não está respondendo");
+    expect(box().textContent).not.toContain("Acme's computer");
+  });
+
+  test("back while this tab was away: the reconnect asks for the computers again, and its screen opens", async () => {
+    const t = await dialog({
+      setup: { state: "ready" },
+      machine: { name: "Computador da Acme", kind: "managed", os: "other", online: false },
+      desktop: { available: false, reason: "offline" },
+    });
+    await act(async () => t.sockets.realtime.last().open());
+    await settle(4);
+    expect(sub()).toBe("Sem resposta");
+    // The socket drops; meanwhile the computer comes back, and its machine.status never reaches this tab.
+    await act(async () => t.sockets.realtime.last().drop());
+    t.machines.patch((t.machine as Machine).id, { online: true });
+    t.fake.desktops.set(ADA_ID, RUNNING);
+    await act(() => new Promise((r) => setTimeout(r, 650)));
+    await act(async () => t.sockets.realtime.last().open());
+    await settle(8);
+    expect(sub()).not.toBe("Sem resposta");
+    expect(t.sockets.screens.length).toBeGreaterThan(0);
   });
 
   test("its screen can't be shown: only to try again in a moment, never a command", async () => {
@@ -319,6 +376,25 @@ describe("the computer dialog, self-host", () => {
     await click(view().getByRole("button", { name: "Trocar computador" }));
     expect(screen().getByRole("dialog", { name: "Trocar o computador" })).toBeTruthy();
     expect(t.closed()).toBe(0);
+  });
+
+  test("a Mac with its browser off: that, and who turns it on, never a screen it doesn't have", async () => {
+    await dialog({
+      machine: { name: "Mac mini", os: "darwin", mode: "single" },
+      desktop: { available: false, reason: "not_allowed" },
+      settings: {
+        allowedDomains: null,
+        available: false,
+        reason: "switched_off",
+        detail: null,
+        machine: { id: "machine-1", name: "Mac mini" },
+      },
+    });
+    expect(box().textContent).toContain("O navegador da Ada está desligado no Mac mini");
+    expect(box().textContent).toContain(
+      "Só quem está no computador liga: no app agentes, em Preferências → Ferramentas.",
+    );
+    expect(box().textContent).not.toContain("A tela da Ada não pode ser mostrada agora");
   });
 
   test("no computer yet: choose one for her", async () => {

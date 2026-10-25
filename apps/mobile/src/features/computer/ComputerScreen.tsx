@@ -6,11 +6,12 @@ import {
   useBrowserHandoffActions,
 } from "@agenteschat/client";
 import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
-import { READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { computerName, READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { useNavigation } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
@@ -38,16 +39,16 @@ const PAGE_POLL_MS = 30_000;
  * da Ada" and the sub-line on top, then the web dialog's states in its words. The stage is the agent's page live
  * (the browser card: watch, take control, tap to click, type, the keys): on the phone, take control means the
  * browser. While the agent works in another app on its screen, it says so and to watch it from a laptop.
- * Closing in control of a take over hands it back at once; the agent's own request keeps its 2 minutes.
+ * Leaving in control of a take over (✕ or Android's back) hands it back at once; the agent's own request keeps
+ * its 2 minutes.
  */
 export function ComputerScreen({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  // The app's own toasts: what closing says shows under the view as it goes.
+  // The app's own toasts: what leaving says shows under the view as it goes.
   const toast = useToast();
   const actions = useBrowserHandoffActions(useOrg().orgId);
-  const close = (held: BrowserHandoff | null) => {
-    goBack();
+  const leave = (held: BrowserHandoff | null) => {
     if (!held) return;
     const g = agentGrammar(t, dir.agentById.get(agentId)?.name ?? "");
     if (held.kind === "takeover") {
@@ -60,18 +61,21 @@ export function ComputerScreen({ agentId }: { agentId: string }) {
   return (
     <ToastHost>
       <SheetHostProvider>
-        <ComputerView agentId={agentId} onClose={close} />
+        <ComputerView agentId={agentId} onLeave={leave} />
       </SheetHostProvider>
     </ToastHost>
   );
 }
 
-/** "Pronto" for a moment when the computer it was waiting for gets ready, then the stage opens by itself. */
+/**
+ * "Pronto" for a moment when the computer it was waiting for gets ready, then the stage opens by itself. A hold
+ * also ends the wait's stage, and the computer isn't ready then.
+ */
 function useReadyFlash(stage: PhoneStage | null) {
   const [flashing, setFlashing] = useState(false);
   const was = useRef(stage);
   useEffect(() => {
-    if (was.current === "preparing" && stage && stage !== "preparing") setFlashing(true);
+    if (was.current === "preparing" && stage && stage !== "preparing" && stage !== "held") setFlashing(true);
     was.current = stage;
   }, [stage]);
   useEffect(() => {
@@ -82,13 +86,16 @@ function useReadyFlash(stage: PhoneStage | null) {
   return flashing;
 }
 
-function ComputerView({ agentId, onClose }: { agentId: string; onClose: (held: BrowserHandoff | null) => void }) {
+function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: BrowserHandoff | null) => void }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const meId = useMeId();
   const { org } = useOrg();
   const dir = useDirectory();
+  const navigation = useNavigation();
+  // Whether the agent's browser is closed, as the page says (its sub-line is "Ao vivo" alone then).
+  const [pageClosed, setPageClosed] = useState(false);
   const [poll, setPoll] = useState<number | false>(POLL_MS);
   const view = useAgentComputer(agentId, poll);
   const run = useAgentRun(agentId);
@@ -103,12 +110,22 @@ function ComputerView({ agentId, onClose }: { agentId: string; onClose: (held: B
   const name = agent?.name ?? "";
   const g = agentGrammar(t, name);
   const machine = view.machine;
-  const computer = machine?.name ?? t("computerSetup.title", { org: org?.name ?? "" });
+  const computer = computerName(t, org?.name ?? "", machine);
   const manages = can(org?.role, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
   const person = (id: string) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson");
-  // What closing hands back: the agent's browser in this person's hands (the phone never holds its screen).
+  // What leaving hands back: the agent's browser in this person's hands (the phone never holds its screen).
   const mine =
     f?.handoff && controlledBy(f.handoff, f.userId) && handoffScreen(f.handoff) === "browser" ? f.handoff : null;
+  const leaving = useRef(() => {});
+  useEffect(() => {
+    leaving.current = () => onLeave(mine);
+  });
+  // However the view goes (✕, Android's back, the app moving elsewhere), what it held goes back. `removed` comes
+  // after this effect's cleanup, so unsubscribing waits a microtask.
+  useEffect(() => {
+    const off = navigation.addListener("removed", () => leaving.current());
+    return () => queueMicrotask(off);
+  }, [navigation]);
   const pausedUntil = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
 
   let sub = "";
@@ -128,8 +145,13 @@ function ComputerView({ agentId, onClose }: { agentId: string; onClose: (held: B
     sub = t("agentComputer.sub.preparing");
     body = <SetupWait view={f.setup} agentName={name} />;
   } else if (stage === "page" || stage === "otherApp") {
-    sub = liveSubLine(t, f, { name, computer, person, nowMs: now });
-    const ask = screenRequest(f.handoff);
+    const controlled = f.handoff?.status === "active" && Boolean(f.handoff.controllerUserId);
+    // A closed browser shows nothing live to watch: "Ao vivo" alone, as on the web.
+    sub =
+      stage === "page" && pageClosed && !controlled
+        ? t("browser.watch.live")
+        : liveSubLine(t, f, { name, computer, person, nowMs: now });
+    const ask = screenRequest(f.handoff, now);
     const last = steps.at(-1);
     body = (
       <>
@@ -158,6 +180,7 @@ function ComputerView({ agentId, onClose }: { agentId: string; onClose: (held: B
             handoff={f.handoff && handoffScreen(f.handoff) === "browser" ? f.handoff : null}
             canTakeOver={!f.held && !pausedUntil}
             surface
+            onClosed={setPageClosed}
             style={styles.flush}
           />
         ) : (
@@ -215,7 +238,14 @@ function ComputerView({ agentId, onClose }: { agentId: string; onClose: (held: B
     body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");
-    body = <Cover icon="computerLinux" text={t("agentComputer.state.noComputer", g)} />;
+    // The phone has no computer picker: who may choose one is told where.
+    body = (
+      <Cover
+        icon="computerLinux"
+        text={t("agentComputer.state.noComputer", g)}
+        help={manages ? t("agentComputer.phone.chooseOnWeb") : undefined}
+      />
+    );
   } else if (stage === "noScreen") {
     body = (
       <Cover
@@ -248,7 +278,7 @@ function ComputerView({ agentId, onClose }: { agentId: string; onClose: (held: B
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-        <IconButton icon="x" plate label={t("mobile.common.close")} onPress={() => onClose(mine)} />
+        <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
         <View style={styles.title}>
           <Text variant="subhead" style={styles.bold} numberOfLines={1} accessibilityRole="header">
             {t("agentComputer.title", g)}

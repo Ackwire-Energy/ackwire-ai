@@ -66,6 +66,8 @@ const SELFHOST_ONLY = [
   "agentComputer.state.screensMissing",
   "agentComputer.state.outdated",
   "agentComputer.state.noComputer",
+  "agentComputer.state.browserOff",
+  "agentComputer.phone.chooseOnWeb",
 ];
 
 /** Every key a Cloud workspace shows where a computer is named, past the `computerSetup.` and `agentComputer.` ones. */
@@ -148,6 +150,10 @@ const SELFHOST_EXTRA = [
   "agentPage.work.computer.offline",
   "agentPage.work.computer.alsoOffline",
   "agentPage.work.computer.connect",
+  "agentPage.work.cell.daytona",
+  "agentPage.work.saved.daytona",
+  "agentPage.work.saved.none",
+  "agentPage.work.computer.useDaytona",
   "agentPage.computer.ownerPicks",
   ...["mine", "mineDesc", "cloud", "cloudDesc", "cloudReady"].map((k) => `onboarding.computer.${k}`),
   "onboarding.brain.help",
@@ -234,10 +240,16 @@ describe("computer copy", () => {
     for (const s of ["4 CPUs · 8 GB de memória", "Um usuário para cada agente", "Go to settings", "a equipe"]) {
       expect(TECHNICAL.test(s)).toBe(false);
     }
-    for (const s of ["Your computer is off right now", "Connect a computer", "It turns on by itself", "Pair it"]) {
+    for (const s of [
+      "Your computer is off right now",
+      "Connect a computer",
+      "It turns on by itself",
+      "Pair it",
+      "Turning it on",
+    ]) {
       expect(bannedIn(s, CLOUD_BANNED.en).length).toBeGreaterThan(0);
     }
-    for (const s of ["Seu computador está desligado", "Na nuvem", "Ela liga sozinha", "Abrir o Terminal"]) {
+    for (const s of ["Seu computador está desligado", "Na nuvem", "Ela liga sozinha", "Abrir o Terminal", "Ligando"]) {
       expect(bannedIn(s, CLOUD_BANNED["pt-BR"]).length).toBeGreaterThan(0);
     }
     for (const s of ["Always on, day and night", "Sempre ligado, dia e noite", "Not answering · we're on it"]) {

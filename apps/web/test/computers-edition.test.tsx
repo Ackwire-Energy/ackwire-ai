@@ -4,8 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ComputerSetup } from "@agenteschat/client";
-import { cleanup } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { act, cleanup, fireEvent } from "@testing-library/react";
+import { ADA_ID, ATLAS_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -66,6 +66,59 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     expect(body()).not.toMatch(/na nuvem|seu computador|desligad|parear|terminal/i);
   });
 
+  test("its page, for a member: Open only beside the agents they may watch, and no word on who changes it", async () => {
+    const { api, machines } = await computers(`/org/${ORG_ID}/settings/computers`, {
+      setup: { state: "ready" },
+      role: "member",
+    });
+    const m = machines.pair({
+      name: "Computador da Acme",
+      kind: "managed",
+      os: "other",
+      pairedBy: null,
+      canManage: false,
+    });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
+    await api.sandbox.setTarget(ORG_ID, ATLAS_ID, m.id);
+    // Atlas's computer isn't this member's to watch: its dialog would only say so.
+    fakeBrowserOf.get(api)?.forbidden.add(ATLAS_ID);
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/settings/computers/${m.id}`, { api });
+    await settle(10);
+    expect(screen().getByRole("button", { name: "Abrir: Computador da Ada" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Abrir: Computador do Atlas" })).toBeNull();
+    // Nobody in the workspace changes what its own computer allows: no note that only admins do.
+    expect(document.body.textContent).not.toContain("mudam o que este computador libera");
+  });
+
+  test("before the server says which edition this is, neither's cards: a failed answer says so and asks again", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ step: "installing" });
+    const answer = api.machines.computerSetup;
+    let down = true;
+    api.machines.computerSetup = async (orgId) => {
+      if (down) throw new TypeError("Failed to fetch");
+      return answer(orgId);
+    };
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(10);
+    for (const name of [
+      "Computador deste servidor",
+      "Outros computadores",
+      "Conectar outro computador",
+      "Qual computador cada agente usa",
+    ])
+      expect(region(name)).toBeNull();
+    expect(body()).not.toContain("install.sh");
+    expect(body()).toContain("Não foi possível carregar. Confira a conexão e tente de novo.");
+    down = false;
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Tentar de novo" })));
+    await settle(8);
+    expect(region("Computador da Acme")).toBeTruthy();
+    expect(body()).toContain("Onde os agentes trabalham: um computador só deste workspace");
+  });
+
   test("an agent on it: Trabalha no Computador da Acme, with no chevron and no picker in its settings", async () => {
     await computers(`/org/${ORG_ID}/agents/${ADA_ID}`, { setup: { state: "preparing" } });
     expect(document.querySelector(".agp-workcard")?.textContent).toContain("Computador da Acme");
@@ -105,10 +158,12 @@ describe("Configurações → Computadores on self-host", () => {
   test("with no computer of the server's own, admins read how to make it one, only while sign-up is closed", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`);
     const missing = region("Computador deste servidor") as HTMLElement;
+    // The guide's steps: the installer takes no option for it yet (its setup refuses unknown ones).
     expect(missing.textContent).toContain(
-      "Este servidor também pode ser o computador dos agentes: rode sh install.sh --computer yes onde o agentes.chat está instalado.",
+      "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no SELF_HOSTING.md.",
     );
-    expect(missing.querySelector("code")?.textContent).toBe("sh install.sh --computer yes");
+    expect(missing.querySelector("code")?.textContent).toBe("SELF_HOSTING.md");
+    expect(missing.textContent).not.toContain("--computer");
     cleanup();
     // Open sign-up: the server refuses a computer of its own, so nothing to suggest.
     await computers(`/org/${ORG_ID}/settings/computers`, { signupOpen: true });

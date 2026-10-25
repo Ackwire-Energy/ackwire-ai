@@ -1,7 +1,14 @@
 import type { Machine, Model, Role } from "@agenteschat/client";
-import { keys, useComputerSetup, useConfirmDevice, useMachines, useMe, useSandboxSettings } from "@agenteschat/client";
+import {
+  keys,
+  meQuery,
+  useComputerSetup,
+  useConfirmDevice,
+  useMachines,
+  useSandboxSettings,
+} from "@agenteschat/client";
 import { type SetupView, setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
 import {
@@ -396,11 +403,13 @@ export function OnboardingPage() {
   const sandbox = useSandboxSettings(created?.orgId ?? "", Boolean(created) && step.id === "computer");
   // Daytona's sandboxes are a choice only on a server that has them.
   const daytona = sandbox.data?.available === true;
-  const me = useMe();
   // Where the workspace gets its own computer (ADR 0056 §10): no choice to make, only its progress (polled:
-  // no socket is open here).
-  const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), step.id === "computer" ? 5000 : false);
+  // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown.
+  const computerPoll = step.id === "computer" ? 5000 : false;
+  const me = useQuery({ ...meQuery(api), refetchInterval: computerPoll });
+  const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), computerPoll);
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
+  const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
 
   const saveComputer = useMutation({
     mutationFn: async () => {
@@ -774,7 +783,8 @@ export function OnboardingPage() {
               <WorkspaceComputerStep
                 view={workspaceComputer}
                 orgName={orgName}
-                reader={{ owner: true, email: me.data?.user.email ?? "", held: false }}
+                reader={{ owner: true, email: me.data?.user.email ?? "", held: hold !== null }}
+                hold={hold}
               />
             </div>
           )}
@@ -1406,9 +1416,20 @@ function ComputerStep({
 
 /**
  * Where the workspace gets its own computer: no choice, only its progress, live, with the time left and who
- * hears when it's ready (whoever creates the workspace owns it); the person goes on meanwhile.
+ * hears when it's ready (whoever creates the workspace owns it); the person goes on meanwhile. On hold, the hold
+ * speaks instead of a time (its computer waits for the hold too).
  */
-function WorkspaceComputerStep({ view, orgName, reader }: { view: SetupView; orgName: string; reader: WaitReader }) {
+function WorkspaceComputerStep({
+  view,
+  orgName,
+  reader,
+  hold,
+}: {
+  view: SetupView;
+  orgName: string;
+  reader: WaitReader;
+  hold: string | null;
+}) {
   const { t } = useTranslation();
   return (
     <Card as="div" className="onb__workspace-computer">
@@ -1419,6 +1440,12 @@ function WorkspaceComputerStep({ view, orgName, reader }: { view: SetupView; org
           <span className="small muted">{t("computerSetup.lead")}</span>
         </span>
       </div>
+      {hold && (
+        <p className="setup-line" role="status">
+          <Icon name="pause" size={14} />
+          <span>{hold}</span>
+        </p>
+      )}
       <SetupWait view={view} reader={reader} />
       {view.phase !== "ready" && (
         <p className="onb__status">

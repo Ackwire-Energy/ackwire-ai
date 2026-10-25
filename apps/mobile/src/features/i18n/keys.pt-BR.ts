@@ -486,8 +486,6 @@ export const featureKeysPtBR = {
     submit: "Pedir um plano",
     created: "{{name}} está montando o plano",
     noAgents: "Nenhum agente pode fazer missões ainda. Conecte um computador pelo site.",
-    computerOn: "{{name}} · ligado",
-    computerOff: "{{name}} · desligado",
     reason: {
       no_computer: "Precisa de um computador conectado",
       cloud_computer: "Missões nas sandboxes da Daytona chegam em breve",
@@ -511,6 +509,7 @@ export const featureKeysPtBR = {
     itemsDone: "de {{total}} itens prontos",
     computerOn: "{{name}} · ligado",
     computerOff: "{{name}} · desligado",
+    computerNotAnswering: "{{name}} · sem resposta",
     running_one: "{{count}} item em andamento",
     running_other: "{{count}} itens em andamento",
     conversation: "Conversa da missão",

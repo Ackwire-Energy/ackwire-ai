@@ -22,6 +22,7 @@ import {
 } from "../../src/features/computer/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
+import { missionComputerKey } from "../../src/features/missions/logic";
 import { withMobileKeys } from "../../src/i18n/merge";
 
 async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
@@ -45,6 +46,8 @@ const CLOUD_KEYS = [
   "outage.titleCloud",
   "outage.a11yCloud",
   "outage.cloudSub",
+  "mission.computerOn",
+  "mission.computerNotAnswering",
 ] as const;
 
 const at = (strings: object, path: string) =>
@@ -72,6 +75,18 @@ describe("the agent's computer on the phone: its words by edition", () => {
     );
     const en = await translator("en");
     expect(en("mobile.browser.card.computer", { title: "Sign in" })).toBe("Help from a laptop: Sign in");
+  });
+
+  test("a mission's computer on the Cloud isn't answering, never off", async () => {
+    expect(missionComputerKey(false, true)).toBe("mobile.mission.computerNotAnswering");
+    expect(missionComputerKey(false, false)).toBe("mobile.mission.computerOff");
+    expect(missionComputerKey(true, true)).toBe("mobile.mission.computerOn");
+    const t = await translator("pt-BR");
+    expect(t(missionComputerKey(false, true), { name: "Computador da Acme" })).toBe(
+      "Computador da Acme · sem resposta",
+    );
+    const en = await translator("en");
+    expect(en(missionComputerKey(false, true), { name: "Acme's computer" })).toBe("Acme's computer · not answering");
   });
 
   test("a closed browser keeps its sign-ins and promises no reopening", async () => {
@@ -212,9 +227,17 @@ describe("the profile's Computador entry on the phone", () => {
     const screenAsk = entryState(facts({ handoff: request({ screen: "desktop" }) }), NOW);
     expect(screenAsk.kind).toBe("needsYou");
     expect(phoneEntryButton(screenAsk)).toBe("open");
-    expect(screenRequest(request({ screen: "desktop" }))?.id).toBe("h1");
-    expect(screenRequest(request({ screen: "desktop", status: "done" }))).toBeNull();
-    expect(screenRequest(request())).toBeNull();
+    expect(screenRequest(request({ screen: "desktop" }), NOW)?.id).toBe("h1");
+    expect(screenRequest(request({ screen: "desktop", status: "done" }), NOW)).toBeNull();
+    expect(screenRequest(request(), NOW)).toBeNull();
+    // Only a request still waiting: not one someone already helps with, not one past its time, and never a take
+    // over, which asks nothing (its banner would read "Ajude pelo notebook: " with nothing after it).
+    const helping = request({ screen: "desktop", status: "active", controllerUserId: "ana" });
+    expect(screenRequest(helping, NOW)).toBeNull();
+    expect(screenRequest(request({ screen: "desktop" }), NOW + 5 * 60_000)).toBeNull();
+    const takeover = request({ screen: "desktop", kind: "takeover", instructions: "", status: "active" });
+    expect(screenRequest({ ...takeover, controllerUserId: "ana" }, NOW)).toBeNull();
+    expect(screenRequest({ ...takeover, status: "pending" }, NOW)).toBeNull();
     // A request for someone else, and no computer (the phone has no picker): Open.
     expect(phoneEntryButton(entryState(facts({ handoff: request({ requestedForUserId: "ana" }) }), NOW))).toBe("open");
     const none = entryState(facts({ edition: "selfhost", machine: null, desktop: null, browser: false }), NOW);

@@ -213,6 +213,22 @@ export const setupNoticeKey = (orgId: string, view: SetupView) =>
  */
 export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 
+/**
+ * The agent's computer as this reader calls it. The workspace's own keeps the name it got in its first owner's
+ * language (mirrors `managedMachineName` in packages/engine/src/machine-provisioning.ts) until someone renames
+ * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name.
+ */
+export function computerName(
+  t: TFunction,
+  orgName: string,
+  machine: Pick<Machine, "kind" | "name"> | null | undefined,
+): string {
+  const ours = t("computerSetup.title", { org: orgName });
+  if (!machine) return ours;
+  if (machine.kind !== "managed") return machine.name;
+  return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
+}
+
 export type NoComputer = "cloud" | "workspace" | "none";
 
 /**

@@ -2,6 +2,7 @@ import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
   useAiAccounts,
+  useComputerSetup,
   useConnections,
   useCredentials,
   useInvitations,
@@ -18,6 +19,7 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -65,7 +67,6 @@ import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
-import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
@@ -94,7 +95,8 @@ export function SettingsPage({
   const { org } = useOrg();
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
   const current = visible.some((s) => s.id === section) ? section : "general";
-  const edition = useComputerEdition(org.id);
+  const setup = useComputerSetup(org.id);
+  const edition = computerEdition(setup.data);
 
   return (
     <div className="settings">
@@ -148,8 +150,8 @@ export function SettingsPage({
               <p className="muted" style={{ margin: 0 }}>
                 {edition === "cloud" ? t("computers.leadCloud") : t("computers.lead")}
               </p>
-            ) : (
-              // Never one edition's words before the server says which this is.
+            ) : setup.isError ? null : (
+              // Never one edition's words before the server says which this is (the section says if it couldn't).
               <LoadingLine width={320} />
             )}
           </header>

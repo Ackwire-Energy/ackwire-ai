@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ComputerSetup, Machine } from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -238,6 +239,28 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     expect(work.textContent).not.toMatch(/nuvem/i);
   });
 
+  test("who hears when it's ready: owners of a server that sends email; anyone else reads it shows here", async () => {
+    const wait = { state: "waiting", reason: "capacity", notifyByEmail: true } as const;
+    const card = () => screen().getByRole("region", { name: "Computador da Acme" }).textContent ?? "";
+    await open(`/org/${ORG_ID}/settings/computers`, wait);
+    expect(card()).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto. Pode fechar esta página.");
+    expect(card()).not.toContain("Aparece aqui");
+    cleanup();
+
+    // Only owners get the email: nobody else is promised it.
+    const member = seedState();
+    if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
+    await open(`/org/${ORG_ID}/settings/computers`, wait, member);
+    expect(card()).toContain("Aparece aqui assim que ficar pronto.");
+    expect(card()).not.toContain("Avisamos");
+    cleanup();
+
+    // A server that sends no email promises none, to owners either.
+    await open(`/org/${ORG_ID}/settings/computers`, { ...wait, notifyByEmail: false });
+    expect(card()).toContain("Aparece aqui assim que ficar pronto.");
+    expect(card()).not.toContain("Avisamos");
+  });
+
   test("while it is on its way: no picker either, the wait in its place", async () => {
     await open(`/org/${ORG_ID}/settings/computers`, { state: "waiting", reason: "capacity" });
     expect(screen().queryByRole("region", { name: "Qual computador cada agente usa" })).toBeNull();
@@ -362,5 +385,45 @@ describe("the onboarding where the workspace gets its own computer", () => {
     await click(button("Continuar"));
     await settle(4);
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+  });
+
+  test("a hold put on the new workspace meanwhile: the hold speaks, with no time and no email", async () => {
+    const state = seedState();
+    if (state.me) state.me.organizations = [];
+    const r = await open(
+      "/onboarding",
+      { state: "preparing", step: "installing", secondsLeft: 330, notifyByEmail: true },
+      state,
+    );
+    const type = async (label: string, value: string) => {
+      await act(async () => fireEvent.change(screen().getByLabelText(label), { target: { value } }));
+      await settle(2);
+    };
+    const button = (name: string) => screen().getByRole("button", { name });
+    await type("Nome", "Acme Saúde");
+    await click(button("Continuar"));
+    await settle(4);
+    await type("Contexto", "Clínicas.");
+    await click(button("Continuar"));
+    await settle(4);
+    await click(button("Pular esta etapa"));
+    await settle(6);
+    const step = () => (document.querySelector(".onb__workspace-computer") as HTMLElement).textContent ?? "";
+    expect(step()).toContain("Faltam uns 6 min");
+
+    // Held (a review of the new sign-up, say): its provisioner waits too, so no countdown and no promise.
+    const me = state.me;
+    if (!me) throw new Error("no me");
+    state.me = {
+      ...me,
+      organizations: me.organizations.map((o) =>
+        o.name === "Acme Saúde" ? { ...o, standing: { state: "hold", reason: null } } : o,
+      ),
+    };
+    await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.me }));
+    await settle(6);
+    expect(step()).toContain("Os agentes deste workspace estão pausados para uma revisão.");
+    expect(step()).not.toContain("Faltam");
+    expect(step()).not.toContain("Avisamos");
   });
 });

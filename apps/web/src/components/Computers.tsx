@@ -2,7 +2,7 @@ import { useComputerSetup, useSandboxSettings } from "@agenteschat/client";
 import { setupView } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AgentComputersCard, CloudComputerCard } from "@/components/AgentComputer";
-import { LoadingCards } from "@/components/Loading";
+import { ErrorState, LoadingCards } from "@/components/Loading";
 import { HostComputerCard, MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { WorkspaceComputerCard } from "@/components/WorkspaceComputer";
@@ -18,8 +18,14 @@ export function ComputersSection() {
   const setup = useComputerSetup(org.id);
   const view = setupView(setup.data, setup.dataUpdatedAt);
   const sandbox = useSandboxSettings(org.id, setup.data?.mode === "pair");
-  // No edition's cards for a moment before the server says which one this is.
-  if (setup.isLoading) return <LoadingCards count={2} />;
+  // No edition's cards before the server says which one this is: a failed answer is asked again, not guessed.
+  if (!setup.data) {
+    return setup.isError ? (
+      <ErrorState error={setup.error} onRetry={() => void setup.refetch()} />
+    ) : (
+      <LoadingCards count={2} />
+    );
+  }
   if (view) return <WorkspaceComputerCard view={view} />;
   return (
     <>

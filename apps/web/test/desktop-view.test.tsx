@@ -230,14 +230,16 @@ describe("the agent's screen in the computer dialog", () => {
     expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
 
-    // Its screen went away meanwhile: the server starts none for a held agent.
-    t.fake.desktops.set(ADA_ID, { ...RUNNING, running: false, held: true });
+    // Its screen went away meanwhile: the server starts none for a held agent. The close alone says so, before
+    // the screen's state (asked again at the close, and still saying it runs) could.
     await act(async () => t.sockets.desktops[0]?.serverClose(4502, "held"));
     await settle(6);
     expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
     expect(view().getAllByText("A Ada está em pausa por enquanto")).toHaveLength(1);
     expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
     // Not running and held: no socket tries again until the hold ends.
+    t.fake.desktops.set(ADA_ID, { ...RUNNING, running: false, held: true });
+    await act(async () => t.services.queryClient.invalidateQueries({ queryKey: keys.agentDesktop(ORG_ID, ADA_ID) }));
     await act(async () => new Promise((r) => setTimeout(r, 1100)));
     await settle(4);
     expect(t.sockets.desktops).toHaveLength(1);

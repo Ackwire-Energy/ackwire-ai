@@ -33,6 +33,8 @@ export const keys = {
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
+  /** Whether the agent has a run going now (its newest running run, if any). */
+  runningRuns: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs", "running"] as const,
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,

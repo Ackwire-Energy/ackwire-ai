@@ -147,6 +147,20 @@ describe("Conectar uma IA", () => {
     expect(within(none.dialog).getByRole("link", { name: "Conectar um computador" })).toBeTruthy();
   });
 
+  test("before the server says which edition this is: a wait, never a computer to connect", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [], computers: [] });
+    // The Cloud's answer still on its way: self-host's words would send its people to pair a computer.
+    api.machines.computerSetup = () => new Promise(() => {});
+    await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
+    await settle(6);
+    await click(screen().getByRole("button", { name: "Conectar uma IA" }));
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    expect(within(dialog).queryByRole("link", { name: "Conectar um computador" })).toBeNull();
+    expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado/);
+  });
+
   test("on the Cloud, while the workspace's computer is prepared: where plans will sign in and how long, no computer to connect", async () => {
     const { dialog } = await connect([], {
       step: "installing",

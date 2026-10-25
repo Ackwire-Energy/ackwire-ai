@@ -6,6 +6,7 @@ import { keys } from "../src/api/keys";
 import type { ComputerSetup, Me } from "../src/api/types";
 import {
   agentsWaitingForComputer,
+  computerName,
   newerSetup,
   noComputerChoice,
   SETUP_STEPS,
@@ -142,6 +143,18 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupNoticeKey("o1", starting)).toBe(setupNoticeKey("o1", { ...starting }));
     expect(new Set([starting, installing, waiting].map((v) => setupNoticeKey("o1", v))).size).toBe(3);
     expect(setupNoticeKey("o1", starting)).not.toBe(setupNoticeKey("o2", starting));
+  });
+
+  test("named in the reader's words while it keeps the name it got, in any language; a name given to it stays", () => {
+    const managed = (name: string) => ({ kind: "managed" as const, name });
+    const ours = t("computerSetup.title", { org: "Oficina" });
+    // Before it exists, and under the name it got in its first owner's language, whichever that was.
+    expect(computerName(t, "Oficina", null)).toBe(ours);
+    expect(computerName(t, "Oficina", managed("Oficina's computer"))).toBe(ours);
+    expect(computerName(t, "Oficina", managed("Computador da Oficina"))).toBe(ours);
+    // Renamed by an admin: theirs. Any other computer: its own.
+    expect(computerName(t, "Oficina", managed("Servidor da loja"))).toBe("Servidor da loja");
+    expect(computerName(t, "Oficina", { kind: "connected", name: "Oficina's computer" })).toBe("Oficina's computer");
   });
 
   test("drawn as a server before and after it exists, never as the cloud computer an agent gets", () => {

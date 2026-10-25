@@ -55,6 +55,7 @@ export function BrowserCard({
   computer,
   surface = false,
   canTakeOver = true,
+  onClosed,
   style,
 }: {
   agentId: string;
@@ -73,11 +74,14 @@ export function BrowserCard({
   computer?: string | null;
   /**
    * The agent's computer full screen: always open, nothing to fold; Take control also opens a closed browser,
-   * and in control an empty or closed one gets an address to open (the phone has no other way to a site).
+   * and in control an empty or closed one gets an address to open (the phone has no other way to a site). The
+   * view's own head names it and says what goes on: the card keeps only the request or the site, and one action.
    */
   surface?: boolean;
   /** Take control may show: no hold or pause (the server still decides who may). */
   canTakeOver?: boolean;
+  /** Whether the agent's browser is closed (the full-screen view's sub-line says so). */
+  onClosed?: (closed: boolean) => void;
   style?: StyleProp<ViewStyle>;
 }) {
   const { t } = useTranslation();
@@ -120,6 +124,7 @@ export function BrowserCard({
   const doing = steps.at(-1);
   const helper = controller && !mine ? dir.nameOf({ type: "person", id: controller }) : "";
   const closed = live.unavailable === "closed";
+  useEffect(() => onClosed?.(closed), [closed, onClosed]);
   // Assumir and Parar need a live page to drive; full screen, Assumir also opens a closed browser (there is
   // an address to open a site there).
   const ready = watching && Boolean(live.frame) && !live.unavailable;
@@ -240,7 +245,11 @@ export function BrowserCard({
   const asked = (mine || waiting) && handoff?.instructions ? handoff.instructions : "";
   // Nothing going on (its profile, the agent idle): the agent's browser and where it runs, not "in the browser".
   const idle = !working && !handoff && !host;
-  const title = asked || host || (idle ? t("browser.inCard.group", agentGrammar(t, name)) : t("browser.watch.title"));
+  const title =
+    asked ||
+    host ||
+    (surface ? "" : idle ? t("browser.inCard.group", agentGrammar(t, name)) : t("browser.watch.title"));
+  const hasAction = Boolean(mine && handoff) || waiting || (!controller && canTake);
   const minutes = waiting ? handoffMinutesLeft(handoff, now) : null;
   const subtitle = mine
     ? host
@@ -263,86 +272,92 @@ export function BrowserCard({
   return (
     <View style={[styles.card, raised, style]}>
       <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
-      <Pressable
-        onPress={
-          surface
-            ? undefined
-            : () => {
-                tapHaptic();
-                setOpen(!open);
-              }
-        }
-        accessibilityRole={surface ? undefined : "button"}
-        accessibilityState={surface ? undefined : { expanded: open }}
-        accessibilityLabel={`${title}. ${subtitle}`}
-        style={styles.head}
-      >
-        {!open ? (
-          // Closed: the page's small live picture.
-          <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
-            {live.frame ? (
-              <Image
-                source={{ uri: `data:image/jpeg;base64,${live.frame.data}` }}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-                fadeDuration={0}
-              />
-            ) : (
-              <Icon name={live.hidden ? "eyeoff" : "globe"} size={18} color={c.faint} />
-            )}
-          </View>
-        ) : null}
-        <View style={styles.grow}>
-          <Text variant="footnote" tone="ink" numberOfLines={asked ? 2 : 1} style={styles.semibold}>
-            {title}
-          </Text>
-          <View style={styles.subRow}>
-            {working && !mine && !waiting && !helper && !closed ? <PixelOrbit color={color} size={10} /> : null}
-            <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {subtitle}
-            </Text>
-          </View>
-          {!open && !mine && !waiting ? (
-            <Text variant="caption" tone="faint" numberOfLines={1} style={styles.hint}>
-              {t("mobile.browser.card.expandHint")}
-            </Text>
-          ) : null}
-        </View>
-        {mine && handoff ? (
-          <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
-        ) : waiting ? (
-          <Button variant="primary" size="sm" label={t("mobile.browser.card.open")} onPress={answer} />
-        ) : (
-          <View style={styles.acts}>
-            {!controller && canTake ? (
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  label={surface ? t("desktop.takeover") : t("mobile.browser.live.takeOver")}
-                  onPress={takeover}
+      {surface && !title && !hasAction ? null : (
+        <Pressable
+          onPress={
+            surface
+              ? undefined
+              : () => {
+                  tapHaptic();
+                  setOpen(!open);
+                }
+          }
+          accessibilityRole={surface ? undefined : "button"}
+          accessibilityState={surface ? undefined : { expanded: open }}
+          accessibilityLabel={surface ? title : `${title}. ${subtitle}`}
+          style={styles.head}
+        >
+          {!open ? (
+            // Closed: the page's small live picture.
+            <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
+              {live.frame ? (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${live.frame.data}` }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                  fadeDuration={0}
                 />
-                {ready ? (
-                  <Pressable
-                    onPress={stop}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("mobile.browser.card.stop")}
-                    hitSlop={8}
-                    style={styles.icon}
-                  >
-                    <Icon name="stop" size={16} color={c.muted} />
-                  </Pressable>
-                ) : null}
-              </>
+              ) : (
+                <Icon name={live.hidden ? "eyeoff" : "globe"} size={18} color={c.faint} />
+              )}
+            </View>
+          ) : null}
+          <View style={styles.grow}>
+            {title ? (
+              <Text variant="footnote" tone="ink" numberOfLines={asked ? 2 : 1} style={styles.semibold}>
+                {title}
+              </Text>
             ) : null}
             {surface ? null : (
-              <View style={open ? styles.flip : undefined}>
-                <Icon name="chev" size={14} color={c.faint} />
+              <View style={styles.subRow}>
+                {working && !mine && !waiting && !helper && !closed ? <PixelOrbit color={color} size={10} /> : null}
+                <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
+                  {subtitle}
+                </Text>
               </View>
             )}
+            {!open && !mine && !waiting ? (
+              <Text variant="caption" tone="faint" numberOfLines={1} style={styles.hint}>
+                {t("mobile.browser.card.expandHint")}
+              </Text>
+            ) : null}
           </View>
-        )}
-      </Pressable>
+          {mine && handoff ? (
+            <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
+          ) : waiting ? (
+            <Button variant="primary" size="sm" label={t("mobile.browser.card.open")} onPress={answer} />
+          ) : (
+            <View style={styles.acts}>
+              {!controller && canTake ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={surface ? t("desktop.takeover") : t("mobile.browser.live.takeOver")}
+                    onPress={takeover}
+                  />
+                  {ready && !surface ? (
+                    <Pressable
+                      onPress={stop}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("mobile.browser.card.stop")}
+                      hitSlop={8}
+                      style={styles.icon}
+                    >
+                      <Icon name="stop" size={16} color={c.muted} />
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : null}
+              {surface ? null : (
+                <View style={open ? styles.flip : undefined}>
+                  <Icon name="chev" size={14} color={c.faint} />
+                </View>
+              )}
+            </View>
+          )}
+        </Pressable>
+      )}
 
       {open ? (
         <>

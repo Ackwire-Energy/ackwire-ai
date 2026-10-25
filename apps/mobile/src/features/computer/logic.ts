@@ -1,4 +1,4 @@
-import { type BrowserHandoff, handoffScreen, type ScreenStep } from "@agenteschat/client";
+import { type BrowserHandoff, handoffScreen, isWaitingHandoff, type ScreenStep } from "@agenteschat/client";
 import {
   type AgentComputerFacts,
   type EntryState,
@@ -60,9 +60,12 @@ export function phoneStage(f: AgentComputerFacts, screenWork: boolean): PhoneSta
 export const phoneEntryButton = (s: EntryState): "help" | "open" =>
   entryButton(s) === "help" && s.kind === "needsYou" && handoffScreen(s.handoff) === "browser" ? "help" : "open";
 
-/** A request on the agent's screen, open: the phone says to help from a laptop. */
-export const screenRequest = (h: BrowserHandoff | null) =>
-  h && (h.status === "pending" || h.status === "active") && handoffScreen(h) === "desktop" ? h : null;
+/**
+ * A request of the agent's on its screen, waiting for someone: the phone says to help from a laptop. Not a take
+ * over (it asks nothing) nor a request someone already helps with (the sub-line says who is in control).
+ */
+export const screenRequest = (h: BrowserHandoff | null, nowMs = Date.now()) =>
+  h && h.kind === "ask" && isWaitingHandoff(h, nowMs) && handoffScreen(h) === "desktop" ? h : null;
 
 /** "Trocar computador" on an offline computer: only on self-host (the Cloud has no other), for who manages it. */
 export const offersSwitch = (f: Pick<AgentComputerFacts, "edition">, manages: boolean, hasOutage: boolean) =>

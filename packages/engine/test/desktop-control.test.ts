@@ -387,7 +387,8 @@ describe("the agent asks for help on its desktop", () => {
       renderPush("pt-BR", { kind: "browser_handoff", waiting: true, actorName: "Dev", screen: "desktop" }),
     ).toEqual({
       title: "Dev precisa de você no computador",
-      body: "Abra num computador para ver a tela.",
+      // "a computer" alone would read as the agent's own: a laptop, where the screen is helped.
+      body: "Abra o agentes.chat num notebook para ajudar.",
     });
   });
 
