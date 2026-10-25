@@ -4,21 +4,21 @@ import { xmlEscape } from "./xml";
 
 /**
  * The agents' desktops' own look (ADR 0058 §15): the agentes.chat wallpaper and a dock floating at the bottom
- * center (the mark opens the apps menu, then Files and Terminal, then a button for each open window), one
+ * center (the mark, which opens the apps menu, then Files and Terminal, then a button for each open window), one
  * workspace, no top panel and no desktop icons, Orchis's light theme where it is installed.
  *
  * - It is XFCE's own settings, written into the desktop session's HOME only (the agent's own home in system
  *   mode, `<agent folder>/.agentes/home` otherwise), by the agent's own process (`LOOK_SCRIPT`): never the
  *   computer's settings, so a self-hosted computer's own desktop stays as it is.
  * - Versioned: the HOME's marker names the look written there. A desktop gets it at its first start, and
- *   again once when the version (or the theme the computer has) changes; what a person changes in between
- *   stays until then.
+ *   again once when the version, the theme the computer has or the HOME's own path changes; what a person
+ *   changes in between stays until then.
  * - The dock is the panel's own launcher and window-button plugins, which the agent's desktop use reads
  *   (ADR 0062): a dock plugin that runs in a process of its own isn't on the accessibility bus.
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 1;
+export const LOOK_VERSION = 2;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -34,8 +34,11 @@ const SVG_LOADERS = ["x86_64-linux-gnu", "aarch64-linux-gnu"].flatMap((triplet) 
 export const lookTheme = (exists: (path: string) => boolean): LookTheme =>
   exists(ORCHIS) && SVG_LOADERS.some(exists) ? "orchis" : "stock";
 
-/** What the marker says: the look's version and theme. */
-export const lookId = (theme: LookTheme) => `${LOOK_VERSION}:${theme}`;
+/**
+ * What the marker says: the look's version, its theme and the HOME it was written for. Its settings name files
+ * by their full path, and a HOME can move (single-user mode renames an agent's folder with its handle).
+ */
+export const lookId = (theme: LookTheme, home: string) => `${LOOK_VERSION}:${theme}:${home}`;
 
 /** The look's own files and its marker, under HOME. */
 export const LOOK_DIR = ".local/share/agentes";
@@ -52,7 +55,8 @@ const INK = "4, 32, 63";
 /**
  * The dock: floating (p=0) with its center 31 px above the bottom, so it stays centered as windows come and go.
  * It reserves no room of its own: xfwm4's margin_bottom keeps maximized windows 60 px above the bottom. Plugin
- * ids name their widgets (`#separator-2` in gtk.css) and the launchers' folders (`launcher-3`).
+ * ids name their widgets (`#separator-2` in gtk.css) and the launchers' folders (`launcher-3`). No gap before
+ * the windows: a separator there would also stand in the empty dock, off its center.
  */
 const panel = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
 
@@ -74,7 +78,6 @@ const panel = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
         <value type="int" value="3"/>
         <value type="int" value="4"/>
         <value type="int" value="5"/>
-        <value type="int" value="6"/>
       </property>
     </property>
   </property>
@@ -96,10 +99,7 @@ const panel = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
         <value type="string" value="terminal.desktop"/>
       </property>
     </property>
-    <property name="plugin-5" type="string" value="separator">
-      <property name="style" type="uint" value="0"/>
-    </property>
-    <property name="plugin-6" type="string" value="tasklist">
+    <property name="plugin-5" type="string" value="tasklist">
       <property name="show-labels" type="bool" value="false"/>
       <property name="grouping" type="bool" value="false"/>
       <property name="include-all-workspaces" type="bool" value="false"/>
@@ -142,7 +142,10 @@ const backdrop = (home: string) => `<?xml version="1.0" encoding="UTF-8"?>
 </channel>
 `;
 
-/** vblank_mode off as desktop-session.ts's PREPARE keeps it; no shadow around the dock's square window. */
+/**
+ * vblank_mode off as desktop-session.ts's PREPARE keeps it; no shadow around the dock's square window. New windows
+ * centered: xfwm4 centers only those under `placement_ratio` percent of the screen and fits the rest into corners.
+ */
 const windowManager = (theme: LookTheme) => `<?xml version="1.0" encoding="UTF-8"?>
 
 <channel name="xfwm4" version="1.0">
@@ -154,6 +157,7 @@ const windowManager = (theme: LookTheme) => `<?xml version="1.0" encoding="UTF-8
     <property name="button_layout" type="string" value="|HMC"/>
     <property name="workspace_count" type="int" value="1"/>
     <property name="placement_mode" type="string" value="center"/>
+    <property name="placement_ratio" type="int" value="100"/>
     <property name="show_dock_shadow" type="bool" value="false"/>
     <property name="show_frame_shadow" type="bool" value="true"/>
     <property name="show_popup_shadow" type="bool" value="true"/>
@@ -186,6 +190,7 @@ const settings = (theme: LookTheme) => `<?xml version="1.0" encoding="UTF-8"?>
 </channel>
 `;
 
+/** The design system's dark tokens, also for the 16 colors programs print in (the shell's prompt among them). */
 const TERMINAL = `<?xml version="1.0" encoding="UTF-8"?>
 
 <channel name="xfce4-terminal" version="1.0">
@@ -195,6 +200,7 @@ const TERMINAL = `<?xml version="1.0" encoding="UTF-8"?>
   <property name="color-cursor-use-default" type="bool" value="false"/>
   <property name="color-cursor" type="string" value="#5aa8ff"/>
   <property name="color-bold-use-default" type="bool" value="true"/>
+  <property name="color-palette" type="string" value="#242423;#f08a80;#5fc48a;#e0a84a;#5aa8ff;#c9a2f5;#6cc7d6;#d6d6d2;#71716c;#f5a69e;#7fd3a2;#ebbd6a;#8cc3ff;#d9bdfa;#92d8e3;#efefec"/>
 </channel>
 `;
 
@@ -249,6 +255,26 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
 }
 `;
 
+/**
+ * The apps menu: XFCE's own, laid out without its first and last groups (Run Program, About, Log Out), which are
+ * missing or hidden here and left a separator alone at each end.
+ */
+const MENU = `<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+
+<Menu>
+  <Name>Xfce</Name>
+  <MergeFile type="parent"/>
+  <Layout>
+    <Filename>xfce4-terminal-emulator.desktop</Filename>
+    <Filename>xfce4-file-manager.desktop</Filename>
+    <Separator/>
+    <Menuname>Settings</Menuname>
+    <Separator/>
+    <Merge type="all"/>
+  </Layout>
+</Menu>
+`;
+
 const launcher = (name: string, exec: string, icon: string) =>
   `[Desktop Entry]\nType=Application\nName=${name}\nExec=${exec}\nIcon=${icon}\nStartupNotify=true\n`;
 /** Out of the apps menu: a browser and a mail reader that aren't installed, and Log Out, which ends the desktop. */
@@ -269,6 +295,7 @@ export function lookFiles(home: string, theme: LookTheme): { path: string; data:
       launcher("Terminal", "xfce4-terminal", "org.xfce.terminalemulator"),
     ],
     [".config/gtk-3.0/gtk.css", GTK_CSS],
+    [".config/menus/xfce-applications.menu", MENU],
     [".local/share/applications/xfce4-web-browser.desktop", hidden("Web Browser")],
     [".local/share/applications/xfce4-mail-reader.desktop", hidden("Mail Reader")],
     [".local/share/applications/xfce4-session-logout.desktop", hidden("Log Out")],
@@ -279,19 +306,27 @@ export function lookFiles(home: string, theme: LookTheme): { path: string; data:
 }
 
 /**
- * Run as the agent (`lookCommand`): unless the marker already names this look, each file is written (0600, its
- * folders 0700) and renamed into place, then the marker. As the agent's own process it writes nothing the agent
- * couldn't itself: a link the agent made in its home leads only to the agent's own files.
+ * Run as the agent (`lookCommand`), the files on its stdin, a `<path under HOME> <base64>` line each: unless the
+ * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, then the
+ * marker once all of them are. As the agent's own process it writes nothing the agent couldn't itself: a link the
+ * agent made in its home leads only to the agent's own files. What sits at a temporary name goes first and only a
+ * plain file is read as the marker, so a pipe left in the home can't hold the desktop's start.
  */
 export const LOOK_SCRIPT = [
-  'h=$1 v=$2 m="$1/$3" && shift 3 && umask 077',
-  '[ "$(cat "$m" 2>/dev/null)" = "$v" ] && exit 0',
-  'while [ $# -ge 2 ]; do f="$h/$1"; mkdir -p "$(dirname "$f")" && printf %s "$2" | base64 -d > "$f.new" && mv -f "$f.new" "$f" || exit 1; shift 2; done',
-  'mkdir -p "$(dirname "$m")" && printf "%s\\n" "$v" > "$m"',
+  'h=$1 v=$2 m="$1/$3" n=$4 && umask 077',
+  '[ -f "$m" ] && [ "$(cat "$m")" = "$v" ] && exit 0',
+  'while [ "$n" -gt 0 ] && read -r p b; do f="$h/$p" && mkdir -p "$(dirname "$f")" && rm -f "$f.new" && printf %s "$b" | base64 -d > "$f.new" && mv -f "$f.new" "$f" || exit 1; n=$((n - 1)); done',
+  '[ "$n" -eq 0 ] && mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
 ].join("\n");
 
-/** `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> (<path under HOME> <base64>)...` */
-export function lookCommand(home: string, theme: LookTheme): string[] {
-  const files = lookFiles(home, theme).flatMap((f) => [f.path, f.data.toString("base64")]);
-  return ["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, lookId(theme), LOOK_MARKER, ...files];
+/**
+ * `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> <file count>`, the files as its input. Not as
+ * arguments: in system mode systemd-run names the agent's scope after its command line, and the journal logs it.
+ */
+export function lookCommand(home: string, theme: LookTheme): { argv: string[]; input: string } {
+  const files = lookFiles(home, theme);
+  return {
+    argv: ["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, lookId(theme, home), LOOK_MARKER, String(files.length)],
+    input: files.map((f) => `${f.path} ${f.data.toString("base64")}\n`).join(""),
+  };
 }

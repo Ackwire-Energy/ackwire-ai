@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, writeSync
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
-import { LOOK_MARKER, LOOK_SCRIPT, lookId } from "../../runner/desktop-look";
+import { LOOK_MARKER, LOOK_SCRIPT, lookFiles, lookId } from "../../runner/desktop-look";
 import {
   DesktopSessions,
   type DesktopSessionsOptions,
@@ -42,7 +42,7 @@ const commandOf = (p: FakeProc) =>
 /**
  * A computer with no X: the prepare script makes its folders, the look's
  * script only answers, "Xtigervnc" takes its display's lock and socket, and
- * every process lives until killed.
+ * every process lives until killed (`hangs`: the prepare's or the look's too).
  */
 function fakeComputer(lockDir: string) {
   const procs: FakeProc[] = [];
@@ -53,6 +53,7 @@ function fakeComputer(lockDir: string) {
   let xvncFails: string | null = null;
   let lookFails = false;
   const files = new Set<string>();
+  const hangs = new Set<string>();
   const system: DesktopSystem = {
     platform: "linux",
     pty: true,
@@ -78,7 +79,9 @@ function fakeComputer(lockDir: string) {
       };
       procs.push(p);
       const command = commandOf(p);
-      if (command === "agentes-look") {
+      if (hangs.has(command ?? "")) {
+        // held up: it ends only when killed
+      } else if (command === "agentes-look") {
         queueMicrotask(() => p.exit(lookFails ? 1 : 0));
       } else if (command === "sh") {
         for (const dir of argv.slice(-4, -2)) mkdirSync(dir, { recursive: true });
@@ -118,6 +121,8 @@ function fakeComputer(lockDir: string) {
     },
     /** Files the computer has (`exists`). */
     files,
+    /** Commands that never end by themselves ("sh": the prepare, "agentes-look"). */
+    hangs,
   };
 }
 
@@ -326,7 +331,7 @@ test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settin
   // The look's own xfwm4 settings came after, the vblank still off.
   expect(readFileSync(settings, "utf8")).toContain('name="margin_bottom"');
   const home = path.join(t.folders, "dev", ".agentes", "home");
-  expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId("stock")}\n`);
+  expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId("stock", home)}\n`);
 
   // xfwm4 writes every setting it has on its first start; the next start changes that one only.
   const own = [
@@ -358,24 +363,17 @@ test("the look: written as the agent into its desktop's HOME, after the prepare 
   expect(t.fake.procs.indexOf(prepare)).toBeLessThan(t.fake.procs.indexOf(look));
   expect(t.fake.procs.indexOf(look)).toBeLessThan(t.fake.procs.indexOf(xvnc));
   const home = path.join(t.folders, "dev", ".agentes", "home");
-  expect(look.argv.slice(0, 8)).toEqual([
-    "/bin/sh",
-    "-c",
-    LOOK_SCRIPT,
-    "agentes-look",
-    home,
-    lookId("stock"),
-    LOOK_MARKER,
-    expect.any(String),
-  ]);
+  const count = String(lookFiles(home, "stock").length);
+  expect(look.argv).toEqual(["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, lookId("stock", home), LOOK_MARKER, count]);
   expect(look.opts).toMatchObject({ cwd: "/", env: { HOME: home } });
+  expect(look.opts.input?.startsWith(".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml ")).toBe(true);
   await t.desktops.stop(dev);
 
   // A computer with Orchis and gdk-pixbuf's SVG loader gets its theme.
   t.fake.files.add("/usr/share/themes/Orchis-Light/xfwm4/themerc");
   t.fake.files.add("/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader_svg.so");
   await t.desktops.ensure(dev);
-  expect(t.fake.of("agentes-look").at(-1)?.argv[5]).toBe(lookId("orchis"));
+  expect(t.fake.of("agentes-look").at(-1)?.argv[5]).toBe(lookId("orchis", home));
   t.desktops.close();
 });
 
@@ -385,6 +383,26 @@ test("a look that can't be written never stops the desktop: it starts as its HOM
   expect(await t.desktops.ensure(dev)).toMatchObject({ started: true });
   expect(t.desktops.status(dev).running).toBe(true);
   expect(t.logs.some((l) => l.includes("keeps the look its home has"))).toBe(true);
+  t.desktops.close();
+});
+
+test("a step before X that is held up (a pipe in the HOME, a hung disk) is stopped: never the agent's desktop", async () => {
+  const t = setup({ stepMs: 30 });
+  t.fake.hangs.add("agentes-look");
+  expect(await t.desktops.ensure(dev)).toMatchObject({ started: true });
+  const [look] = t.fake.of("agentes-look");
+  expect(t.fake.kills).toContainEqual([look?.pid ?? 0, "SIGTERM"]);
+  expect(t.logs).toContainEqual(expect.stringContaining("writing the agentes.chat look was stopped after 0.03 s"));
+  await t.desktops.stop(dev);
+
+  // The prepare held up: that start fails, the display is free again, and the next start goes on.
+  t.fake.hangs.clear();
+  t.fake.hangs.add("sh");
+  expect(await errorCode(() => t.desktops.ensure(dev))).toBe("internal");
+  const [, prepare] = t.fake.of("sh");
+  expect(t.fake.kills).toContainEqual([prepare?.pid ?? 0, "SIGTERM"]);
+  t.fake.hangs.clear();
+  expect(await t.desktops.ensure(dev)).toMatchObject({ display: 20, started: true });
   t.desktops.close();
 });
 
