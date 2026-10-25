@@ -4011,6 +4011,10 @@ export interface MailAccount {
   offActions: MailActionName[];
   /** Actions that always ask a person in this mailbox (`draft`, `organize`). */
   askActions: MailActionName[];
+  /** Other addresses of this mailbox: a reply goes out from the one the email arrived at. */
+  aliases: string[];
+  /** What new emails go out from; null = `address`. */
+  defaultFrom: string | null;
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }
@@ -4029,6 +4033,19 @@ export type MailActionName =
 
 /** Why an IMAP mailbox didn't connect (`422 { error }`). */
 export type MailConnectError = "auth" | "imap_unreachable" | "smtp_unreachable" | "tls" | "blocked_host" | "unknown";
+
+/** What a mailbox's PATCH changes (each field optional). */
+export interface MailAccountUpdate {
+  label?: string;
+  /** A new app password (IMAP): tested first, a `422` carries `MailConnectError`. */
+  password?: string;
+  offActions?: MailActionName[];
+  askActions?: MailActionName[];
+  /** The mailbox's other addresses (replaces the list). */
+  aliases?: string[];
+  /** One of `address` or `aliases`; null = `address`. */
+  defaultFrom?: string | null;
+}
 
 export interface MailImapInput {
   preset: string;
@@ -4062,7 +4079,7 @@ export interface MailPolicy {
   dailySendCap: number;
   /** Sends without asking (only with `allowedRecipients`). */
   sendWithoutAsking: boolean;
-  /** Send as this alias; null = the mailbox's address. */
+  /** The only address this agent sends from (one of the mailbox's); null = automatic (replies from where the email arrived). */
   fromAddress: string | null;
 }
 

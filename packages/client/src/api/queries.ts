@@ -60,7 +60,7 @@ import type {
   IssueStatus,
   Machine,
   MachineAccessReduce,
-  MailActionName,
+  MailAccountUpdate,
   MailImapInput,
   Message,
   MessageMemory,
@@ -746,6 +746,18 @@ export const useMailFolders = (orgId: string, accountId: string | null) => {
   });
 };
 
+/** Addresses a mailbox has sent from: what the addresses screen offers. */
+export const useMailSuggestedAddresses = (orgId: string, accountId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.mailSuggested(orgId, accountId ?? ""),
+    queryFn: () => api.mail.suggestedAddresses(orgId, accountId ?? ""),
+    enabled: Boolean(accountId),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+};
+
 /** An agent's access and rules per mailbox. */
 export const useAgentMail = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
@@ -773,16 +785,8 @@ export function useMailAction(orgId: string) {
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string }) => api.mail.connectComposio(orgId, input),
     }),
     update: useMutation({
-      mutationFn: ({
-        accountId,
-        ...input
-      }: {
-        accountId: string;
-        label?: string;
-        password?: string;
-        offActions?: MailActionName[];
-        askActions?: MailActionName[];
-      }) => api.mail.update(orgId, accountId, input),
+      mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>
+        api.mail.update(orgId, accountId, input),
       onSuccess: done,
       meta: { silent: true },
     }),

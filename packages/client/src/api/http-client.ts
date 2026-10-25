@@ -225,6 +225,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).account,
       disconnect: (orgId, accountId) =>
         request<void>(`${org(orgId)}/mail/accounts/${enc(accountId)}`, { method: "DELETE" }),
+      suggestedAddresses: async (orgId, accountId) =>
+        (await request<{ addresses: string[] }>(`${org(orgId)}/mail/accounts/${enc(accountId)}/suggested-addresses`))
+          .addresses,
       folders: async (orgId, accountId) =>
         (await request<{ folders: MailFolder[] }>(`${org(orgId)}/mail/accounts/${enc(accountId)}/folders`)).folders,
       agent: async (orgId, agentId) =>
