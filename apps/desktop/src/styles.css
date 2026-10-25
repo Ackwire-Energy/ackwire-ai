@@ -843,9 +843,23 @@ body[data-window="popover"] {
   white-space: nowrap;
 }
 /* A command under a line of text (Tailscale's, on Linux). */
-.dk-crow__text > .dk-fr__cmd,
 .dk-honest .dk-fr__cmd {
   margin-top: 6px;
+}
+/* A short command inside a line of text, with its copy button. */
+.dk-fr__cmd--inline {
+  display: inline-flex;
+  vertical-align: middle;
+  gap: 2px;
+  padding: 0 0 0 8px;
+  border-radius: 8px;
+}
+.dk-fr__cmd--inline code {
+  flex: none;
+}
+.dk-fr__cmd--inline .dk-iconbtn {
+  width: 24px;
+  height: 22px;
 }
 .dk-fr__ways {
   list-style: none;

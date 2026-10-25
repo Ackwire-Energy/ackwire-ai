@@ -189,7 +189,7 @@ export const desktopEn: DesktopTranslations = {
     reachText:
       "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat.",
     reachOff: "Tailscale is on this {{device}} but not connected. Open Tailscale and connect.",
-    reachOffTerminal: "Tailscale is on this {{device}} but not connected. Connect it in the terminal, then come back:",
+    reachOffTerminal: "Tailscale is on this {{device}} but not connected. Connect it in the terminal:",
     reachMissing:
       "Install Tailscale, free, to reach agentes.chat from your phone and invite teammates. You can do it later.",
     openTailscale: "Open Tailscale",
@@ -228,7 +228,7 @@ export const desktopEn: DesktopTranslations = {
       serve: "Tailscale on this {{device}} can't share it; install Tailscale from tailscale.com",
       operator: "Tailscale needs your permission first",
     },
-    operatorRun: "Run this once in the terminal, then try again:",
+    operatorRun: "Give that permission once, in the terminal:",
     turnOn: "Turn it on",
     copyDiagnostics: "Copy diagnostics",
     already: "agentes.chat is already installed on this {{device}}",

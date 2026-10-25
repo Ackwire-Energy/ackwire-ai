@@ -15,8 +15,11 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-/** A command to copy, with Copy turning into Copied. */
-export function CommandCopy({ command }: { command: string }) {
+/**
+ * A command to copy, with Copy turning into Copied. `inline`: a short one inside a line of text, with an icon
+ * button (a row that has no room for a box of its own).
+ */
+export function CommandCopy({ command, inline = false }: { command: string; inline?: boolean }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -24,6 +27,26 @@ export function CommandCopy({ command }: { command: string }) {
     const timer = setTimeout(() => setCopied(false), 2000);
     return () => clearTimeout(timer);
   }, [copied]);
+  const copy = () =>
+    void navigator.clipboard
+      .writeText(command)
+      .then(() => setCopied(true))
+      .catch(() => {});
+  if (inline) {
+    return (
+      <span className="dk-fr__cmd dk-fr__cmd--inline">
+        <code>{command}</code>
+        <button
+          type="button"
+          className="dk-iconbtn"
+          aria-label={copied ? t("desktop.common.copied") : t("desktop.common.copy")}
+          onClick={copy}
+        >
+          <Icon name={copied ? "check" : "copy"} size={14} />
+        </button>
+      </span>
+    );
+  }
   return (
     <div className="dk-fr__cmd">
       {/* Breaks only between words: a flag like `--network` never splits (selecting it copies the same text). */}
@@ -36,16 +59,7 @@ export function CommandCopy({ command }: { command: string }) {
           </span>
         ))}
       </code>
-      <Button
-        size="sm"
-        icon={copied ? "check" : "copy"}
-        onClick={() =>
-          void navigator.clipboard
-            .writeText(command)
-            .then(() => setCopied(true))
-            .catch(() => {})
-        }
-      >
+      <Button size="sm" icon={copied ? "check" : "copy"} onClick={copy}>
         {copied ? t("desktop.common.copied") : t("desktop.common.copy")}
       </Button>
     </div>

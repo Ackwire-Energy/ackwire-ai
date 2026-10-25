@@ -194,7 +194,7 @@ export const desktopPtBR = {
     reachText:
       "Com o Tailscale, uma rede particular dos seus aparelhos: o seu celular e quem você convidar entram nela, e mais ninguém chega ao agentes.chat.",
     reachOff: "O Tailscale está neste {{device}}, mas desconectado. Abra o Tailscale e conecte.",
-    reachOffTerminal: "O Tailscale está neste {{device}}, mas desconectado. Conecte pelo terminal e volte aqui:",
+    reachOffTerminal: "O Tailscale está neste {{device}}, mas desconectado. Conecte pelo terminal:",
     reachMissing:
       "Instale o Tailscale, que é grátis, para acessar o agentes.chat pelo celular e convidar a equipe. Dá para fazer depois.",
     openTailscale: "Abrir o Tailscale",
@@ -234,7 +234,7 @@ export const desktopPtBR = {
       serve: "o Tailscale deste {{device}} não consegue compartilhar; instale o Tailscale pelo tailscale.com",
       operator: "o Tailscale precisa da sua permissão antes",
     },
-    operatorRun: "Rode isto uma vez no terminal e tente de novo:",
+    operatorRun: "Dê essa permissão uma vez, no terminal:",
     turnOn: "Ligar",
     copyDiagnostics: "Copiar o diagnóstico",
     already: "O agentes.chat já está instalado neste {{device}}",

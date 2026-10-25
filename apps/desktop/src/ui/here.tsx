@@ -60,9 +60,14 @@ export function ReachRow({
                 </button>
               </>
             )}
+            {fromTerminal && (
+              <>
+                {" "}
+                <CommandCopy command={TAILSCALE_UP} inline />
+              </>
+            )}
           </span>
         </small>
-        {fromTerminal && <CommandCopy command={TAILSCALE_UP} />}
       </span>
       <span className="dk-crow__end">
         <Switch id="here-reach" checked={on} disabled={!usable || busy} onCheckedChange={onChange} />
