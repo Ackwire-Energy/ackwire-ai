@@ -1,6 +1,7 @@
-import { type Approval, type ApprovalEmail, useCatalog } from "@agenteschat/client";
-import { emailTitleWords } from "@agenteschat/client/lib/approval-kind";
+import { type Approval, type ApprovalEmail, useCatalog, useCustomServers } from "@agenteschat/client";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import type { TFunction } from "i18next";
 import { useState } from "react";
@@ -8,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Fuse, Icon, LineIcon, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
-import { useColors, useNow } from "../shared/hooks";
+import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
 import { approvalSaid, approvalTable, approvalTraits } from "./logic";
 
@@ -27,12 +28,15 @@ const TRAIT_ICON = {
   deletable: "undo",
 } as const;
 
-/** The action in words: an email's in the person's language ("Salvar um rascunho de resposta para…"), else the server's. */
-export function approvalTitleText(t: TFunction, a: Pick<Approval, "title" | "email">) {
-  if (!a.email) return a.title;
-  const words = emailTitleWords(a.email);
-  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
-  return tt(words.key, words.values);
+/**
+ * The action in words, as the web says it: an email's ("Salvar um rascunho de resposta para…"), a tool run by
+ * name ("Ver stack trace do evento", never "Sentry: Execute sentry tool"), the app's own tools, else the server's.
+ */
+export function approvalTitleText(
+  t: TFunction,
+  a: Pick<Approval, "tool" | "title" | "params" | "email"> & Partial<Pick<Approval, "connector">>,
+) {
+  return approvalTitle(t, a);
 }
 
 /** "rotina «X»" / "sem ninguém acompanhando", for the card's top line; null when a person was there. */
@@ -156,16 +160,39 @@ export function ApprovalTraits({ approval: a }: { approval: Approval }) {
   );
 }
 
-/** Por onde, then the exact values (at most `max` rows), on a sunken plate. */
-export function ApprovalDetails({ approval: a, max = 3 }: { approval: Approval; max?: number }) {
+/** Por onde, then the exact values (at most `max` rows; `long`: whole, every one), on a sunken plate. */
+export function ApprovalDetails({
+  approval: a,
+  max = 3,
+  long = false,
+}: {
+  approval: Approval;
+  max?: number;
+  long?: boolean;
+}) {
   const { t } = useTranslation();
   const c = useColors();
+  const orgId = useOrgId();
   const catalog = useCatalog();
+  // A server connected by address (`custom:{connectionId}`) goes by its own name ("Sentry"), as on the web.
+  const customId = a.connector?.startsWith("custom:") ? a.connector.slice("custom:".length) : null;
+  const servers = useCustomServers(orgId, customId !== null);
   // The connector's name from the catalog ("GitHub"); the raw id until it loads.
-  const rows = approvalTable(a, max, (id) => {
-    const def = catalog.data?.connectors.find((d) => d.id === id);
-    return def ? connectorName(t, def) : id;
-  });
+  const rows = approvalTable(
+    a,
+    max,
+    (id) => {
+      if (customId) {
+        const server = servers.data?.find((s) => s.id === customId);
+        return server
+          ? itemName(t, fromServer(server, catalog.data?.connectors ?? []))
+          : t("approvals.panel.orgConnector");
+      }
+      const def = catalog.data?.connectors.find((d) => d.id === id);
+      return def ? connectorName(t, def) : id;
+    },
+    long,
+  );
   if (rows.length === 0) return null;
   return (
     <View style={[styles.facts, { backgroundColor: c.sunken }]}>
@@ -177,7 +204,7 @@ export function ApprovalDetails({ approval: a, max = 3 }: { approval: Approval; 
           <Text variant="small" tone="muted" style={styles.factKey} numberOfLines={1}>
             {r.label ?? t("mobile.approval.via")}
           </Text>
-          <Text variant="small" tone="ink" style={styles.grow} numberOfLines={2}>
+          <Text variant="small" tone="ink" style={styles.grow} numberOfLines={long ? undefined : 2}>
             {r.value}
           </Text>
         </View>

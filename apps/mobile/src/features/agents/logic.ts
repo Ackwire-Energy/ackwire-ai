@@ -38,6 +38,8 @@ export interface WorkItem {
   plan: { done: number; total: number } | null;
   /** Since when (the mission's or the run's start, else when it was created). */
   since: string;
+  /** A run stopped on a person (your ok, your answer): it isn't working, it waits ("espera seu ok"). */
+  waiting: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
       missionId: m.id,
       plan: { done: m.plan.done, total: m.plan.total },
       since: m.startedAt ?? m.createdAt,
+      waiting: false,
     });
     seen.add(spot(m.agentId, m.channelId, m.threadId));
   }
@@ -82,6 +85,7 @@ export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] |
       missionId: null,
       plan: null,
       since: newest(r),
+      waiting: r.status === "waiting_approval" || r.status === "waiting_input",
     });
   }
   return out;

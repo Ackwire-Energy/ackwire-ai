@@ -38,7 +38,7 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
   trailing?: ReactNode;
   /** A hairline above, inset to the text column (every row but the first). */
   divider?: boolean;
-  /** A small ink dot left of the avatar (unread). */
+  /** A red dot on the right, centered on the row (unread), as messaging apps do. */
   dot?: boolean;
   /** Something new in it: the name bold, the time and the preview darker. */
   unread?: boolean;
@@ -77,7 +77,6 @@ export function ListRow({
       ]}
     >
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
-      {dot ? <View style={[styles.dot, { backgroundColor: c.ink }]} /> : null}
       <View style={styles.avatar}>{leading}</View>
       <View style={styles.tx}>
         <View style={styles.l1}>
@@ -115,6 +114,7 @@ export function ListRow({
           </View>
         ) : null}
       </View>
+      {dot ? <View style={[styles.dot, { backgroundColor: c.badge }]} /> : null}
     </Pressable>
   );
 }
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     minHeight: 82,
   },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  dot: { position: "absolute", left: 3, top: "50%", marginTop: -4, width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginLeft: -3 },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
   l1: { flexDirection: "row", alignItems: "center", gap: 6 },

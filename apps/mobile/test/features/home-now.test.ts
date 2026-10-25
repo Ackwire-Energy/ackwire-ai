@@ -31,6 +31,7 @@ const work = (key: string, agentId: string, over: Partial<WorkItem> = {}): WorkI
   missionId: null,
   plan: null,
   since: at(30),
+  waiting: false,
   ...over,
 });
 
