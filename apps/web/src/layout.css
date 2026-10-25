@@ -9261,9 +9261,13 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler". */
+/*
+ * Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler".
+ * At the right edge like "Visto": on the left, the agent's face read as the author of my next message.
+ */
 .msg-steer {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   min-height: 20px;
   margin: 4px 0 0;

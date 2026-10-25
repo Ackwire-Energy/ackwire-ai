@@ -3889,6 +3889,10 @@ a.ac-list__row:focus-visible {
     inset 0 0 0 1px var(--line),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
+/* The tile already holds the agent at work (its face moves): no halo around it, which looked like a bigger box. */
+.ac-avatar--framed.ac-avatar--running::after {
+  content: none;
+}
 .ac-avatar--framed .ac-avatar__canvas {
   left: 0;
   top: 0;
