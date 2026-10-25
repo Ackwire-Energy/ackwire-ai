@@ -4009,7 +4009,7 @@ p {
 }
 
 /* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
-   white with a hairline (one indicator slides between items); counts are plain numbers. */
+   white with a hairline, painted on the item itself (no sliding); counts are plain numbers. */
 .sidebar {
   position: relative;
   background: var(--side);
@@ -4026,27 +4026,9 @@ p {
   }
 }
 .sidebar > *,
-.sidebar__scroll > *:not(.sidebar__indicator) {
+.sidebar__scroll > * {
   position: relative;
   z-index: 1;
-}
-.sidebar__indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  border-radius: var(--control-r-md);
-  background: var(--side-active);
-  box-shadow: inset 0 0 0 1px var(--line);
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .sidebar__indicator {
-    transition:
-      transform 0.32s var(--spring),
-      width 0.2s var(--out),
-      height 0.2s var(--out);
-  }
 }
 /* Nav items are default controls of the ruler (40, r12). */
 .sidebar__item {
@@ -4061,12 +4043,12 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
-.sidebar__item[data-status="active"] {
-  background: transparent;
-  font-weight: 600;
-}
+.sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
-  background: transparent;
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 600;
+  transition: none;
 }
 .sidebar__label {
   font-size: 11.5px;
