@@ -4127,12 +4127,23 @@ p {
 .sidebar__jump-row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   margin-top: -8px;
 }
+/* The same 40px tile as the field beside it (a bare icon looked smaller than the field). */
 .sidebar__collapse.ac-btn {
   flex: none;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--control-r-md);
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
+}
+.sidebar__collapse.ac-btn:hover {
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
   .sidebar {
