@@ -46,7 +46,7 @@ const PAGE_POLL_MS = 30_000;
 /**
  * Full screen fills the screen with the dialog. The page itself goes full screen, not the dialog: noVNC's
  * mouse-capture layer lives on the page's body, and outside the full-screen element it would swallow the
- * first click after leaving it (Hand back did nothing once, then worked).
+ * first click after leaving it (Hand back would take two clicks).
  */
 function useFullScreen(full: boolean, setFull: (full: boolean) => void) {
   useEffect(() => {
