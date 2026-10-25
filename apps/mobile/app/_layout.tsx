@@ -3,9 +3,10 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { keys, useApi } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Entering } from "@/features/auth/Entering";
 import { forgetInvite, loadPendingInvite } from "@/features/auth/invite";
+import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
@@ -27,8 +28,8 @@ export default function RootLayout() {
 
 /**
  * Signed out → `(auth)`; signed in → `(app)` (the screens, which wait for the organization themselves). The
- * splash stays up until the fonts, the session and the organization are known, so nobody sees a flash of the
- * wrong side. Exactly one group is open at any moment: with both guarded (e.g. signed in while the
+ * splash (`LaunchSplash`) stays up until the fonts, the session and the organization are known, so nobody sees
+ * a flash of the wrong side. Exactly one group is open at any moment: with both guarded (e.g. signed in while the
  * organization still loads), expo-router sends the guarded screen to the first open route, `+not-found`, and
  * the app would stay there once the organization arrived. While the session is still being read (the saved
  * one comes out of SecureStore a moment after launch) `(app)` is the open one, so the URL the app opened with
@@ -45,9 +46,14 @@ function Gate() {
   const inApp = signedIn || session.pending;
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
 
+  // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
+  // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
+  const [launching, setLaunching] = useState(true);
+  const hideNative = useCallback(() => void SplashScreen.hideAsync().catch(() => {}), []);
+  const launched = useCallback(() => setLaunching(false), []);
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
+    if (ready) hideNative();
+  }, [ready, hideNative]);
 
   // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in.
   const [entering, setEntering] = useState(false);
@@ -79,6 +85,9 @@ function Gate() {
       {/* Signed in with no workspace yet: the first run (an invitation waiting is accepted instead). */}
       {ready && signedIn && org.none && !accepting ? <OnboardingFlow /> : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
+      {launching ? (
+        <LaunchSplash ready={ready} fontsReady={fontsReady} onShown={hideNative} onDone={launched} />
+      ) : null}
     </NavigationThemeProvider>
   );
 }

@@ -10,7 +10,7 @@ import { type DitherKind, shaderSource } from "./shaders";
 const effects = new Map<DitherKind, SkRuntimeEffect | null>();
 
 /** The compiled shader for a drawing (compiled once; null if the device refuses it). */
-function effectOf(kind: DitherKind): SkRuntimeEffect | null {
+export function effectOf(kind: DitherKind): SkRuntimeEffect | null {
   if (!effects.has(kind)) {
     let effect: SkRuntimeEffect | null = null;
     try {

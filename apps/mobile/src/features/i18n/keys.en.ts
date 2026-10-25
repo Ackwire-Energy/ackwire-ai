@@ -1293,6 +1293,10 @@ export const featureKeysEn: FeatureTranslations = {
     titleNew: "Entering…",
     lead: "Your conversations are on their way.",
   },
+  splash: {
+    slow: "Connecting…",
+    offline: "No connection. Trying again.",
+  },
   onb: {
     progress: "Step {{n}} of {{total}}",
     done: "Done",
