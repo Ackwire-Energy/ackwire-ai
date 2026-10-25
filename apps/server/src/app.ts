@@ -43,7 +43,12 @@ import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { threadRoutes } from "./routes/app/threads";
 import { wikiRoutes } from "./routes/app/wiki";
-import { createDesktopReleases, registerDesktopRoutes } from "./routes/desktop";
+import {
+  createDesktopReleases,
+  createNativeReleases,
+  registerDesktopRoutes,
+  registerNativeRoutes,
+} from "./routes/desktop";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
@@ -81,6 +86,7 @@ export interface AppOptions {
  * - `/api/git/*`          git proxy for agents' computers (their own credential, ADR 0024)
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
+ * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
@@ -158,6 +164,15 @@ export function createApp(options: AppOptions) {
         token: deps.config.DESKTOP_RELEASES_TOKEN,
         repo: deps.config.DESKTOP_RELEASES_REPO,
         publicUrl: deps.config.PUBLIC_URL,
+        fetch: deps.extras?.desktopFetch,
+      }),
+    );
+    registerNativeRoutes(
+      api,
+      deps,
+      createNativeReleases({
+        token: deps.config.DESKTOP_RELEASES_TOKEN,
+        repo: deps.config.DESKTOP_RELEASES_REPO,
         fetch: deps.extras?.desktopFetch,
       }),
     );
