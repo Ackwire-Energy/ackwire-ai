@@ -831,13 +831,18 @@ export class RunnerDaemon implements RequestObserver {
       desktopUse,
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
-    // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
+    // it lands in `hello` if it finishes first, else comes after as `accounts.changed`. Nothing reaches the
+    // server between `hello` and `welcome`, so what changed in that gap goes out with `welcome`.
     this.accounts.refresh(true).catch(() => undefined);
+    /** The accounts and usage the last `hello` carried (JSON). */
+    let told: string | undefined;
     const connection = new RunnerConnection({
       url: connectUrl(config.server),
       token: config.token,
       info: () => {
         const accounts = this.accounts.snapshot();
+        const usage = this.ownUsage();
+        told = JSON.stringify([accounts, usage]);
         return {
           ...this.info(workspaceReal),
           browser: browser.info(),
@@ -845,7 +850,7 @@ export class RunnerDaemon implements RequestObserver {
           terminal: this.terminals.info(),
           desktopUse: desktopUse.info(),
           ...(accounts ? { accounts } : {}),
-          ...this.ownUsage(),
+          ...usage,
           // Who may control a desktop or open a terminal follows it (ADR 0058 §4).
           ...(agentUser ? { mode: "system" as const } : {}),
         };
@@ -872,6 +877,11 @@ export class RunnerDaemon implements RequestObserver {
       onWelcome: () => {
         this.flushDecisions();
         this.syncLogo(config);
+        const accounts = this.accounts.snapshot();
+        const usage = this.ownUsage();
+        if (accounts && JSON.stringify([accounts, usage]) !== told) {
+          this.send({ type: "accounts.changed", accounts, ...usage });
+        }
       },
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
