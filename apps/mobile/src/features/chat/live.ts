@@ -10,6 +10,7 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
+  consultSeeds,
   consultsIn,
   dismissRun,
   dropProvisional,
@@ -20,7 +21,9 @@ import {
   type LiveRun,
   type Message,
   markStopping,
+  type OpenConsult,
   type ReactionCount,
+  reconcileConsults,
   reconcileRuns,
   runsInChannel,
   type StreamsState,
@@ -49,6 +52,7 @@ interface LiveState {
 type Action =
   | { type: "event"; event: ChannelEvent; at: number }
   | { type: "reconcile"; channelId: string; active: Parameters<typeof reconcileRuns>[2]; at: number; askedAt: number }
+  | { type: "consults"; channelId: string; open: OpenConsult[]; at: number; askedAt: number }
   | { type: "expect"; channelId: string; threadId: string; agentIds: string[]; at: number }
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
@@ -70,6 +74,11 @@ function reduce(state: LiveState, action: Action): LiveState {
       return {
         ...state,
         streams: reconcileRuns(state.streams, action.channelId, action.active, action.at, action.askedAt),
+      };
+    case "consults":
+      return {
+        ...state,
+        consults: reconcileConsults(state.consults, action.channelId, action.open, action.askedAt, action.at),
       };
     case "expect": {
       let streams = state.streams;
@@ -229,6 +238,15 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {} });
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Questions agents asked from here still out (the "asking…" line), listed with the active runs.
+  useEffect(
+    () =>
+      consultSeeds.subscribe((id, open, askedAt) => {
+        if (id === channelId) dispatch({ type: "consults", channelId, open, at: Date.now(), askedAt });
+      }),
+    [channelId],
+  );
 
   // On open and after every reconnect: the server's active runs replace what we guessed.
   useEffect(() => {

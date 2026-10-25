@@ -38,6 +38,7 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheTask,
+  consultSeeds,
   createBrowserLiveConnection,
   dismissRun,
   dropProvisional,
@@ -48,9 +49,11 @@ import {
   isNotificationEvent,
   keys,
   markStopping,
+  type OpenConsult,
   RealtimeConnection,
   type ReceiptsState,
   realtimeUrl,
+  reconcileConsults,
   reconcileRuns,
   refreshMission,
   retargetProvisional,
@@ -325,6 +328,9 @@ export function createStreamsStore(
     /** The server's active runs for a channel (load, reconnect): stale rows go away. */
     reconcile: (channelId: string, active: ActiveRun[], askedAt = now()) =>
       set({ ...state, streams: reconcileRuns(state.streams, channelId, active, now(), askedAt) }),
+    /** The server's questions still out in a channel (load, reconnect): the "asking…" line. */
+    reconcileConsults: (channelId: string, open: OpenConsult[], askedAt = now()) =>
+      set({ ...state, consults: reconcileConsults(state.consults, channelId, open, askedAt, now()) }),
     /** "Continuar" went through (or there is nothing left to continue: `newRunId` null). */
     continued: (runId: string, newRunId: string | null) =>
       set({ ...state, continued: { ...state.continued, [runId]: newRunId } }),
@@ -380,6 +386,8 @@ export function RealtimeProvider({
   const toast = useToast();
   const { t, i18n } = useTranslation();
   const streams = useMemo(() => createStreamsStore(), []);
+  // Questions agents asked that are still out, as the server lists them with the active runs.
+  useEffect(() => consultSeeds.subscribe(streams.reconcileConsults), [streams]);
   const [connection, setConnection] = useState<RealtimeConnection | null>(null);
   // Latest `t` without reconnecting when the language changes.
   const tRef = useRef(t);

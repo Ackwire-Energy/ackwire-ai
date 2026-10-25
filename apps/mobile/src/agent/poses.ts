@@ -35,10 +35,11 @@ export const STILL_T = 2;
 
 /**
  * Where the body sits in an avatar box of `size`: smaller with an accessory
- * so a hat fits, bottom-aligned; fewer dither cells at small sizes.
+ * so a hat fits (at every size: the agent is always itself), bottom-aligned;
+ * fewer dither cells at small sizes.
  */
 export function agentLayout(size: number, hasAccessory: boolean) {
-  const withAccessory = hasAccessory && size >= 26;
+  const withAccessory = hasAccessory;
   const inner = size * (withAccessory ? 0.74 : 0.86);
   return {
     x: (size - inner) / 2,
@@ -51,10 +52,10 @@ export function agentLayout(size: number, hasAccessory: boolean) {
 
 /**
  * Inside a framed tile (the web's `drawFramed`): the agent stands centered,
- * feet near the bottom edge, smaller with an accessory so it has room above (accessories from 26pt).
+ * feet near the bottom edge, smaller with an accessory so it has room above (at every size).
  */
 export function framedLayout(size: number, hasAccessory: boolean) {
-  const withAccessory = hasAccessory && size >= 26;
+  const withAccessory = hasAccessory;
   const inner = size * (withAccessory ? 0.6 : 0.66);
   return {
     x: (size - inner) / 2,
