@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -31,7 +31,7 @@ jobs:
       - name: Skip without EXPO_TOKEN
         if: env.EXPO_TOKEN == ''
         run: echo "EXPO_TOKEN is not set; skipping the EAS build."
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         if: env.EXPO_TOKEN != ''
       - uses: oven-sh/setup-bun@v2
         if: env.EXPO_TOKEN != ''
