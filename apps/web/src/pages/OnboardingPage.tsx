@@ -1,5 +1,5 @@
 import type { Machine, Model, Role } from "@agenteschat/client";
-import { keys, useComputerSetup, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
+import { keys, useComputerSetup, useConfirmDevice, useMachines, useMe, useSandboxSettings } from "@agenteschat/client";
 import { type SetupView, setupPortrait, setupView, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -55,7 +55,7 @@ import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton } from "@/components/ThisMac";
-import { SetupFacts, SetupProgress } from "@/components/WorkspaceComputer";
+import { SetupWait, type WaitReader } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
@@ -394,11 +394,13 @@ export function OnboardingPage() {
   });
 
   const sandbox = useSandboxSettings(created?.orgId ?? "", Boolean(created) && step.id === "computer");
-  const cloudAvailable = sandbox.data?.available !== false;
+  // Daytona's sandboxes are a choice only on a server that has them.
+  const daytona = sandbox.data?.available === true;
+  const me = useMe();
   // Where the workspace gets its own computer (ADR 0056 §10): no choice to make, only its progress (polled:
   // no socket is open here).
   const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), step.id === "computer" ? 5000 : false);
-  const workspaceComputer = setupView(setup.data);
+  const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
 
   const saveComputer = useMutation({
     mutationFn: async () => {
@@ -518,9 +520,9 @@ export function OnboardingPage() {
         )
       : t("onboarding.railValue.skipped"),
     computer: workspaceComputer
-      ? t("computerSetup.title", { org: orgName })
+      ? t(workspaceComputer.chipKey)
       : computer === "cloud"
-        ? t("onboarding.done.computerCloud")
+        ? t("onboarding.computer.cloud")
         : computer === "host"
           ? t("machines.host.label")
           : computer === "machine" && machine
@@ -552,22 +554,22 @@ export function OnboardingPage() {
             lead:
               step.id === "agents" && metNames.length
                 ? t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
-                : t(`onboarding.${step.id}.lead`),
+                : step.id === "computer" && workspaceComputer
+                  ? t("onboarding.computer.leadCloud")
+                  : t(`onboarding.${step.id}.lead`),
           };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
   const primaryLabel =
     step.id === "done"
       ? t("onboarding.done.open")
-      : step.id === "computer" && computer === "cloud"
-        ? t("onboarding.actions.useCloud")
-        : step.id === "agents" && agentsPhase === "pick" && !needsKey && joining > 0
-          ? t("onboarding.actions.create", { count: joining })
-          : step.id === "agents" && agentsPhase === "key" && joining > 0
-            ? t("onboarding.actions.saveAndCreate", { count: joining })
-            : step.id === "team" && toSend.length > 0
-              ? t("onboarding.actions.invite", { count: toSend.length })
-              : t("onboarding.actions.continue");
+      : step.id === "agents" && agentsPhase === "pick" && !needsKey && joining > 0
+        ? t("onboarding.actions.create", { count: joining })
+        : step.id === "agents" && agentsPhase === "key" && joining > 0
+          ? t("onboarding.actions.saveAndCreate", { count: joining })
+          : step.id === "team" && toSend.length > 0
+            ? t("onboarding.actions.invite", { count: toSend.length })
+            : t("onboarding.actions.continue");
   // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception).
   const showSkip = step.optional && !(step.id === "computer" && workspaceComputer);
   const back = () => {
@@ -605,8 +607,10 @@ export function OnboardingPage() {
             name: t(`onboarding.stepNames.${s.id}`),
             done: done.has(s.id),
             disabled: i > reached || busy || (created === null && i > 0),
-            optional: s.optional,
+            // The workspace's own computer is no choice: its rail says how far it is, never "opcional".
+            optional: s.optional && !(s.id === "computer" && workspaceComputer),
             value: railValue[s.id],
+            ...(s.id === "computer" && workspaceComputer ? { note: t(workspaceComputer.chipKey) } : {}),
           }))}
         />
         <OnboardingHorizon progress={done.size / (total - 1)} />
@@ -767,7 +771,11 @@ export function OnboardingPage() {
 
           {step.id === "computer" && created && workspaceComputer && (
             <div className="onb__answer">
-              <WorkspaceComputerStep view={workspaceComputer} orgName={orgName} />
+              <WorkspaceComputerStep
+                view={workspaceComputer}
+                orgName={orgName}
+                reader={{ owner: true, email: me.data?.user.email ?? "", held: false }}
+              />
             </div>
           )}
 
@@ -782,7 +790,7 @@ export function OnboardingPage() {
               <ComputerStep
                 orgId={created.orgId}
                 computer={computer}
-                cloudAvailable={cloudAvailable}
+                daytona={daytona}
                 machine={machine}
                 onChoose={(c) => {
                   // Leaving the server's computer for "this computer": the pairing starts from nothing.
@@ -887,7 +895,9 @@ export function OnboardingPage() {
                         <span className="ac-option__title">
                           {t("onboarding.brain.claudeCode", { computer: machine.name })}
                         </span>
-                        <span className="ac-option__desc">{t("onboarding.brain.claudeCodeDesc")}</span>
+                        <span className="ac-option__desc">
+                          {t("onboarding.brain.claudeCodeDesc", { computer: machine.name })}
+                        </span>
                       </span>
                     </OptionCard>
                     <OptionCard pressed={brain === "model"} onClick={() => setBrain("model")}>
@@ -994,7 +1004,11 @@ export function OnboardingPage() {
                   className="onb__link"
                   onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
                 >
-                  {t("onboarding.keyStep.useComputer")}
+                  {workspaceComputer
+                    ? t("onboarding.keyStep.useComputerCloud", { computer: t("computerSetup.title", { org: orgName }) })
+                    : t("onboarding.keyStep.useComputer", {
+                        computer: machine?.name ?? t("outage.someComputer"),
+                      })}
                 </button>
               </p>
               <BudgetCard
@@ -1215,7 +1229,7 @@ function ChoiceCard({
 function ComputerStep({
   orgId,
   computer,
-  cloudAvailable,
+  daytona,
   machine,
   onChoose,
   onPaired,
@@ -1223,7 +1237,8 @@ function ComputerStep({
 }: {
   orgId: string;
   computer: Computer;
-  cloudAvailable: boolean;
+  /** This server has Daytona's sandboxes. */
+  daytona: boolean;
   machine: Machine | null;
   onChoose: (c: Computer) => void;
   onPaired: (m: Machine) => void;
@@ -1297,20 +1312,21 @@ function ComputerStep({
           />
         )}
         <ChoiceCard
-          art={<ComputerPortrait kind="cloud" state={cloudAvailable ? "online" : "offline"} />}
-          title={t("onboarding.computer.cloud")}
-          desc={cloudAvailable ? t("onboarding.computer.cloudDesc") : t("onboarding.computer.cloudUnavailable")}
-          pressed={computer === "cloud"}
-          disabled={!cloudAvailable}
-          onClick={() => onChoose("cloud")}
-        />
-        <ChoiceCard
           art={<ComputerPortrait kind={machine ? computerKind(machine.os) : "mac"} state="online" />}
           title={app ? t("onboarding.computer.thisMac") : t("onboarding.computer.mine")}
           desc={app ? t("onboarding.computer.thisMacDesc") : t("onboarding.computer.mineDesc")}
           pressed={computer === "machine"}
           onClick={chooseMachine}
         />
+        {daytona && (
+          <ChoiceCard
+            art={<ComputerPortrait kind="cloud" state="online" />}
+            title={t("onboarding.computer.cloud")}
+            desc={t("onboarding.computer.cloudDesc")}
+            pressed={computer === "cloud"}
+            onClick={() => onChoose("cloud")}
+          />
+        )}
       </div>
 
       {computer === "cloud" && (
@@ -1388,8 +1404,11 @@ function ComputerStep({
   );
 }
 
-/** Where the workspace gets its own computer: it is being prepared, live, and the person goes on meanwhile. */
-function WorkspaceComputerStep({ view, orgName }: { view: SetupView; orgName: string }) {
+/**
+ * Where the workspace gets its own computer: no choice, only its progress, live, with the time left and who
+ * hears when it's ready (whoever creates the workspace owns it); the person goes on meanwhile.
+ */
+function WorkspaceComputerStep({ view, orgName, reader }: { view: SetupView; orgName: string; reader: WaitReader }) {
   const { t } = useTranslation();
   return (
     <Card as="div" className="onb__workspace-computer">
@@ -1400,8 +1419,7 @@ function WorkspaceComputerStep({ view, orgName }: { view: SetupView; orgName: st
           <span className="small muted">{t("computerSetup.lead")}</span>
         </span>
       </div>
-      <SetupProgress view={view} />
-      <SetupFacts view={view} />
+      <SetupWait view={view} reader={reader} />
       {view.phase !== "ready" && (
         <p className="onb__status">
           <Icon name="check" />
@@ -1586,7 +1604,7 @@ function DoneStep({
   );
   const computerLabel =
     computer === "cloud"
-      ? t("onboarding.done.computerCloud")
+      ? t("onboarding.computer.cloud")
       : computer === null
         ? t("onboarding.done.computerPending")
         : computer === undefined

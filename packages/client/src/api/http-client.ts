@@ -287,7 +287,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
-      start: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/desktop/start`, { json: {} }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),

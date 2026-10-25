@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 // By path: the client doesn't depend on the adapters, so the package isn't linked here.
-import {
-  DESKTOP_KEYBOARDS as PROTOCOL_KEYBOARDS,
-  STREAM_CLOSE,
-  STREAM_LIMITS,
-} from "../../adapters/src/machine-protocol";
+import { DESKTOP_KEYBOARDS as PROTOCOL_KEYBOARDS, STREAM_CLOSE } from "../../adapters/src/machine-protocol";
 import type { BrowserHandoff, DesktopStatus } from "../src/index";
 import {
   DESKTOP_CLOSE,
@@ -15,12 +11,7 @@ import {
   desktopSocketUrl,
   desktopStatusState,
   desktopWithHandoff,
-  isTerminalExit,
   keyboardFor,
-  TERMINAL_SIZE,
-  terminalCloseState,
-  terminalSize,
-  terminalSocketUrl,
 } from "../src/index";
 
 const handoff = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
@@ -51,12 +42,11 @@ const status = (over: Partial<DesktopStatus> = {}): DesktopStatus => ({
   handoff: null,
   viewers: 0,
   canControl: true,
-  canStart: true,
-  terminal: { available: true, reason: null, allowed: true },
+  held: false,
   ...over,
 });
 
-describe("the desktop panel", () => {
+describe("the agent's screen", () => {
   test("the mirrors match the protocol: close codes and keyboard layouts", () => {
     for (const [name, code] of Object.entries(DESKTOP_CLOSE)) {
       expect(STREAM_CLOSE[name as keyof typeof STREAM_CLOSE]).toBe(code);
@@ -72,7 +62,10 @@ describe("the desktop panel", () => {
     expect(desktopCloseState(4429)).toEqual({ state: "busy", retry: "later" });
     expect(desktopCloseState(4503, "offline")).toEqual({ state: "offline", retry: "later" });
     expect(desktopCloseState(1000)).toEqual({ state: "ended", retry: "never" });
-    expect(desktopCloseState(4502, "desktop_off")).toEqual({ state: "off", retry: "later" });
+    // An older computer refuses a screen that isn't running: the server starts it, so it is opening, never off.
+    expect(desktopCloseState(4502, "desktop_off")).toEqual({ state: "connecting", retry: "later" });
+    // No memory left for another screen: "Tentar de novo", nothing by itself.
+    expect(desktopCloseState(4502, "desktop_busy")).toEqual({ state: "noRoom", retry: "never" });
     expect(desktopCloseState(4502, "machine_paused")).toEqual({ state: "paused", retry: "later" });
     expect(desktopCloseState(4502, "runner_outdated")).toEqual({ state: "outdated", retry: "never" });
     expect(desktopCloseState(4502, "not_allowed")).toEqual({ state: "unavailable", retry: "never" });
@@ -83,9 +76,10 @@ describe("the desktop panel", () => {
     expect([0, 1, 2, 3, 9].map(desktopRetryMs)).toEqual([1000, 2000, 5000, 10_000, 10_000]);
   });
 
-  test("the desktop's state before a socket: off, someone else in control, or why it can't show", () => {
+  test("its state before a socket: someone else in control, or why it can't show; one not running opens", () => {
     expect(desktopStatusState(status(), "me")).toBeNull();
-    expect(desktopStatusState(status({ running: false }), "me")).toBe("off");
+    // Opening the stream starts it: no "off" before it.
+    expect(desktopStatusState(status({ running: false }), "me")).toBeNull();
     expect(desktopStatusState(status({ controllerUserId: "ana" }), "me")).toBe("hidden");
     expect(desktopStatusState(status({ controllerUserId: "me" }), "me")).toBeNull();
     expect(desktopStatusState(status({ available: false, reason: "offline" }), "me")).toBe("offline");
@@ -132,9 +126,6 @@ describe("the desktop panel", () => {
         keyboard: "us-intl",
       }),
     ).toBe("ws://localhost:5173/api/desktop?orgId=o%201&agentId=a1&mode=control&keyboard=us-intl");
-    expect(terminalSocketUrl(base, { orgId: "o1", agentId: "a1", cols: 80, rows: 24 })).toBe(
-      "wss://agentes.chat/api/terminal?orgId=o1&agentId=a1&cols=80&rows=24",
-    );
   });
 
   test("the keyboard: ABNT2 by its ç key, else by the browser's language", () => {
@@ -146,36 +137,5 @@ describe("the desktop panel", () => {
     expect(keyboardFor("pt-PT")).toBe("pt");
     expect(keyboardFor("de")).toBe("de");
     expect(keyboardFor("ja-JP")).toBe("us");
-  });
-});
-
-describe("the terminal panel", () => {
-  test("close codes: what shows (it never opens again by itself)", () => {
-    expect(terminalCloseState(1000)).toBe("ended");
-    expect(terminalCloseState(4403)).toBe("forbidden");
-    expect(terminalCloseState(4404, "no_computer")).toBe("unavailable");
-    expect(terminalCloseState(4429, "rate_limited")).toBe("busy");
-    expect(terminalCloseState(4503, "offline")).toBe("offline");
-    expect(terminalCloseState(4502, "machine_paused")).toBe("paused");
-    expect(terminalCloseState(4502, "runner_outdated")).toBe("outdated");
-    expect(terminalCloseState(4502, "not_allowed")).toBe("unavailable");
-    expect(terminalCloseState(4502, "terminal_unavailable")).toBe("unavailable");
-    expect(terminalCloseState(4502, "internal")).toBe("dropped");
-    for (const code of [1001, 1006, 1011, 1013, 4400, 4408]) expect(terminalCloseState(code)).toBe("dropped");
-  });
-
-  test("its size: what fits the panel, within what the server takes", () => {
-    expect(TERMINAL_SIZE).toEqual({ cols: [...STREAM_LIMITS.cols], rows: [...STREAM_LIMITS.rows] });
-    expect(terminalSize(132.7, 40.2)).toEqual({ cols: 132, rows: 40 });
-    expect(terminalSize(3, 1)).toEqual({ cols: 20, rows: 5 });
-    expect(terminalSize(900, 900)).toEqual({ cols: 400, rows: 200 });
-  });
-
-  test("the shell's end comes as a text frame; anything else is not it", () => {
-    expect(isTerminalExit('{"type":"exit","code":0}')).toBe(true);
-    expect(isTerminalExit('{"type":"exit","code":null}')).toBe(true);
-    expect(isTerminalExit('{"type":"resize","cols":80,"rows":24}')).toBe(false);
-    expect(isTerminalExit("null")).toBe(false);
-    expect(isTerminalExit("not json")).toBe(false);
   });
 });

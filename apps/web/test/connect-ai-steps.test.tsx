@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AiComputer, MachineAccount } from "@agenteschat/client";
+import type { AiComputer, ComputerSetup, MachineAccount } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -43,14 +43,18 @@ const account = (over: Partial<MachineAccount> = {}): MachineAccount => ({
   ...over,
 });
 
-/** Contas de IA with the MacBook (Ada on it, Walter's), and "Conectar uma IA" opened. */
-async function connect(computers: AiComputer[] = [MAC]) {
+/**
+ * Contas de IA with the MacBook (Ada on it, Walter's), and "Conectar uma IA" opened. `setup`: the workspace gets
+ * its own computer (the Cloud), this far; then there is no MacBook.
+ */
+async function connect(computers: AiComputer[] = [MAC], setup?: Partial<ComputerSetup>) {
   const state = seedState();
   const ada = state.agents.find((a) => a.id === ADA_ID);
   if (ada) ada.ownerUserId = "u-walter";
   const api = createFakeApi(state);
   const machines = fakeMachinesOf.get(api);
-  machines?.pair({ id: "machine_1", name: "MacBook", agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }] });
+  if (setup) machines?.setSetup(setup);
+  else machines?.pair({ id: "machine_1", name: "MacBook", agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }] });
   machines?.setAiAccounts({ accounts: [], computers });
   await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
   await settle(6);
@@ -141,5 +145,36 @@ describe("Conectar uma IA", () => {
     const none = await connect([{ ...MAC, canAdd: false, mine: false }]);
     expect(none.dialog.textContent).toContain("Conecte um seu primeiro.");
     expect(within(none.dialog).getByRole("link", { name: "Conectar um computador" })).toBeTruthy();
+  });
+
+  test("on the Cloud, while the workspace's computer is prepared: where plans will sign in and how long, no computer to connect", async () => {
+    const { dialog } = await connect([], {
+      step: "installing",
+      secondsLeft: 330,
+      expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
+      notifyByEmail: true,
+    });
+    expect(dialog.textContent).toContain(
+      "Os seus planos entram no Computador da Acme, que está sendo preparado. Volte aqui quando ele ficar pronto.",
+    );
+    expect(dialog.textContent).toContain("Faltam uns 6 min");
+    expect(dialog.textContent).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(within(dialog).queryByRole("link", { name: "Conectar um computador" })).toBeNull();
+    expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado/);
+  });
+
+  test("on the Cloud, its computer not answering: said by name, looked after", async () => {
+    const workspace: AiComputer = {
+      ...MAC,
+      machineId: "managed_1",
+      name: "Computador da Acme",
+      online: false,
+      mine: false,
+    };
+    const { dialog } = await connect([workspace], { state: "ready" });
+    const claude = within(dialog).getByRole("button", { name: /^Claude/ }) as HTMLButtonElement;
+    expect(claude.disabled).toBe(true);
+    expect(claude.textContent).toContain("O Computador da Acme não está respondendo agora. Já estamos cuidando.");
+    expect(dialog.textContent).not.toMatch(/Seu computador está desligado|desligado/);
   });
 });

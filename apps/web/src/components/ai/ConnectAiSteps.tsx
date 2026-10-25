@@ -18,6 +18,13 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
+import {
+  managedOf,
+  SetupWaitLines,
+  useComputerEdition,
+  useSetupView,
+  useWaitReader,
+} from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
@@ -59,6 +66,12 @@ export function ConnectAiDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const ai = useAiAccounts(org.id);
+  // On the Cloud, plans sign in on the workspace's own computer: its words, never a computer to connect.
+  const edition = useComputerEdition(org.id);
+  const setup = useSetupView(org.id);
+  const reader = useWaitReader();
+  const workspaceComputer =
+    managedOf(useMachines(org.id, edition === "cloud").data)?.name ?? t("computerSetup.title", { org: org.name });
   const [choice, setChoice] = useState<ConnectChoice | null>(null);
   const [machineId, setMachineId] = useState<string | null>(null);
   const [added, setAdded] = useState<MachineAccount | null>(null);
@@ -72,6 +85,13 @@ export function ConnectAiDialog({ onClose }: { onClose: () => void }) {
     body = (
       <DialogBody>
         {ai.isError ? <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote> : <Spinner />}
+      </DialogBody>
+    );
+  } else if (!computers.some((c) => c.canAdd) && edition === "cloud") {
+    body = (
+      <DialogBody>
+        <SettingNote icon="computer">{t("aiAccounts.connect.preparing", { computer: workspaceComputer })}</SettingNote>
+        {setup && <SetupWaitLines view={setup} reader={reader} />}
       </DialogBody>
     );
   } else if (!computers.some((c) => c.canAdd)) {
@@ -104,7 +124,11 @@ export function ConnectAiDialog({ onClose }: { onClose: () => void }) {
                   <span className="ac-option__title">{name(c)}</span>
                   <span className="ac-option__desc">
                     {why
-                      ? t(`aiAccounts.connect.needs.${why}`)
+                      ? edition === "cloud"
+                        ? t(`aiAccounts.connect.needsCloud.${why === "keys" ? "claude_code" : why}`, {
+                            computer: workspaceComputer,
+                          })
+                        : t(`aiAccounts.connect.needs.${why}`)
                       : c.provider
                         ? t("aiAccounts.connect.keyText")
                         : t(`aiAccounts.connect.${c.kind}Text`)}

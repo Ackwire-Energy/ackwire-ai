@@ -66,7 +66,14 @@ describe("Computador desconectado (phone)", () => {
     const t = await translator("pt-BR");
     expect(noticeText(t, air)).toEqual({
       title: "O MacBook Air desconectou",
+      a11y: "Computador desconectado",
       sub: "Ada e Theo esperam por ele · 3 tarefas",
+    });
+    // The Cloud's one computer isn't answering, and it is being looked after.
+    expect(noticeText(t, { ...air, name: "Computador da Acme" }, true)).toEqual({
+      title: "O Computador da Acme não está respondendo",
+      a11y: "Computador sem resposta",
+      sub: "Já estamos cuidando: nada a fazer do seu lado. · Ada e Theo esperam por ele · 3 tarefas",
     });
     const one = { ...air, waitingRuns: 1, agents: [air.agents[0]] } as MachineOutage;
     expect(noticeText(t, one).sub).toBe("Ada espera por ele · 1 tarefa");
@@ -74,6 +81,7 @@ describe("Computador desconectado (phone)", () => {
     const en = await translator("en");
     expect(noticeText(en, air)).toEqual({
       title: "MacBook Air disconnected",
+      a11y: "Computer disconnected",
       sub: "Ada and Theo are waiting for it · 3 tasks",
     });
   });
@@ -96,7 +104,7 @@ describe("Computador desconectado (phone)", () => {
     });
     expect(off && targetText(t, off)).toEqual({ title: "PC do escritório", tag: null, desc: "Desconectado" });
     expect(cloud && targetText(t, cloud)).toEqual({
-      title: "Computador na nuvem",
+      title: "Sandbox da Daytona",
       tag: null,
       desc: "Não tem o Claude Code",
     });
@@ -105,7 +113,8 @@ describe("Computador desconectado (phone)", () => {
     const odd = targetOptions(air, [{ ...pro, reasonOff: "something_new" }], ["ada"])[0];
     expect(odd && targetText(t, odd).desc).toBe("Não dá para usar agora");
     const able = targetOptions(air, [{ kind: "cloud", available: true, brains: ["claude_code"] }], ["ada"])[0];
-    expect(able && targetText(t, able)).toMatchObject({ tag: "Sempre ligado" });
+    // Daytona's sandbox carries no tag: "always on" is the Cloud's word, and this is self-host.
+    expect(able && targetText(t, able)).toMatchObject({ title: "Sandbox da Daytona", tag: null });
     expect(computerIcon("darwin")).toBe("computerMac");
     expect(computerIcon("windows")).toBe("computerWindows");
     expect(computerIcon("linux")).toBe("computerLinux");

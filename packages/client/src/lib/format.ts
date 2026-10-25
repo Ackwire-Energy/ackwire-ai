@@ -38,6 +38,10 @@ export function formatTokensShort(t: TFunction, locale: string, value: number) {
 export const formatTime = (locale: string, iso: string) =>
   new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
+/** "14:05" today, "24 out 14:05" another day (a pause's end, when a computer went offline). */
+export const clockAt = (locale: string, iso: string, now = new Date()) =>
+  daysBetween(iso, now) === 0 ? formatTime(locale, iso) : `${formatShortDate(locale, iso)} ${formatTime(locale, iso)}`;
+
 /** "12 out" */
 export const formatShortDate = (locale: string, iso: string) =>
   new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" })

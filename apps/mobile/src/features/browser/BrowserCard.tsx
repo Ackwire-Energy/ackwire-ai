@@ -26,12 +26,12 @@ import {
 } from "react-native";
 import { Sky } from "@/sky/Sky";
 import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
-import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, NOTE_MAX, pageNoteOf, siteOf } from "./logic";
+import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf } from "./logic";
 import { FrameView, TypeBar, useLiveConnection } from "./parts";
 
 /** The log's last lines under the page (the design shows three). */
@@ -92,6 +92,8 @@ export function BrowserCard({
   const toast = useToast();
   const sheet = useSheet();
   const raised = useSurface("e2");
+  // The Cloud's computer is always on: when it doesn't answer, it says so.
+  const cloud = useEdition() === "cloud";
   const now = useNow(15_000);
   const actions = useBrowserHandoffActions(orgId);
   const [ownOpen, setOwnOpen] = useState(false);
@@ -346,7 +348,7 @@ export function BrowserCard({
                     ? t(`mobile.browser.card.starting${g}`, { name })
                     : note.say === "hidden"
                       ? t("mobile.browser.live.hidden", { name: helper })
-                      : t(`mobile.browser.live.unavailable.${note.say}${g}`, { name })}
+                      : t(pageGapKey(note.say, g, cloud), { name })}
                 </Text>
                 {note.help ? (
                   <Text variant="caption" tone="muted" style={styles.centerText}>

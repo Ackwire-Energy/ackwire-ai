@@ -87,6 +87,10 @@ export function profileBrowserOf(
 /** Why the card has no live page: the server's reason, or the stream ended. */
 export type PageGap = BrowserLiveUnavailable | "ended";
 
+/** The words for why the page shows nothing; the Cloud's computer is always on, so offline there isn't answering. */
+export const pageGapKey = (gap: PageGap, gender: "F" | "M", cloud: boolean) =>
+  `mobile.browser.live.unavailable.${gap === "offline" && cloud ? "offlineCloud" : gap}${gender}` as const;
+
 export interface PageNote {
   say: PageGap | "starting" | "hidden";
   /** Only while the page may still come by itself. */

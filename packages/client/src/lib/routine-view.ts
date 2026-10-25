@@ -240,7 +240,7 @@ export function healthWords(h: Routine["health"]): Words[] | null {
 }
 
 /**
- * Where it runs: "Claude Code no MacBook do Walter", "Codex num computador", "Na nuvem" (the API).
+ * Where it runs: "Claude Code no MacBook do Walter", "Codex num computador", "Pensa pela API".
  */
 export function whereItRuns(brain: Routine["brain"]): Words {
   if (brain.kind === "model") return { key: "routines.runsOn.cloud", values: {} };

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
+import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED } from "./edition-words";
 import { leaves } from "./leaves";
 
 /**
@@ -12,26 +13,31 @@ const NAMESPACES = [
   "onboarding.computer.",
   "computer.",
   "computerSetup.",
+  "computers.",
+  "agentComputer.",
   "machine.",
   "machines.host.",
   "standing.",
   "support.",
 ];
 
-/** What the workspace computer's screens say in each state (`setupView` in packages/client/src/lib/computer.ts). */
+/** What the workspace computer's screens say in each state (`setupView`, `etaView` in packages/client/src/lib/computer.ts). */
 const SETUP_KEYS = [
   ...["reserving", "starting", "installing", "connecting"].map((s) => `computerSetup.step.${s}`),
-  ...["preparing", "approval", "capacity", "problem", "ready"].flatMap((s) => [
+  ...["preparing", "capacity", "problem", "ready"].flatMap((s) => [
     `computerSetup.status.${s}`,
     `computerSetup.chip.${s}`,
   ]),
+  ...["minutes_one", "minutes_other", "underMinute", "almost", "late"].map((s) => `computerSetup.eta.${s}`),
+  "computerSetup.email.you",
+  "computerSetup.email.here",
+  "computerSetup.plans",
   "computerSetup.title",
   "computerSetup.lead",
   "computerSetup.specs",
   "computerSetup.users",
   "computerSetup.notice.title",
   "computerSetup.agentWaiting",
-  "computerSetup.notWorking",
   "computer.target.none",
   "standing.onHold",
   "standing.paused",
@@ -41,19 +47,163 @@ const SETUP_KEYS = [
   "support.ask",
 ];
 
+/** `agentComputer.` keys only self-host shows: its computers are people's own, connected with a code. */
+const SELFHOST_ONLY = [
+  "agentComputer.choose",
+  "agentComputer.status.offline",
+  "agentComputer.status.paused",
+  "agentComputer.status.pausedPlain",
+  "agentComputer.status.noComputer",
+  "agentComputer.status.outdated",
+  "agentComputer.sub.paused",
+  "agentComputer.sub.offline",
+  "agentComputer.state.paused",
+  "agentComputer.state.pausedPlain",
+  "agentComputer.state.offline",
+  "agentComputer.state.offlineHelp",
+  "agentComputer.state.offlineHelpPlain",
+  "agentComputer.state.screensOff",
+  "agentComputer.state.screensMissing",
+  "agentComputer.state.outdated",
+  "agentComputer.state.noComputer",
+];
+
+/** Every key a Cloud workspace shows where a computer is named, past the `computerSetup.` and `agentComputer.` ones. */
+const CLOUD_EXTRA = [
+  "desktop.sub.control",
+  "desktop.sub.controlAsked",
+  "desktop.sub.hidden",
+  "desktop.takeover",
+  ...["handBack", "done", "couldnt", "full", "fullExit", "closed", "closedHelp"].map((k) => `browser.inCard.${k}`),
+  "desktop.state.busy",
+  "desktop.state.ended",
+  "desktop.state.retrying",
+  "desktop.retry",
+  "browser.now.handedBack",
+  "desktop.control.notice",
+  "desktop.paste.placeholder",
+  "desktop.paste.label",
+  "desktop.clipboard.got",
+  "desktop.keyboard.label",
+  "computers.leadCloud",
+  ...["title", "screens", "plans", "coding", "always"].map((k) => `computers.onIt.${k}`),
+  "agentPage.work.cell.computer",
+  "agentPage.work.offlineCloud",
+  "agentPage.work.brain.fallbackTitle",
+  "agentPage.work.brain.offCloud",
+  "missions.settings.more.sub",
+  "missions.settings.recovery.title",
+  "onboarding.budget.noteKey",
+  "onboarding.computer.leadCloud",
+  "onboarding.keyStep.lead",
+  "onboarding.keyStep.useComputerCloud",
+  "outage.titleCloud",
+  "outage.cloudSub",
+  "aiAccounts.connect.preparing",
+  "aiAccounts.connect.needsCloud.claude_code",
+  "aiAccounts.connect.needsCloud.codex",
+  "aiAccounts.connect.needsCloud.online",
+  "agentPage.work.browserDialog.noComputerCloud",
+  "brain.reasons.no_computerCloud",
+  "scopes.browser_use.description",
+  "access.areaText.browser.write",
+  "missions.subtitle",
+  "missions.empty.text",
+  "threads.empty.missions",
+  "missions.share.lendText",
+  "missions.waitingCloud",
+];
+
+/** The same screens' self-host keys, past the `agentComputer.` ones. */
+const SELFHOST_EXTRA = [
+  "computers.lead",
+  "computers.hostMissing",
+  ...["title", "text", "emptyTitle", "emptyText"].map((k) => `computers.other.${k}`),
+  "computers.daytona.cardTitle",
+  "computers.cloud.note",
+  "computers.agents.title",
+  "computers.agents.text",
+  "machines.host.label",
+  "machines.host.desc",
+  "machines.host.descUsers",
+  "machines.host.descShared",
+  "machines.download.title",
+  "machines.pausedHint",
+  "outage.switch",
+  "outage.title",
+  "outage.dialog.cloud",
+  "outage.dialog.cloudText",
+  "computer.target.none",
+  "computer.target.daytona",
+  "computer.target.daytonaText",
+  "computer.emptyText",
+  "computer.machineOffline",
+  "desktop.use.title",
+  "agentPage.work.offline",
+  "agentPage.work.brain.off",
+  "agentPage.work.computer.offline",
+  "agentPage.work.computer.alsoOffline",
+  "agentPage.work.computer.connect",
+  "agentPage.computer.ownerPicks",
+  ...["mine", "mineDesc", "cloud", "cloudDesc", "cloudReady"].map((k) => `onboarding.computer.${k}`),
+  "onboarding.brain.help",
+  "onboarding.brain.claudeCodeDesc",
+  "onboarding.keyStep.useComputer",
+  ...["claude_code", "codex", "keys", "online"].map((k) => `aiAccounts.connect.needs.${k}`),
+  "aiAccounts.connect.noComputer",
+  "aiAccounts.connect.addComputer",
+];
+
 /** Case-insensitive, so the Go language is left out: it would match English "Go to…". */
 const TECHNICAL =
   /\bLinux\b|\bIP(v[46])?\b|\bvCPU|Chrome|\bgit\b|\bNode\b|Python|\bRust\b|Debian|Ubuntu|Docker|kernel/i;
 
+const LOCALES = [
+  ["pt-BR", ptBR],
+  ["en", en],
+] as const;
+
+const valuesOf = (strings: object) => new Map(leaves(strings).map(([k, v]) => [k, String(v)]));
+
+/** The Cloud's keys and the self-host's, in one locale. */
+function editionKeys(strings: object) {
+  const all = [...valuesOf(strings).keys()];
+  const computer = all.filter((k) => k.startsWith("agentComputer."));
+  const cloud = [
+    ...all.filter((k) => k.startsWith("computerSetup.")),
+    ...computer.filter((k) => !SELFHOST_ONLY.includes(k)),
+    ...CLOUD_EXTRA,
+  ];
+  return { cloud, selfhost: [...computer, ...SELFHOST_EXTRA] };
+}
+
+/** Each key with the banned phrases its value holds, only those that hold some. */
+function hitsOf(values: Map<string, string>, keys: string[], phrasesOf: (key: string) => readonly string[]) {
+  return keys.map((k) => [k, bannedIn(values.get(k) ?? "", phrasesOf(k))] as const).filter(([, f]) => f.length > 0);
+}
+
 describe("computer copy", () => {
-  for (const [locale, strings] of [
-    ["pt-BR", ptBR],
-    ["en", en],
-  ] as const) {
+  for (const [locale, strings] of LOCALES) {
     test(`${locale} names no system, address or tool`, () => {
       const copy = leaves(strings).filter(([k]) => NAMESPACES.some((n) => k.startsWith(n)));
       expect(copy.length).toBeGreaterThan(0);
       expect(copy.filter(([, v]) => TECHNICAL.test(String(v)))).toEqual([]);
+    });
+
+    test(`${locale}: the Cloud's computer is always on, nobody pairs one, and it isn't in the cloud`, () => {
+      const values = valuesOf(strings);
+      const { cloud } = editionKeys(strings);
+      expect(cloud.filter((k) => !values.has(k))).toEqual([]);
+      expect(hitsOf(values, cloud, () => CLOUD_BANNED[locale])).toEqual([]);
+    });
+
+    test(`${locale}: self-host never says the cloud, and its computer's dialog never says terminal`, () => {
+      const values = valuesOf(strings);
+      const { selfhost } = editionKeys(strings);
+      expect(selfhost.filter((k) => !values.has(k))).toEqual([]);
+      const phrases = (k: string) =>
+        k.startsWith("agentComputer.") ? [...SELFHOST_BANNED, "terminal"] : SELFHOST_BANNED;
+      expect(hitsOf(values, selfhost, phrases)).toEqual([]);
     });
   }
 
@@ -65,6 +215,14 @@ describe("computer copy", () => {
     }
   });
 
+  test("no terminal view and no wait for an approval are left to say", () => {
+    for (const strings of [ptBR, en]) {
+      const keys = [...valuesOf(strings).keys()];
+      expect(keys.filter((k) => k.startsWith("terminal.") || k.startsWith("computers.kinds."))).toEqual([]);
+      expect(keys.filter((k) => k.startsWith("computerSetup.") && k.endsWith(".approval"))).toEqual([]);
+    }
+  });
+
   test("catches the words it bans, whatever the case", () => {
     for (const s of ["Um Linux só do workspace", "com ip próprio", "4 vCPU", "Chrome, git, Node", "IPv4"]) {
       expect(TECHNICAL.test(s)).toBe(true);
@@ -72,5 +230,16 @@ describe("computer copy", () => {
     for (const s of ["4 CPUs · 8 GB de memória", "Um usuário para cada agente", "Go to settings", "a equipe"]) {
       expect(TECHNICAL.test(s)).toBe(false);
     }
+    for (const s of ["Your computer is off right now", "Connect a computer", "It turns on by itself", "Pair it"]) {
+      expect(bannedIn(s, CLOUD_BANNED.en).length).toBeGreaterThan(0);
+    }
+    for (const s of ["Seu computador está desligado", "Na nuvem", "Ela liga sozinha", "Abrir o Terminal"]) {
+      expect(bannedIn(s, CLOUD_BANNED["pt-BR"]).length).toBeGreaterThan(0);
+    }
+    for (const s of ["Always on, day and night", "Sempre ligado, dia e noite", "Not answering · we're on it"]) {
+      expect(bannedIn(s, [...CLOUD_BANNED.en, ...CLOUD_BANNED["pt-BR"]])).toEqual([]);
+    }
+    expect(bannedIn("Cloud computer", SELFHOST_BANNED)).toEqual(["cloud computer"]);
+    expect(bannedIn("Sandbox da Daytona", SELFHOST_BANNED)).toEqual([]);
   });
 });

@@ -1,4 +1,14 @@
-import { type Agent, type Member, type RealtimeConnection, useAgents, useMe, useMembers } from "@agenteschat/client";
+import {
+  type Agent,
+  type Edition,
+  type Member,
+  type RealtimeConnection,
+  useAgents,
+  useComputerSetup,
+  useMe,
+  useMembers,
+} from "@agenteschat/client";
+import { computerEdition } from "@agenteschat/client/lib/computer";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
@@ -9,6 +19,11 @@ import { agentLook, daysAgo, whenKind } from "./logic";
 /** The current organization's id. */
 export function useOrgId(): string {
   return useOrg().orgId;
+}
+
+/** Which words the computers get here: the Cloud's or self-host's (`computerEdition`); null while loading. */
+export function useEdition(): Edition | null {
+  return computerEdition(useComputerSetup(useOrgId()).data);
 }
 
 /** The signed-in person's id (null while it loads). */

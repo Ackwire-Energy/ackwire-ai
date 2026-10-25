@@ -42,6 +42,7 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { ThisMacButton } from "@/components/ThisMac";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { CommandApprovalSelect, executorOptions } from "./MissionBits";
@@ -74,6 +75,9 @@ export function NewMissionDialog({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  // On the Cloud every agent works on the workspace's own computer: missions wait for it, nobody connects one.
+  const cloud = useComputerEdition(org.id) === "cloud";
+  const waitWords = t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) });
   const api = useApi();
   const dir = useDirectory(org.id);
   const toast = useToast();
@@ -183,10 +187,10 @@ export function NewMissionDialog({
             <span>
               <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
-            <span>{t("missions.new.noEligibleText")}</span>
+            <span>{cloud ? waitWords : t("missions.new.noEligibleText")}</span>
             {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}
-            <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />
-            {setupAgent && (
+            {!cloud && <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />}
+            {setupAgent && !cloud && (
               <Link
                 className="mi-lnk"
                 to="/org/$orgId/agents/$agentId"
@@ -218,7 +222,9 @@ export function NewMissionDialog({
                           computer: a.machine.name,
                           state: a.machine.online ? t("missions.online") : t("missions.offline"),
                         })
-                      : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
+                      : cloud && (a.reason ?? "no_computer") === "no_computer"
+                        ? waitWords
+                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
                   leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
                 }))}
               />
@@ -243,18 +249,22 @@ export function NewMissionDialog({
                   <span className="mi-blocked__text">
                     <b>{a.name}</b>
                     <span>
-                      {t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
+                      {cloud && (a.reason ?? "no_computer") === "no_computer"
+                        ? waitWords
+                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
                     </span>
                   </span>
-                  <Link
-                    className="mi-lnk"
-                    to="/org/$orgId/agents/$agentId"
-                    params={{ orgId: org.id, agentId: a.id }}
-                    search={{ tab: "settings", sec: "computer" }}
-                    onClick={() => onOpenChange(false)}
-                  >
-                    {t("missions.new.connect")}
-                  </Link>
+                  {!cloud && (
+                    <Link
+                      className="mi-lnk"
+                      to="/org/$orgId/agents/$agentId"
+                      params={{ orgId: org.id, agentId: a.id }}
+                      search={{ tab: "settings", sec: "computer" }}
+                      onClick={() => onOpenChange(false)}
+                    >
+                      {t("missions.new.connect")}
+                    </Link>
+                  )}
                 </li>
               ))}
           </ul>

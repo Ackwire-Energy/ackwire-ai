@@ -10,6 +10,7 @@ import {
   useCreateMission,
   useEligibleAgents,
   useFollowThread,
+  useMe,
   useMissionControl,
   usePinMessage,
   usePins,
@@ -27,7 +28,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
@@ -565,6 +566,8 @@ export function NewMissionForm({
   const toast = useToast();
   const sheet = useSheet();
   const eligible = useEligibleAgents(orgId);
+  // On the Cloud missions wait for the workspace's own computer: nobody connects one.
+  const waitCloud = useCloudMissionWait();
   const create = useCreateMission(orgId);
   const [goal, setGoal] = useState(initialGoal);
   const [picked, setPicked] = useState<string | null>(null);
@@ -612,7 +615,7 @@ export function NewMissionForm({
               key: a.agentId,
               leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
               label: a.name,
-              hint: whereText(t, a),
+              hint: waitCloud && !a.machine ? waitCloud : whereText(t, a),
               disabled: a.eligible === false,
               trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
               onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
@@ -621,7 +624,7 @@ export function NewMissionForm({
         />
       ) : eligible.isSuccess ? (
         <Text variant="small" tone="muted">
-          {t("mobile.newMission.noAgents")}
+          {waitCloud ?? t("mobile.newMission.noAgents")}
         </Text>
       ) : null}
       <Button
@@ -634,6 +637,15 @@ export function NewMissionForm({
       />
     </>
   );
+}
+
+/** "As missões começam quando o Computador da Acme ficar pronto." on the Cloud; null elsewhere. */
+function useCloudMissionWait() {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const org = useMe().data?.organizations.find((o) => o.id === orgId);
+  if (useEdition() !== "cloud") return null;
+  return t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org?.name ?? "" }) });
 }
 
 /** "MacBook do Walter · ligado", or why it can't do a mission for you. */

@@ -1031,12 +1031,11 @@ export interface ApiClient {
     stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
   };
   /**
-   * The agent's desktop (ADR 0058): its state and "Ligar". The screen itself is a WebSocket
-   * (`desktopSocketUrl`); control, "Devolver" and "Desligar" are the browser's screen routes with `desktop`.
+   * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which
+   * starts it when it isn't running; control and "Devolver" are the browser's screen routes with `desktop`.
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
-    start(orgId: string, agentId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

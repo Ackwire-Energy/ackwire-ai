@@ -9,6 +9,7 @@ import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { ConnectAiProvider } from "@/components/ConnectAi";
+import { ComputerDialogProvider } from "@/components/computer/ComputerDialog";
 import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
@@ -104,7 +105,9 @@ function OrgLayout() {
                 {!focused && <OutageNotices />}
                 <div className="shell__pages">
                   <ConnectAiProvider>
-                    <Outlet />
+                    <ComputerDialogProvider>
+                      <Outlet />
+                    </ComputerDialogProvider>
                   </ConnectAiProvider>
                 </div>
               </div>

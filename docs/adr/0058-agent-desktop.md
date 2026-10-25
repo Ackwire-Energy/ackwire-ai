@@ -151,12 +151,12 @@ Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.contro
 
 ### 13. In the app
 
-- On the agent's page, "Tela" (the live screen; watch, take control, "Devolver") and "Terminal" (only for whoever passes the control rule of §4), opened by `?desktop=1` and `?terminal=1`; "Ver a tela inteira" on the browser card. noVNC 1.7.0 (ES modules) and `@xterm/xterm` 6 with its fit add-on.
-- The terminal fits its panel (its size kept within 20–400 × 5–200) and tells each new size as a `resize`; keys go out as UTF-8 bytes. When the shell ends ("A sessão terminou") or the connection does, it waits for "Abrir de novo": a new socket is a new shell, so it never reopens by itself and a person never types into a shell they didn't see start.
+- One entry per agent, "Computador da Ada" ("Ada's computer"): a status line and one button, on the agent's page, in its DM's header and beside the agent on its computer's page. It opens one dialog (`?computer=1`; `?desktop=1`, `?browser=1` and `?terminal=1` from older links open it too): the live screen where the computer serves screens, the agent's page otherwise, and the page alone for whoever helps with a browser request. Watch, take control, "Devolver" and full screen are in it; "Ver a tela inteira" on the browser card opens it. noVNC 1.7.0 (ES modules). No terminal view: in control, the desktop's own Terminal app is there.
+- Full screen is the page's, not the dialog's: noVNC puts its mouse-capture layer on the page's body, and with only the dialog in full screen that layer stays up and swallows the first click after full screen ends. In full screen Esc only leaves full screen; closing the dialog while in control hands the screen back.
 - Watchers ask quality 3, the person in control 6.
 - The person in control picks their keyboard layout (a guess from the browser's language and, where the browser tells, its keys; kept per browser); the control stream carries it (`keyboard`, one of `DESKTOP_KEYBOARDS`) and the runner sets it with `setxkbmap` as the agent.
 - "Colar texto" puts the text in the desktop's clipboard and presses Shift+Insert: typed keysyms lose some accents. Shift+Insert pastes in every window there, a terminal included (where Ctrl+V doesn't: it reads PRIMARY, which Xvnc sets with the clipboard; checked in xfce4-terminal). The person's own clipboard is never written from the desktop (a "Copiar" button instead).
-- The phone app keeps the browser card. A request on the agent's desktop shows there as one line saying it opens on a computer, and is never taken from the phone (taking it would hold the desktop for someone who can't see it).
+- The phone app keeps the browser card. A request on the agent's desktop shows there as "Ajude pelo notebook: …" ("Help from a laptop: …"), and is never taken from the phone (taking it would hold the desktop for someone who can't see it).
 
 ### 14. System mode: the agent's Chrome on its desktop (added 2026-10-24)
 

@@ -1,4 +1,5 @@
 import { isOpenHandoff, useAgentAccess, useAgentBrowserHandoff, useAgentBrowserSettings } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native";
@@ -28,7 +29,7 @@ export function AgentBrowserRow({ agentId, decides, busy }: { agentId: string; d
   if (!show) return null;
   const name = dir.agentById.get(agentId)?.name ?? "";
   return (
-    <Section title={t("mobile.browser.profile.title")}>
+    <Section title={t("agentComputer.title", agentGrammar(t, name))}>
       {show === "waiting" && handoff ? (
         <Card>
           <Row

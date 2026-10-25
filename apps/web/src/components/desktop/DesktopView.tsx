@@ -1,4 +1,4 @@
-import type { DesktopKeyboard, DesktopViewState } from "@agenteschat/client";
+import type { DesktopKeyboard, DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
   DESKTOP_KEYBOARDS,
@@ -11,10 +11,9 @@ import {
   keyboardFor,
   useBrowserHandoffMutations,
   useDesktopStatus,
-  useStartDesktop,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, Input, Select, SkyStrip } from "@agenteschat/ui";
+import { Button, Input, Select } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +22,8 @@ import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
+import { CantShowCover } from "../computer/covers";
+import { DialogHead, FullButton, useDialogHead } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import "../browser/browser.css";
@@ -53,23 +54,38 @@ async function startingKeyboard(): Promise<DesktopKeyboard> {
   return keyboardFor(navigator.language, semicolon);
 }
 
+/** Its state settles: live, or only a person's own step changes it. */
+const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdated", "ended", "noRoom"];
+
 /**
- * An agent's desktop, live (ADR 0058): noVNC on a socket of its own. Watching is view-only at quality 3; in
- * control (the desktop's own handoff is this person's) it takes the pointer and keys at quality 6, with the
- * person's keyboard layout, "Colar texto", and what the desktop copies behind "Copiar" (never written to the
- * person's clipboard by itself). While someone else is in control the screen stays hidden; it opens again
- * by itself after drops, restarts and hand backs.
+ * An agent's screen, live (ADR 0058), as the computer dialog's stage: noVNC on a socket of its own, which
+ * starts a screen that isn't running. Watching is view-only at quality 3; in control (the screen's own
+ * handoff is this person's) it takes the pointer and keys at quality 6, with the person's keyboard layout,
+ * "Colar texto", and what the screen copies behind "Copiar" (never written to the person's clipboard by
+ * itself). While someone else is in control the screen stays hidden; it opens again by itself after drops,
+ * restarts and hand backs. Its sub-line and actions go in the dialog's head.
  */
 export function DesktopView({
   agentId,
   name,
-  onFold,
+  computer,
+  edition,
+  machine,
+  canTakeOver,
+  onTakeBrowser,
   onSettled,
 }: {
   agentId: string;
   name: string;
-  /** Folding takes the panel away. */
-  onFold?: () => void;
+  /** The computer's name ("O Mac mini já mostra o máximo de telas…"). */
+  computer: string;
+  edition: Edition;
+  /** The agent's computer, for the fix of a screen that can't show (its admins and whoever paired it). */
+  machine: Machine | null;
+  /** Take control may show: no hold, pause or request waiting (the server still decides who may). */
+  canTakeOver: boolean;
+  /** Whoever may take over the agent's browser but not its screen takes the browser instead. */
+  onTakeBrowser?: () => void;
   /** The person handed back or said it couldn't be done. */
   onSettled?: () => void;
 }) {
@@ -77,9 +93,9 @@ export function DesktopView({
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
+  const head = useDialogHead();
   const createSocket = useContext(SocketFactoryContext);
   const actions = useBrowserHandoffMutations(org.id);
-  const start = useStartDesktop(org.id);
   const g = agentGrammar(t, name);
   const color = colorOf(dir.agentById.get(agentId));
   const [view, setView] = useState<DesktopViewState>("connecting");
@@ -90,13 +106,10 @@ export function DesktopView({
   const [copied, setCopied] = useState<string | null>(null);
   const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
-  const [confirmStop, setConfirmStop] = useState(false);
-  const [full, setFull] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
   const attempts = useRef(0);
-  // Nothing says when a desktop starts or is handed back: asked often while it may show any moment.
+  // Nothing says when a screen is handed back: asked often while it may change any moment.
   const [poll, setPoll] = useState(5_000);
   const status = useDesktopStatus(org.id, agentId, { poll });
   const s = status.data;
@@ -116,7 +129,7 @@ export function DesktopView({
   useEffect(() => {
     void startingKeyboard().then(setKeyboard);
   }, []);
-  // A changed state may let it open again (a desktop switched on, a computer back).
+  // A changed state may let it open again (a screen switched on, a computer back).
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when what blocks it changes
   useEffect(() => setGaveUp(false), [blocked]);
 
@@ -155,7 +168,7 @@ export function DesktopView({
           setCopied(null);
           const next = desktopCloseState(e.code, e.reason);
           setView(next.state);
-          // What changed shows at once (someone took control, it was turned off); a state that blocks it stops the retry.
+          // What changed shows at once (someone took control); a state that blocks it stops the retry.
           void refetch();
           if (next.retry === "never") return setGaveUp(true);
           // "now" still waits a moment: the new state (control handed back) usually changes the mode first.
@@ -174,6 +187,8 @@ export function DesktopView({
         rfb.addEventListener("connect", () => {
           attempts.current = 0;
           setView("live");
+          // Taking control puts the person's keys on the screen at once.
+          if (inControl) rfb?.focus({ preventScroll: true });
         });
         rfb.addEventListener("clipboard", (e) => setCopied((e as CustomEvent<{ text: string }>).detail.text));
         rfbRef.current = rfb;
@@ -195,7 +210,7 @@ export function DesktopView({
       else ws?.close();
     };
     // A browser that keeps the page for its Back button can keep its sockets open there for minutes: a viewer
-    // nobody sees, holding the desktop up and counted as watching. It goes with the page; coming back opens it again.
+    // nobody sees, holding the screen up and counted as watching. It goes with the page; coming back opens it again.
     const leave = (e: PageTransitionEvent) => {
       if (e.persisted) end();
     };
@@ -212,43 +227,28 @@ export function DesktopView({
     window.addEventListener("pageshow", back);
     return () => window.removeEventListener("pageshow", back);
   }, []);
-
-  // Full screen: the browser's own when it allows it; either way the panel fills the window.
-  useEffect(() => {
-    const el = root.current;
-    if (!full || !el) return;
-    const left = () => {
-      if (!document.fullscreenElement) setFull(false);
-    };
-    document.addEventListener("fullscreenchange", left);
-    if (typeof el.requestFullscreen === "function") el.requestFullscreen().catch(() => {});
-    return () => {
-      document.removeEventListener("fullscreenchange", left);
-      if (document.fullscreenElement === el) document.exitFullscreen().catch(() => {});
-    };
-  }, [full]);
   useEffect(() => {
     if (!inControl) setHandingBack(false);
   }, [inControl]);
 
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
-  // Live, or only a person's own step changes it: no need to ask often.
-  const settledState =
-    live || shown === "forbidden" || shown === "unavailable" || shown === "outdated" || shown === "ended";
-  useEffect(() => setPoll(settledState ? 30_000 : 5_000), [settledState]);
+  const settled = SETTLED.includes(shown);
+  useEffect(() => setPoll(settled ? 30_000 : 5_000), [settled]);
   const handoff = s?.handoff ?? null;
   const ask = inControl && handoff?.kind === "ask" ? handoff.instructions : null;
-  // Until the desktop's state says who (right after a 4409), someone.
+  // Until the screen's state says who (right after a 4409), someone.
   const controllerName =
     (s?.controllerUserId ? dir.memberById.get(s.controllerUserId)?.name : undefined) ?? t("channel.unknownPerson");
   const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
 
+  // One new socket: no longer given up opens it; otherwise a new round does.
   const retry = () => {
     attempts.current = 0;
-    setGaveUp(false);
     setView("connecting");
-    void refetch().finally(() => setRound((r) => r + 1));
+    if (gaveUp) setGaveUp(false);
+    else setRound((r) => r + 1);
+    void refetch();
   };
   const takeover = () =>
     actions.takeover.mutate(
@@ -277,27 +277,6 @@ export function DesktopView({
     if (!handoff) return;
     actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: failedToast });
   };
-  const turnOn = () =>
-    start.mutate(agentId, {
-      onError: (err) =>
-        toast.show(
-          err instanceof ApiError && err.code === "machine.desktop_busy"
-            ? t("desktop.startBusy")
-            : t("desktop.startFailed"),
-          "error",
-        ),
-    });
-  const turnOff = () =>
-    actions.stop.mutate(
-      { agentId, screen: "desktop" },
-      {
-        onSuccess: () => {
-          setConfirmStop(false);
-          toast.show(t("desktop.stopped", g));
-        },
-        onError: failedToast,
-      },
-    );
   const paste = () => {
     const rfb = rfbRef.current;
     if (!rfb || !text) return;
@@ -319,6 +298,7 @@ export function DesktopView({
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
+  const failed = shown === "unavailable" || shown === "outdated" || shown === "ended" || shown === "noRoom";
   const sub = inControl
     ? ask
       ? t("desktop.sub.controlAsked", g)
@@ -326,19 +306,30 @@ export function DesktopView({
     : shown === "hidden"
       ? t("desktop.sub.hidden", { person: controllerName })
       : live
-        ? t("desktop.sub.watching")
-        : shown === "off"
-          ? t("desktop.sub.off")
-          : t("desktop.sub.connecting");
+        ? (head?.watching ?? t("agentComputer.sub.watching"))
+        : failed || shown === "forbidden"
+          ? ""
+          : t("agentComputer.sub.opening");
   const retrying = <span>{t("desktop.state.retrying")}</span>;
-  const unavailableHelp =
-    s?.reason === "not_allowed"
-      ? t("browser.machine.offHelp")
-      : s?.reason === "desktop_unavailable" && s.canStart
-        ? s.detail
-        : null;
+  const again = (
+    <Button size="sm" icon="refresh" onClick={retry}>
+      {t("desktop.retry")}
+    </Button>
+  );
+  const cantShow = (
+    <CantShowCover
+      edition={edition}
+      machine={machine}
+      computer={computer}
+      name={name}
+      reason={shown === "outdated" ? "runner_outdated" : (s?.reason ?? null)}
+      detail={s?.detail ?? null}
+      color={color}
+      onRetry={retry}
+    />
+  );
   const cover: Record<Exclude<DesktopViewState, "live">, ReactNode> = {
-    connecting: <Cover color={color} spinner text={t("desktop.state.connecting", g)} />,
+    connecting: <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} />,
     hidden: (
       <Cover
         color={color}
@@ -347,68 +338,34 @@ export function DesktopView({
         help={t("browser.inCard.hiddenHelp", g)}
       />
     ),
-    off: (
-      <Cover
-        color={color}
-        icon="power"
-        text={t("desktop.state.off", g)}
-        help={t("desktop.state.offHelp", g)}
-        action={
-          s?.canStart && (
-            <Button size="sm" variant="primary" icon="power" loading={start.isPending} onClick={turnOn}>
-              {t("desktop.start")}
-            </Button>
-          )
-        }
-      />
-    ),
-    offline: <Cover color={color} spinner text={t("browser.inCard.offline", g)} help={retrying} />,
+    offline: <Cover color={color} sky spinner text={t("agentComputer.state.opening", g)} help={retrying} />,
     busy: <Cover color={color} spinner text={t("desktop.state.busy")} help={retrying} />,
-    paused: <Cover color={color} icon="pause" text={t("desktop.state.paused", g)} help={retrying} />,
-    forbidden: <Cover color={color} icon="lock" text={t("desktop.state.forbidden")} />,
-    outdated: <Cover color={color} icon="alert" text={t("desktop.state.outdated", g)} />,
-    unavailable: <Cover color={color} icon="dash" text={t("desktop.state.unavailable", g)} help={unavailableHelp} />,
-    ended: (
-      <Cover
-        color={color}
-        icon="power"
-        text={t("desktop.state.ended")}
-        action={
-          <Button size="sm" icon="refresh" onClick={retry}>
-            {t("desktop.retry")}
-          </Button>
-        }
-      />
+    noRoom: <Cover color={color} icon="alert" text={t("agentComputer.state.noRoom", { computer })} action={again} />,
+    paused: (
+      <Cover color={color} icon="pause" text={t("agentComputer.state.pausedPlain", { computer })} help={retrying} />
     ),
+    forbidden: <Cover color={color} icon="lock" text={t("agentComputer.state.forbidden")} />,
+    outdated: cantShow,
+    unavailable: cantShow,
+    ended:
+      edition === "selfhost" ? (
+        <Cover color={color} icon="dash" text={t("desktop.state.ended")} action={again} />
+      ) : (
+        cantShow
+      ),
   };
 
-  const watchActs = confirmStop ? (
+  const watchActs = (
     <>
-      <span className="small muted">{t("desktop.stopAsk", g)}</span>
-      <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
-        {t("browser.watch.no")}
-      </Button>
-      <Button size="sm" variant="primary" loading={actions.stop.isPending} onClick={turnOff}>
-        {t("desktop.stop")}
-      </Button>
-    </>
-  ) : (
-    <>
-      {live && s?.canControl && !s.controllerUserId && (
-        <Button size="sm" icon="person" loading={actions.takeover.isPending} onClick={takeover}>
-          {t("desktop.takeover")}
-        </Button>
-      )}
-      {s?.canStart && s.running && (
+      {live && !s?.controllerUserId && canTakeOver && (s?.canControl || onTakeBrowser) && (
         <Button
           size="sm"
-          variant="ghost"
-          iconOnly
-          icon="power"
-          aria-label={t("desktop.stop")}
-          title={t("desktop.stop")}
-          onClick={() => setConfirmStop(true)}
-        />
+          icon="person"
+          loading={actions.takeover.isPending}
+          onClick={s?.canControl ? takeover : onTakeBrowser}
+        >
+          {t("desktop.takeover")}
+        </Button>
       )}
     </>
   );
@@ -416,7 +373,7 @@ export function DesktopView({
     <>
       {ask && (
         <Button size="sm" variant="ghost" loading={actions.failed.isPending} onClick={giveUp}>
-          {t("browser.inCard.giveUp")}
+          {t("browser.inCard.couldnt")}
         </Button>
       )}
       {!handingBack && (
@@ -426,66 +383,27 @@ export function DesktopView({
       )}
     </>
   );
-  const fullLabel = full ? t("browser.inCard.fullExit") : t("browser.inCard.full");
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group, not a fieldset
-    <div
-      ref={root}
-      className={["brw-ac", "is-open", "dsk", inControl && "is-control", full && "is-full"].filter(Boolean).join(" ")}
-      role="group"
-      aria-label={t("desktop.title", g)}
-      data-state={shown}
-    >
-      <SkyStrip color={color} muted={inControl} moving={live && !inControl} />
-      <div className="brw-ac__head">
-        <span className="brw-ac__tt is-static">
-          <span className="brw-ac__tx">
-            <b className={ask ? "is-ask" : undefined} title={ask ?? undefined}>
-              {ask ?? t("desktop.title", g)}
-            </b>
-            <small>
-              <span>{sub}</span>
-            </small>
-          </span>
-        </span>
-        <span className="brw-ac__acts">
-          {inControl ? controlActs : watchActs}
-          {live && (
-            <Button
-              size="sm"
-              variant="ghost"
-              iconOnly
-              icon={full ? "close" : "external"}
-              aria-label={fullLabel}
-              title={fullLabel}
-              onClick={() => setFull((v) => !v)}
-            />
-          )}
-          {onFold && !full && (
-            <Button
-              size="sm"
-              variant="ghost"
-              iconOnly
-              icon="chevronDown"
-              className="brw-ac__chev"
-              aria-label={t("browser.inCard.collapse")}
-              title={t("browser.inCard.collapse")}
-              onClick={onFold}
-            />
-          )}
-        </span>
-      </div>
-      <div className="brw-ac__body">
-        <div className="brw-ac__stage">
-          <div
-            ref={screenRef}
-            className={inControl ? "dsk-screen is-control" : "dsk-screen"}
-            role="img"
-            aria-label={t("desktop.screen", g)}
-          />
-          {shown !== "live" && cover[shown]}
-        </div>
+    <div className={["dsk", inControl && "is-control"].filter(Boolean).join(" ")} data-state={shown}>
+      <DialogHead
+        sub={sub}
+        actions={
+          <>
+            {inControl ? controlActs : watchActs}
+            {(live || inControl || shown === "hidden") && <FullButton />}
+          </>
+        }
+      />
+      {ask && <p className="cmp-asked">“{ask}”</p>}
+      <div className="brw-ac__stage dsk-stage">
+        <div
+          ref={screenRef}
+          className={inControl ? "dsk-screen is-control" : "dsk-screen"}
+          role="img"
+          aria-label={t("agentComputer.screen", g)}
+        />
+        {shown !== "live" && cover[shown]}
       </div>
       {inControl &&
         (handingBack ? (
@@ -562,7 +480,7 @@ export function DesktopView({
                 onValueChange={chooseKeyboard}
                 options={DESKTOP_KEYBOARDS.map((k) => ({ value: k, label: t(`desktop.keyboard.layouts.${k}`) }))}
               />
-              <span className="small muted dsk-notice">{t("desktop.control.notice")}</span>
+              <span className="small muted dsk-notice">{t("desktop.control.notice", g)}</span>
             </div>
           </div>
         ))}

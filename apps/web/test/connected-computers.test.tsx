@@ -239,7 +239,7 @@ describe("Configurações → Computadores", () => {
     };
   };
 
-  test("one section for both kinds (Sandbox joined it); empty state explains it", async () => {
+  test("one section (Sandbox joined it): one lead line, other computers and how to connect one", async () => {
     await go();
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     const links = within(nav)
@@ -247,30 +247,19 @@ describe("Configurações → Computadores", () => {
       .map((l) => l.textContent);
     expect(links).toContain("Computadores");
     expect(links).not.toContain("Sandbox");
-    const kinds = screen().getByRole("region", { name: "Onde os agentes trabalham" });
-    expect(kinds.textContent).toContain("Na nuvem");
-    expect(kinds.textContent).toContain("No seu computador");
-    // The numbers sit behind each kind's ⓘ, not as chips on the card.
-    expect(kinds.querySelector(".ac-chip")).toBeNull();
-    const info = async (where: string) => {
-      const button = within(kinds).getByRole("button", { name: `Quem usa: ${where}` });
-      button.focus();
-      await act(async () => fireEvent.click(button));
-      const pop = screen().getByRole("dialog", { name: `Quem usa: ${where}` });
-      const text = pop.textContent;
-      await act(async () => fireEvent.keyDown(pop, { key: "Escape" }));
-      await act(() => new Promise((r) => setTimeout(r, 0)));
-      return text;
-    };
-    // Every agent is on the cloud until a computer of yours takes one.
-    expect(await info("Na nuvem")).toContain("2 agentes usam");
-    expect(await info("No seu computador")).toContain("Nenhum conectado");
-    expect(kinds.querySelectorAll("canvas.ac-computer")).toHaveLength(2);
-    expect(screen().getByRole("region", { name: "Computador na nuvem" })).toBeTruthy();
-    expect(screen().getByText("Nenhum computador seu ainda")).toBeTruthy();
-    expect(document.body.textContent).toContain("Instale o app agentes no seu Mac e entre com a sua conta.");
+    const body = document.querySelector(".settings__body") as HTMLElement;
+    expect(body.textContent).toContain(
+      "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
+    );
+    // No kinds side by side anymore, and never "in the cloud" here.
+    expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
+    expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);
+    expect(screen().getByRole("region", { name: "Outros computadores" })).toBeTruthy();
+    expect(screen().getByText("Nenhum outro computador ainda")).toBeTruthy();
+    expect(body.textContent).toContain("Conecte um Mac pelo app agentes, ou qualquer servidor com um comando.");
+    expect(screen().getByRole("region", { name: "Conectar outro computador" })).toBeTruthy();
     // Never internal names in the UI.
-    expect(document.querySelector(".settings__body")?.textContent).not.toMatch(/runner|MCP|sandbox/i);
+    expect(body.textContent).not.toMatch(/runner|MCP/i);
   });
 
   test("the old Sandbox address opens Computadores", async () => {
@@ -287,7 +276,8 @@ describe("Configurações → Computadores", () => {
     await settle(8);
     const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
     const trigger = within(card).getByRole("combobox", { name: "Computador de Ada" });
-    expect(trigger.textContent).toContain("Nuvem");
+    // This server has Daytona's sandboxes: they're the "no computer" choice, by name.
+    expect(trigger.textContent).toContain("Sandbox da Daytona");
     trigger.focus();
     await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
     await act(async () => fireEvent.click(screen().getByRole("option", { name: /^Escritório/ })));
@@ -295,12 +285,6 @@ describe("Configurações → Computadores", () => {
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, ADA_ID, m.id]);
     expect(document.body.textContent).toContain("Ada agora usa Escritório.");
     expect(within(card).getByRole("combobox", { name: "Computador de Ada" }).textContent).toContain("Escritório");
-    // The counts sit behind each kind's ⓘ.
-    const kinds = screen().getByRole("region", { name: "Onde os agentes trabalham" });
-    const who = within(kinds).getByRole("button", { name: "Quem usa: No seu computador" });
-    who.focus();
-    await act(async () => fireEvent.click(who));
-    expect(screen().getByRole("dialog", { name: "Quem usa: No seu computador" }).textContent).toContain("1 agente usa");
     // The row's portrait is the Mac's.
     expect(document.querySelector(".machine-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
   });
@@ -314,9 +298,9 @@ describe("Configurações → Computadores", () => {
     await settle(8);
     const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
     expect(within(card).queryByRole("combobox")).toBeNull();
-    expect(card.textContent).toContain("Nuvem");
-    // The cloud computer's settings stay with the admins.
-    expect(screen().queryByRole("region", { name: "Computador na nuvem" })).toBeNull();
+    expect(card.textContent).toContain("Sandbox da Daytona");
+    // Daytona's settings stay with the admins.
+    expect(screen().queryByRole("region", { name: "Sandboxes da Daytona" })).toBeNull();
   });
 
   test("download: the Mac app from the latest build (version, size, SHA-256), first-run steps, other ways", async () => {
@@ -333,7 +317,7 @@ describe("Configurações → Computadores", () => {
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
     expect(state.calls.find((c) => c.method === "machines.desktopLatest")?.args).toEqual(["darwin", "aarch64"]);
-    const card = screen().getByRole("region", { name: "Conectar um computador" });
+    const card = screen().getByRole("region", { name: "Conectar outro computador" });
     const download = within(card).getByRole("link", { name: "Baixar o app para Mac" });
     expect(download.getAttribute("href")).toBe(
       "http://localhost:3000/api/desktop/download/0.2.0/agentes_0.2.0_aarch64.dmg",
@@ -362,7 +346,7 @@ describe("Configurações → Computadores", () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
-    const card = screen().getByRole("region", { name: "Conectar um computador" });
+    const card = screen().getByRole("region", { name: "Conectar outro computador" });
     expect(within(card).queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
     expect(card.textContent).toContain("O app para Mac ainda não está disponível.");
     expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
@@ -428,7 +412,7 @@ describe("Configurações → Computadores", () => {
     );
     await click(within(menu).getByRole("menuitem", { name: "Remover" }));
     const confirm = screen().getByRole("dialog", { name: "Remover “Notebook do Walter”?" });
-    expect(confirm.textContent).toContain("voltam para o PC na nuvem");
+    expect(confirm.textContent).toContain("Os agentes que usam ele precisam de outro computador.");
     await click(within(confirm).getByRole("button", { name: "Remover" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);

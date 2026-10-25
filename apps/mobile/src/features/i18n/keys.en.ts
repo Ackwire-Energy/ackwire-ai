@@ -475,7 +475,7 @@ export const featureKeysEn: FeatureTranslations = {
     computerOff: "{{name}} · off",
     reason: {
       no_computer: "Needs a connected computer",
-      cloud_computer: "Missions on the cloud computer are coming soon",
+      cloud_computer: "Missions on Daytona sandboxes are coming soon",
       exec_off: "The computer doesn't allow running commands",
       runner_outdated: "The computer needs an update",
       not_in_audience: "Doesn't work with you",
@@ -1081,9 +1081,9 @@ export const featureKeysEn: FeatureTranslations = {
       submit_other: "Switch {{count}} agents",
       later: "Not now",
       on: "On",
-      cloud: "Cloud computer",
+      cloud: "Daytona sandbox",
       cloudTag: "Always on",
-      cloudDesc: "Without your computer's folders; the repository comes from GitHub",
+      cloudDesc: "An isolated computer on Daytona",
       managedDesc: "Just for this workspace · one user per agent",
       has: "Has {{brains}}",
       and: " and ",
@@ -1118,7 +1118,7 @@ export const featureKeysEn: FeatureTranslations = {
       target_not_found: "That computer isn't connected anymore. Choose another one.",
       target_same: "Choose a computer other than {{computer}}.",
       target_paused: "That computer is paused. Choose another one.",
-      target_cloud_unavailable: "The cloud computer isn't available right now.",
+      target_cloud_unavailable: "Daytona sandboxes aren't available right now.",
       not_found: "{{computer}} isn't in the computers list anymore.",
     },
     card: {
@@ -1130,6 +1130,9 @@ export const featureKeysEn: FeatureTranslations = {
       moved: "Switched computers",
       movedBody: "What was waiting for {{computer}} goes on on the new computer.",
     },
+    titleCloud: "{{computer}} isn't answering",
+    a11yCloud: "Computer not answering",
+    cloudSub: "We're on it: nothing to do on your side.",
   },
   // The agent's browser (ADR 0040).
   browser: {
@@ -1154,7 +1157,7 @@ export const featureKeysEn: FeatureTranslations = {
       failedNote: "Couldn't: {{note}}",
       expired: "Nobody opened it in time: {{title}}",
       cancelled: "Canceled: {{title}}",
-      computer: "Open it on a computer to see the screen: {{title}}",
+      computer: "Help from a laptop: {{title}}",
     },
     live: {
       inControl: "You're in control",
@@ -1175,8 +1178,8 @@ export const featureKeysEn: FeatureTranslations = {
       page: "The browser's page. Tap to click.",
       graceF: "If you leave, {{name}} waits 2 min.",
       graceM: "If you leave, {{name}} waits 2 min.",
-      closedHelpF: "It opens when {{name}} browses again. Logins stay saved.",
-      closedHelpM: "It opens when {{name}} browses again. Logins stay saved.",
+      closedHelpF: "Its sign-ins stay saved.",
+      closedHelpM: "Its sign-ins stay saved.",
       hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",
@@ -1187,8 +1190,8 @@ export const featureKeysEn: FeatureTranslations = {
       unavailable: {
         reconnectingF: "Reconnecting…",
         reconnectingM: "Reconnecting…",
-        offlineF: "{{name}}'s computer is off.",
-        offlineM: "{{name}}'s computer is off.",
+        offlineF: "{{name}}'s computer is offline.",
+        offlineM: "{{name}}'s computer is offline.",
         no_computerF: "{{name}} has no computer.",
         no_computerM: "{{name}} has no computer.",
         unavailableF: "{{name}}'s browser isn't available right now.",
@@ -1199,10 +1202,11 @@ export const featureKeysEn: FeatureTranslations = {
         forbiddenM: "You can't see this browser.",
         closedF: "{{name}}'s browser is closed.",
         closedM: "{{name}}'s browser is closed.",
+        offlineCloudF: "{{name}}'s computer isn't answering right now.",
+        offlineCloudM: "{{name}}'s computer isn't answering right now.",
       },
     },
     profile: {
-      title: "Browser",
       waitingF: "{{name}} needs you",
       waitingM: "{{name}} needs you",
     },

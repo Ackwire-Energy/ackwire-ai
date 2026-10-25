@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type { DesktopStatus } from "../api/types";
@@ -6,28 +6,29 @@ import { handoffScreen } from "../browser";
 import { type SocketBase, socketUrl } from "../realtime/connection";
 
 /**
- * The agent's desktop in the apps (ADR 0058): what the panel shows, the
+ * The agent's screen in the apps (ADR 0058): what the dialog's screen shows, the
  * viewer sockets' addresses, and what each of their close codes means.
  */
 
-/** What the desktop panel shows. */
+/** What the screen shows. */
 export type DesktopViewState =
+  /** The socket opens, or the screen starts: opening it starts a screen that isn't running. */
   | "connecting"
   | "live"
   /** Someone else is in control: their screen stays theirs until they hand it back. */
   | "hidden"
-  /** The desktop isn't running (a viewer never starts it). */
-  | "off"
   /** The computer is offline, or its socket is on another server (retrying). */
   | "offline"
-  /** As many viewers as the desktop takes, or too many opens in a minute (retrying). */
+  /** As many viewers as the screen takes, or too many opens in a minute (retrying). */
   | "busy"
+  /** The computer shows as many screens as its memory allows (`desktop_busy`): "Tentar de novo". */
+  | "noRoom"
   /** Its owner paused the computer: control waits for the resume (retrying). */
   | "paused"
   | "forbidden"
-  /** The agentes app on the computer is too old for desktops. */
+  /** The agentes app on the computer is too old for screens. */
   | "outdated"
-  /** Its switch is off on the computer, it can't run desktops, or the agent may not use one. */
+  /** Its switch is off on the computer, it can't run screens, or the agent may not use one. */
   | "unavailable"
   /** The computer ended the stream for good: only "Tentar de novo" opens it again. */
   | "ended";
@@ -66,7 +67,9 @@ export function desktopCloseState(code: number, reason = ""): { state: DesktopVi
     case DESKTOP_CLOSE.normal:
       return { state: "ended", retry: "never" };
     case DESKTOP_CLOSE.refused:
-      if (reason === "desktop_off") return { state: "off", retry: "later" };
+      // An older computer refuses a screen that isn't running: the server starts it, the next try opens it.
+      if (reason === "desktop_off") return { state: "connecting", retry: "later" };
+      if (reason === "desktop_busy") return { state: "noRoom", retry: "never" };
       if (reason === "machine_paused") return { state: "paused", retry: "later" };
       if (reason === "runner_outdated") return { state: "outdated", retry: "never" };
       if (reason === "not_allowed" || reason === "desktop_unavailable") return { state: "unavailable", retry: "never" };
@@ -77,7 +80,7 @@ export function desktopCloseState(code: number, reason = ""): { state: DesktopVi
   }
 }
 
-/** What `GET …/desktop`'s `reason` (or its terminal's) means for the panel. */
+/** What `GET …/desktop`'s `reason` means for the screen. */
 export function desktopReasonState(reason: string | null): "offline" | "outdated" | "unavailable" {
   if (reason === "offline" || reason === "other_server") return "offline";
   if (reason === "runner_outdated") return "outdated";
@@ -85,12 +88,11 @@ export function desktopReasonState(reason: string | null): "offline" | "outdated
 }
 
 /**
- * What the panel shows before any socket opens, from the desktop's state;
- * null: open the screen.
+ * What the screen shows before any socket opens, from its state; null: open it (a screen that isn't running
+ * starts on its first viewer).
  */
 export function desktopStatusState(status: DesktopStatus, userId: string): DesktopViewState | null {
   if (!status.available) return desktopReasonState(status.reason);
-  if (!status.running) return "off";
   if (status.controllerUserId && status.controllerUserId !== userId) return "hidden";
   return null;
 }
@@ -138,77 +140,7 @@ export function desktopSocketUrl(
   return socketUrl(base, "/api/desktop", params);
 }
 
-/** A person's terminal on the agent's computer, `cols` × `rows` to start with. */
-export function terminalSocketUrl(base: SocketBase, v: { orgId: string; agentId: string; cols: number; rows: number }) {
-  return socketUrl(base, "/api/terminal", { orgId: v.orgId, agentId: v.agentId, cols: v.cols, rows: v.rows });
-}
-
-/** What the terminal panel shows. It never opens again by itself: a new socket is a new shell. */
-export type TerminalViewState =
-  | "connecting"
-  | "live"
-  /** The shell ended (its `exit` frame), or the stream did. */
-  | "ended"
-  /** The connection broke (the server restarted, the network, the computer didn't answer in time…). */
-  | "dropped"
-  | "offline"
-  /** As many terminals as the agent or its computer take, or too many opens in a minute. */
-  | "busy"
-  | "paused"
-  | "forbidden"
-  | "outdated"
-  /** Its switch is off on the computer, or the computer can't open terminals. */
-  | "unavailable";
-
-/** What a terminal socket's close means for the panel; `reason` is the server's (4502: the computer's error code). */
-export function terminalCloseState(code: number, reason = ""): TerminalViewState {
-  switch (code) {
-    case DESKTOP_CLOSE.normal:
-      return "ended";
-    case DESKTOP_CLOSE.forbidden:
-      return "forbidden";
-    case DESKTOP_CLOSE.notFound:
-      return "unavailable";
-    case DESKTOP_CLOSE.tooMany:
-      return "busy";
-    case DESKTOP_CLOSE.unreachable:
-      return "offline";
-    case DESKTOP_CLOSE.refused:
-      if (reason === "machine_paused") return "paused";
-      if (reason === "runner_outdated") return "outdated";
-      if (reason === "not_allowed" || reason === "terminal_unavailable") return "unavailable";
-      return "dropped";
-    default:
-      return "dropped";
-  }
-}
-
-/**
- * A terminal's size, inclusive; mirrors `STREAM_LIMITS.cols`/`rows` in machine-protocol.ts. The server ends a
- * stream asked or resized outside it.
- */
-export const TERMINAL_SIZE = { cols: [20, 400], rows: [5, 200] } as const;
-
-/** The size that fits the panel, brought within `TERMINAL_SIZE`. */
-export function terminalSize(cols: number, rows: number) {
-  const [minCols, maxCols] = TERMINAL_SIZE.cols;
-  const [minRows, maxRows] = TERMINAL_SIZE.rows;
-  return {
-    cols: Math.min(maxCols, Math.max(minCols, Math.floor(cols))),
-    rows: Math.min(maxRows, Math.max(minRows, Math.floor(rows))),
-  };
-}
-
-/** Whether a terminal's text frame from the server says its shell ended (`{"type":"exit","code":…}`). */
-export function isTerminalExit(data: string) {
-  try {
-    return (JSON.parse(data) as { type?: unknown } | null)?.type === "exit";
-  } catch {
-    return false;
-  }
-}
-
-/** The agent's desktop as this person sees it; `poll`: ask again this often (nothing else says when it starts or is handed back). */
+/** The agent's screen as this person sees it; `poll`: ask again this often (nothing else says when it is handed back). */
 export const useDesktopStatus = (
   orgId: string,
   agentId: string,
@@ -223,14 +155,3 @@ export const useDesktopStatus = (
     refetchInterval: options.poll ?? false,
   });
 };
-
-/** "Ligar": 502 `machine.desktop_busy` when the computer runs as many desktops as it can. */
-export function useStartDesktop(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (agentId: string) => api.desktop.start(orgId, agentId),
-    meta: { silent: true },
-    onSuccess: (_done, agentId) => qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, agentId) }),
-  });
-}

@@ -148,4 +148,6 @@ export const keys = {
   browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
   /** The agent's desktop (ADR 0058): its state as this person sees it. */
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
+  /** Every agent's screen (`agentDesktop`'s prefix). */
+  agentDesktops: (orgId: string) => ["org", orgId, "desktop"] as const,
 };
