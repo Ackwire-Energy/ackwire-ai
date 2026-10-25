@@ -152,6 +152,12 @@ pub fn on_event(app: &AppHandle, id: &str) {
             let _ = crate::present(app, "welcome");
         }
         "open" => crate::open_app(app),
+        // The tray's line for the server here (Windows and Linux).
+        "hereStart" => crate::local_server::start(app),
+        "hereStop" => {
+            let app = app.clone();
+            std::thread::spawn(move || crate::local_server::stop(&app, false));
+        }
         // The popover owns updates, quitting (it asks first while agents are working), access requests, the
         // Servers tab and pausing.
         "updates" | "quit" | "requests" | "thisMac" | "servers" | "pause1h" | "pauseTomorrow" | "pauseManual"
@@ -309,7 +315,8 @@ pub fn servers_menu(
     let file = crate::servers::get(app);
     let mut menu = SubmenuBuilder::new(app, l("servers"));
     for (n, server) in file.servers.iter().enumerate() {
-        let name = server.strip_prefix("https://").unwrap_or(server);
+        let here = crate::local_server::is_here(app, server).then(|| l("serverTitle"));
+        let name = here.as_deref().unwrap_or_else(|| server.strip_prefix("https://").unwrap_or(server));
         let current = file.current.as_deref() == Some(server.as_str());
         let item = tauri::menu::CheckMenuItemBuilder::with_id(format!("server:{n}"), name).checked(current).build(app)?;
         menu = menu.item(&item);
@@ -356,8 +363,8 @@ pub fn rebuild(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// The site's organizations (`this_mac` `orgs`, already checked), for the Go menu.
-pub fn set_orgs(app: &AppHandle, orgs: &serde_json::Value) {
+/// The site's organizations (`this_mac` `orgs`, already checked), for the Go menu; whether they changed.
+pub fn set_orgs(app: &AppHandle, orgs: &serde_json::Value) -> bool {
     let list: Vec<(String, String)> = orgs
         .as_array()
         .map(|a| {
@@ -370,11 +377,12 @@ pub fn set_orgs(app: &AppHandle, orgs: &serde_json::Value) {
         let parts = app.state::<MenuParts>();
         let mut orgs = parts.orgs.lock().unwrap_or_else(|e| e.into_inner());
         if *orgs == list {
-            return;
+            return false;
         }
         *orgs = list;
     }
     let _ = rebuild(app);
+    true
 }
 
 /// A download finished (main_window.rs): a notification with its name, in the app's language.

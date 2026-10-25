@@ -37,6 +37,18 @@ const COMMANDS: &[&str] = &[
     "cover_server",
     "this_mac_listening",
     "dock_set",
+    "local_server_status",
+    "local_server_install",
+    "local_server_start",
+    "local_server_stop",
+    "local_server_restart",
+    "local_server_reach",
+    "local_server_usage",
+    "local_server_backup",
+    "local_server_diagnostics",
+    "local_server_sync",
+    "tailscale_status",
+    "tailscale_open",
 ];
 
 fn main() {

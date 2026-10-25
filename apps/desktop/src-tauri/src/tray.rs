@@ -3,7 +3,7 @@
 //! bars by itself), shown while this computer works for agents or when the person chose it, and opening the
 //! popover. On Windows and Linux there is no Dock and closing the window only hides it, so the icon is always
 //! there, the app's own, with a native menu (Linux's AppIndicator never passes clicks to the app): open the
-//! app, the servers, pausing the agents here, Preferences, quit.
+//! app, the servers, pausing the agents here, the server here's state with Start or Stop, Preferences, quit.
 
 use tauri::AppHandle;
 
@@ -98,6 +98,21 @@ fn menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
         menu.append(&PredefinedMenuItem::separator(app)?)?;
         menu.append(&pause)?;
         menu.append(&item("resume", "trayResume")?)?;
+    }
+    // The server here: its state, and Start or Stop.
+    if crate::local_server::runs(app) {
+        use crate::local_server::Phase;
+        let phase = crate::local_server::phase(app);
+        let (state, action) = match phase {
+            Phase::Running => ("serverRunning", ("hereStop", "serverStop")),
+            Phase::Starting | Phase::Updating => ("serverStarting", ("hereStop", "serverStop")),
+            Phase::Failing => ("serverFailing", ("hereStart", "serverStart")),
+            Phase::Stopped | Phase::Off => ("serverStopped", ("hereStart", "serverStart")),
+        };
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+        let line = format!("{} · {}", l("serverTitle"), l(state));
+        menu.append(&MenuItemBuilder::new(line).enabled(false).build(app)?)?;
+        menu.append(&item(action.0, action.1)?)?;
     }
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     menu.append(&item("prefs", "trayPrefs")?)?;

@@ -4,9 +4,10 @@ import type { TFunction } from "i18next";
 export const MAX_MENU_LABEL = 120;
 
 /**
- * Everything Rust shows in the app's language: the menu bar, the tray's own menu on Windows and Linux, the
- * system dialog before a page pairs this computer and the notice about retired Cloud homes. `{org}`, `{host}`
- * and `{path}` are left for Rust to fill in.
+ * Everything Rust shows in the app's language: the menu bar, the tray's own menu on Windows and Linux (the
+ * server here's line in it too), the system dialog before a page pairs this computer, the notice about retired
+ * Cloud homes and the server here's notifications. `{org}`, `{host}`, `{path}` and `{version}` are left for
+ * Rust to fill in.
  */
 export function menuLabels(t: TFunction): Record<string, string> {
   return {
@@ -26,5 +27,16 @@ export function menuLabels(t: TFunction): Record<string, string> {
     pairNotNow: t("desktop.pair.notNow"),
     migrateTitle: t("desktop.migrate.cloudTitle"),
     migrateBody: t("desktop.migrate.cloudBody", { path: "{path}" }),
+    serverTitle: t("desktop.server.title"),
+    serverRunning: t("desktop.server.running"),
+    serverStarting: t("desktop.server.starting"),
+    serverStopped: t("desktop.server.stopped"),
+    serverFailing: t("desktop.server.failing"),
+    serverStart: t("desktop.server.start"),
+    serverStop: t("desktop.server.stop"),
+    hereStopped: t("desktop.server.stoppedBanner"),
+    hereStoppedBody: t("desktop.server.stoppedBody"),
+    hereFailing: t("desktop.server.failingBanner"),
+    hereBack: t("desktop.server.updateBack", { version: "{version}" }),
   };
 }

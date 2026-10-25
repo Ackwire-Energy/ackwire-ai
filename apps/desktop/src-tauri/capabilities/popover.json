@@ -1,6 +1,6 @@
 {
   "identifier": "popover",
-  "description": "The menu bar popover: live state, pause, access requests, the tray icon and its menu, notifications, the servers (to name the one open now and open it).",
+  "description": "The menu bar popover: live state, pause, access requests, the tray icon and its menu, notifications, the servers (to name the one open now and open it), and the server here (its state, start, stop, restart, its organizations' connections).",
   "windows": ["popover"],
   "permissions": [
     "core:default",
@@ -23,6 +23,12 @@
     "allow-this-mac-reply",
     "allow-app-menu-set",
     "allow-this-mac-listening",
-    "allow-dock-set"
+    "allow-dock-set",
+    "allow-local-server-status",
+    "allow-local-server-start",
+    "allow-local-server-stop",
+    "allow-local-server-restart",
+    "allow-local-server-diagnostics",
+    "allow-local-server-sync"
   ]
 }

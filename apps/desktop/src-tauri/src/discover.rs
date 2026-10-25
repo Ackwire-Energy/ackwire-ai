@@ -4,17 +4,12 @@
 //! whose name starts with "agentes". Only addresses: the welcome window asks each one whether it is a server.
 //! No scan of the local network: servers listen on their own machine, and plain http across it is refused.
 
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::path::Path;
 
 use serde::Serialize;
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
-/// The Tailscale tool gets this long to answer.
-const TAILSCALE_WAIT: Duration = Duration::from_secs(2);
 /// Devices named agentes… on the tailnet, at most.
 const MAX_PEERS: usize = 5;
 /// Where the native server and a Docker install answer on this computer, when nothing says otherwise.
@@ -70,50 +65,6 @@ fn tailnet(status: &Value) -> Vec<String> {
     out
 }
 
-/// The Tailscale tool at the places it installs itself; never a path from a page.
-fn tailscale() -> Option<PathBuf> {
-    #[cfg(target_os = "macos")]
-    let fixed: &[&str] = &[
-        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-        "/usr/local/bin/tailscale",
-        "/opt/homebrew/bin/tailscale",
-    ];
-    #[cfg(target_os = "windows")]
-    let fixed: &[&str] = &[r"C:\Program Files\Tailscale\tailscale.exe"];
-    #[cfg(target_os = "linux")]
-    let fixed: &[&str] = &["/usr/bin/tailscale", "/usr/local/bin/tailscale", "/usr/sbin/tailscale"];
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    let fixed: &[&str] = &[];
-    fixed.iter().map(PathBuf::from).find(|p| p.is_file())
-}
-
-/// `tailscale status --json`, or None when it isn't there, fails or takes too long.
-fn tailscale_status() -> Option<Value> {
-    let mut child = Command::new(tailscale()?)
-        .args(["status", "--json"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let started = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => break,
-            Ok(Some(_)) | Err(_) => return None,
-            Ok(None) if started.elapsed() > TAILSCALE_WAIT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-        }
-    }
-    let mut out = String::new();
-    child.stdout.take()?.take(8 * 1024 * 1024).read_to_string(&mut out).ok()?;
-    serde_json::from_str(&out).ok()
-}
-
 pub fn find(home: &Path, status: Option<&Value>) -> Vec<Candidate> {
     let mut out: Vec<Candidate> = Vec::new();
     let mut add = |server: String, place: &'static str| {
@@ -133,7 +84,7 @@ pub fn find(home: &Path, status: Option<&Value>) -> Vec<Candidate> {
 #[tauri::command]
 pub async fn discover(app: AppHandle) -> Vec<Candidate> {
     let Ok(home) = app.path().home_dir() else { return Vec::new() };
-    tauri::async_runtime::spawn_blocking(move || find(&home, tailscale_status().as_ref()))
+    tauri::async_runtime::spawn_blocking(move || find(&home, crate::tailscale::status_json().as_ref()))
         .await
         .unwrap_or_default()
 }

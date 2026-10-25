@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../../app";
 import { noteLines } from "../../control/version";
-import type { UpdateCheck } from "../../hooks";
+import { type UpdateCheck, useLocalServer } from "../../hooks";
 import { useToast } from "../../ui/Toast";
 import { clock } from "../../ui/time";
 import { CardTitle, PrefCard, PrefHead } from "./shared";
@@ -20,6 +20,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
   const { latest, available, required } = update.state;
   const [installing, setInstalling] = useState(false);
   const [manual, setManual] = useState(false);
+  const local = useLocalServer();
 
   const install = async () => {
     setInstalling(true);
@@ -69,6 +70,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
                   })
                 : t("desktop.prefs.updates.neverChecked")}
             </small>
+            {local.run && <small className="dk-help">{t("desktop.server.updatesWithApp")}</small>}
           </span>
           <Button size="sm" loading={update.checking} onClick={() => void checkNow()}>
             {t("desktop.prefs.updates.checkNow")}

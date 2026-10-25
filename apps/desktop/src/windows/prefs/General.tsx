@@ -9,7 +9,7 @@ import { SITE_NOTIFY_PREF } from "../../control/notify";
 import { homeServer } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
-import { usePref } from "../../hooks";
+import { useLocalServer, usePref } from "../../hooks";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
@@ -24,6 +24,7 @@ export function General() {
   const homes = pairedHomes(snap);
   const works = homes.length > 0;
   const mac = host.platform === "mac";
+  const local = useLocalServer();
   const current = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? "";
   const [name, setName] = useState(current);
   const [saving, setSaving] = useState(false);
@@ -38,7 +39,7 @@ export function General() {
   const [menuBar, setMenuBar] = usePref<boolean | null>(MENU_BAR_PREF, null);
   const [leaving, setLeaving] = useState<Home | null>(null);
   const [busy, setBusy] = useState(false);
-  const iconShown = menuBarShown(menuBar, dock, works);
+  const iconShown = menuBarShown(menuBar, dock, works || local.run);
   useEffect(() => {
     void host.setTrayVisible(iconShown).catch(() => {});
   }, [host, iconShown]);
@@ -184,9 +185,12 @@ export function General() {
                           {t("desktop.common.open")}
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setLeaving(h)}>
-                        {t("desktop.prefs.general.leave")}
-                      </Button>
+                      {/* The server here's own organizations work here by its rule (its computer, ADR 0060). */}
+                      {!(local.run && server === local.url) && (
+                        <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setLeaving(h)}>
+                          {t("desktop.prefs.general.leave")}
+                        </Button>
+                      )}
                     </>
                   }
                 />
@@ -201,7 +205,13 @@ export function General() {
       <PrefCard>
         <PrefRow
           title={t("desktop.prefs.general.launchTitle")}
-          desc={works ? t("desktop.prefs.general.launchDesc") : undefined}
+          desc={
+            local.run
+              ? t("desktop.prefs.general.launchHere")
+              : works
+                ? t("desktop.prefs.general.launchDesc")
+                : undefined
+          }
           htmlFor="launch"
           end={
             <Switch

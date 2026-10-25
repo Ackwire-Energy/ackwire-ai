@@ -7,20 +7,17 @@ import { type ConnectLink, type ServerCheck, type ServerProblem, serverHost } fr
 import type { Platform } from "./platform";
 import { appServer, serverName } from "./server";
 
+export type FirstScreen = "choose" | "own" | "connect" | "here" | "windows" | "link";
+
 /**
- * "Run agentes.chat on this computer" on a Mac or Linux: off until that screen ships, so "Use your own
- * server" goes straight to Connect there. Windows shows its own card meanwhile (the two ways for now).
+ * Where "Use your own server ›" goes: the two ways where both exist (`canRunHere`: this build carries the
+ * server, on a Mac or Linux; Windows explains its own two ways for now), else straight to Connect.
  */
-export const RUN_HERE = false;
-
-export type FirstScreen = "choose" | "own" | "connect" | "windows" | "link";
-
-/** Where "Use your own server ›" goes: the two ways where both exist, else Connect. */
-export const ownServerScreen = (platform: Platform): FirstScreen =>
-  platform === "windows" || RUN_HERE ? "own" : "connect";
+export const ownServerScreen = (platform: Platform, canRunHere: boolean): FirstScreen =>
+  platform === "windows" || canRunHere ? "own" : "connect";
 
 /** Where the run-here card on "Your own server" goes. */
-export const runHereScreen = (platform: Platform): FirstScreen => (platform === "windows" ? "windows" : "connect");
+export const runHereScreen = (platform: Platform): FirstScreen => (platform === "windows" ? "windows" : "here");
 
 /** The one-command setup, for a server without a screen; on Windows, inside WSL 2 with no network question. */
 export const INSTALL_COMMAND = "curl -fsSL https://agentes.chat/install | sh";

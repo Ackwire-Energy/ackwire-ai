@@ -928,6 +928,138 @@ body[data-window="popover"] {
   display: flex;
   gap: 8px;
 }
+/* F4: run agentes.chat here. The window is 600 px tall: a smaller title and two fields side by side. */
+.dk-fr__body h1.dk-fr__h1sm {
+  font-size: 28px;
+}
+.dk-fr__here {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 600px;
+}
+.dk-fr__who {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dk-fr__body .dk-fr__wide {
+  max-width: 66ch;
+}
+.dk-fr__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Start stays in view when the form is taller than the window: it sticks to the bottom edge. */
+.dk-fr__here .dk-fr__end {
+  position: sticky;
+  /* The scroller's own bottom padding (28px) counts: the bar meets the window's edge. */
+  bottom: -28px;
+  margin: 0 -48px -28px;
+  padding: 10px 48px 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg) 10px);
+}
+/* After a short screen's text, not at the window's bottom. */
+.dk-fr__end[data-near] {
+  margin-top: 24px;
+  max-width: 600px;
+}
+/* F4b, F4c: the steps as they run. */
+.dk-fr__steps {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 600px;
+}
+.dk-fr__steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.dk-fr__steps li[data-state="todo"] {
+  color: var(--faint);
+}
+.dk-fr__stepmark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+.dk-fr__steps li[data-state="done"] .dk-fr__stepmark {
+  color: var(--ok);
+}
+.dk-fr__steps li[data-state="failed"] .dk-fr__stepmark {
+  color: var(--danger);
+}
+.dk-fr__steps li[data-state="warn"] .dk-fr__stepmark {
+  color: var(--warn);
+}
+.dk-fr__stepdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.dk-fr__steptext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dk-fr__stepname {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.dk-fr__stepname b {
+  font-weight: 600;
+  font-size: 14px;
+}
+.dk-fr__stepname small {
+  color: var(--faint);
+  font-size: 12px;
+}
+.dk-fr__stepfail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dk-fr__stepacts {
+  display: flex;
+  gap: 8px;
+}
+.dk-fr__steps .dk-fr__problem {
+  margin: 0;
+}
+.dk-fr__bar {
+  margin-top: 28px;
+  height: 6px;
+  max-width: 600px;
+  border-radius: 3px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.dk-fr__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--agent2);
+  transition: width 0.4s var(--out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dk-fr__bar span {
+    transition: none;
+  }
+}
 .dk-wel__horizon {
   position: absolute;
   left: 0;
@@ -1006,6 +1138,24 @@ body[data-window="popover"] {
 /* The action under a card ("Add a server…"). */
 .dk-under-card {
   margin-top: 12px;
+}
+/* The server here: Restart and Stop under its card, "Stop running it here…" at the far end. */
+.dk-here__acts {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dk-here__end {
+  margin-left: auto;
+}
+/* Its card on top of the popover. */
+.dk-here__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.dk-here__more {
+  margin-top: 0;
 }
 
 .dk-prefs {

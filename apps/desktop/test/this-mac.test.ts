@@ -88,10 +88,25 @@ test("status: only the asking server's organizations, and whether agents may wor
   expect(await answerThisMac(deps, { kind: "status", origin: SERVER, agentsHere: true })).toEqual({
     orgs: [{ orgId: "o1", machineId: "m-o1", connection: "online" }],
     agentsHere: true,
+    local: false,
   });
   expect(await answerThisMac(deps, { kind: "status", origin: "https://agentes.chat", agentsHere: false })).toEqual({
     orgs: [],
     agentsHere: false,
+    local: false,
+  });
+});
+
+test("status on the server here: its own homes point at its loopback address, whichever address the page has", async () => {
+  const LOCAL = "http://127.0.0.1:4310";
+  const { store, deps } = setup({ h1: paired("o1", "online", LOCAL), h2: paired("o2") });
+  store.start();
+  await settle();
+  const asked = { kind: "status" as const, origin: "https://ana-mac.tail1234.ts.net", agentsHere: false };
+  expect(await answerThisMac(deps, { ...asked, local: true, also: LOCAL })).toEqual({
+    orgs: [{ orgId: "o1", machineId: "m-o1", connection: "online" }],
+    agentsHere: false,
+    local: true,
   });
 });
 

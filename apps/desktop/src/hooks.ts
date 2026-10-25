@@ -1,6 +1,7 @@
 import type { ControlAgent } from "@agenteschat/adapters/runner-control";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHost } from "./app";
+import { type LocalServerStatus, NO_SERVER } from "./control/local-server";
 import type { Home } from "./control/store";
 import {
   CHECK_EVERY_MS,
@@ -80,6 +81,25 @@ export function useUpdateCheck(auto: boolean): UpdateCheck {
   }, [auto, version, check]);
 
   return { state: updateStateOf(version ?? "0.0.0", latest), checkedAt, checking, failed, check, version };
+}
+
+/** The server here (`local_server.rs`), kept current. */
+export function useLocalServer(): LocalServerStatus {
+  const host = useHost();
+  const [local, setLocal] = useState<LocalServerStatus>(NO_SERVER);
+  useEffect(() => {
+    let live = true;
+    host
+      .localServer()
+      .then((s) => live && setLocal(s))
+      .catch(() => {});
+    const off = host.onLocalServer(setLocal);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [host]);
+  return local;
 }
 
 /** Runs `fn` whenever the shell brings this window up. */

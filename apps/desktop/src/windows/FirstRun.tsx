@@ -1,12 +1,31 @@
 /**
  * The welcome window: how the app finds its server. agentes.chat is the one big action; your own server is a
  * small line under it, leading to Connect (an address, or one found on this computer or the Tailscale
- * network, and the one-command setup for a server that has none yet) or, on Windows, the two ways to run one
- * for now. A connect link (`agenteschat://connect`) opens here too: the server in large type, nothing changes
- * before Connect. Choosing a server opens the main window there and closes this one.
+ * network, and the one-command setup for a server that has none yet) or to running agentes.chat on this
+ * computer (on Windows, the two ways to run one for now). A connect link (`agenteschat://connect`) opens here
+ * too: the server in large type, nothing changes before Connect. Choosing a server opens the main window there
+ * and closes this one.
  */
-import { CLOUD_SERVER, type ConnectLink, parseConnectLink, type ServerCheck } from "@agenteschat/client/lib/server";
-import { Button, Chip, glowTones, Icon, Input, PixelSky, PixelSpinner, type SkyOptions } from "@agenteschat/ui";
+import {
+  CLOUD_SERVER,
+  type ConnectLink,
+  connectLink,
+  parseConnectLink,
+  type ServerCheck,
+} from "@agenteschat/client/lib/server";
+import { isEmail } from "@agenteschat/client/lib/text";
+import {
+  Button,
+  Chip,
+  Field,
+  glowTones,
+  Icon,
+  Input,
+  PixelSky,
+  PixelSpinner,
+  type SkyOptions,
+  Switch,
+} from "@agenteschat/ui";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
@@ -26,9 +45,20 @@ import {
   typedServer,
   WSL_INSTALL_COMMAND,
 } from "../control/first-run";
+import {
+  hereView,
+  type LocalServerStatus,
+  type SetupStep,
+  type StepChange,
+  setupSteps,
+  stepStates,
+  type Tailnet,
+} from "../control/local-server";
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, writePref } from "../hooks";
 import { BrandFace } from "../ui/bits";
+import { CopyDiagnostics, ReachProblem, ReachRow } from "../ui/here";
+import { shortPath } from "../ui/time";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
 const HORIZON: SkyOptions = {
@@ -49,6 +79,8 @@ export function FirstRun() {
   const [screen, setScreen] = useState<FirstScreen>("choose");
   const [trail, setTrail] = useState<FirstScreen[]>([]);
   const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView } | null>(null);
+  // This build carries the server (Mac and Linux): "Run agentes.chat on this computer" is offered.
+  const [canRunHere, setCanRunHere] = useState(false);
   const linkSeq = useRef(0);
   const screenRef = useRef(screen);
   screenRef.current = screen;
@@ -117,6 +149,13 @@ export function FirstRun() {
     [host, finish],
   );
 
+  useEffect(() => {
+    void host
+      .localServer()
+      .then((s) => setCanRunHere(s.bundled && host.platform !== "windows"))
+      .catch(() => {});
+  }, [host]);
+
   // The server the menu bar app was told to sign in to ("Server: … · Change"): it opens, as chosen then.
   useEffect(() => {
     const old = appServer(readPref<string | null>("server", null) ?? "");
@@ -166,7 +205,7 @@ export function FirstRun() {
         {screen === "choose" && (
           <Choose
             onCloud={(page) => void finish(CLOUD_SERVER, page)}
-            onOwn={() => go(ownServerScreen(host.platform))}
+            onOwn={() => go(ownServerScreen(host.platform, canRunHere))}
           />
         )}
         {screen === "own" && (
@@ -180,6 +219,7 @@ export function FirstRun() {
             onConfirm={confirm}
           />
         )}
+        {screen === "here" && <RunHere onBack={back} onUse={finish} onConfirm={confirm} onLink={openLink} />}
         {screen === "windows" && <WindowsWays onBack={back} onConnect={() => go("connect")} />}
         {screen === "link" && link && (
           <LinkSheet
@@ -271,7 +311,7 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
             <Icon name={host.platform === "windows" ? "computerWindows" : "computer"} size={18} />
           </span>
           <b>{t("desktop.own.here")}</b>
-          <small>{later ? t("desktop.own.hereLater") : null}</small>
+          <small>{later ? t("desktop.own.hereLater") : t("desktop.own.hereText")}</small>
           <Icon name="chevronRight" size={16} className="dk-fr__card-go" />
         </button>
       </div>
@@ -454,6 +494,297 @@ function Connect({
         <CommandCopy command={INSTALL_COMMAND} />
         <p className="dk-help">{t("desktop.connect.noneText")}</p>
       </section>
+    </>
+  );
+}
+
+/**
+ * F4: agentes.chat on this computer, inside the app: the owner's name and email (until the owner exists), reach
+ * through Tailscale (off), usage statistics (on), then Start. F4b: the steps as the app runs them, each problem
+ * on its own step (F4c). F4d: one installed from the terminal already runs here: Use it (its owner page while it
+ * waits for one).
+ */
+function RunHere({
+  onBack,
+  onUse,
+  onConfirm,
+  onLink,
+}: {
+  onBack: () => void;
+  onUse: (server: string) => Promise<void>;
+  onConfirm: (server: string) => Promise<void>;
+  onLink: (raw: string) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const host = useHost();
+  const [status, setStatus] = useState<LocalServerStatus | null>(null);
+  // A server (a Docker install) answering on this computer when the app doesn't run one: checked once.
+  const [answering, setAnswering] = useState<string | null | undefined>(undefined);
+  const [tailnet, setTailnet] = useState<Tailnet>({ state: "missing" });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [reach, setReach] = useState(false);
+  const [usage, setUsage] = useState(true);
+  const [setup, setSetup] = useState<{ steps: SetupStep[]; changes: StepChange[] } | null>(null);
+  const [problem, setProblem] = useState<{ problem: ConnectProblem; host: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  // Reach ended with a warning: the window stays until the person read it (the main window is already open).
+  const warned = useRef(false);
+
+  useEffect(() => {
+    void host
+      .localServer()
+      .then((s) => {
+        setStatus(s);
+        if (s.systemName) setName((n) => n || (s.systemName ?? ""));
+      })
+      .catch(() => {});
+    void host
+      .checkServer("http://127.0.0.1:3000")
+      .then((c) => setAnswering(c.ok ? c.server : null))
+      .catch(() => setAnswering(null));
+  }, [host]);
+
+  // Tailscale, each time the window comes to the front (the person may have just connected it).
+  useEffect(() => {
+    const read = () =>
+      void host
+        .tailscale()
+        .then(setTailnet)
+        .catch(() => setTailnet({ state: "missing" }));
+    read();
+    window.addEventListener("focus", read);
+    return () => window.removeEventListener("focus", read);
+  }, [host]);
+
+  useEffect(
+    () =>
+      host.onSetupStep((c) => {
+        if (c.state === "warn") warned.current = true;
+        setSetup((s) => (s ? { ...s, changes: [...s.changes, c] } : s));
+      }),
+    [host],
+  );
+
+  // Esc goes back, except while it is being set up.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && setup && !setup.changes.some((c) => c.state === "failed")) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setup]);
+
+  if (!status || answering === undefined) {
+    return (
+      <>
+        <BackLink label={t("desktop.own.title")} onClick={onBack} />
+        <h1>{t("desktop.here.title")}</h1>
+        <p className="dk-fr__looking" aria-live="polite">
+          <PixelSpinner size={14} color="sky" />
+        </p>
+      </>
+    );
+  }
+  const view = hereView(status, answering);
+
+  if (view.kind === "already") {
+    const use = async () => {
+      if (view.claim) return onLink(connectLink(view.server, { claim: view.claim }));
+      setChecking(true);
+      const outcome = connectOutcome(view.server, await host.checkServer(view.server));
+      setChecking(false);
+      if (outcome.kind === "problem") setProblem(outcome);
+      else if (outcome.kind === "use") await onUse(outcome.server);
+      else await onConfirm(outcome.server);
+    };
+    return (
+      <>
+        <BackLink label={t("desktop.own.title")} onClick={onBack} />
+        <h1>{t("desktop.here.already")}</h1>
+        <p className="dk-lead">{t("desktop.here.alreadyText", { url: view.server })}</p>
+        {problem && <ProblemLine problem={problem.problem} host={problem.host} />}
+        <div className="dk-fr__end" data-near>
+          <Button variant="primary" autoFocus loading={checking} onClick={() => void use()}>
+            {t("desktop.here.useIt")}
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  const start = async () => {
+    const choice = view.ask ? { name: name.trim(), email: email.trim(), reach, usage } : { reach, usage };
+    setSetup({ steps: setupSteps(reach), changes: [] });
+    warned.current = false;
+    try {
+      await host.installLocalServer(choice);
+      if (!warned.current) await host.hideWindow("welcome").catch(() => {});
+    } catch {
+      // The failed step says it (F4c); Try again starts over, keeping what was done.
+    }
+  };
+
+  if (setup) {
+    return (
+      <HereSetup
+        steps={setup.steps}
+        changes={setup.changes}
+        onRetry={() => void start()}
+        onContinue={() => void host.hideWindow("welcome").catch(() => {})}
+      />
+    );
+  }
+
+  const ready = !view.ask || (name.trim().length > 0 && isEmail(email));
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (ready) void start();
+  };
+  return (
+    <>
+      <BackLink label={t("desktop.own.title")} onClick={onBack} />
+      <h1 className="dk-fr__h1sm">{t("desktop.here.title")}</h1>
+      <p className="dk-lead dk-fr__wide">
+        {view.ask
+          ? t("desktop.here.how")
+          : `${t("desktop.here.how")} ${t("desktop.here.again", { path: shortPath(status.dir) })}`}
+      </p>
+      <form className="dk-fr__here" onSubmit={submit} noValidate>
+        {view.ask && (
+          <div className="dk-fr__who">
+            <Field label={t("desktop.here.name")}>
+              <Input
+                autoFocus
+                value={name}
+                maxLength={100}
+                autoComplete="name"
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field
+              label={t("desktop.here.email")}
+              labelAside={<span className="dk-help">{t("desktop.here.emailHint")}</span>}
+            >
+              <Input
+                type="email"
+                inputMode="email"
+                value={email}
+                maxLength={254}
+                autoComplete="email"
+                spellCheck={false}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+          </div>
+        )}
+        <div className="dk-card">
+          <ReachRow tailnet={tailnet} on={reach} onChange={setReach} />
+          <div className="dk-crow">
+            <span className="dk-crow__text">
+              <label htmlFor="here-usage" className="dk-crow__title">
+                {t("desktop.here.usage")}
+              </label>
+              <small>{t("desktop.here.usageText")}</small>
+            </span>
+            <span className="dk-crow__end">
+              <Switch id="here-usage" checked={usage} onCheckedChange={setUsage} />
+            </span>
+          </div>
+        </div>
+        <div className="dk-fr__notes">
+          <p className="dk-help">{t("desktop.here.agents")}</p>
+          <p className="dk-help">{t("desktop.here.limits")}</p>
+        </div>
+        <div className="dk-fr__end">
+          <Button type="submit" variant="primary" autoFocus={!view.ask} disabled={!ready}>
+            {t("desktop.here.start")}
+          </Button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+/** F4b, F4c: each step as it runs; a failed step says what happened, reach failing never stops the rest. */
+function HereSetup({
+  steps,
+  changes,
+  onRetry,
+  onContinue,
+}: {
+  steps: SetupStep[];
+  changes: StepChange[];
+  onRetry: () => void;
+  onContinue: () => void;
+}) {
+  const { t } = useTranslation();
+  const states = stepStates(steps, changes);
+  const done = steps.filter((s) => states[s] === "done" || states[s] === "warn").length;
+  const reachProblem = changes.find((c) => c.step === "reach" && c.state === "warn")?.reason;
+  return (
+    <>
+      <h1 className="dk-fr__h1sm">{t("desktop.here.setting")}</h1>
+      <ol className="dk-fr__steps" aria-live="polite">
+        {steps.map((step) => {
+          const state = states[step];
+          return (
+            <li key={step} data-state={state}>
+              <span className="dk-fr__stepmark" aria-hidden="true">
+                {state === "active" ? (
+                  <PixelSpinner size={16} color="sky" />
+                ) : state === "done" ? (
+                  <Icon name="check" size={16} />
+                ) : state === "failed" ? (
+                  <Icon name="close" size={16} />
+                ) : state === "warn" ? (
+                  <Icon name="alert" size={16} />
+                ) : (
+                  <span className="dk-fr__stepdot" />
+                )}
+              </span>
+              <span className="dk-fr__steptext">
+                <span className="dk-fr__stepname">
+                  <b className={state === "active" ? "dk-shimmer" : undefined}>{t(`desktop.here.step.${step}`)}</b>
+                  {step === "database" && <small>{t("desktop.here.step.databaseNote")}</small>}
+                </span>
+                {state === "failed" && (
+                  <span className="dk-fr__stepfail">
+                    <span className="dk-honest">
+                      <Icon name="alert" size={16} />
+                      {step === "account" ? t("desktop.here.fail.account") : t("desktop.here.fail.start")}
+                    </span>
+                    <span className="dk-fr__stepacts">
+                      <CopyDiagnostics />
+                      <Button size="sm" variant="primary" icon="refresh" autoFocus onClick={onRetry}>
+                        {t("desktop.common.retry")}
+                      </Button>
+                    </span>
+                  </span>
+                )}
+                {step === "reach" && reachProblem && <ReachProblem problem={reachProblem} text="fail" />}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <div
+        className="dk-fr__bar"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={steps.length}
+        aria-valuenow={done}
+        aria-label={t("desktop.here.setting")}
+      >
+        <span style={{ width: `${(done / steps.length) * 100}%` }} />
+      </div>
+      {done === steps.length && reachProblem && (
+        <div className="dk-fr__end" data-near>
+          <Button variant="primary" autoFocus onClick={onContinue}>
+            {t("desktop.common.continue")}
+          </Button>
+        </div>
+      )}
     </>
   );
 }

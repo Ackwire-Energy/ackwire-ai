@@ -5,22 +5,50 @@
  *
  * Scenarios (`?scenario=`): `first` (a Mac, nothing chosen yet), `windows` and `linux` (the same there),
  * `cloud` (agentes.chat, nothing on this computer), `selfhost` (the default: a server on Tailscale with two
- * organizations whose agents work here) and `link` (a claim link waiting); `?link=` makes any scenario start
- * with that link waiting.
+ * organizations whose agents work here), `link` (a claim link waiting) and `here` (agentes.chat runs on this
+ * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting.
  * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
+ * The server here: `?phase=` (starting, updating, stopped, failing), `?reach=1`, `?back=<version>` (an update
+ * went back), `?tailscale=` (on, off, missing), `?installed=terminal` (one from the terminal; `&claim=1` waits
+ * for its owner), `?fail=` (database, start, account, reach: that setup step fails), `?hold=<step>` (setting up
+ * stops there).
  */
 import { CLOUD_SERVER, readInstance, type ServerCheck } from "@agenteschat/client/lib/server";
 import type { Candidate } from "../control/first-run";
+import {
+  type LocalPhase,
+  type LocalServerStatus,
+  NO_SERVER,
+  type SetupStep,
+  type StepChange,
+  setupSteps,
+  type Tailnet,
+} from "../control/local-server";
 import type { Platform } from "../control/platform";
 import type { ServerList } from "../control/server";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
 
-export type Scenario = "first" | "windows" | "linux" | "cloud" | "selfhost" | "link";
-export const SCENARIOS: readonly Scenario[] = ["first", "windows", "linux", "cloud", "selfhost", "link"];
+export type Scenario = "first" | "windows" | "linux" | "cloud" | "selfhost" | "link" | "here";
+export const SCENARIOS: readonly Scenario[] = ["first", "windows", "linux", "cloud", "selfhost", "link", "here"];
+
+/** The fake server here's options (`?phase=`, `?reach=1`, …, see above). */
+export interface HereOptions {
+  phase?: LocalPhase;
+  reach?: boolean;
+  back?: string | null;
+  tailscale?: Tailnet["state"];
+  installed?: "terminal";
+  claim?: boolean;
+  fail?: SetupStep;
+  hold?: SetupStep;
+}
+
+const LOCAL_URL = "http://127.0.0.1:4310";
+const TAILNET_URL = "https://ana-mac.tail1234.ts.net";
 
 export interface FakeHost extends Host {
   window: WindowName;
@@ -61,7 +89,7 @@ function fakeCheck(server: string, waits: boolean): ServerCheck {
 export function createFakeHost(
   initial: WindowName,
   scenario: Scenario,
-  options: { link?: string | null; found?: boolean } = {},
+  options: { link?: string | null; found?: boolean; here?: HereOptions } = {},
 ): FakeHost {
   const runners = new Map<string, FakeRunner>();
   const lineListeners = new Set<(homeId: string, line: string) => void>();
@@ -73,12 +101,54 @@ export function createFakeHost(
   let autostart = true;
   let version = "0.6.0";
   const platform: Platform = scenario === "windows" ? "windows" : scenario === "linux" ? "linux" : "mac";
+  const here = options.here ?? {};
+  const tailnet: Tailnet =
+    here.tailscale === "missing"
+      ? { state: "missing" }
+      : here.tailscale === "off"
+        ? { state: "off" }
+        : { state: "on", device: "ana-mac.tail1234.ts.net" };
+  const running = scenario === "here";
+  let local: LocalServerStatus = {
+    ...NO_SERVER,
+    bundled: platform !== "windows",
+    dir: "/Users/voce/.agentes",
+    ...(running
+      ? {
+          installed: "app" as const,
+          run: true,
+          owner: true,
+          phase: here.phase ?? "running",
+          url: LOCAL_URL,
+          publicUrl: here.reach ? TAILNET_URL : LOCAL_URL,
+          reach: !!here.reach,
+          version: "1.4.0",
+          backTo: here.back ?? null,
+        }
+      : here.installed === "terminal"
+        ? {
+            installed: "terminal" as const,
+            url: LOCAL_URL,
+            version: "1.4.0",
+            claim: here.claim ? "b3duZXItY2xhaW0tYWJjZGVmZ2hpamtsbW5vcHFy" : null,
+          }
+        : { systemName: "Ana Souza" }),
+  };
+  const localListeners = new Set<(s: LocalServerStatus) => void>();
+  const stepListeners = new Set<(c: StepChange) => void>();
+  const setLocal = (next: Partial<LocalServerStatus>) => {
+    local = { ...local, ...next };
+    for (const l of localListeners) l(local);
+    devChanged();
+  };
   const list: ServerList =
     scenario === "cloud"
       ? { current: CLOUD_SERVER, servers: [CLOUD_SERVER] }
       : scenario === "selfhost"
         ? { current: FAKE_SERVER, servers: [FAKE_SERVER, CLOUD_SERVER] }
-        : { current: null, servers: [] };
+        : running
+          ? { current: local.publicUrl, servers: [local.publicUrl ?? LOCAL_URL] }
+          : { current: null, servers: [] };
   let link: string | null = options.link ?? (scenario === "link" ? CLAIM_LINK : null);
   const waits = link?.includes("claim=") ?? false;
   const devChanged = () => {
@@ -106,6 +176,11 @@ export function createFakeHost(
     spawn("a1b2c3d4", acmeSeed());
     spawn("e5f6a7b8", horizonteSeed());
     signIns = 2;
+  }
+  if (running) {
+    spawn("0e7c1d2a-0000-4000-8000-000000000001", acmeSeed());
+    for (const r of runners.values()) r.server = LOCAL_URL;
+    signIns = 1;
   }
 
   const host: FakeHost = {
@@ -251,6 +326,88 @@ export function createFakeHost(
     notchInfo: async () => FAKE_NOTCH,
     notchPlace: async () => FAKE_NOTCH,
     resize: async () => {},
+    localServer: async () => local,
+    onLocalServer: (cb) => {
+      localListeners.add(cb);
+      return () => localListeners.delete(cb);
+    },
+    onSetupStep: (cb) => {
+      stepListeners.add(cb);
+      return () => stepListeners.delete(cb);
+    },
+    installLocalServer: async (choice) => {
+      const say = (change: StepChange) => {
+        for (const l of stepListeners) l(change);
+      };
+      for (const step of setupSteps(choice.reach)) {
+        say({ step, state: "active" });
+        if (here.hold === step) await new Promise(() => {});
+        await wait(step === "database" ? 1400 : 800);
+        if (step === "reach" && (here.fail === "reach" || tailnet.state !== "on")) {
+          say({ step, state: "warn", reason: { reason: "https", url: null } });
+          continue;
+        }
+        if (here.fail === step) {
+          say({ step, state: "failed" });
+          throw new Error(step);
+        }
+        say({ step, state: "done" });
+      }
+      const reach = choice.reach && tailnet.state === "on" && here.fail !== "reach";
+      setLocal({
+        installed: "app",
+        run: true,
+        owner: true,
+        phase: "running",
+        url: LOCAL_URL,
+        publicUrl: reach ? TAILNET_URL : LOCAL_URL,
+        reach,
+        usage: choice.usage,
+        version: "1.4.0",
+      });
+      await host.chooseServer(local.publicUrl ?? LOCAL_URL, "/desktop/handover#token=fake");
+    },
+    startLocalServer: async () => {
+      setLocal({ run: true, phase: "starting", backTo: null });
+      await wait(1200);
+      setLocal({ phase: "running" });
+    },
+    stopLocalServer: async (forget) => {
+      await wait(600);
+      setLocal({ phase: forget ? "off" : "stopped", run: !forget });
+      if (forget) await host.removeServer(local.publicUrl ?? LOCAL_URL);
+    },
+    restartLocalServer: async () => {
+      setLocal({ phase: "starting" });
+      await wait(1200);
+      setLocal({ phase: "running" });
+    },
+    setLocalReach: async (on) => {
+      await wait(900);
+      if (on && tailnet.state !== "on") return { ok: false, problem: { reason: "serve" } };
+      if (on && here.fail === "reach") return { ok: false, problem: { reason: "https", url: null } };
+      const url = on ? TAILNET_URL : LOCAL_URL;
+      list.servers = list.servers.map((s) => (s === local.publicUrl ? url : s));
+      if (list.current === local.publicUrl) list.current = url;
+      setLocal({ reach: on, publicUrl: url });
+      return { ok: true, url };
+    },
+    setLocalUsage: async (on) => {
+      setLocal({ phase: "starting", usage: on });
+      await wait(900);
+      setLocal({ phase: "running" });
+    },
+    backupLocalServer: async () => {
+      await wait(1100);
+      return "/Users/voce/.agentes/backups/agentes-2026-10-25-101500.tar.gz";
+    },
+    localDiagnostics: async () => `agentes.chat app ${version} (macos aarch64)\nserver here: ${local.phase}`,
+    syncLocalHomes: async () => {},
+    tailscale: async () => tailnet,
+    openTailscale: async (page) => {
+      console.info("[fake] open Tailscale:", page);
+    },
+    onNewHostHome: () => () => {},
     onDev: (cb) => {
       devListeners.add(cb);
       return () => devListeners.delete(cb);

@@ -38,6 +38,18 @@ impl ServerFile {
         self.current = Some(origin.to_string());
     }
 
+    /// `old` is known by `new` now, in its place (the server here's address moves with reach).
+    pub fn replace(&mut self, old: &str, new: &str) {
+        let Some(pos) = self.servers.iter().position(|s| s == old) else { return };
+        self.servers[pos] = new.to_string();
+        // Already in the list too: it stays once, in its first place.
+        let mut seen = false;
+        self.servers.retain(|s| s != new || !std::mem::replace(&mut seen, true));
+        if self.current.as_deref() == Some(old) {
+            self.current = Some(new.to_string());
+        }
+    }
+
     /// `origin` leaves the list; when it was open, the first one left opens instead (or none: the first run).
     pub fn remove(&mut self, origin: &str) {
         self.servers.retain(|s| s != origin);
@@ -147,6 +159,17 @@ pub fn choose(app: &AppHandle, origin: &str) {
     let file = {
         let mut file = lock(app);
         file.choose(origin);
+        file.clone()
+    };
+    write(app, &file);
+    crate::menus::servers_changed(app);
+}
+
+pub fn replace(app: &AppHandle, old: &str, new: &str) {
+    grant(app, new);
+    let file = {
+        let mut file = lock(app);
+        file.replace(old, new);
         file.clone()
     };
     write(app, &file);
@@ -274,5 +297,19 @@ mod tests {
         }
         assert_eq!(file.servers.len(), MAX_SERVERS);
         assert_eq!(file.current.as_deref(), Some("https://s29.example.com"));
+    }
+
+    #[test]
+    fn the_server_here_moves_with_reach() {
+        let here = "http://127.0.0.1:4310";
+        let tailnet = "https://ana-mac.tail1234.ts.net";
+        let mut file = ServerFile { current: Some(here.into()), servers: vec![CLOUD.into(), here.into()] };
+        file.replace(here, tailnet);
+        assert_eq!(file, ServerFile { current: Some(tailnet.into()), servers: vec![CLOUD.into(), tailnet.into()] });
+        file.replace(tailnet, here);
+        assert_eq!(file.servers, vec![CLOUD.to_string(), here.to_string()]);
+        file.current = Some(CLOUD.into());
+        file.replace("https://unknown.example.com", tailnet);
+        assert_eq!(file.servers, vec![CLOUD.to_string(), here.to_string()], "only a server of the list moves");
     }
 }

@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
+import { useLocalServer } from "../../hooks";
 import { useToast } from "../../ui/Toast";
 import { ToolAccounts } from "./Accounts";
 import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
@@ -22,6 +23,7 @@ export function Tools() {
   const store = useStore();
   const snap = useSnapshot();
   const toast = useToast();
+  const local = useLocalServer();
   const homes = pairedHomes(snap);
   const tools: RunnerTools = homes.find((h) => h.access)?.access?.tools ?? {
     claude: false,
@@ -122,7 +124,13 @@ export function Tools() {
           under={
             <span className="dk-honest">
               <Icon name="alert" size={14} />
-              <span>{homes.length > 1 ? t("desktop.tools.commandsWarnOrgs") : t("desktop.tools.commandsWarn")}</span>
+              <span>
+                {local.run
+                  ? t("desktop.tools.commandsWarnHere")
+                  : homes.length > 1
+                    ? t("desktop.tools.commandsWarnOrgs")
+                    : t("desktop.tools.commandsWarn")}
+              </span>
             </span>
           }
         />

@@ -4,6 +4,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Candidate } from "../control/first-run";
+import type { LocalServerStatus, ReachResult, StepChange, Tailnet } from "../control/local-server";
 import { platformOf } from "../control/platform";
 import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -85,5 +86,20 @@ export function createTauriHost(): Host {
     setDock: (show) => invoke<void>("dock_set", { show }),
     setSiteNotify: (on) => invoke<void>("notify_site_set", { on }),
     onBadge: (cb) => subscribe<BadgeCounts>("badge://counts", cb),
+    localServer: () => invoke<LocalServerStatus>("local_server_status"),
+    onLocalServer: (cb) => subscribe<LocalServerStatus>("local-server://status", cb),
+    installLocalServer: (choice) => invoke<void>("local_server_install", { choice }),
+    onSetupStep: (cb) => subscribe<StepChange>("local-server://step", cb),
+    startLocalServer: () => invoke<void>("local_server_start"),
+    stopLocalServer: (forget) => invoke<void>("local_server_stop", { forget }),
+    restartLocalServer: () => invoke<void>("local_server_restart"),
+    setLocalReach: (on) => invoke<ReachResult>("local_server_reach", { on }),
+    setLocalUsage: (on) => invoke<void>("local_server_usage", { on }),
+    backupLocalServer: () => invoke<string>("local_server_backup"),
+    localDiagnostics: () => invoke<string>("local_server_diagnostics"),
+    syncLocalHomes: (rotate) => invoke<void>("local_server_sync", { rotate }),
+    tailscale: () => invoke<Tailnet>("tailscale_status"),
+    openTailscale: (page) => invoke<void>("tailscale_open", { page }),
+    onNewHostHome: (cb) => subscribe<string>("host://new", cb),
   };
 }

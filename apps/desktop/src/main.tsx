@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import "./styles.css";
 import { AppProvider } from "./app";
+import type { LocalPhase, SetupStep, Tailnet } from "./control/local-server";
 import { DesktopStore } from "./control/store";
 import { DevFrame } from "./dev/DevFrame";
 import { readPref } from "./hooks";
@@ -22,7 +23,20 @@ const fakeHost = inTauri()
   : createFakeHost(
       (WINDOW_NAMES as readonly string[]).includes(asked ?? "") ? (asked as WindowName) : "popover",
       (SCENARIOS as readonly string[]).includes(scenario ?? "") ? (scenario as Scenario) : "selfhost",
-      { link: params.get("link"), found: params.get("found") !== "0" },
+      {
+        link: params.get("link"),
+        found: params.get("found") !== "0",
+        here: {
+          phase: (params.get("phase") as LocalPhase | null) ?? undefined,
+          reach: params.get("reach") === "1",
+          back: params.get("back"),
+          tailscale: (params.get("tailscale") as Tailnet["state"] | null) ?? undefined,
+          installed: params.get("installed") === "terminal" ? "terminal" : undefined,
+          claim: params.get("claim") === "1",
+          fail: (params.get("fail") as SetupStep | null) ?? undefined,
+          hold: (params.get("hold") as SetupStep | null) ?? undefined,
+        },
+      },
     );
 const host: Host = fakeHost ?? createTauriHost();
 

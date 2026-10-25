@@ -1,6 +1,6 @@
 {
   "identifier": "prefs",
-  "description": "Preferences: general, the servers this app opens, updates, and (while agents work here) this computer's folders, tools, activity and limits.",
+  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits.",
   "windows": ["prefs"],
   "permissions": [
     "core:default",
@@ -22,6 +22,16 @@
     "allow-autostart-get",
     "allow-autostart-set",
     "allow-update-install",
-    "allow-dock-set"
+    "allow-dock-set",
+    "allow-local-server-status",
+    "allow-local-server-start",
+    "allow-local-server-stop",
+    "allow-local-server-restart",
+    "allow-local-server-reach",
+    "allow-local-server-usage",
+    "allow-local-server-backup",
+    "allow-local-server-diagnostics",
+    "allow-tailscale-status",
+    "allow-tailscale-open"
   ]
 }

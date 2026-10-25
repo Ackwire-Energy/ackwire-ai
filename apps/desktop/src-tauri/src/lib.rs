@@ -1,19 +1,24 @@
 //! agentes.chat for macOS, Windows and Linux: the main window on the server open now (agentes.chat or a
 //! server of the person's own, `servers`), the welcome window that finds one, and, only while agents work on
 //! this computer for a server of the person's own, the runners it spawns (one per organization), the menu bar
-//! popover and Preferences' tabs for this computer. Rust stays thin: windows, the tray, the server list, links,
-//! the runner children, single instance, start at login, notifications, native dialogs and self-update.
-//! Everything else lives in the runner (TypeScript) and in the web view.
+//! popover and Preferences' tabs for this computer. On a Mac or Linux it can also run agentes.chat itself, as
+//! its child (`local_server`, with this computer as its agents' computer, `host_sync`). Rust stays thin:
+//! windows, the tray, the server list, links, the children, single instance, start at login, notifications,
+//! native dialogs and self-update. Everything else lives in the runner and the server (TypeScript) and in the
+//! web view.
 
 mod cover;
 mod deep_link;
 mod discover;
 mod dock;
+mod host_sync;
+mod local_server;
 mod main_window;
 mod menus;
 mod notch;
 mod runners;
 mod servers;
+mod tailscale;
 mod tray;
 mod window_state;
 
@@ -160,7 +165,18 @@ pub(crate) fn toggle_popover(app: &AppHandle) {
     }
 }
 
-/// Graceful quit: every runner gets `shutdown` and a few seconds, then the app exits.
+/// The children finish their work: every runner gets `shutdown` and a few seconds, and the server here
+/// drains (at most 25 s), side by side.
+fn stop_children(app: &AppHandle) {
+    let server = {
+        let app = app.clone();
+        std::thread::spawn(move || local_server::shutdown(&app))
+    };
+    app.state::<Runners>().shutdown_all();
+    let _ = server.join();
+}
+
+/// Graceful quit: the children stop, then the app exits.
 fn begin_quit(app: AppHandle) {
     let runners = app.state::<Runners>();
     if runners.is_quitting() {
@@ -175,7 +191,7 @@ fn begin_quit(app: AppHandle) {
         }
     }
     std::thread::spawn(move || {
-        app.state::<Runners>().shutdown_all();
+        stop_children(&app);
         app.exit(0);
     });
 }
@@ -305,9 +321,10 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
         .download_and_install(|_, _| {}, || {})
         .await
         .map_err(|e| e.to_string())?;
-    // The runners finish their work first, as when quitting; then the new app opens.
+    // The runners and the server here finish their work first, as when quitting; then the new app opens
+    // (and starts the server here's new version, `local_server`).
     tauri::async_runtime::spawn_blocking(move || {
-        app.state::<Runners>().shutdown_all();
+        stop_children(&app);
         app.restart();
     });
     Ok(true)
@@ -378,6 +395,8 @@ pub fn run() {
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
         .manage(servers::Servers::default())
+        .manage(local_server::LocalServer::default())
+        .manage(host_sync::HostSync::default())
         .manage(deep_link::PendingLink::default())
         .manage(main_window::Bridge::default())
         .manage(main_window::Notices::default())
@@ -411,6 +430,18 @@ pub fn run() {
             servers::server_remove,
             discover::discover,
             deep_link::link_take,
+            local_server::local_server_status,
+            local_server::local_server_install,
+            local_server::local_server_start,
+            local_server::local_server_stop,
+            local_server::local_server_restart,
+            local_server::local_server_reach,
+            local_server::local_server_usage,
+            local_server::local_server_backup,
+            local_server::local_server_diagnostics,
+            local_server::local_server_sync,
+            tailscale::tailscale_status,
+            tailscale::tailscale_open,
             tray::tray_visible,
             main_window::this_mac,
             main_window::this_mac_reply,
@@ -493,8 +524,11 @@ pub fn run() {
             if launcher.is_enabled().unwrap_or(false) {
                 let _ = launcher.enable();
             }
-            // Nothing starts without homes: in the Cloud, or with a server whose agents work elsewhere.
+            // The server here first (its own homes start with the rest); nothing starts without homes: in the
+            // Cloud, or with a server whose agents work elsewhere.
+            local_server::load(&handle);
             app.state::<Runners>().start_all(&handle);
+            host_sync::start(&handle);
             deep_link::setup(&handle);
             // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
             // the server open now, or the first run while there is none.

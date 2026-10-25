@@ -236,6 +236,9 @@ export class FakeRunner {
   ];
   private logins = new Map<string, { kind: RunnerAccountInfo["kind"]; doneAt: number }>();
 
+  /** The server this home is paired with (the server here's homes point at its loopback address). */
+  server = FAKE_SERVER;
+
   constructor(
     readonly homeId: string,
     seed: FakeOrgSeed | null,
@@ -487,7 +490,7 @@ export class FakeRunner {
     const s = this.seed;
     return {
       paired: !!s,
-      server: FAKE_SERVER,
+      server: this.server,
       org: s ? { ...s.org, ...(s.logo ? { logoEtag: `"${s.org.id}.png"` } : {}) } : undefined,
       machine: s ? { id: `m_${this.homeId}`, name: this.machineName } : undefined,
       connection: this.connection,

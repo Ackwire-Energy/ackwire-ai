@@ -1,5 +1,6 @@
 //! One runner child process per organization home (ADR 0036 §2, §4b), and none without homes: in the Cloud,
-//! or with a server whose agents work elsewhere, nothing of this computer runs.
+//! or with a server whose agents work elsewhere, nothing of this computer runs. The server here's own homes
+//! (`host_sync.rs`) run the same way.
 //!
 //! Each home lives in `~/.agentes-runner/orgs/<localId>/` and runs the bundled sidecar
 //! `agentes-runner app --home <dir>`. Its stdout carries one JSON line per message of the
@@ -78,13 +79,14 @@ pub struct Runners {
 }
 
 /// 1, 2, 4, 8, 16, 32, then 60 seconds.
-fn backoff(failures: u32) -> Duration {
+pub(crate) fn backoff(failures: u32) -> Duration {
     let secs = 1u64 << failures.min(6);
     Duration::from_secs(secs.min(60))
 }
 
-/// Home ids are ours (random hex), but they come back from the web view: never a path.
-fn valid_id(id: &str) -> bool {
+/// Home ids are ours (random hex, or an organization's id for the server here's homes), but they come back
+/// from the web view: never a path.
+pub(crate) fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
@@ -154,17 +156,46 @@ impl Runners {
 
     /// Finds the homes on disk and starts one runner for each of the app's own.
     pub fn start_all(&self, app: &AppHandle) {
+        self.rescan(app);
+    }
+
+    /// Starts the runner of every home of the app's on disk that isn't running yet (new homes of the server
+    /// here, `host_sync.rs`).
+    pub fn rescan(&self, app: &AppHandle) {
+        if self.is_quitting() {
+            return;
+        }
         let Ok(root) = orgs_root(app) else { return };
+        let own = crate::local_server::loopback(app);
         let mut ids = Vec::new();
-        for (name, dir) in app_homes(&root) {
-            self.lock().insert(name.clone(), Runner::new(dir));
-            ids.push(name);
+        for (name, dir) in app_homes(&root, own.as_deref()) {
+            let mut map = self.lock();
+            if !map.contains_key(&name) {
+                map.insert(name.clone(), Runner::new(dir));
+                ids.push(name);
+            }
         }
         for id in ids {
             if let Err(err) = self.spawn(app, &id) {
                 eprintln!("agentes: could not start the runner for {id}: {err}");
                 self.schedule_restart(app, &id);
             }
+        }
+    }
+
+    pub fn has(&self, home_id: &str) -> bool {
+        self.lock().contains_key(home_id)
+    }
+
+    /// Stops a home's runner and starts it again (its connection's token changed on disk).
+    pub fn restart(&self, app: &AppHandle, home_id: &str) {
+        if !self.has(home_id) {
+            return;
+        }
+        self.stop(home_id);
+        if let Err(err) = self.spawn(app, home_id) {
+            eprintln!("agentes: could not restart the runner for {home_id}: {err}");
+            self.schedule_restart(app, home_id);
         }
     }
 
@@ -471,9 +502,10 @@ fn handle_line(app: &AppHandle, home_id: &str, generation: u64, raw: &[u8]) {
 }
 
 /// The homes the app runs, by id: every home on disk but the ones another program keeps (`managedBy:
-/// "host"`, a terminal install's `agentes-runner host` shares this folder). A home without a config never
-/// finished signing in (the runner writes it on pairing): it goes, so failed attempts don't pile up.
-pub fn app_homes(root: &std::path::Path) -> Vec<(String, PathBuf)> {
+/// "host"`, a terminal install's `agentes-runner host` shares this folder), unless they are the server here's
+/// own (`own_server`, its loopback address). A home without a config never finished signing in (the runner
+/// writes it on pairing): it goes, so failed attempts don't pile up.
+pub fn app_homes(root: &std::path::Path, own_server: Option<&str>) -> Vec<(String, PathBuf)> {
     let Ok(entries) = fs::read_dir(root) else { return Vec::new() };
     let mut out = Vec::new();
     for entry in entries.flatten() {
@@ -486,8 +518,9 @@ pub fn app_homes(root: &std::path::Path) -> Vec<(String, PathBuf)> {
             let _ = fs::remove_dir_all(entry.path());
             continue;
         }
-        let host = home_config(&entry.path()).is_some_and(|c| c.get("managedBy").and_then(|m| m.as_str()) == Some("host"));
-        if !host {
+        let config = home_config(&entry.path());
+        let host = config.as_ref().is_some_and(|c| c.get("managedBy").and_then(|m| m.as_str()) == Some("host"));
+        if !host || config.as_ref().is_some_and(|c| crate::host_sync::is_host_home(c, own_server)) {
             out.push((name, entry.path()));
         }
     }
@@ -542,7 +575,7 @@ pub fn plan_move(homes: &[(PathBuf, serde_json::Value)]) -> Move {
 /// Runs `plan_move` on the homes on disk: Cloud homes go before any runner starts.
 pub fn migrate(app: &AppHandle) -> Move {
     let Ok(root) = orgs_root(app) else { return Move::default() };
-    let homes: Vec<(PathBuf, serde_json::Value)> = app_homes(&root)
+    let homes: Vec<(PathBuf, serde_json::Value)> = app_homes(&root, None)
         .into_iter()
         .filter_map(|(_, dir)| home_config(&dir).map(|c| (dir, c)))
         .collect();
@@ -574,9 +607,9 @@ mod tests {
     fn no_homes_no_runner_and_a_terminal_install_s_homes_left_alone() {
         let root = std::env::temp_dir().join(format!("agentes-homes-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        assert!(app_homes(&root).is_empty());
+        assert!(app_homes(&root, None).is_empty());
         std::fs::create_dir_all(&root).unwrap();
-        assert!(app_homes(&root).is_empty());
+        assert!(app_homes(&root, None).is_empty());
         for (id, config) in [
             ("a1b2c3d4", Some(r#"{"server":"https://agentes.tail1234.ts.net","token":"agm_x"}"#)),
             ("0e7c1d2a-0000-4000-8000-000000000001", Some(r#"{"server":"http://127.0.0.1:3000","managedBy":"host"}"#)),
@@ -587,10 +620,15 @@ mod tests {
                 std::fs::write(root.join(id).join("config.json"), c).unwrap();
             }
         }
-        let ids: Vec<String> = app_homes(&root).into_iter().map(|(id, _)| id).collect();
+        let ids: Vec<String> = app_homes(&root, None).into_iter().map(|(id, _)| id).collect();
         assert_eq!(ids, vec!["a1b2c3d4".to_string()]);
         assert!(!root.join("deadbeef").exists(), "an attempt that never paired goes");
         assert!(root.join("0e7c1d2a-0000-4000-8000-000000000001").exists());
+        // The server the app runs here at another address: still a terminal install's home.
+        assert_eq!(app_homes(&root, Some("http://127.0.0.1:4310")).len(), 1);
+        // The server the app runs here: its host homes are the app's.
+        let ids: Vec<String> = app_homes(&root, Some("http://127.0.0.1:3000")).into_iter().map(|(id, _)| id).collect();
+        assert_eq!(ids, vec!["0e7c1d2a-0000-4000-8000-000000000001".to_string(), "a1b2c3d4".to_string()]);
         std::fs::remove_dir_all(&root).unwrap();
     }
 

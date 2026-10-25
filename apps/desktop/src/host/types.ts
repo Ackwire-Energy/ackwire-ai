@@ -1,6 +1,7 @@
 import type { ServerCheck } from "@agenteschat/client/lib/server";
 import type { HelloLine } from "../control/client";
 import type { Candidate } from "../control/first-run";
+import type { LocalChoice, LocalServerStatus, ReachResult, StepChange, Tailnet } from "../control/local-server";
 import type { Platform } from "../control/platform";
 import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -128,6 +129,36 @@ export interface Host {
   setSiteNotify(on: boolean): Promise<void>;
   /** The Dock's counts whenever the site changes them. */
   onBadge(cb: (counts: BadgeCounts) => void): () => void;
+  /** The server here (`local_server.rs`): whether this build carries it, what `~/.agentes` holds, its state. */
+  localServer(): Promise<LocalServerStatus>;
+  onLocalServer(cb: (status: LocalServerStatus) => void): () => void;
+  /**
+   * "Run agentes.chat on this computer": sets it up, starts it, makes the owner, makes this computer its agents'
+   * computer, turns reach on when asked, and opens the main window there, signed in. Rejects with the step that
+   * failed; each step's progress arrives at `onSetupStep`.
+   */
+  installLocalServer(choice: LocalChoice): Promise<void>;
+  onSetupStep(cb: (change: StepChange) => void): () => void;
+  startLocalServer(): Promise<void>;
+  /** Stops it; `forget`: it no longer starts with the app (its data stays). */
+  stopLocalServer(forget: boolean): Promise<void>;
+  restartLocalServer(): Promise<void>;
+  /** Reach from the person's other devices (Tailscale), on or off; the main window follows the address. */
+  setLocalReach(on: boolean): Promise<ReachResult>;
+  /** The usage-statistics switch (`TELEMETRY` in its settings; it starts again). */
+  setLocalUsage(on: boolean): Promise<void>;
+  /** "Back up now": the file it wrote. */
+  backupLocalServer(): Promise<string>;
+  /** What "Copy diagnostics" copies. */
+  localDiagnostics(): Promise<string>;
+  /** The server here's homes again, with new tokens for the organizations in `rotate`. */
+  syncLocalHomes(rotate: string[]): Promise<void>;
+  /** Tailscale on this computer. */
+  tailscale(): Promise<Tailnet>;
+  /** Tailscale's app (a Mac), its download page, or the admin page where HTTPS is turned on. */
+  openTailscale(page: "app" | "download" | "https"): Promise<void>;
+  /** A home the server here's sync just made (its first tools go on, `firstTools`). */
+  onNewHostHome(cb: (homeId: string) => void): () => void;
 }
 
 export type MenuAction =

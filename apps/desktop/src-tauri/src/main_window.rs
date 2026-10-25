@@ -51,10 +51,10 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
 };
 
 /// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
-/// computer of its own), a server on this computer itself (its own computer is set up with it), or on
-/// Windows (no program for agents ships there yet).
-pub fn agents_here(origin: &str) -> bool {
-    origin != servers::CLOUD && !servers::is_loopback(origin) && PLATFORM != "windows"
+/// computer of its own), a server on this computer itself, the server here included at its Tailscale address
+/// (`server_here`: its own computer is set up with it), or on Windows (no program for agents ships there yet).
+pub fn agents_here(origin: &str, server_here: bool) -> bool {
+    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here && PLATFORM != "windows"
 }
 
 /// What a navigation in the window does.
@@ -127,6 +127,7 @@ fn go_in_page(url: &Url) -> Option<String> {
 /// the page shows, or a page whose fragment carries a one-time secret (the router keeps fragments in its
 /// history), loads as a whole page.
 pub fn show_url(app: &AppHandle, url: Url) -> Result<(), String> {
+    let url = crate::local_server::page_for_people(app, url);
     let origin = url.origin().ascii_serialization();
     if !servers::get(app).servers.contains(&origin) {
         return Err("not a server of this app".into());
@@ -322,18 +323,24 @@ fn front(app: &AppHandle) -> Result<(), String> {
 /// What the site may ask of this computer: which of its organizations this computer works for (`status`),
 /// pairing it with one (`connect`: the system's own dialog asks first, then the site confirms the runner's
 /// code with its own session), reconnecting it (`reconnect`), Preferences on a tab (`prefs`), the menu bar's
-/// access requests (`requests`), the Dock's badge (`badge`), the Go menu's organizations (`orgs`) and a
-/// notification while the app is in the background (`notify`). Rust checks each request, rebuilds it from
-/// the keys it may have, adds the asking page's own `origin` and whether agents may work here for it, and
-/// relays it: the popover's code owns the runners (apps/desktop/src/control/this-mac.ts) and answers through
-/// `this_mac_reply`. The machine's token never leaves the runner.
+/// access requests (`requests`), the Dock's badge (`badge`), the Go menu's organizations (`orgs`), a
+/// notification while the app is in the background (`notify`) and, on the server here, signing its owner in
+/// (`signIn`: the app spends its owner key on a one-time sign-in, which the window trades itself). Rust checks
+/// each request, rebuilds it from the keys it may have, adds the asking page's own `origin`, whether agents may
+/// work here for it and whether it is the server here (`local`), and relays it: the popover's code owns the
+/// runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The machine's token
+/// and the owner key never leave the app.
 #[derive(Default)]
 pub struct Bridge {
     next: AtomicU64,
     waiting: Mutex<HashMap<u64, mpsc::Sender<Result<Value, String>>>>,
     /// The popover listens (`this_mac_listening`): before that a request would be lost, so it waits.
     listening: AtomicBool,
+    /// The last owner sign-in, at most one every 10 seconds.
+    signed_in: Mutex<Option<Instant>>,
 }
+
+const SIGN_IN_GAP: Duration = Duration::from_secs(10);
 
 /// How long the popover has to answer (`connect` waits for the runner's code).
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -371,6 +378,7 @@ fn checked(request: &Value) -> Result<Value, String> {
     match text("kind") {
         Some("status") => Ok(json!({ "kind": "status" })),
         Some("requests") => Ok(json!({ "kind": "requests" })),
+        Some("signIn") => Ok(json!({ "kind": "signIn" })),
         Some("connect") => {
             let mut out = json!({ "kind": "connect", "orgId": org()? });
             if let Some(name) = display_name(request.get("orgName")) {
@@ -533,6 +541,7 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
     }
     let mut request = checked(&request)?;
     let origin = page_origin(&app, &webview).ok_or("not a server of this app")?;
+    let server_here = crate::local_server::is_here(&app, &origin);
     // What the app itself answers (the popover isn't needed).
     match request["kind"].as_str() {
         Some("badge") => {
@@ -541,8 +550,29 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             return Ok(json!({}));
         }
         Some("orgs") => {
-            crate::menus::set_orgs(&app, &request["orgs"]);
+            // A new organization on the server here: this computer works for it within seconds.
+            if crate::menus::set_orgs(&app, &request["orgs"]) && server_here {
+                crate::host_sync::trigger(&app);
+            }
             return Ok(json!({}));
+        }
+        Some("signIn") => {
+            if !server_here {
+                return Err("not_here".into());
+            }
+            {
+                let bridge = app.state::<Bridge>();
+                let mut last = bridge.signed_in.lock().unwrap_or_else(|e| e.into_inner());
+                if last.is_some_and(|at| at.elapsed() < SIGN_IN_GAP) {
+                    return Err("too_soon".into());
+                }
+                *last = Some(Instant::now());
+            }
+            let signer = app.clone();
+            return tauri::async_runtime::spawn_blocking(move || crate::local_server::sign_in_window(&signer, &origin))
+                .await
+                .map_err(|e| e.to_string())?
+                .map(|()| json!({}));
         }
         Some("notify") => {
             if let Ok(site) = origin.parse::<Url>() {
@@ -552,10 +582,17 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
         }
         _ => {}
     }
-    let here = agents_here(&origin);
+    let here = agents_here(&origin, server_here);
     if matches!(request["kind"].as_str(), Some("status" | "connect" | "reconnect")) {
         request["origin"] = json!(origin);
         request["agentsHere"] = json!(here);
+        // The server here's own homes point at its loopback address, whichever address the page has.
+        if server_here {
+            request["local"] = json!(true);
+            if let Some(loopback) = crate::local_server::loopback(&app) {
+                request["also"] = json!(loopback);
+            }
+        }
     }
     if request["kind"] == "connect" {
         if !here {
@@ -687,10 +724,11 @@ mod tests {
 
     #[test]
     fn agents_work_here_only_for_a_server_elsewhere() {
-        assert!(!agents_here("https://agentes.chat"));
-        assert!(!agents_here("http://127.0.0.1:4310"));
-        assert!(!agents_here("http://localhost:3000"));
-        assert_eq!(agents_here("https://agentes.tail1234.ts.net"), PLATFORM != "windows");
+        assert!(!agents_here("https://agentes.chat", false));
+        assert!(!agents_here("http://127.0.0.1:4310", false));
+        assert!(!agents_here("http://localhost:3000", false));
+        assert_eq!(agents_here("https://agentes.tail1234.ts.net", false), PLATFORM != "windows");
+        assert!(!agents_here("https://ana-mac.tail1234.ts.net", true), "the server here, at its Tailscale address");
     }
 
     #[test]
@@ -716,6 +754,7 @@ mod tests {
         assert_eq!(checked(&json!({ "kind": "reconnect", "orgId": "o1" })), Ok(json!({ "kind": "reconnect", "orgId": "o1" })));
         assert!(checked(&json!({ "kind": "reconnect" })).is_err());
         assert_eq!(checked(&json!({ "kind": "requests", "x": 1 })), Ok(json!({ "kind": "requests" })));
+        assert_eq!(checked(&json!({ "kind": "signIn", "key": "x" })), Ok(json!({ "kind": "signIn" })));
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
     }
 

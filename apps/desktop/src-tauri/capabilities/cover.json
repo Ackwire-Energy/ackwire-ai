@@ -1,6 +1,16 @@
 {
   "identifier": "cover",
-  "description": "The main window's cover (cover.rs): a page of the app over the server's page. It may drag the window, ask which server is open, load it again once it is reachable, or step aside; nothing of the server's page, the runners or this computer.",
+  "description": "The main window's cover (cover.rs): a page of the app over the server's page. It may drag the window, ask which server is open, load it again once it is reachable, or step aside; for the server here, start it, turn reach off, copy its diagnostics or open Tailscale. Nothing of the server's page, the runners or this computer.",
   "webviews": ["main-cover"],
-  "permissions": ["core:window:allow-start-dragging", "allow-cover-retry", "allow-cover-hide", "allow-cover-server"]
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "allow-cover-retry",
+    "allow-cover-hide",
+    "allow-cover-server",
+    "allow-local-server-status",
+    "allow-local-server-start",
+    "allow-local-server-reach",
+    "allow-local-server-diagnostics",
+    "allow-tailscale-open"
+  ]
 }

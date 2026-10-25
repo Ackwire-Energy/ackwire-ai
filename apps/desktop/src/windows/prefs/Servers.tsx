@@ -1,12 +1,21 @@
-import { Button, Chip, Dialog, DialogFooter, Icon, type IconName, Menu, MenuItem } from "@agenteschat/ui";
+import { Button, Chip, Dialog, DialogFooter, Icon, type IconName, Menu, MenuItem, Switch } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
+import {
+  hereLine,
+  isHereServer,
+  type LocalServerStatus,
+  type ServeProblem,
+  type Tailnet,
+} from "../../control/local-server";
 import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
 import { pairedHomes } from "../../control/store";
-import { useOnShown } from "../../hooks";
+import { useLocalServer, useOnShown } from "../../hooks";
+import { ReachProblem, ReachRow } from "../../ui/here";
 import { useToast } from "../../ui/Toast";
-import { PrefCard, PrefHead, PrefRow } from "./shared";
+import { shortPath } from "../../ui/time";
+import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
 
 const KIND_ICON: Record<ServerKind, IconName> = { cloud: "cloud", tailnet: "globe", here: "computer", own: "globe" };
 const KIND_SUB: Record<ServerKind, string> = {
@@ -24,6 +33,7 @@ export function Servers() {
   const snap = useSnapshot();
   const toast = useToast();
   const [list, setList] = useState<ServerList>({ current: null, servers: [] });
+  const local = useLocalServer();
   const [removing, setRemoving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -32,10 +42,13 @@ export function Servers() {
       .servers()
       .then(setList)
       .catch(() => {});
-  useEffect(read, [host]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again when the server here's address moves
+  useEffect(read, [host, local.publicUrl, local.run]);
   useOnShown("prefs", read);
 
   const homesOf = (server: string) => pairedHomes(snap).filter((h) => homeServer(h) === server);
+  // The server here has its own card, above.
+  const others = list.servers.filter((server) => !isHereServer(local, server));
 
   const open = async (server: string) => {
     await host.chooseServer(server).catch(() => toast(t("desktop.common.error"), "alert"));
@@ -65,54 +78,60 @@ export function Servers() {
   return (
     <>
       <PrefHead title={t("desktop.servers.title")} lead={t("desktop.servers.lead")} />
-      <PrefCard>
-        {list.servers.map((server) => {
-          const kind = serverKind(server);
-          const now = server === list.current;
-          return (
-            <PrefRow
-              key={server}
-              lead={
-                <span className="dk-logo dk-logo--soft">
-                  <Icon name={KIND_ICON[kind]} size={16} />
-                </span>
-              }
-              title={serverName(server)}
-              desc={t(KIND_SUB[kind])}
-              end={
-                <>
-                  {now ? (
-                    <Chip icon="check" tone="done">
-                      {t("desktop.servers.openNow")}
-                    </Chip>
-                  ) : (
-                    <Button size="sm" onClick={() => void open(server)}>
-                      {t("desktop.servers.open")}
-                    </Button>
-                  )}
-                  <Menu
-                    align="end"
-                    label={t("desktop.servers.more", { host: serverName(server) })}
-                    trigger={
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        iconOnly
-                        icon="more"
-                        aria-label={t("desktop.servers.more", { host: serverName(server) })}
-                      />
-                    }
-                  >
-                    <MenuItem icon="trash" danger onSelect={() => setRemoving(server)}>
-                      {t("desktop.servers.remove")}
-                    </MenuItem>
-                  </Menu>
-                </>
-              }
-            />
-          );
-        })}
-      </PrefCard>
+      {local.run && <HereServer local={local} current={list.current} />}
+      {others.length > 0 && (
+        <>
+          {local.run && <CardTitle>{t("desktop.servers.title")}</CardTitle>}
+          <PrefCard>
+            {others.map((server) => {
+              const kind = serverKind(server);
+              const now = server === list.current;
+              return (
+                <PrefRow
+                  key={server}
+                  lead={
+                    <span className="dk-logo dk-logo--soft">
+                      <Icon name={KIND_ICON[kind]} size={16} />
+                    </span>
+                  }
+                  title={serverName(server)}
+                  desc={t(KIND_SUB[kind])}
+                  end={
+                    <>
+                      {now ? (
+                        <Chip icon="check" tone="done">
+                          {t("desktop.servers.openNow")}
+                        </Chip>
+                      ) : (
+                        <Button size="sm" onClick={() => void open(server)}>
+                          {t("desktop.servers.open")}
+                        </Button>
+                      )}
+                      <Menu
+                        align="end"
+                        label={t("desktop.servers.more", { host: serverName(server) })}
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            iconOnly
+                            icon="more"
+                            aria-label={t("desktop.servers.more", { host: serverName(server) })}
+                          />
+                        }
+                      >
+                        <MenuItem icon="trash" danger onSelect={() => setRemoving(server)}>
+                          {t("desktop.servers.remove")}
+                        </MenuItem>
+                      </Menu>
+                    </>
+                  }
+                />
+              );
+            })}
+          </PrefCard>
+        </>
+      )}
       <div className="dk-under-card">
         <Button size="sm" icon="plus" onClick={() => void host.showWindow("welcome")}>
           {t("desktop.servers.add")}
@@ -138,6 +157,220 @@ export function Servers() {
           </Button>
           <Button variant="danger" loading={busy} onClick={() => void remove()}>
             {t("desktop.servers.remove")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * agentes.chat on this computer (the app runs it): its state and address, reach from the person's other
+ * devices (Tailscale) and the phone's QR code with it, the usage-statistics switch, its version, data and
+ * backups, Restart and Stop, and "Stop running it here…" (its data stays).
+ */
+function HereServer({ local, current }: { local: LocalServerStatus; current: string | null }) {
+  const { t } = useTranslation();
+  const host = useHost();
+  const toast = useToast();
+  const [tailnet, setTailnet] = useState<Tailnet>({ state: "missing" });
+  const [reaching, setReaching] = useState(false);
+  const [reachProblem, setReachProblem] = useState<ServeProblem | null>(null);
+  const [busy, setBusy] = useState<"restart" | "stop" | "start" | "usage" | "backup" | null>(null);
+  const [stopping, setStopping] = useState(false);
+  const address = local.publicUrl ?? local.url ?? "";
+  const running = local.phase === "running";
+  const up = running || local.phase === "starting" || local.phase === "updating";
+
+  useEffect(() => {
+    const read = () =>
+      void host
+        .tailscale()
+        .then(setTailnet)
+        .catch(() => setTailnet({ state: "missing" }));
+    read();
+    window.addEventListener("focus", read);
+    return () => window.removeEventListener("focus", read);
+  }, [host]);
+
+  const act = async (what: NonNullable<typeof busy>, run: () => Promise<unknown>) => {
+    setBusy(what);
+    try {
+      await run();
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const reach = async (on: boolean) => {
+    setReaching(true);
+    setReachProblem(null);
+    try {
+      const result = await host.setLocalReach(on);
+      if (!result.ok) setReachProblem(result.problem);
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    } finally {
+      setReaching(false);
+    }
+  };
+  const chip =
+    local.phase === "running" ? (
+      <Chip icon="check" tone="done">
+        {t("desktop.server.running")}
+      </Chip>
+    ) : (
+      <Chip icon={local.phase === "failing" || local.phase === "stopped" ? "alert" : undefined} tone="waiting">
+        {t(`desktop.server.${local.phase === "off" ? "stopped" : local.phase}`)}
+      </Chip>
+    );
+
+  return (
+    <>
+      <PrefCard>
+        <PrefRow
+          lead={
+            <span className="dk-logo dk-logo--soft">
+              <Icon name="computer" size={16} />
+            </span>
+          }
+          title={t("desktop.server.title")}
+          desc={t(hereLine(local))}
+          end={chip}
+        />
+        <PrefRow
+          title={t("desktop.server.address")}
+          desc={<span className="dk-path">{address}</span>}
+          end={
+            current === address ? (
+              <Chip icon="check" tone="done">
+                {t("desktop.servers.openNow")}
+              </Chip>
+            ) : (
+              <Button size="sm" disabled={!address} onClick={() => void host.chooseServer(address).catch(() => {})}>
+                {t("desktop.servers.open")}
+              </Button>
+            )
+          }
+        />
+        <ReachRow tailnet={tailnet} on={local.reach} busy={reaching || !running} onChange={(on) => void reach(on)} />
+        {reachProblem && <PrefRow desc={<ReachProblem problem={reachProblem} text="prefs" />} />}
+        <PrefRow
+          title={t("desktop.server.phone")}
+          desc={local.reach ? undefined : t("desktop.server.phoneOff")}
+          end={
+            <Button
+              size="sm"
+              icon="phone"
+              disabled={!local.reach || !running}
+              onClick={() => void host.openExternal(`${address}/?open=phone`).catch(() => {})}
+            >
+              {t("desktop.server.showQr")}
+            </Button>
+          }
+        />
+        <PrefRow
+          title={t("desktop.here.usage")}
+          desc={`${t("desktop.here.usageText")} ${t("desktop.server.usageRestart")}`}
+          htmlFor="here-usage-prefs"
+          end={
+            <Switch
+              id="here-usage-prefs"
+              checked={local.usage}
+              disabled={busy === "usage"}
+              onCheckedChange={(on) => void act("usage", () => host.setLocalUsage(on))}
+            />
+          }
+        />
+        {local.version && <PrefRow desc={t("desktop.server.version", { version: local.version })} />}
+        <PrefRow
+          title={t("desktop.server.data")}
+          desc={<span className="dk-path">{shortPath(local.dir)}</span>}
+          end={
+            <>
+              <Button
+                size="sm"
+                loading={busy === "backup"}
+                disabled={!up}
+                onClick={() =>
+                  void act("backup", async () => {
+                    const file = await host.backupLocalServer();
+                    toast(t("desktop.server.backedUp", { file: shortPath(file) }), "check");
+                  })
+                }
+              >
+                {t("desktop.server.backup")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => void host.revealFolder(local.dir).catch(() => {})}>
+                {host.platform === "mac" ? t("desktop.server.reveal") : t("desktop.server.revealFiles")}
+              </Button>
+            </>
+          }
+        />
+      </PrefCard>
+      <div className="dk-under-card dk-here__acts">
+        {up ? (
+          <>
+            <Button
+              size="sm"
+              icon="refresh"
+              loading={busy === "restart"}
+              disabled={busy !== null}
+              onClick={() => void act("restart", () => host.restartLocalServer())}
+            >
+              {t("desktop.server.restart")}
+            </Button>
+            <Button
+              size="sm"
+              icon="stop"
+              loading={busy === "stop"}
+              disabled={busy !== null}
+              onClick={() => void act("stop", () => host.stopLocalServer(false))}
+            >
+              {t("desktop.server.stop")}
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            variant="primary"
+            icon="play"
+            loading={busy === "start"}
+            onClick={() => void act("start", () => host.startLocalServer())}
+          >
+            {t("desktop.server.start")}
+          </Button>
+        )}
+        <span className="dk-here__end">
+          <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setStopping(true)}>
+            {t("desktop.server.stopHere")}
+          </Button>
+        </span>
+      </div>
+      <Dialog
+        open={stopping}
+        onOpenChange={(o) => !o && busy !== "stop" && setStopping(false)}
+        title={t("desktop.server.stopHereTitle")}
+        description={t("desktop.server.stopHereBody", { path: shortPath(local.dir) })}
+        closeLabel={t("desktop.common.close")}
+        width={440}
+      >
+        <DialogFooter bar>
+          <Button variant="ghost" onClick={() => setStopping(false)} disabled={busy === "stop"}>
+            {t("desktop.common.cancel")}
+          </Button>
+          <Button
+            variant="danger"
+            loading={busy === "stop"}
+            onClick={() =>
+              void act("stop", async () => {
+                await host.stopLocalServer(true);
+                setStopping(false);
+              })
+            }
+          >
+            {t("desktop.server.stopHereConfirm")}
           </Button>
         </DialogFooter>
       </Dialog>

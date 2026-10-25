@@ -7,7 +7,6 @@ import {
   INSTALL_COMMAND,
   linkView,
   ownServerScreen,
-  RUN_HERE,
   runHereScreen,
   typedServer,
   WSL_INSTALL_COMMAND,
@@ -36,10 +35,13 @@ const down = (server: string): ServerCheck => ({ ok: false, server, problem: "un
 
 describe("which screen", () => {
   test("your own server: the two ways where both exist, else straight to Connect", () => {
-    expect(RUN_HERE).toBe(false);
-    expect(ownServerScreen("windows")).toBe("own");
-    expect(ownServerScreen("mac")).toBe("connect");
-    expect(ownServerScreen("linux")).toBe("connect");
+    expect(ownServerScreen("windows", false)).toBe("own");
+    expect(ownServerScreen("mac", true)).toBe("own");
+    expect(ownServerScreen("linux", true)).toBe("own");
+    // A build without the server (development): no card that can't work.
+    expect(ownServerScreen("mac", false)).toBe("connect");
+    expect(runHereScreen("mac")).toBe("here");
+    expect(runHereScreen("linux")).toBe("here");
     expect(runHereScreen("windows")).toBe("windows");
   });
 

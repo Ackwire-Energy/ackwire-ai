@@ -12,10 +12,14 @@ import { ControlError } from "./client";
 import { homeServer } from "./server";
 import { type DesktopStore, type Home, isPairedHome, isRefusedHome, pairedHomes } from "./store";
 
+/**
+ * `local`: the asking page is the server here (`local_server.rs`), whose own homes point at its loopback
+ * address, `also`, whichever address the page has.
+ */
 export type ThisMacRequest =
-  | { kind: "status"; origin: string; agentsHere: boolean }
-  | { kind: "connect"; orgId: string; origin: string; agentsHere: boolean }
-  | { kind: "reconnect"; orgId: string; origin: string }
+  | { kind: "status"; origin: string; agentsHere: boolean; local?: boolean; also?: string }
+  | { kind: "connect"; orgId: string; origin: string; agentsHere: boolean; local?: boolean; also?: string }
+  | { kind: "reconnect"; orgId: string; origin: string; local?: boolean; also?: string }
   | { kind: "prefs"; tab: PrefsTab }
   | { kind: "requests" };
 
@@ -25,6 +29,8 @@ export interface ThisMacStatus {
   orgs: { orgId: string; machineId: string | null; connection: string }[];
   /** Whether agents may work on this computer for this server (false: the site hides "This Mac"). */
   agentsHere: boolean;
+  /** The page is the server this app runs here (its sign-in offers "Continue on this Mac"). */
+  local: boolean;
 }
 
 /** `userCode`: the site confirms it (`/machines/device/{code}/confirm`); null when already connected. */
@@ -44,24 +50,35 @@ export interface ThisMacDeps {
 
 const orgOf = (h: Home) => h.status?.org?.id;
 
-/** The homes paired with `origin` (never another server's). */
-const homesOf = (store: DesktopStore, origin: string) =>
-  pairedHomes(store.getSnapshot()).filter((h) => homeServer(h) === origin);
+/** The homes paired with `origin`, or with `also` (the server here's loopback address); never another server's. */
+const homesOf = (store: DesktopStore, origin: string, also?: string) =>
+  pairedHomes(store.getSnapshot()).filter((h) => {
+    const server = homeServer(h);
+    return server === origin || (!!also && server === also);
+  });
 
-export function thisMacStatus(store: DesktopStore, origin: string, agentsHere: boolean): ThisMacStatus {
+export function thisMacStatus(
+  store: DesktopStore,
+  origin: string,
+  agentsHere: boolean,
+  local = false,
+  also?: string,
+): ThisMacStatus {
   return {
-    orgs: homesOf(store, origin).flatMap((h) => {
+    orgs: homesOf(store, origin, also).flatMap((h) => {
       const orgId = orgOf(h);
       return orgId
         ? [{ orgId, machineId: h.status?.machine?.id ?? null, connection: h.status?.connection ?? "offline" }]
         : [];
     }),
     agentsHere,
+    local,
   };
 }
 
 export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest): Promise<unknown> {
-  if (request.kind === "status") return thisMacStatus(deps.store, request.origin, request.agentsHere);
+  if (request.kind === "status")
+    return thisMacStatus(deps.store, request.origin, request.agentsHere, request.local === true, request.also);
   if (request.kind === "prefs") {
     await deps.openPrefs(request.tab);
     return {};
@@ -72,7 +89,9 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
   }
   if (request.kind === "reconnect") {
     // The socket again (as the popover's "Reconnect"). Refused by the organization: pairing again is `connect`.
-    const home = homesOf(deps.store, request.origin).find((h) => orgOf(h) === request.orgId && !isRefusedHome(h));
+    const home = homesOf(deps.store, request.origin, request.also).find(
+      (h) => orgOf(h) === request.orgId && !isRefusedHome(h),
+    );
     if (!home) throw new Error("not_connected");
     await deps.store.request(home.homeId, { type: "reconnect" });
     return {};
@@ -122,30 +141,51 @@ async function connect(
 }
 
 /**
- * Once the site confirmed: the new organization gets the tools the others have (they are for the whole
- * computer). The first one starts with the browser on, Claude Code and Codex on when found here, and
- * commands off; more is Preferences › Tools.
+ * A new organization's tools on this computer: the ones the others have (they are for the whole computer);
+ * the first one starts with the browser on, Claude Code and Codex on when found here, and commands off. More
+ * is Preferences › Tools.
  */
+export async function firstTools(store: DesktopStore, homeId: string) {
+  await store.refresh(homeId);
+  const snap = store.getSnapshot();
+  const found = snap.homes.find((h) => h.homeId === homeId)?.status?.executors ?? {};
+  const base = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools ?? {
+    claude: !!found.claude,
+    codex: !!found.codex,
+    commands: false,
+    browser: true,
+  };
+  for (const tool of ["claude", "codex", "commands", "browser"] as const) {
+    await store.request(homeId, { type: "tools.set", tool, on: !!base[tool] }).catch(() => {});
+  }
+}
+
+/** Once the site confirmed the pairing, the new organization's first tools. */
 function whenPaired(store: DesktopStore, homeId: string) {
   const off = store.onEvent((id, event) => {
     if (id !== homeId || (event.kind !== "pair.done" && event.kind !== "pair.failed")) return;
     off();
-    if (event.kind === "pair.failed") return;
-    void (async () => {
-      await store.refresh(homeId);
-      const snap = store.getSnapshot();
-      const found = snap.homes.find((h) => h.homeId === homeId)?.status?.executors ?? {};
-      const base = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools ?? {
-        claude: !!found.claude,
-        codex: !!found.codex,
-        commands: false,
-        browser: true,
-      };
-      for (const tool of ["claude", "codex", "commands", "browser"] as const) {
-        await store.request(homeId, { type: "tools.set", tool, on: !!base[tool] }).catch(() => {});
-      }
-    })();
+    if (event.kind === "pair.done") void firstTools(store, homeId);
   });
   // A code nobody confirms expires; stop listening well after.
   setTimeout(off, 30 * 60_000);
+}
+
+/**
+ * A home the server here's sync made (`host://new`): once its runner says it is signed in, its first tools.
+ * Gives up after `timeoutMs` (its runner never came up; the next sync doesn't call it new again).
+ */
+export function whenHostHomeReady(store: DesktopStore, homeId: string, timeoutMs = 60_000) {
+  const ready = () => store.home(homeId)?.status?.paired === true;
+  if (ready()) {
+    void firstTools(store, homeId);
+    return;
+  }
+  const timer = setTimeout(() => off(), timeoutMs);
+  const off = store.subscribe(() => {
+    if (!ready()) return;
+    clearTimeout(timer);
+    off();
+    void firstTools(store, homeId);
+  });
 }
