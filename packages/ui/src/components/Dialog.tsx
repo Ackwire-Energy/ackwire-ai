@@ -18,6 +18,12 @@ export interface DialogProps {
   className?: string;
   /** Esc pressed: call `preventDefault()` to keep the dialog open (e.g. close an inner pane first). */
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  /** Before the title (an avatar). */
+  leading?: ReactNode;
+  /** A live line under the title (`aria-live`): what the dialog shows now. */
+  subtitle?: ReactNode;
+  /** The head's own actions, before the close button. */
+  actions?: ReactNode;
 }
 
 /**
@@ -34,6 +40,9 @@ export function Dialog({
   children,
   className,
   onEscapeKeyDown,
+  leading,
+  subtitle,
+  actions,
 }: DialogProps) {
   // Controlled dialogs have no Radix Trigger to return focus to, so remember
   // what had focus when it opened and give focus back on close.
@@ -62,7 +71,18 @@ export function Dialog({
           {...(description ? {} : { "aria-describedby": undefined })}
         >
           <div className="ac-dialog__head">
-            <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+            {leading}
+            {subtitle === undefined ? (
+              <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+            ) : (
+              <span className="ac-dialog__titles">
+                <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+                <span className="ac-dialog__sub" aria-live="polite">
+                  {subtitle}
+                </span>
+              </span>
+            )}
+            {actions}
             <RDialog.Close asChild>
               <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} />
             </RDialog.Close>

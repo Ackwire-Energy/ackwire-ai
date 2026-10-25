@@ -167,6 +167,24 @@ export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy:
   );
 }
 
+/** Behind an agent's computer while its screen opens: its sky, calm, filling the stage. */
+export function ComputerSky({ color }: { color: AgentColor }) {
+  return (
+    <span className="cmp-sky" aria-hidden="true">
+      <PixelSky
+        options={{
+          pixel: 4,
+          palette: agentTones(color),
+          body: spriteTone(color),
+          sprites: { area: 1400, max: 12 },
+          light: 0,
+          base: (u, v, tt) => 0.78 - 0.18 * u - 0.4 * v + 0.06 * S(u * 5 + tt * 0.5),
+        }}
+      />
+    </span>
+  );
+}
+
 /* ---------- Sign in and sign up ---------- */
 
 /**

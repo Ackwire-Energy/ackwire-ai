@@ -1,9 +1,9 @@
 import { ApiError } from "@agenteschat/client";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { openRefusalKey } from "@agenteschat/client/lib/sites";
 import { Button, Icon } from "@agenteschat/ui";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { openRefusalKey } from "./sites";
 
 /**
  * The address bar of the agent's browser while a person is in control (ADR 0040 §7): the site
@@ -14,12 +14,15 @@ export function AddressBar({
   grammar,
   onOpen,
   focus = false,
+  cloud = false,
 }: {
   grammar: ReturnType<typeof agentGrammar>;
   /** Opens the typed address; rejects with the server's refusal. */
   onOpen: (url: string) => Promise<unknown>;
   /** Takes the focus when it appears: with the browser closed, an address is the next thing to type. */
   focus?: boolean;
+  /** The workspace's own computer: its refusals never say it is off. */
+  cloud?: boolean;
 }) {
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
@@ -39,7 +42,7 @@ export function AddressBar({
       await onOpen(typed);
       setUrl("");
     } catch (e) {
-      setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined), grammar));
+      setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined, cloud), grammar));
     } finally {
       setBusy(false);
     }

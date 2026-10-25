@@ -1600,6 +1600,17 @@ textarea.ac-input {
   line-height: 24px;
   font-weight: 650;
 }
+.ac-dialog__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ac-dialog__sub {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
 .ac-dialog__desc {
   margin: 0;
   padding: 0 20px 12px;

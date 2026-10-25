@@ -460,7 +460,7 @@ describe("Onboarding", () => {
     await throughImport(state);
 
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
-    await click(button(/Este computador ou um servidor/), 8);
+    await click(button(/Outro computador/), 8);
     // No code made on the site anymore: the computer makes it and the person confirms on /conectar.
     expect(calls(state, "machines.createPairing")).toHaveLength(0);
     expect(document.body.textContent).toContain("O app para Mac ainda não está disponível.");

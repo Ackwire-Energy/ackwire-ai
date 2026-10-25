@@ -6,8 +6,12 @@ import { useCallback } from "react";
  * (`?open=…`) so a reload, a shared link or Back reopens it. Replaces the
  * history entry: opening and closing details isn't a page of its own.
  * Numbers (an issue's) go as numbers, so the URL reads `?open=6`.
+ * `aliases`: older names the route reads as this one; they go with it.
  */
-export function useOpenParam(name = "open"): [string | null, (value: string | number | null) => void] {
+export function useOpenParam(
+  name = "open",
+  aliases: readonly string[] = [],
+): [string | null, (value: string | number | null) => void] {
   const value = useRouterState({
     select: (s) => {
       const v = (s.location.search as Record<string, unknown>)[name];
@@ -22,12 +26,13 @@ export function useOpenParam(name = "open"): [string | null, (value: string | nu
         replace: true,
         search: ((prev: Record<string, unknown>) => {
           const out = { ...prev };
+          for (const alias of aliases) delete out[alias];
           if (next === null) delete out[name];
           else out[name] = next;
           return out;
         }) as never,
       }),
-    [navigate, name],
+    [navigate, name, aliases],
   );
   return [value, set];
 }

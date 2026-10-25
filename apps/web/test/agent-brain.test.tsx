@@ -36,9 +36,9 @@ const card = (d: HTMLElement, name: RegExp) =>
   within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name });
 /** The opened brain's model, one click away (a segmented control). */
 const model = (d: HTMLElement, name: RegExp) => click(within(d).getByRole("radio", { name }));
-/** The switch at the opened brain's foot: answer through the API while the computer is off. */
+/** The switch at the opened brain's foot: answer through the API while the computer doesn't answer. */
 const offSwitch = (d: HTMLElement) =>
-  within(d).getByRole("switch", { name: /^Se o MacBook desligar, responder pela API/ });
+  within(d).getByRole("switch", { name: /^Se o MacBook parar de responder, responder pela API/ });
 /** Opens one of the opened brain's dropdowns and picks an option. */
 const pick = async (d: HTMLElement, select: string, option: RegExp) => {
   const trigger = within(d).getByRole("combobox", { name: select });
@@ -59,7 +59,8 @@ const pairMac = (api: ReturnType<typeof createFakeApi>, browser: boolean) =>
 describe("Como trabalha under the name", () => {
   test("where, who thinks and the browser, in three cells (where first); each opens its dialog", async () => {
     await open();
-    expect(sentence().textContent).toContain("Trabalha naNuvem");
+    // This server has Daytona's sandboxes: the agent with no computer of its own works on one, by name.
+    expect(sentence().textContent).toContain("Trabalha naSandbox da Daytona");
     expect(sentence().textContent).toContain("Pensa com");
     expect(sentence().textContent).toContain("o modelo da organização");
     expect(sentence().textContent).toContain("Navegadornão navega em sites");
@@ -457,6 +458,20 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     await settle(6);
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args.slice(1)).toEqual([ADA_ID, "machine_1"]);
     expect(document.body.textContent).toContain("A Ada agora trabalha no MacBook.");
+  });
+
+  test("back to a Daytona sandbox: its own words, since a sandbox isn't named like a computer", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    await open(state, api);
+    const d = await dialog("Mudar onde trabalha", "Onde a Ada trabalha?");
+    await click(within(d).getByRole("radio", { name: /^Sandbox da Daytona/ }));
+    await click(within(d).getByRole("button", { name: "Usar uma sandbox da Daytona" }));
+    await settle(6);
+    expect(state.calls.findLast((c) => c.method === "sandbox.setTarget")?.args.slice(1)).toEqual([ADA_ID, null]);
+    expect(document.body.textContent).toContain("A Ada agora trabalha numa sandbox da Daytona.");
   });
 
   test("the browser on the cloud: the agent moves to the MacBook, and the steps there show before it's allowed", async () => {

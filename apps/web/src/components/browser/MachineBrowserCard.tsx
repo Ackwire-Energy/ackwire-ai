@@ -20,7 +20,6 @@ import { AgentAvatar } from "../AgentAvatar";
 import { CommandBlock } from "../Machines";
 import { useOrg } from "../org-context";
 import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
-import { NotWorkingNote } from "../WorkspaceComputer";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
 
@@ -75,9 +74,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   if (!access && !m.browser) return null;
   const switchedOn = access?.tools.browser === true;
   const ready = switchedOn && m.browser?.available === true;
-  // The workspace's own computer: no way in to turn it on or run a command (`NotWorkingNote`).
-  const managed = m.kind === "managed";
-  const command = managed ? null : commandInReason(m.browser?.reason);
+  const command = commandInReason(m.browser?.reason);
   const uses = m.agents.flatMap((a, i) => {
     const h = handoffs[i]?.data as BrowserHandoff | null | undefined;
     const open = h && isOpenHandoff(h) ? h : null;
@@ -130,8 +127,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         )}
         {ready && m.browser?.version && <span className="small muted">{m.browser.chrome ?? ""}</span>}
       </div>
-      {managed && !ready && (!switchedOn || m.browser?.reason) && <NotWorkingNote />}
-      {!switchedOn && !managed && (
+      {!switchedOn && (
         <div className="brw-note">
           <Icon name="computer" size={16} />
           {here ? (
@@ -144,7 +140,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
           )}
         </div>
       )}
-      {switchedOn && !ready && m.browser?.reason && !managed && (
+      {switchedOn && !ready && m.browser?.reason && (
         <div className="brw-note">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>

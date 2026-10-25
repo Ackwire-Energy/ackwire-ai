@@ -1,4 +1,5 @@
-import type { AgentComputer, ComputerSetup, ComputerSetupStep, Machine } from "../api/types";
+import type { TFunction } from "i18next";
+import type { AgentComputer, ComputerSetup, ComputerSetupStep, Edition, Machine } from "../api/types";
 import { type ComputerState, computerKind } from "./machines";
 
 /** What a person asked the agent's PC to do. */
@@ -60,12 +61,20 @@ export function busyView(action: ComputerAction, sinceMs: number, nowMs: number,
 
 // ── The workspace's own computer (ADR 0056 §10) ─────────────────────────────
 
+/**
+ * Which words the computers get: the Cloud's where a provisioner prepares each workspace's own computer
+ * (`computer-setup` says `external`), self-host's where people connect theirs (`pair`). Null while loading:
+ * no edition's words show then. `/api/health`'s edition isn't it: the Cloud runs the self-host image.
+ */
+export const computerEdition = (setup: ComputerSetup | null | undefined): Edition | null =>
+  setup ? (setup.mode === "external" ? "cloud" : "selfhost") : null;
+
 /** The provisioner's steps, in order (`computerSetup.step.*`). */
 export const SETUP_STEPS: readonly ComputerSetupStep[] = ["reserving", "starting", "installing", "connecting"];
 
 export type SetupPhase = "preparing" | "waiting" | "problem" | "ready";
 /** What a line or a chip says: the phase, or why it waits. */
-type SetupStatus = Exclude<SetupPhase, "waiting"> | "approval" | "capacity";
+type SetupStatus = Exclude<SetupPhase, "waiting"> | "capacity";
 
 /** The workspace's own computer as every screen says it (onboarding, notice, Computers, the agent's page, phone). */
 export interface SetupView {
@@ -73,8 +82,8 @@ export interface SetupView {
   /** While preparing: the step, and its number from 1 (0 before the provisioner names one). */
   step: ComputerSetupStep | null;
   stepNumber: number;
-  /** While waiting: `approval` (soon) or `capacity` (longer than usual). */
-  reason: "approval" | "capacity" | null;
+  /** While waiting: `capacity` (longer than usual). */
+  reason: "capacity" | null;
   /** The status line. */
   textKey: `computerSetup.step.${ComputerSetupStep}` | `computerSetup.status.${SetupStatus}`;
   /** The short word for a chip. */
@@ -83,25 +92,84 @@ export interface SetupView {
   specs: ComputerSetup["specs"];
   /** The computer itself, once made (its page). */
   machineId: string | null;
+  /** The server's seconds left when its answer came (`receivedAt`, this device's clock); null: no time said. */
+  secondsLeft: number | null;
+  receivedAt: number;
+  /** Seconds people had waited when the server answered, on the server's clock; null when it doesn't say. */
+  waited: number | null;
+  /** The server sends email (`promisesEmail`). */
+  notifyByEmail: boolean;
 }
 
-/** Null where people connect their own computers (`pair`), or before the server answers: nothing to show. */
-export function setupView(setup: ComputerSetup | null | undefined): SetupView | null {
+/**
+ * Null where people connect their own computers (`pair`), or before the server answers: nothing to show.
+ * `receivedAt`: when the answer came, on this device's clock (the time left counts down from it).
+ */
+export function setupView(setup: ComputerSetup | null | undefined, receivedAt = Date.now()): SetupView | null {
   if (setup?.mode !== "external") return null;
   const phase: SetupPhase = setup.state ?? "preparing";
   const step = phase === "preparing" && setup.step && SETUP_STEPS.includes(setup.step) ? setup.step : null;
-  const reason = phase === "waiting" ? (setup.reason === "capacity" ? "capacity" : "approval") : null;
-  const status: SetupStatus = reason ?? (phase === "waiting" ? "approval" : phase);
+  // Every wait reads as capacity: an older server's `approval` too.
+  const status: SetupStatus = phase === "waiting" ? "capacity" : phase;
+  const secondsLeft = typeof setup.secondsLeft === "number" ? setup.secondsLeft : null;
   return {
     phase,
     step,
     stepNumber: step ? SETUP_STEPS.indexOf(step) + 1 : 0,
-    reason,
+    reason: phase === "waiting" ? "capacity" : null,
     textKey: step ? `computerSetup.step.${step}` : `computerSetup.status.${status}`,
     chipKey: `computerSetup.chip.${status}`,
     specs: setup.specs,
     machineId: setup.machineId,
+    secondsLeft,
+    receivedAt,
+    waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,
+    notifyByEmail: setup.notifyByEmail === true,
   };
+}
+
+/** The time left as the preparing screens say it (`computerSetup.eta.*`). */
+export type EtaView =
+  | { kind: "minutes"; count: number }
+  | { kind: "underMinute" }
+  | { kind: "almost" }
+  | { kind: "late" };
+
+/**
+ * The time left now: the server's `secondsLeft` less the seconds since its answer came. A minute or more:
+ * whole minutes, rounded up; under 15 s, or up to a minute past the time: almost; past that: a little longer
+ * than expected. Null without a time.
+ */
+export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number): EtaView | null {
+  if (secondsLeft === null) return null;
+  const left = secondsLeft - Math.max(0, nowMs - receivedAtMs) / 1000;
+  if (left >= 60) return { kind: "minutes", count: Math.ceil(left / 60) };
+  if (left >= 15) return { kind: "underMinute" };
+  if (left >= -60) return { kind: "almost" };
+  return { kind: "late" };
+}
+
+/** "About 6 min left", "Almost ready…" (`computerSetup.eta.*`). */
+export const etaLine = (t: TFunction, eta: EtaView) =>
+  eta.kind === "minutes" ? t("computerSetup.eta.minutes", { count: eta.count }) : t(`computerSetup.eta.${eta.kind}`);
+
+/** Only while it is being prepared: a wait and a problem have no time. */
+export const setupEta = (view: SetupView, nowMs: number) =>
+  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs) : null;
+
+/** How often the time line repaints: every 15 s, every 5 s under a minute. No ticking seconds. */
+export const etaTickMs = (eta: EtaView | null) => (eta?.kind === "minutes" ? 15_000 : 5_000);
+
+/**
+ * Whether "we'll email you" holds: the server sends email, and the wait is or will be over a minute, which
+ * is when it emails the owners once the computer is ready: more than a minute left when it answered,
+ * waiting or a problem, or a minute gone since people started waiting (with no time said, only that).
+ */
+export function promisesEmail(view: SetupView, nowMs: number): boolean {
+  if (!view.notifyByEmail || view.phase === "ready") return false;
+  if (view.phase === "waiting" || view.phase === "problem") return true;
+  if (view.secondsLeft !== null && view.secondsLeft > 60) return true;
+  return view.waited !== null && view.waited + Math.max(0, nowMs - view.receivedAt) / 1000 > 60;
 }
 
 /**
@@ -145,17 +213,31 @@ export const setupNoticeKey = (orgId: string, view: SetupView) =>
  */
 export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 
+/**
+ * The agent's computer as this reader calls it. The workspace's own keeps the name it got in its first owner's
+ * language (mirrors `managedMachineName` in packages/engine/src/machine-provisioning.ts) until someone renames
+ * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name.
+ */
+export function computerName(
+  t: TFunction,
+  orgName: string,
+  machine: Pick<Machine, "kind" | "name"> | null | undefined,
+): string {
+  const ours = t("computerSetup.title", { org: orgName });
+  if (!machine) return ours;
+  if (machine.kind !== "managed") return machine.name;
+  return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
+}
+
 export type NoComputer = "cloud" | "workspace" | "none";
 
 /**
- * What an agent's "no computer" choice (`machineId` null) stands for in a picker: `cloud` where people
- * connect their own computers or this server has the cloud computer; `workspace` while the workspace's own
- * computer is on its way (the agents with none get it); `none` once it is ready on a server without the cloud
- * computer, shown only for an agent that has none (picking it would leave an agent with no computer). Null:
- * not offered.
+ * What an agent's "no computer" choice (`machineId` null) stands for in a picker: `workspace` while the
+ * workspace's own computer is on its way (the agents with none get it); `cloud`, a Daytona sandbox, where this
+ * server has them; else `none`, shown only for an agent that has none (picking it would leave an agent with
+ * no computer). Null: not offered.
  */
 export function noComputerChoice(view: SetupView | null, cloudAvailable: boolean, current: boolean): NoComputer | null {
-  if (!view) return "cloud";
   if (setupPending(view)) return "workspace";
   if (cloudAvailable) return "cloud";
   return current ? "none" : null;

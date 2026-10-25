@@ -39,6 +39,7 @@ function AppStack() {
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
+  const setupSheet = useFormSheetOptions([0.7, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -58,6 +59,7 @@ function AppStack() {
       />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
+      <Stack.Screen name="computer-setup" options={setupSheet} />
       <Stack.Screen name="me" options={meSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />
@@ -75,6 +77,10 @@ function AppStack() {
       <Stack.Screen name="handoff/[id]" options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }} />
       <Stack.Screen
         name="file/[id]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
+      <Stack.Screen
+        name="computer/[agentId]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
       />
     </Stack>
