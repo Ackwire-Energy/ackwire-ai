@@ -24,7 +24,7 @@ const ACTION_ICON = { newConversation: "compose", newTask: "target", newAgent: "
 
 /**
  * Busca, under the field of the search tab (the phone's ⌘K): the actions with no words, then the
- * results grouped (Conversas, Mensagens, Arquivos) with a chip per group and its count.
+ * results grouped (Conversas, Ações do time, Mensagens, Arquivos) with a chip per group and its count.
  */
 export function SearchResults({ q }: { q: string }) {
   const { t } = useTranslation();
@@ -71,6 +71,7 @@ export function SearchResults({ q }: { q: string }) {
           items={[
             { key: "all", label: t("mobile.find.filter.all"), count: counts.all },
             { key: "chats", label: t("mobile.find.conversations"), count: counts.chats },
+            { key: "team", label: t("searchPage.kinds.action"), count: counts.team },
             { key: "messages", label: t("mobile.find.messages"), count: counts.messages },
             { key: "files", label: t("mobile.find.files"), count: counts.files },
           ]}
@@ -119,6 +120,33 @@ export function SearchResults({ q }: { q: string }) {
                   onPress: () => router.push(chatHref(ch.id)),
                 })),
               ]}
+            />
+          </Group>
+        ) : null}
+        {r.team.length > 0 ? (
+          <Group title={t("searchPage.kinds.action")} count={r.team.length}>
+            <ActionList
+              items={r.team.map((h) => {
+                const channelId = h.channelIds[0] ?? "";
+                const where = channelName(channelId);
+                return {
+                  key: h.sourceId,
+                  leading: h.author ? (
+                    <AgentFace agentId={h.author.id} size={34} live={false} />
+                  ) : (
+                    <Tile icon="reply" size={34} />
+                  ),
+                  label: previewOf(h.snippet || h.title),
+                  hint: [
+                    h.author?.name,
+                    where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null,
+                    when.short(h.createdAt),
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                  onPress: () => router.push(chatHref(channelId)),
+                };
+              })}
             />
           </Group>
         ) : null}

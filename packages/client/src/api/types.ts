@@ -119,8 +119,14 @@ export interface Invitation {
 
 export interface InvitationPreview {
   orgName: string;
+  /** Empty for an org-wide invite link. */
   email: string;
   role: Role;
+  kind?: "email" | "link";
+  /** Who invited (their name), when known. */
+  invitedBy?: string | null;
+  /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
+  agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
 }
 
 export interface Credential {
@@ -684,6 +690,8 @@ export interface Approval {
   /** The connector it goes through ("github") and its account. */
   connector?: string | null;
   connectorAccount?: string | null;
+  /** The email itself, for mail drafts and sends; null for every other action. */
+  email?: ApprovalEmail | null;
   /** Why it asks (ADR 0053 §8): what the agent found and why this action. Shown above the action. */
   why?: string | null;
   /** Asked while nobody watched: by a routine (its name) or by an unattended run. Null: a person was there. */
@@ -691,6 +699,23 @@ export interface Approval {
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
+}
+
+/** The email a mail approval writes (draft, send, reply, forward), as its card shows it. */
+export interface ApprovalEmail {
+  verb: "draft" | "send" | "reply" | "forward";
+  /** The mailbox it goes through and its provider ("iCloud", "Gmail"; null: unknown). */
+  mailbox: string;
+  provider: string | null;
+  from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  /** The text, cut after 1500 characters. */
+  body: string;
+  /** The message it answers or forwards (its sender may be unknown). */
+  original: { subject: string; from: string | null } | null;
 }
 
 /** Who asked when nobody was watching (`approvals.origin`). */
@@ -862,6 +887,8 @@ export interface OrgSettings {
   timezone: string;
   /** Admins only: monthly budget of every agent without its own (US$). Absent for members. */
   defaultAgentBudgetUsd?: number;
+  /** Agents check what the team already did before acting outside (ADR 0064). On by default. */
+  actionCheck: boolean;
 }
 
 /** Sidebar counts. */
@@ -929,6 +956,9 @@ export interface AgentDetail {
   defaultBudgetUsd?: number;
   tokensThisMonth: number;
   runsThisMonth: number;
+  failuresThisMonth: number;
+  /** This month's runs and failures per day of the month (UTC); only days with runs. */
+  runsByDay: { day: number; runs: number; failed: number }[];
   pendingApprovals: number;
   channels: AgentChannel[];
   createdAt: string;
@@ -1069,7 +1099,15 @@ export type CustomConnectStart =
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
-export type SearchKind = "message" | "context_item" | "issue" | "forum_topic" | "forum_reply" | "file";
+export type SearchKind =
+  | "message"
+  | "context_item"
+  | "issue"
+  | "forum_topic"
+  | "forum_reply"
+  | "file"
+  | "wiki"
+  | "action";
 
 export interface SearchHit {
   kind: SearchKind;
@@ -1080,6 +1118,27 @@ export interface SearchHit {
   snippet: string;
   score: number;
   createdAt: string;
+  /** Message hits: who wrote it; action hits: the agent that did it. */
+  author?: { type: AuthorType; id: string; name: string } | null;
+}
+
+/**
+ * `message.meta.teamChecks` (ADR 0064, server-made): outside actions the agent didn't repeat because the
+ * team already did them. `agentId` null = it happened where the agent can't see: only "someone" and when.
+ */
+export interface TeamCheck {
+  id: string;
+  tool: string;
+  /** What it touched, as people read it (`ana@acme.com`, `acme/app#212`). */
+  targets: string[];
+  matches: {
+    agentId: string | null;
+    agentName: string | null;
+    channelId: string | null;
+    channelName: string | null;
+    summary: string | null;
+    at: string;
+  }[];
 }
 
 /** `message.meta.replyTo`: the message a quote reply answers, as it was when quoted (server-made). */

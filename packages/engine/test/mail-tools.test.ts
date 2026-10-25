@@ -1,7 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
 import { fakeMailAuthError } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { grantScopes, isSensitive, mailSlugs, UNTRUSTED_NOTE, updateMailAccount, wrapUntrusted } from "../src";
+import {
+  grantScopes,
+  isSensitive,
+  listApprovals,
+  mailSlugs,
+  UNTRUSTED_NOTE,
+  updateMailAccount,
+  wrapUntrusted,
+} from "../src";
 import { giveMail, imapAccount, type MailFixture, mailSetup, runContext } from "./mail-fixtures";
 
 let m: MailFixture;
@@ -195,6 +203,62 @@ test("send asks a person with the exact action; approved, it sends once and is c
   expect(sends).toMatchObject([{ agentId: m.f.agent.id, accountId: account.id, kind: "send", subject: "Hi" }]);
   const audit = await m.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "mail.sent"));
   expect(audit).toHaveLength(1);
+});
+
+test("a reply draft that asks shows the email it saves and the message it answers; nothing is sent", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write");
+  await updateMailAccount(m.deps, m.f.owner.id, m.f.org.id, account.id, { askActions: ["draft"] });
+  m.box.add({
+    id: "t1",
+    from: { address: "ana@acme.com" },
+    to: [{ address: "support@example.com" }],
+    subject: "Question",
+    date: daysAgo(1),
+  });
+  const ctx = await runContext(m.f);
+  const r = await m.tools.invoke(ctx, {
+    toolUseId: "tu_draft",
+    name: "mail_support_draft",
+    input: {
+      to: ["Ana@acme.com"],
+      subject: "Re: Question",
+      body: "Thanks!",
+      in_reply_to: "t1",
+      why: "The customer asked a question; a person reviews the answer before it goes.",
+    },
+  });
+  if (r.type !== "approval") throw new Error("expected an approval");
+  expect(r.approval.title).toBe('Save a draft reply to ana@acme.com in support@example.com: "Re: Question"');
+
+  const [listed] = await listApprovals(m.f.db, m.f.owner.id, m.f.org.id);
+  expect(listed).toMatchObject({
+    connector: "email",
+    connectorAccount: "support@example.com",
+    email: {
+      verb: "draft",
+      mailbox: "support@example.com",
+      provider: "iCloud",
+      from: "support@example.com",
+      to: ["ana@acme.com"],
+      cc: [],
+      bcc: [],
+      subject: "Re: Question",
+      body: "Thanks!",
+      original: { subject: "Question", from: "ana@acme.com" },
+    },
+  });
+  expect(m.box.state.sent).toEqual([]);
+
+  // A reply draft to a message this agent may not read is refused before anyone is asked.
+  expect(
+    await m.tools.invoke(ctx, {
+      toolUseId: "tu_draft_2",
+      name: "mail_support_draft",
+      input: { subject: "Re: ?", body: "Hi", in_reply_to: "missing", why: "Answering it." },
+    }),
+  ).toMatchObject({ output: { isError: true } });
 });
 
 test("recipients outside the list are refused, including reply-all's computed ones and after approval", async () => {

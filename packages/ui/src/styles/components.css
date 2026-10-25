@@ -870,21 +870,15 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
-/* Asked while nobody watched: one quiet line with its icon. */
-.ac-approval__origin {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 18px;
-  color: var(--ink-muted);
-}
+/* Asked while nobody watched: on the line of who asks, with its icon. */
 .ac-approval__origin > svg {
-  flex: none;
-  margin-top: 2px;
+  margin: 0 3px 0 1px;
+  vertical-align: -2px;
 }
-/* Why the agent asks, in its words, read before the action. */
+.ac-approval__action {
+  min-width: 0;
+}
+/* Why the agent asks, in its words, after the action. */
 .ac-approval__why {
   margin: 0;
   font-size: 13.5px;
@@ -3906,6 +3900,10 @@ a.ac-list__row:focus-visible {
     inset 0 0 0 1px var(--line),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
+/* The tile already holds the agent at work (its face moves): no halo around it, which looked like a bigger box. */
+.ac-avatar--framed.ac-avatar--running::after {
+  content: none;
+}
 .ac-avatar--framed .ac-avatar__canvas {
   left: 0;
   top: 0;
@@ -5798,6 +5796,13 @@ a.ac-list__row:focus-visible {
   display: block;
   image-rendering: pixelated;
 }
+/* An agent's month (MonthRuns): the row's whole width, 2px cells. */
+.ac-month-runs {
+  display: block;
+  width: 100%;
+  height: 80px;
+  image-rendering: pixelated;
+}
 .ac-run-key {
   display: inline-block;
   width: 6px;
@@ -6835,16 +6840,16 @@ label.ac-setrow__title {
   border: 0;
 }
 
-/* Carousel: one row that slides item by item; the arrows step back when it all fits. */
+/*
+ * Carousel: one row that slides item by item. The arrows float over its edges, only where there is
+ * more to see, and the row fades out under them: the first item always starts where rows that fit do.
+ */
 .ac-carousel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
   min-width: 0;
 }
 .ac-carousel__track {
   display: flex;
-  flex: 1;
   gap: 6px;
   min-width: 0;
   padding: 2px;
@@ -6860,9 +6865,20 @@ label.ac-setrow__title {
   flex: none;
   scroll-snap-align: start;
 }
+.ac-carousel[data-more="end"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+.ac-carousel[data-more="start"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+.ac-carousel[data-more="both"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
 .ac-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-raised);
   display: grid;
-  flex: none;
   place-items: center;
   width: 28px;
   height: 28px;
@@ -6873,21 +6889,25 @@ label.ac-setrow__title {
   box-shadow: var(--e1), var(--top);
   color: var(--muted);
   cursor: pointer;
+  transform: translateY(-50%);
   transition:
     color 0.15s,
     opacity 0.15s;
+}
+.ac-carousel__arrow:first-child {
+  left: 0;
+}
+.ac-carousel__arrow:last-child {
+  right: 0;
 }
 .ac-carousel__arrow:hover:not(:disabled) {
   color: var(--ink);
 }
 .ac-carousel__arrow:disabled {
-  opacity: 0.35;
-  cursor: default;
+  opacity: 0;
+  pointer-events: none;
 }
 .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
-}
-.ac-carousel--fits .ac-carousel__arrow {
-  display: none;
 }

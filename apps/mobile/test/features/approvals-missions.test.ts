@@ -33,6 +33,16 @@ describe("requests to approve", () => {
     expect(approvalAction({ tool: "post_message", scope: "slack:post_message" })).toBe("other");
   });
 
+  test("a mailbox's scope says what a mail tool does: a draft is a tap, nothing leaves", () => {
+    const draft = { tool: "mail_support_draft", scope: "mail:draft", params: {} };
+    expect(approvalAction(draft)).toBe("draft");
+    expect(approvalRisk(draft)).toBe("normal");
+    expect(approvalTraits(draft)).toEqual(["unsent", "deletable"]);
+    expect(approvalRisk({ tool: "mail_support_archive", scope: "mail:organize" })).toBe("normal");
+    expect(approvalRisk({ tool: "mail_support_reply", scope: "mail:send" })).toBe("high");
+    expect(approvalAction({ tool: "mail_support_trash", scope: "mail:delete" })).toBe("delete");
+  });
+
   test("what it touches, in plain words", () => {
     expect(approvalTraits({ tool: "deploy", scope: "x", params: {} })).toEqual(["production", "reversible"]);
     expect(approvalTraits({ tool: "send_email", scope: "mail", params: {} })).toEqual(["irreversible", "external"]);

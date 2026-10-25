@@ -54,6 +54,9 @@ const Settings = z
     defaultAgentBudgetUsd: z.number().optional().openapi({
       description: "Monthly budget of every agent without its own. Admins only (absent for members).",
     }),
+    actionCheck: z.boolean().openapi({
+      description: "Agents check what the team already did before acting outside (ADR 0064). On by default.",
+    }),
   })
   .openapi("OrgSettings");
 
@@ -113,6 +116,10 @@ const AgentDetail = z
     defaultBudgetUsd: z.number().optional().openapi({ description: "Admins only: the workspace default budget." }),
     tokensThisMonth: z.number(),
     runsThisMonth: z.number(),
+    failuresThisMonth: z.number(),
+    runsByDay: z
+      .array(z.object({ day: z.number(), runs: z.number(), failed: z.number() }))
+      .openapi({ description: "This month's runs and failures per day (UTC); only days with runs." }),
     pendingApprovals: z.number(),
     channels: z.array(AgentChannel),
     createdAt: z.string(),
@@ -214,6 +221,7 @@ export function managementRoutes(deps: AppDeps) {
               .max(1_000_000)
               .optional()
               .openapi({ description: "Monthly budget of every agent without its own." }),
+            actionCheck: z.boolean().optional(),
           }),
         ),
       },
@@ -603,6 +611,8 @@ export function managementRoutes(deps: AppDeps) {
             : {}),
           tokensThisMonth: d.month.tokens,
           runsThisMonth: d.month.runs,
+          failuresThisMonth: d.month.failures,
+          runsByDay: d.month.byDay,
           pendingApprovals: d.pendingApprovals,
           audience: audienceOf(d.agent),
           audienceMode: d.agent.audienceMode,

@@ -9,7 +9,8 @@ export type AvatarKind = "person" | "agent";
 /**
  * The agent symbol's state: `idle` blinks now and then, `thinking` looks
  * around (with a halo), `writing` has dash eyes (with a halo), `waiting`
- * looks up at you (waiting on a person's decision, no halo).
+ * looks up at you (waiting on a person's decision, no halo). The halo shows
+ * only without the tile (`xs`, `xl`): in a tile the moving face says it.
  */
 export type AgentState = "idle" | "thinking" | "writing" | "waiting";
 

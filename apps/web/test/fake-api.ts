@@ -31,6 +31,7 @@ import type {
   Role,
   Run,
   ScopeGrant,
+  SearchHit,
   SecretRequest,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -153,6 +154,10 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
+  actionCheck?: boolean;
+  /** What agents did outside (search kind `action`), as the search returns it. */
+  teamActions?: SearchHit[];
   /** My inbox (`notifications.*`); empty unless a test fills it. */
   notifications?: AppNotification[];
   /** `actions.undo`/`redo`/`undoMessage` fail for these receipt ids with this error (`action.changed_since`…). */
@@ -830,6 +835,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         routerModel: null,
         summaryModel: null,
         timezone: "America/Sao_Paulo",
+        actionCheck: state.actionCheck ?? true,
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
@@ -838,6 +844,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.context !== undefined) state.context = input.context;
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
+        if (input.actionCheck !== undefined) state.actionCheck = input.actionCheck;
         return {
           name: input.name ?? "Acme",
           context: state.context ?? "",
@@ -845,6 +852,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           routerModel: null,
           summaryModel: null,
           timezone: input.timezone ?? "America/Sao_Paulo",
+          actionCheck: state.actionCheck ?? true,
         };
       },
       overview: async () => ({
@@ -1116,6 +1124,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             : {}),
           tokensThisMonth: agentId === ADA_ID ? 3_100_000 : 210_000,
           runsThisMonth: agentId === ADA_ID ? 142 : 12,
+          failuresThisMonth: agentId === ADA_ID ? 2 : 0,
+          runsByDay:
+            agentId === ADA_ID
+              ? [
+                  { day: 1, runs: 70, failed: 1 },
+                  { day: 2, runs: 72, failed: 1 },
+                ]
+              : [{ day: 1, runs: 12, failed: 0 }],
           pendingApprovals: state.approvals.filter((x) => x.agentId === agentId && x.status === "pending").length,
           channels,
         };
@@ -1443,6 +1459,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("connectors.startOAuth", orgId, connector, input);
         return `https://github.com/login/oauth/authorize?state=s&return=${encodeURIComponent(input.returnTo)}`;
       },
+      completeOAuth: async (orgId, input) => {
+        log("connectors.completeOAuth", orgId, input);
+        throw new Error("the web app finishes OAuth in the callback");
+      },
       disconnect: async (orgId, connectionId) => {
         log("connectors.disconnect", orgId, connectionId);
         state.connections = state.connections.filter((c) => c.id !== connectionId);
@@ -1493,7 +1513,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             score: 0.5,
             createdAt: m.updatedAt,
           }));
-        return [...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+        const actions = (state.teamActions ?? []).filter((h) => h.snippet.toLowerCase().includes(q));
+        return [...actions, ...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
       },
     },
     memory: {

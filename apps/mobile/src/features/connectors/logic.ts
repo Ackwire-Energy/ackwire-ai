@@ -1,0 +1,153 @@
+import type { Connection, ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import { mixHex } from "@agenteschat/ui/agent/engine";
+
+/**
+ * The connectors gallery on the phone: pure pieces the screen and
+ * the tests share. No React Native imports.
+ */
+
+/** Suggestions, in order (the web's list, catalog services only): the first three not connected yet. */
+export const SUGGESTED = ["github", "linear", "notion", "drive", "sentry", "stripe", "slack"];
+
+/** Categories in the order the filters show them. */
+export const CATEGORIES: ConnectorCategory[] = [
+  "dev",
+  "product",
+  "docs",
+  "payments",
+  "support",
+  "marketing",
+  "automation",
+];
+
+/** The organization's live connection to a catalog service (a vendor's server is matched by its address). */
+export function connectionOf(def: ConnectorDef, connections: Connection[]): Connection | undefined {
+  const byAddress = (c: Connection) =>
+    def.kind === "remote_mcp" && def.serverUrl !== null && c.serverUrl === def.serverUrl;
+  return connections.find((c) => !c.revokedAt && (c.connector === def.id || byAddress(c)));
+}
+
+/** The first three suggestions that can be connected here and aren't yet. */
+export function suggestionsOf(catalog: ConnectorDef[], connections: Connection[], count = 3): ConnectorDef[] {
+  const out: ConnectorDef[] = [];
+  for (const id of SUGGESTED) {
+    const def = catalog.find((d) => d.id === id);
+    if (def?.available && !connectionOf(def, connections)) out.push(def);
+    if (out.length === count) break;
+  }
+  return out;
+}
+
+/** Search over the name, id and description (and the text shown in the app's language). */
+export function searchConnectors(list: ConnectorDef[], query: string, shown: (d: ConnectorDef) => string = () => "") {
+  const q = query.trim().toLowerCase();
+  return q ? list.filter((d) => `${d.label} ${d.id} ${d.description} ${shown(d)}`.toLowerCase().includes(q)) : list;
+}
+
+/** How a service connects on the phone: signing in in the browser, a key, or either. */
+export type ConnectHow = "signIn" | "key" | "either";
+
+export function connectHow(def: ConnectorDef): ConnectHow {
+  // A vendor's official server: its own sign-in (or a key when it asks for one).
+  if (def.kind === "remote_mcp") return "signIn";
+  const signIn = def.oauthConfigured && def.auth.includes("oauth");
+  const key = def.auth.includes("api_key");
+  return signIn && key ? "either" : signIn ? "signIn" : "key";
+}
+
+/** i18n key of an id (`cloudflare-bindings` → `cloudflare_bindings`). */
+const safeId = (id: string) => id.replace(/[^a-zA-Z0-9]/g, "_");
+
+/**
+ * What agents could do there, in plain words: our lines (`connectors.can.<id>`: "1", "2", "3", and "ask"
+ * for what always asks approval, the same as the web), or else the service's scopes.
+ */
+export function capabilityLines(
+  tr: (key: string) => string,
+  exists: (key: string) => boolean,
+  def: ConnectorDef,
+  scopeLabel: (scope: ConnectorDef["scopes"][number]) => string,
+): { text: string; asks: boolean }[] {
+  const base = `connectors.can.${safeId(def.id)}`;
+  if (exists(`${base}.1`)) {
+    const lines = (["1", "2", "3"] as const)
+      .filter((n) => exists(`${base}.${n}`))
+      .map((n) => ({ text: tr(`${base}.${n}`), asks: false }));
+    if (exists(`${base}.ask`)) lines.push({ text: tr(`${base}.ask`), asks: true });
+    return lines;
+  }
+  return def.scopes.map((s) => ({ text: scopeLabel(s), asks: s.sensitive }));
+}
+
+/** The state an authorize URL carries (to recognize the answer the browser brings back). */
+export function stateOf(authorizeUrl: string): string | null {
+  try {
+    return new URL(authorizeUrl).searchParams.get("state");
+  } catch {
+    return null;
+  }
+}
+
+/** What the browser brought back to the app (`agenteschat://connectors/oauth?state=…&code=…` or `?error=…`). */
+export type AuthAnswer = { kind: "code"; state: string; code: string } | { kind: "error"; error: string };
+
+export function authAnswerOf(url: string): AuthAnswer | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const error = parsed.searchParams.get("error");
+  if (error) return { kind: "error", error };
+  const state = parsed.searchParams.get("state");
+  const code = parsed.searchParams.get("code");
+  return state && code ? { kind: "code", state, code } : null;
+}
+
+/**
+ * Authorizations the open sheet is finishing itself: the deep link route (Android also opens the app with
+ * the answer) leaves those alone, so the same code is never sent twice.
+ */
+const finishing = new Set<string>();
+export const markFinishing = (state: string) => finishing.add(state);
+export const isFinishing = (state: string) => finishing.has(state);
+export const doneFinishing = (state: string) => finishing.delete(state);
+
+/** Only our own icons (`/connectors/{name}.svg`), never an arbitrary URL. */
+const ICON_URL = /^\/connectors\/[a-z0-9-]+\.svg$/;
+
+/** The brand icon's address on the server, or null (a monogram then). */
+export function iconUri(base: string, iconUrl: string | null): string | null {
+  return iconUrl && ICON_URL.test(iconUrl) ? `${base}${iconUrl}` : null;
+}
+
+/** A brand color we can trust ("#rrggbb"), else null. */
+export const brandOf = (color: string | null) => (color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : null);
+
+/** The suggestion card's strip: tones from the surface into the brand's color, deep last. */
+export function brandTones(surface: string, brand: string): string[] {
+  return [
+    surface,
+    mixHex(surface, brand, 0.1),
+    mixHex(surface, brand, 0.2),
+    mixHex(surface, brand, 0.34),
+    mixHex(surface, brand, 0.5),
+  ];
+}
+
+/** "GitHub" → "G", "Google Drive" → "GD": the monogram of a service without an icon. */
+export function monogram(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : (words[0]?.[0] ?? "?");
+  return letters.toUpperCase();
+}
+
+/** A plausible MCP server address (https only, like the server). */
+export function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value.trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}

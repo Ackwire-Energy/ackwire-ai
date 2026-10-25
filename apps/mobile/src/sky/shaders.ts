@@ -4,9 +4,10 @@
  *
  * Uniforms shared by all: `size` (points), `px` (points per cell), `t` (seconds), `last` (index of the
  * last tone), `pal[8]` (tones, padded), `fade` (from this height, as a share, the drawing fades out to
- * the bottom like the web's mask; 2 = no fade). Arrays are only read with loop indices (SkSL rule).
+ * the bottom like the web's mask; 2 = no fade), `clear` (1 = the first tone is see-through, for a drawing
+ * over glass). Arrays are only read with loop indices (SkSL rule).
  */
-export type DitherKind = "sky" | "fuse" | "bar" | "track" | "sweep";
+export type DitherKind = "sky" | "fuse" | "bar" | "track" | "sweep" | "pill" | "pillwork";
 
 const PRELUDE = `
 uniform float2 size;
@@ -14,6 +15,7 @@ uniform float px;
 uniform float t;
 uniform float last;
 uniform float fade;
+uniform float clear;
 uniform float4 pal[8];
 
 float hash2(float a, float b) {
@@ -53,6 +55,7 @@ half4 main(float2 pos) {
   float s = f * last;
   float b = floor(s);
   float idx = (s - b > bayer(x, y)) ? b + 1.0 : b;
+  if (clear > 0.5 && idx < 0.5) return half4(0.0);
   float4 c = tone(min(idx, last));
   float yy = pos.y / size.y;
   float a = yy < fade ? 1.0 : clamp(1.0 - (yy - fade) / max(0.001, 1.0 - fade), 0.0, 1.0);
@@ -114,6 +117,19 @@ float field(float u, float v, float x, float y) {
   float c = mod(t * 0.32, 1.6) - 0.3;
   float d = u - c;
   return 0.08 + 0.5 * exp(-(d * d) / 0.035);
+}
+`,
+  pill: `
+float field(float u, float v, float x, float y) {
+  float e = max(0.0, (u - 0.55) / 0.45);
+  return 0.55 * e * e * (0.8 + 0.2 * sin(v * 5.0 + t * 0.7));
+}
+`,
+  pillwork: `
+float field(float u, float v, float x, float y) {
+  float p = mod(t * 0.42, 1.6) - 0.3;
+  float d = u - p;
+  return min(0.75, 0.32 * u * u * u + 0.5 * exp(-(d * d) / 0.02) * (0.5 + 0.5 * u)) + 0.04 * sin(v * 6.0 + t);
 }
 `,
 };
