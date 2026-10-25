@@ -522,6 +522,7 @@ ones a self-hosted instance usually touches:
 | `TS_EXTRA_ARGS` | | More `tailscale up` flags. The setup puts `--advertise-tags` here for an OAuth client secret. |
 | `TAILSCALE_FUNNEL` | `false` | `true` opens the instance to the internet at the same address (What needs a public URL). Only `true` or `false`. |
 | `ALLOW_SIGNUP` | `false` | `true` lets anyone create an account. |
+| `OWNER_CLAIM_SHA256` | | Set by the setup: while no account exists, only its owner link creates the first one (Sign-up, below). `OWNER_KEY_SHA256` is the desktop app's. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
 | `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. |
