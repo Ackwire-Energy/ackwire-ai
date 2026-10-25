@@ -10,6 +10,7 @@
  *   server.lock      the pid of the one process using the folder
  *   server.json      written once it listens, removed when it stops
  *   backups/         what an upgrade's restore moved aside
+ *   db.lock          the database's own lock, held by the process that has it open
  *
  * It listens on 127.0.0.1 only and answers only its own addresses (`ownHostsOnly`).
  */
@@ -18,9 +19,12 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, wri
 import os from "node:os";
 import { join, resolve } from "node:path";
 import { format, parseArgs } from "node:util";
+import { loadConfig } from "@agenteschat/config";
 import {
   createDatabase,
+  DatabaseInUseError,
   dumpPglite,
+  folderLockFile,
   folderVersion,
   isEmptyFolder,
   openPglite,
@@ -44,6 +48,7 @@ import {
 } from "../runner/service";
 import { createLogger } from "./logger";
 import { prepareDatabase, startServer } from "./start";
+import { printTelemetry } from "./telemetry";
 import { version } from "./version";
 
 export const EXIT = { ok: 0, error: 1, locked: 3, upgrade: 4, port: 5 } as const;
@@ -73,6 +78,9 @@ Usage:
       upgrade: that one moves to backups/).
   agentes-server db check [--data <folder>]
       Opens the database and prints what wrote it.
+  agentes-server telemetry [--data <folder>]
+      Prints the next anonymous usage report, exactly, and sends nothing. TELEMETRY=off in the
+      folder's .env turns the report off.
   agentes-server version
   agentes-server service install|uninstall|status [--data <folder>]
       Starts it with this computer: at login on macOS, and from boot on Linux.
@@ -91,6 +99,9 @@ export function nativeFiles(dir: string) {
     backups: join(dir, "backups"),
   };
 }
+
+/** Where a restore builds the new database, and where it waits once complete, before taking `db`'s place. */
+const restoreFolders = (db: string) => ({ building: `${db}.new`, complete: `${db}.restored` });
 
 const ENV_HEADER = `# agentes.chat on this computer, with its database built in (agentes-server). Every value is
 # explained in SELF_HOSTING.md. AGENTES_SECRET encrypts the keys stored in the database: it travels
@@ -132,6 +143,7 @@ async function nativeEnv(dir: string, env: NodeJS.ProcessEnv = process.env) {
   for (const [key, value] of envEntries(readFileSync(files.env, "utf8"))) env[key] ??= value;
   env.PORT ??= String(NATIVE_PORTS.first);
   env.PUBLIC_URL ??= `http://127.0.0.1:${env.PORT}`;
+  env.INSTALL_MODE ??= "native";
   env.WEB_DIR ??= join(PACKAGE, "web");
   env.DATABASE_URL = `pglite://${files.db}`;
   env.FILES_DIR = files.files;
@@ -166,11 +178,18 @@ const fail = (code: number, message: string) => {
   return code;
 };
 
-/** One process per folder; released when this one exits. */
+/**
+ * One process per folder; released when this one exits. Then the folder as the last command left it: a
+ * restore stopped between moving the old database aside and putting the new one in its place is finished.
+ */
 function lockFolder(dir: string): LockResult {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const lock = acquireLock(dir, "server", { file: LOCK_FILE });
-  if (lock.ok) process.once("exit", lock.release);
+  if (!lock.ok) return lock;
+  process.once("exit", lock.release);
+  const { db } = nativeFiles(dir);
+  const { complete } = restoreFolders(db);
+  if (!existsSync(db) && existsSync(complete)) renameSync(complete, db);
   return lock;
 }
 
@@ -179,22 +198,25 @@ const lockedMessage = (dir: string, pid: number) =>
 
 /** `agentes-server [--data <dir>]`: runs until SIGTERM or SIGINT (`startServer` drains and exits). */
 async function run(dir: string): Promise<number> {
+  const files = nativeFiles(dir);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // From the start: a service's own output may go nowhere (launchd), and this says why it stopped.
+  teeLogs(files.log);
   const lock = lockFolder(dir);
   if (!lock.ok) return fail(EXIT.locked, lockedMessage(dir, lock.holder.pid));
-  const files = nativeFiles(dir);
   const { port, publicUrl } = await nativeEnv(dir);
   if (Number.isInteger(port) && (await portTaken(port))) {
     return fail(EXIT.port, `Port ${port} is taken on this computer. Set another PORT in ${files.env}.`);
   }
-  teeLogs(files.log);
-  process.once("exit", () => rmSync(files.ready, { force: true }));
   try {
     await startServer({ edition: "selfhost", ownHostsOnly: true });
   } catch (error) {
     if (error instanceof PgMajorMismatchError) return fail(EXIT.upgrade, error.message);
+    if (error instanceof DatabaseInUseError) return fail(EXIT.locked, error.message);
     if ((error as { code?: string }).code === "EADDRINUSE") return fail(EXIT.port, `Port ${port} is taken.`);
     return fail(EXIT.error, `agentes.chat didn't start: ${error instanceof Error ? error.message : String(error)}`);
   }
+  process.once("exit", () => rmSync(files.ready, { force: true }));
   writeAtomic(
     files.ready,
     `${JSON.stringify({
@@ -237,31 +259,40 @@ async function dump(dir: string, out: string | undefined): Promise<number> {
 
 /**
  * Into a folder with no database yet; or, when its database is another Postgres major's (an upgrade),
- * into `db.new`, which then takes the place of `db` (moved to `backups/`). A database this version can
- * open is never written over.
+ * in its place, the old one moved to `backups/`. A database this version can open is never written over.
+ * The new database is built aside and takes `db`'s place only once complete, so a restore that fails or
+ * stops halfway leaves the folder as it was.
  */
 async function restore(dir: string, input: string): Promise<number> {
   const lock = lockFolder(dir);
   if (!lock.ok) return fail(EXIT.locked, lockedMessage(dir, lock.holder.pid));
   const files = nativeFiles(dir);
-  const text = readFileSync(resolve(input), "utf8");
-  if (isEmptyFolder(files.db)) {
-    await restorePglite(files.db, text);
-    return EXIT.ok;
-  }
-  const old = folderVersion(files.db);
-  if (!old || old.pgMajor === PG_MAJOR) {
+  if (folderVersion(files.db)?.pgMajor === PG_MAJOR) {
     return fail(EXIT.error, `${files.db} already holds a database. Restore into a new folder (--data) instead.`);
   }
-  const next = `${files.db}.new`;
-  // A restore that stopped halfway left only its own copy here.
-  rmSync(next, { recursive: true, force: true });
-  await restorePglite(next, text);
-  mkdirSync(files.backups, { recursive: true, mode: 0o700 });
-  const aside = join(files.backups, `db-pg${old.pgMajor}-${new Date().toISOString().replace(/[:.]/g, "-")}`);
-  renameSync(files.db, aside);
-  renameSync(next, files.db);
-  console.error(`Restored. The previous database is in ${aside}.`);
+  const text = readFileSync(resolve(input), "utf8");
+  const { building, complete } = restoreFolders(files.db);
+  // What a restore that stopped halfway left: its own copies only.
+  for (const leftover of [building, complete]) rmSync(leftover, { recursive: true, force: true });
+  try {
+    await restorePglite(building, text);
+    renameSync(building, complete);
+  } finally {
+    rmSync(building, { recursive: true, force: true });
+    rmSync(folderLockFile(building), { force: true });
+  }
+  if (!isEmptyFolder(files.db)) {
+    mkdirSync(files.backups, { recursive: true, mode: 0o700 });
+    const old = folderVersion(files.db);
+    const aside = join(
+      files.backups,
+      `db-${old ? `pg${old.pgMajor}` : "unknown"}-${new Date().toISOString().replace(/[:.]/g, "-")}`,
+    );
+    renameSync(files.db, aside);
+    console.error(`Restored. The previous database is in ${aside}.`);
+  }
+  rmSync(files.db, { recursive: true, force: true });
+  renameSync(complete, files.db);
   return EXIT.ok;
 }
 
@@ -289,22 +320,50 @@ async function check(dir: string): Promise<number> {
   return EXIT.ok;
 }
 
+/** `agentes-server telemetry`: the next usage report on stdout, as `main.ts telemetry` prints it; sends nothing. */
+async function telemetry(dir: string): Promise<number> {
+  const lock = lockFolder(dir);
+  if (!lock.ok) return fail(EXIT.locked, lockedMessage(dir, lock.holder.pid));
+  if (!folderVersion(nativeFiles(dir).db)) return fail(EXIT.error, `There is no database in ${dir} yet.`);
+  await nativeEnv(dir);
+  const config = loadConfig();
+  const database = createDatabase({ url: config.DATABASE_URL, poolMax: 1 });
+  try {
+    await printTelemetry(database.db, config);
+  } finally {
+    await database.close();
+  }
+  // Once stdout has drained: a piped report arrives whole.
+  await new Promise((done) => process.stdout.write("", done));
+  return EXIT.ok;
+}
+
 /** The server as a background service of the person's own account (never root). */
-function serviceDefinition(dir: string): ServiceDefinition {
+export function serviceDefinition(dir: string, manager: "systemd" | "launchd"): ServiceDefinition {
   return {
     unit: "agentes-server",
     label: "chat.agentes.server",
     description: "agentes.chat",
     program: [join(PACKAGE, "bin", "agentes-server")],
     args: ["--data", dir],
-    env: [],
-    // Stopped on purpose, or a database that needs its upgrade: starting again can't help.
-    finalExits: [EXIT.ok, EXIT.upgrade],
+    env: [[SERVICE_ENV, manager]],
+    // Stopped on purpose, or a database that needs its upgrade: starting again can't help. A folder or a
+    // port in use can free up, so those start again.
+    finalExits: [EXIT.ok, ...FINAL_EXITS],
   };
 }
 
+/** Exit codes after which a service isn't started again. */
+const FINAL_EXITS: number[] = [EXIT.upgrade];
+/** Set in the service's environment: which system starts it. */
+const SERVICE_ENV = "AGENTES_SERVER_SERVICE";
+
+/** launchd starts a service again after any exit but 0, so under it a final exit is 0 (its message is in the log). */
+const serviceExit = (code: number) =>
+  process.env[SERVICE_ENV] === "launchd" && FINAL_EXITS.includes(code) ? EXIT.ok : code;
+
 function service(action: string | undefined, dir: string): number {
-  const d = serviceDefinition(dir);
+  const d = serviceDefinition(dir, process.platform === "darwin" ? "launchd" : "systemd");
   const print = (line: string) => console.log(line);
   if (process.platform !== "linux" && process.platform !== "darwin") {
     return fail(EXIT.error, "agentes-server runs as a service on macOS and Linux.");
@@ -338,7 +397,12 @@ function service(action: string | undefined, dir: string): number {
   return EXIT.ok;
 }
 
+/** What the launcher and the desktop app run (`server/native.js`): the command's exit code. */
 export async function main(argv: string[]): Promise<number> {
+  return serviceExit(await runCommand(argv));
+}
+
+async function runCommand(argv: string[]): Promise<number> {
   let parsed: ReturnType<typeof parseCommand>;
   try {
     parsed = parseCommand(argv);
@@ -359,6 +423,8 @@ export async function main(argv: string[]): Promise<number> {
         return values.in ? await restore(dir, values.in) : fail(EXIT.error, "db restore needs --in <file>.");
       case "db check":
         return await check(dir);
+      case "telemetry":
+        return await telemetry(dir);
       case "version":
         console.log(JSON.stringify({ version, pgMajor: PG_MAJOR, pglite: PGLITE_VERSION }));
         return EXIT.ok;
@@ -371,6 +437,7 @@ export async function main(argv: string[]): Promise<number> {
     }
   } catch (error) {
     if (error instanceof PgMajorMismatchError) return fail(EXIT.upgrade, error.message);
+    if (error instanceof DatabaseInUseError) return fail(EXIT.locked, error.message);
     return fail(EXIT.error, error instanceof Error ? error.message : String(error));
   }
 }

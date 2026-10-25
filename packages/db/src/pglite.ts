@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { Database as SQLite } from "bun:sqlite";
+import fs, { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite, type QueryOptions, type Results, type Transaction } from "@electric-sql/pglite";
+import { NodeFS } from "@electric-sql/pglite/nodefs";
 import { vector } from "@electric-sql/pglite-pgvector";
 import { pgDump } from "@electric-sql/pglite-tools/pg_dump";
 
@@ -76,54 +78,167 @@ function recordFolder(folder: string) {
   renameSync(`${file}.tmp`, file);
 }
 
-const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
-
-async function thenYield<T>(answer: Promise<T>): Promise<T> {
-  try {
-    return await answer;
-  } finally {
-    await nextTurn();
+/** Another process has the folder's database open: two Postgres engines writing one folder corrupt it. */
+export class DatabaseInUseError extends Error {
+  constructor(readonly folder: string) {
+    super(`The database in ${folder} is open in another program. Stop that one first.`);
+    this.name = "DatabaseInUseError";
   }
 }
 
+/** The file beside a database folder whose lock says a process has that database open. */
+export const folderLockFile = (folder: string) => `${folder}.lock`;
+
 /**
- * PGlite answers within the same turn of the event loop, so back-to-back queries (a migration, a busy
- * worker) would hold timers and sockets back until they all end: every query yields a turn once it is
- * done, inside transactions too.
+ * Locks `folder` for this process until the returned function runs, or the process ends however it ends:
+ * the lock is the system's own file lock, which SQLite takes on an empty file for an open write transaction.
+ * The file sits beside the folder, never in it: Postgres opens every file of its folder when it recovers, and
+ * closing any descriptor of a file drops this process's lock on it.
  */
-class YieldingPGlite extends PGlite {
+function lockFolder(folder: string): () => void {
+  const lock = new SQLite(folderLockFile(folder), { create: true });
+  try {
+    // Nothing is ever written: a journal on disk would only be a file a crash leaves behind.
+    lock.exec("PRAGMA journal_mode = MEMORY");
+    lock.exec("BEGIN IMMEDIATE");
+  } catch (error) {
+    lock.close();
+    if ((error as { code?: string }).code === "SQLITE_BUSY") throw new DatabaseInUseError(folder);
+    throw error;
+  }
+  return () => lock.close();
+}
+
+/**
+ * PGlite starts Postgres with fsync off (`-F`), and its Node filesystem has no fsync, so a commit reached the
+ * system's cache with no promise of reaching the disk: a power cut could lose it or leave the folder unopenable.
+ * Here Postgres syncs, through fsync() (PGlite's fdatasync does nothing), and each sync reaches the disk.
+ */
+const DURABLE_START = [...PGlite.defaultStartParams.filter((p) => p !== "-F"), "-c", "wal_sync_method=fsync"];
+
+type EmscriptenOptions = Parameters<NodeFS["init"]>[1];
+type PostgresModule = Parameters<NonNullable<EmscriptenOptions["preRun"]>[number]>[0];
+
+interface NodeStream {
+  nfd?: number;
+  node: unknown;
+}
+
+class DurableNodeFS extends NodeFS {
+  override async init(pg: PGlite, opts: EmscriptenOptions) {
+    const { emscriptenOpts } = await super.init(pg, opts);
+    const addSync = (mod: PostgresModule) => {
+      const nodefs = mod.FS.filesystems.NODEFS as unknown as {
+        stream_ops: { fsync?: (stream: NodeStream) => number };
+        realPath(node: unknown): string;
+        tryFSOperation<T>(run: () => T): T;
+      };
+      nodefs.stream_ops.fsync = (stream) =>
+        nodefs.tryFSOperation(() => {
+          if (stream.nfd !== undefined) {
+            fs.fsyncSync(stream.nfd);
+            return 0;
+          }
+          // A folder (Postgres syncs one after creating or renaming a file in it).
+          const fd = fs.openSync(nodefs.realPath(stream.node), "r");
+          try {
+            fs.fsyncSync(fd);
+          } finally {
+            fs.closeSync(fd);
+          }
+          return 0;
+        });
+    };
+    return { emscriptenOpts: { ...emscriptenOpts, preRun: [...(emscriptenOpts.preRun ?? []), addSync] } };
+  }
+}
+
+const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+/**
+ * The database of one folder. PGlite answers within the same turn of the event loop, and hands its next
+ * waiter the turn at once, so queries queued together (a page's requests, a migration, a busy worker) would
+ * hold timers and sockets back until they all end: each query and transaction starts a turn after the one
+ * before it, and so does each query inside a transaction. Closing it lets another process open the folder.
+ */
+class FolderPGlite extends PGlite {
+  #last: Promise<unknown> = Promise.resolve();
+  #started = false;
+
+  constructor(
+    folder: string,
+    private readonly unlock: () => void,
+  ) {
+    super({ fs: new DurableNodeFS(folder), extensions: { vector }, startParams: DURABLE_START });
+    this.waitReady.then(
+      () => {
+        this.#started = true;
+      },
+      () => undefined,
+    );
+  }
+
+  #inTurn<T>(work: () => Promise<T>): Promise<T> {
+    // While PGlite starts, its own queries (its types) and any made meanwhile run as they come: queued,
+    // an early one would wait for a start that waits for the queries behind it. PGlite holds them all
+    // until it has started.
+    if (!this.#started) return work();
+    const run = this.#last.then(nextTurn).then(work);
+    this.#last = run.catch(() => undefined);
+    return run;
+  }
+
   override query<T>(query: string, params?: unknown[], options?: QueryOptions): Promise<Results<T>> {
-    return thenYield(super.query<T>(query, params, options));
+    return this.#inTurn(() => super.query<T>(query, params, options));
   }
 
   override exec(query: string, options?: QueryOptions): Promise<Results[]> {
-    return thenYield(super.exec(query, options));
+    return this.#inTurn(() => super.exec(query, options));
   }
 
   override transaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
     // The transaction's other members (rollback, closed) stay its own, through the prototype.
-    return super.transaction((tx) =>
-      callback(
-        Object.create(tx, {
-          query: { value: <R>(q: string, p?: unknown[], o?: QueryOptions) => thenYield(tx.query<R>(q, p, o)) },
-          exec: { value: (q: string, o?: QueryOptions) => thenYield(tx.exec(q, o)) },
-        }) as Transaction,
+    return this.#inTurn(() =>
+      super.transaction((tx) =>
+        callback(
+          Object.create(tx, {
+            query: {
+              value: <R>(q: string, p?: unknown[], o?: QueryOptions) => nextTurn().then(() => tx.query<R>(q, p, o)),
+            },
+            exec: { value: (q: string, o?: QueryOptions) => nextTurn().then(() => tx.exec(q, o)) },
+          }) as Transaction,
+        ),
       ),
     );
+  }
+
+  override async close() {
+    try {
+      await super.close();
+    } finally {
+      this.unlock();
+    }
   }
 }
 
 /**
  * Opens the database in `folder`, creating it when the folder is new. Throws `PgMajorMismatchError`
- * before touching anything when the folder holds another Postgres major's files. `ready` resolves
- * once PGlite has started and the folder records what wrote it.
+ * before touching anything when the folder holds another Postgres major's files, and `DatabaseInUseError`
+ * when another process has it open. `ready` resolves once PGlite has started and the folder records what
+ * wrote it.
  */
 export function openPglite(folder: string): { pg: PGlite; ready: Promise<void> } {
   const found = folderVersion(folder);
   if (found && found.pgMajor !== PG_MAJOR) throw new PgMajorMismatchError(folder, found.pgMajor);
   mkdirSync(folder, { recursive: true, mode: 0o700 });
-  const pg = new YieldingPGlite(folder, { extensions: { vector } });
-  return { pg, ready: pg.waitReady.then(() => recordFolder(folder)) };
+  const unlock = lockFolder(folder);
+  try {
+    const pg = new FolderPGlite(folder, unlock);
+    return { pg, ready: pg.waitReady.then(() => recordFolder(folder)) };
+  } catch (error) {
+    unlock();
+    throw error;
+  }
 }
 
 /**

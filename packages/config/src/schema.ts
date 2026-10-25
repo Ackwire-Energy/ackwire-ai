@@ -121,7 +121,7 @@ export const envVars = {
       .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner link's token)")
       .optional(),
     description:
-      "SHA-256 (hex) of the token in the owner link the setup prints. While no account exists, only that link (`/owner#claim=…`) creates the first account, the installation's owner; every other sign-up waits. Unset (an install by hand): the first account to sign up owns the installation.",
+      "SHA-256 (hex) of the token in the owner link an installer prints. While no account exists, only that link (`/owner#claim=…`) creates the first account, the installation's owner; every other sign-up waits. Unset (an install by hand): the first account to sign up owns the installation.",
     section: "Sign-in",
   },
   OWNER_KEY_SHA256: {
@@ -711,7 +711,7 @@ export const envVars = {
   INSTALL_MODE: {
     schema: z.enum(["docker", "native", "desktop"]).optional(),
     description:
-      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it. Unset: `docker` inside a container, else `native`.",
+      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it, and `agentes-server` (no Docker) when it isn't set. Unset: `docker` inside a container, else `native`.",
     section: "Usage report",
   },
   LOG_LEVEL: {

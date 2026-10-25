@@ -2,6 +2,7 @@ import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
+import composeFile from "../../../docker-compose.yml" with { type: "text" };
 import installScript from "../../../install.sh" with { type: "text" };
 import { registerAppLinks } from "./app-links";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
@@ -92,6 +93,7 @@ export interface AppOptions {
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
+ * - `/install/docker-compose.yml` the compose file of this release, which the setup downloads
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -215,6 +217,10 @@ export function createApp(options: AppOptions) {
       c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
     );
   }
+  // The setup downloads it into a folder that has none: this release's, from any instance.
+  app.get("/install/docker-compose.yml", (c) =>
+    c.body(composeFile, 200, { "content-type": "application/yaml; charset=utf-8", "cache-control": "no-store" }),
+  );
 
   if (options.webDir) {
     const assets = serveStatic({ root: options.webDir });

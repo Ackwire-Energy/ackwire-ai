@@ -1,11 +1,12 @@
-import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
+import fs, { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
 import { createDatabase } from "../src/client";
 import {
+  DatabaseInUseError,
   dumpPglite,
   FOLDER_FILE,
   folderVersion,
@@ -94,3 +95,83 @@ test("back-to-back queries leave room for timers", async () => {
   await pg.close();
   expect([outside, inside]).toEqual([true, true]);
 });
+
+test("a query made while the database still starts waits for it, then answers", async () => {
+  const { pg } = openPglite(db);
+  try {
+    expect((await pg.query<{ x: number }>("select 1 as x")).rows).toEqual([{ x: 1 }]);
+  } finally {
+    await pg.close();
+  }
+}, 15_000);
+
+test("queries queued at once still leave room for timers between them", async () => {
+  const { pg, ready } = openPglite(db);
+  await ready;
+  const busy = "select count(*) from generate_series(1, 20000)";
+  let last = performance.now();
+  let longest = 0;
+  const timer = setInterval(() => {
+    const now = performance.now();
+    longest = Math.max(longest, now - last);
+    last = now;
+  }, 1);
+  const start = performance.now();
+  try {
+    // A page's requests, the workers and a run's streaming, all querying at the same moment.
+    await Promise.all(Array.from({ length: 100 }, () => pg.query(busy)));
+  } finally {
+    clearInterval(timer);
+    await pg.close();
+  }
+  expect(longest).toBeLessThan((performance.now() - start) / 4);
+});
+
+test("commits reach the disk: Postgres syncs, and its syncs reach the system", async () => {
+  const { pg, ready } = openPglite(db);
+  const sync = spyOn(fs, "fsyncSync");
+  try {
+    await ready;
+    const { rows } = await pg.query<{ fsync: string; method: string }>(
+      "select current_setting('fsync') as fsync, current_setting('wal_sync_method') as method",
+    );
+    expect(rows[0]).toEqual({ fsync: "on", method: "fsync" });
+    sync.mockClear();
+    await pg.query("update users set name = 'Ana' where id = 'u1'");
+    expect(sync).toHaveBeenCalled();
+  } finally {
+    sync.mockRestore();
+    await pg.close();
+  }
+});
+
+test("one process at a time has a folder's database open, until it stops however it stops", async () => {
+  const first = openPglite(db);
+  await first.ready;
+  // While held, the lock is one empty file beside the folder, and nothing else that a crash would leave.
+  expect(readdirSync(root).filter((name) => name.startsWith("db."))).toEqual(["db.lock"]);
+  expect(() => openPglite(db)).toThrow(DatabaseInUseError);
+  await first.pg.close();
+
+  // Another program holds it, then is killed: the system lets go of its lock with it.
+  const holder = Bun.spawn(
+    [
+      process.execPath,
+      "-e",
+      `const { openPglite } = await import(${JSON.stringify(join(import.meta.dir, "../src/pglite.ts"))});
+       const { ready } = openPglite(${JSON.stringify(db)});
+       await ready;
+       console.log("open");
+       setInterval(() => {}, 1000);`,
+    ],
+    { stdout: "pipe" },
+  );
+  const reader = holder.stdout.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toContain("open");
+  expect(() => openPglite(db)).toThrow(DatabaseInUseError);
+  holder.kill("SIGKILL");
+  await holder.exited;
+  const after = openPglite(db);
+  await after.ready;
+  await after.pg.close();
+}, 30_000);

@@ -259,7 +259,10 @@ const SECRET_DIRS = [
   ".config/gh",
   ".config/gcloud",
 ] as const;
-/** Files that hold tokens, anywhere (a project's `.npmrc` or service account too; Claude Code's own sign-in). */
+/**
+ * Files that hold tokens, anywhere (a project's `.npmrc` or service account too; Claude Code's own sign-in;
+ * beside the server's `.env`, the token of the server's own computer).
+ */
 const SECRET_FILES = [
   ".netrc",
   ".npmrc",
@@ -270,6 +273,7 @@ const SECRET_FILES = [
   "credentials.json",
   ".credentials.json",
   "mcp-token",
+  "host-computer-token",
 ] as const;
 /**
  * Sign-ins by a name too common to refuse everywhere: Codex's own, and what an account folder
