@@ -10,6 +10,8 @@ import {
   usePlatformKey,
   useRemoveCredential,
   useRotateCredential,
+  useServerTelemetry,
+  useSetServerTelemetry,
   useSettings,
   useSkills,
   useStorage,
@@ -367,8 +369,72 @@ function GeneralSection() {
       </Card>
 
       <SettingsTiles />
+      <UsageStatisticsCard />
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
     </>
+  );
+}
+
+/**
+ * The usage report's switch (ADR 0060 §5): the title, the switch and "Ver o que é enviado". Only the
+ * installation's owner gets it (the API answers `null` to everyone else, and on agentes.chat itself).
+ */
+function UsageStatisticsCard() {
+  const { t } = useTranslation();
+  const telemetry = useServerTelemetry();
+  const set = useSetServerTelemetry();
+  const [open, setOpen] = useState(false);
+  const data = telemetry.data;
+  if (!data) return null;
+  return (
+    <Card aria-labelledby="sec-telemetry">
+      <CardHeader
+        id="sec-telemetry"
+        icon="chart"
+        title={t("settings.telemetry.title")}
+        action={
+          <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+            {t("settings.telemetry.see")}
+          </Button>
+        }
+      />
+      <div className="settings-rows">
+        <div className="settings-row">
+          <div className="settings-row__text">
+            <label className="settings-row__label" htmlFor="set-telemetry">
+              {t("settings.telemetry.label")}
+            </label>
+            <span className="settings-row__help" id="set-telemetry-help">
+              {t("settings.telemetry.help")}
+              {data.envOff && ` ${t("settings.telemetry.envOff")}`}
+            </span>
+          </div>
+          <div className="settings-row__control">
+            <Switch
+              id="set-telemetry"
+              checked={data.enabled && !data.envOff}
+              onCheckedChange={(on) => set.mutate(on)}
+              disabled={data.envOff || set.isPending}
+              aria-describedby="set-telemetry-help"
+            />
+          </div>
+        </div>
+      </div>
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t("settings.telemetry.dialogTitle")}
+        description={t("settings.telemetry.dialogText")}
+        closeLabel={t("common.close")}
+        width={560}
+      >
+        <DialogBody>
+          <pre className="md__code" style={{ margin: 0, maxHeight: 420 }}>
+            {JSON.stringify(data.report, null, 2)}
+          </pre>
+        </DialogBody>
+      </Dialog>
+    </Card>
   );
 }
 

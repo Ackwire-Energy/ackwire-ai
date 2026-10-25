@@ -120,6 +120,21 @@ export const useHealth = () => {
   return useQuery({ queryKey: keys.health, queryFn: () => api.system.health(), staleTime: 5 * 60_000 });
 };
 
+/** The usage report's switch: `null` for everyone but the installation's owner. */
+export const useServerTelemetry = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.telemetry, queryFn: () => api.system.telemetry() });
+};
+
+export function useSetServerTelemetry() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.system.setTelemetry(enabled),
+    onSuccess: (telemetry) => qc.setQueryData(keys.telemetry, telemetry),
+  });
+}
+
 export function useCreateOrganization() {
   const api = useApi();
   const qc = useQueryClient();

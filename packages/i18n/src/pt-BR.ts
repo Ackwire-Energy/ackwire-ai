@@ -7143,6 +7143,15 @@ export const ptBR = {
     actionCheck: "Agentes conferem o que o time já fez",
     actionCheckHelp:
       "Antes de mandar e-mail, mensagem ou abrir PR, o agente vê se alguém do time já fez isso com a mesma pessoa ou lugar nos últimos 30 dias, e não repete.",
+    telemetry: {
+      title: "Estatísticas de uso",
+      label: "Enviar estatísticas de uso anônimas ao agentes.chat",
+      help: "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+      envOff: "Desligado nas configurações deste servidor (TELEMETRY=off). Daqui não dá para ligar.",
+      see: "Ver o que é enviado",
+      dialogTitle: "O que é enviado",
+      dialogText: "Uma vez por dia. Este é o próximo envio, exatamente.",
+    },
     tilesTitle: "Tudo da organização",
     tile: {
       members: "Quem está na organização",

@@ -47,6 +47,37 @@ describe("Configurações da organização", () => {
     expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({ actionCheck: false });
   });
 
+  test("usage statistics: the installation's owner gets the switch and sees exactly what is sent", async () => {
+    const { state } = await go(
+      seedState({ telemetry: { enabled: true, envOff: false, report: { report: 1, people: { total: 3 } } } }),
+    );
+    const card = screen().getByRole("region", { name: "Estatísticas de uso" });
+    expect(card.textContent).toContain(
+      "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+    );
+    const toggle = within(card).getByRole("switch", { name: "Enviar estatísticas de uso anônimas ao agentes.chat" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await click(toggle);
+    await settle(4);
+    expect(state.calls.findLast((c) => c.method === "system.setTelemetry")?.args).toEqual([false]);
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    await click(within(card).getByRole("button", { name: "Ver o que é enviado" }));
+    const dialog = screen().getByRole("dialog", { name: "O que é enviado" });
+    expect(dialog.textContent).toContain('"total": 3');
+  });
+
+  test("usage statistics: with TELEMETRY=off the switch is off and the card says why; others never see it", async () => {
+    await go(seedState({ telemetry: { enabled: true, envOff: true, report: { report: 1 } } }));
+    const card = screen().getByRole("region", { name: "Estatísticas de uso" });
+    const toggle = within(card).getByRole("switch", { name: "Enviar estatísticas de uso anônimas ao agentes.chat" });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(toggle.hasAttribute("disabled")).toBe(true);
+    expect(card.textContent).toContain("Desligado nas configurações deste servidor (TELEMETRY=off).");
+    cleanup();
+    await go();
+    expect(screen().queryByRole("region", { name: "Estatísticas de uso" })).toBeNull();
+  });
+
   test("connected connectors are listed; disconnect asks first", async () => {
     const { state } = await go(seedState(), "settings/connectors");
     const section = screen().getByRole("region", { name: "Conectores" });
