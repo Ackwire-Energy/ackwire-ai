@@ -118,7 +118,7 @@ async function firstFreePort(): Promise<number> {
  * under whatever the environment already sets, then what native mode is: the database and the files
  * in the folder, and only this computer's loopback.
  */
-export async function nativeEnv(dir: string, env: NodeJS.ProcessEnv = process.env) {
+async function nativeEnv(dir: string, env: NodeJS.ProcessEnv = process.env) {
   const files = nativeFiles(dir);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   chmodSync(dir, 0o700);

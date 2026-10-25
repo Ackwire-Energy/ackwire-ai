@@ -218,6 +218,7 @@ export async function isSignupAllowed(
   /** The token of an org invite link the person is signing up from. */
   inviteToken?: string | null,
 ) {
+  if (policy.allowSignup && !policy.ownerByLink) return true;
   if ((await countUsers(db)) === 0) return !policy.ownerByLink;
   if (policy.allowSignup) return true;
   if (inviteToken) {
