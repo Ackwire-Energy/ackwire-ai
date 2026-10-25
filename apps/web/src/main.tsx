@@ -59,8 +59,8 @@ const router = createRouter({
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
-  // Page changes cross-fade where the browser has the View Transitions API (CSS fallback in layout.css).
-  defaultViewTransition: true,
+  // No View Transitions: they freeze the whole page while the next one renders (the sidebar's pill
+  // stalled mid-slide). Each page's main fades in on mount instead (layout.css).
 });
 
 declare module "@tanstack/react-router" {

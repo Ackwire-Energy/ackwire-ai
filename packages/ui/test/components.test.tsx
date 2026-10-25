@@ -113,7 +113,7 @@ describe("Avatar", () => {
 });
 
 describe("Chip", () => {
-  test("always renders its icon with the word", () => {
+  test("a state renders its icon with the word", () => {
     const { container } = render(
       <Chip icon="waiting" tone="waiting">
         Aguardando você
@@ -123,6 +123,13 @@ describe("Chip", () => {
     expect(chip?.className).toBe("ac-chip ac-chip--waiting");
     expect(chip?.querySelector("svg.ac-icon")).not.toBeNull();
     expect(chip?.textContent).toBe("Aguardando você");
+  });
+
+  test("a value goes without an icon, same shape", () => {
+    const { container } = render(<Chip>Issue: ACME-177</Chip>);
+    const chip = container.querySelector(".ac-chip");
+    expect(chip?.querySelector("svg")).toBeNull();
+    expect(chip?.textContent).toBe("Issue: ACME-177");
   });
 });
 

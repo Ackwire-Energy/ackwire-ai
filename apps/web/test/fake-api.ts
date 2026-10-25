@@ -1136,6 +1136,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             : {}),
           tokensThisMonth: agentId === ADA_ID ? 3_100_000 : 210_000,
           runsThisMonth: agentId === ADA_ID ? 142 : 12,
+          failuresThisMonth: agentId === ADA_ID ? 2 : 0,
+          runsByDay:
+            agentId === ADA_ID
+              ? [
+                  { day: 1, runs: 70, failed: 1 },
+                  { day: 2, runs: 72, failed: 1 },
+                ]
+              : [{ day: 1, runs: 12, failed: 0 }],
           pendingApprovals: state.approvals.filter((x) => x.agentId === agentId && x.status === "pending").length,
           channels,
         };
