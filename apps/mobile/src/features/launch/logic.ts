@@ -1,7 +1,7 @@
 import { idlePose, mixHex, type Pose } from "@agenteschat/ui/agent/engine";
 
 /**
- * The launch splash (telas/SplashApp.html, B · Céu sobe): pure pieces the screen and the tests share. No React
+ * The launch splash: pure pieces the screen and the tests share. No React
  * Native imports. Times in seconds.
  */
 export const LAUNCH = {
@@ -99,5 +99,12 @@ export function launchSkyTones(bg: string, dark: boolean): string[] {
       mixHex(bg, "#2b74e6", 0.48),
       mixHex(bg, "#4b93ff", 0.66),
     ];
-  return [bg, mixHex(bg, "#a6cfff", 0.22), mixHex(bg, "#a6cfff", 0.48), mixHex(bg, "#a6cfff", 0.78), "#a6cfff", "#78b4ff"];
+  return [
+    bg,
+    mixHex(bg, "#a6cfff", 0.22),
+    mixHex(bg, "#a6cfff", 0.48),
+    mixHex(bg, "#a6cfff", 0.78),
+    "#a6cfff",
+    "#78b4ff",
+  ];
 }

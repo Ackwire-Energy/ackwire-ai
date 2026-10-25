@@ -97,9 +97,7 @@ function Gate() {
       {ready && signedIn && org.none && !accepting ? <OnboardingFlow /> : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
       {org.state && suspended ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
-      {launching ? (
-        <LaunchSplash ready={ready} fontsReady={fontsReady} onShown={hideNative} onDone={launched} />
-      ) : null}
+      {launching ? <LaunchSplash ready={ready} fontsReady={fontsReady} onShown={hideNative} onDone={launched} /> : null}
     </NavigationThemeProvider>
   );
 }
