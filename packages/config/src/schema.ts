@@ -77,9 +77,14 @@ export const envVars = {
     section: "Server",
   },
   DATABASE_URL: {
-    schema: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
+    schema: z
+      .string()
+      .regex(
+        /^(postgres(ql)?:\/\/|pglite:\/\/\/)/,
+        "must be a postgres:// or postgresql:// URL, or pglite:/// and an absolute folder",
+      ),
     description:
-      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS.",
+      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS. Native mode (`agentes-server`, no Docker) sets it to `pglite:///<folder>`: the database built into the server, in that folder, for one process.",
     section: "Database",
     example: "postgres://agenteschat:password@db.example.com:5432/agenteschat?sslmode=require",
     secret: true,
@@ -627,7 +632,7 @@ export const envVars = {
   DESKTOP_RELEASES_TOKEN: {
     schema: z.string().optional(),
     description:
-      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`). Unset: those endpoints answer 404.",
+      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases and the server's. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`), and the packages that run agentes.chat without Docker from the latest `v*` one (`/api/native/latest`, `/api/native/download/...`). Unset: those endpoints answer 404.",
     section: "Sandbox",
     secret: true,
   },
@@ -636,7 +641,8 @@ export const envVars = {
       .string()
       .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
       .default("agentes-chat/agentes.chat"),
-    description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
+    description:
+      "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app, and `v<version>` the packages without Docker.",
     section: "Sandbox",
   },
   OPERATOR_API_TOKEN: {

@@ -12,6 +12,7 @@ import {
   createImapPoller,
   createLogEmailSender,
   createMemoryPresence,
+  createMemoryPubSub,
   createMemoryRateLimiter,
   createMillionSendSender,
   createPostgresBlobStore,
@@ -64,6 +65,12 @@ const RUN_DRAIN_MS = 20_000;
 export interface StartOptions {
   edition: Edition;
   modules?: AgentesModule[];
+  /**
+   * Answer only requests addressed to this server's own names (`127.0.0.1:<PORT>`, `localhost:<PORT>`
+   * and `PUBLIC_URL`'s host), with a 421 for any other: native mode listens on loopback, where a web
+   * page that points a name of its own at 127.0.0.1 (DNS rebinding) would otherwise reach it.
+   */
+  ownHostsOnly?: boolean;
 }
 
 /**
@@ -72,7 +79,7 @@ export interface StartOptions {
  * Shared by the self-hosted entrypoint (`src/main.ts`) and any entrypoint
  * that adds public modules (ADR 0002); only `modules` differ.
  */
-export async function startServer({ edition, modules = [] }: StartOptions) {
+export async function startServer({ edition, modules = [], ownHostsOnly = false }: StartOptions) {
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
@@ -103,7 +110,8 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
 
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
-    pubsub: await createPostgresPubSub(postgresJsNotifier(database.client)),
+    // PGlite (native mode) is one process: nothing to tell other replicas.
+    pubsub: database.client ? await createPostgresPubSub(postgresJsNotifier(database.client)) : createMemoryPubSub(),
     presence: createMemoryPresence(),
     rateLimiter: createMemoryRateLimiter(),
     keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
@@ -214,13 +222,19 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     browserLive: engine.browserLive,
     streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
+  const ownHosts = ownHostsOnly
+    ? new Set([`127.0.0.1:${config.PORT}`, `localhost:${config.PORT}`, new URL(config.PUBLIC_URL).host])
+    : null;
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
     port: config.PORT,
     // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
     // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
     idleTimeout: 120,
-    fetch: (req, srv) => realtime.fetch(req, srv, (r) => app.fetch(r)),
+    fetch: (req, srv) =>
+      ownHosts && !ownHosts.has(req.headers.get("host") ?? "")
+        ? new Response("This server answers only at its own address.\n", { status: 421 })
+        : realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });

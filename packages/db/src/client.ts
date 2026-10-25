@@ -1,16 +1,19 @@
 import { resolve } from "node:path";
 import { sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { assertMigrationsMatch } from "./migration-guard";
+import { openPglite, pgliteFolder } from "./pglite";
 import * as schema from "./schema";
 import { tracingLogger } from "./trace";
 
 /**
- * Driver-agnostic database handle. Production uses postgres.js; tests use an
- * in-memory PGlite instance (see `test/pglite.ts`). Code outside this package
+ * Driver-agnostic database handle. A Postgres server goes through postgres.js; native mode
+ * (`pglite:///folder`) and the tests (`test/pglite.ts`) through PGlite. Code outside this package
  * should depend on this type, never on a specific driver.
  */
 export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
@@ -31,7 +34,25 @@ export interface DatabaseOptions {
   poolMax: number;
 }
 
-export function createDatabase(options: DatabaseOptions) {
+export interface DatabaseHandle {
+  db: Database;
+  /** The postgres.js client, for LISTEN/NOTIFY (see `@agenteschat/adapters`); null on PGlite (one process). */
+  client: postgres.Sql | null;
+  /**
+   * Applies pending migrations, after checking that the applied ones are
+   * exactly this build's (`assertMigrationsMatch`). Safe to run
+   * concurrently on a server: drizzle takes an advisory lock.
+   */
+  migrate: () => Promise<void>;
+  /** Cheap connectivity check for health endpoints. */
+  ping: () => Promise<void>;
+  close: () => Promise<void>;
+}
+
+/** A Postgres server for a `postgres://` URL, the built-in database for `pglite:///folder` (`pglite.ts`). */
+export function createDatabase(options: DatabaseOptions): DatabaseHandle {
+  const folder = pgliteFolder(options.url);
+  if (folder) return createPgliteDatabase(folder);
   const client = postgres(options.url, {
     max: options.poolMax,
     // Silence "relation already exists, skipping" notices from migrations.
@@ -40,18 +61,11 @@ export function createDatabase(options: DatabaseOptions) {
   const db = drizzle(client, { schema, casing: "snake_case", logger: tracingLogger });
   return {
     db: db as unknown as Database,
-    /** Raw postgres.js client, for LISTEN/NOTIFY (see `@agenteschat/adapters`). */
     client,
-    /**
-     * Applies pending migrations, after checking that the applied ones are
-     * exactly this build's (`assertMigrationsMatch`). Safe to run
-     * concurrently: drizzle takes an advisory lock.
-     */
     migrate: async () => {
       await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
       await migrate(db, { migrationsFolder });
     },
-    /** Cheap connectivity check for health endpoints. */
     ping: async () => {
       await client`select 1`;
     },
@@ -59,7 +73,27 @@ export function createDatabase(options: DatabaseOptions) {
   };
 }
 
-export type DatabaseHandle = ReturnType<typeof createDatabase>;
+function createPgliteDatabase(folder: string): DatabaseHandle {
+  const { pg, ready } = openPglite(folder);
+  const db = drizzlePglite(pg, { schema, casing: "snake_case", logger: tracingLogger });
+  return {
+    db: db as unknown as Database,
+    client: null,
+    migrate: async () => {
+      await ready;
+      await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
+      await migratePglite(db, { migrationsFolder });
+    },
+    ping: async () => {
+      await ready;
+      await pg.query("select 1");
+    },
+    close: async () => {
+      await ready.catch(() => {});
+      await pg.close();
+    },
+  };
+}
 
 /**
  * Creates monthly `messages` partitions for the current month and the next
