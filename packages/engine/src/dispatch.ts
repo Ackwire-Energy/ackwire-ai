@@ -76,7 +76,7 @@ export async function startOrJoinRun(
     // Several runs may be active (in the agents' DM one per person behind them; elsewhere a person's run
     // next to an unattended one, or one held by a decision): the message joins the newest it may
     // (`mayJoin`). A run waiting on an approval, a secret or a mission's decision takes nothing new
-    // (`holdsMessages`, D97): the agent answers this in a run of its own meanwhile.
+    // (`holdsMessages`): the agent answers this in a run of its own meanwhile.
     const active = await tx
       .select({
         id: agentRuns.id,
@@ -104,7 +104,11 @@ export async function startOrJoinRun(
       .orderBy(sql`${agentRuns.createdAt} desc`)
       .limit(10);
     for (const run of active) {
-      if (run.triggerMessageId === message.id || (await holdsMessages(tx, run)) || !(await mayJoin(tx, message, run.id)))
+      if (
+        run.triggerMessageId === message.id ||
+        (await holdsMessages(tx, run)) ||
+        !(await mayJoin(tx, message, run.id))
+      )
         continue;
       if (await queueOnRun(tx, run.id, message.id)) return { joined: run.id };
       break;

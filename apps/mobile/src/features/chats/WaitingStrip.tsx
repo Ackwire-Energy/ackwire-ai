@@ -99,12 +99,7 @@ export function WaitingStrip({
       >
         {open ? (
           <Animated.View key="card" {...fade}>
-            <WaitingCard
-              item={first}
-              rest={stack.rest}
-              faces={stack.faces}
-              stacked={stack.stacked}
-            />
+            <WaitingCard item={first} rest={stack.rest} faces={stack.faces} stacked={stack.stacked} />
           </Animated.View>
         ) : (
           <Animated.View key="pill" {...fade}>

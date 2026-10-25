@@ -164,7 +164,7 @@ export async function deliverNoticeToRun(
     .where(eq(agentRuns.id, run.id))
     .for("update");
   // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
-  // notice wakes the agent in a run of its own instead (D97).
+  // notice wakes the agent in a run of its own instead.
   const active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
   const delivered = await deliverNotice(tx, {
     orgId: run.orgId,
