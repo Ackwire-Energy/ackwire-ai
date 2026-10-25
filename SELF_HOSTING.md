@@ -403,14 +403,24 @@ will do it with `install.sh --native`. By hand, from a release package, below.
   (`FILES_DIR`), the settings in `.env`, the log in `logs/server.log`. Jobs already live in the
   database, and live updates run in memory.
 - **Its limits:** one process, which answers queries one at a time, for a person or a small team,
-  while that computer is on. It takes about 0.5 to 1 GB of memory. For a bigger team or a server
-  that's always on, use the one-command install with Docker and full Postgres. Moving there later is
-  a dump and a restore (below).
+  while that computer is on. It takes about 0.5 to 1 GB of memory. Each change reaches the disk before
+  it's confirmed, as with Postgres, but nothing makes backups for you: copy the folder now and then,
+  with it stopped (Backing up, below). Moving the database or upgrading it takes memory of about ten
+  times its size (`du -sh ~/.agentes/db`): with 8 GB, up to about 500 MB. For a bigger team or a
+  server that's always on, use the one-command install with Docker and full Postgres. Moving there
+  later is a dump and a restore (below).
 
-It listens on this computer only (`127.0.0.1`), and answers only at its own address. To reach it from
-your phone or a teammate's computer, put it on your tailnet with `tailscale serve` (on this computer:
+It listens on this computer only (`127.0.0.1`), and answers only at its own address (opened as
+`localhost`, it sends the browser there). To reach it from your phone or a teammate's computer, put it
+on your tailnet with `tailscale serve` (on this computer:
 `tailscale serve --bg --https=443 http://127.0.0.1:4310`) and set `PUBLIC_URL` in `~/.agentes/.env` to
 the `https://…ts.net` address it prints, then start it again.
+
+**Usage statistics.** Like any self-hosted install, it sends agentes.chat an anonymous usage report
+once a day (Optional services and what they receive lists every field in it). To turn it off, put
+`TELEMETRY=off` in `~/.agentes/.env` and start it again, or use the switch in **Settings → General →
+Usage statistics**. `agentes-server telemetry` prints the next report and sends nothing (with the
+server stopped; while it runs, **See what is sent** there shows the same).
 
 **By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
 (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
@@ -435,22 +445,37 @@ them unreadable.
 | `agentes-server service install` | Starts it with this computer: at login on macOS (launchd), from boot on Linux (a systemd user unit, kept after you log out). `uninstall` and `status` too. |
 | `agentes-server migrate` | Updates the database to this version, then exits (every start does it too). |
 | `agentes-server db dump --out agentes.sql` | The whole database as SQL. |
-| `agentes-server db restore --in agentes.sql` | A dump into a folder with no database yet. |
+| `agentes-server db restore --in agentes.sql` | A dump into a folder with no database yet (or the upgrade, below). If it fails, the folder stays as it was. |
 | `agentes-server db check` | Opens the database and prints what wrote it. |
+| `agentes-server telemetry` | Prints the next usage report, exactly, and sends nothing. |
 | `agentes-server version` | Its version, and its PGlite's and Postgres's. |
 
-When it stops at once, its exit code says why: 3, another `agentes-server` uses that folder (the
-message names its process); 4, the database needs an upgrade (below); 5, another program uses the
-port (set `PORT` in `.env`).
+When it stops at once, its exit code says why: 3, another `agentes-server` (or another program) uses
+that folder (the message names its process); 4, the database needs an upgrade (below); 5, another
+program uses the port (set `PORT` in `.env`). Its log, `~/.agentes/logs/server.log`, says it too.
 
-**Upgrading** is extracting the new version beside the old one and starting it on the same folder.
-When a version moves PGlite to a new Postgres major (its release notes say so), the new one refuses
-the old folder with exit 4 until it is upgraded, with the server stopped: `db dump` with the old
-version, then `db restore` with the new one, which keeps the old database in `backups/`:
+**Backing up.** Stop it (Ctrl-C, or `agentes-server service uninstall`), copy the whole folder
+(`~/.agentes`, with the `AGENTES_SECRET` of its `.env`, which the keys stored in the database need),
+then start it again (`service install`). To restore, put the folder back. A dump (`db dump`) is the
+other way, for moving the data elsewhere; it holds the database, without `files/` or `.env`.
+
+**Upgrading** is extracting the new version beside the old one, then running its `service install`
+once, so the service starts the new version (by hand, start the new one on the same folder):
 
 ```sh
+~/.agentes/app/1.5.0/bin/agentes-server service install --data ~/.agentes
+```
+
+When a version moves PGlite to a new Postgres major (its release notes say so), the new one refuses
+the old folder with exit 4 until it is upgraded, with the server stopped: `db dump` with the old
+version, then `db restore` with the new one, which keeps the old database in `backups/`, then the new
+version's `service install`:
+
+```sh
+~/.agentes/app/1.4.0/bin/agentes-server service uninstall
 ~/.agentes/app/1.4.0/bin/agentes-server db dump --data ~/.agentes --out ~/agentes-upgrade.sql
 ~/.agentes/app/1.5.0/bin/agentes-server db restore --data ~/.agentes --in ~/agentes-upgrade.sql
+~/.agentes/app/1.5.0/bin/agentes-server service install --data ~/.agentes
 ```
 
 **Moving to Docker.** The dump restores into the Docker install's Postgres 18:
@@ -462,8 +487,10 @@ version, then `db restore` with the new one, which keeps the old database in `ba
    database, `docker compose up -d postgres`.
 3. Restore into it, still empty:
    `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.
-4. Start the app, `docker compose up -d`, and copy the uploaded files into its volume:
-   `docker compose cp ~/.agentes/files/. agentes:/data/files/`. Sign in as before.
+4. Start the app, `docker compose up -d`, copy the uploaded files into its volume, and give them to
+   the app's user (the copy arrives as root's):
+   `docker compose cp ~/.agentes/files/. agentes:/data/files/`, then
+   `docker compose exec -u root agentes chown -R bun:bun /data/files`. Sign in as before.
 
 </details>
 
@@ -612,12 +639,12 @@ about 2.5 hours, then dropped: the next day's report replaces it. These are all 
 
 It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
 workspaces, people or computers (the request itself comes from your server's address, as any request
-does). `docker compose run --rm agentes telemetry` prints exactly the next
-report, whether it is on or off, and sends nothing; in the app, **Settings → General → Usage
-statistics → See what is sent** shows the same. Turn it off either way:
+does). `docker compose run --rm agentes telemetry` (without Docker, `agentes-server telemetry`) prints
+exactly the next report, whether it is on or off, and sends nothing; in the app, **Settings → General →
+Usage statistics → See what is sent** shows the same. Turn it off either way:
 
-- `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts). This wins
-  over the switch below.
+- `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts); without
+  Docker, in `~/.agentes/.env`, then start it again. This wins over the switch below.
 - The switch in **Settings → General → Usage statistics**. Only the installation's first account (the
   person who set it up) sees it.
 
