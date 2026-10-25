@@ -109,6 +109,14 @@ option of the setup passes through (`--network local`, `--email skip`):
 curl -fsSL https://agentes.chat/install | sh -s -- --plan
 ```
 
+That's the installer's own plan: it runs nothing, not even the setup, so it can't show what the setup
+would do. The setup's plan comes from the setup, with the Bun the installer leaves in its folder (no
+Node.js needed), once the installer has run:
+
+```sh
+cd /opt/agentes && .runtime/bun x --bun @agenteschat/setup --dry-run    # ~/agentes when not root
+```
+
 Without a terminal (cloud-init, a CI job) nothing is asked: the setup takes its defaults and the
 options given, and Docker is installed only with `--yes`.
 
@@ -228,7 +236,10 @@ AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' npx -y @agenteschat/setup --netwo
 No Node.js or Docker on the server? As root, the installer gets what's missing and then runs the
 same setup: give it `--yes` and the same options. Its own lines go to stderr, so stdout is still
 the setup's JSON; a failure before the setup starts is a line on stderr and exit code 1. Its
-`--plan` (`--dry-run` too) prints the installer's plan and runs nothing, not even the setup.
+`--plan` (`--dry-run` too) prints the installer's plan and runs nothing, not even the setup. The
+setup's plan as JSON comes from the setup itself, with `--dry-run --json`: through `npx`, or on a
+server the installer set up, with its Bun, `.runtime/bun x --bun @agenteschat/setup --dry-run --json`
+in its folder.
 
 ```sh
 curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' sh -s -- --yes --network tailscale --email skip --json

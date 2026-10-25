@@ -12,8 +12,16 @@ npx @agenteschat/setup --help     # every option
 ```
 
 It needs Node.js 18 or newer, and Docker with Compose 2.23.1 or newer. Neither on the server?
-`curl -fsSL https://agentes.chat/install | sh` installs what's missing and runs this setup. The
-same setup also ships in the app's image:
+`curl -fsSL https://agentes.chat/install | sh` installs what's missing and runs this setup with
+Bun, no Node.js needed (a Bun of its own in the setup's folder, when the computer has none). The
+installer's `--plan` (`--dry-run` too) is its own plan and doesn't run the setup; once it has run,
+its Bun prints the setup's plan:
+
+```sh
+cd /opt/agentes && .runtime/bun x --bun @agenteschat/setup --dry-run   # ~/agentes when not root
+```
+
+The same setup also ships in the app's image:
 
 ```sh
 docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup
