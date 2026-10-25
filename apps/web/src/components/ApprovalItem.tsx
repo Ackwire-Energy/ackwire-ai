@@ -16,10 +16,14 @@ import { EmailLetter } from "@/components/EmailLetter";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
 import { useOrg } from "./org-context";
 
-export { type ApprovalAction, approvalAction, approvalRisk, approvalTraits };
-
 // Its title, what it wants to do, whether it only looks and its values: the phone's own rules too.
-export { approvalDoing, approvalReadsOnly, approvalTitle, approvalValues } from "@agenteschat/client/lib/approval-words";
+export {
+  approvalDoing,
+  approvalReadsOnly,
+  approvalTitle,
+  approvalValues,
+} from "@agenteschat/client/lib/approval-words";
+export { type ApprovalAction, approvalAction, approvalRisk, approvalTraits };
 
 /** "Aprovado por você · agora" / "Recusado por João · ontem 18:02" / "Expirou · ontem". */
 export function decisionLabel(

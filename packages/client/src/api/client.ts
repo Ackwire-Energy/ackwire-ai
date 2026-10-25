@@ -93,7 +93,7 @@ import type {
   MachineOutages,
   MachineTask,
   MailAccount,
-  MailActionName,
+  MailAccountUpdate,
   MailFolder,
   MailImapInput,
   MailProviders,
@@ -984,12 +984,10 @@ export interface ApiClient {
       orgId: string,
       input: { provider: "gmail" | "outlook"; label?: string },
     ): Promise<{ accountId: string; redirectUrl: string }>;
-    /** A new name, or a new app password (reconnects an IMAP mailbox). */
-    update(
-      orgId: string,
-      accountId: string,
-      input: { label?: string; password?: string; offActions?: MailActionName[]; askActions?: MailActionName[] },
-    ): Promise<MailAccount>;
+    /** A new name, actions, other addresses and the default From, or a new app password (reconnects an IMAP mailbox). */
+    update(orgId: string, accountId: string, input: MailAccountUpdate): Promise<MailAccount>;
+    /** Addresses the mailbox has sent from (its sent folder), offered as its other addresses. */
+    suggestedAddresses(orgId: string, accountId: string): Promise<string[]>;
     disconnect(orgId: string, accountId: string): Promise<void>;
     folders(orgId: string, accountId: string): Promise<MailFolder[]>;
     /** An agent's access and rules per mailbox. */
