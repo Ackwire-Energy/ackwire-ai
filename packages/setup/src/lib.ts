@@ -20,6 +20,8 @@ export const DEFAULT_TIMEOUT_S = 300;
 export const DEFAULT_EMAIL_API_URL = "https://api.millionsend.com";
 /** The names Compose looks for, in the order it prefers them: the setup reads the file Compose runs. */
 export const COMPOSE_FILES = ["compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"] as const;
+/** Whether a download is a compose file, not a web page or an error some server sent instead. */
+export const isComposeFile = (text: string) => /^services:/m.test(text);
 
 /** Tailscale admin console pages the steps send people to. */
 export const TS = {
@@ -617,6 +619,17 @@ export function telemetryOf(content: string | null): OnOff | null {
   return on === null ? null : on ? "on" : "off";
 }
 
+/**
+ * The usage statistics: the flag, else what .env says, else the person's answer, yes by default (`ask`:
+ * no flag and nothing in .env, so a terminal asks). Either answer goes into .env, so a run again keeps
+ * it and asks nothing.
+ */
+export function decideTelemetry(p: { flag?: OnOff; content: string | null; answer?: boolean }) {
+  const now = telemetryOf(p.content);
+  const value: OnOff = p.flag ?? now ?? (p.answer === false ? "off" : "on");
+  return { ask: !p.flag && !now, value, kept: value === now, entries: value === now ? {} : { TELEMETRY: value } };
+}
+
 // ── The agents' computer ────────────────────────────────────────────────────
 
 /** Beside .env: the service that runs agents here reads HOST_COMPUTER_TOKEN from it, never from its own command line. */
@@ -632,13 +645,17 @@ export interface ThisMachine {
   root: boolean;
   /** Whether systemd runs it: on Linux the agents' computer is a systemd unit. */
   systemd: boolean;
+  /** Whether apt-get is here: the computers' installer installs the screens' and browsers' packages with it. */
+  apt: boolean;
+  /** Whether it's already connected to an agentes.chat as a computer (`connectedConfig`). */
+  connected: boolean;
 }
 
 export type ComputerOffer = { mac: boolean; yes: boolean; why: string | null } | { problem: Problem };
 
 /**
  * Whether this machine can be its agents' computer, and the answer when nobody gives one: yes, except on
- * a Linux machine too small for agents' screens, which `why` says.
+ * a Linux machine too small for agents' screens or without apt-get for their packages, which `why` says.
  */
 export function computerOffer(machine: ThisMachine, content: string | null, image: boolean): ComputerOffer {
   const no = (error: string, fix: string): ComputerOffer => ({ problem: { check: "computer", error, fix } });
@@ -655,24 +672,49 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
       `Set ALLOW_SIGNUP=false in .env, or ${later}.`,
     );
   }
-  if (machine.platform === "darwin") return { mac: true, yes: true, why: null };
-  if (machine.platform !== "linux") return no("The agents' computer runs on Linux or a Mac.", `So ${later}.`);
-  if (!machine.root) {
+  const mac = machine.platform === "darwin";
+  if (!mac && machine.platform !== "linux") return no("The agents' computer runs on Linux or a Mac.", `So ${later}.`);
+  if (!mac && !machine.root) {
     return no(
       "Each agent gets a user of its own on this machine, which needs root.",
       `Run the setup as root, or ${later}.`,
     );
   }
-  if (!machine.systemd) {
+  if (!mac && !machine.systemd) {
     return no("The agents' computer runs as a system service, and systemd isn't running here.", `So ${later}.`);
   }
-  if (machine.memory >= COMPUTER_MIN_MEMORY) return { mac: false, yes: true, why: null };
+  if (machine.connected) {
+    // Its service would be replaced, and the server it's connected to would lose this computer.
+    return no(
+      "This machine is already connected to agentes.chat as a computer, so it can't also be this server's own.",
+      `Its connection stays as it is. So ${later}.`,
+    );
+  }
+  if (mac) return { mac, yes: true, why: null };
+  if (!machine.apt) {
+    return {
+      mac,
+      yes: false,
+      why: "This machine has no apt-get, so the packages agents' screens and browsers need would be yours to install.",
+    };
+  }
+  if (machine.memory >= COMPUTER_MIN_MEMORY) return { mac, yes: true, why: null };
   const gb = Number((machine.memory / 1024 ** 3).toFixed(1));
   return {
-    mac: false,
+    mac,
     yes: false,
     why: `This machine has ${gb} GB of memory; each agent's screen needs about 0.2 GB and its browser 0.6 GB more.`,
   };
+}
+
+/** Whether a runner's config.json is a connected computer's: it has a token (the computers' installer checks the same). */
+export function connectedConfig(text: string | null): boolean {
+  try {
+    const token = (JSON.parse(text ?? "null") as { token?: unknown } | null)?.token;
+    return typeof token === "string" && token !== "";
+  } catch {
+    return false;
+  }
 }
 
 /** What .env says: on (a token), off (answered no: the key, empty, which the server reads as unset), or never asked. */
@@ -681,29 +723,41 @@ export function computerOf(content: string | null): OnOff | null {
   return token === null ? null : token ? "on" : "off";
 }
 
+/**
+ * Where this machine reaches agentes.chat: the address the compose file publishes it on (`BIND_ADDRESS`,
+ * `HOST_PORT`), loopback when that's every address. Root runs the installer that answers there.
+ */
+export function appOnThisMachine(content: string | null): string {
+  const bind = envValue(content, "BIND_ADDRESS") || "127.0.0.1";
+  const host = bind === "0.0.0.0" || bind === "[::]" ? "127.0.0.1" : bind;
+  return `http://${host}:${envValue(content, "HOST_PORT") || "3000"}`;
+}
+
 export interface ComputerInstall {
+  /** Where this machine reaches agentes.chat. */
+  server: string;
   script: string;
   args: string[];
 }
 
 /**
- * The server's own installer for computers, run on this machine once agentes.chat answers. It reaches
- * the server on loopback: this machine may not reach the address people use (a tailnet name served from
- * a container). On Linux each agent gets a user and a screen; on a Mac agents work as the person.
+ * The server's own installer for computers, run on this machine once agentes.chat answers, from where
+ * this machine reaches it (`appOnThisMachine`): it may not reach the address people use (a tailnet name
+ * served from a container). On Linux each agent gets a user and a screen; on a Mac agents work as the person.
  */
 export function computerInstall(p: {
   mac: boolean;
-  port: string;
+  server: string;
   tokenFile: string;
   commands: boolean;
 }): ComputerInstall {
-  const server = `http://127.0.0.1:${p.port}`;
   return {
-    script: `${server}/api/machines/install.sh`,
+    server: p.server,
+    script: `${p.server}/api/machines/install.sh`,
     args: [
       ...(p.mac ? [] : ["--system", "--desktop"]),
       "--server",
-      server,
+      p.server,
       "--host-token-file",
       p.tokenFile,
       ...(p.commands ? [] : ["--no-exec"]),
@@ -713,6 +767,130 @@ export function computerInstall(p: {
 
 export const computerCommand = (install: ComputerInstall) =>
   `curl -fsSL ${install.script} | sh -s -- ${install.args.map(quoteEnvValue).join(" ")}`;
+
+/** What the run does about the agents' computer (a dry run takes the answers' defaults). */
+export type ComputerPlan =
+  | {
+      state: "on";
+      mac: boolean;
+      commands: boolean;
+      install: ComputerInstall;
+      /** On before this run, and nothing asked to change it: set up again only when it needs to be. */
+      kept: boolean;
+    }
+  /** `wasOn`: this run turns it off. */
+  | { state: "off"; wasOn: boolean }
+  | { state: "skipped"; why: string };
+
+export type ComputerDecision =
+  | { ask: "computer" | "commands"; yes: boolean }
+  | { plan: ComputerPlan; entries: Record<string, string> }
+  | { problem: Problem };
+
+/**
+ * The agents' computer, from the flags, what .env says, what's installed and the person's answers so far:
+ * the next question to ask with its default, or the plan and what .env gets. .env remembers the answer,
+ * a token for yes and the key left empty for no, so a run again asks nothing; whether agents run
+ * commands is read back from the installed service.
+ */
+export function decideComputer(p: {
+  offer: ComputerOffer;
+  content: string | null;
+  computer?: "yes" | "no";
+  commands?: "yes" | "no";
+  /** Commands in the service installed here (`installedCommands`); null when there's none. */
+  installed: boolean | null;
+  answers: { on?: boolean; commands?: boolean };
+  server: string;
+  tokenFile: string;
+}): ComputerDecision {
+  const now = computerOf(p.content);
+  const off = (): ComputerDecision => ({
+    plan: { state: "off", wasOn: now === "on" },
+    entries: now === "off" ? {} : { HOST_COMPUTER_TOKEN: "" },
+  });
+  if ("problem" in p.offer) {
+    if (p.computer === "yes") return { problem: p.offer.problem };
+    if (p.computer === "no" || now === "off") return off();
+    if (now === "on" && envFlag(p.content, "ALLOW_SIGNUP")) {
+      return {
+        problem: {
+          check: "computer",
+          error:
+            "Sign-up is open here (ALLOW_SIGNUP=true), and agentes.chat doesn't start with this machine's token (HOST_COMPUTER_TOKEN in .env) then.",
+          fix: "Set ALLOW_SIGNUP=false in .env, or run the setup again with --computer no.",
+        },
+      };
+    }
+    return { plan: { state: "skipped", why: p.offer.problem.error }, entries: {} };
+  }
+  const on = p.computer ? p.computer === "yes" : now ? now === "on" : p.answers.on;
+  if (on === undefined) return { ask: "computer", yes: p.offer.yes };
+  if (!on) return off();
+  const { mac } = p.offer;
+  // On a Mac agents work as the person, so their commands could reach everything that person can: asked
+  // with the computer, off when it was on already and nothing installed says otherwise.
+  const unsaid = mac ? (now === "on" ? false : p.answers.commands) : true;
+  const commands = p.commands ? p.commands === "yes" : (p.installed ?? unsaid);
+  if (commands === undefined) return { ask: "commands", yes: false };
+  return {
+    plan: {
+      state: "on",
+      mac,
+      commands,
+      install: computerInstall({ mac, server: p.server, tokenFile: p.tokenFile, commands }),
+      kept: now === "on" && !p.computer && !p.commands,
+    },
+    entries: now === "on" ? {} : { HOST_COMPUTER_TOKEN: randomBytes(48).toString("base64") },
+  };
+}
+
+/** The service that runs agents here: its unit or launchd plist, and its runner, as the computers' installer puts them. */
+export const HOST_SERVICE = "agentes-runner";
+export const HOST_LAUNCHD_LABEL = "chat.agentes.runner";
+/** The root runner's home on Linux: a computer connected in system mode has its token in its config.json. */
+export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
+
+export function computerFiles(mac: boolean, home: string, runnerHome: string) {
+  return mac
+    ? {
+        service: join(home, "Library", "LaunchAgents", `${HOST_LAUNCHD_LABEL}.plist`),
+        bundle: join(runnerHome, "agentes-runner.mjs"),
+        command: join(runnerHome, "bin", "agentes-runner"),
+        log: hostLogFile(runnerHome),
+      }
+    : {
+        service: `/etc/systemd/system/${HOST_SERVICE}.service`,
+        bundle: "/opt/agentes-runner/agentes-runner.mjs",
+        command: "/usr/local/bin/agentes-runner",
+        log: null,
+      };
+}
+
+export const hostLogFile = (runnerHome: string) => join(runnerHome, "runner.log");
+
+/** Whether the service installed here lets agents run commands; null when it isn't this server's computer's. */
+export function installedCommands(service: string | null): boolean | null {
+  // The unit's ExecStart, or the plist's ProgramArguments.
+  const args =
+    /^ExecStart=(.*)$/m.exec(service ?? "")?.[1] ??
+    /<key>ProgramArguments<\/key>([\s\S]*?)<\/array>/.exec(service ?? "")?.[1];
+  if (!args || !/(^|[\s>"])host(?=[\s<"]|$)/.test(args)) return null;
+  return !args.includes("--no-exec");
+}
+
+/**
+ * Whether a computer kept on from an earlier run is fine as it is: running, answering the server, with the
+ * runner the server serves. Setting it up again restarts it, which interrupts its agents.
+ */
+export const computerUpToDate = (p: {
+  kept: boolean;
+  running: boolean;
+  state: HostState | null;
+  /** The runner installed here, and the one the server serves now. */
+  installed: string | null;
+  served: string | null;
+}) => p.kept && p.running && p.state === "on" && p.installed !== null && p.installed === p.served;
 
 export type HostState = "on" | "off" | "refused" | "unreachable" | "no_token";
 
@@ -735,10 +913,6 @@ export function hostState(log: string): HostState | null {
   return state;
 }
 
-/** The service's name on Linux (its journal) and its log on a Mac: `service.ts`. */
-export const HOST_SERVICE = "agentes-runner";
-export const hostLogFile = (runnerHome: string) => join(runnerHome, "runner.log");
-
 export const COMPUTER_PROBLEMS = {
   off: {
     check: "computer.off",
@@ -760,10 +934,47 @@ export const COMPUTER_PROBLEMS = {
 // ── The end ─────────────────────────────────────────────────────────────────
 
 /**
- * The link the apps open on this server: the desktop app when it's clicked, the phone app from the QR
- * code. The web app's "Abrir no celular" adds `&token=` for a one-time sign-in. SELF_HOSTING.md, "Your phone".
+ * The link the agentes.chat phone app opens on this server, from the QR code. The web app's "Abrir no
+ * celular" adds `&token=` for a one-time sign-in. SELF_HOSTING.md, "Your phone".
  */
 export const appLink = (origin: string) => `agenteschat://connect?${new URLSearchParams({ server: origin })}`;
+
+/** The phone app opens https servers only (a phone also reaches only its own localhost). */
+export const hasAppLink = (url: string) => url.startsWith("https://");
+
+/** What the end shows and what `--json` returns, with the agents' computer's failure, if it failed. */
+export function theEnd(p: {
+  network: Network;
+  url: string;
+  app: { health: Record<string, unknown>; firstRun: boolean } | null;
+  keyExpiry: string | null;
+  choices: { computer: ComputerPlan["state"]; telemetry: OnOff } | null;
+  first?: string[];
+  failed: Problem | null;
+}) {
+  const link = hasAppLink(p.url) ? appLink(p.url) : null;
+  const steps = [
+    ...(p.first ?? []),
+    ...nextSteps({ network: p.network, url: p.url, firstRun: p.app?.firstRun ?? null, keyExpiry: p.keyExpiry }),
+  ];
+  return {
+    link,
+    steps,
+    result: {
+      // agentes.chat is up either way, so its address and links still follow a failure of its computer.
+      ok: p.failed === null,
+      ...p.failed,
+      network: p.network,
+      url: p.url,
+      health: p.app?.health ?? null,
+      ownerExists: p.app ? !p.app.firstRun : null,
+      appLink: link,
+      phoneLink: link,
+      ...p.choices,
+      nextSteps: steps,
+    },
+  };
+}
 
 /** A QR code in half blocks, light modules drawn: on a terminal it needs light on dark (cli.ts sets the colors). */
 export const qrCode = (text: string) => renderUnicodeCompact(text, { border: 2 });
@@ -793,13 +1004,10 @@ export interface PlanInput {
   image: boolean;
 }
 
-/** What the run does about the agents' computer (a dry run takes the answers' defaults). */
-export type ComputerPlan =
-  | { state: "on"; mac: boolean; commands: boolean; install: ComputerInstall }
-  | { state: "off" }
-  | { state: "skipped"; why: string };
-
 function computerStep(c: ComputerPlan): string {
+  if (c.state === "off" && c.wasOn) {
+    return `agents' computer: not this machine any more (HOST_COMPUTER_TOKEN emptied, ${HOST_TOKEN_FILE} removed)`;
+  }
   if (c.state === "off") return "agents' computer: not this machine (connect one later in Settings → Computers)";
   if (c.state === "skipped") return `agents' computer: skipped. ${c.why}`;
   const who = c.mac
@@ -877,13 +1085,14 @@ export function planSteps(p: PlanInput): string[] {
   }
   if (p.computer.state === "on") {
     steps.push(
-      `agents' computer: ${computerCommand(p.computer.install)}, then wait up to ${COMPUTER_WAIT_S} s for it to answer`,
+      `agents' computer: ${p.computer.kept ? "if it isn't running and up to date, " : ""}${computerCommand(p.computer.install)}, then wait up to ${COMPUTER_WAIT_S} s for it to answer`,
     );
   }
+  const linked = p.network === "proxy" ? hasAppLink(p.publicUrl.now ?? "") : p.network !== "local";
   steps.push(
-    p.network === "local"
-      ? "finish: the address, the link that opens the agentes.chat app on it, and what to do next"
-      : "finish: the address, the link that opens the agentes.chat apps on it with its QR code, and what to do next",
+    linked
+      ? "finish: the address, the link that opens the agentes.chat phone app on it with its QR code, and what to do next"
+      : "finish: the address and what to do next",
   );
   return steps;
 }
@@ -912,9 +1121,11 @@ export function nextSteps(p: {
     }
   } else if (p.network === "domain" || p.network === "proxy") {
     steps.push(`Open ${p.url} and ${account}.`);
-    steps.push(
-      `Phone: point the camera at the QR code above, or on the agentes.chat app's sign-in screen tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code".`,
-    );
+    if (hasAppLink(p.url)) {
+      steps.push(
+        `Phone: point the camera at the QR code above, or on the agentes.chat app's sign-in screen tap "Change" next to the server ("Trocar" in Portuguese), then "Scan QR code".`,
+      );
+    }
   } else {
     const port = new URL(p.url).port || "80";
     steps.push(`Open ${p.url} and ${account}.`);

@@ -4,24 +4,36 @@
  * directory and prints the commands that finish the job.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { chmodSync, closeSync, existsSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  readSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, totalmem } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import {
-  appLink,
+  appOnThisMachine,
   COMPOSE_FILES,
   COMPOSE_URL,
   COMPUTER_PROBLEMS,
   COMPUTER_WAIT_S,
   type ComputerPlan,
-  computerInstall,
-  computerOf,
+  computerFiles,
   computerOffer,
+  computerUpToDate,
+  connectedConfig,
   DEFAULT_EMAIL_API_URL,
   DEFAULT_HOSTNAME,
+  decideComputer,
+  decideTelemetry,
   diagnoseAppLogs,
   diagnoseCompose,
   diagnoseDocker,
@@ -34,18 +46,19 @@ import {
   envName,
   envValue,
   GUIDE_URL,
+  HOST_LAUNCHD_LABEL,
   HOST_SERVICE,
   HOST_TOKEN_FILE,
-  hostLogFile,
   hostState,
   httpUrlProblem,
   IMAGE,
   ISSUES_URL,
+  installedCommands,
+  isComposeFile,
   isTailnetUrl,
   MIN_COMPOSE,
   type Network,
   networkOf,
-  nextSteps,
   normalizeDomain,
   type OnOff,
   type Options,
@@ -56,6 +69,7 @@ import {
   qrCode,
   readTailscaleStatus,
   resolveChoice,
+  SYSTEM_RUNNER_HOME,
   secretEntries,
   smtpUrlProblem,
   stopCommand,
@@ -64,7 +78,7 @@ import {
   TS,
   tailscaleKeyEntries,
   tailscaleKeyProblem,
-  telemetryOf,
+  theEnd,
   upsertEnv,
   versionAtLeast,
   wayIn,
@@ -108,6 +122,9 @@ AGENTES_SETUP_TAILSCALE_KEY=tskey-auth-… Without a terminal, answers are read 
 stdin, and an empty line or the end of the input takes the default.
 
 Guide: ${GUIDE_URL}`;
+
+/** The runner's home for the person running the setup, as the computers' installer picks it. */
+const RUNNER_HOME = process.env.AGENTES_RUNNER_HOME || join(homedir(), ".agentes-runner");
 
 class SetupError extends Error {
   constructor(readonly problem: Problem) {
@@ -287,19 +304,20 @@ function checkDocker(): { label: string } | { problem: Problem } {
   return { label: `Docker ${server.stdout.trim()} with Compose ${version}` };
 }
 
-/** A command whose output is shown as it comes and kept for a diagnosis; `input` goes to its stdin. */
+/** A command whose output is kept for a diagnosis and shown as it comes (unless `show` is false); `input` goes to its stdin. */
 function streamed(
   ui: Ui,
   command: string,
   args: string[],
   input?: string,
+  show = true,
 ): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"] });
     let output = "";
     const forward = (chunk: Buffer) => {
       output += chunk.toString();
-      ui.stream.write(ui.dim(chunk.toString()));
+      if (show) ui.stream.write(ui.dim(chunk.toString()));
     };
     child.stdout?.on("data", forward);
     child.stderr?.on("data", forward);
@@ -498,14 +516,26 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   if (listQuestions && preset === null) questions.push("email for invitations and password resets (skip by default)");
   const email = await emailEntries(opts, ui, preset, content, network, domain, entries);
 
+  const mac = process.platform === "darwin";
+  const files = computerFiles(mac, homedir(), RUNNER_HOME);
   const machine: ThisMachine = {
     platform: process.platform,
     memory: totalmem(),
     root: process.getuid?.() === 0,
     systemd: existsSync("/run/systemd/system"),
+    apt: spawnSync("sh", ["-c", "command -v apt-get"], { stdio: "ignore" }).status === 0,
+    connected: connectedConfig(readOrNull(join(mac ? RUNNER_HOME : SYSTEM_RUNNER_HOME, "config.json"))),
   };
   const asked = listQuestions ? questions : null;
-  const computer = await chooseComputer(opts, ui, { machine, content, image, port, dir, questions: asked, entries });
+  const computer = await chooseComputer(opts, ui, {
+    offer: computerOffer(machine, content, image),
+    content,
+    installed: installedCommands(readOrNull(files.service)),
+    server: appOnThisMachine(content),
+    tokenFile: join(dir, HOST_TOKEN_FILE),
+    questions: asked,
+    entries,
+  });
   const telemetry = await chooseTelemetry(opts, ui, content, asked, entries);
   const choices: Choices = { computer, telemetry: telemetry.value };
 
@@ -540,9 +570,15 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   env.save(upsertEnv(withNetworkProfile(content ?? ENV_HEADER, way.profile), entries));
   const written = Object.keys(entries).filter((key) => key !== "TS_EXTRA_ARGS");
   ui.ok(`.env${written.length ? `: ${written.join(", ")}` : " kept as it was"} (readable by you only)`);
+  const tokenFile = join(dir, HOST_TOKEN_FILE);
   if (computer.state === "on") {
     // Written again each run, from .env: the server reads the token there, the agents' computer here.
-    saveSecret(join(dir, HOST_TOKEN_FILE), envValue(env.read(), "HOST_COMPUTER_TOKEN") ?? "");
+    saveSecret(tokenFile, envValue(env.read(), "HOST_COMPUTER_TOKEN") ?? "");
+  } else if (computer.state === "off" && computer.wasOn) {
+    rmSync(tokenFile, { force: true });
+    ui.note(
+      `This machine stops being your agents' computer once agentes.chat restarts. To remove what ran them here: ${files.command} service uninstall --host`,
+    );
   }
 
   await ensureComposeFile(ui, dir, composeFile, network);
@@ -590,77 +626,68 @@ function saveSecret(file: string, content: string) {
   }
 }
 
-/**
- * The agents' computer: this machine, by default where it can be (`computerOffer`). .env remembers the
- * answer, a token for yes and the key left empty for no, so a run again asks nothing.
- */
+/** A yes/no question's answer: asked on a terminal, listed in a dry run's plan, else its default. */
+async function yesOrNo(ui: Ui, questions: string[] | null, listed: string, yes: boolean, ask: () => Promise<boolean>) {
+  if (questions) {
+    questions.push(`${listed} (${yes ? "yes" : "no"} unless you choose otherwise)`);
+    return yes;
+  }
+  return ui.canAsk ? ask() : yes;
+}
+
+/** The agents' computer, as `decideComputer` says: this machine, by default where it can be. */
 async function chooseComputer(
   opts: Options,
   ui: Ui,
-  c: {
-    machine: ThisMachine;
-    content: string | null;
-    image: boolean;
-    port: string;
-    dir: string;
-    /** A dry run's list: the question goes there, and the default is taken. */
+  c: Omit<Parameters<typeof decideComputer>[0], "answers" | "computer" | "commands"> & {
+    /** A dry run's list: the questions go there, and their defaults are taken. */
     questions: string[] | null;
     entries: Record<string, string>;
   },
 ): Promise<ComputerPlan> {
-  const offer = computerOffer(c.machine, c.content, c.image);
-  const now = computerOf(c.content);
-  const off = (): ComputerPlan => {
-    if (now !== "off") c.entries.HOST_COMPUTER_TOKEN = "";
-    return { state: "off" };
-  };
-  if ("problem" in offer) {
-    if (opts.computer === "yes") throw new SetupError(offer.problem);
-    if (opts.computer === "no" || now === "off") return off();
-    ui.note(`Agents' computer: skipped. ${offer.problem.error}`);
-    return { state: "skipped", why: offer.problem.error };
-  }
-  const what = offer.mac ? "this Mac" : "this machine";
-  let on = opts.computer ? opts.computer === "yes" : now ? now === "on" : offer.yes;
-  if (!opts.computer && !now) {
-    if (c.questions)
-      c.questions.push(`${what} as your agents' computer (${offer.yes ? "yes" : "no"} unless you choose otherwise)`);
-    else if (ui.canAsk) {
-      ui.title("Agents' computer");
-      if (offer.mac) {
-        ui.write("  Agents need a computer to work on: a browser and a folder each. This Mac can be it.");
-      } else {
-        ui.write("  Agents need a computer to work on: their own screen, a browser and a folder each.");
-        ui.write("  This machine can be it. Each agent gets a user of its own here, with about 0.2 GB");
-        ui.write("  of memory for its screen (0.6 GB more while its browser is open).");
-        if (offer.why) ui.write(`  ${offer.why}`);
-      }
-      on = await ui.confirm(
-        offer.mac
-          ? "Use this Mac as your agents' computer? They work as you, in folders of their own."
-          : "Use this machine as your agents' computer?",
-        offer.yes,
+  const answers: { on?: boolean; commands?: boolean } = {};
+  for (;;) {
+    const next = decideComputer({ ...c, computer: opts.computer, commands: opts.computerCommands, answers });
+    if ("problem" in next) throw new SetupError(next.problem);
+    if ("plan" in next) {
+      Object.assign(c.entries, next.entries);
+      if (next.plan.state === "skipped") ui.note(`Agents' computer: skipped. ${next.plan.why}`);
+      return next.plan;
+    }
+    const mac = !("problem" in c.offer) && c.offer.mac;
+    if (next.ask === "computer") {
+      answers.on = await yesOrNo(
+        ui,
+        c.questions,
+        `${mac ? "this Mac" : "this machine"} as your agents' computer`,
+        next.yes,
+        () => {
+          ui.title("Agents' computer");
+          if (mac) {
+            ui.write("  Agents need a computer to work on: a browser and a folder each. This Mac can be it.");
+          } else {
+            ui.write("  Agents need a computer to work on: their own screen, a browser and a folder each.");
+            ui.write("  This machine can be it. Each agent gets a user of its own here, with about 0.2 GB");
+            ui.write("  of memory for its screen (0.6 GB more while its browser is open).");
+            if (!("problem" in c.offer) && c.offer.why) ui.write(`  ${c.offer.why}`);
+          }
+          return ui.confirm(
+            mac
+              ? "Use this Mac as your agents' computer? They work as you, in folders of their own."
+              : "Use this machine as your agents' computer?",
+            next.yes,
+          );
+        },
+      );
+    } else {
+      answers.commands = await yesOrNo(ui, c.questions, "whether agents may run commands on this Mac", next.yes, () =>
+        ui.confirm("Can they run commands here too? Commands run as you and can reach your files.", next.yes),
       );
     }
   }
-  if (!on) return off();
-  if (now !== "on") c.entries.HOST_COMPUTER_TOKEN = randomBytes(48).toString("base64");
-  // On a Mac agents work as the person, so their commands could reach everything that person can.
-  let commands = opts.computerCommands ? opts.computerCommands === "yes" : !offer.mac;
-  if (offer.mac && !opts.computerCommands) {
-    if (c.questions) c.questions.push("whether agents may run commands on this Mac (no unless you choose otherwise)");
-    else if (ui.canAsk) {
-      commands = await ui.confirm(
-        "Can they run commands here too? Commands run as you and can reach your files.",
-        false,
-      );
-    }
-  }
-  const install = computerInstall({ mac: offer.mac, port: c.port, tokenFile: join(c.dir, HOST_TOKEN_FILE), commands });
-  return { state: "on", mac: offer.mac, commands, install };
 }
 
-/** The usage statistics: asked once, then .env says it (`TELEMETRY=on|off`) and a run again keeps it. */
+/** The usage statistics, as `decideTelemetry` says: asked once, then .env keeps `TELEMETRY=on|off`. */
 async function chooseTelemetry(
   opts: Options,
   ui: Ui,
@@ -668,18 +695,19 @@ async function chooseTelemetry(
   questions: string[] | null,
   entries: Record<string, string>,
 ): Promise<{ value: OnOff; kept: boolean }> {
-  const now = telemetryOf(content);
-  let value: OnOff = opts.telemetry ?? now ?? "on";
-  if (!opts.telemetry && !now) {
-    if (questions) questions.push("usage statistics (yes unless you choose otherwise)");
-    else if (ui.canAsk) {
-      ui.title("Usage statistics");
-      for (const line of TELEMETRY_TEXT) ui.write(`  ${line}`);
-      value = (await ui.confirm("Send them?", true)) ? "on" : "off";
-    }
-  }
-  if (value !== now) entries.TELEMETRY = value;
-  return { value, kept: value === now };
+  const first = decideTelemetry({ ...(opts.telemetry ? { flag: opts.telemetry } : {}), content });
+  const decision = first.ask
+    ? decideTelemetry({
+        content,
+        answer: await yesOrNo(ui, questions, "usage statistics", true, () => {
+          ui.title("Usage statistics");
+          for (const line of TELEMETRY_TEXT) ui.write(`  ${line}`);
+          return ui.confirm("Send them?", true);
+        }),
+      })
+    : first;
+  Object.assign(entries, decision.entries);
+  return { value: decision.value, kept: decision.kept };
 }
 
 function tailscaleSteps(ui: Ui, hostname: string, tag: string) {
@@ -780,8 +808,10 @@ async function ensureComposeFile(ui: Ui, dir: string, file: string | null, netwo
   try {
     const response = await fetch(COMPOSE_URL, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = await response.text();
+    if (!isComposeFile(body)) throw new Error("what came back isn't a compose file");
     // Over the outdated file itself: Compose keeps reading a compose.yaml next to a newer docker-compose.yml.
-    writeFileSync(join(dir, file ?? "docker-compose.yml"), await response.text());
+    writeFileSync(join(dir, file ?? "docker-compose.yml"), body);
   } catch (error) {
     throw new SetupError({
       check: "compose.download",
@@ -1074,21 +1104,77 @@ async function finishFromStatus(opts: Options, ui: Ui, env: Env): Promise<Result
   ]);
 }
 
+/** A file's text, or null when it can't be read. */
+function readOrNull(file: string): string | null {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** A file's text from `offset` on, or its last 256 KB; "" when it can't be read. */
+function readFrom(file: string, offset: number | null) {
+  try {
+    const size = statSync(file).size;
+    const start = offset ?? Math.max(0, size - 256 * 1024);
+    const fd = openSync(file, "r");
+    try {
+      const bytes = Buffer.alloc(Math.max(0, size - start));
+      readSync(fd, bytes, 0, bytes.length, start);
+      return bytes.toString("utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return "";
+  }
+}
+
+const succeeds = (command: string, args: string[]) =>
+  spawnSync(command, args, { stdio: "ignore", timeout: 10_000 }).status === 0;
+
 /**
  * The agents' computer, once agentes.chat answers: the server's installer for it, then up to
  * `COMPUTER_WAIT_S` for its first answer to the server, read from its own log. Not answering yet is a
- * warning: it keeps trying on its own.
+ * warning: it keeps trying on its own. One kept from an earlier run is left alone while it's up to date.
  */
 async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "on" }>) {
+  const what = computer.mac ? "this Mac" : "this machine";
+  const files = computerFiles(computer.mac, homedir(), RUNNER_HOME);
+  // Its unit's journal on Linux, its log file on a Mac: since a time or an offset, or the latest lines.
+  const log = (since: { at: number; offset: number } | null) =>
+    files.log
+      ? readFrom(files.log, since ? since.offset : null)
+      : (spawnSync(
+          "journalctl",
+          ["-u", HOST_SERVICE, "-o", "cat", "--no-pager", ...(since ? ["--since", `@${since.at}`] : ["-n", "1000"])],
+          { encoding: "utf8", timeout: 10_000, maxBuffer: 16 * 1024 * 1024 },
+        ).stdout ?? "");
+  if (computer.kept) {
+    const served = await fetch(`${computer.install.server}/runner/agentes-runner.mjs`, {
+      signal: AbortSignal.timeout(30_000),
+    })
+      .then((response) => (response.ok ? response.text() : null))
+      .catch(() => null);
+    const running = computer.mac
+      ? succeeds("launchctl", ["print", `gui/${process.getuid?.() ?? 0}/${HOST_LAUNCHD_LABEL}`])
+      : succeeds("systemctl", ["is-active", "--quiet", HOST_SERVICE]);
+    const state = hostState(log(null));
+    if (computerUpToDate({ kept: true, running, state, installed: readOrNull(files.bundle), served })) {
+      ui.ok(`Agents' computer: ${what}`);
+      return;
+    }
+  }
   ui.note(
     computer.mac
       ? "Setting up this Mac for your agents…"
       : "Setting up this machine for your agents: a user and a screen for each, and the packages they need. The first time takes a few minutes…",
   );
-  const runnerHome = process.env.AGENTES_RUNNER_HOME || join(homedir(), ".agentes-runner");
-  const logFile = computer.mac ? hostLogFile(runnerHome) : null;
-  const offset = logFile && existsSync(logFile) ? statSync(logFile).size : 0;
-  const since = Math.floor(Date.now() / 1000);
+  const since = {
+    at: Math.floor(Date.now() / 1000),
+    offset: files.log && existsSync(files.log) ? statSync(files.log).size : 0,
+  };
   let script: string;
   try {
     const response = await fetch(computer.install.script, { signal: AbortSignal.timeout(30_000) });
@@ -1101,45 +1187,26 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
       fix: "Run the setup again: agentes.chat itself is up.",
     });
   }
-  const run = await streamed(ui, "sh", ["-s", "--", ...computer.install.args], script);
+  const run = await streamed(ui, "sh", ["-s", "--", ...computer.install.args], script, false);
   if (run.code !== 0) {
+    for (const line of run.output.trim().split("\n").slice(-12)) ui.note(`  ${line}`);
     throw new SetupError({
       check: "computer.install",
       error: `Setting up the agents' computer failed: ${lastLine(run.output)}`,
       fix: "Fix what the output above says, then run the setup again: agentes.chat itself is up.",
     });
   }
-  const newLog = () => {
-    if (!logFile) {
-      const args = ["-u", HOST_SERVICE, "-o", "cat", "--no-pager", "--since", `@${since}`];
-      return spawnSync("journalctl", args, { encoding: "utf8", timeout: 10_000 }).stdout ?? "";
-    }
-    try {
-      const fd = openSync(logFile, "r");
-      try {
-        const bytes = Buffer.alloc(Math.max(0, statSync(logFile).size - offset));
-        readSync(fd, bytes, 0, bytes.length, offset);
-        return bytes.toString("utf8");
-      } finally {
-        closeSync(fd);
-      }
-    } catch {
-      return "";
-    }
-  };
   const deadline = Date.now() + COMPUTER_WAIT_S * 1000;
   for (;;) {
-    const state = hostState(newLog());
+    const state = hostState(log(since));
     if (state === "on") {
-      ui.ok(`Agents' computer: ${computer.mac ? "this Mac" : "this machine"}`);
+      ui.ok(`Agents' computer: ${what}`);
       return;
     }
     if (state === "off" || state === "refused" || state === "no_token") throw new SetupError(COMPUTER_PROBLEMS[state]);
     if (Date.now() > deadline) {
-      const check = computer.mac
-        ? `${join(runnerHome, "bin", "agentes-runner")} status, and its log, ${logFile}`
-        : `agentes-runner status, and its log, journalctl -u ${HOST_SERVICE}`;
-      ui.warn(`Agents' computer: set up, but it hasn't answered agentes.chat yet; it keeps trying. To check: ${check}`);
+      const where = files.log ?? `journalctl -u ${HOST_SERVICE}`;
+      ui.warn(`Agents' computer: set up, but it hasn't answered agentes.chat yet; it keeps trying. Its log: ${where}`);
       return;
     }
     await sleep(2000);
@@ -1155,7 +1222,6 @@ async function finish(
   choices: Choices | null,
   first: string[] = [],
 ): Promise<Result> {
-  // agentes.chat is up either way, so its address and links still follow a failure here.
   let failed: Problem | null = null;
   if (choices?.computer.state === "on") {
     try {
@@ -1166,29 +1232,16 @@ async function finish(
       ui.fail(failed);
     }
   }
-  const link = appLink(url);
+  const end = theEnd({ network, url, app, keyExpiry, choices: choices ? results(choices) : null, first, failed });
   ui.write("");
   ui.write(`  ${url}`);
-  ui.write("");
-  ui.write(`    App:  ${link}`);
-  // A phone reaches localhost only on itself.
-  if (network !== "local") {
+  if (end.link) {
     ui.write("");
-    ui.qr(link);
+    ui.write(`    App:  ${end.link}`);
+    ui.write("");
+    ui.qr(end.link);
     ui.note("  Point your phone's camera here to open the agentes.chat app on this server.");
   }
-  const steps = [...first, ...nextSteps({ network, url, firstRun: app?.firstRun ?? null, keyExpiry })];
-  ui.list("Next", steps, true);
-  return {
-    ok: failed === null,
-    ...failed,
-    network,
-    url,
-    health: app?.health ?? null,
-    ownerExists: app ? !app.firstRun : null,
-    appLink: link,
-    phoneLink: link,
-    ...(choices ? results(choices) : {}),
-    nextSteps: steps,
-  };
+  ui.list("Next", end.steps, true);
+  return end.result;
 }

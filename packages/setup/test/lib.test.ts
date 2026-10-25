@@ -3,13 +3,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   appLink,
+  appOnThisMachine,
   COMPOSE_FILES,
   computerCommand,
   computerInstall,
   computerOf,
   computerOffer,
+  computerUpToDate,
+  connectedConfig,
   DEFAULT_TAG,
   DEFAULT_TIMEOUT_S,
+  decideComputer,
+  decideTelemetry,
   diagnoseAppLogs,
   diagnoseCompose,
   diagnoseTailscaleLogs,
@@ -18,6 +23,8 @@ import {
   envName,
   envValue,
   hostState,
+  installedCommands,
+  isComposeFile,
   isTailnetUrl,
   networkOf,
   nextSteps,
@@ -36,6 +43,7 @@ import {
   tailscaleKeyEntries,
   tailscaleKeyProblem,
   telemetryOf,
+  theEnd,
   upsertEnv,
   versionAtLeast,
   wayIn,
@@ -430,20 +438,24 @@ describe("Docker", () => {
 
 describe("the agents' computer", () => {
   const GB = 1024 ** 3;
-  const server: ThisMachine = { platform: "linux", memory: 8 * GB, root: true, systemd: true };
+  const server: ThisMachine = {
+    platform: "linux",
+    memory: 8 * GB,
+    root: true,
+    systemd: true,
+    apt: true,
+    connected: false,
+  };
+  const mac: ThisMachine = { ...server, platform: "darwin", memory: 16 * GB, root: false, systemd: false, apt: false };
 
   test("yes by default on a Linux server with room for agents' screens, and on a Mac", () => {
     expect(computerOffer(server, null, false)).toEqual({ mac: false, yes: true, why: null });
     // A "4 GB" server reports a little less.
     expect(computerOffer({ ...server, memory: 3.8 * GB }, null, false)).toMatchObject({ yes: true });
-    expect(computerOffer({ platform: "darwin", memory: 16 * GB, root: false, systemd: false }, null, false)).toEqual({
-      mac: true,
-      yes: true,
-      why: null,
-    });
+    expect(computerOffer(mac, null, false)).toEqual({ mac: true, yes: true, why: null });
   });
 
-  test("no by default under 4 GB, saying why", () => {
+  test("no by default under 4 GB, or without apt-get for the screens' and browsers' packages, saying why", () => {
     expect(computerOffer({ ...server, memory: 2 * GB }, null, false)).toEqual({
       mac: false,
       yes: false,
@@ -451,6 +463,11 @@ describe("the agents' computer", () => {
     });
     expect(computerOffer({ ...server, memory: 1.9 * GB }, null, false)).toMatchObject({
       why: expect.stringMatching(/^This machine has 1\.9 GB of memory;/),
+    });
+    expect(computerOffer({ ...server, apt: false }, null, false)).toEqual({
+      mac: false,
+      yes: false,
+      why: "This machine has no apt-get, so the packages agents' screens and browsers need would be yours to install.",
     });
   });
 
@@ -467,11 +484,25 @@ describe("the agents' computer", () => {
     expect(why({ ...server, systemd: false })?.error).toContain("systemd isn't running");
     expect(why(server, null, true)?.fix).toContain("This server as the agents' computer");
     expect(why({ ...server, platform: "win32" })?.error).toBe("The agents' computer runs on Linux or a Mac.");
+    // Already a computer of some server: its service would be replaced.
+    for (const machine of [server, mac]) {
+      expect(why({ ...machine, connected: true })?.error).toBe(
+        "This machine is already connected to agentes.chat as a computer, so it can't also be this server's own.",
+      );
+    }
     for (const machine of [
       { ...server, root: false },
       { ...server, systemd: false },
+      { ...server, connected: true },
     ]) {
       expect(why(machine)?.fix).toContain("Settings → Computers");
+    }
+  });
+
+  test("a runner's config.json is a connected computer's when it has a token", () => {
+    expect(connectedConfig('{ "server": "https://agentes.chat", "token": "agm_x" }')).toBe(true);
+    for (const text of [null, "", "{}", '{ "mode": "system" }', '{ "token": "" }', "not json"]) {
+      expect([text, connectedConfig(text)]).toEqual([text, false]);
     }
   });
 
@@ -482,14 +513,24 @@ describe("the agents' computer", () => {
     expect(computerOf("HOST_COMPUTER_TOKEN=\n")).toBe("off");
   });
 
-  test("set up with the server's own installer, on loopback: system mode on Linux, as the person on a Mac", () => {
+  test("this machine reaches the app where the compose file publishes it", () => {
+    expect(appOnThisMachine(null)).toBe("http://127.0.0.1:3000");
+    expect(appOnThisMachine("HOST_PORT=3001\n")).toBe("http://127.0.0.1:3001");
+    expect(appOnThisMachine("BIND_ADDRESS=0.0.0.0\n")).toBe("http://127.0.0.1:3000");
+    expect(appOnThisMachine("BIND_ADDRESS=[::]\n")).toBe("http://127.0.0.1:3000");
+    // Published on one address only: loopback isn't it, and whatever answers there isn't agentes.chat.
+    expect(appOnThisMachine("BIND_ADDRESS=10.0.0.5\nHOST_PORT=8080\n")).toBe("http://10.0.0.5:8080");
+  });
+
+  test("set up with the server's own installer: system mode on Linux, as the person on a Mac", () => {
     const linux = computerInstall({
       mac: false,
-      port: "3001",
+      server: "http://127.0.0.1:3001",
       tokenFile: "/opt/agentes/host-computer-token",
       commands: true,
     });
     expect(linux).toEqual({
+      server: "http://127.0.0.1:3001",
       script: "http://127.0.0.1:3001/api/machines/install.sh",
       args: [
         "--system",
@@ -500,22 +541,136 @@ describe("the agents' computer", () => {
         "/opt/agentes/host-computer-token",
       ],
     });
-    const mac = computerInstall({
+    const onMac = computerInstall({
       mac: true,
-      port: "3000",
+      server: "http://127.0.0.1:3000",
       tokenFile: "/Users/ana/my agentes/host-computer-token",
       commands: false,
     });
-    expect(mac.args).toEqual([
+    expect(onMac.args).toEqual([
       "--server",
       "http://127.0.0.1:3000",
       "--host-token-file",
       "/Users/ana/my agentes/host-computer-token",
       "--no-exec",
     ]);
-    expect(computerCommand(mac)).toBe(
+    expect(computerCommand(onMac)).toBe(
       "curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --server http://127.0.0.1:3000 --host-token-file '/Users/ana/my agentes/host-computer-token' --no-exec",
     );
+  });
+
+  describe("what the run decides, question by question", () => {
+    const TOKEN = `HOST_COMPUTER_TOKEN=${"t".repeat(64)}\n`;
+    const decide = (
+      machine: ThisMachine,
+      over: Partial<Parameters<typeof decideComputer>[0]> = {},
+    ): ReturnType<typeof decideComputer> =>
+      decideComputer({
+        offer: computerOffer(machine, over.content ?? null, false),
+        content: null,
+        installed: null,
+        answers: {},
+        server: "http://127.0.0.1:3000",
+        tokenFile: "/opt/agentes/host-computer-token",
+        ...over,
+      });
+    const plan = (d: ReturnType<typeof decideComputer>) => ("plan" in d ? d.plan : null);
+
+    test("a first run asks, yes by default; yes writes a new token, no the key left empty", () => {
+      expect(decide(server)).toEqual({ ask: "computer", yes: true });
+      expect(decide({ ...server, memory: 2 * GB })).toEqual({ ask: "computer", yes: false });
+      const yes = decide(server, { answers: { on: true } });
+      expect(plan(yes)).toMatchObject({ state: "on", mac: false, commands: true, kept: false });
+      expect("entries" in yes && yes.entries.HOST_COMPUTER_TOKEN).toMatch(/^[A-Za-z0-9+/]{64}$/);
+      expect(decide(server, { answers: { on: false } })).toEqual({
+        plan: { state: "off", wasOn: false },
+        entries: { HOST_COMPUTER_TOKEN: "" },
+      });
+    });
+
+    test("on a Mac a second question, commands, no by default", () => {
+      expect(decide(mac, { answers: { on: true } })).toEqual({ ask: "commands", yes: false });
+      const no = plan(decide(mac, { answers: { on: true, commands: false } }));
+      expect(no).toMatchObject({ state: "on", mac: true, commands: false });
+      expect(no?.state === "on" && no.install.args).toContain("--no-exec");
+      expect(plan(decide(mac, { commands: "yes", answers: { on: true } }))).toMatchObject({ commands: true });
+    });
+
+    test("a run again asks nothing: .env has the answer, the installed service whether commands are on", () => {
+      const again = decide(server, { content: TOKEN });
+      expect(again).toEqual({ plan: expect.objectContaining({ state: "on", kept: true }), entries: {} });
+      expect(decide(server, { content: "HOST_COMPUTER_TOKEN=\n" })).toEqual({
+        plan: { state: "off", wasOn: false },
+        entries: {},
+      });
+      for (const installed of [true, false]) {
+        expect(plan(decide(mac, { content: TOKEN, installed }))).toMatchObject({ commands: installed, kept: true });
+      }
+      // On before, but nothing installed yet (the first run stopped short): still no question, commands off.
+      expect(plan(decide(mac, { content: TOKEN }))).toMatchObject({ state: "on", commands: false, kept: true });
+    });
+
+    test("flags answer without asking; one given sets the computer up again", () => {
+      expect(plan(decide(server, { computer: "yes" }))).toMatchObject({ state: "on", kept: false });
+      expect(plan(decide(server, { content: TOKEN, computer: "yes" }))).toMatchObject({ state: "on", kept: false });
+      expect(plan(decide(server, { content: TOKEN, commands: "no" }))).toMatchObject({ commands: false, kept: false });
+      // Turned off after a yes: the token goes, and the run says how to remove what ran agents here.
+      expect(decide(server, { content: TOKEN, computer: "no" })).toEqual({
+        plan: { state: "off", wasOn: true },
+        entries: { HOST_COMPUTER_TOKEN: "" },
+      });
+    });
+
+    test("where it can't be: skipped and .env left alone, refused when asked for, stopped when the server wouldn't start", () => {
+      const noRoot = { ...server, root: false };
+      expect(decide(noRoot)).toEqual({
+        plan: { state: "skipped", why: "Each agent gets a user of its own on this machine, which needs root." },
+        entries: {},
+      });
+      expect(decide(noRoot, { computer: "yes" })).toEqual({ problem: expect.objectContaining({ check: "computer" }) });
+      expect(decide(noRoot, { computer: "no" })).toEqual({
+        plan: { state: "off", wasOn: false },
+        entries: { HOST_COMPUTER_TOKEN: "" },
+      });
+      // Run again as someone else: the computer set up earlier stays on.
+      expect(decide(noRoot, { content: TOKEN })).toMatchObject({ plan: { state: "skipped" }, entries: {} });
+      // Sign-up opened after a yes: the server refuses to start with both.
+      const open = decide(server, { content: `${TOKEN}ALLOW_SIGNUP=true\n` });
+      expect("problem" in open && open.problem.fix).toBe(
+        "Set ALLOW_SIGNUP=false in .env, or run the setup again with --computer no.",
+      );
+    });
+  });
+
+  test("whether the installed service lets agents run commands, from its own arguments", () => {
+    const unit = (args: string) =>
+      `[Unit]\nDescription=agentes.chat runner\n\n[Service]\nExecStart="/opt/agentes-runner/bin/bun" "/opt/agentes-runner/agentes-runner.mjs" ${args}\n`;
+    expect(installedCommands(unit("host --server http://127.0.0.1:3000 --token-file /opt/agentes/t"))).toBe(true);
+    expect(installedCommands(unit("host --server http://127.0.0.1:3000 --no-exec"))).toBe(false);
+    const plist = (args: string[]) =>
+      `<key>ProgramArguments</key>\n  <array>\n    ${args.map((a) => `<string>${a}</string>`).join("\n    ")}\n  </array>`;
+    expect(installedCommands(plist(["/usr/local/bin/bun", "host", "--no-exec"]))).toBe(false);
+    expect(installedCommands(plist(["/usr/local/bin/bun", "host"]))).toBe(true);
+    // A connected computer's own service, or none.
+    expect(installedCommands(unit("start"))).toBeNull();
+    expect(installedCommands(plist(["/usr/local/bin/bun", "start"]))).toBeNull();
+    expect(installedCommands(null)).toBeNull();
+  });
+
+  test("a computer kept from an earlier run is left running only when it's up to date", () => {
+    const fine = { kept: true, running: true, state: "on" as const, installed: "runner v1", served: "runner v1" };
+    expect(computerUpToDate(fine)).toBe(true);
+    for (const change of [
+      { kept: false },
+      { running: false },
+      { state: "unreachable" as const },
+      { state: null },
+      { served: "runner v2" },
+      { installed: null },
+      { installed: null, served: null },
+    ]) {
+      expect([change, computerUpToDate({ ...fine, ...change })]).toEqual([change, false]);
+    }
   });
 
   test("its state, from the lines it logs: the latest wins, its organizations' lines don't count", () => {
@@ -554,10 +709,37 @@ describe("usage statistics", () => {
     expect(envFlag("ALLOW_SIGNUP=enabled\n", "ALLOW_SIGNUP")).toBe(true);
     expect(envFlag("ALLOW_SIGNUP=n\n", "ALLOW_SIGNUP")).toBe(false);
   });
+
+  test("asked once, yes by default; either answer goes into .env, and a run again keeps it", () => {
+    expect(decideTelemetry({ content: null })).toEqual({
+      ask: true,
+      value: "on",
+      kept: false,
+      entries: { TELEMETRY: "on" },
+    });
+    expect(decideTelemetry({ content: null, answer: false })).toMatchObject({
+      value: "off",
+      entries: { TELEMETRY: "off" },
+    });
+    for (const value of ["on", "off"] as const) {
+      expect(decideTelemetry({ content: `TELEMETRY=${value}\n` })).toEqual({
+        ask: false,
+        value,
+        kept: true,
+        entries: {},
+      });
+    }
+    expect(decideTelemetry({ flag: "off", content: "TELEMETRY=on\n" })).toEqual({
+      ask: false,
+      value: "off",
+      kept: false,
+      entries: { TELEMETRY: "off" },
+    });
+  });
 });
 
 describe("the end", () => {
-  test("the link the apps open, and its QR code", () => {
+  test("the link the phone app opens, and its QR code", () => {
     const link = appLink("https://agentes.tail1234.ts.net");
     expect(link).toBe("agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net");
     const rows = qrCode(link).split("\n");
@@ -565,6 +747,63 @@ describe("the end", () => {
     expect(rows.length).toBeGreaterThan(10);
     for (const row of rows) expect([...row].length).toBe([...(rows[0] as string)].length);
     expect(Math.abs([...(rows[0] as string)].length - rows.length * 2)).toBeLessThanOrEqual(1);
+  });
+
+  test("what it shows and returns: the link only for https, the computer's failure with agentes.chat still up", () => {
+    const app = { health: { status: "ok", version: "1.4.0" }, firstRun: true };
+    const choices = { computer: "on" as const, telemetry: "on" as const };
+    const tailnet = theEnd({
+      network: "tailscale",
+      url: "https://agentes.tail1234.ts.net",
+      app,
+      keyExpiry: null,
+      choices,
+      failed: null,
+    });
+    expect(tailnet.link).toBe("agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net");
+    expect(tailnet.result).toEqual({
+      ok: true,
+      network: "tailscale",
+      url: "https://agentes.tail1234.ts.net",
+      health: app.health,
+      ownerExists: false,
+      appLink: tailnet.link,
+      phoneLink: tailnet.link,
+      computer: "on",
+      telemetry: "on",
+      nextSteps: tailnet.steps,
+    });
+    // A phone opens no http server, and reaches only its own localhost.
+    const local = theEnd({
+      network: "local",
+      url: "http://localhost:3000",
+      app,
+      keyExpiry: null,
+      choices,
+      failed: null,
+    });
+    expect(local.link).toBeNull();
+    expect(local.result).toMatchObject({ appLink: null, phoneLink: null });
+    const failed = {
+      check: "computer.install",
+      error: "Setting up the agents' computer failed: x",
+      fix: "Run it again.",
+    };
+    expect(
+      theEnd({ network: "tailscale", url: "https://agentes.tail1234.ts.net", app, keyExpiry: null, choices, failed })
+        .result,
+    ).toMatchObject({ ok: false, ...failed, url: "https://agentes.tail1234.ts.net", appLink: tailnet.link });
+    expect(
+      theEnd({
+        network: "tailscale",
+        url: "https://a.ts.net",
+        app: null,
+        keyExpiry: null,
+        choices: null,
+        first: ["Run it."],
+        failed: null,
+      }),
+    ).toMatchObject({ steps: expect.arrayContaining(["Run it."]), result: { ownerExists: null, health: null } });
   });
 
   test("next steps: the tailnet, the phone, and the key that would expire", () => {
@@ -588,13 +827,17 @@ describe("the end", () => {
     const proxy = nextSteps({ network: "proxy", url: "https://chat.example.com", firstRun: false, keyExpiry: null });
     expect(proxy[0]).toBe("Open https://chat.example.com and sign in.");
     expect(proxy[1]).toStartWith("Phone: point the camera at the QR code above");
+    // An http proxy has no QR code to point at.
+    expect(nextSteps({ network: "proxy", url: "http://192.168.1.5:3000", firstRun: false, keyExpiry: null })).toEqual([
+      "Open http://192.168.1.5:3000 and sign in.",
+    ]);
   });
 });
 
 describe("the plan", () => {
   const linux = computerInstall({
     mac: false,
-    port: "3000",
+    server: "http://127.0.0.1:3000",
     tokenFile: "/opt/agentes/host-computer-token",
     commands: true,
   });
@@ -610,14 +853,14 @@ describe("the plan", () => {
     tailscale: "ask",
     domain: null,
     email: "skip",
-    computer: { state: "on", mac: false, commands: true, install: linux },
+    computer: { state: "on", mac: false, commands: true, install: linux, kept: false },
     telemetry: { value: "on", kept: false },
     compose: null,
     start: true,
     image: false,
   };
   const finishLine =
-    "finish: the address, the link that opens the agentes.chat apps on it with its QR code, and what to do next";
+    "finish: the address, the link that opens the agentes.chat phone app on it with its QR code, and what to do next";
 
   test("an empty directory on a tailnet: every step, in order", () => {
     expect(planSteps(base)).toEqual([
@@ -637,24 +880,38 @@ describe("the plan", () => {
     ]);
   });
 
-  test("the agents' computer: a Mac, no, skipped; the usage statistics kept or off", () => {
-    const mac = computerInstall({
+  test("the agents' computer: a Mac, kept, no, turned off, skipped; the usage statistics kept or off", () => {
+    const onMac = computerInstall({
       mac: true,
-      port: "3001",
+      server: "http://127.0.0.1:3001",
       tokenFile: "/Users/ana/agentes/host-computer-token",
       commands: false,
     });
-    const onMac = planSteps({ ...base, computer: { state: "on", mac: true, commands: false, install: mac } });
-    expect(onMac).toContain(
+    const steps = planSteps({
+      ...base,
+      computer: { state: "on", mac: true, commands: false, install: onMac, kept: false },
+    });
+    expect(steps).toContain(
       "agents' computer: this Mac, agents working as you in folders of their own, commands off (HOST_COMPUTER_TOKEN, also in host-computer-token)",
     );
-    expect(onMac).toContain(
+    expect(steps).toContain(
       "agents' computer: curl -fsSL http://127.0.0.1:3001/api/machines/install.sh | sh -s -- --server http://127.0.0.1:3001 --host-token-file /Users/ana/agentes/host-computer-token --no-exec, then wait up to 90 s for it to answer",
     );
-    const off = planSteps({ ...base, computer: { state: "off" }, telemetry: { value: "off", kept: false } });
+    const kept = planSteps({ ...base, computer: { ...base.computer, kept: true } as PlanInput["computer"] });
+    expect(kept).toContain(
+      "agents' computer: if it isn't running and up to date, curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system --desktop --server http://127.0.0.1:3000 --host-token-file /opt/agentes/host-computer-token, then wait up to 90 s for it to answer",
+    );
+    const off = planSteps({
+      ...base,
+      computer: { state: "off", wasOn: false },
+      telemetry: { value: "off", kept: false },
+    });
     expect(off).toContain("agents' computer: not this machine (connect one later in Settings → Computers)");
     expect(off).toContain("usage statistics: not sent (TELEMETRY=off)");
     expect(off.some((s) => s.includes("install.sh"))).toBe(false);
+    expect(planSteps({ ...base, computer: { state: "off", wasOn: true } })).toContain(
+      "agents' computer: not this machine any more (HOST_COMPUTER_TOKEN emptied, host-computer-token removed)",
+    );
     const skipped = planSteps({
       ...base,
       computer: { state: "skipped", why: "Each agent gets a user of its own on this machine, which needs root." },
@@ -716,6 +973,10 @@ describe("the plan", () => {
       "network: your own proxy or tunnel at https://chat.example.com; PUBLIC_URL and COMPOSE_PROFILES stay",
     );
     expect(proxy.some((s) => s.startsWith("PUBLIC_URL:"))).toBe(false);
+    expect(proxy.at(-1)).toBe(finishLine);
+    expect(planSteps({ ...base, network: "proxy", publicUrl: { now: "http://10.0.0.5", next: null } }).at(-1)).toBe(
+      "finish: the address and what to do next",
+    );
     const local = planSteps({
       ...base,
       network: "local",
@@ -724,10 +985,8 @@ describe("the plan", () => {
     });
     expect(local).toContain("PUBLIC_URL: http://localhost:3000, replacing https://agentes.tail1234.ts.net");
     expect(local).toContain("stop: docker compose --profile tailscale rm -sf tailscale, the way in it no longer uses");
-    // No QR code for localhost: a phone reaches only its own.
-    expect(local.at(-1)).toBe(
-      "finish: the address, the link that opens the agentes.chat app on it, and what to do next",
-    );
+    // No link and no QR code for localhost: a phone reaches only its own.
+    expect(local.at(-1)).toBe("finish: the address and what to do next");
   });
 
   test("inside the image, and without starting: the commands to run", () => {
@@ -748,6 +1007,9 @@ describe("the compose file the setup drives", () => {
 
   test("is the one the setup downloads, looked for in Compose's own order", () => {
     expect(COMPOSE_FILES).toEqual(["compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"]);
+    // A web page answered at its address (an instance older than the route) is never saved as it.
+    expect(isComposeFile(file)).toBe(true);
+    expect(isComposeFile('<!doctype html>\n<html lang="en"><div id="root"></div></html>')).toBe(false);
     expect(Object.keys(compose.services)).toEqual(
       expect.arrayContaining(["postgres", "agentes", "tailscale", "caddy"]),
     );

@@ -2,9 +2,29 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { HOST_SERVICE, hostLogFile, hostState, parseOptions } from "../../../packages/setup/src/lib";
+import { en } from "../../../packages/i18n/src/en";
+import {
+  computerFiles,
+  HOST_LAUNCHD_LABEL,
+  HOST_SERVICE,
+  hostLogFile,
+  hostState,
+  installedCommands,
+  parseOptions,
+  SYSTEM_RUNNER_HOME,
+  TELEMETRY_TEXT,
+} from "../../../packages/setup/src/lib";
+import { SYSTEM_RUNNER_HOME as RUNNER_SYSTEM_HOME } from "../runner/config";
 import { HostComputer } from "../runner/host";
-import { launchdPlist, SERVICE_NAME } from "../runner/service";
+import { installScript, SYSTEM_LAUNCHER, SYSTEM_RUNNER_DIR } from "../runner/install-script";
+import {
+  LAUNCHD_LABEL,
+  launchdPlist,
+  launchdPlistPath,
+  SERVICE_NAME,
+  SYSTEM_UNIT_PATH,
+  systemdSystemUnit,
+} from "../runner/service";
 import { createApp } from "../src/app";
 
 /**
@@ -133,6 +153,49 @@ describe("the setup reads the agents' computer the way the runner writes it", ()
     const home = "/Users/ana/.agentes-runner";
     const plist = launchdPlist({ runtime: "/usr/local/bin/bun", script: `${home}/agentes-runner.mjs`, home });
     expect(plist).toContain(`<key>StandardOutPath</key>\n  <string>${hostLogFile(home)}</string>`);
+  });
+
+  test("where its service and its runner are, and the home a connected computer's token is in", () => {
+    expect(HOST_LAUNCHD_LABEL).toBe(LAUNCHD_LABEL);
+    expect(SYSTEM_RUNNER_HOME).toBe(RUNNER_SYSTEM_HOME);
+    expect(computerFiles(true, "/Users/ana", "/Users/ana/.agentes-runner")).toEqual({
+      service: launchdPlistPath("/Users/ana"),
+      bundle: "/Users/ana/.agentes-runner/agentes-runner.mjs",
+      command: "/Users/ana/.agentes-runner/bin/agentes-runner",
+      log: hostLogFile("/Users/ana/.agentes-runner"),
+    });
+    expect(computerFiles(false, "/root", "/root/.agentes-runner")).toEqual({
+      service: SYSTEM_UNIT_PATH,
+      bundle: `${SYSTEM_RUNNER_DIR}/agentes-runner.mjs`,
+      command: SYSTEM_LAUNCHER,
+      log: null,
+    });
+    // The installer's own runner paths, and its check for a connected computer.
+    const script = installScript("https://agentes.test");
+    expect(script).toContain('BUNDLE="$SYSTEM_DIR/agentes-runner.mjs"');
+    expect(script).toContain('BUNDLE="$RUNNER_HOME/agentes-runner.mjs"');
+    expect(script).toContain('LAUNCHER="$RUNNER_HOME/bin/agentes-runner"');
+    expect(script).toContain(`grep -q '"token"' "$RUNNER_HOME/config.json"`);
+  });
+
+  test("whether its service lets agents run commands, from the unit and the plist the runner writes", () => {
+    const launch = {
+      runtime: "/opt/agentes-runner/bin/bun",
+      script: "/opt/agentes-runner/agentes-runner.mjs",
+      home: "/x",
+    };
+    const host = ["host", "--server", "http://127.0.0.1:3000", "--token-file", "/opt/agentes/host-computer-token"];
+    for (const write of [systemdSystemUnit, launchdPlist]) {
+      expect(installedCommands(write(launch, host))).toBe(true);
+      expect(installedCommands(write(launch, [...host, "--no-exec"]))).toBe(false);
+      // A connected computer's own service isn't this server's.
+      expect(installedCommands(write(launch, ["start"]))).toBeNull();
+    }
+  });
+
+  test("the usage statistics question says what the web app's switch says", () => {
+    const { label, help } = en.settings.telemetry;
+    expect(TELEMETRY_TEXT.join(" ")).toBe(`${label}: ${help.charAt(0).toLowerCase()}${help.slice(1)}`);
   });
 
   test("each state of `agentes-runner host`, from the lines it logs", async () => {
