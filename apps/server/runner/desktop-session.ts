@@ -112,6 +112,7 @@ const INSTALL = `sudo apt install --no-install-recommends ${[
   "adwaita-icon-theme",
   "elementary-xfce-icon-theme",
   "fonts-noto-core",
+  "fonts-noto-cjk",
 ].join(" ")}`;
 
 /**

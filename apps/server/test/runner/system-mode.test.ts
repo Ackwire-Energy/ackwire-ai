@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MACHINE_OPS, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import {
+  configPath,
   DEFAULT_AGENT_UID_RANGE,
   normalizeStored,
   parseUidRange,
@@ -17,6 +18,7 @@ import { type HandlerContext, handleRequest, OP_ROUTES } from "../../runner/hand
 import {
   BROWSER_APT_PACKAGES,
   DESKTOP_APT_PACKAGES,
+  DESKTOP_CJK_APT_PACKAGES,
   DESKTOP_LOOK_APT_PACKAGES,
   installScript,
   RUNNER_BUN_SHA256,
@@ -186,6 +188,41 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(install({ booted: false })).toBe(1);
   expect(calls).toEqual([]);
 });
+
+test.if(posix)(
+  "service install --system: systemd's files readable by all under any umask, the home root's alone",
+  () => {
+    for (const umask of [0o077, 0o022]) {
+      const h = home();
+      const unitPath = path.join(h, "systemd", "agentes-runner.service");
+      const limits = agentSliceLimitsPath(unitPath);
+      // As a run under umask 077 left them: PID 1 warned at every read.
+      mkdirSync(path.dirname(limits), { recursive: true, mode: 0o700 });
+      writeFileSync(unitPath, "", { mode: 0o600 });
+      writeFileSync(limits, "", { mode: 0o600 });
+      const runnerHome = path.join(h, "runner");
+      const before = process.umask(umask);
+      try {
+        expect(
+          installSystemService({
+            print: () => {},
+            run: () => ({ code: 0, output: "" }),
+            launch: { runtime: BUN, script: BUNDLE, home: runnerHome },
+            uid: 0,
+            platform: "linux",
+            unitPath,
+            booted: true,
+            start: false,
+          }),
+        ).toBe(0);
+      } finally {
+        process.umask(before);
+      }
+      const files = [unitPath, path.dirname(limits), limits, runnerHome, configPath(runnerHome)];
+      expect(files.map((p) => statSync(p).mode & 0o777)).toEqual([0o644, 0o755, 0o644, 0o700, 0o600]);
+    }
+  },
+);
 
 test("a system-mode runner (root) without workers does no agent work; machine-level ops still answer", async () => {
   const ws = home();
@@ -358,11 +395,11 @@ test.if(posix)(
     // Root on Linux, as far as the script can tell.
     writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
     writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });
-    // apt-get notes its calls (and has no Orchis with $NO_ORCHIS); apt-cache knows the packages in $KNOWN once
-    // apt-get update has fetched the lists.
+    // apt-get notes its calls (and has none of the packages in $MISSING); apt-cache knows the packages in $KNOWN
+    // once apt-get update has fetched the lists.
     writeFileSync(
       path.join(fake, "apt-get"),
-      '#!/bin/sh\necho "apt-get $*" >> "$LOG"\ncase "$*" in *update*) : > "$LISTS" ;; *orchis*) [ -z "$NO_ORCHIS" ] || exit 100 ;; esac\n',
+      '#!/bin/sh\necho "apt-get $*" >> "$LOG"\ncase "$*" in *update*) : > "$LISTS" ;; esac\nfor p in $MISSING; do case " $* " in *" $p "*) exit 100 ;; esac; done\n',
       { mode: 0o755 },
     );
     writeFileSync(
@@ -371,7 +408,7 @@ test.if(posix)(
       { mode: 0o755 },
     );
     // The installer as run, up to the first folder it makes: from there on it writes to the computer's own folders.
-    const step = (desktop: boolean, opts: { known?: string[]; apt?: boolean; noOrchis?: boolean } = {}) => {
+    const step = (desktop: boolean, opts: { known?: string[]; apt?: boolean; missing?: string[] } = {}) => {
       const d = home();
       const r = spawnSync("/bin/sh", ["-s", "--", "--system", ...(desktop ? ["--desktop"] : [])], {
         input: installScript("https://agentes.test").replace(/main "\$@"\n$/, `mkdir() { exit 0; }\nmain "$@"\n`),
@@ -381,7 +418,7 @@ test.if(posix)(
           LOG: path.join(d, "log"),
           LISTS: path.join(d, "lists"),
           KNOWN: (opts.known ?? []).join(" "),
-          NO_ORCHIS: opts.noOrchis ? "1" : "",
+          MISSING: (opts.missing ?? []).join(" "),
         },
       });
       const log = path.join(d, "log");
@@ -413,12 +450,25 @@ test.if(posix)(
     // With --desktop: one install with the screens' packages too.
     r = step(true, { known: t64 });
     expect(r.out).toBe("Installing the packages for the agents' browser and screens ...\n");
-    // Then the screens' theme, where apt has it: a failure only says so.
-    expect(r.calls).toBe(update + install([...t64, ...DESKTOP_APT_PACKAGES]) + install(DESKTOP_LOOK_APT_PACKAGES));
-    r = step(true, { known: t64, noOrchis: true });
+    // Then the screens' theme and their CJK fonts, each where apt has it: a failure only says so.
+    expect(r.calls).toBe(
+      update +
+        install([...t64, ...DESKTOP_APT_PACKAGES]) +
+        install(DESKTOP_LOOK_APT_PACKAGES) +
+        install(DESKTOP_CJK_APT_PACKAGES),
+    );
+    expect(DESKTOP_CJK_APT_PACKAGES).toEqual(["fonts-noto-cjk"]);
+    // No Orchis (Ubuntu 22.04): the fonts still go in.
+    r = step(true, { known: t64, missing: ["orchis-gtk-theme"] });
     expect(r.status).toBe(0);
     expect(r.out).toContain(
       "The agents' screens keep the stock theme: apt has no orchis-gtk-theme librsvg2-common here",
+    );
+    expect(r.calls.endsWith(install(DESKTOP_CJK_APT_PACKAGES))).toBe(true);
+    r = step(true, { known: t64, missing: ["fonts-noto-cjk"] });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(
+      "The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no fonts-noto-cjk here",
     );
 
     // No apt: what to install, by name.

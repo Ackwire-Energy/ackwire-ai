@@ -1,7 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION, shQuote } from "../../runner/install-script";
 import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
@@ -231,28 +240,66 @@ test.skipIf(process.platform === "win32")(
   },
 );
 
+/** Root on Linux, with the system mode's folders in the test's own and the pinned Bun's download matching. */
+function rootLinux() {
+  const pc = fakeComputer({});
+  writeFileSync(path.join(pc.fake, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
+  writeFileSync(path.join(pc.fake, "chown"), "#!/bin/sh\n", { mode: 0o755 });
+  symlinkSync(Bun.which("dirname") as string, path.join(pc.fake, "dirname"));
+  const at = (dir: string) => path.join(pc.home, "system", dir);
+  const script = installScript("https://agentes.test")
+    .replace(RUNNER_BUN_SHA256["linux-aarch64"], createHash("sha256").update(FAKE_ZIP).digest("hex"))
+    .replaceAll("'/opt/agentes-runner'", shQuote(at("opt")))
+    .replaceAll("'/var/lib/agentes-runner'", shQuote(at("var")))
+    .replaceAll("'/usr/local/bin/agentes-runner'", shQuote(at("bin/agentes-runner")));
+  return { ...pc, at, script };
+}
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system: what it installs has the same modes under any umask (a provisioner's 077 included)",
+  () => {
+    const modes = (umask: string) => {
+      const pc = rootLinux();
+      // The computer's own /usr/local/bin.
+      mkdirSync(pc.at("bin"), { recursive: true, mode: 0o755 });
+      const r = pc.install(`umask ${umask}\n${pc.script}`, ["--system", "--desktop", "--no-pair", "--no-start"]);
+      expect(r.status).toBe(0);
+      expect(r.log).toContain("service install --system --no-start");
+      return Object.fromEntries(
+        readdirSync(pc.at(""), { recursive: true })
+          .map(String)
+          .filter((p) => p !== "bin")
+          .map((p) => [p, (lstatSync(pc.at(p)).mode & 0o777).toString(8)]),
+      );
+    };
+    const strict = modes("077");
+    // The agents' users run the runner on its Bun; root alone reads its home (the token).
+    expect(strict).toEqual({
+      opt: "755",
+      "opt/bin": "755",
+      "opt/bin/bun": "755",
+      "opt/agentes-runner.mjs": "644",
+      "bin/agentes-runner": "755",
+      var: "700",
+    });
+    expect(modes("022")).toEqual(strict);
+  },
+  // Two whole installs, each a shell running real tools.
+  30_000,
+);
+
 test.skipIf(process.platform === "win32")(
   "this server's computer on Linux, as root: --no-exec passed on; a computer already connected keeps its service",
   () => {
-    /** Root on Linux, with the system mode's folders in the test's own and the pinned Bun's download matching. */
-    const rootLinux = () => {
-      const pc = fakeComputer({});
-      writeFileSync(path.join(pc.fake, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
-      writeFileSync(path.join(pc.fake, "chown"), "#!/bin/sh\n", { mode: 0o755 });
-      symlinkSync(Bun.which("dirname") as string, path.join(pc.fake, "dirname"));
-      const at = (dir: string) => path.join(pc.home, "system", dir);
-      const script = installScript("https://agentes.test")
-        .replace(RUNNER_BUN_SHA256["linux-aarch64"], createHash("sha256").update(FAKE_ZIP).digest("hex"))
-        .replaceAll("'/opt/agentes-runner'", shQuote(at("opt")))
-        .replaceAll("'/var/lib/agentes-runner'", shQuote(at("var")))
-        .replaceAll("'/usr/local/bin/agentes-runner'", shQuote(at("bin/agentes-runner")));
+    const rootHost = () => {
+      const pc = rootLinux();
       const token = path.join(pc.home, "host-computer-token");
       writeFileSync(token, "t".repeat(64));
       const args = ["--system", "--desktop", "--server", "http://127.0.0.1:3000", "--host-token-file", token];
-      return { ...pc, at, token, run: (more: string[] = []) => pc.install(script, [...args, ...more]) };
+      return { ...pc, token, run: (more: string[] = []) => pc.install(pc.script, [...args, ...more]) };
     };
 
-    const pc = rootLinux();
+    const pc = rootHost();
     const run = pc.run(["--no-exec"]);
     expect(run.status).toBe(0);
     expect(run.log).toContain("service install --system --no-start");
@@ -262,7 +309,7 @@ test.skipIf(process.platform === "win32")(
     expect(pc.run().log).toContain(`service install --host --server http://127.0.0.1:3000 --token-file ${pc.token}\n`);
 
     // Connected as a computer of its own: the root unit stays that connection's, and nothing is installed.
-    const paired = rootLinux();
+    const paired = rootHost();
     mkdirSync(paired.at("var"), { recursive: true });
     writeFileSync(path.join(paired.at("var"), "config.json"), '{ "mode": "system", "token": "agm_x" }\n');
     const refused = paired.run();
