@@ -24,11 +24,13 @@ impl Default for Dock {
     }
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn shows(app: &AppHandle) -> bool {
     app.state::<Dock>().show.load(Ordering::Relaxed)
 }
 
 /// What the badge says: the count (99+ past 99), a dot for unread only, nothing otherwise.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 pub fn label(waiting: u32, unread: u32) -> Option<String> {
     match (waiting, unread) {
         (0, 0) => None,

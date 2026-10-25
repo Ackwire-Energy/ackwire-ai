@@ -5,7 +5,8 @@
  *
  * Scenarios (`?scenario=`): `first` (a Mac, nothing chosen yet), `windows` and `linux` (the same there),
  * `cloud` (agentes.chat, nothing on this computer), `selfhost` (the default: a server on Tailscale with two
- * organizations whose agents work here) and `link` (a connect link waiting, `?link=` or a claim link).
+ * organizations whose agents work here) and `link` (a claim link waiting); `?link=` makes any scenario start
+ * with that link waiting.
  * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
@@ -78,7 +79,7 @@ export function createFakeHost(
       : scenario === "selfhost"
         ? { current: FAKE_SERVER, servers: [FAKE_SERVER, CLOUD_SERVER] }
         : { current: null, servers: [] };
-  let link: string | null = scenario === "link" ? (options.link ?? CLAIM_LINK) : null;
+  let link: string | null = options.link ?? (scenario === "link" ? CLAIM_LINK : null);
   const waits = link?.includes("claim=") ?? false;
   const devChanged = () => {
     for (const l of devListeners) l();

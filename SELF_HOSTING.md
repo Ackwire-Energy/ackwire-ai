@@ -158,12 +158,30 @@ Agents run commands and code, drive a browser, and can think with Claude Code or
 you connect (Agent computers, below). A computer must reach the instance, so on Tailscale, install
 Tailscale on it and sign in to the same tailnet first.
 
-- **A Mac:** the agentes.chat desktop app. On its first screen, click the server line
-  (**Server: agentes.chat · Change**), paste your address (`https://agentes.<your-tailnet>.ts.net`),
-  click **Use this server**, and sign in when the browser opens. **Add organization** has the same
-  line.
+The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a window of its own:
+
+1. On its first screen, under **Sign in to agentes.chat**, click **Use your own server** (on Windows,
+   then **Connect to my server**).
+2. Type your address (`https://agentes.<your-tailnet>.ts.net`), or click **Use** next to one the app
+   found: it looks on this computer and, when Tailscale is connected, on your tailnet. Plain http works
+   only for an instance on the same computer (`http://127.0.0.1:…`).
+3. Sign in, as in the browser. The link the setup prints at the end (`agenteschat://connect?…`) does
+   steps 1 and 2 for you; the app shows the address in large type and asks before it connects.
+
+**Servers** in the app's Preferences (and its menus) switches between instances; each keeps its own
+sign-in.
+
+- **Agents on that Mac or Linux computer:** in the instance's onboarding or **Settings → Computers**,
+  click **Use this Mac** (**Use this computer** on Linux). The app asks first, in its own dialog naming
+  the instance and the organization. Agents start with no folders of yours and commands off; you choose
+  more in the app's Preferences. On Windows, and with agentes.chat Cloud, the app is only a window onto
+  the workspace and nothing of the computer is used.
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
+
+Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), an instance's download button asks
+agentes.chat for the newest version of the app (the request names the system, nothing of the instance or
+its people).
 
 </details>
 

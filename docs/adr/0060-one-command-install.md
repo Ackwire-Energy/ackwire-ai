@@ -3,7 +3,7 @@
 - Status: Accepted. Built: the installer, the server's computer and plain words. Not built yet: native mode (§2), so a Mac needs Docker for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
 - Date: 2026-10-24
 - Extends: ADR 0003 (PGlite), ADR 0025 (connected computers), ADR 0030 (isolation on computers), ADR 0036 (one runner per organization), ADR 0041 (accounts on a computer)
-- Out of scope for now: Windows, a container image as the agents' computer, native mode as a server database at scale
+- Out of scope for now: Windows as the server (the desktop app is a client there, ADR 0066; WSL2 follows the Linux path), a container image as the agents' computer, native mode as a server database at scale
 
 ## Context
 
@@ -26,6 +26,7 @@ After the install, agents still need a computer, and on a fresh server nobody ha
 - **Flags:** `--dir`, `--yes`, and `--plan` (or `--dry-run`), which prints each decision and the commands it would run and runs nothing (what the tests assert). `--native` comes with native mode; until then it says so and stops. Every other flag goes to the wizard, and a test checks the wizard accepts every option the installer hands it; with its `--json`, the installer's own lines go to stderr. `AGENTES_INSTALL_SETUP` points at a local build of the wizard. A version is held the compose file's way, with `AGENTES_IMAGE` in `.env`.
 - **Folders:** `/opt/agentes` as root, `~/agentes` for a user who can already use Docker, `~/.agentes` in native mode.
 - The docs also show "download, read, then run".
+- The desktop app shows the command where a person needs it (ADR 0066): under Connect, as "Don't have one yet? Run this on it", for a server without a screen (a VPS, a Mac mini over SSH); on Windows, the WSL 2 form `… | sh -s -- --network local`, whose server the PC then finds at `localhost`. The app connects to an install by its address, by what it finds on this computer or the Tailscale network, or by the link the setup prints at the end.
 
 ### 2. Docker or native
 

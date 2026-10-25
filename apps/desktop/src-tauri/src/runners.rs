@@ -131,23 +131,9 @@ impl Runners {
         self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.lock().is_empty()
-    }
-
     /// Whether any home is signed in to an organization (its config holds a token).
     pub fn any_paired(&self) -> bool {
         self.lock().values().any(|r| paired_home(&r.dir))
-    }
-
-    /// The server each home signs in to (`server` in its config).
-    pub fn servers(&self) -> Vec<String> {
-        self.lock().values().filter_map(|r| home_server(&r.dir)).collect()
-    }
-
-    /// The server of each home signed in to an organization.
-    pub fn paired_servers(&self) -> Vec<String> {
-        self.lock().values().filter(|r| paired_home(&r.dir)).filter_map(|r| home_server(&r.dir)).collect()
     }
 
     pub fn is_shut_down(&self) -> bool {
@@ -576,13 +562,6 @@ fn paired_home(dir: &std::path::Path) -> bool {
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
         .and_then(|v| v.get("token").and_then(|t| t.as_str()).map(|t| !t.is_empty()))
         .unwrap_or(false)
-}
-
-/// The server a home signs in to, from its `config.json` (none before its first sign-in).
-fn home_server(dir: &std::path::Path) -> Option<String> {
-    let text = fs::read_to_string(dir.join("config.json")).ok()?;
-    let config = serde_json::from_str::<serde_json::Value>(&text).ok()?;
-    config.get("server")?.as_str().map(str::to_string)
 }
 
 #[cfg(test)]

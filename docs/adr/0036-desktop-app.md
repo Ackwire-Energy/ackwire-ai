@@ -1,6 +1,6 @@
 # 0036. Desktop app: Tauri in the menu bar, the runner as its child process
 
-- Status: Accepted (not built yet)
+- Status: Accepted; its menu-bar-first model, "the runner ships and starts in every install" and §11's "the main window loads agentes.chat only" are superseded by ADR 0066 (one app for agentes.chat and your own server, a plain client first)
 - Date: 2026-10-17
 - Extends: ADR 0025 (connected computers), ADR 0029 (missions and background tasks), ADR 0030 (isolation), ADR 0035 (shared client packages)
 

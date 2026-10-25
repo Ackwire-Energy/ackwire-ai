@@ -140,6 +140,7 @@ pub(crate) fn open_app(app: &AppHandle) {
     }
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn toggle_popover(app: &AppHandle) {
     let Some(window) = app.get_webview_window("popover") else { return };
     if window.is_visible().unwrap_or(false) {
