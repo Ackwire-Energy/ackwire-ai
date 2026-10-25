@@ -23,7 +23,7 @@ export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
   firstRun: boolean;
-  /** No account yet, and the first one only through the owner link the installer printed (absent: false). */
+  /** No account yet, and the first one only through the owner link (`/owner#claim=…`; absent: false). */
   ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;

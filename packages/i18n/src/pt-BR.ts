@@ -114,8 +114,7 @@ export const ptBR = {
       sentLead: "Vale por 1 hora. Não chegou em 1 minuto? Veja o spam.",
       openMail: "Abrir o {{app}}",
       ownerWaits: "Este servidor espera o seu dono.",
-      ownerWaitsLead:
-        "Abra o link que o instalador mostrou no fim, neste computador ou no celular. Para ver de novo, rode o comando de instalação no servidor mais uma vez.",
+      ownerWaitsLead: "Abra o link de dono deste servidor (termina em /owner#claim=…), neste computador ou no celular.",
       noPassword: "Esta conta entra pelo app do agentes.chat.",
       noPasswordLead:
         "Abra o app no computador onde este servidor roda. Lá, no menu da sua conta, escolha Adicionar uma senha: aí você entra por aqui também.",
@@ -153,11 +152,10 @@ export const ptBR = {
       title: "Configurar este servidor",
       lead: "Crie a conta de dono. Depois você convida a sua equipe.",
       create: "Criar a conta de dono",
-      noLink: "Abra o link do instalador",
-      noLinkLead:
-        "Esta página precisa do link que o instalador mostrou no fim. Para ver de novo, rode o comando de instalação no servidor mais uma vez.",
+      noLink: "Abra o link de dono deste servidor",
+      noLinkLead: "Esta página precisa do link de dono deste servidor (termina em #claim=…).",
       wrongLink: "Este link não é deste servidor.",
-      wrongLinkLead: "Abra o link mais recente que o instalador mostrou.",
+      wrongLinkLead: "Abra o link de dono mais recente deste servidor.",
       taken: "Este servidor já tem dono.",
       takenLead: "Entre com a sua conta.",
     },

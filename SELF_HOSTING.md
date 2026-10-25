@@ -12,7 +12,7 @@ anything, and every link the app sends come from it. Opened at any other address
 "Invalid origin" and saving fails with `bad_origin`.
 
 The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
-DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → API keys**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -511,7 +511,7 @@ tar -xzf agentes-native-1.4.0-linux-x64.tar.gz -C ~/.agentes/app --strip-compone
 The first start makes the folder (readable by you only) and its `.env`, with a new `AGENTES_SECRET`
 and a free port from 4310, migrates the database and answers at `http://127.0.0.1:4310` (it prints the
 address; `PORT` in `.env` changes it). Open it and create the owner account: the first account owns the
-installation, unless an installer left an owner link (Configuration, Sign-up). `AGENTES_SECRET`
+installation, unless `OWNER_CLAIM_SHA256` keeps it for an owner link (Configuration, Sign-up). `AGENTES_SECRET`
 encrypts the keys organizations store: it travels with the folder in a backup, and changing it makes
 them unreadable.
 
@@ -525,6 +525,10 @@ them unreadable.
 | `agentes-server db check` | Opens the database and prints what wrote it. |
 | `agentes-server telemetry` | Prints the next usage report, exactly, and sends nothing. |
 | `agentes-server version` | Its version, and its PGlite's and Postgres's. |
+
+On a Mac the service starts when you log in, so a Mac mini that must come back by itself after a
+power cut needs automatic login (System Settings › Users & Groups; FileVault turns it off) and **Start
+up automatically after a power failure** (System Settings › Energy).
 
 When it stops at once, its exit code says why: 3, another `agentes-server` (or another program) uses
 that folder (the message names its process); 4, the database needs an upgrade (below); 5, another
@@ -640,15 +644,25 @@ ones a self-hosted instance usually touches:
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 
 **Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
-MiniMax) in **Settings → API keys**, and each agent uses one of them. Usage and cost are recorded per agent.
+MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
-**Sign-up.** The first account is always allowed. After it, with `ALLOW_SIGNUP=false` (the default),
-only invited people get in: invited by email from **Settings → Members and invitations**, or through
-an invite link, which works without email. Keep sign-up closed on an instance reachable from the
-internet. An installer can keep the first account for its owner: with `OWNER_CLAIM_SHA256` set, only
-the owner link it printed (`<PUBLIC_URL>/owner#claim=…`) creates it, with a password, and every other
-sign-up waits until it has. The link works once, so treat it like a password until you've used it.
-`OWNER_KEY_SHA256` does the same for the desktop app that runs the server on its own computer.
+**Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
+it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
+email from **Settings → Members and invitations**, or through an invite link, which works without
+email. Keep sign-up closed on an instance reachable from the internet. To keep the first account for
+its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex) of a one-time token (the setup doesn't make
+one yet); then only `<PUBLIC_URL>/owner#claim=<token>` creates it, with a password, and every other
+sign-up waits until it has. In the folder with `.env`:
+
+```sh
+token=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')
+echo "OWNER_CLAIM_SHA256=$(printf %s "$token" | openssl dgst -sha256 | sed 's/^.*= //')" >> .env
+docker compose up -d
+echo "Owner link: <PUBLIC_URL>/owner#claim=$token"
+```
+
+The link works once, so treat it like a password until you've used it. `OWNER_KEY_SHA256` does the
+same for the desktop app that runs the server on its own computer.
 
 **Email.** Without `SMTP_URL` or `MILLIONSEND_API_KEY`, the app writes each email to its log instead
 of sending it (`docker compose logs agentes | grep 'email (not sent'`), so an invitation link can
@@ -731,6 +745,10 @@ none (`https://agentes.chat/install/docker-compose.yml`), the packages that run 
 (`https://agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and the
 desktop app's check for its own new version, at start and every 6 hours
 (`https://agentes.chat/api/desktop/latest`). The instance itself downloads nothing from agentes.chat.
+
+An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, Chrome
+for Testing from Google the first time an agent opens the browser there, and, on Linux, the packages
+agents' screens and browsers need from the system's own package sources.
 
 Besides that report and the model providers each organization chooses, the instance talks to a third
 party only when you turn that service on:
@@ -874,7 +892,7 @@ desktop use.
 **This server as the agents' computer.** The machine agentes.chat runs on can be a computer too, for
 the organizations the installation's first account made and is an owner or an admin of. The setup
 does it by default, after asking: on Linux each agent gets a user of its own with a screen (as root,
-with systemd, apt-get and 4 GB of memory or more; otherwise the answer defaults to no, saying why),
+with systemd: yes by default with apt-get and 4 GB of memory or more, no by default otherwise, saying why),
 and on a Mac agents work as you, in folders of their own, with a browser, Claude Code and Codex, and
 commands off unless you say yes. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
 `host-computer-token` beside it (readable by you only), installs what runs the agents there from the
@@ -883,9 +901,10 @@ address the app is published on (`BIND_ADDRESS` and `HOST_PORT`), and waits for 
 up again when agentes.chat brings a newer version. Answering no leaves `HOST_COMPUTER_TOKEN=` empty,
 so the setup doesn't ask again; `--computer yes` on a later run turns it on, and `--computer no`
 after a yes empties the token, removes `host-computer-token` and prints the command that removes the
-service. It's skipped while sign-up is open (`ALLOW_SIGNUP=true`) or a provisioner gives every
-workspace its computer (`MACHINE_PROVISIONING=external`), since the server won't start with the token
-then, and on a machine already connected as a computer, whose connection stays as it is.
+service. It's skipped, saying why, while sign-up is open (`ALLOW_SIGNUP=true`) or a provisioner gives
+every workspace its computer (`MACHINE_PROVISIONING=external`), since the server won't start with the
+token then; on Linux without root or systemd; inside the image; and on a machine already connected as
+a computer, whose connection stays as it is.
 
 By hand on Linux (a server set up before, say): set a token in `.env` and give the same one to the
 agents' computer, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you
@@ -895,11 +914,11 @@ changed it):
 (umask 077 && openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token)
 echo "HOST_COMPUTER_TOKEN=$(cat /root/host-computer-token)" >> .env
 docker compose up -d
-curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system \
+curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system --desktop \
   --server http://127.0.0.1:3000 --host-token-file /root/host-computer-token
 ```
 
-Within a minute it shows as "Computador deste servidor" in each of those organizations, and agents
+Within a minute it shows as "This server's computer" in each of those organizations, and agents
 without a computer start using it; admins stop it per organization there. `HOST_COMPUTER_TOKEN` can't
 be set with `ALLOW_SIGNUP=true`, and a new token retires the old one's connections when the server
 restarts.
@@ -961,8 +980,8 @@ Migrations run when the new version starts, so that is the whole upgrade for a s
 compose file runs `ghcr.io/agentes-chat/agentes:latest`, the latest release, for amd64 and arm64;
 `:1.2.3` and `:1.2` tags exist alongside it, and `:edge` follows `main`. To hold a version, set
 `AGENTES_IMAGE` in `.env` to a version tag or a digest (`ghcr.io/agentes-chat/agentes@sha256:…`),
-and download the compose file of that version's tag (`…/agentes-chat/v1.2.3/docker-compose.yml`)
-instead of `main`'s. This prints the digest you have:
+and download that version's compose file (`docker-compose.yml` at the repository's `v1.2.3` tag)
+instead of agentes.chat's latest one. This prints the digest you have:
 
 ```sh
 docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/agentes-chat/agentes:latest

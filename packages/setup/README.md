@@ -35,8 +35,8 @@ removes the old one's container.
    already there.
 5. **Email** for invitations and password resets, optional: an SMTP server or a Resend-compatible
    API.
-6. **The agents' computer:** this machine, by default where it can be (Linux as root with apt-get
-   and 4 GB of memory or more, each agent a user of its own with a screen; a Mac, agents working as
+6. **The agents' computer:** this machine, by default where it can be (Linux as root with systemd,
+   apt-get and 4 GB of memory or more, each agent a user of its own with a screen; a Mac, agents working as
    you with a browser, Claude Code and Codex, commands off unless you say yes).
 7. **Usage statistics:** whether to send anonymous usage statistics to agentes.chat (yes by
    default), written to `.env` as `TELEMETRY=on|off`.

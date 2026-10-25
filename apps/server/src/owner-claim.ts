@@ -9,11 +9,11 @@ import { z } from "zod";
 import type { Logger } from "./logger";
 
 /**
- * The installation's first account, its owner (ADR 0060 §6), made by whoever holds the secret its
- * install left instead of by whoever signs up first:
+ * The installation's first account, its owner (ADR 0060 §6), made by whoever holds the secret set for
+ * it instead of by whoever signs up first:
  *
- * - a claim (`OWNER_CLAIM_SHA256`, the setup's): the link it prints, `/owner#claim=<token>`, with a
- *   name, an email and a password, once;
+ * - a claim (`OWNER_CLAIM_SHA256`): the link `/owner#claim=<token>`, with a name, an email and a
+ *   password, once;
  * - the owner key (`OWNER_KEY_SHA256`, the desktop app's, which runs the server on that computer):
  *   the owner with no password, then a one-time sign-in for them whenever the app asks. The key
  *   never reaches a web view.

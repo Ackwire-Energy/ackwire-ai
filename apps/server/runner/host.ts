@@ -196,10 +196,12 @@ export class HostComputer {
   /**
    * One round that writes the homes and starts nothing (`host --once`, for a program that runs their
    * runners itself, the desktop app). A new home has every tool off: that program turns on its own.
-   * `gone`: this server's homes here that it no longer serves; they stay until their owner removes them.
+   * New means the organization had no home here: one written for the server at its previous port is the same
+   * home, tools and all. `gone`: this server's homes here that it no longer serves; they stay until their
+   * owner removes them.
    */
   async once(): Promise<HostSyncResult> {
-    const before = this.homes().filter((h) => h.config.managedBy === "host" && h.config.server === this.opts.server);
+    const before = this.homes().filter((h) => h.config.managedBy === "host");
     const orgs = await this.ask();
     if (!orgs) return { status: this.status === "starting" ? "unreachable" : this.status, homes: [], gone: [] };
     const homes = orgs.flatMap((org) => {
@@ -208,7 +210,9 @@ export class HostComputer {
       const fresh = !before.some((h) => h.orgId === org.orgId);
       return [{ orgId: org.orgId, orgName: org.orgName, machineId: org.machineId, home, new: fresh }];
     });
-    const gone = before.filter((h) => !orgs.some((o) => o.orgId === h.orgId)).map((h) => h.orgId);
+    const gone = before
+      .filter((h) => h.config.server === this.opts.server && !orgs.some((o) => o.orgId === h.orgId))
+      .map((h) => h.orgId);
     return { status: "on", homes, gone };
   }
 

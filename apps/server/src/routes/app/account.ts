@@ -89,8 +89,7 @@ export function accountRoutes(deps: AppDeps) {
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
             firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
             ownerClaim: z.boolean().openapi({
-              description:
-                "No account yet, and only the owner link the installer printed creates the first one (`OWNER_CLAIM_SHA256`).",
+              description: "No account yet, and only the owner link (`OWNER_CLAIM_SHA256`) creates the first one.",
             }),
             passwordReset: z.boolean().openapi({ description: 'Offer "forgot password" (e-mail is configured).' }),
             landing: z
