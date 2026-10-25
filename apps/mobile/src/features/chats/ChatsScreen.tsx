@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet } from "react-native";
 import { LargeTitleScreen, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
+import { SetupNotice } from "../computer/SetupWait";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
@@ -32,8 +33,8 @@ export const openKindList = (kind: ListKind) => router.push(`/conversations/${ki
  * large title with Você and "+" (Novo) in the bar, over a light sky, the greeting under it with what changed
  * (what an agent finished, how many work), the "Esperando você" strip (only while something waits; it opens into
  * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
- * collapsible (remembered), five rows and "Ver todos". Under the greeting, a notice per computer that went
- * offline with agents waiting for it. An agent's row says it waits on your ok, waits
+ * collapsible (remembered), five rows and "Ver todos". Under the greeting, the workspace's own computer while it
+ * is being prepared, and a notice per computer that went offline with agents waiting for it. An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  */
 export function ChatsScreen() {
@@ -82,6 +83,7 @@ export function ChatsScreen() {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
       onScrollBeginDrag={waitOpen ? () => setWaitOpen(false) : undefined}
     >
+      <SetupNotice />
       <OutageNotices />
       {strip}
       {empty ? (

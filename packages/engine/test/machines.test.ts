@@ -713,7 +713,19 @@ describe("tools on a connected machine", () => {
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');
     expect(status.content).not.toContain(RUNNER.workspace);
-    expect((await call(ctx, "computer_stop", {})).content).toContain("only its owner");
+    // Turning a computer on and off is a sandbox's: a computer of the workspace has no such tools.
+    expect(listed?.filter((t) => t.name.startsWith("computer_")).map((t) => t.name)).toEqual(["computer_status"]);
+
+    // The workspace's own computer is always on.
+    const kind = (k: "managed" | "connected") =>
+      f.db.update(schema.machines).set({ kind: k }).where(eq(schema.machines.id, paired.machineId));
+    await kind("managed");
+    expect((await call(ctx, "computer_status", {})).content).toContain(
+      `You are on "Build box", this workspace's own computer (Linux), always on: answering now.`,
+    );
+    const ownRunCode = (await f.tools?.list(ctx))?.find((t) => t.name === "run_code");
+    expect(ownRunCode?.description).toContain(`Runs on "Build box" (Linux), this workspace's own computer, always on`);
+    await kind("connected");
 
     expect(await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.kind, "sandbox"))).toEqual([]);
     expect(await f.db.select().from(schema.sandboxes)).toEqual([]);

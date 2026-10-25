@@ -12,6 +12,7 @@ import {
 import type { Database } from "@agenteschat/db";
 import { type MachineHub, MachineRequestError } from "./machine-hub";
 import { authenticateMachine, MachineOfflineError, MachinePausedError } from "./machines";
+import { AgentHeldError, OrgPausedError } from "./standing";
 
 /** A WebSocket as the broker sees it: the server adapts Bun's, tests use in-memory ones. */
 export interface StreamSocket {
@@ -30,8 +31,13 @@ export interface StreamInput {
   request: StreamRequest;
 }
 
-/** Where a stream that may open goes, or why it can't (the viewer's close code and a short reason). */
-export type StreamTarget = { machineId: string; agent: AgentScope } | { refused: number; reason: string };
+/**
+ * Where a stream that may open goes, or why it can't (the viewer's close code and a short reason). `held`:
+ * the agent or its workspace is held, so a desktop that runs may be watched but none is started for it.
+ */
+export type StreamTarget =
+  | { machineId: string; agent: AgentScope; held?: boolean }
+  | { refused: number; reason: string };
 
 export interface Stream extends StreamInput {
   /** 32 random bytes, base64url: the runner's data socket names the stream with it. */
@@ -162,6 +168,8 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
   function refusal(error: unknown): [number, string] {
     if (error instanceof MachineOfflineError) return [STREAM_CLOSE.unreachable, "offline"];
     if (error instanceof MachinePausedError) return [STREAM_CLOSE.refused, "machine_paused"];
+    // The hub's own check, for what starts something (control; a start on an older runner).
+    if (error instanceof AgentHeldError || error instanceof OrgPausedError) return [STREAM_CLOSE.refused, "held"];
     if (error instanceof MachineRequestError) {
       if (error.code === "timeout") return [STREAM_CLOSE.late, "timeout"];
       if (error.code === "too_many_streams") return [STREAM_CLOSE.tooMany, error.code];
@@ -182,12 +190,24 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     if ("refused" in target) return close(s, target.refused, target.reason);
     if (full(s, target.machineId)) return close(s, STREAM_CLOSE.tooMany, "too_many_streams");
     s.machineId = target.machineId;
-    const request = { op: "stream.open", streamId: s.id, ...s.request, agent: target.agent } as Extract<
+    const { machineId, agent } = target;
+    const held = target.held === true;
+    const starts = s.request.kind === "desktop" && !held ? { start: true } : {};
+    const request = { op: "stream.open", streamId: s.id, ...s.request, agent, ...starts } as Extract<
       MachineRequest,
       { op: "stream.open" }
     >;
+    const open = () => deps.hub.call(machineId, request, { timeoutMs: limits.openTimeoutMs });
     try {
-      await deps.hub.call(target.machineId, request, { timeoutMs: limits.openTimeoutMs });
+      try {
+        await open();
+      } catch (error) {
+        if (!(error instanceof MachineRequestError && error.code === "desktop_off") || s.closed) throw error;
+        if (held) return close(s, STREAM_CLOSE.refused, "held");
+        // A runner from before desktops stayed on ignores `start`: it starts, then opens.
+        await deps.hub.call(machineId, { op: "desktop.session.start", agent }, { timeoutMs: limits.openTimeoutMs });
+        if (!s.closed) await open();
+      }
       // The runner answers only once its data socket got `stream.ready`: without one by now, none is coming.
       if (!s.runner) close(s, STREAM_CLOSE.late, "no data socket");
     } catch (error) {

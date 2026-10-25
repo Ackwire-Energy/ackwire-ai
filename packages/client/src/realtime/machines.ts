@@ -181,7 +181,18 @@ export function applyComputerEvent(qc: QueryClient, orgId: string, event: { type
   void qc.invalidateQueries({ queryKey: keys.agentBrowser(orgId, e.agentId) });
 }
 
-const SETUP_FIELDS = ["state", "step", "reason", "since", "etaSeconds", "specs", "machineId"] as const;
+const SETUP_FIELDS = [
+  "state",
+  "step",
+  "reason",
+  "since",
+  "requestedAt",
+  "expectedReadyAt",
+  "secondsLeft",
+  "secondsWaited",
+  "specs",
+  "machineId",
+] as const;
 
 /**
  * The workspace's own computer and standing (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
@@ -191,12 +202,22 @@ const SETUP_FIELDS = ["state", "step", "reason", "since", "etaSeconds", "specs",
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "machine.provisioning") {
-    const e = event as Partial<Record<(typeof SETUP_FIELDS)[number], unknown>>;
-    const next = Object.fromEntries(SETUP_FIELDS.map((k) => [k, e[k] ?? null])) as Omit<ComputerSetup, "mode">;
-    qc.setQueryData<ComputerSetup>(keys.computerSetup(orgId), { mode: "external", ...next });
+    const e = event as Partial<Record<(typeof SETUP_FIELDS)[number] | "notifyByEmail", unknown>>;
+    const next = Object.fromEntries(SETUP_FIELDS.map((k) => [k, e[k] ?? null])) as Omit<
+      ComputerSetup,
+      "mode" | "notifyByEmail"
+    >;
+    qc.setQueryData<ComputerSetup>(keys.computerSetup(orgId), (old) => ({
+      mode: "external",
+      ...next,
+      // Whether the server sends email is the server's, not the step's: an event without it keeps what was known.
+      notifyByEmail: typeof e.notifyByEmail === "boolean" ? e.notifyByEmail : (old?.notifyByEmail ?? false),
+    }));
     if (next.state === "ready") {
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
       void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+      // Every agent's screen is there now: an open computer dialog shows it at once.
+      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
     }
     return true;
   }

@@ -14,6 +14,7 @@ import { body, iso, json, noContent, OrgParams } from "../routes/app/context";
 import type { OperatorDeps } from "./app";
 
 const tags = ["Operator"];
+const MAX_AHEAD_MS = 7 * 86_400_000;
 const errors = {
   400: errorResponse("Invalid request"),
   401: errorResponse("Missing or wrong token"),
@@ -34,7 +35,13 @@ const Provisioning = z
     step: z.enum(PROVISIONING_STEPS).nullable(),
     reason: z.enum(PROVISIONING_REASONS).nullable(),
     since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
-    etaSeconds: z.number().int().nullable(),
+    requestedAt: z.string().openapi({
+      description: "When its people started waiting: the computer's last removal, else the workspace's creation.",
+    }),
+    expectedReadyAt: z
+      .string()
+      .nullable()
+      .openapi({ description: "With `preparing`: the ready time you gave, kept while it is past (any moment now)." }),
     specs: Specs.nullable(),
   })
   .openapi("OperatorProvisioning");
@@ -65,15 +72,28 @@ const ProvisioningInput = z.object({
     .optional()
     .openapi({ description: "With `preparing`: reserving, starting, installing or connecting; ignored otherwise." }),
   reason: z
-    .enum(PROVISIONING_REASONS)
+    .enum([...PROVISIONING_REASONS, "approval"])
     .optional()
-    .openapi({ description: "With `waiting`: approval or capacity; ignored otherwise." }),
+    .openapi({
+      description: "With `waiting`: capacity; ignored otherwise. `approval`, from an older client, reads as capacity.",
+    }),
+  expectedReadyAt: z.iso
+    .datetime({ offset: true })
+    .refine((at) => Date.parse(at) <= Date.now() + MAX_AHEAD_MS, "At most 7 days ahead")
+    .optional()
+    .openapi({
+      description:
+        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A time already past means any moment now, and while the stored one is past too it stays, so people see the wait run over.",
+    }),
   etaSeconds: z
     .number()
     .int()
     .min(0)
-    .max(7 * 86_400)
-    .optional(),
+    .max(MAX_AHEAD_MS / 1000)
+    .optional()
+    .openapi({
+      description: "From an older client, in place of `expectedReadyAt`: read as that many seconds from now.",
+    }),
   specs: Specs.optional().openapi({ description: "Kept from before when absent." }),
 });
 
@@ -103,7 +123,7 @@ const Machine = z
 
 const MachineParams = OrgParams.extend({ machineId: z.uuid().openapi({ param: { name: "machineId", in: "path" } }) });
 
-export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub }: OperatorDeps) {
+export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub, emails }: OperatorDeps) {
   api.openapi(
     createRoute({
       method: "get",
@@ -136,12 +156,16 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub 
       tags,
       summary: "Say how far the workspace's computer is",
       description:
-        "Its people see it live. The time `since` restarts only when the state, step or reason change. Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "Its people see it live, with the time left. The time `since` restarts only when the state, step or reason change. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
       request: { params: OrgParams, body: body(ProvisioningInput) },
       responses: { 204: noContent[204], ...errors, 409: errorResponse("The computer is ready") },
     }),
     async (c) => {
-      const found = await setProvisioning({ db, pubsub }, c.req.valid("param").orgId, c.req.valid("json"));
+      const { expectedReadyAt, ...input } = c.req.valid("json");
+      const found = await setProvisioning({ db, pubsub, emails }, c.req.valid("param").orgId, {
+        ...input,
+        ...(expectedReadyAt ? { expectedReadyAt: new Date(expectedReadyAt) } : {}),
+      });
       if (!found) return apiError(c, 404, "not_found", "No workspace with this id");
       return c.body(null, 204);
     },
@@ -188,13 +212,13 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub 
       tags,
       summary: "Take the workspace's computer away",
       description:
-        "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now. 404 when the workspace has no such managed computer (also when it was already removed).",
       request: { params: MachineParams },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, machineId } = c.req.valid("param");
-      if (!(await revokeManagedMachine({ db, pubsub }, orgId, machineId))) {
+      if (!(await revokeManagedMachine({ db, pubsub, emails }, orgId, machineId))) {
         return apiError(c, 404, "not_found", "This workspace has no managed computer with this id");
       }
       return c.body(null, 204);

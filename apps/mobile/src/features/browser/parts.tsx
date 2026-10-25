@@ -1,4 +1,5 @@
 import {
+  ApiError,
   type BrowserFrame,
   type BrowserInputEvent,
   clickEvents,
@@ -9,6 +10,8 @@ import {
   keyEvents,
   textEvent,
 } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { openRefusalKey } from "@agenteschat/client/lib/sites";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -154,6 +157,83 @@ export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) =>
           <Icon name="send" size={16} color={c.bg} />
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+/**
+ * The address of the agent's browser while a person is in control of its page full screen: the site
+ * opens there (a closed browser starts, to sign in ahead of time); a refusal (outside the agent's sites,
+ * not an address, a page that didn't load) is said under the field, as on the web.
+ */
+export function AddressBar({
+  name,
+  cloud,
+  onOpen,
+}: {
+  name: string;
+  /** The workspace's own computer: its refusals never say it is off. */
+  cloud: boolean;
+  /** Opens the typed address; rejects with the server's refusal. */
+  onOpen: (url: string) => Promise<unknown>;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const go = async () => {
+    const typed = url.trim();
+    if (!typed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onOpen(typed);
+      setUrl("");
+    } catch (e) {
+      setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined, cloud), agentGrammar(t, name)));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const ready = url.trim().length > 0 && !busy;
+  return (
+    <View style={styles.typeWrap}>
+      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
+        <Icon name="globe" size={16} color={c.muted} />
+        <TextInput
+          value={url}
+          onChangeText={(v) => {
+            setUrl(v);
+            setError(null);
+          }}
+          placeholder={t("browser.inCard.goPlaceholder")}
+          placeholderTextColor={c.faint}
+          accessibilityLabel={t("browser.inCard.goLabel")}
+          style={[styles.input, { color: c.ink }]}
+          keyboardType="url"
+          textContentType="URL"
+          autoCapitalize="none"
+          autoCorrect={false}
+          maxLength={2048}
+          returnKeyType="go"
+          onSubmitEditing={() => void go()}
+        />
+        <Pressable
+          onPress={() => void go()}
+          disabled={!ready}
+          accessibilityRole="button"
+          accessibilityLabel={t("browser.inCard.go")}
+          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 }]}
+        >
+          <Icon name="right" size={16} color={c.bg} />
+        </Pressable>
+      </View>
+      {error ? (
+        <Text variant="caption" tone="danger" accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }

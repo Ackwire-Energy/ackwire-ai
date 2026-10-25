@@ -2161,10 +2161,19 @@ export interface ComputerSetup {
   state: "preparing" | "waiting" | "problem" | "ready" | null;
   /** While `preparing`. */
   step: ComputerSetupStep | null;
-  /** While `waiting`: `approval` (soon) or `capacity` (taking longer than usual). */
-  reason: "approval" | "capacity" | null;
+  /** While `waiting`: `capacity` (taking longer than usual). */
+  reason: "capacity" | null;
   since: string | null;
-  etaSeconds: number | null;
+  /** When people started waiting: the workspace's creation, or the computer's last revoke. */
+  requestedAt: string | null;
+  /** When the provisioner expects it ready; null while it can't say. */
+  expectedReadyAt: string | null;
+  /** `expectedReadyAt` less the server's clock when it answered (negative once past), so a device's clock doesn't matter. */
+  secondsLeft: number | null;
+  /** The server's clock when it answered less `requestedAt`, for the same reason. */
+  secondsWaited: number | null;
+  /** The server sends email: the workspace's owners get one when it's ready after a wait. */
+  notifyByEmail: boolean;
   specs: { cpus: number; memoryGb: number; diskGb: number } | null;
   /** The computer itself, once the provisioner made it. */
   machineId: string | null;
@@ -4196,11 +4205,10 @@ export interface DesktopStatus {
   controllerUserId: string | null;
   handoff: BrowserHandoff | null;
   viewers: number;
-  /** This person may take control (and open the agent's terminal). */
+  /** This person may take control. */
   canControl: boolean;
-  /** This person may turn it on ("Ligar") and off ("Desligar"). */
-  canStart: boolean;
-  terminal: { available: boolean; reason: string | null; allowed: boolean };
+  /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
+  held: boolean;
 }
 
 /** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */

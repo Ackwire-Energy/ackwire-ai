@@ -29,6 +29,7 @@ import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { useThreadWhere } from "@/components/threads/ThreadView";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import {
@@ -360,6 +361,7 @@ export function useCompactOnScroll(fold = 240, unfold = 48) {
 function PickComputer({ mission }: { mission: Mission }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
+  const cloud = useComputerEdition(org.id) === "cloud";
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -377,7 +379,9 @@ function PickComputer({ mission }: { mission: Mission }) {
     >
       {mine.length === 0 && (
         <MenuItem icon="info" disabled onSelect={() => {}}>
-          {t("missions.pinned.noComputers")}
+          {cloud
+            ? t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) })
+            : t("missions.pinned.noComputers")}
         </MenuItem>
       )}
       {mine.map((x) => (

@@ -35,6 +35,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
@@ -103,6 +104,8 @@ function OutageNotice({
   const [open, setOpen] = useState(false);
   // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, o.machineId);
+  // The Cloud's one computer: its people are told it is being looked after, with no other computer to go to.
+  const cloud = useComputerEdition(org.id) === "cloud";
   // "há 12 min" moves on by itself.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -114,6 +117,7 @@ function OutageNotice({
     t("newAgent.and"),
   );
   const sub = [
+    cloud ? t("outage.cloudSub") : null,
     t("outage.waitFor", { count: o.agents.length, names }),
     o.waitingRuns > 0 ? t("outage.stopped", { count: o.waitingRuns }) : null,
   ]
@@ -126,7 +130,9 @@ function OutageNotice({
         <b>
           {here
             ? t("machines.thisMac.outageTitle", { ago: offlineFor(t, o.offlineSince, now) })
-            : t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}
+            : cloud
+              ? t("outage.titleCloud", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })
+              : t("outage.title", { name: o.name, ago: offlineFor(t, o.offlineSince, now) })}
         </b>
         <span>{sub}</span>
       </span>
@@ -150,9 +156,11 @@ function OutageNotice({
           </Link>
         </Button>
         {here && <ReconnectThisMacButton orgId={org.id} primary />}
-        <Button variant={here ? "ghost" : "primary"} size="sm" onClick={() => setOpen(true)}>
-          {t("outage.switch")}
-        </Button>
+        {!cloud && (
+          <Button variant={here ? "ghost" : "primary"} size="sm" onClick={() => setOpen(true)}>
+            {t("outage.switch")}
+          </Button>
+        )}
         <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("outage.dismiss")} onClick={onDismiss} />
       </span>
       {open && <SwitchComputerDialog open={open} onOpenChange={setOpen} outage={o} data={data} />}
@@ -170,7 +178,6 @@ function targetOption(t: TFunction, target: OutageTarget, brains: ComputerBrain[
     return {
       value: "cloud",
       title: t("outage.dialog.cloud"),
-      tag: block ? undefined : t("outage.dialog.alwaysOn"),
       description: block ? t(`outage.dialog.block.${block}`, { brains: needed }) : t("outage.dialog.cloudText"),
       leading: <Icon name="computerCloud" />,
       disabled: block !== null,

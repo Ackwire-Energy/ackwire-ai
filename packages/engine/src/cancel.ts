@@ -1,5 +1,5 @@
-import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
+import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -13,7 +13,7 @@ import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 import { standingErrorDetail } from "./standing";
 
-const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels } = schema;
+const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels, machines } = schema;
 
 /** Cross-instance: the worker running the run aborts it (LISTEN/NOTIFY with the Postgres pub/sub). */
 export const RUN_CANCEL_TOPIC = "system:run-cancel";
@@ -332,7 +332,8 @@ export async function stopRun(
 
 /**
  * Ends what a suspended workspace's agents still have going: every run not finished stops with `reason`
- * (its `standingText`) and hands nothing on, and its computers stop its tasks.
+ * (its `standingText`) and hands nothing on, its computers stop its tasks, and its agents' desktops end with
+ * whatever runs on them (nothing else stops a desktop: they stay on).
  */
 export async function stopOrgWork(
   deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineHub, "call"> },
@@ -357,4 +358,15 @@ export async function stopOrgWork(
     ? (machineId, request) => hub.call(machineId, request, { timeoutMs: 15_000 })
     : undefined;
   await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system");
+  if (!hub) return;
+  const desktops = await deps.db
+    .select({ id: agents.id, handle: agents.handle, name: agents.name, machineId: machines.id })
+    .from(agents)
+    .innerJoin(machines, eq(machines.id, agents.machineId))
+    .where(and(eq(agents.orgId, orgId), gte(machines.protocol, DESKTOP_PROTOCOL)));
+  await Promise.all(
+    desktops.map(({ machineId, ...agent }) =>
+      hub.call(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 15_000 }).catch(() => null),
+    ),
+  );
 }

@@ -2,15 +2,22 @@ import type { Machine } from "@agenteschat/client";
 import { useAgents, useComputerSetup, useMachines } from "@agenteschat/client";
 import {
   agentsWaitingForComputer,
+  computerEdition,
+  computerName,
+  etaLine,
+  etaTickMs,
+  promisesEmail,
   SETUP_STEPS,
   type SetupView,
+  setupEta,
   setupNoticeKey,
   setupPending,
   setupPortrait,
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Button,
   Card,
@@ -19,6 +26,7 @@ import {
   ComputerPortrait,
   Icon,
   type IconName,
+  ProviderLogo,
   Spinner,
   Steps,
 } from "@agenteschat/ui";
@@ -27,17 +35,47 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { SupportLine } from "@/components/Standing";
+import { useNow } from "@/hooks/useNow";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
  * The workspace's own computer (ADR 0056 §10), where a provisioner prepares one for each workspace: how far it
- * is, live from `machine.provisioning`. Words only a person needs: no system, address, provider or tool list.
+ * is and the time left, live from `machine.provisioning`. Words only a person needs: no system, address,
+ * provider or tool list.
  */
+
+/** Which words the computers get here (`computerEdition`); null while the server hasn't said. */
+export function useComputerEdition(orgId: string) {
+  return computerEdition(useComputerSetup(orgId).data);
+}
 
 /** This workspace's computer on its way, or null where people connect their own (`pair`). */
 export function useSetupView(orgId: string): SetupView | null {
-  return setupView(useComputerSetup(orgId).data);
+  const q = useComputerSetup(orgId);
+  return setupView(q.data, q.dataUpdatedAt);
+}
+
+/** Who reads the wait: owners hear of the email, at their address; a workspace on hold hears of neither. */
+export interface WaitReader {
+  owner: boolean;
+  email: string;
+  held: boolean;
+}
+
+/** The person reading, in a workspace's pages. */
+export function useWaitReader(): WaitReader {
+  const { org, me } = useOrg();
+  return { owner: org.role === "owner", email: me.user.email, held: org.standing?.state === "hold" };
+}
+
+/**
+ * The time left now, repainted every 15 s (every 5 s under a minute), and whether "we'll email you" holds.
+ * A workspace on hold shows neither: its hold banner speaks, and its provisioner waits too.
+ */
+export function useSetupWait(view: SetupView | null, held: boolean) {
+  const live = view && setupPending(view) && !held ? view : null;
+  const now = useNow((at) => (live ? etaTickMs(setupEta(live, at)) : false));
+  return live ? { eta: setupEta(live, now), email: promisesEmail(live, now), now } : { eta: null, email: false, now };
 }
 
 const PHASE_ICON: Record<SetupView["phase"], IconName> = {
@@ -47,7 +85,7 @@ const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   ready: "check",
 };
 
-/** While it's on its way: the four steps as bars ("Passo 2 de 4 · Ligando"), or why it waits, in one line. */
+/** While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. */
 export function SetupProgress({ view }: { view: SetupView }) {
   const { t } = useTranslation();
   if (view.step) {
@@ -66,6 +104,30 @@ export function SetupProgress({ view }: { view: SetupView }) {
       {view.phase === "preparing" ? <Spinner /> : <Icon name={PHASE_ICON[view.phase]} size={16} />}
       <span>{t(view.textKey)}</span>
     </p>
+  );
+}
+
+/**
+ * The wait in words, under the steps: the time left, then who hears when it's ready. Only owners get the
+ * email, so only they are told so (`promisesEmail`); everyone else is told it shows here.
+ */
+export function SetupWaitLines({ view, reader }: { view: SetupView; reader: WaitReader }) {
+  const { t } = useTranslation();
+  const { eta, email } = useSetupWait(view, reader.held);
+  if (!setupPending(view) || reader.held) return null;
+  const emailed = email && reader.owner;
+  return (
+    <>
+      {eta && (
+        <p className="setup-eta" aria-live="polite">
+          {etaLine(t, eta)}
+        </p>
+      )}
+      <p className="setup-line">
+        <Icon name={emailed ? "mail" : "bell"} size={14} />
+        <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
+      </p>
+    </>
   );
 }
 
@@ -88,18 +150,35 @@ export function SetupFacts({ view }: { view: SetupView }) {
   );
 }
 
-/**
- * Something on the workspace's own computer doesn't work (its browser, the agents' desktops): nobody here can
- * run a command on it, so no runner reason or command, only that it doesn't work and who to ask.
- */
-export function NotWorkingNote() {
+/** Claude Code and Codex come ready on it: each agent signs in with a plan once it's ready. */
+export function SetupPlans() {
   const { t } = useTranslation();
   return (
-    <div className="brw-note">
-      <Icon name="alert" size={16} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {t("computerSetup.notWorking")} <SupportLine />
-      </div>
+    <p className="setup-line">
+      <ProviderLogo id="claude_code" size="xs" />
+      <span>{t("computerSetup.plans")}</span>
+    </p>
+  );
+}
+
+/**
+ * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left,
+ * who hears when it's ready, the agent that waits for it (in its dialog), the plans and the size.
+ */
+export function SetupWait({ view, reader, agentName }: { view: SetupView; reader: WaitReader; agentName?: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="setup-wait">
+      <SetupProgress view={view} />
+      <SetupWaitLines view={view} reader={reader} />
+      {agentName && view.phase !== "ready" && (
+        <p className="setup-line">
+          <Icon name="clock" size={14} />
+          <span>{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
+        </p>
+      )}
+      <SetupPlans />
+      <SetupFacts view={view} />
     </div>
   );
 }
@@ -117,19 +196,19 @@ function SetupChip({ view, machine }: { view: SetupView; machine: Machine | unde
 }
 
 /** The workspace's computer row of the list, once the provisioner made it. */
-const managedOf = (machines: Machine[] | undefined) => machines?.find((m) => m.kind === "managed");
+export const managedOf = (machines: Machine[] | undefined) => machines?.find((m) => m.kind === "managed");
 
 /**
  * Configurações → Computadores where the workspace gets its own computer: its card, with no hostname, system or
- * address, and no Remove. On its way: the steps, or why it waits; ready: online or not. Always its size and
- * one user per agent, and the agents on it.
+ * address, and no Remove. On its way: the steps, the time left, or why it waits; ready: online or not. Always
+ * its size and one user per agent, and the agents on it.
  */
 export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const reader = useWaitReader();
   const machine = managedOf(useMachines(org.id).data);
-  // Its own name once it exists ("Computador da Acme" until someone renames it).
-  const title = machine?.name ?? t("computerSetup.title", { org: org.name });
+  const title = computerName(t, org.name, machine);
   return (
     <Card aria-labelledby="sec-workspace-computer" className="setup-card" data-phase={view.phase}>
       <div className="computers-card__head">
@@ -159,6 +238,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
         </span>
       </div>
       {view.phase !== "ready" && <SetupProgress view={view} />}
+      <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
       {machine && machine.agents.length > 0 && (
         <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -183,23 +263,28 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 
 /**
  * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
- * is on its way, with the agents that wait for it. Everyone sees it; closed, it stays closed until the state
- * (or the step) changes.
+ * is on its way: the step, the time left and the agents that wait for it ("Passo 3 de 4 · Instalando os
+ * programas · faltam uns 6 min · Ada e Theo esperam por ele"). Everyone sees it; closed, it stays closed until
+ * the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const view = useSetupView(org.id);
   const pending = setupPending(view);
   const agents = useAgents(org.id);
   const machines = useMachines(org.id, pending);
+  const { eta } = useSetupWait(view, org.standing?.state === "hold");
   const [hidden, setHidden] = useState(() => storage.get(STORAGE_KEYS.setupNoticeHidden));
   if (!pending) return null;
   const key = setupNoticeKey(org.id, view);
   if (hidden === key) return null;
   const waiting = agentsWaitingForComputer(agents.data ?? [], machines.data ?? []);
   const line = [
-    t(view.textKey),
+    view.step
+      ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
+      : t(view.textKey),
+    eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
     waiting.length > 0
       ? t("computerSetup.notice.waits", {
           count: waiting.length,

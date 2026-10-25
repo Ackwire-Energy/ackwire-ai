@@ -11,9 +11,15 @@ import {
   parseServerFrame,
   type RunnerTools,
 } from "@agenteschat/adapters/machine-protocol";
-import { type AgentUids, DesktopManager, type DesktopManagerOptions, ownUserRefusal, xKey } from "../../runner/desktop";
+import {
+  type AgentUids,
+  DesktopManager,
+  type DesktopManagerOptions,
+  HELPER_IDLE_MS,
+  ownUserRefusal,
+  xKey,
+} from "../../runner/desktop";
 import type { HelperSnapshot, HelperWindow } from "../../runner/desktop-helper";
-import { DESKTOP_IDLE_MS } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
 import { handleRequest } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir } from "./helpers";
@@ -549,7 +555,7 @@ describe("desktop use", () => {
   test("an idle helper stops; the next use starts another", async () => {
     const t = setup();
     await t.manager.look(AGENT);
-    t.advance(DESKTOP_IDLE_MS - 1000);
+    t.advance(HELPER_IDLE_MS - 1000);
     t.manager.sweep();
     expect(t.lines.filter((l) => l.includes("nobody used it"))).toEqual([]);
     t.advance(2000);

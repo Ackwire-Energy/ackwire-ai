@@ -29,6 +29,7 @@ import { AgentSecretsList } from "@/components/AgentSecrets";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
 import { BLANK_LOOK } from "@/lib/new-agent";
@@ -102,6 +103,7 @@ export function SettingsTab({
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org, me } = useOrg();
+  const edition = useComputerEdition(org.id);
   const dir = useDirectory(org.id);
   const { agent, g, viewer, draft, saved, set, can, changes, errors, ownerFirst, openWork } = useAgentEdit();
   const admin = viewer === "admin";
@@ -444,7 +446,8 @@ export function SettingsTab({
                 admin={admin}
                 machine={CLOUD}
                 machineNote={
-                  can("machine") ? (
+                  // The Cloud's agents all work on the workspace's own computer: nothing to pick.
+                  can("machine") && edition === "selfhost" ? (
                     <Button
                       size="sm"
                       icon="computer"

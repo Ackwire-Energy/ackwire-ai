@@ -4,10 +4,10 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AgentBrowserSettings, BrowserHandoff } from "@agenteschat/client";
+import { isBlankPage, openRefusalKey } from "@agenteschat/client/lib/sites";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { isBlankPage, openRefusalKey } from "@/components/browser/sites";
 import { agentSearch } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -29,8 +29,28 @@ const frame = (url = "https://loja.example.com/carrinho") => ({
   metadata: { deviceWidth: 1280, deviceHeight: 800, url },
 });
 
-/** Ada may use its browser, on a computer that serves it; `as`: who I am to Ada. */
-function setup(options: { as?: "admin" | "owner" | "member"; sites?: string[] | null } = {}) {
+const ask = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
+  id: "h-ask",
+  agentId: ADA_ID,
+  runId: "r-ask",
+  machineId: "machine-1",
+  kind: "ask",
+  instructions: "Entrar no Stripe",
+  status: "pending",
+  requestedForUserId: "u-walter",
+  controllerUserId: null,
+  note: null,
+  expiresAt: new Date(Date.now() + 8 * 60_000).toISOString(),
+  createdAt: new Date().toISOString(),
+  resolvedAt: null,
+  ...over,
+});
+
+/**
+ * Ada on a Mac of Walter's (no screens there: the dialog shows her browser's page), on a self-hosted server;
+ * `as`: who I am to Ada. A member who neither owns it nor was asked may not watch it.
+ */
+async function setup(options: { as?: "admin" | "owner" | "member"; sites?: string[] | null } = {}) {
   const state = seedState();
   if (options.as === "owner" || options.as === "member") {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
@@ -42,12 +62,18 @@ function setup(options: { as?: "admin" | "owner" | "member"; sites?: string[] | 
   state.scopes[ADA_ID] = [...(state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
   const api = createFakeApi(state);
   const browser = fakeBrowserOf.get(api);
-  if (!browser) throw new Error("no fake browser");
+  const machines = fakeMachinesOf.get(api);
+  if (!browser || !machines) throw new Error("no fakes");
+  const mac = machines.pair({ name: "MacBook do Walter", os: "darwin" });
+  await api.sandbox.setTarget(ORG_ID, ADA_ID, mac.id);
   browser.settings.set(ADA_ID, { ...READY, allowedDomains: options.sites ?? null });
+  browser.desktops.set(ADA_ID, { available: false, reason: "desktop_unavailable", canControl: true });
+  if (options.as === "member") browser.forbidden.add(ADA_ID);
   return { state, api, browser };
 }
+type Setup = Awaited<ReturnType<typeof setup>>;
 
-async function open(path: string, s: ReturnType<typeof setup>) {
+async function open(path: string, s: Setup) {
   const r = await renderApp(path, { api: s.api });
   await settle(8);
   const socket = r.sockets.last();
@@ -60,284 +86,135 @@ async function open(path: string, s: ReturnType<typeof setup>) {
   return { ...r, socket, push };
 }
 
-const calls = (s: ReturnType<typeof setup>, method: string) =>
-  s.state.calls.filter((c) => c.method === method).map((c) => c.args);
-const block = () => screen().queryByRole("region", { name: "Navegador da Ada" });
+const calls = (s: Setup, method: string) => s.state.calls.filter((c) => c.method === method).map((c) => c.args);
+const entry = () => screen().queryByRole("region", { name: "Computador da Ada" });
+const dialog = () => screen().queryByRole("dialog", { name: "Computador da Ada" });
 const card = () => document.querySelector(".brw-ac") as HTMLElement;
+const sub = () => (document.querySelector(".ac-dialog__sub") as HTMLElement).textContent;
 const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(3);
 };
 
-/** The DM with Ada, its header's Navegador opened. */
-async function dialogOf(s: ReturnType<typeof setup>) {
+/** The DM with Ada, its header's Computador opened. */
+async function dialogOf(s: Setup) {
   const r = await open(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, s);
-  await click(screen().getByRole("button", { name: /^Navegador/ }));
-  const dialog = screen().getByRole("dialog", { name: "Navegador da Ada" });
-  return { ...r, dialog };
+  await click(screen().getByRole("button", { name: /^Computador/ }));
+  return { ...r, view: within(dialog() as HTMLElement) };
 }
 
-describe("the agent's browser outside a conversation", () => {
-  test("its owner and admins get Navegador on the agent's page and in its DM header; a member doesn't", async () => {
-    const admin = setup();
+describe("the agent's computer without screens (a Mac): its browser's page, in the dialog", () => {
+  test("whoever may watch it gets one entry and the DM's Computador; a member who may not gets neither", async () => {
+    const admin = await setup();
     await open(`/org/${ORG_ID}/agents/${ADA_ID}`, admin);
-    const row = block() as HTMLElement;
-    // Nothing going on: where it runs, no picture (watching would keep an idle browser open).
-    expect(row.textContent).toContain("Pronto no MacBook do Walter");
+    const row = entry() as HTMLElement;
+    expect(row.textContent).toContain("Disponível · ninguém usando agora");
+    // The entry never opens a stream: no picture, no viewer counted.
     expect(row.querySelector("img")).toBeNull();
-    expect(within(row).getByRole("button", { name: "Abrir o navegador" })).toBeTruthy();
+    expect(within(row).getByRole("button", { name: "Abrir" })).toBeTruthy();
+    // One entry: the browser's, the desktop's and the terminal's rows are gone.
+    expect(screen().queryByRole("region", { name: "Navegador da Ada" })).toBeNull();
+    expect(document.body.textContent).not.toContain("Abrir o terminal");
     cleanup();
 
-    const owner = setup({ as: "owner" });
+    const owner = await setup({ as: "owner" });
     await open(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, owner);
-    expect(screen().getByRole("button", { name: /^Navegador/ })).toBeTruthy();
+    expect(screen().getByRole("button", { name: /^Computador/ })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: /^Navegador/ })).toBeNull();
     cleanup();
 
-    const member = setup({ as: "member" });
+    const member = await setup({ as: "member" });
     await open(`/org/${ORG_ID}/agents/${ADA_ID}`, member);
-    expect(block()).toBeNull();
+    expect(entry()).toBeNull();
     cleanup();
     await open(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, member);
-    expect(screen().queryByRole("button", { name: /^Navegador/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /^Computador/ })).toBeNull();
     expect(calls(member, "browser.settings")).toEqual([]);
   });
 
-  test("a browser that can't run (no computer serving it) shows nothing", async () => {
-    const s = setup();
-    s.browser.settings.set(ADA_ID, { ...READY, available: false, reason: "switched_off" });
-    await open(`/org/${ORG_ID}/agents/${ADA_ID}`, s);
-    expect(block()).toBeNull();
-  });
-
-  test("Abrir o navegador takes over with no run; closed, it says so calmly and the address bar opens a site", async () => {
-    const s = setup({ sites: ["loja.example.com"] });
+  test("Abrir shows the page live; a closed browser keeps its sign-ins; Assumir opens it and the address bar a site", async () => {
+    const s = await setup({ sites: ["loja.example.com"] });
     const { push } = await open(`/org/${ORG_ID}/agents/${ADA_ID}`, s);
-    await click(within(block() as HTMLElement).getByRole("button", { name: "Abrir o navegador" }));
-    expect(calls(s, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
-    expect(card().classList.contains("is-control")).toBe(true);
-    expect(card().classList.contains("is-open")).toBe(true);
+    await click(within(entry() as HTMLElement).getByRole("button", { name: "Abrir" }));
+    expect(dialog()).toBeTruthy();
+    await push(frame());
+    expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    // One head: the site above the page, no fold, no Parar.
+    expect(document.querySelector(".cmp-site")?.textContent).toBe("loja.example.com/carrinho");
+    expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Recolher" })).toBeNull();
+    expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Parar" })).toBeNull();
 
-    // The runner says the browser isn't open: no spinner, no "opening", the address bar instead.
+    // Closed after 15 unused minutes: never "it opens when", nothing about waking.
     await push({ type: "browser.unavailable", agentId: ADA_ID, reason: "closed" });
     expect(card().textContent).toContain("O navegador da Ada está fechado");
+    expect(card().textContent).toContain("Os logins continuam salvos.");
+    expect(card().textContent).not.toContain("Abre quando");
+    expect(sub()).toBe("Ao vivo");
+    // The dialog's page is its stage, not a card in a message: one sky, under the dialog's head.
+    expect(card().classList.contains("is-surface")).toBe(true);
+    expect(card().querySelector(".ac-sky-strip")).toBeNull();
+
+    // Take control opens it, to sign in ahead of time.
+    await click(within(dialog() as HTMLElement).getByRole("button", { name: "Assumir o controle" }));
+    expect(calls(s, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
+    expect(card().classList.contains("is-control")).toBe(true);
     expect(card().textContent).toContain("Digite um endereço acima para abrir um site.");
-    expect(card().textContent).not.toContain("Abrindo o navegador");
-    expect(card().querySelector(".ac-pixspin, .brw-skel")).toBeNull();
-    // A retry's status doesn't flash "opening" in between: only a frame ends "closed".
-    await push({
-      type: "browser.status",
-      agentId: ADA_ID,
-      mode: "control",
-      controllerUserId: "u-walter",
-      handoff: null,
-      hidden: false,
-    });
-    expect(card().textContent).toContain("O navegador da Ada está fechado");
+    expect(sub()).toBe("Você no controle · a Ada espera");
 
     // Outside the agent's sites: said under the field, nothing opens.
     const address = within(card()).getByRole("textbox", { name: "Endereço do site" });
     await act(async () => fireEvent.change(address, { target: { value: "outro.com" } }));
     await click(within(card()).getByRole("button", { name: "Abrir" }));
     expect(within(card()).getByRole("alert").textContent).toBe("Fora dos sites que a Ada pode abrir.");
-
     await act(async () => fireEvent.change(address, { target: { value: "loja.example.com" } }));
     await click(within(card()).getByRole("button", { name: "Abrir" }));
     expect(calls(s, "browser.open").at(-1)).toEqual([ORG_ID, ADA_ID, "loja.example.com"]);
-    expect(card().textContent).toContain("Abrindo loja.example.com…");
-    // The page arrives: the card shows it, the address bar folds away.
     await push(frame("https://loja.example.com/"));
     expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
-    expect(within(card()).queryByRole("textbox", { name: "Endereço do site" })).toBeNull();
   });
 
-  test("a request waiting for someone: an amber row with Abrir, which takes control here", async () => {
-    const s = setup();
-    const handoff: BrowserHandoff = {
-      id: "h-ask",
-      agentId: ADA_ID,
-      runId: "r-ask",
-      machineId: "machine-1",
-      kind: "ask",
-      instructions: "Entrar no Stripe",
-      status: "pending",
-      requestedForUserId: "u-walter",
-      controllerUserId: null,
-      note: null,
-      expiresAt: new Date(Date.now() + 8 * 60_000).toISOString(),
-      createdAt: new Date().toISOString(),
-      resolvedAt: null,
-    };
-    s.browser.handoffs.set(handoff.id, handoff);
+  test("a request for me: the entry says so with Ajudar, which takes it and opens the page in my control", async () => {
+    const s = await setup();
+    s.browser.handoffs.set("h-ask", ask());
     await open(`/org/${ORG_ID}/agents/${ADA_ID}`, s);
-    const row = (block() as HTMLElement).querySelector('[data-tone="warn"]') as HTMLElement;
-    expect(row.textContent).toContain("Ada precisa de você");
-    expect(row.textContent).toContain("Entrar no Stripe · 8 min");
+    const row = entry() as HTMLElement;
+    expect(row.dataset.tone).toBe("warn");
+    expect(row.textContent).toContain("Precisa de você · Entrar no Stripe · 8 min");
+    await click(within(row).getByRole("button", { name: "Ajudar" }));
+    expect(calls(s, "browser.takeControl")).toEqual([[ORG_ID, "h-ask"]]);
+    // The page with its tools, never the whole screen; the request above it.
+    expect(dialog()).toBeTruthy();
+    expect(card().classList.contains("is-control")).toBe(true);
+    expect(document.querySelector(".cmp-asked")?.textContent).toBe("“Entrar no Stripe”");
+    const view = within(dialog() as HTMLElement);
+    expect(view.getByRole("button", { name: "Pronto" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Não consegui" })).toBeTruthy();
+  });
+
+  test("a request for someone else names them; Help stays for whoever may take it", async () => {
+    const s = await setup();
+    s.browser.handoffs.set("h-ask", ask({ requestedForUserId: "u-joao" }));
+    const { push } = await open(`/org/${ORG_ID}/agents/${ADA_ID}`, s);
+    const row = entry() as HTMLElement;
+    expect(row.textContent).toContain("Esperando João · Entrar no Stripe · 8 min");
     await click(within(row).getByRole("button", { name: "Abrir" }));
-    expect(calls(s, "browser.takeControl")).toEqual([[ORG_ID, "h-ask"]]);
-    // In control of the request: it's the card's title, Pronto hands back.
-    expect(card().classList.contains("is-control")).toBe(true);
-    expect(card().querySelector(".brw-ac__tx b")?.textContent).toBe("Entrar no Stripe");
-    expect(within(card()).getByRole("button", { name: "Pronto" })).toBeTruthy();
-  });
-
-  test("someone else in control: who and what for, with nothing to watch (their screen stays theirs)", async () => {
-    const s = setup();
-    s.browser.handoffs.set("h-joao", {
-      id: "h-joao",
-      agentId: ADA_ID,
-      runId: null,
-      machineId: "machine-1",
-      kind: "takeover",
-      instructions: "",
-      status: "active",
-      requestedForUserId: null,
-      controllerUserId: "u-joao",
-      note: null,
-      expiresAt: null,
-      createdAt: new Date().toISOString(),
-      resolvedAt: null,
-    });
-    await open(`/org/${ORG_ID}/agents/${ADA_ID}`, s);
-    const row = block() as HTMLElement;
-    expect(row.textContent).toContain("João está no controle");
-    expect(within(row).queryByRole("button")).toBeNull();
-  });
-
-  test("?browser=1 (the tray's link) opens the view on the agent's page", async () => {
-    const s = setup();
-    const r = await open(`/org/${ORG_ID}/agents/${ADA_ID}?browser=1`, s);
-    expect(card().classList.contains("is-open")).toBe(true);
-    // Used once: the link doesn't reopen it on a reload.
-    expect((r.router.state.location.search as Record<string, unknown>).browser).toBeUndefined();
-    // Folding it brings the line back.
-    await click(within(card()).getByRole("button", { name: "Recolher" }));
-    expect(document.querySelector(".brw-ac")).toBeNull();
-    expect((block() as HTMLElement).textContent).toContain("Pronto no MacBook do Walter");
-  });
-});
-
-describe("the DM header's Navegador", () => {
-  test("opens the live view in a dialog; Assumir takes over with no run; closing it in control hands back", async () => {
-    const s = setup();
-    const { dialog, push } = await dialogOf(s);
     await push(frame());
-    const view = within(dialog);
-    expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
-    // Always open in its dialog: nothing to fold.
-    expect(view.queryByRole("button", { name: "Recolher" })).toBeNull();
-    await click(view.getByRole("button", { name: "Assumir" }));
-    expect(calls(s, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
-    expect(card().classList.contains("is-control")).toBe(true);
-
-    // In control, Esc belongs to the page: the dialog stays.
-    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
-    await settle(2);
-    expect(screen().queryByRole("dialog", { name: "Navegador da Ada" })).toBeTruthy();
-    expect(calls(s, "browser.done")).toEqual([]);
-
-    // Closing hands the browser back now, not after the 2-minute grace.
-    await click(view.getByRole("button", { name: "Fechar" }));
-    expect(calls(s, "browser.done")).toEqual([[ORG_ID, "takeover-1"]]);
-    expect(screen().queryByRole("dialog", { name: "Navegador da Ada" })).toBeNull();
-    expect(document.body.textContent).toContain("Devolvido à Ada.");
+    const banner = document.querySelector(".cmp-banner") as HTMLElement;
+    expect(banner.textContent).toContain("A Ada pediu para João: “Entrar no Stripe” · 8 min");
+    expect(sub()).toBe("Ao vivo · a Ada pediu para João");
+    // Walter owns the workspace: he may still help.
+    expect(within(banner).getByRole("button", { name: "Ajudar" })).toBeTruthy();
+    expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Assumir o controle" })).toBeNull();
   });
 
-  test("closing it while in control of the agent's own request doesn't answer it: only Pronto or Desistir do", async () => {
-    const s = setup();
-    s.browser.handoffs.set("h-ask", {
-      id: "h-ask",
-      agentId: ADA_ID,
-      runId: "r-ask",
-      machineId: "machine-1",
-      kind: "ask",
-      instructions: "Entrar no Stripe",
-      status: "pending",
-      requestedForUserId: "u-walter",
-      controllerUserId: null,
-      note: null,
-      expiresAt: new Date(Date.now() + 8 * 60_000).toISOString(),
-      createdAt: new Date().toISOString(),
-      resolvedAt: null,
-    });
-    const { dialog } = await dialogOf(s);
-    const view = within(dialog);
-    await click(view.getByRole("button", { name: "Abrir" }));
-    expect(calls(s, "browser.takeControl")).toEqual([[ORG_ID, "h-ask"]]);
-    // In control: Esc belongs to the page.
-    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
-    await settle(2);
-    expect(screen().queryByRole("dialog", { name: "Navegador da Ada" })).toBeTruthy();
-
-    await click(view.getByRole("button", { name: "Fechar" }));
-    expect(screen().queryByRole("dialog", { name: "Navegador da Ada" })).toBeNull();
-    expect(calls(s, "browser.done")).toEqual([]);
-    expect(s.browser.handoffs.get("h-ask")?.status).toBe("active");
-  });
-
-  test("Parar says so, opens the browser again from the dialog, and gives way to the page when it's back", async () => {
-    const s = setup();
-    const { dialog, push } = await dialogOf(s);
-    await push(frame());
-    const view = within(dialog);
-    await click(view.getByRole("button", { name: "Parar" }));
-    await click(view.getByRole("button", { name: "Parar" }));
-    expect(calls(s, "browser.stop")).toEqual([[ORG_ID, ADA_ID]]);
-    expect(card().textContent).toContain("Navegador parado");
-    expect(view.getByRole("button", { name: "Abrir o navegador" })).toBeTruthy();
-
-    // The agent opens it again: the page shows, not the stop.
-    await push(frame("https://loja.example.com/novo"));
-    expect(card().textContent).not.toContain("Navegador parado");
-    expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
-  });
-
-  test("Abrir o navegador after Parar takes over right there", async () => {
-    const s = setup();
-    const { dialog, push } = await dialogOf(s);
-    await push(frame());
-    const view = within(dialog);
-    await click(view.getByRole("button", { name: "Parar" }));
-    await click(view.getByRole("button", { name: "Parar" }));
-    await click(view.getByRole("button", { name: "Abrir o navegador" }));
-    expect(calls(s, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
-    expect(card().textContent).not.toContain("Navegador parado");
-    expect(card().classList.contains("is-control")).toBe(true);
-  });
-
-  test("full screen opens while watching and Esc leaves it, keeping the dialog", async () => {
-    const s = setup();
-    const { dialog, push } = await dialogOf(s);
-    await push(frame());
-    await click(within(dialog).getByRole("button", { name: "Tela cheia" }));
-    expect(card().classList.contains("is-full")).toBe(true);
-    // Watching: no control was taken.
-    expect(calls(s, "browser.takeover")).toEqual([]);
-    expect(within(card()).getByRole("button", { name: "Assumir" })).toBeTruthy();
-    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
-    await settle(2);
-    expect(card().classList.contains("is-full")).toBe(false);
-    expect(screen().queryByRole("dialog", { name: "Navegador da Ada" })).toBeTruthy();
-  });
-
-  test("someone else in control: the page is hidden from me, and who has it is said", async () => {
-    const s = setup();
-    const { push } = await dialogOf(s);
-    await push(frame());
-    const held: BrowserHandoff = {
-      id: "h-joao",
-      agentId: ADA_ID,
-      runId: null,
-      machineId: "machine-1",
-      kind: "takeover",
-      instructions: "",
-      status: "active",
-      requestedForUserId: null,
-      controllerUserId: "u-joao",
-      note: null,
-      expiresAt: null,
-      createdAt: new Date().toISOString(),
-      resolvedAt: null,
-    };
+  test("someone else in control: the entry says who; the page stays hidden in the dialog", async () => {
+    const s = await setup();
+    const held = ask({ kind: "takeover", status: "active", controllerUserId: "u-joao", expiresAt: null });
+    s.browser.handoffs.set(held.id, held);
+    const { push } = await open(`/org/${ORG_ID}/agents/${ADA_ID}`, s);
+    expect((entry() as HTMLElement).textContent).toContain("João está usando");
+    await click(within(entry() as HTMLElement).getByRole("button", { name: "Abrir" }));
     await push({
       type: "browser.status",
       agentId: ADA_ID,
@@ -347,23 +224,87 @@ describe("the DM header's Navegador", () => {
       hidden: true,
     });
     expect(card().querySelector("img")).toBeNull();
-    expect(card().textContent).toContain("João está no controle");
     expect(card().textContent).toContain("Por privacidade, a tela fica oculta até voltar para a Ada.");
-    expect(card().textContent).toContain("João no controle · tela oculta");
-    expect(within(card()).queryByRole("button", { name: "Assumir" })).toBeNull();
+    expect(sub()).toBe("João no controle · tela oculta");
+    expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+  });
+});
+
+describe("the DM header's Computador", () => {
+  test("opens the dialog in place; closing it in control of a take over hands it back at once", async () => {
+    const s = await setup();
+    const { view, push } = await dialogOf(s);
+    await push(frame());
+    await click(view.getByRole("button", { name: "Assumir o controle" }));
+    expect(calls(s, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
+
+    // In control, Esc belongs to the computer: the dialog stays.
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    expect(dialog()).toBeTruthy();
+    expect(calls(s, "browser.done")).toEqual([]);
+
+    await click(view.getByRole("button", { name: "Fechar" }));
+    expect(calls(s, "browser.done")).toEqual([[ORG_ID, "takeover-1"]]);
+    expect(dialog()).toBeNull();
+    expect(document.body.textContent).toContain("Devolvido à Ada.");
+  });
+
+  test("closing it during the agent's own request keeps its 2 minutes of grace, and says so", async () => {
+    const s = await setup();
+    s.browser.handoffs.set("h-ask", ask());
+    const { view } = await dialogOf(s);
+    await click(view.getByRole("button", { name: "Ajudar" }));
+    expect(calls(s, "browser.takeControl")).toEqual([[ORG_ID, "h-ask"]]);
+    await click(view.getByRole("button", { name: "Fechar" }));
+    expect(dialog()).toBeNull();
+    expect(calls(s, "browser.done")).toEqual([]);
+    expect(s.browser.handoffs.get("h-ask")?.status).toBe("active");
+    expect(document.body.textContent).toContain("A Ada espera 2 min você voltar.");
+  });
+
+  test("its dot: amber while a request waits, said in words for screen readers", async () => {
+    const s = await setup();
+    s.browser.handoffs.set("h-ask", ask());
+    await open(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, s);
+    const button = screen().getByRole("button", { name: /^Computador/ });
+    expect(button.dataset.state).toBe("waiting");
+    expect(button.textContent).toContain("Precisa de você · Entrar no Stripe");
+  });
+
+  test("full screen while watching; Esc leaves full screen only, keeping the dialog", async () => {
+    const s = await setup();
+    const { view, push } = await dialogOf(s);
+    await push(frame());
+    await click(view.getByRole("button", { name: "Tela cheia" }));
+    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(true);
+    expect(calls(s, "browser.takeover")).toEqual([]);
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    await settle(2);
+    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(false);
+    expect(dialog()).toBeTruthy();
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    await settle(2);
+    expect(dialog()).toBeNull();
   });
 });
 
 describe("browser helpers", () => {
-  test("the search param, blank pages and what a refused open says", () => {
-    expect(agentSearch({ browser: 1 })).toEqual({ tab: undefined, sec: undefined, browser: 1 });
-    expect(agentSearch({ browser: "1", tab: "memory" })).toMatchObject({ tab: "memory", browser: 1 });
-    expect(agentSearch({ browser: "yes" })).not.toHaveProperty("browser");
+  test("the links, blank pages and what a refused open says", () => {
+    // `?computer=1`, and the older links to it.
+    for (const name of ["computer", "browser", "desktop", "terminal"]) {
+      expect(agentSearch({ [name]: 1 })).toEqual({ tab: undefined, sec: undefined, computer: 1 });
+      expect(agentSearch({ [name]: "1", tab: "memory" })).toMatchObject({ tab: "memory", computer: 1 });
+    }
+    expect(agentSearch({ browser: "yes" })).not.toHaveProperty("computer");
     expect(isBlankPage("about:blank")).toBe(true);
     expect(isBlankPage("https://loja.example.com/")).toBe(false);
     expect(isBlankPage(undefined)).toBe(false);
     expect(openRefusalKey("browser.not_allowed")).toBe("browser.inCard.goNotAllowed");
     expect(openRefusalKey("browser.bad_address")).toBe("browser.inCard.goBadAddress");
     expect(openRefusalKey("machine.timeout")).toBe("browser.live.actionFailed");
+    // The workspace's own computer is never off.
+    expect(openRefusalKey("machine.offline")).toBe("browser.inCard.offline");
+    expect(openRefusalKey("machine.offline", true)).toBe("browser.inCard.offlineCloud");
   });
 });
