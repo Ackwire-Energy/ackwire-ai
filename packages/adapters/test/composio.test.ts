@@ -4,6 +4,7 @@ import {
   ComposioSignatureError,
   createComposioClient,
   createComposioMailConnector,
+  gmailMessage,
   gmailQueryFromFilter,
   gmailSearchQuery,
   type MailAccountRef,
@@ -110,6 +111,18 @@ const gmailFull = {
     ],
   },
 };
+
+test("a Gmail message says where it was delivered (every Delivered-To and X-Original-To)", () => {
+  const headers = [
+    ...gmailFull.payload.headers,
+    { name: "Delivered-To", value: "Suporte@Acme.com" },
+    { name: "Delivered-To", value: "ana@acme.com" },
+    { name: "X-Original-To", value: "suporte@acme.com" },
+  ];
+  const message = gmailMessage({ ...gmailFull, payload: { ...gmailFull.payload, headers } });
+  expect(message.deliveredTo).toEqual(["suporte@acme.com", "ana@acme.com"]);
+  expect(gmailMessage(gmailFull).deliveredTo).toBeUndefined();
+});
 
 describe("gmail queries", () => {
   test("gmailQueryFromFilter: senders, subject and text; quotes dropped; null when empty", () => {

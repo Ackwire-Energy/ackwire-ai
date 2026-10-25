@@ -73,6 +73,20 @@ export function splitAddresses(text: string): { valid: string[]; invalid: string
   return { valid: parts.filter(isAddressOrDomain), invalid: parts.filter((p) => !isAddressOrDomain(p)) };
 }
 
+/** Typed text → the email addresses in it (no `@domains`), lowercased; anything else is invalid. */
+export function splitEmails(text: string): { valid: string[]; invalid: string[] } {
+  const { valid, invalid } = splitAddresses(text);
+  return { valid: valid.filter(isAddress), invalid: [...invalid, ...valid.filter((v) => !isAddress(v))] };
+}
+
+/** Every address a mailbox sends as: its own first, then its other addresses. */
+export const mailboxAddresses = (account: Pick<MailAccount, "address" | "aliases">) => [
+  ...new Set([account.address, ...account.aliases]),
+];
+
+/** The rules' "Enviar como" when the agent isn't pinned to one address. */
+export const AUTO_FROM = "auto";
+
 export const DEFAULT_DAILY_CAP = 25;
 
 /** The connectors' level (Sem acesso · Ler · Ler e escrever) as the mail API says it. */

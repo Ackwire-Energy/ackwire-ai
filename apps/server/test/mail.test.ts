@@ -138,6 +138,21 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   const renamed = await api(`/mail/accounts/${account.id}`, { method: "PATCH", json: { label: "Help desk" } });
   expect(((await renamed.json()) as { account: { label: string } }).account.label).toBe("Help desk");
 
+  // Other addresses of the mailbox, and the one new mail goes out from.
+  const aliased = await api(`/mail/accounts/${account.id}`, {
+    method: "PATCH",
+    json: { aliases: ["Help@Acme.com"], defaultFrom: "help@acme.com" },
+  });
+  expect(((await aliased.json()) as { account: unknown }).account).toMatchObject({
+    aliases: ["help@acme.com"],
+    defaultFrom: "help@acme.com",
+  });
+  const outside = await api(`/mail/accounts/${account.id}`, { method: "PATCH", json: { defaultFrom: "x@acme.com" } });
+  expect(outside.status).toBe(400);
+  const suggested = await api(`/mail/accounts/${account.id}/suggested-addresses`);
+  expect(suggested.status).toBe(200);
+  expect(await suggested.json()).toEqual({ addresses: [] });
+
   expect((await api(`/mail/accounts/${account.id}`, { method: "DELETE" })).status).toBe(204);
   expect(((await (await api("/mail/accounts")).json()) as { accounts: unknown[] }).accounts).toHaveLength(1);
   const scopes = await t.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, account.id));
