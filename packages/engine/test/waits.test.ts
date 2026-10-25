@@ -177,7 +177,7 @@ describe("a person's message while a run waits for help in the browser", () => {
   });
 });
 
-describe("approvals hold the run, never the agent (D97)", () => {
+describe("approvals hold the run, never the agent", () => {
   test("a message never decides an approval, nor waits behind it: the agent answers it in a run of its own", async () => {
     const github = fakeGithub();
     f = await setup({
@@ -368,7 +368,7 @@ describe("ask_agent", () => {
     );
   });
 
-  test("a question to an agent whose run waits on an approval doesn't wait behind it; the asker's line stays (D97)", async () => {
+  test("a question to an agent whose run waits on an approval doesn't wait behind it; the asker's line stays", async () => {
     f = await setup({
       askAgent: true,
       reply: (req) => {

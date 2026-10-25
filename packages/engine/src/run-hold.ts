@@ -7,7 +7,7 @@ const { agentConsultations, agentRuns, browserHandoffs } = schema;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Whether a run waits on something a new message can't move (D97): an approval, a secret, a mission's own
+ * Whether a run waits on something a new message can't move: an approval, a secret, a mission's own
  * wait (a blocking decision, a review). Such a run takes no new messages: the decision may take hours and
  * the agent stays responsive meanwhile, so whatever arrives (another agent's question, a notice, a
  * person's message) gets a run of its own. A run waiting on a question to people, another agent's answer,

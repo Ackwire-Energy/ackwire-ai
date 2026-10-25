@@ -320,7 +320,7 @@ describe("the floor (a follow-up without @ in the channel)", () => {
   });
 });
 
-describe("a run held by a decision takes nothing new: the agent stays responsive (D97)", () => {
+describe("a run held by a decision takes nothing new: the agent stays responsive", () => {
   const holdOnApproval = (id: string) =>
     f.db.update(schema.agentRuns).set({ status: "waiting_approval" }).where(eq(schema.agentRuns.id, id));
   /** Paused on a mission's own wait (a blocking decision): a message can't move it. */

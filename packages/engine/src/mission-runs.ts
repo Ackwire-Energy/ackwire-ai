@@ -35,7 +35,7 @@ export async function enqueueRunJob(
     .orderBy(sql`${agentRuns.createdAt} desc`)
     .limit(1);
   // Queued only while that run is still active; one that just ended, or one held by a decision (an
-  // approval, the mission's own: `holdsMessages`, D97), and the notice starts a run.
+  // approval, the mission's own: `holdsMessages`), and the notice starts a run.
   if (active && !(await holdsMessages(tx, active)) && (await queueOnRun(tx, active.id, message.id)))
     return { run: null, steered: active.id };
   const [run] = await tx
