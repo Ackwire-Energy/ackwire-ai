@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { appLocale } from "@agenteschat/i18n/locale";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
@@ -446,8 +447,7 @@ export async function setMyLocale(db: Database, userId: string, locale: UserLoca
 
 /**
  * The app language a request's `Accept-Language` asks for: its most preferred English or Portuguese tag
- * ("en-GB,en;q=0.9" → en, "pt-PT" → pt-BR), else null. The web app sends its own language in it. Mirrors
- * `browserLocale` in apps/web/src/i18n/index.ts.
+ * ("en-GB,en;q=0.9" → en, "pt-PT" → pt-BR), else null. The web app sends its own language in it.
  */
 export function requestLocale(acceptLanguage: string | null | undefined): UserLocale | null {
   const tags = (acceptLanguage ?? "")
@@ -459,11 +459,7 @@ export function requestLocale(acceptLanguage: string | null | undefined): UserLo
     })
     .filter((l) => l.q > 0)
     .sort((a, b) => b.q - a.q);
-  for (const { tag } of tags) {
-    if (tag.startsWith("en")) return "en";
-    if (tag.startsWith("pt")) return "pt-BR";
-  }
-  return null;
+  return appLocale(tags.map((l) => l.tag));
 }
 
 /** Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. */
