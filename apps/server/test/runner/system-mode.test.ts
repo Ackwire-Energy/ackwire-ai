@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MACHINE_OPS, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -189,6 +189,19 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(calls).toEqual([]);
 });
 
+/** `service install --system --no-start` as root, with the unit at `unitPath`. */
+const installNoStart = (unitPath: string, runnerHome: string) =>
+  installSystemService({
+    print: () => {},
+    run: () => ({ code: 0, output: "" }),
+    launch: { runtime: BUN, script: BUNDLE, home: runnerHome },
+    uid: 0,
+    platform: "linux",
+    unitPath,
+    booted: true,
+    start: false,
+  });
+
 test.if(posix)(
   "service install --system: systemd's files readable by all under any umask, the home root's alone",
   () => {
@@ -203,23 +216,28 @@ test.if(posix)(
       const runnerHome = path.join(h, "runner");
       const before = process.umask(umask);
       try {
-        expect(
-          installSystemService({
-            print: () => {},
-            run: () => ({ code: 0, output: "" }),
-            launch: { runtime: BUN, script: BUNDLE, home: runnerHome },
-            uid: 0,
-            platform: "linux",
-            unitPath,
-            booted: true,
-            start: false,
-          }),
-        ).toBe(0);
+        expect(installNoStart(unitPath, runnerHome)).toBe(0);
       } finally {
         process.umask(before);
       }
       const files = [unitPath, path.dirname(limits), limits, runnerHome, configPath(runnerHome)];
       expect(files.map((p) => statSync(p).mode & 0o777)).toEqual([0o644, 0o755, 0o644, 0o700, 0o600]);
+    }
+  },
+);
+
+// A chmod through the link throws EPERM for anyone but root, and as root would change this computer's /dev/null.
+test.if(posix && process.getuid?.() !== 0)(
+  "service install --system: a unit or drop-in masked (a link to /dev/null) stays masked, /dev/null untouched",
+  () => {
+    for (const dropIn of [false, true]) {
+      const h = home();
+      const unitPath = path.join(h, "systemd", "agentes-runner.service");
+      const masked = dropIn ? agentSliceLimitsPath(unitPath) : unitPath;
+      mkdirSync(path.dirname(masked), { recursive: true });
+      symlinkSync("/dev/null", masked);
+      expect(installNoStart(unitPath, path.join(h, "runner"))).toBe(0);
+      expect(lstatSync(masked).isSymbolicLink()).toBe(true);
     }
   },
 );
