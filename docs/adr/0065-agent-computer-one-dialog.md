@@ -1,4 +1,4 @@
-# 0064. The agent's computer in one dialog; screens stay on
+# 0065. The agent's computer in one dialog; screens stay on
 
 - Status: Accepted (2026-10-25)
 - Date: 2026-10-25

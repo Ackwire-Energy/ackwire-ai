@@ -1,20 +1,146 @@
-import { type Approval, useCatalog } from "@agenteschat/client";
-import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { type Approval, type ApprovalEmail, useCatalog } from "@agenteschat/client";
+import { emailTitleWords } from "@agenteschat/client/lib/approval-kind";
+import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { connectorName } from "@agenteschat/client/lib/scopes";
+import type { TFunction } from "i18next";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Fuse, Icon, Text } from "@/ui";
+import { AgentFace } from "../shared/Face";
 import { useColors, useNow } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
 import { approvalSaid, approvalTable, approvalTraits } from "./logic";
 
 /**
- * The exact request, in reading order: what it affects as
- * chips, the details table (Por onde, then the values it runs with), what the agent said before, and the
- * amber fuse until it expires. The chat's card and the sheet draw the same pieces.
+ * The exact request, in reading order: the action in words, the action itself (an email as it will be,
+ * else the details table: Por onde, then the values it runs with), what the agent said, what it affects
+ * as chips, and the amber fuse until it expires. The chat's card and the sheet draw the same pieces.
  */
 
-const TRAIT_ICON = { production: "globe", irreversible: "x", reversible: "undo", external: "send" } as const;
+const TRAIT_ICON = {
+  production: "globe",
+  irreversible: "x",
+  reversible: "undo",
+  external: "send",
+  unsent: "archive",
+  deletable: "undo",
+} as const;
+
+/** The action in words: an email's in the person's language ("Salvar um rascunho de resposta para…"), else the server's. */
+export function approvalTitleText(t: TFunction, a: Pick<Approval, "title" | "email">) {
+  if (!a.email) return a.title;
+  const words = emailTitleWords(a.email);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return tt(words.key, words.values);
+}
+
+/** "rotina «X»" / "sem ninguém acompanhando", for the card's top line; null when a person was there. */
+export function useOriginShort(a: Pick<Approval, "origin">) {
+  const { t } = useTranslation();
+  const origin = approvalOriginShort(a);
+  if (!origin) return null;
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return tt(origin.key, origin.values);
+}
+
+/**
+ * The email an approval writes, as it will be, one column (label above its value): De (the mailbox and
+ * its provider), Para, Assunto, the text folded to four lines ("Ler tudo") unless `full`, and the
+ * message it answers.
+ */
+export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; full?: boolean }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const [open, setOpen] = useState(false);
+  const long = email.body.length > 180 || email.body.split("\n").length > 4;
+  const rows: { label: string; value: string; note?: string }[] = [
+    { label: t("approval.email.from"), value: email.from || email.mailbox, note: email.provider ?? undefined },
+    ...(email.to.length > 0 ? [{ label: t("approval.email.to"), value: email.to.join(", ") }] : []),
+    ...(email.cc.length > 0 ? [{ label: t("approval.email.cc"), value: email.cc.join(", ") }] : []),
+    ...(email.bcc.length > 0 ? [{ label: t("approval.email.bcc"), value: email.bcc.join(", ") }] : []),
+    { label: t("approval.email.subject"), value: email.subject || t("approval.email.noSubject") },
+  ];
+  const answers = email.original
+    ? t(
+        email.verb === "forward"
+          ? email.original.from
+            ? "mobile.approval.forwardsFrom"
+            : "mobile.approval.forwards"
+          : email.original.from
+            ? "mobile.approval.answersFrom"
+            : "mobile.approval.answers",
+        { subject: email.original.subject, from: email.original.from ?? "" },
+      )
+    : null;
+  return (
+    <View style={[styles.letter, { borderColor: c.line2 }]}>
+      <View style={[styles.letterHead, { borderBottomColor: c.line2 }]}>
+        {rows.map((r) => (
+          <View key={r.label}>
+            <Text variant="footnote" tone="muted">
+              {r.label}
+            </Text>
+            <Text variant="small" tone="ink" style={styles.medium}>
+              {r.value}
+            </Text>
+            {r.note ? (
+              <Text variant="footnote" tone="muted">
+                {r.note}
+              </Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
+      {email.body ? (
+        <View style={styles.letterBody}>
+          <Text variant="small" tone="ink2" style={styles.said} numberOfLines={full || open ? undefined : 4}>
+            {email.body}
+          </Text>
+          {!full && long ? (
+            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setOpen((o) => !o)}>
+              <Text variant="footnote" tone="ink2" style={[styles.medium, styles.underline]}>
+                {open ? t("approval.email.less") : t("approval.email.more")}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      {answers ? (
+        <View style={[styles.answers, { backgroundColor: c.sunken, borderTopColor: c.line2 }]}>
+          <Icon name="reply" size={13} color={c.muted} />
+          <Text variant="footnote" tone="muted" style={styles.grow}>
+            {answers}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** What the agent said before asking, after the action: its face, "Lisa:" and its words. */
+export function ApprovalSaid({
+  approval: a,
+  name,
+}: {
+  approval: Pick<Approval, "agentId" | "why" | "trail">;
+  name: string;
+}) {
+  const { t } = useTranslation();
+  const said = approvalSaid(a);
+  if (!said) return null;
+  return (
+    <View style={styles.saidRow}>
+      <AgentFace agentId={a.agentId} size={20} />
+      <Text variant="small" tone="ink2" style={[styles.grow, styles.said]}>
+        <Text variant="small" tone="ink" style={styles.medium}>
+          {name}:{" "}
+        </Text>
+        {t("mobile.approval.saidText", { text: said })}
+      </Text>
+    </View>
+  );
+}
 
 /** "Para todos, em produção", "Dá para desfazer": only what the request itself says. */
 export function ApprovalTraits({ approval: a }: { approval: Approval }) {
@@ -124,5 +250,19 @@ const styles = StyleSheet.create({
   why: { gap: 4 },
   origin: { flexDirection: "row", alignItems: "center", gap: 6 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10 },
+  letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 4, overflow: "hidden" },
+  letterHead: { gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  letterBody: { gap: 6, paddingHorizontal: 12, paddingVertical: 10 },
+  answers: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  medium: { fontWeight: "600" },
+  underline: { textDecorationLine: "underline" },
+  saidRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   expiry: { fontWeight: "500", fontVariant: ["tabular-nums"] },
 });

@@ -172,6 +172,16 @@ export function accountRoutes(deps: AppDeps) {
             email: z.string().openapi({ description: "Empty for an org-wide invite link." }),
             role: Role,
             kind: z.enum(["email", "link"]),
+            invitedBy: z.string().nullable().openapi({ description: "Who invited (their name), when known." }),
+            agents: z
+              .array(
+                z.object({
+                  id: z.uuid(),
+                  name: z.string(),
+                  appearance: z.object({ color: z.string(), eyes: z.string(), accessory: z.string() }).nullable(),
+                }),
+              )
+              .openapi({ description: "A few of the organization's agents (name and look)." }),
           }),
         ),
         404: errors[404],
