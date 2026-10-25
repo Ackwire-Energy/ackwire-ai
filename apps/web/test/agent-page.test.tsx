@@ -73,6 +73,11 @@ describe("agent page: tabs and the URL", () => {
     await openTab(/^Atividade/);
     expect(router.state.location.search).toMatchObject({ tab: "activity" });
     expect(screen().getByRole("searchbox", { name: "Buscar execuções" })).toBeTruthy();
+    // The month on top: runs per day in pixels, the numbers as its legend (from the server's counts).
+    const month = screen().getByRole("region", { name: /^O mês de / });
+    expect(within(month).getByRole("img", { name: /^142 execuções em / })).toBeTruthy();
+    expect(month.querySelector("canvas.ac-month-runs")).toBeTruthy();
+    expect(month.querySelector(".agp-month__legend")?.textContent).toContain("142");
     cleanup();
     await go("?tab=memory");
     expect(

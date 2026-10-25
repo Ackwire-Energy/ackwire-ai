@@ -956,6 +956,9 @@ export interface AgentDetail {
   defaultBudgetUsd?: number;
   tokensThisMonth: number;
   runsThisMonth: number;
+  failuresThisMonth: number;
+  /** This month's runs and failures per day of the month (UTC); only days with runs. */
+  runsByDay: { day: number; runs: number; failed: number }[];
   pendingApprovals: number;
   channels: AgentChannel[];
   createdAt: string;
