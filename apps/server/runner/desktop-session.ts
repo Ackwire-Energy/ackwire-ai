@@ -695,7 +695,7 @@ export class DesktopSessions {
             `The agent's desktop couldn't be prepared: ${tailLines(logFile, 3).join(" ")}`,
           );
         }
-        // The agentes.chat look (desktop-look.ts), written as the agent; without it the desktop starts as its HOME has it.
+        // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
         const theme = lookTheme((f) => this.sys.exists(f));
         const look = this.sys.spawn([...user.prefix, ...lookCommand(user.home, theme)], {
           cwd: "/",

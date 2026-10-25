@@ -43,6 +43,13 @@ export const DESKTOP_APT_PACKAGES = [
 ] as const;
 
 /**
+ * The desktops' theme (ADR 0058 §15), installed after `DESKTOP_APT_PACKAGES` where apt has it (Debian 12 and
+ * 13, Ubuntu 24.04 with universe; not Ubuntu 22.04): without it the desktops keep GTK's and xfwm4's own. Orchis
+ * draws its window buttons from SVG files, so gdk-pixbuf's SVG loader comes with it.
+ */
+export const DESKTOP_LOOK_APT_PACKAGES = ["orchis-gtk-theme", "librsvg2-common"] as const;
+
+/**
  * Debian/Ubuntu packages with the shared libraries the agents' Chrome for
  * Testing links (`--system`, with or without `--desktop`): what `ldd chrome`
  * finds missing on a bare Debian 12 or 13, or Ubuntu 22.04 or 24.04. Where
@@ -102,7 +109,8 @@ export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
  * `SYSTEM_RUNNER_DIR`, the launcher at `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
- * `--desktop` adds `DESKTOP_APT_PACKAGES`, and `--agent-uid-range` sets the
+ * `--desktop` adds `DESKTOP_APT_PACKAGES` (and `DESKTOP_LOOK_APT_PACKAGES` where
+ * apt has them), and `--agent-uid-range` sets the
  * agents' uids (default `DEFAULT_AGENT_UID_RANGE`). Everything runs from
  * `main`, so a download cut short runs nothing.
  *
@@ -140,6 +148,7 @@ SERVER=${server}
 BUN_VERSION=${shQuote(RUNNER_BUN_VERSION)}
 BROWSER_PACKAGES=${shQuote(BROWSER_APT_PACKAGES.join(" "))}
 DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
+LOOK_PACKAGES=${shQuote(DESKTOP_LOOK_APT_PACKAGES.join(" "))}
 
 DIR=""
 NAME=""
@@ -248,6 +257,11 @@ system_packages() {
     say "Installing the packages for $WHAT ..."
     # shellcheck disable=SC2086
     apt_install $PACKAGES || die "installing the packages for $WHAT failed"
+    if [ "$DESKTOP" -eq 1 ]; then
+      # shellcheck disable=SC2086
+      apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $LOOK_PACKAGES ||
+        say "The agents' screens keep the stock theme: apt has no $LOOK_PACKAGES here"
+    fi
   else
     say "For $WHAT, install these packages (Debian names) with this computer's package manager:"
     say "  $PACKAGES"
