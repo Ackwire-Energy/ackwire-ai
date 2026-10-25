@@ -1,4 +1,5 @@
-import { type ConnectorDef, useCatalog, useConnections } from "@agenteschat/client";
+import { type ConnectorDef, useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
+import { connectedItems } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import { useMemo, useState } from "react";
@@ -37,25 +38,28 @@ function Gallery() {
   const sheet = useSheet();
   const catalog = useCatalog();
   const connections = useConnections(orgId);
+  // Servers connected by address (a vendor's own, like Sentry's) come from their own list, as on the web.
+  const servers = useCustomServers(orgId);
   const pull = usePullRefresh(async () => {
-    await Promise.all([catalog.refetch(), connections.refetch()]);
+    await Promise.all([catalog.refetch(), connections.refetch(), servers.refetch()]);
   });
   // Connecting is for admins (the server checks it too).
   const admin = can(org?.role, "configure");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const list = catalog.data?.connectors ?? [];
-  const conns = connections.data ?? [];
+  const items = useMemo(
+    () => connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []),
+    [connections.data, servers.data, catalog.data],
+  );
   const name = (d: ConnectorDef) => connectorName(t, d);
-  const shown = (d: ConnectorDef) => `${name(d)} ${connectorDescription(t, d)}`;
-  const connected = useMemo(() => list.filter((d) => connectionOf(d, conns)), [list, conns]);
-  const suggestions = useMemo(() => suggestionsOf(list, conns), [list, conns]);
+  const connected = useMemo(() => list.filter((d) => connectionOf(d, items)), [list, items]);
+  const suggestions = useMemo(() => suggestionsOf(list, items), [list, items]);
   const searching = q.trim().length > 0;
   const rest = useMemo(() => {
     const pool = searching ? list : list.filter((d) => !suggestions.includes(d));
     const inCat = cat === "all" ? pool : pool.filter((d) => d.category === cat);
-    return searchConnectors(inCat, q, shown);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `shown` reads the language through `t`
+    return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
   const open = (def: ConnectorDef) => sheet.open(<ConnectSheet def={def} />);
@@ -74,7 +78,7 @@ function Gallery() {
           returnKeyType="search"
         />
       </View>
-      {catalog.isLoading || connections.isLoading ? (
+      {catalog.isLoading || connections.isLoading || servers.isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={c.muted} />
         </View>
@@ -127,14 +131,17 @@ function Gallery() {
             </>
           ) : null}
           {cats.length > 1 ? (
-            <Filters
-              items={[
-                { key: "all", label: t("mobile.connectors.all") },
-                ...cats.map((k) => ({ key: k, label: t(`connectors.category.${k}`) })),
-              ]}
-              value={cat}
-              onChange={setCat}
-            />
+            // Under the search it sits close; after the sections above it starts a new one (their spacing).
+            <View style={searching ? undefined : styles.filters}>
+              <Filters
+                items={[
+                  { key: "all", label: t("mobile.connectors.all") },
+                  ...cats.map((k) => ({ key: k, label: t(`connectors.category.${k}`) })),
+                ]}
+                value={cat}
+                onChange={setCat}
+              />
+            </View>
           ) : null}
           {rest.length === 0 ? (
             <EmptyState title={t("mobile.connectors.noResults")} />
@@ -146,7 +153,7 @@ function Gallery() {
                   def={d}
                   name={name(d)}
                   text={d.available ? connectorDescription(t, d) : t("mobile.connectors.soon")}
-                  connected={Boolean(connectionOf(d, conns))}
+                  connected={Boolean(connectionOf(d, items))}
                   onPress={d.available ? open : undefined}
                 />
               ))}
@@ -232,13 +239,7 @@ function Suggestion({
       style={({ pressed }) => [styles.card, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
     >
       <View style={styles.band}>
-        <Dither
-          kind="sky"
-          tones={brandTones(c.bg, brand)}
-          pixel={3}
-          animated={false}
-          style={StyleSheet.absoluteFill}
-        />
+        <Dither kind="sky" tones={brandTones(c.bg, brand)} pixel={3} animated={false} style={StyleSheet.absoluteFill} />
         <ConnectorIcon def={def} label={name} size={44} />
       </View>
       <View style={styles.cardText}>
@@ -321,6 +322,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   suggestions: { gap: 10, paddingHorizontal: 16 },
+  filters: { paddingTop: 20 },
   card: {
     flexDirection: "row",
     alignItems: "center",

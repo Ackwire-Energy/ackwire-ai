@@ -64,7 +64,7 @@ export function EmailLetter({ email, full }: { email: ApprovalEmail; full?: bool
       )}
       {email.original && (
         <p className="email-letter__original">
-          <Icon name="reply" size={13} />
+          <Icon name="reply" size={14} />
           <span>
             <Trans
               i18nKey={

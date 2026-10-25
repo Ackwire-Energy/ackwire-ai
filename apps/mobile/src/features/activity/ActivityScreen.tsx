@@ -19,6 +19,7 @@ import {
   LargeTitleScreen,
   LIST_AVATAR,
   LIST_INSET,
+  LineIcon,
   ListRow,
   SectionHeader,
   Sky,
@@ -163,7 +164,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         ) : null}
         <View style={styles.grow} />
         <View style={styles.kind}>
-          <Icon name={KIND_ICON[card.kind]} size={13} color={c.amber} />
+          <LineIcon name={KIND_ICON[card.kind]} size={13} color={c.amber} variant="footnote" />
           <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
             {kind}
           </Text>

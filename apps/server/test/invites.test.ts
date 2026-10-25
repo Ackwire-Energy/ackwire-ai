@@ -11,17 +11,20 @@ afterEach(() => t.close());
 test("invite link: anyone signed in joins as a member; members can't create links", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
-  const { orgId } = await seedOrg(owner);
+  const { orgId, agentId } = await seedOrg(owner);
   const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
   expect(res.status).toBe(201);
   const { url, expiresAt } = (await res.json()) as { url: string; expiresAt: string };
   expect(new Date(expiresAt).getTime() - Date.now()).toBeGreaterThan(6.9 * 86_400_000);
   const token = url.split("/invite/")[1] ?? "";
+  // Before signing in: who invited and a few of the org's agents, by name and look only.
   expect(await (await browser(t)(`/api/app/invitations/${token}`)).json()).toEqual({
     orgName: "Acme",
     email: "",
     role: "member",
     kind: "link",
+    invitedBy: "owner",
+    agents: [{ id: agentId, name: "Dev", appearance: null }],
   });
   // Sign-up is closed here: the link's token lets a new person register.
   await expect(signUp(browser(t), "eve@example.com")).rejects.toThrow("403");
