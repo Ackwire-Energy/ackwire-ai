@@ -7217,6 +7217,8 @@ export const ptBR = {
       label: "Enviar estatísticas de uso anônimas ao agentes.chat",
       help: "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
       envOff: "Desligado nas configurações deste servidor (TELEMETRY=off). Daqui não dá para ligar.",
+      envOffDesktop:
+        "Desligado no app do agentes.chat no computador onde este servidor roda, em Preferências › Servidores. Daqui não dá para ligar.",
       see: "Ver o que é enviado",
       dialogTitle: "O que é enviado",
       dialogText: "Uma vez por dia. Este é o próximo envio, exatamente.",

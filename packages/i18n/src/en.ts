@@ -7195,6 +7195,8 @@ export const en: Translations = {
       label: "Send anonymous usage statistics to agentes.chat",
       help: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
       envOff: "Turned off in this server's settings (TELEMETRY=off). It can't be turned on from here.",
+      envOffDesktop:
+        "Turned off in the agentes.chat app on the computer that runs this server, in Preferences › Servers. It can't be turned on from here.",
       see: "See what is sent",
       dialogTitle: "What is sent",
       dialogText: "Once a day. This is the next report, exactly.",

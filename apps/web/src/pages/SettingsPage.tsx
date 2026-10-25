@@ -413,7 +413,8 @@ function UsageStatisticsCard() {
             </label>
             <span className="settings-row__help" id="set-telemetry-help">
               {t("settings.telemetry.help")}
-              {data.envOff && ` ${t("settings.telemetry.envOff")}`}
+              {data.envOff &&
+                ` ${t(data.report.install === "desktop" ? "settings.telemetry.envOffDesktop" : "settings.telemetry.envOff")}`}
             </span>
           </div>
           <div className="settings-row__control">

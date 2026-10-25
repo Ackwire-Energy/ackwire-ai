@@ -74,6 +74,12 @@ describe("Configurações da organização", () => {
     expect(toggle.hasAttribute("disabled")).toBe(true);
     expect(card.textContent).toContain("Desligado nas configurações deste servidor (TELEMETRY=off).");
     cleanup();
+    // Run by the desktop app on its own computer: the switch that turned it off is in the app.
+    await go(seedState({ telemetry: { enabled: true, envOff: true, report: { report: 1, install: "desktop" } } }));
+    const desktop = screen().getByRole("region", { name: "Estatísticas de uso" });
+    expect(desktop.textContent).toContain("Desligado no app do agentes.chat no computador onde este servidor roda");
+    expect(desktop.textContent).not.toContain("TELEMETRY=off");
+    cleanup();
     await go();
     expect(screen().queryByRole("region", { name: "Estatísticas de uso" })).toBeNull();
   });
