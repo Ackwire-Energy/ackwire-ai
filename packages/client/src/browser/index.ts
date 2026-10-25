@@ -253,12 +253,6 @@ export interface TakeoverInput {
   screen?: ScreenKind;
 }
 
-/** "Parar" one of the agent's screens: the browser by default ("Desligar" for its desktop). */
-export interface StopInput {
-  agentId: string;
-  screen?: ScreenKind;
-}
-
 /** "Pronto" or "Devolver" with what the person wants the agent to know (it reads it as their words). */
 export interface DoneInput {
   handoffId: string;
@@ -317,14 +311,8 @@ export function useBrowserHandoffMutations(orgId: string) {
       onSuccess: apply,
     }),
     stop: useMutation({
-      mutationFn: (v: string | StopInput) =>
-        typeof v === "string" ? api.browser.stop(orgId, v) : api.browser.stop(orgId, v.agentId, v.screen),
+      mutationFn: (agentId: string) => api.browser.stop(orgId, agentId),
       meta: { silent: true },
-      onSuccess: (_done, v) => {
-        if (typeof v !== "string" && v.screen === "desktop") {
-          void qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, v.agentId) });
-        }
-      },
     }),
   };
 }

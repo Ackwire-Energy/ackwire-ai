@@ -112,10 +112,6 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
   // Every wait reads as capacity: an older server's `approval` too.
   const status: SetupStatus = phase === "waiting" ? "capacity" : phase;
   const secondsLeft = typeof setup.secondsLeft === "number" ? setup.secondsLeft : null;
-  // The server's clock at its answer: exact from its own two numbers, else this device's.
-  const serverNow =
-    secondsLeft !== null && setup.expectedReadyAt ? Date.parse(setup.expectedReadyAt) - secondsLeft * 1000 : receivedAt;
-  const requested = setup.requestedAt ? Date.parse(setup.requestedAt) : Number.NaN;
   return {
     phase,
     step,
@@ -127,7 +123,7 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     machineId: setup.machineId,
     secondsLeft,
     receivedAt,
-    waited: Number.isNaN(requested) || Number.isNaN(serverNow) ? null : Math.max(0, (serverNow - requested) / 1000),
+    waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,
     notifyByEmail: setup.notifyByEmail === true,
   };
 }

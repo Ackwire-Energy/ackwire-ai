@@ -74,6 +74,7 @@ export function DesktopView({
   canTakeOver,
   onTakeBrowser,
   onSettled,
+  onHeld,
 }: {
   agentId: string;
   name: string;
@@ -88,6 +89,8 @@ export function DesktopView({
   onTakeBrowser?: () => void;
   /** The person handed back or said it couldn't be done. */
   onSettled?: () => void;
+  /** Whether the held cover shows (the agent held and its screen not running), for the dialog's own pause line. */
+  onHeld?: (held: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -138,7 +141,7 @@ export function DesktopView({
     const el = screenRef.current;
     if (!connect || !el) return;
     // While it retries, the cover keeps saying why; anything else is a fresh start.
-    setView((v) => (v === "offline" || v === "busy" || v === "paused" ? v : "connecting"));
+    setView((v) => (v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -235,6 +238,8 @@ export function DesktopView({
   const live = shown === "live";
   const settled = SETTLED.includes(shown);
   useEffect(() => setPoll(settled ? 30_000 : 5_000), [settled]);
+  const held = shown === "held";
+  useEffect(() => onHeld?.(held), [held, onHeld]);
   const handoff = s?.handoff ?? null;
   const ask = inControl && handoff?.kind === "ask" ? handoff.instructions : null;
   // Until the screen's state says who (right after a 4409), someone.
@@ -305,11 +310,13 @@ export function DesktopView({
       : t("desktop.sub.control", g)
     : shown === "hidden"
       ? t("desktop.sub.hidden", { person: controllerName })
-      : live
-        ? (head?.watching ?? t("agentComputer.sub.watching"))
-        : failed || shown === "forbidden"
-          ? ""
-          : t("agentComputer.sub.opening");
+      : held
+        ? t("agentComputer.sub.held")
+        : live
+          ? (head?.watching ?? t("agentComputer.sub.watching"))
+          : failed || shown === "forbidden"
+            ? ""
+            : t("agentComputer.sub.opening");
   const retrying = <span>{t("desktop.state.retrying")}</span>;
   const again = (
     <Button size="sm" icon="refresh" onClick={retry}>
@@ -343,6 +350,14 @@ export function DesktopView({
     noRoom: <Cover color={color} icon="alert" text={t("agentComputer.state.noRoom", { computer })} action={again} />,
     paused: (
       <Cover color={color} icon="pause" text={t("agentComputer.state.pausedPlain", { computer })} help={retrying} />
+    ),
+    held: (
+      <Cover
+        color={color}
+        icon="pause"
+        text={t("agentComputer.state.held", g)}
+        help={t("agentComputer.state.heldHelp")}
+      />
     ),
     forbidden: <Cover color={color} icon="lock" text={t("agentComputer.state.forbidden")} />,
     outdated: cantShow,

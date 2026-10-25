@@ -33,6 +33,7 @@ const external = (patch: Partial<ComputerSetup> = {}): ComputerSetup => ({
   requestedAt: "2026-10-24T21:04:30.000Z",
   expectedReadyAt: null,
   secondsLeft: null,
+  secondsWaited: 30,
   notifyByEmail: true,
   specs: null,
   machineId: null,
@@ -146,30 +147,37 @@ describe("we'll email you", () => {
     expect(promisesEmail(view({ state: "ready" }), NOW)).toBe(false);
   });
 
-  test("the wait is measured on the server's clock when it says both its time and its seconds left", () => {
-    // The server's now is 21:00:00 (ready at 21:02:00, 120 s left): 6 minutes after people started waiting, though
-    // this device's clock reads 21:05:00 at the answer.
-    const v = setupView(
-      external({
-        requestedAt: "2026-10-24T20:54:00.000Z",
-        expectedReadyAt: "2026-10-24T21:02:00.000Z",
-        secondsLeft: 120,
-      }),
-      NOW,
-    );
-    expect(v?.waited).toBe(360);
-    expect(setupView(external({ requestedAt: null }), NOW)?.waited).toBeNull();
+  test("the wait is the server's own count of seconds, whatever this device's clock says", () => {
+    // People started waiting at 20:54 by the server's word, but the server counted 20 s: this device's clock is
+    // off, and the minute isn't up.
+    const early = view({ requestedAt: "2026-10-24T20:54:00.000Z", secondsWaited: 20 });
+    expect(early.waited).toBe(20);
+    expect(promisesEmail(early, NOW)).toBe(false);
+    expect(promisesEmail(early, NOW + 41_000)).toBe(true);
+    // And the other way: a `requestedAt` ahead of this device's clock, 90 s by the server's.
+    const late = view({ requestedAt: "2026-10-24T21:30:00.000Z", secondsWaited: 90 });
+    expect(promisesEmail(late, NOW)).toBe(true);
+    // A server that doesn't count: no promise from the wait alone.
+    const unknown = view({ secondsWaited: null });
+    expect(unknown.waited).toBeNull();
+    expect(promisesEmail(unknown, NOW + 3_600_000)).toBe(false);
   });
 
   test("an event keeps whether the server sends email when it doesn't say", () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.computerSetup("o1"), external({ notifyByEmail: true }));
-    applyWorkspaceEvent(qc, "o1", { type: "machine.provisioning", state: "preparing", secondsLeft: 300 } as {
+    applyWorkspaceEvent(qc, "o1", {
+      type: "machine.provisioning",
+      state: "preparing",
+      secondsLeft: 300,
+      secondsWaited: 75,
+    } as {
       type: string;
     });
     expect(qc.getQueryData<ComputerSetup>(keys.computerSetup("o1"))).toMatchObject({
       notifyByEmail: true,
       secondsLeft: 300,
+      secondsWaited: 75,
     });
     applyWorkspaceEvent(qc, "o1", { type: "machine.provisioning", state: "preparing", notifyByEmail: false } as {
       type: string;

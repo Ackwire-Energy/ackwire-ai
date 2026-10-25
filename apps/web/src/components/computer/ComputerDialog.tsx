@@ -169,6 +169,8 @@ function ComputerStage({
   const navigate = useNavigate();
   const outages = useMachineOutages(org.id, can(org.role, "manage_agents"));
   const [switching, setSwitching] = useState(false);
+  // The screen's own held cover says it all: no pause line over it.
+  const [screenHeld, setScreenHeld] = useState(false);
   const f = view.facts;
   const g = agentGrammar(t, agent.name);
   const color = colorOf(agent);
@@ -268,7 +270,9 @@ function ComputerStage({
     body = (
       <>
         {f.held ? (
-          <Banner tone="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />
+          !(surface === "screen" && screenHeld) && (
+            <Banner tone="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />
+          )
         ) : paused ? (
           <Banner
             tone="pause"
@@ -315,6 +319,7 @@ function ComputerStage({
             edition={f.edition}
             machine={machine}
             canTakeOver={canTakeOver}
+            onHeld={setScreenHeld}
             {...(manages && f.browser && !view.desktop?.canControl ? { onTakeBrowser: takeBrowser } : {})}
           />
         ) : (

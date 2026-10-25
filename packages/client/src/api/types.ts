@@ -2170,6 +2170,8 @@ export interface ComputerSetup {
   expectedReadyAt: string | null;
   /** `expectedReadyAt` less the server's clock when it answered (negative once past), so a device's clock doesn't matter. */
   secondsLeft: number | null;
+  /** The server's clock when it answered less `requestedAt`, for the same reason. */
+  secondsWaited: number | null;
   /** The server sends email: the workspace's owners get one when it's ready after a wait. */
   notifyByEmail: boolean;
   specs: { cpus: number; memoryGb: number; diskGb: number } | null;

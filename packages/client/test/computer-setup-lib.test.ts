@@ -32,6 +32,7 @@ const external = (patch: Partial<ComputerSetup> = {}): ComputerSetup => ({
   requestedAt: "2026-10-24T18:49:00.000Z",
   expectedReadyAt: null,
   secondsLeft: null,
+  secondsWaited: 4,
   notifyByEmail: false,
   specs: null,
   machineId: null,
@@ -201,6 +202,7 @@ describe("live: machine.provisioning and org.standing", () => {
         requestedAt: "2026-10-24T18:49:00.000Z",
         expectedReadyAt: null,
         secondsLeft: null,
+        secondsWaited: 660,
         specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
         machineId: null,
       } as { type: string }),
@@ -214,6 +216,7 @@ describe("live: machine.provisioning and org.standing", () => {
       requestedAt: "2026-10-24T18:49:00.000Z",
       expectedReadyAt: null,
       secondsLeft: null,
+      secondsWaited: 660,
       // The event doesn't say whether the server sends email: what the answer said stays.
       notifyByEmail: false,
       specs: { cpus: 4, memoryGb: 8, diskGb: 100 },

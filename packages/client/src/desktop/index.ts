@@ -25,6 +25,8 @@ export type DesktopViewState =
   | "noRoom"
   /** Its owner paused the computer: control waits for the resume (retrying). */
   | "paused"
+  /** The agent or its workspace is held and its screen isn't running: nothing starts it until the hold ends. */
+  | "held"
   | "forbidden"
   /** The agentes app on the computer is too old for screens. */
   | "outdated"
@@ -71,6 +73,7 @@ export function desktopCloseState(code: number, reason = ""): { state: DesktopVi
       if (reason === "desktop_off") return { state: "connecting", retry: "later" };
       if (reason === "desktop_busy") return { state: "noRoom", retry: "never" };
       if (reason === "machine_paused") return { state: "paused", retry: "later" };
+      if (reason === "held") return { state: "held", retry: "later" };
       if (reason === "runner_outdated") return { state: "outdated", retry: "never" };
       if (reason === "not_allowed" || reason === "desktop_unavailable") return { state: "unavailable", retry: "never" };
       return { state: "connecting", retry: "later" };
@@ -94,6 +97,8 @@ export function desktopReasonState(reason: string | null): "offline" | "outdated
 export function desktopStatusState(status: DesktopStatus, userId: string): DesktopViewState | null {
   if (!status.available) return desktopReasonState(status.reason);
   if (status.controllerUserId && status.controllerUserId !== userId) return "hidden";
+  // A held agent's screen that runs may be watched; one that doesn't isn't started until the hold ends.
+  if (status.held && !status.running) return "held";
   return null;
 }
 

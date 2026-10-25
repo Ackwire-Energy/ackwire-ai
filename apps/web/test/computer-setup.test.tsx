@@ -74,6 +74,7 @@ async function open(path: string, setup: Partial<ComputerSetup> | null, state = 
           requestedAt: new Date(Date.now() - 30_000).toISOString(),
           expectedReadyAt: null,
           secondsLeft: null,
+          secondsWaited: 30,
           specs: SPECS,
           machineId: null,
           ...event,

@@ -144,6 +144,7 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
         secondsLeft: 330,
         expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
         requestedAt: new Date(Date.now() - 120_000).toISOString(),
+        secondsWaited: 120,
         notifyByEmail: true,
         specs: SPECS,
       },

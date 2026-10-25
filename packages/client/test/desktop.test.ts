@@ -67,6 +67,8 @@ describe("the agent's screen", () => {
     // No memory left for another screen: "Tentar de novo", nothing by itself.
     expect(desktopCloseState(4502, "desktop_busy")).toEqual({ state: "noRoom", retry: "never" });
     expect(desktopCloseState(4502, "machine_paused")).toEqual({ state: "paused", retry: "later" });
+    // A held agent's screen that isn't running: nothing starts it, so the held cover, until the hold ends.
+    expect(desktopCloseState(4502, "held")).toEqual({ state: "held", retry: "later" });
     expect(desktopCloseState(4502, "runner_outdated")).toEqual({ state: "outdated", retry: "never" });
     expect(desktopCloseState(4502, "not_allowed")).toEqual({ state: "unavailable", retry: "never" });
     expect(desktopCloseState(4502, "internal")).toEqual({ state: "connecting", retry: "later" });
@@ -85,6 +87,9 @@ describe("the agent's screen", () => {
     expect(desktopStatusState(status({ available: false, reason: "offline" }), "me")).toBe("offline");
     expect(desktopStatusState(status({ available: false, reason: "runner_outdated" }), "me")).toBe("outdated");
     expect(desktopStatusState(status({ available: false, reason: "not_allowed" }), "me")).toBe("unavailable");
+    // Held: a screen that runs may be watched; one that doesn't isn't started, so no socket opens for it.
+    expect(desktopStatusState(status({ held: true }), "me")).toBeNull();
+    expect(desktopStatusState(status({ held: true, running: false }), "me")).toBe("held");
   });
 
   test("control only on the desktop's own handoff, active and mine", () => {

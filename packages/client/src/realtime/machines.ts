@@ -189,6 +189,7 @@ const SETUP_FIELDS = [
   "requestedAt",
   "expectedReadyAt",
   "secondsLeft",
+  "secondsWaited",
   "specs",
   "machineId",
 ] as const;

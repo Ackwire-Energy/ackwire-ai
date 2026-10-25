@@ -207,6 +207,42 @@ describe("the agent's screen in the computer dialog", () => {
     expect(sub()).toBe("Ao vivo · você está assistindo");
   });
 
+  test("held, its screen not running: nothing starts it, the pause said once; once the hold ends it opens", async () => {
+    const t = await dialog({ ...RUNNING, running: false, held: true });
+    expect(t.sockets.desktops).toHaveLength(0);
+    expect(view().getAllByText("A Ada está em pausa por enquanto")).toHaveLength(1);
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+
+    t.fake.desktops.set(ADA_ID, { ...RUNNING, running: false });
+    await act(async () => t.services.queryClient.invalidateQueries({ queryKey: keys.agentDesktop(ORG_ID, ADA_ID) }));
+    await settle(6);
+    expect(t.sockets.desktops).toHaveLength(1);
+    await connected();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("held while watching: the pause over the live screen; the stream's `held` close is the held cover, not opening", async () => {
+    const t = await dialog({ ...RUNNING, held: true });
+    await connected();
+    expect(view().getByText("A Ada está em pausa por enquanto")).toBeTruthy();
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+
+    // Its screen went away meanwhile: the server starts none for a held agent.
+    t.fake.desktops.set(ADA_ID, { ...RUNNING, running: false, held: true });
+    await act(async () => t.sockets.desktops[0]?.serverClose(4502, "held"));
+    await settle(6);
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(view().getAllByText("A Ada está em pausa por enquanto")).toHaveLength(1);
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    // Not running and held: no socket tries again until the hold ends.
+    await act(async () => new Promise((r) => setTimeout(r, 1100)));
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(1);
+  });
+
   test("4409: someone else took control, the screen hides; once handed back it opens again", async () => {
     const t = await dialog();
     await connected();

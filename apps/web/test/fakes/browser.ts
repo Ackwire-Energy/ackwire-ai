@@ -143,9 +143,8 @@ export function createFakeBrowser(
         throw new ApiError(403, "browser.not_allowed", `${host} is outside the sites this agent may use`);
       }
     },
-    stop: async (orgId, agentId, screen) => {
-      log("browser.stop", orgId, agentId, ...(screen ? [screen] : []));
-      if (screen === "desktop") desktops.set(agentId, { ...desktops.get(agentId), running: false });
+    stop: async (orgId, agentId) => {
+      log("browser.stop", orgId, agentId);
     },
   };
   const desktop: ApiClient["desktop"] = {
