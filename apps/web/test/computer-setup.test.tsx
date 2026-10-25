@@ -426,4 +426,90 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(step()).not.toContain("Faltam");
     expect(step()).not.toContain("Avisamos");
   });
+
+  /** A new person's onboarding up to the computer step, the import skipped. */
+  const toComputerStep = async (setup: Partial<ComputerSetup>) => {
+    const state = seedState();
+    if (state.me) state.me.organizations = [];
+    const r = await open("/onboarding", setup, state);
+    // Nothing says whether the computer is a choice before the workspace exists.
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).not.toContain("opcional");
+    for (const [label, value] of [
+      ["Nome", "Acme Saúde"],
+      ["Contexto", "Clínicas."],
+    ] as const) {
+      await act(async () => fireEvent.change(screen().getByLabelText(label), { target: { value } }));
+      await click(screen().getByRole("button", { name: "Continuar" }));
+    }
+    await click(screen().getByRole("button", { name: "Pular esta etapa" }));
+    const reported = async (next: Partial<ComputerSetup>) => {
+      r.machines.setSetup(next);
+      await act(async () => r.services.queryClient.invalidateQueries());
+      await settle(6);
+    };
+    return { ...r, reported };
+  };
+
+  test("a computer kept ready: every line follows it in seconds, and nothing waits once it's ready", async () => {
+    const r = await toComputerStep({ state: "preparing", specs: SPECS, notifyByEmail: true });
+    const step = () => (document.querySelector(".onb__workspace-computer") as HTMLElement).textContent ?? "";
+    // Nothing reported yet: no time is promised.
+    expect(step()).toContain("Preparando o computador.");
+    expect(step()).not.toContain("minutos");
+
+    // One kept ready is handed over: the last step, seconds away. The steps before it are done, it is under way.
+    await r.reported({ state: "preparing", step: "connecting", secondsLeft: 6, specs: SPECS, notifyByEmail: true });
+    const bars = [...document.querySelectorAll(".onb__workspace-computer .ac-steps__bar")];
+    expect(bars.map((b) => [b.getAttribute("data-done"), b.hasAttribute("data-current")])).toEqual([
+      ["true", false],
+      ["true", false],
+      ["true", false],
+      ["false", true],
+    ]);
+    expect(step()).toContain("Passo 4 de 4 · Conectando ao seu workspace");
+    expect(step()).toContain("Quase pronto…");
+
+    await r.reported({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
+    expect(document.body.textContent).toContain("Num computador só deste workspace, que já está pronto.");
+    expect(step()).toContain("Pronto. Os agentes trabalham nele.");
+    expect(step()).toContain("O Claude Code e o Codex já vêm nele. Cada agente entra com o seu plano");
+    expect(step()).not.toMatch(/Quando ficar pronto|Pode seguir/);
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
+
+    // The key step offers the plan on it now, not "once it's ready".
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "Ou entre com o seu plano do Claude ou do ChatGPT no Computador da Acme Saúde: sem chave.",
+    );
+    await click(screen().getByRole("button", { name: "Conectar depois" }));
+    await settle(6);
+    await click(screen().getByRole("button", { name: "Pular esta etapa" }));
+    // Done: how far it is in the tile's big type, whose it is under it.
+    const tile = [...document.querySelectorAll(".onb__summary > *")].find((c) =>
+      c.textContent?.startsWith("Computador"),
+    );
+    expect(tile?.querySelector(".onb__stat")?.textContent).toBe("Pronto");
+    expect(tile?.querySelector(".onb__stat-of")?.textContent).toBe("Computador da Acme Saúde");
+  });
+
+  test("on its way, every step keeps asking about it (the rail, the key step follow); once ready, it stops", async () => {
+    const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+    const query = r.services.queryClient
+      .getQueryCache()
+      .findAll()
+      .find((q) => q.queryKey[2] === "computer-setup" && q.getObserversCount() > 0);
+    const every = () => {
+      const interval = query?.observers[0]?.options.refetchInterval;
+      return typeof interval === "function" && query ? interval(query) : interval;
+    };
+    expect(every()).toBe(5000);
+    await r.reported({ state: "ready", machineId: "m-1", specs: SPECS });
+    expect(every()).toBe(false);
+  });
 });

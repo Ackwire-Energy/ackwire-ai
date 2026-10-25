@@ -444,6 +444,34 @@ export async function setMyLocale(db: Database, userId: string, locale: UserLoca
   await db.update(users).set({ locale }).where(eq(users.id, userId));
 }
 
+/**
+ * The app language a request's `Accept-Language` asks for: its most preferred English or Portuguese tag
+ * ("en-GB,en;q=0.9" → en, "pt-PT" → pt-BR), else null. The web app sends its own language in it. Mirrors
+ * `browserLocale` in apps/web/src/i18n/index.ts.
+ */
+export function requestLocale(acceptLanguage: string | null | undefined): UserLocale | null {
+  const tags = (acceptLanguage ?? "")
+    .split(",")
+    .map((part) => {
+      const [tag = "", ...params] = part.split(";").map((s) => s.trim().toLowerCase());
+      const q = params.find((p) => p.startsWith("q="));
+      return { tag, q: q ? Number(q.slice(2)) : 1 };
+    })
+    .filter((l) => l.q > 0)
+    .sort((a, b) => b.q - a.q);
+  for (const { tag } of tags) {
+    if (tag.startsWith("en")) return "en";
+    if (tag.startsWith("pt")) return "pt-BR";
+  }
+  return null;
+}
+
+/** Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. */
+export async function isEmailVerified(db: Database, userId: string) {
+  const [row] = await db.select({ verified: users.emailVerified }).from(users).where(eq(users.id, userId));
+  return row?.verified === true;
+}
+
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })

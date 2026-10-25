@@ -81,6 +81,8 @@ export interface User {
   image: string | null;
   /** Signs in with a password (false: only Google or Apple, or the desktop app that runs the server). */
   hasPassword?: boolean;
+  /** Opened the link that confirms the email address. */
+  emailVerified?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */

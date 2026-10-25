@@ -18,7 +18,9 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@agenteschat/client/lib/text";
 import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
+import { createBetterAuthClient } from "@/auth/better-auth";
 import { createI18n } from "@/i18n";
+import { EMAIL_CONFIRMED_PATH, emailConfirmedToast } from "@/lib/email-confirmation";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;
@@ -184,5 +186,43 @@ describe("i18n", () => {
     };
     walk(ptBR);
     expect(strings.filter((s) => s.includes("!"))).toEqual([]);
+  });
+});
+
+describe("the confirmation email", () => {
+  test("its link lands back here: confirmed, or a link that no longer works; anything else is no toast", () => {
+    expect(emailConfirmedToast(EMAIL_CONFIRMED_PATH.slice(1))).toEqual({ key: "auth.emailConfirmed", tone: "info" });
+    expect(emailConfirmedToast("?email_confirmed=1&error=TOKEN_EXPIRED")).toEqual({
+      key: "auth.emailLinkExpired",
+      tone: "error",
+    });
+    expect(emailConfirmedToast("?connector_error=x")).toBeNull();
+    expect(emailConfirmedToast("")).toBeNull();
+  });
+
+  test("the auth client says the app's language on every request; a sign-up's link comes back to that page", async () => {
+    const sent: { path: string; language: string | null; body: Record<string, unknown> | null }[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      sent.push({
+        path: new URL(String(url)).pathname,
+        language: new Headers(init?.headers).get("accept-language"),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
+      });
+      return Response.json({ token: null, user: { id: "u", name: "Bia", email: "bia@example.com" } });
+    }) as typeof fetch;
+    try {
+      let language = "en";
+      const auth = createBetterAuthClient("http://localhost:3000", () => language);
+      await auth.signUp({ name: "Bia", email: "bia@example.com", password: "senha-longa" });
+      language = "pt-BR";
+      await auth.requestPasswordReset({ email: "bia@example.com", redirectTo: "/reset-password" });
+      const signUp = sent.find((r) => r.path === "/api/auth/sign-up/email");
+      expect(signUp?.language).toBe("en");
+      expect(signUp?.body).toMatchObject({ callbackURL: EMAIL_CONFIRMED_PATH });
+      expect(sent.find((r) => r.path === "/api/auth/request-password-reset")?.language).toBe("pt-BR");
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });

@@ -167,8 +167,28 @@ describe("Criar conta (e-mail novo)", () => {
     expect(screen().getByText("Senha ok.")).toBeTruthy();
     await press(/Criar conta/);
     expect(calls[0]?.args[0]).toEqual({ name: "Walter Souza", email: "walter@acme.com.br", password: "senha-longa" });
+    // This server sends no email, so no confirmation link went anywhere.
+    expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
     // Signed out in the fake, so onboarding sends back to sign-in.
     expect(router.state.location.pathname).toBe("/login");
+  });
+
+  test("a server that emails: the onboarding learns where the confirmation went; the name isn't spell-checked", async () => {
+    const { api } = authApi(NEW, { reset: true });
+    const { auth } = createFakeAuth();
+    await renderApp("/signup", { api, auth });
+    await type("E-mail", "Walter@Acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(screen().getByLabelText("Seu nome").getAttribute("spellcheck")).toBe("false");
+    await type("Seu nome", "Walter Souza");
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "senha-longa");
+    try {
+      await press(/Criar conta/);
+      expect(sessionStorage.getItem("agentes.confirmation.sent")).toBe("walter@acme.com.br");
+    } finally {
+      sessionStorage.clear();
+    }
   });
 
   test("sign-up closed for that e-mail: says so and offers another e-mail", async () => {
@@ -277,15 +297,27 @@ describe("Onboarding", () => {
     }
   };
 
+  const progress = () => document.querySelector(".onb__progress")?.textContent;
+  const railStep = (name: RegExp) =>
+    within(screen().getByRole("navigation", { name: "Passos para começar" })).getByRole("button", { name });
+
   /** Workspace → Contexto, up to the import step. */
   const throughContext = async (state: ReturnType<typeof seedState>) => {
-    expect(screen().getByText("Faltam 6 etapas")).toBeTruthy();
+    // How many are left, said once.
+    expect(progress()).toBe("Faltam 6 etapas");
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     // The host introduces itself the first time it asks.
-    expect(document.body.textContent).toContain("Oi, eu sou a Ada, vou montar tudo com você.");
+    expect(document.body.textContent).toContain("Oi, eu sou a Ada. Vou montar tudo com você.");
+    // Whether the computer is a choice is the workspace's to say: no edition's word before it exists.
+    expect(railStep(/^Trazer seus agentes/).textContent).toContain("opcional");
+    expect(railStep(/^Computador/).textContent).not.toContain("opcional");
+    // A name is no misspelling.
+    expect(screen().getByLabelText("Nome").getAttribute("spellcheck")).toBe("false");
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await type("Nome", "Acme Saúde");
     await next();
+    // Here people connect their own computer: a choice.
+    expect(railStep(/^Computador/).textContent).toContain("opcional");
     // The workspace exists after step 1 (so the logo can be sent); the time zone goes to its settings.
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Acme Saúde" });
     const zone = calls(state, "orgs.updateSettings")[0]?.args[1] as { timezone?: unknown };
@@ -327,7 +359,11 @@ describe("Onboarding", () => {
     // No connected computer thinks for them: the key comes next, on its own screen.
     await next();
     expect(calls(state, "agents.create")).toHaveLength(0);
-    expect(screen().getByRole("heading", { name: "Falta a chave de API." })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    // Where to make the key reads as this page's own link.
+    expect(screen().getByRole("link", { name: /Crie a chave em console.anthropic.com/ }).className).toContain(
+      "ac-link",
+    );
     // The key is required there; the platform key isn't offered by this server.
     expect(screen().queryByRole("button", { name: /Usar a chave do agentes.chat/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
@@ -414,7 +450,7 @@ describe("Onboarding", () => {
     await skip();
     await keepOnly("Theo · PM");
     await next();
-    expect(screen().getByRole("heading", { name: "Falta a chave de API." })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(document.body.textContent).toContain("Os agentes começam a responder quando uma IA estiver conectada.");
     // A key typed and then left for later isn't saved.
     await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
@@ -543,7 +579,72 @@ describe("Onboarding", () => {
     // The rail marks the steps done and lets you go back.
     const steps = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(steps.querySelectorAll("li[data-done]")).toHaveLength(6);
-    expect(screen().getByText("Tudo certo")).toBeTruthy();
+    expect(progress()).toBe("Tudo certo");
+
+    // Back to Team: it's open again, so one step is left until it's answered again, and it was no less
+    // optional before: its row keeps no "opcional".
+    await click(button("Voltar"), 4);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(progress()).toBe("Falta 1 etapa");
+    expect(railStep(/^Time/).textContent).not.toContain("opcional");
+    await skip();
+    expect(progress()).toBe("Tudo certo");
+  });
+
+  test('import: Theo\'s "pular" is the way out, and no two apps share a tile', async () => {
+    const { state } = await start();
+    await throughContext(state);
+    expect(document.body.textContent).toContain("Se não usa, é só pular.");
+    // The apps we ship no mark for get their own letters.
+    const tiles = [...document.querySelectorAll(".imp-source")].map((card) => [
+      card.querySelector(".ac-option__title")?.textContent,
+      card.querySelector(".imp-mark")?.textContent,
+    ]);
+    expect(tiles).toContainEqual(["OpenClaw", "OC"]);
+    expect(tiles).toContainEqual(["Hermes Agent", "H"]);
+    expect(tiles).toContainEqual(["OpenBot.Run", "OR"]);
+    expect(tiles).toContainEqual(["Paperclip", "P"]);
+    await click(button("pular"), 6);
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");
+  });
+
+  test("the confirmation email: the first step says where it went, then that it's confirmed", async () => {
+    const state = seedState();
+    if (!state.me) throw new Error("no me");
+    state.me.organizations = [];
+    state.me.user.emailVerified = false;
+    // This tab signed up with this address.
+    sessionStorage.setItem("agentes.confirmation.sent", "walter@acme.com.br");
+    try {
+      await renderApp("/onboarding", { api: createFakeApi(state) });
+      await settle(4);
+      const note = () => document.querySelector(".onb__note")?.textContent;
+      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br. Abra quando quiser.");
+      // Nothing waits for it.
+      expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+      await type("Nome", "Acme");
+      expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+
+      // The link opened in another tab: back here, the line says so.
+      state.me = { ...state.me, user: { ...state.me.user, emailVerified: true } };
+      await act(async () => window.dispatchEvent(new Event("visibilitychange")));
+      await settle(6);
+      expect(note()).toBe("E-mail confirmado: walter@acme.com.br.");
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
+  test("no confirmation line where this tab sent none (a Google sign-up, another tab)", async () => {
+    const state = seedState();
+    if (!state.me) throw new Error("no me");
+    state.me.organizations = [];
+    state.me.user.emailVerified = false;
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(4);
+    expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
+    expect(document.querySelector(".onb__note")).toBeNull();
   });
 
   const fixture = (name: string) => readFileSync(join(import.meta.dir, "fixtures", "agent-import", name), "utf8");

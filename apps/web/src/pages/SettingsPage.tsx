@@ -298,6 +298,7 @@ function GeneralSection() {
             <div className="settings-row__control">
               <Input
                 id="set-name"
+                spellCheck={false}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={saveName}

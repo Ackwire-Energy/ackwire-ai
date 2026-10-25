@@ -75,6 +75,8 @@ export const ptBR = {
     passwordMissing_one: "Falta {{count}} caractere (mínimo de 8).",
     passwordMissing_other: "Faltam {{count}} caracteres (mínimo de 8).",
     passwordTooLong: "Use no máximo 128 caracteres.",
+    emailConfirmed: "E-mail confirmado.",
+    emailLinkExpired: "Este link de confirmação não vale mais. Sua conta funciona normalmente.",
     termsBefore: "Ao continuar, você aceita os ",
     terms: "Termos",
     termsMiddle: " e a ",
@@ -190,16 +192,15 @@ export const ptBR = {
       done: "Pronto",
     },
     hosts: {
-      ada: "Oi, eu sou a Ada, vou montar tudo com você.",
-      lia: "Oi, eu sou a Lia, cuido de pesquisa.",
+      ada: "Oi, eu sou a Ada. Vou montar tudo com você.",
+      lia: "Oi, eu sou a Lia. Cuido de pesquisa.",
       theo: "Prazer, sou o Theo. Organizo as tarefas do time.",
-      atlas: "E aí, Atlas aqui, cuido dos computadores.",
+      atlas: "E aí, Atlas aqui. Cuido dos computadores.",
     },
     progress: {
       left_one: "Falta {{count}} etapa",
       left_other: "Faltam {{count}} etapas",
       done: "Tudo certo",
-      count: "{{n}} de {{total}}",
     },
     railValue: {
       context: "Escrito",
@@ -254,6 +255,8 @@ export const ptBR = {
     import: {
       title: "Já usa agentes em outro app?",
       lead: "Traga do OpenClaw, do Hermes, do OpenBot e de outros: os agentes chegam com instruções, skills, rotinas e memória. Se não usa, é só pular.",
+      leadWithSkip:
+        "Traga do OpenClaw, do Hermes, do OpenBot e de outros: os agentes chegam com instruções, skills, rotinas e memória. Se não usa, é só <skip>pular</skip>.",
       sourcesLabel: "De onde vêm os agentes",
       otherName: "Outro app",
       openclawDesc: "A pasta ~/.openclaw, um workspace ou um CLAW.md.",
@@ -510,7 +513,7 @@ export const ptBR = {
       atlas: { name: "Atlas", role: "Ops", desc: "Monitora erros, filas e deploys." },
     },
     keyStep: {
-      title: "Falta a chave de API.",
+      title: "Qual IA eles vão usar?",
       lead: "Os agentes precisam de uma IA para pensar: uma chave de API, ou o seu plano do Claude ou do ChatGPT com login no computador.",
       useComputer: "Ou entre com o seu plano do Claude ou do ChatGPT no {{computer}}: sem chave.",
       useComputerCloud: "Ou entre com o seu plano quando o {{computer}} ficar pronto: sem chave.",
@@ -567,6 +570,7 @@ export const ptBR = {
       hostReady: "Os agentes escolhidos vão trabalhar no computador deste servidor.",
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
       leadCloud: "Num computador só deste workspace, que está sendo preparado agora.",
+      leadCloudReady: "Num computador só deste workspace, que já está pronto.",
     },
     team: {
       title: "Quem mais trabalha com você?",
@@ -602,6 +606,10 @@ export const ptBR = {
       open: "Abrir o #general",
     },
     skip: "Pular esta etapa",
+    confirmation: {
+      sent: "Mandamos um link de confirmação para {{email}}. Abra quando quiser.",
+      confirmed: "E-mail confirmado: {{email}}.",
+    },
   },
   /** The desktop app's right click (lib/context-menu.ts). */
   // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).
@@ -8283,7 +8291,7 @@ export const ptBR = {
     },
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
     status: {
-      preparing: "Preparando o computador. Leva alguns minutos.",
+      preparing: "Preparando o computador.",
       capacity: "Está demorando mais que o normal. Nada se perde.",
       problem: "Algo deu errado ao preparar o computador. Já estamos cuidando: nada a fazer do seu lado.",
       ready: "Pronto. Os agentes trabalham nele.",
@@ -8300,7 +8308,7 @@ export const ptBR = {
     managedHint: "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
     continue: "Pode seguir: os agentes começam a usar assim que ele ficar pronto.",
     plans:
-      "O Claude Code e o Codex já vêm nele. Quando ficar pronto, cada agente entra com o seu plano do Claude ou do ChatGPT, ou com o plano de código de outra IA.",
+      "O Claude Code e o Codex já vêm nele. Cada agente entra com o seu plano do Claude ou do ChatGPT, ou com o plano de código de outra IA.",
     eta: {
       minutes_one: "Falta cerca de 1 min",
       minutes_other: "Faltam uns {{count}} min",

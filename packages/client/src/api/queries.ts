@@ -42,6 +42,7 @@ import type {
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
+  ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
   DirectMessage,
@@ -1971,9 +1972,13 @@ export const useHostComputer = (orgId: string, enabled = true) => {
 
 /**
  * The workspace's own computer on its way (ADR 0056 §10): `machine.provisioning` events keep it live in the
- * org shell; `pollMs` where no socket is open (the onboarding).
+ * org shell; `pollMs` where no socket is open (the onboarding), a time or one picked from the last answer.
  */
-export const useComputerSetup = (orgId: string, enabled = true, pollMs: number | false = false) => {
+export const useComputerSetup = (
+  orgId: string,
+  enabled = true,
+  pollMs: number | false | ((setup: ComputerSetup | undefined) => number | false) = false,
+) => {
   const api = useApi();
   const qc = useQueryClient();
   return useQuery({
@@ -1982,7 +1987,7 @@ export const useComputerSetup = (orgId: string, enabled = true, pollMs: number |
       newerSetup(qc.getQueryData(keys.computerSetup(orgId)), await api.machines.computerSetup(orgId)),
     enabled: enabled && orgId.length > 0,
     retry: false,
-    refetchInterval: pollMs,
+    refetchInterval: typeof pollMs === "function" ? (query) => pollMs(query.state.data) : pollMs,
     // Events keep it current; a reconnect asks again (what came while offline is gone).
     staleTime: 5 * 60_000,
     meta: { quiet: true },

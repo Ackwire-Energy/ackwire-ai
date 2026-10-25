@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/client";
+import { EMAIL_CONFIRMED_PATH } from "@/lib/email-confirmation";
 import type { AuthClient, AuthResult } from "./client";
 
 const toResult = (error: { status?: number; message?: string; code?: string } | null | undefined): AuthResult =>
@@ -11,12 +12,24 @@ const toResult = (error: { status?: number; message?: string; code?: string } | 
       }
     : { ok: true };
 
-/** Better Auth client for the web app (same origin, `/api/auth`). */
-export function createBetterAuthClient(origin = window.location.origin): AuthClient {
-  const client = createAuthClient({ baseURL: origin, basePath: "/api/auth" });
+/**
+ * Better Auth client for the web app (same origin, `/api/auth`). Every request says the app's language
+ * (`language`) in `Accept-Language`: an account made here keeps it, and its first emails come in it.
+ */
+export function createBetterAuthClient(origin = window.location.origin, language?: () => string): AuthClient {
+  const client = createAuthClient({
+    baseURL: origin,
+    basePath: "/api/auth",
+    fetchOptions: {
+      onRequest: (request) => {
+        if (language) request.headers.set("accept-language", language());
+      },
+    },
+  });
   return {
     signIn: async ({ email, password }) => toResult((await client.signIn.email({ email, password })).error),
-    signUp: async ({ name, email, password }) => toResult((await client.signUp.email({ name, email, password })).error),
+    signUp: async ({ name, email, password }) =>
+      toResult((await client.signUp.email({ name, email, password, callbackURL: EMAIL_CONFIRMED_PATH })).error),
     signInSocial: async (provider, callbackURL) =>
       toResult((await client.signIn.social({ provider, callbackURL, errorCallbackURL: "/login" })).error),
     requestPasswordReset: async ({ email, redirectTo }) =>

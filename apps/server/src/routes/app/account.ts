@@ -10,6 +10,7 @@ import {
   deleteAccount,
   getOrganization,
   hasPassword,
+  isEmailVerified,
   isValidTimeZone,
   listInvitations,
   listMembers,
@@ -221,6 +222,9 @@ export function accountRoutes(deps: AppDeps) {
                 description:
                   "Signs in with a password. False for social sign-ins only, and for the owner the desktop app signs in.",
               }),
+              emailVerified: z.boolean().openapi({
+                description: "The person opened the link that confirms their email address.",
+              }),
             }),
             organizations: z.array(Organization),
           }),
@@ -230,10 +234,21 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const [memberships, password] = await Promise.all([listMemberships(db, user.id), hasPassword(db, user.id)]);
+      const [memberships, password, verified] = await Promise.all([
+        listMemberships(db, user.id),
+        hasPassword(db, user.id),
+        isEmailVerified(db, user.id),
+      ]);
       return c.json(
         {
-          user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null, hasPassword: password },
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image ?? null,
+            hasPassword: password,
+            emailVerified: verified,
+          },
           organizations: memberships.map((m) => ({
             id: m.orgId,
             name: m.orgName,

@@ -12,17 +12,9 @@
   padding: 0 10px;
 }
 .onb__progress-text {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
-}
-.onb__progress-count {
-  font-weight: 500;
-  color: var(--faint);
 }
 .onb__progress-sky {
   position: relative;
@@ -44,7 +36,7 @@
   justify-content: center;
   min-width: 0;
 }
-/* One calm column per step, centered: the host asks, the answer, one big action. */
+/* One calm column per step, centered where it opens: the host asks, the answer, one big action. */
 .onb__body {
   display: flex;
   flex-direction: column;
@@ -53,6 +45,7 @@
   max-width: 600px;
   margin: auto 0;
   padding: 48px clamp(16px, 4vw, 32px) 64px;
+  text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
 }
 @keyframes onb-in {
@@ -174,21 +167,38 @@ textarea.onb__big.ac-input {
   font-size: 13px;
   color: var(--faint);
 }
-.onb__link {
+/* The one link look here, a field's help links too ("Create the key at…"). */
+.onb__link,
+.onb__body .ac-field__help a {
   padding: 0;
   border: 0;
   background: none;
   color: var(--muted);
   font: inherit;
   font-weight: 600;
+  text-align: start;
   text-decoration: underline;
   text-decoration-color: var(--line2);
   text-underline-offset: 3px;
   cursor: pointer;
 }
-.onb__link:hover {
+.onb__link:hover:not(:disabled),
+.onb__body .ac-field__help a:hover {
   color: var(--ink);
   text-decoration-color: currentColor;
+}
+.onb__link:disabled {
+  cursor: default;
+}
+/* A quiet line with its icon ("We sent a confirmation link to…"). */
+.onb__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.onb__note > .ac-icon {
+  flex: none;
+  margin-top: 2px;
 }
 .onb__starters {
   display: flex;
@@ -429,6 +439,19 @@ textarea.onb__big.ac-input {
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
   font-size: 22px;
+  overflow-wrap: anywhere;
+}
+/* A name, not a number: in words of its own size (a connected computer's). */
+.onb__stat--name {
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.35;
+}
+/* Under the big word, whose it is ("Ready" · Acme's computer). */
+.onb__stat-of {
+  font-size: 13px;
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 /* Phone. */

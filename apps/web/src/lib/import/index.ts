@@ -82,6 +82,13 @@ export const SOURCE_ICON: Record<ImportSource, string> = {
   openbot: "/brands/openbot.png",
   agenteschat: "/favicon.svg",
 };
+/** The letters on the tile of each source we ship no mark for, so no two tiles look alike. */
+export const SOURCE_MONOGRAM: Partial<Record<ImportSource, string>> = {
+  openclaw: "OC",
+  hermes: "H",
+  openbotrun: "OR",
+  paperclip: "P",
+};
 const ARCHIVES = ".zip,.tar.gz,.tgz,.tar,application/zip,application/gzip,application/x-tar";
 /** What the file picker offers for each source. */
 export const SOURCE_ACCEPT: Record<ImportSource, string> = {

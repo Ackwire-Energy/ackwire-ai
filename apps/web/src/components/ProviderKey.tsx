@@ -9,7 +9,7 @@ export function KeySite({ provider }: { provider: ProviderId }) {
   if (!p) return null;
   return (
     <>
-      <a href={`https://${p.site}`} target="_blank" rel="noreferrer">
+      <a className="ac-link ac-link--muted" href={`https://${p.site}`} target="_blank" rel="noreferrer">
         {t("onboarding.keySite", { site: p.site })}
       </a>
       {p.plans && ` ${t("onboarding.keyNotPlan")}`}

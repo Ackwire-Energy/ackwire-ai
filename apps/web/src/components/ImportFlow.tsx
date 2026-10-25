@@ -49,6 +49,7 @@ import {
   parseImport,
   readImportFiles,
   SOURCE_ICON,
+  SOURCE_MONOGRAM,
   SOURCE_NAME,
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
@@ -336,14 +337,17 @@ function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">
 }
 
 function SourceMark({ card }: { card: ImportCard }) {
-  const icon = card === "other" ? "" : SOURCE_ICON[card];
+  if (card === "other") {
+    return (
+      <span className="imp-mark" aria-hidden="true">
+        <Icon name="message" />
+      </span>
+    );
+  }
+  const icon = SOURCE_ICON[card];
   return (
     <span className="imp-mark" aria-hidden="true">
-      {icon ? (
-        <img src={icon} alt="" className="imp-mark__img" />
-      ) : (
-        <Icon name={card === "other" ? "message" : "layers"} />
-      )}
+      {icon ? <img src={icon} alt="" className="imp-mark__img" /> : SOURCE_MONOGRAM[card]}
     </span>
   );
 }
