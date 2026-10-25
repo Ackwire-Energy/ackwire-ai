@@ -85,7 +85,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
       if (fails.libraries) {
         log.push("chrome failed");
         throw new ChromeStartError(
-          "this computer is missing system libraries it needs (libnspr4.so); install them there, then try again",
+          "the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
           `missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
           ["libnspr4.so"],
         );
@@ -93,7 +93,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
       if (fails.headed > 0 && !args.includes("--headless=new")) {
         fails.headed--;
         log.push("chrome failed");
-        throw new Error("Chrome closed while starting (another Chrome may be using this profile)");
+        throw new Error("Chrome closed while starting");
       }
       const c: FakeChrome = { args, env, killed: false };
       chromes.push(c);
@@ -310,7 +310,7 @@ test.if(posix)(
       (e: unknown) => e as RunnerError,
     );
     expect(failed?.message).toBe(
-      "Couldn't start the agent's browser: this computer is missing system libraries it needs (libnspr4.so); install them there, then try again",
+      "Couldn't start the agent's browser: the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
     );
     expect(t.log).toEqual([
       "desktop dev",

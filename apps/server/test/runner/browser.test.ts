@@ -385,13 +385,13 @@ async function failedStart(body: string): Promise<ChromeStartError> {
 }
 
 test.if(posix)(
-  "a Chrome that can't load its libraries says which, in words for people, never that its profile is in use",
+  "a Chrome that can't load its libraries says which, in words for people; a profile in use only when Chrome says so",
   async () => {
     const loader = `echo "$0: error while loading shared libraries: libnspr4.so: cannot open shared object file: No such file or directory" >&2; exit 127`;
     let err = await failedStart(loader);
     expect(err.missing).toEqual(["libnspr4.so"]);
     expect(err.message).toBe(
-      "this computer is missing system libraries it needs (libnspr4.so); install them there, then try again",
+      "the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
     );
     expect(err.detail).toMatch(
       /^missing libnspr4\.so: \/.+\/chrome: error while loading shared libraries: libnspr4\.so:/,
@@ -415,14 +415,22 @@ test.if(posix)(
       process.env.PATH = PATH;
     }
     expect(err.missing).toEqual(all);
-    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more); install them there`);
+    expect(err.message).toContain(`(${libs.slice(0, 5).join(", ")} and 2 more); install them on it`);
     expect(err.detail).toStartWith(`missing ${all.join(", ")}: `);
 
-    // Any other exit keeps its message, and what Chrome said goes to the logs.
-    err = await failedStart(`echo "Opening in existing browser session." >&2; exit 0`);
+    // A profile another Chrome holds, as Chrome for Testing says it and exits.
+    const held =
+      "Failed to create a ProcessSingleton for your profile directory. Aborting now to avoid profile corruption.";
+    err = await failedStart(`echo "${held}" >&2; exit 21`);
     expect(err.missing).toEqual([]);
-    expect(err.message).toBe("Chrome closed while starting (another Chrome may be using this profile)");
-    expect(err.detail).toBe("Opening in existing browser session.");
+    expect(err.message).toBe("Chrome closed while starting (another Chrome is using this profile)");
+    expect(err.detail).toBe(held);
+
+    // Any other exit, a loader error among them, gets no guess at why; what Chrome said goes to the logs.
+    err = await failedStart(`echo "$0: /lib/libc.so.6: version 'GLIBC_2.38' not found (required by $0)" >&2; exit 1`);
+    expect(err.missing).toEqual([]);
+    expect(err.message).toBe("Chrome closed while starting");
+    expect(err.detail).toContain("version 'GLIBC_2.38' not found");
   },
 );
 

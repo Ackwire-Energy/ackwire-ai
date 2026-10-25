@@ -875,7 +875,8 @@ newer, the packages, or the switch), as in Agent computers above.
 
 **An agent's browser "is missing system libraries".** Chrome for Testing can't load them on that
 computer. The message names the first few and the runner's log all of them; install the packages
-under Agent computers above, or run the installer again with `--system`.
+under Agent computers above. On a computer installed with `--system`, running that same install
+command again installs them.
 
 **`extension "vector" is not available` at the first start.** The database is a Postgres without
 pgvector. Use the compose file's `pgvector/pgvector` image; on a database of your own, install

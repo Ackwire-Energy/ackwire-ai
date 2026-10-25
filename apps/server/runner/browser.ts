@@ -511,7 +511,7 @@ function missingLibraries(exe: string, output: string): string[] {
 function missingLibrariesText(missing: string[]): string {
   const names =
     missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
-  return `this computer is missing system libraries it needs (${names}); install them there, then try again`;
+  return `the agent's computer is missing system libraries Chrome needs (${names}); install them on it, then try again`;
 }
 
 /**
@@ -576,7 +576,12 @@ export async function launchChrome(
       if (missing.length > 0) {
         throw new ChromeStartError(missingLibrariesText(missing), `missing ${missing.join(", ")}: ${detail}`, missing);
       }
-      throw new ChromeStartError("Chrome closed while starting (another Chrome may be using this profile)", detail);
+      // 21 is Chrome's exit code for a profile another Chrome holds (RESULT_CODE_PROFILE_IN_USE).
+      const inUse = child.exitCode === 21;
+      throw new ChromeStartError(
+        inUse ? "Chrome closed while starting (another Chrome is using this profile)" : "Chrome closed while starting",
+        detail,
+      );
     }
     const text = await readFile(portFile, "utf8").catch(() => "");
     const port = Number(text.split("\n")[0]);

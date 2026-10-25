@@ -353,7 +353,11 @@ test.if(posix)(
   () => {
     const fake = home();
     const tools = home();
-    for (const tool of ["xargs", "sed", "grep"]) symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
+    for (const tool of ["xargs", "sed", "grep", "dirname"])
+      symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
+    // Root on Linux, as far as the script can tell.
+    writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
+    writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });
     // apt-get notes its calls; apt-cache knows the packages in $KNOWN once apt-get update has fetched the lists.
     writeFileSync(
       path.join(fake, "apt-get"),
@@ -365,14 +369,11 @@ test.if(posix)(
       `#!/bin/sh\n[ -f "$LISTS" ] || exit 100\nshift\nfor p in "$@"; do case " $KNOWN " in *" $p "*) printf 'Package: %s\\nVersion: 1\\n\\n' "$p" ;; esac; done\n`,
       { mode: 0o755 },
     );
-    // Only the package step: everything after it writes to the computer's own folders.
+    // The installer as run, up to the first folder it makes: from there on it writes to the computer's own folders.
     const step = (desktop: boolean, opts: { known?: string[]; apt?: boolean } = {}) => {
       const d = home();
-      const r = spawnSync("/bin/sh", ["-s"], {
-        input: installScript("https://agentes.test").replace(
-          /main "\$@"\n$/,
-          `DESKTOP=${desktop ? 1 : 0}\nsystem_packages\n`,
-        ),
+      const r = spawnSync("/bin/sh", ["-s", "--", "--system", ...(desktop ? ["--desktop"] : [])], {
+        input: installScript("https://agentes.test").replace(/main "\$@"\n$/, `mkdir() { exit 0; }\nmain "$@"\n`),
         encoding: "utf8",
         env: {
           PATH: opts.apt === false ? tools : `${fake}:${tools}`,
@@ -392,7 +393,7 @@ test.if(posix)(
     const install = (packages: readonly string[]) =>
       `apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends ${packages.join(" ")}\n`;
 
-    // Debian 12, Ubuntu 22.04: the names as they are.
+    // --system alone, on Debian 12 or Ubuntu 22.04: the names as they are.
     let r = step(false);
     expect(r.status).toBe(0);
     expect(r.out).toBe("Installing the packages for the agents' browser ...\n");
