@@ -3902,35 +3902,14 @@ p {
 }
 
 /*
- * Route transitions: only the main column moves (opacity + 4 px), 160 ms.
- * View Transitions where supported; otherwise the page fades in on mount.
- * Nothing moves with prefers-reduced-motion.
+ * Route transitions: only the main column moves (opacity + 4 px), 160 ms, as each page's main mounts.
+ * No View Transitions: the browser freezes the whole page while the new one renders, so the
+ * sidebar's sliding pill stopped halfway and jumped. Nothing moves with prefers-reduced-motion.
  */
-.shell__main {
-  view-transition-name: page;
-}
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-}
 @media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(page) {
-    animation: page-out 120ms ease-in both;
-  }
-  ::view-transition-new(page) {
+  /* A thread opening in the side panel has its own entrance. */
+  .shell__main:not(.thread-panel__chat) {
     animation: page-in 160ms ease-out both;
-  }
-  @supports not (view-transition-name: page) {
-    .shell__main {
-      animation: page-in 160ms ease-out both;
-    }
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
   }
 }
 @keyframes page-in {
@@ -3941,14 +3920,6 @@ p {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-@keyframes page-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
   }
 }
 /* "Carregando mensagens anteriores…": floats over the top, takes no space (no jump). */
