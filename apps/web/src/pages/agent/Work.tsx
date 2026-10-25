@@ -25,6 +25,7 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
+import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
@@ -64,7 +65,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { CLOUD } from "@/components/AgentComputer";
+import { CLOUD, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
@@ -162,6 +163,7 @@ function Cell({
 export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => void; footer?: ReactNode }) {
   const { t, i18n } = useTranslation();
   const { agent, viewer, saved, can, g } = useAgentEdit();
+  const noComputer = useNoComputer();
   const models = useModels();
   const work = useWork();
   const view = work.brain.data;
@@ -208,11 +210,20 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       : null;
   const target = work.target;
   const machine = target?.kind === "machine" ? target : null;
+  // Read once the server says where it works: "no computer" never shows while that loads.
+  const choice = target && !machine ? noComputer.choice(true) : null;
+  // No computer yet where the workspace's own is on its way: it works there once it's ready.
+  const waiting = choice === "workspace" ? noComputer.setup : null;
   const member = viewer === "member";
   const reason = work.browser.data?.reason;
-  const steps =
-    !member && work.browserWord === "waiting" && machine && (reason === "switched_off" || reason === "not_reported");
   const machineRow = machine ? work.machines.data?.find((m) => m.id === machine.machineId) : undefined;
+  // The steps happen on the computer itself: never on the workspace's own, which nobody here reaches.
+  const steps =
+    !member &&
+    work.browserWord === "waiting" &&
+    machine &&
+    machineRow?.kind !== "managed" &&
+    (reason === "switched_off" || reason === "not_reported");
   const desktopGranted = (work.scopes.data ?? []).some(
     (s) => s.connectionId === null && s.scope === DESKTOP_TOOL_SCOPE,
   );
@@ -222,9 +233,24 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         <div className="agp-cells">
           {!member && (
             <Cell
-              icon={<Icon name={machine ? "computer" : "cloud"} size={16} />}
-              label={t(machine ? "agentPage.work.cell.computer" : "agentPage.work.cell.cloud")}
-              value={machine ? machine.name : t("agentPage.work.cloud")}
+              icon={<Icon name={choice === "cloud" ? "cloud" : choice === "none" ? "dash" : "computer"} size={16} />}
+              label={
+                choice === "cloud"
+                  ? t("agentPage.work.cell.cloud")
+                  : choice === "none"
+                    ? t("computer.target.label")
+                    : t("agentPage.work.cell.computer")
+              }
+              value={
+                machine
+                  ? machine.name
+                  : choice === "cloud"
+                    ? t("agentPage.work.cloud")
+                    : choice
+                      ? noComputer.label(choice)
+                      : null
+              }
+              sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
               openLabel={t("agentPage.work.open.computer")}
               onOpen={can("machine") ? () => onOpen("computer") : undefined}
             />
@@ -259,6 +285,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         </div>
         {footer && <div className="agp-workcard__foot">{footer}</div>}
       </section>
+      {waiting && !member && <SettingNote icon="waiting">{t("computerSetup.agentWaiting", g)}</SettingNote>}
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {t("agentPage.work.offline", { ...g, computer: machine.name })}
@@ -1057,6 +1084,12 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   const work = useWork();
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
+  const noComputer = useNoComputer();
+  const listed = noComputer.pending ? pickable.filter((m) => m.kind !== "managed") : pickable;
+  const cloud = noComputer.choice(work.machineId === CLOUD);
+  // The workspace's own computer on its way stands in the cloud's place: what it will be (every brain, the
+  // browser) and when, never what the cloud computer lacks.
+  const workspace = cloud === "workspace" ? noComputer.setup : null;
   const [choice, setChoice] = useState(work.machineId);
   // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
@@ -1082,6 +1115,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   };
   const also = (id: string) => {
     if (id === work.machineId) return [];
+    if (id === CLOUD && workspace) return [t("computerSetup.agentWaiting", g)];
     const m = pickable.find((x) => x.id === id);
     return [
       ...(brain !== "model" && !has(id, brain)
@@ -1099,13 +1133,15 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
     try {
       await setTarget.mutateAsync({ agentId: agent.id, machineId: choice === CLOUD ? null : choice });
       // What the new computer can't do goes back to the organization's model (said before, in the dialog).
-      if (brain !== "model" && (choice === CLOUD || !has(choice, brain)))
+      if (brain !== "model" && (choice === CLOUD ? !workspace : !has(choice, brain)))
         await api.agents.setBrain(org.id, agent.id, { brain: "model" });
       refresh();
       toast.show(
         chosen
           ? t("agentPage.work.saved.computer", { ...g, computer: chosen.name })
-          : t("agentPage.work.saved.cloud", g),
+          : workspace
+            ? t("agentPage.work.saved.computer", { ...g, computer: noComputer.label("workspace") })
+            : t("agentPage.work.saved.cloud", g),
       );
       onClose();
     } catch {
@@ -1141,14 +1177,30 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
           value={choice}
           onValueChange={setChoice}
           options={[
-            {
-              value: CLOUD,
-              leading: <ComputerPortrait kind="cloud" state="online" />,
-              title: t("computer.target.cloud"),
-              description: t("agentPage.work.computer.cloudText"),
-              children: note(CLOUD),
-            },
-            ...pickable.map((m) => ({
+            ...(cloud
+              ? [
+                  {
+                    value: CLOUD,
+                    leading:
+                      cloud === "none" ? (
+                        <Icon name="dash" size={20} />
+                      ) : (
+                        <ComputerPortrait
+                          kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
+                          state={workspace ? setupPortrait(workspace, false) : "online"}
+                        />
+                      ),
+                    title: noComputer.label(cloud),
+                    description: workspace
+                      ? t(workspace.textKey)
+                      : cloud === "none"
+                        ? t("computer.target.noneText")
+                        : t("agentPage.work.computer.cloudText"),
+                    children: note(CLOUD),
+                  },
+                ]
+              : []),
+            ...listed.map((m) => ({
               value: m.id,
               leading: <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />,
               title: m.name,
@@ -1178,7 +1230,11 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
         primary={
           chosen
             ? t("agentPage.work.computer.useMachine", { computer: chosen.name })
-            : t("agentPage.work.computer.useCloud")
+            : workspace
+              ? t("agentPage.work.computer.useMachine", { computer: noComputer.label("workspace") })
+              : cloud === "cloud"
+                ? t("agentPage.work.computer.useCloud")
+                : t("agentPage.work.use")
         }
         onClose={onClose}
         onUse={() => void use()}

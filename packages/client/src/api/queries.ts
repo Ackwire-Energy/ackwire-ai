@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { artifactRefs } from "../lib/artifacts";
+import { newerSetup } from "../lib/computer";
 import {
   allItems,
   matchesFilter,
@@ -1931,6 +1932,26 @@ export const useHostComputer = (orgId: string, enabled = true) => {
     queryFn: () => api.machines.host(orgId),
     enabled,
     retry: false,
+    meta: { quiet: true },
+  });
+};
+
+/**
+ * The workspace's own computer on its way (ADR 0056 §10): `machine.provisioning` events keep it live in the
+ * org shell; `pollMs` where no socket is open (the onboarding).
+ */
+export const useComputerSetup = (orgId: string, enabled = true, pollMs: number | false = false) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: keys.computerSetup(orgId),
+    queryFn: async () =>
+      newerSetup(qc.getQueryData(keys.computerSetup(orgId)), await api.machines.computerSetup(orgId)),
+    enabled: enabled && orgId.length > 0,
+    retry: false,
+    refetchInterval: pollMs,
+    // Events keep it current; a reconnect asks again (what came while offline is gone).
+    staleTime: 5 * 60_000,
     meta: { quiet: true },
   });
 };

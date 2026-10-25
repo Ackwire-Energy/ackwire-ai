@@ -44,6 +44,8 @@ export const STORAGE_KEYS = {
   sidebarSections: "agentes.sidebar.sections",
   /** Offline-computer notices the person closed (`machineId@offlineSince`), until that computer comes back. */
   outagesDismissed: "agentes.outages.dismissed",
+  /** The workspace computer's notice the person closed (`setupNoticeKey`), until its state changes. */
+  setupNoticeHidden: "agentes.setup.hidden",
   /** The desktop app's right click: "ours" (default) or "system" (lib/context-menu.ts). */
   menuLook: "agentes.desktop.menu",
   /** Prefix (`.<message id>`, in `sessionStore`): the Connect dialog already opened by itself for that message. */

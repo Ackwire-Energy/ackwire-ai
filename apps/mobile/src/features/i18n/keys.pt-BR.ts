@@ -1087,6 +1087,7 @@ export const featureKeysPtBR = {
       on: "Ligado",
       cloud: "Computador na nuvem",
       cloudTag: "Sempre ligado",
+      managedDesc: "Só deste workspace · um usuário para cada agente",
       cloudDesc: "Sem as pastas do seu computador; o repositório vem pelo GitHub",
       has: "Tem o {{brains}}",
       and: " e o ",

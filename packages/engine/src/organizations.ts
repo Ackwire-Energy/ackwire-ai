@@ -4,6 +4,7 @@ import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
@@ -63,7 +64,7 @@ export interface Membership {
   role: MemberRole;
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
-  /** The workspace's standing (`standing.ts`; getMembership). */
+  /** The workspace's standing (`standing.ts`). */
   standing?: WorkspaceStanding;
 }
 
@@ -74,6 +75,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
+      standing: STANDING_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
@@ -173,8 +175,9 @@ export async function updateOrganization(
   orgId: string,
   input: { name?: string; context?: string },
 ) {
-  await requirePermission(db, actorId, orgId, "configure");
+  const before = await requirePermission(db, actorId, orgId, "configure");
   const [row] = await db.update(organizations).set(input).where(eq(organizations.id, orgId)).returning();
+  if (row && row.name !== before.orgName) await followWorkspaceName(db, orgId, before.orgName, row.name);
   caches.orgs.delete(`${orgId}:`);
   return row;
 }

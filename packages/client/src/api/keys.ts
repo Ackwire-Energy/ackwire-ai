@@ -69,6 +69,8 @@ export const keys = {
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
   machineOutages: (orgId: string) => ["org", orgId, "machines", "outages"] as const,
+  /** The workspace's own computer on its way (ADR 0056 §10); `machine.provisioning` events set it. */
+  computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
   machineDevice: (userCode: string) => ["machine-device", userCode] as const,
   desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,

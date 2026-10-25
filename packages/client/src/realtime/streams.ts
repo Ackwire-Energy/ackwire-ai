@@ -129,6 +129,9 @@ export interface LiveRun {
   text: string;
   lastSeq: number;
   error?: string;
+  /** `run.finished`'s code for the error (`run.org_paused`…) and its values. */
+  errorCode?: string;
+  errorParams?: Record<string, string>;
   /** Added by the client on send; no server event yet. */
   provisional?: boolean;
   /** The tool it is calling right now ("github_list_prs"), from `agent.tool`. */
@@ -600,7 +603,10 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
     case "run.finished": {
       const settled = settleAfterRun(state, event);
       if (event.status === "failed" && event.error === NO_AI) return finish(settled, event.runId);
-      if (event.status === "failed") return upsert(settled, event, { status: "failed", error: event.error });
+      if (event.status === "failed") {
+        const { error, errorCode, errorParams } = event;
+        return upsert(settled, event, { status: "failed", error, errorCode, errorParams });
+      }
       // done: the message replaces the row; waiting_approval: the approval card does.
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }

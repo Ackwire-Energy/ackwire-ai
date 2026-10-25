@@ -33,6 +33,8 @@ export interface MachineOutage {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: MachineOutageAgent[];
   waitingRuns: number;
@@ -125,6 +127,8 @@ export function targetText(t: TFunction, x: TargetOption) {
   }
   if (x.kind === "cloud")
     return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.cloudDesc") };
+  // The workspace's own computer: always on, a user of its own for each agent.
+  if (x.managed) return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.managedDesc") };
   const brains = x.brains.map((b) => BRAIN_NAME[b]).join(t("mobile.outage.sheet.and"));
   return {
     title,

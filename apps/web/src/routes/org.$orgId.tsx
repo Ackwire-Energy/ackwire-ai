@@ -17,6 +17,8 @@ import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
+import { HoldBanner, SuspendedScreen } from "@/components/Standing";
+import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
@@ -66,6 +68,17 @@ function OrgLayout() {
     );
   }
 
+  // Suspended: its own screen, the socket still open so lifting it brings the workspace back at once.
+  if (membership.standing?.state === "suspended") {
+    return (
+      <OrgProvider org={membership} me={me}>
+        <RealtimeProvider orgId={membership.id}>
+          <SuspendedScreen org={membership} me={me} />
+        </RealtimeProvider>
+      </OrgProvider>
+    );
+  }
+
   return (
     <OrgProvider org={membership} me={me}>
       <RealtimeProvider orgId={membership.id}>
@@ -83,8 +96,11 @@ function OrgLayout() {
                   <ShellBar />
                 </>
               )}
-              {/* The work area: a notice on top when a computer the agents run on went offline, then the page. */}
+              {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
+                  the agents run on went offline), then the page. */}
               <div className="shell__work">
+                {!focused && <HoldBanner />}
+                {!focused && <ComputerSetupNotice />}
                 {!focused && <OutageNotices />}
                 <div className="shell__pages">
                   <ConnectAiProvider>

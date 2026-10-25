@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
@@ -479,6 +479,42 @@ export interface OwnChrome {
 }
 
 /**
+ * Chrome didn't start. The message is for people; `detail` (what Chrome
+ * printed meanwhile) is for the logs; `missing` lists the libraries this
+ * computer lacks, when that is why.
+ */
+export class ChromeStartError extends Error {
+  constructor(
+    message: string,
+    readonly detail: string,
+    readonly missing: string[] = [],
+  ) {
+    super(message);
+    this.name = "ChromeStartError";
+  }
+}
+
+/**
+ * When Chrome's output says it exited for a library the dynamic loader
+ * couldn't find: every library `ldd` finds missing (the loader stops at the
+ * first), else the ones the loader named. Empty for any other exit.
+ */
+function missingLibraries(exe: string, output: string): string[] {
+  const named = [...output.matchAll(/error while loading shared libraries: ([^:\s]+)/g)].map((m) => m[1] as string);
+  if (named.length === 0) return [];
+  const ldd = spawnSync("ldd", [exe], { encoding: "utf8", timeout: 5000 });
+  const all = [...(ldd.stdout ?? "").matchAll(/^\s*(\S+) => not found$/gm)].map((m) => m[1] as string);
+  return all.length > 0 ? all : named;
+}
+
+/** For people: the missing libraries, the first few by name when there are many. */
+function missingLibrariesText(missing: string[]): string {
+  const names =
+    missing.length > 6 ? `${missing.slice(0, 5).join(", ")} and ${missing.length - 5} more` : missing.join(", ");
+  return `the agent's computer is missing system libraries Chrome needs (${names}); install them on it, then try again`;
+}
+
+/**
  * Starts Chrome and waits for its debugging port (Chrome writes it to
  * `<profile>/DevToolsActivePort` with `--remote-debugging-port=0`).
  */
@@ -490,7 +526,17 @@ export async function launchChrome(
 ): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
   await rm(portFile, { force: true });
-  const child = spawn(exe, args, { stdio: "ignore", windowsHide: true, ...(env ? { env } : {}) });
+  const child = spawn(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
+  let output = "";
+  let started = false;
+  // Read for as long as Chrome runs, since a full pipe would stall it; only what it says while starting is kept.
+  child.stderr?.on("data", (chunk: Buffer) => {
+    if (!started) output = (output + chunk.toString()).slice(-4000);
+  });
+  const outputClosed = new Promise<void>((resolve) => {
+    if (child.stderr) child.stderr.once("close", () => resolve());
+    else resolve();
+  });
   const events = child as unknown as EventEmitter;
   let gone = false;
   const exited = new Promise<void>((resolve) => {
@@ -522,11 +568,26 @@ export async function launchChrome(
   };
   const deadline = Date.now() + CHROME_START_MS;
   while (Date.now() < deadline) {
-    if (gone) throw new Error("Chrome closed while starting (another Chrome may be using this profile)");
+    if (gone) {
+      // Its last words can arrive after its exit; a process it started may hold the pipe open, so not for long.
+      await Promise.race([outputClosed, new Promise((r) => setTimeout(r, 500))]);
+      const detail = output.trim();
+      const missing = missingLibraries(exe, output);
+      if (missing.length > 0) {
+        throw new ChromeStartError(missingLibrariesText(missing), `missing ${missing.join(", ")}: ${detail}`, missing);
+      }
+      // 21 is Chrome's exit code for a profile another Chrome holds (RESULT_CODE_PROFILE_IN_USE).
+      const inUse = child.exitCode === 21;
+      throw new ChromeStartError(
+        inUse ? "Chrome closed while starting (another Chrome is using this profile)" : "Chrome closed while starting",
+        detail,
+      );
+    }
     const text = await readFile(portFile, "utf8").catch(() => "");
     const port = Number(text.split("\n")[0]);
     if (Number.isInteger(port) && port > 0 && port < 65536) {
       if (!child.pid) break;
+      started = true;
       return { pid: child.pid, port, kill, exited };
     }
     await new Promise((r) => setTimeout(r, 100));
@@ -535,7 +596,7 @@ export async function launchChrome(
   // Gone before anyone starts another Chrome on this profile (the headless retry of a headed start that hung):
   // one still running would hold the profile.
   await exited;
-  throw new Error("Chrome didn't open its debugging port in time");
+  throw new ChromeStartError("Chrome didn't open its debugging port in time", output.trim());
 }
 
 /** "Google Chrome", "Chrome for Testing"… for `hello.browser`. */
@@ -1390,14 +1451,22 @@ export class BrowserManager {
       const launch = async (on: ChromeDisplay | null) => {
         if (on) useOwnFrame(profile);
         const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page);
-        const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
-        if (on) started.display = on.display;
-        return started;
+        try {
+          const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
+          if (on) started.display = on.display;
+          return started;
+        } catch (err) {
+          if (err instanceof ChromeStartError && err.detail) {
+            this.opts.log(`the browser of ${agent.handle} didn't start: ${err.detail}`);
+          }
+          throw err;
+        }
       };
       let chrome: OwnChrome;
       try {
         chrome = await launch(where).catch((err: unknown) => {
-          if (!where) throw err;
+          // Libraries Chrome can't load fail a headless start just the same, and aren't the desktop's doing.
+          if (!where || (err instanceof ChromeStartError && err.missing.length > 0)) throw err;
           // A headed start failed (its desktop went away or hung under it): headless for now, like a desktop that
           // can't start.
           session.desktopFailedAt = this.now();

@@ -89,6 +89,10 @@ export const Machine = z
     hostname: z.string(),
     os: z.string().openapi({ description: "`linux`, `darwin`, `windows` or `other`." }),
     arch: z.string(),
+    mode: z.enum(["system", "single"]).openapi({
+      description:
+        "`system`: each agent works as its own OS user, in its own folder (ADR 0057); `single`: every agent as the runner's user.",
+    }),
     runnerVersion: z.string(),
     protocol: z.number().int().openapi({ description: "The runner's machine protocol (9+: pause; 10+: access)." }),
     execAllowed: z.boolean().openapi({ description: "`false`: started with `--no-exec` (files and uploads only)." }),
@@ -204,6 +208,9 @@ const MachineOutage = z
     machineId: z.uuid(),
     name: z.string(),
     platform: Platform,
+    managed: z
+      .boolean()
+      .openapi({ description: "The workspace's own computer (ADR 0056 §10): its platform is `other`." }),
     offlineSince: z.string().openapi({ description: "ISO time of its last sign of life." }),
     agents: z.array(
       z.object({
@@ -227,6 +234,9 @@ const OutageTarget = z
       machineId: z.uuid(),
       name: z.string(),
       platform: Platform,
+      managed: z
+        .boolean()
+        .openapi({ description: "The workspace's own computer (ADR 0056 §10): its platform is `other`." }),
       online: z.boolean(),
       brains: z.array(ComputerBrain).openapi({ description: "Computer brains it can run (`brainOptions`)." }),
       reasonOff: z
