@@ -55,6 +55,7 @@ import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
 import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
+import { startTelemetry } from "./telemetry";
 import { version } from "./version";
 import { startWorkers } from "./workers";
 
@@ -170,6 +171,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     desktops: engine.desktops,
     log,
   });
+  const telemetry = startTelemetry({ db: database.db, config, log });
 
   const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
   const webDir = resolve(config.WEB_DIR);
@@ -246,6 +248,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // No new jobs; HTTP stops taking requests (the new deploy serves them). Not awaited: the
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
+    telemetry.stop();
     void server.stop();
     void operator?.stop();
     // Runners reconnect to the next instance, and people's desktops and terminals open again there.
