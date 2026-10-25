@@ -1,7 +1,7 @@
 import { idlePose, mixHex, type Pose } from "@agenteschat/ui/agent/engine";
 
 /**
- * The launch splash (telas/SplashApp.html, B · Céu sobe): pure pieces the screen and the tests share. No React
+ * The launch splash: pure pieces the screen and the tests share. No React
  * Native imports. Times in seconds.
  */
 export const LAUNCH = {
