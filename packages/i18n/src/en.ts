@@ -1516,6 +1516,7 @@ export const en: Translations = {
       close: "Close",
       exact: "The exact action",
       builtIn: "agentes.chat tool",
+      orgConnector: "Your organization's connector",
       bound:
         "The approval covers only this action, with these values. If {{name}} changes anything, it has to ask again.",
       why: "Why",

@@ -5,10 +5,12 @@ import {
   useApprovals,
   useCatalog,
   useChannels,
+  useCustomServers,
   useDecideApproval,
   usePostMessage,
 } from "@agenteschat/client";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -419,11 +421,25 @@ function groups(list: Approval[]): ["today" | "yesterday" | "earlier", Approval[
 /** "github · acme" with the brand icon, or the app's own tool. */
 function ConnectorLine({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const catalog = useCatalog();
-  const def = approval.connector ? catalog.data?.connectors.find((c) => c.id === approval.connector) : undefined;
-  const name = approval.connector
-    ? connectorName(t, def ?? { id: approval.connector, label: approval.connector })
-    : t("approvals.panel.builtIn");
+  // A server connected by address (`custom:{connectionId}`): its own name, and the preset's icon when it came from one.
+  const customId = approval.connector?.startsWith("custom:") ? approval.connector.slice("custom:".length) : null;
+  const servers = useCustomServers(org.id, customId !== null);
+  const server = customId ? servers.data?.find((s) => s.id === customId) : undefined;
+  const custom = server ? fromServer(server, catalog.data?.connectors ?? []) : null;
+  const def = custom
+    ? (custom.def ?? undefined)
+    : approval.connector
+      ? catalog.data?.connectors.find((c) => c.id === approval.connector)
+      : undefined;
+  const name = custom
+    ? itemName(t, custom)
+    : customId
+      ? t("approvals.panel.orgConnector")
+      : approval.connector
+        ? connectorName(t, def ?? { id: approval.connector, label: approval.connector })
+        : t("approvals.panel.builtIn");
   return (
     <span className="ap-conn">
       {approval.connector ? (

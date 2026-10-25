@@ -1529,6 +1529,7 @@ export const ptBR = {
       close: "Fechar",
       exact: "A ação exata",
       builtIn: "Ferramenta do agentes.chat",
+      orgConnector: "Conector da organização",
       bound:
         "A aprovação vale só para esta ação, com estes valores. Se {{the}} {{name}} mudar qualquer coisa, precisa pedir de novo.",
       why: "Por que",
