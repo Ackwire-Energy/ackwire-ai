@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   agentComputerInfo,
   computerSetup,
@@ -14,6 +14,7 @@ import {
   listMachineRequests,
   listMachines,
   type MachineHub,
+  type MachineHubDeps,
   OrgPausedError,
   pollDeviceToken,
   reduceMachineAccess,
@@ -64,9 +65,9 @@ async function enrolled(orgId = f.org.id) {
   return { machineId: issued.machineId, token: token.token };
 }
 
-/** A runner saying hello over an in-memory socket. */
-async function hello(token: string) {
-  hub ??= createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+/** A runner saying hello over an in-memory socket (on a server that sends email with `readyEmail`). */
+async function hello(token: string, readyEmail: MachineHubDeps["readyEmail"] = null) {
+  hub ??= createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a", readyEmail });
   const sent: ServerFrame[] = [];
   let closed: string | undefined;
   const conn = hub.open({
@@ -122,6 +123,7 @@ describe("external provisioning", () => {
     await setOrgStanding(deps(), held.organization.id, { state: "hold", reason: "Review", notice: "silent" });
     expect(await requested()).toEqual(["Acme", "Later"]);
 
+    // `approval`, from an older provisioner, reads as capacity: there is no approval step.
     expect(await setProvisioning(deps(), later.organization.id, { state: "waiting", reason: "approval" })).toBe(true);
     const one = await page("external", { limit: 1 });
     expect(one.requests.map((r) => r.orgName)).toEqual(["Acme"]);
@@ -132,9 +134,10 @@ describe("external provisioning", () => {
         provisioning: {
           state: "waiting",
           step: null,
-          reason: "approval",
+          reason: "capacity",
           since: expect.any(String),
-          etaSeconds: null,
+          requestedAt: later.organization.createdAt.toISOString(),
+          expectedReadyAt: null,
           specs: null,
         },
       }),
@@ -156,23 +159,35 @@ describe("external provisioning", () => {
       step: null,
       reason: null,
       since: null,
-      etaSeconds: null,
+      requestedAt: f.org.createdAt.toISOString(),
+      expectedReadyAt: null,
       specs: null,
+      secondsLeft: null,
+      secondsWaited: expect.any(Number),
+      notifyByEmail: false,
       machineId: null,
     });
     expect((await computerSetup(f.db, "off", f.owner.id, f.org.id)).mode).toBe("pair");
 
     const specs = { cpus: 4, memoryGb: 8, diskGb: 75 };
-    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", etaSeconds: 900, specs });
+    const at = new Date(Date.now() + 900_000);
+    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", expectedReadyAt: at, specs });
     const reserving = await status();
-    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", etaSeconds: 900 });
-    expect(await status()).toEqual(reserving);
+    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", expectedReadyAt: at });
+    expect(await status()).toEqual({ ...reserving, secondsLeft: expect.any(Number) });
     expect(events).toHaveLength(1);
     await Bun.sleep(5);
     // A reason only goes with `waiting`.
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", reason: "capacity" });
     const installing = await status();
-    expect(installing).toMatchObject({ state: "preparing", step: "installing", reason: null, etaSeconds: null, specs });
+    expect(installing).toMatchObject({
+      state: "preparing",
+      step: "installing",
+      reason: null,
+      expectedReadyAt: null,
+      secondsLeft: null,
+      specs,
+    });
     expect(installing.since).not.toBe(reserving.since);
     expect(events.at(-1)).toMatchObject({ type: "machine.provisioning", step: "installing", specs });
     expect(await setProvisioning(deps(), crypto.randomUUID(), { state: "problem" })).toBe(false);
@@ -184,10 +199,133 @@ describe("external provisioning", () => {
       code: "provisioning.ready",
     });
 
+    // Removed: waiting again from now, with nothing reported yet.
+    const revokedAt = Date.now();
     expect(await revokeManagedMachine(deps(), f.org.id, machineId)).toBe(true);
-    expect(await status()).toMatchObject({ state: "preparing", since: null, machineId: null });
-    expect(events.at(-1)).toMatchObject({ type: "machine.provisioning", state: "preparing", machineId: null });
+    const waiting = await status();
+    expect(waiting).toMatchObject({
+      state: "preparing",
+      step: null,
+      specs: null,
+      expectedReadyAt: null,
+      machineId: null,
+    });
+    expect(Date.parse(waiting.requestedAt ?? "")).toBeGreaterThanOrEqual(revokedAt);
+    expect(waiting.since).toBe(waiting.requestedAt);
+    expect(events.at(-1)).toMatchObject({
+      type: "machine.provisioning",
+      state: "preparing",
+      requestedAt: waiting.requestedAt,
+      machineId: null,
+    });
+    expect(await requested()).toEqual(["Acme"]);
     expect(await setProvisioning(deps(), f.org.id, { state: "problem" })).toBe(true);
+    // Every later report keeps when the wait began.
+    expect((await status()).requestedAt).toBe(waiting.requestedAt);
+  });
+
+  test("the ready time: past times keep the first, the seconds left come from the server, older words still read", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id, true);
+    const report = (expectedReadyAt?: Date, etaSeconds?: number) =>
+      setProvisioning({ ...deps(), emails: true }, f.org.id, {
+        state: "preparing",
+        step: "installing",
+        expectedReadyAt,
+        etaSeconds,
+      });
+
+    const sixMinutes = new Date(Date.now() + 360_000);
+    await report(sixMinutes);
+    const first = await status();
+    expect(first).toMatchObject({ expectedReadyAt: sixMinutes.toISOString(), notifyByEmail: true });
+    expect(first.secondsLeft).toBeGreaterThan(350);
+    expect(first.secondsLeft).toBeLessThanOrEqual(360);
+    expect(events.at(-1)).toMatchObject({ expectedReadyAt: sixMinutes.toISOString(), notifyByEmail: true });
+    // How long it has waited, counted here as well: the workspace was made two minutes ago.
+    await f.db
+      .update(schema.organizations)
+      .set({ createdAt: new Date(Date.now() - 120_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    const waited = (await status()).secondsWaited ?? 0;
+    expect(waited).toBeGreaterThanOrEqual(120);
+    expect(waited).toBeLessThan(130);
+
+    // It runs over: the provisioner sends "now" again and again; the first time past stays, so the wait shows late.
+    const overdue = new Date(Date.now() - 90_000);
+    await report(overdue);
+    const heardBefore = events.length;
+    await report(new Date());
+    await report(new Date(Date.now() - 1000));
+    expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
+    expect((await status()).secondsLeft).toBeLessThanOrEqual(-90);
+    // The provisioner's clock a little ahead of this one: its "now" arrives seconds in the future, and still is now.
+    await report(new Date(Date.now() + 10_000));
+    expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
+    expect(events.length).toBe(heardBefore);
+    // A time ahead replaces it.
+    const soon = new Date(Date.now() + 30_000);
+    await report(soon);
+    expect((await status()).expectedReadyAt).toBe(soon.toISOString());
+    const later = new Date(Date.now() + 120_000);
+    await report(later);
+    expect((await status()).expectedReadyAt).toBe(later.toISOString());
+
+    // An older provisioner's countdown is a time from now.
+    const sent = Date.now();
+    await report(undefined, 600);
+    const eta = Date.parse((await status()).expectedReadyAt ?? "");
+    expect(eta).toBeGreaterThanOrEqual(sent + 600_000);
+    expect(eta).toBeLessThanOrEqual(Date.now() + 600_000);
+
+    // Only `preparing` has a time.
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity", expectedReadyAt: later });
+    expect(await status()).toMatchObject({
+      state: "waiting",
+      reason: "capacity",
+      expectedReadyAt: null,
+      secondsLeft: null,
+    });
+
+    // A row an older provisioner left says `approval`: it reads as capacity, and the same report keeps `since`.
+    await f.db
+      .update(schema.machineProvisioning)
+      .set({ reason: "approval" })
+      .where(eq(schema.machineProvisioning.orgId, f.org.id));
+    const since = (await status()).since;
+    expect((await status()).reason).toBe("capacity");
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    expect((await status()).since).toBe(since);
+  });
+
+  test("the ready email is promised by a ready time over a minute ahead, waiting or a problem, until it is ready", async () => {
+    f = await setup();
+    const promised = async (orgId = f.org.id) => {
+      const [row] = await f.db
+        .select()
+        .from(schema.machineProvisioning)
+        .where(eq(schema.machineProvisioning.orgId, orgId));
+      return row?.emailWhenReady;
+    };
+    const preparing = (seconds: number) =>
+      setProvisioning(deps(), f.org.id, {
+        state: "preparing",
+        step: "starting",
+        expectedReadyAt: new Date(Date.now() + seconds * 1000),
+      });
+    await preparing(30);
+    expect(await promised()).toBe(false);
+    await preparing(90);
+    expect(await promised()).toBe(true);
+    // Told once, kept: a later, shorter estimate doesn't take it back.
+    await preparing(10);
+    expect(await promised()).toBe(true);
+    for (const state of ["waiting", "problem"] as const) {
+      const other = await createOrganization(f.db, (await addUser(f.db, state)).id, { name: state });
+      await setProvisioning(deps(), other.organization.id, { state });
+      expect(await promised(other.organization.id)).toBe(true);
+    }
   });
 
   test("issuing is idempotent per workspace: one managed row, a new code each time, the old one dead", async () => {
@@ -285,8 +423,12 @@ describe("external provisioning", () => {
           step: null,
           reason: null,
           since: expect.any(String),
-          etaSeconds: null,
+          requestedAt: f.org.createdAt.toISOString(),
+          expectedReadyAt: null,
           specs: null,
+          secondsLeft: null,
+          secondsWaited: expect.any(Number),
+          notifyByEmail: false,
           machineId,
         },
         {
@@ -316,6 +458,137 @@ describe("external provisioning", () => {
     // New agents are born on it.
     const later = await createAgent(f.db, f.owner.id, f.org.id, { name: "Later", handle: "later" }, { model: "auto" });
     expect(later.machineId).toBe(machineId);
+  });
+
+  test("the ready email: to the owners by language, once, when promised; a wait counts from the removal", async () => {
+    f = await setup();
+    const readyEmail = { publicUrl: "https://chat.example.com/", gateway: { hasModelCredential: async () => true } };
+    const emails = async () =>
+      (await f.db.select().from(schema.outbox))
+        .filter((j) => j.kind === "email.send")
+        .map((j) => j.payload as { key: string; to: string[]; template: Record<string, unknown> })
+        .sort((a, b) => a.key.localeCompare(b.key));
+    const caio = await addMember(f.db, f.org.id, "owner", "caio");
+    await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, caio.id));
+    await addMember(f.db, f.org.id, "admin", "bia");
+
+    // A spare claimed at once: no email.
+    const quick = await enrolled();
+    let runner = await hello(quick.token, readyEmail);
+    expect(await emails()).toEqual([]);
+
+    // An old workspace whose computer is taken away and made again at once: the wait began at the removal.
+    await f.db
+      .update(schema.organizations)
+      .set({ createdAt: new Date(Date.now() - 3_600_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    await runner.disconnect();
+    await revokeManagedMachine(deps(), f.org.id, quick.machineId);
+    runner = await hello((await enrolled()).token);
+    expect(await emails()).toEqual([]);
+
+    // Told it takes longer: the owners get it, each in their language; an admin doesn't.
+    await runner.disconnect();
+    await revokeManagedMachine(deps(), f.org.id, quick.machineId);
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    const again = await enrolled();
+    await hello(again.token);
+    const [readyAt] = await f.db
+      .select({ since: schema.machineProvisioning.since })
+      .from(schema.machineProvisioning)
+      .where(eq(schema.machineProvisioning.orgId, f.org.id));
+    const key = `computer_ready:${again.machineId}:${readyAt?.since.getTime()}`;
+    const [pt, en] = await emails();
+    expect(pt).toEqual({
+      key,
+      to: [f.owner.email],
+      template: {
+        kind: "computer_ready",
+        locale: "pt-BR",
+        orgName: "Acme",
+        specs: null,
+        needsAi: false,
+        hasAgents: true,
+        url: `https://chat.example.com/org/${f.org.id}`,
+      },
+    });
+    expect(en).toMatchObject({ key: `${key}:en`, to: [caio.email], template: { locale: "en" } });
+
+    // A reconnect is no new ready: nothing more.
+    await hello(again.token);
+    expect(await emails()).toHaveLength(2);
+  });
+
+  test("the ready email: a wait over a minute with nothing promised; none from a server that sends no email", async () => {
+    f = await setup();
+    const queued = async () => (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
+    await f.db
+      .update(schema.organizations)
+      .set({ createdAt: new Date(Date.now() - 120_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    // Promised, but this server sends no email.
+    await setProvisioning(deps(), f.org.id, { state: "problem" });
+    await hello((await enrolled()).token);
+    expect(await queued()).toEqual([]);
+    await hub?.stop();
+    hub = null;
+
+    // Made over a minute ago, on a server that sends email, with no agent (and so no AI) yet.
+    const other = await createOrganization(f.db, (await addUser(f.db, "caio")).id, { name: "Beta" });
+    await f.db
+      .update(schema.organizations)
+      .set({ createdAt: new Date(Date.now() - 61_000) })
+      .where(eq(schema.organizations.id, other.organization.id));
+    const { token } = await enrolled(other.organization.id);
+    await hello(token, { publicUrl: "https://chat.example.com", gateway: { hasModelCredential: async () => true } });
+    const [email] = await queued();
+    expect(email?.payload).toMatchObject({
+      template: { kind: "computer_ready", orgName: "Beta", needsAi: true, hasAgents: false },
+    });
+  });
+
+  test("the ready email goes out with the ready or not at all, and not to a workspace that isn't active", async () => {
+    f = await setup();
+    const readyEmail = { publicUrl: "https://chat.example.com", gateway: { hasModelCredential: async () => true } };
+    const queued = async (orgId = f.org.id) =>
+      (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send" && j.orgId === orgId);
+    const state = async (orgId = f.org.id) => {
+      const [row] = await f.db
+        .select({ state: schema.machineProvisioning.state })
+        .from(schema.machineProvisioning)
+        .where(eq(schema.machineProvisioning.orgId, orgId));
+      return row?.state;
+    };
+    await setProvisioning(deps(), f.org.id, { state: "problem" });
+    const { token } = await enrolled();
+    // The email can't be queued: the computer doesn't turn ready without it, and the next hello does both.
+    await f.db.execute(
+      sql.raw(
+        "create function no_email() returns trigger language plpgsql as $$ begin raise exception 'outbox down'; end $$",
+      ),
+    );
+    await f.db.execute(
+      sql.raw(
+        "create trigger no_email before insert on outbox for each row when (new.kind = 'email.send') execute function no_email()",
+      ),
+    );
+    const first = await hello(token, readyEmail);
+    expect(await state()).toBe("problem");
+    expect(await queued()).toEqual([]);
+    await f.db.execute(sql.raw("drop trigger no_email on outbox"));
+    await first.disconnect();
+    await hello(token);
+    expect(await state()).toBe("ready");
+    expect(await queued()).toHaveLength(1);
+
+    // Put on hold while its computer was being made: ready, but no email telling its owners to give a first task.
+    const held = await createOrganization(f.db, (await addUser(f.db, "bia")).id, { name: "Held" });
+    await setProvisioning(deps(), held.organization.id, { state: "problem" });
+    const heldComputer = await enrolled(held.organization.id);
+    await setOrgStanding(deps(), held.organization.id, { state: "hold", reason: "Review", notice: "silent" });
+    await hello(heldComputer.token);
+    expect(await state(held.organization.id)).toBe("ready");
+    expect(await queued(held.organization.id)).toEqual([]);
   });
 
   test("people see it without its insides and can't remove it; the provisioner can", async () => {

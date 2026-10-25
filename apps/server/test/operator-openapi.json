@@ -465,20 +465,25 @@
           },
           "reason": {
             "type": ["string", "null"],
-            "enum": ["approval", "capacity", null]
+            "enum": ["capacity", null]
           },
           "since": {
             "type": ["string", "null"],
             "description": "When this state (and step or reason) began."
           },
-          "etaSeconds": {
-            "type": ["integer", "null"]
+          "requestedAt": {
+            "type": "string",
+            "description": "When its people started waiting: the computer's last removal, else the workspace's creation."
+          },
+          "expectedReadyAt": {
+            "type": ["string", "null"],
+            "description": "With `preparing`: the ready time you gave, kept while it is past (any moment now)."
           },
           "specs": {
             "$ref": "#/components/schemas/OperatorMachineSpecs"
           }
         },
-        "required": ["state", "step", "reason", "since", "etaSeconds", "specs"],
+        "required": ["state", "step", "reason", "since", "requestedAt", "expectedReadyAt", "specs"],
         "description": "What you last said about it; null: nothing yet."
       },
       "OperatorMachineSpecs": {
@@ -1282,7 +1287,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Say how far the workspace's computer is",
-        "description": "Its people see it live. The time `since` restarts only when the state, step or reason change. Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "description": "Its people see it live, with the time left. The time `since` restarts only when the state, step or reason change. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
         "parameters": [
           {
             "schema": {
@@ -1313,13 +1318,19 @@
                   },
                   "reason": {
                     "type": "string",
-                    "enum": ["approval", "capacity"],
-                    "description": "With `waiting`: approval or capacity; ignored otherwise."
+                    "enum": ["capacity", "approval"],
+                    "description": "With `waiting`: capacity; ignored otherwise. `approval`, from an older client, reads as capacity."
+                  },
+                  "expectedReadyAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A time already past means any moment now, and while the stored one is past too it stays, so people see the wait run over."
                   },
                   "etaSeconds": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 604800
+                    "maximum": 604800,
+                    "description": "From an older client, in place of `expectedReadyAt`: read as that many seconds from now."
                   },
                   "specs": {
                     "allOf": [
@@ -1540,7 +1551,7 @@
       "delete": {
         "tags": ["Operator"],
         "summary": "Take the workspace's computer away",
-        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now. 404 when the workspace has no such managed computer (also when it was already removed).",
         "parameters": [
           {
             "schema": {

@@ -6792,6 +6792,7 @@ export const en: Translations = {
       notFound: "This computer is no longer connected.",
       nameRequired: "Give the computer a name.",
       pairingInvalid: "Invalid, used or expired code. Generate another one.",
+      pairingOff: "This workspace has its own computer: other computers can't be connected to it.",
       targetOffline: "That computer went offline. Choose another one.",
       targetNotFound: "That computer no longer exists. Choose another one.",
       targetSame: "The agents are already on that computer.",
