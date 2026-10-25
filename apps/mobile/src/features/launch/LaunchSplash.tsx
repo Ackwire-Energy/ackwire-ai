@@ -65,7 +65,7 @@ export interface LaunchSplashProps {
 }
 
 /**
- * Opening the app (telas/SplashApp.html, B · Céu sobe). It starts exactly on the native launch image (the logo
+ * Opening the app. It starts exactly on the native launch image (the logo
  * agent centered, 120 pt image), then the pixel sky rises from the bottom with little agents going up in it,
  * the agent lifts and looks at them, and the name comes in. Once the app is ready (and at least 0.9 s have
  * played) the agent and the name go up and out, the sky sinks and the screen fades into the app. Slow: one
