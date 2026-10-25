@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import path from "node:path";
 import { readStoredConfig } from "../../runner/config";
 import { TOKEN_REFUSED_EXIT } from "../../runner/connection";
-import { HostComputer, type HostOptions } from "../../runner/host";
+import { defaultHostState, HostComputer, type HostOptions } from "../../runner/host";
 import { installSystemService, launchdPlist, systemdSystemUnit } from "../../runner/service";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -123,7 +123,7 @@ test("a home per organization (mode 600, kept by the host) and a runner in each;
     orgId: A,
     orgName: "Acme",
     managedBy: "host",
-    access: { folders: [], tools: { claude: true, codex: true, commands: true } },
+    access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
   });
   expect(existsSync(path.join(state, "work", "acme"))).toBe(true);
   expect(readStoredConfig(home(B))?.workspace).toBe(path.join(state, "work", "beta"));
@@ -200,6 +200,23 @@ test("turned off (404) or refused (401): nothing runs; back on when the server s
   await off.host.sync();
   expect(off.server.sent).toEqual([]);
   expect(off.children.started).toEqual([]);
+});
+
+test("--no-exec turns commands off in new homes; Claude Code, Codex and the browser stay on, on a Mac and on Linux", async () => {
+  for (const system of [false, true]) {
+    const { host, server, home } = makeHost({ exec: false, system });
+    server.answer([org(A, MA, "agm_a")]);
+    await host.sync();
+    expect(readStoredConfig(home(A))).toMatchObject({
+      exec: false,
+      access: { folders: [], tools: { claude: true, codex: true, commands: false, browser: true } },
+    });
+  }
+});
+
+test("its homes on a Mac go apart from the agentes app's, which starts every home in <home>/orgs", () => {
+  expect(defaultHostState("darwin", "/Users/ana/.agentes-runner")).toBe("/Users/ana/.agentes-runner/host");
+  expect(defaultHostState("linux", "/var/lib/agentes-runner")).toBe("/var/lib/agentes-runner");
 });
 
 test("system mode: each organization its own block of agent uids, root's folder as workspace, one list of uids", async () => {

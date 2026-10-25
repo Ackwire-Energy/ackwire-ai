@@ -43,7 +43,7 @@ import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, Runn
 import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
-import { HostComputer, readTokenFile, runnerChild } from "./host";
+import { defaultHostState, HostComputer, readTokenFile, runnerChild } from "./host";
 import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
@@ -90,8 +90,8 @@ Usage:
       This server's own computer (HOST_COMPUTER_TOKEN on the server, the same token here): one
       connection per organization of the person who installed the server, each agent as its own
       user on Linux (run it as root). Organizations come and go with the server, checked every minute.
-      --state    where it keeps each organization's connection (default: the home)
-      --no-exec  agents can't run commands here (files and uploads only)
+      --state    where it keeps each organization's connection (default: the home; on a Mac, its host folder)
+      --no-exec  agents can't run commands here (Claude Code, Codex and the browser stay on)
   agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
       Runs host as this computer's service (Linux: the root unit, from boot; macOS: at login).
   agentes-runner update
@@ -432,7 +432,7 @@ function hostFlags(p: Parsed) {
     server: normalizeServerUrl(server),
     tokenFile: tokenFile === undefined ? undefined : path.resolve(expandHome(tokenFile)),
     tokenEnv,
-    state: path.resolve(expandHome(flagString(p, "state") ?? runnerHome())),
+    state: path.resolve(expandHome(flagString(p, "state") ?? defaultHostState())),
     name: flagString(p, "name"),
     exec: !p.flags.has("no-exec"),
   };

@@ -8,6 +8,7 @@ import {
   DEFAULT_AGENT_UID_RANGE,
   expandHome,
   readStoredConfig,
+  runnerHome,
   type StoredConfig,
   serializeConfig,
   writeConfig,
@@ -71,7 +72,7 @@ export interface HostOptions {
   name: string;
   /** Linux as root: every child in system mode. */
   system: boolean;
-  /** Commands on in new homes (`--no-exec`: off). */
+  /** Commands on in new homes (`--no-exec`: off). Claude Code, Codex and the browser are on in them either way. */
   exec: boolean;
   log: (line: string) => void;
   start: StartChild;
@@ -257,7 +258,6 @@ export class HostComputer {
       return false;
     }
     const exec = this.opts.exec;
-    const browser = exec && this.opts.system;
     const next: StoredConfig = {
       ...prev,
       server: this.opts.server,
@@ -275,7 +275,7 @@ export class HostComputer {
             exec,
             access: {
               folders: [],
-              tools: { claude: exec, codex: exec, commands: exec, ...(browser ? { browser } : {}) },
+              tools: { claude: true, codex: true, commands: exec, browser: true },
             },
           }),
       ...(uids ? { mode: "system" as const, agentUidRange: uids } : {}),
@@ -415,6 +415,13 @@ export class HostComputer {
     });
   }
 }
+
+/**
+ * Where `host` keeps its homes without `--state`. On a Mac the agentes app keeps its own homes in
+ * `<home>/orgs` and starts every one it finds there, so this server's go one folder down.
+ */
+export const defaultHostState = (platform: NodeJS.Platform = process.platform, home = runnerHome()) =>
+  platform === "darwin" ? path.join(home, "host") : home;
 
 /** `HOST_COMPUTER_TOKEN` from a file (the service's way: no secret in the unit), or null. */
 export function readTokenFile(file: string): string | null {

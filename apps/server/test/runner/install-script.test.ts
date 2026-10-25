@@ -231,6 +231,47 @@ test.skipIf(process.platform === "win32")(
   },
 );
 
+test.skipIf(process.platform === "win32")(
+  "this server's computer on Linux, as root: --no-exec passed on; a computer already connected keeps its service",
+  () => {
+    /** Root on Linux, with the system mode's folders in the test's own and the pinned Bun's download matching. */
+    const rootLinux = () => {
+      const pc = fakeComputer({});
+      writeFileSync(path.join(pc.fake, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
+      writeFileSync(path.join(pc.fake, "chown"), "#!/bin/sh\n", { mode: 0o755 });
+      symlinkSync(Bun.which("dirname") as string, path.join(pc.fake, "dirname"));
+      const at = (dir: string) => path.join(pc.home, "system", dir);
+      const script = installScript("https://agentes.test")
+        .replace(RUNNER_BUN_SHA256["linux-aarch64"], createHash("sha256").update(FAKE_ZIP).digest("hex"))
+        .replaceAll("'/opt/agentes-runner'", shQuote(at("opt")))
+        .replaceAll("'/var/lib/agentes-runner'", shQuote(at("var")))
+        .replaceAll("'/usr/local/bin/agentes-runner'", shQuote(at("bin/agentes-runner")));
+      const token = path.join(pc.home, "host-computer-token");
+      writeFileSync(token, "t".repeat(64));
+      const args = ["--system", "--desktop", "--server", "http://127.0.0.1:3000", "--host-token-file", token];
+      return { ...pc, at, token, run: (more: string[] = []) => pc.install(script, [...args, ...more]) };
+    };
+
+    const pc = rootLinux();
+    const run = pc.run(["--no-exec"]);
+    expect(run.status).toBe(0);
+    expect(run.log).toContain("service install --system --no-start");
+    expect(run.log).toContain(
+      `service install --host --server http://127.0.0.1:3000 --token-file ${pc.token} --no-exec\n`,
+    );
+    expect(pc.run().log).toContain(`service install --host --server http://127.0.0.1:3000 --token-file ${pc.token}\n`);
+
+    // Connected as a computer of its own: the root unit stays that connection's, and nothing is installed.
+    const paired = rootLinux();
+    mkdirSync(paired.at("var"), { recursive: true });
+    writeFileSync(path.join(paired.at("var"), "config.json"), '{ "mode": "system", "token": "agm_x" }\n');
+    const refused = paired.run();
+    expect(refused.status).toBe(1);
+    expect(refused.out).toContain("already connected to agentes.chat as a computer");
+    expect(refused.log).toBe("");
+  },
+);
+
 test("service files: systemd unit, launchd plist and the Windows task command", () => {
   const launch = {
     runtime: "/usr/bin/node",
