@@ -452,6 +452,7 @@ ones a self-hosted instance usually touches:
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | Files in an S3-compatible bucket instead, when all four are set. `S3_REGION` (default `auto`); `S3_PATH_STYLE=true` for MinIO and Garage. |
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
+| `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 
 **Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
 MiniMax) in **Settings → API keys**, and each agent uses one of them. Usage and cost are recorded per agent.
@@ -500,10 +501,40 @@ which removes the file as soon as it is read. Leave it `off` and people connect 
 <details>
 <summary><b>Optional services and what they receive</b></summary>
 
-Nothing on the instance contacts agentes.chat on its own: it sends no usage report or telemetry. If
-a release ever adds one, it is listed here first, with what it sends and how to turn it off. Besides
-the model providers each organization chooses, it talks to a third party only when you turn that
-service on:
+**The usage report.** The instance sends agentes.chat anonymous usage statistics: counts such as people,
+agents, machine sizes and AI tokens used, never messages, files or names. It goes about an hour after
+the server starts and then once a day, as JSON in a POST to `TELEMETRY_URL`
+(`https://telemetry.agentes.chat/v1/report`). A send that fails is tried again three times within
+about 2.5 hours, then dropped: the next day's report replaces it. These are all its fields:
+
+| Field | What it is |
+| --- | --- |
+| `report` | The report's format: `1`. |
+| `instance` | A random id made at the server's first start. Nothing else in the report identifies the server. |
+| `version`, `edition`, `install` | The agentes.chat version; `selfhost`; `docker`, `native` or `desktop`. |
+| `os`, `arch`, `uptimeHours` | The server's system (`linux`, `darwin`), processor (`x64`, `arm64`) and hours since it started. |
+| `host.size` | The server's machine as it sees it: logical CPUs (`cpus`), memory (`memoryGb`, to 0.5 GB) and the disk of its data volume (`diskGb`, to 1 GB). |
+| `host.container` | Whether the server runs in a container. |
+| `host.load` | How busy that machine got over the last day, sampled every 5 minutes: the average and highest load per CPU (`loadAvg`, `loadPeak`: the 5-minute load average divided by the CPUs, 1 is every CPU busy), the average and highest share of memory in use (`memoryAvg`, `memoryPeak`, from 0 to 1), and the hours the samples cover (`hours`). |
+| `organizations` | How many workspaces. |
+| `people` | How many accounts (`total`), and how many used the server in the last 1, 7 and 30 days (`active1d`, `active7d`, `active30d`). |
+| `agents` | How many agents, archived ones aside. |
+| `computers` | Every computer agents use (this server's own, the ones people connected, one given by a provisioner): its `kind` (`host`, `connected`, `managed`), `os` and `arch`, its `size` and the last day's `load` as above (`null` when its runner is too old to say), and how many `agents` use it. |
+| `lastDay.runs`, `lastDay.toolCalls` | Agent runs started, and tool calls they made, in the last 24 hours. |
+| `lastDay.desktopMinutes`, `lastDay.terminalMinutes` | Minutes people watched or controlled agents' desktops, and had terminals open, in the last 24 hours. |
+| `lastDay.models` | For each AI provider and model used in the last 24 hours (the 50 most used): `provider`, `model`, `calls`, `inputTokens` (cached ones included) and `outputTokens`. A model name that isn't a model id goes as `other`. |
+
+It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
+workspaces, people or computers. `docker compose run --rm agentes telemetry` prints exactly the next
+report, whether it is on or off, and sends nothing; in the app, **Settings → General → Usage
+statistics → See what is sent** shows the same. Turn it off either way:
+
+- `TELEMETRY=off` in `.env`, then `docker compose up -d`. This wins over the switch below.
+- The switch in **Settings → General → Usage statistics**. Only the installation's first account (the
+  person who set it up) sees it.
+
+Besides that report and the model providers each organization chooses, the instance talks to a third
+party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |

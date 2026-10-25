@@ -1,7 +1,7 @@
 # 0060. One-command install, native mode, and the server's computer
 
-- Status: Accepted. Built: the installer, the server's computer and plain words. Not built yet: native mode (§2), so a Mac needs Docker for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
-- Date: 2026-10-24
+- Status: Accepted. Built: the installer, the server's computer, plain words and the usage report (§5). Not built yet: native mode (§2), so a Mac needs Docker for now, and the setup's questions for the server's computer (§3) and the usage report (§5), set by hand until then (`SELF_HOSTING.md`).
+- Date: 2026-10-24. Revised 2026-10-25: the usage report is built, on by default with a way to turn it off (§5)
 - Extends: ADR 0003 (PGlite), ADR 0025 (connected computers), ADR 0030 (isolation on computers), ADR 0036 (one runner per organization), ADR 0041 (accounts on a computer)
 - Out of scope for now: Windows, a container image as the agents' computer, native mode as a server database at scale
 
@@ -93,13 +93,18 @@ The onboarding, preparing and computer screens never name the system (Linux, Deb
 - `packages/i18n/test/plain-computer-copy.test.ts` checks every string under `onboarding.computer.*`, `computer.*` and `machine.*` in both languages. A new screen about computers adds its namespace there.
 - The steps for connecting your own server (Settings → Computadores) still say "Linux": that person needs it.
 
-### 5. A usage report, if one is added
+### 5. The usage report
 
-An instance sends agentes.chat nothing on its own. If a usage report is added:
+A self-hosted server sends agentes.chat an anonymous usage report about an hour after it starts and then once a day. It is on by default, and whoever runs the server can turn it off. agentes.chat's own servers always send theirs.
 
-- The wizard asks one yes/no question with one plain line saying what it is, and never prints the report. `agentes telemetry` prints it on request.
-- Settings shows a card with its title, the switch and "Ver o que é enviado", and nothing else.
-- Before a release sends it, `SELF_HOSTING.md` ("Optional services and what they receive") lists what it sends and how to turn it off.
+- **Counts and sizes, never content.** A random id made at the first start; the version, edition, install mode (`docker`, `native`, `desktop`: `INSTALL_MODE`, else a container means `docker`), system and uptime; the host's size and load; organizations, people and people active in the last 1, 7 and 30 days; agents; every computer the agents use with its kind, system, size, load and number of agents; and for the last day, runs, tool calls, minutes of desktops watched or controlled and of terminals, and per provider and model the calls and input and output tokens, from the usage records every model call writes. Never messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of organizations, people or computers; a model name that isn't an id goes as `other`. `SELF_HOSTING.md` lists every field.
+- **Sizes and load.** Self-hosters run anything from 2 CPUs and 4 GB up, so every machine says how big it is and how busy it gets. The host: logical CPUs, memory, the disk of the data volume (`FILES_DIR`) and whether it runs in a container, as the server process sees them, rounded. Load: the 5-minute load average per logical CPU and the share of memory in use (`MemAvailable` on Linux, `vm_stat` on macOS: the page cache isn't in use), sampled every 5 minutes, then the average and the highest over the last day. The server keeps its host's in its own database row (`instance_telemetry`), so the report printed elsewhere has it too.
+- **Computers (machine protocol 22).** The runner's `hello` carries `size` (its workspace's disk), and its next `pong` after each sample carries the last day's `load`; both are stored on the machine. Nothing new goes to the runner, so an older one sends neither and its computer is reported with its size unknown. A provisioned computer that hasn't said falls back to the provisioner's size (`machine_provisioning.specs`). A load older than a day is left out.
+- **Turning it off.** `TELEMETRY=off` in the server's settings, or the switch in Settings → General, which only the installation's first account sees (stored in the database). `TELEMETRY=off` wins, and the card says so. A development server (`NODE_ENV` not `production`) never sends. On agentes.chat's own servers (`PUBLIC_URL` on agentes.chat) it is always on and nobody has the switch: there, the first account is a customer.
+- **Sending.** The JSON in a POST to `TELEMETRY_URL`, with a 10-second timeout. A failed send is tried again after 5 minutes, 30 minutes and 2 hours, then the next day's report takes its place: nothing queues up. Failures go only to the debug log; nobody sees them and nothing waits on them.
+- **The wizard** asks one yes/no question with one plain line saying what it is, and never prints the report. `agentes telemetry` (through the image, `docker compose run --rm agentes telemetry`) prints exactly the next report, on or off, and sends nothing.
+- **Settings** shows a card with its title, the switch and "Ver o que é enviado" (the next report, as is), and a line only when `TELEMETRY=off` holds it off.
+- **Copy** says what is sent, never why: "Send anonymous usage statistics to agentes.chat: counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names."
 
 The terminal and the card stay short, and the full explanation lives in one public place.
 
