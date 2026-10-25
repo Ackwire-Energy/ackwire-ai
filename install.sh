@@ -4,10 +4,10 @@
 #   curl -fsSL https://agentes.chat/install | sh
 #   curl -fsSL https://agentes.chat/install | sh -s -- --plan      prints what it would do, does nothing
 #
-# --plan (--dry-run too) is this installer's own plan: it runs nothing, the setup included. Once this
-# has run, the setup's own plan comes from its folder (/opt/agentes as root, ~/agentes otherwise):
-#
-#   .runtime/bun x --bun @agenteschat/setup --dry-run
+# --plan (--dry-run too) is this installer's own plan: it runs nothing, the setup included. The setup
+# writes and starts nothing until its last question is answered: for its plan, stop it at its first
+# question (Ctrl-C), then run the setup command this printed again with --dry-run (with sudo if this
+# ran itself again with sudo).
 #
 # To read it before it runs: curl -fsSLo install.sh https://agentes.chat/install, then sh install.sh.
 #
@@ -192,9 +192,10 @@ Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup optio
   --dir <folder>      Where agentes.chat lives: /opt/agentes as root, ~/agentes otherwise.
   --yes               On Linux, install Docker without asking first. A Mac needs Docker Desktop,
                       OrbStack or Colima running.
-  --plan              Print what it would do, and do nothing (--dry-run too). This doesn't run
-                      the setup; for the setup's own plan, once this has run, in its folder:
-                      .runtime/bun x --bun @agenteschat/setup --dry-run
+  --plan              Print what it would do, and do nothing (--dry-run too). Not the setup's
+                      plan: stop the setup at its first question (Ctrl-C), then run the setup
+                      command this printed again with --dry-run (with sudo if this ran itself
+                      again with sudo).
   -h, --help
 
 Every other option goes to the setup, like --network local or --email skip; the guide lists them:

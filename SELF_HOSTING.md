@@ -110,12 +110,9 @@ curl -fsSL https://agentes.chat/install | sh -s -- --plan
 ```
 
 That's the installer's own plan: it runs nothing, not even the setup, so it can't show what the setup
-would do. The setup's plan comes from the setup, with the Bun the installer leaves in its folder (no
-Node.js needed), once the installer has run:
-
-```sh
-cd /opt/agentes && .runtime/bun x --bun @agenteschat/setup --dry-run    # ~/agentes when not root
-```
+would do. The setup writes and starts nothing until its last question is answered: for its plan, stop
+it at its first question (Ctrl-C), then run the setup command the installer printed again with
+`--dry-run` (with `sudo` if the installer ran itself again with `sudo`).
 
 Without a terminal (cloud-init, a CI job) nothing is asked: the setup takes its defaults and the
 options given, and Docker is installed only with `--yes`.
@@ -239,8 +236,7 @@ same setup: give it `--yes` and the same options. Its own lines go to stderr, so
 the setup's JSON; a failure before the setup starts is a line on stderr and exit code 1. Its
 `--plan` (`--dry-run` too) prints the installer's plan and runs nothing, not even the setup. The
 setup's plan as JSON comes from the setup itself, with `--dry-run --json`: through `npx`, or on a
-server the installer set up, with its Bun, `.runtime/bun x --bun @agenteschat/setup --dry-run --json`
-in its folder.
+server the installer set up, the setup command it printed, with `--dry-run --json`.
 
 ```sh
 curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' sh -s -- --yes --network tailscale --email skip --json
