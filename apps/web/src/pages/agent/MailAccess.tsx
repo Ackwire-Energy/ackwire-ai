@@ -166,8 +166,7 @@ function MailboxRow({
                   </summary>
                   <MailRulesPanel
                     key={round}
-                    accountId={account.id}
-                    address={account.address}
+                    account={account}
                     policy={draft.policy}
                     onChange={(policy) => change({ policy })}
                     disabled={!editable}

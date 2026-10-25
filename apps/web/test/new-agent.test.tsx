@@ -337,6 +337,8 @@ describe("Criar agente: what gets created", () => {
         createdAt: new Date().toISOString(),
         offActions: [],
         askActions: [],
+        aliases: [],
+        defaultFrom: null,
         agents: [],
       },
     ];
