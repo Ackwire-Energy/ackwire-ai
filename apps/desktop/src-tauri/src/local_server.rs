@@ -791,13 +791,18 @@ pub fn is_running(app: &AppHandle) -> bool {
     phase(app) == Phase::Running
 }
 
-/// Whether it runs, waiting up to `wait` while it is starting (a page that loaded as it came up asks at once).
-pub fn running_within(app: &AppHandle, wait: Duration) -> bool {
+/// Whether `origin`, one of the server here's addresses, leads to the app's own child now: it runs, and at its
+/// Tailscale address Tailscale shares it again (until then that address may still lead to its old port).
+/// Waits up to `wait` while either is on its way (a page that loaded as it came up asks at once).
+pub fn answers_within(app: &AppHandle, origin: &str, wait: Duration) -> bool {
     let deadline = Instant::now() + wait;
+    let via_tailnet = origin.starts_with("https://");
     loop {
         match phase(app) {
-            Phase::Running => return true,
-            Phase::Starting | Phase::Updating if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(100)),
+            Phase::Running if !via_tailnet || state(app).served => return true,
+            Phase::Running | Phase::Starting | Phase::Updating if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(100))
+            }
             _ => return false,
         }
     }
@@ -1192,10 +1197,14 @@ fn move_port(app: &AppHandle, folder: &Folder, old: u16) -> Result<u16, String> 
         entries.push(("PUBLIC_URL", loopback_url(port)));
     }
     write_env(folder, &entries).map_err(|e| e.to_string())?;
-    if !reach {
+    if reach {
+        // Its share still leads to the old port: it goes now, and comes back on the new one once the server
+        // answers there (`ensure_served`).
+        unserve_here(app);
+    } else {
         crate::servers::replace(app, &loopback_url(old), &loopback_url(port));
+        crate::main_window::follow_move(app, &loopback_url(old));
     }
-    // With reach on, Tailscale shares the new port once the server answers there (`ensure_served`).
     Ok(port)
 }
 
@@ -1325,7 +1334,7 @@ fn open_signed_in(app: &AppHandle, origin: &str, token: &str) -> Result<(), Stri
 
 /// The site's sign-in asked to sign the owner in ("Continue on this Mac", `this_mac` `signIn`).
 pub fn sign_in_window(app: &AppHandle, origin: &str) -> Result<(), String> {
-    if !is_running(app) {
+    if !answers_within(app, origin, Duration::ZERO) {
         return Err("not running".into());
     }
     let folder = folder(app).ok_or("no folder")?;

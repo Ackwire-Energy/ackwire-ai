@@ -145,6 +145,17 @@ pub fn show_url(app: &AppHandle, url: Url) -> Result<(), String> {
     open(app, Some(url))
 }
 
+/// The server here left the address `old` (its port was taken): a window still on it goes to the server open
+/// now, shown or not, so it never stays on whatever answers at the old port.
+pub fn follow_move(app: &AppHandle, old: &str) {
+    let Some(page) = app.get_webview(LABEL) else { return };
+    if page.url().is_ok_and(|u| u.origin().ascii_serialization() == old) {
+        if let Some(site) = site(app) {
+            let _ = page.navigate(site);
+        }
+    }
+}
+
 /// Shows the window (made on first use), on `url` when given (a page of the server open now).
 pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let site = site(app).ok_or("no server chosen yet")?;
@@ -545,9 +556,9 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
     // The server here's pages count only while its own child answers there: another program can listen on
     // its port while it is down. A page that loaded as it came up waits for that a moment.
     if server_here {
-        let waiter = app.clone();
+        let (waiter, asking) = (app.clone(), origin.clone());
         let up = tauri::async_runtime::spawn_blocking(move || {
-            crate::local_server::running_within(&waiter, Duration::from_secs(10))
+            crate::local_server::answers_within(&waiter, &asking, Duration::from_secs(10))
         })
         .await
         .unwrap_or(false);
