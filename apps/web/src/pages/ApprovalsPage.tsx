@@ -443,7 +443,8 @@ function useApprovalVia(approval: Approval): ApprovalVia {
   const customId = approval.connector?.startsWith("custom:") ? approval.connector.slice("custom:".length) : null;
   const servers = useCustomServers(org.id, customId !== null);
   // An email goes through a mailbox, not a catalog connector ("email" has no entry): the box and its provider.
-  if (approval.email) return { kind: "mail", name: approval.email.mailbox, account: approval.email.provider, def: null };
+  if (approval.email)
+    return { kind: "mail", name: approval.email.mailbox, account: approval.email.provider, def: null };
   if (!approval.connector) return { kind: "own", name: t("approvals.panel.builtIn"), account: null, def: null };
   const server = customId ? servers.data?.find((s) => s.id === customId) : undefined;
   const custom = server ? fromServer(server, catalog.data?.connectors ?? []) : null;
