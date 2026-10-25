@@ -285,7 +285,16 @@ function CommandCopy({ command }: { command: string }) {
   }, [copied]);
   return (
     <div className="dk-fr__cmd">
-      <code>{command}</code>
+      {/* Breaks only between words: a flag like `--network` never splits (selecting it copies the same text). */}
+      <code>
+        {command.split(" ").map((word, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, in order
+          <span key={i}>
+            {i > 0 && " "}
+            <span className="dk-fr__word">{word}</span>
+          </span>
+        ))}
+      </code>
       <Button
         size="sm"
         icon={copied ? "check" : "copy"}

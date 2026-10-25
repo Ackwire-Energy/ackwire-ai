@@ -644,7 +644,8 @@ body[data-window="popover"] {
   font-size: 34px;
   letter-spacing: -0.03em;
   line-height: 1.08;
-  max-width: 22ch;
+  max-width: 28ch;
+  text-wrap: balance;
 }
 .dk-fr__hello {
   flex: 1;
@@ -835,9 +836,11 @@ body[data-window="popover"] {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink);
-  overflow-wrap: anywhere;
   -webkit-user-select: text;
   user-select: text;
+}
+.dk-fr__word {
+  white-space: nowrap;
 }
 .dk-fr__ways {
   list-style: none;
