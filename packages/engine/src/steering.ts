@@ -107,12 +107,12 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     const waiting =
       !active.waitingMachineId && (active.status === "waiting_input" || active.status === "waiting_approval");
     // Waiting on something the message can't move (a secret, a mission's decision; an approval never takes
-    // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own.
-    const handed =
-      waiting &&
-      (await holdsMessages(deps.db, active)) &&
-      (await handOnMessages(deps.db, deps.pubsub, active, [message.id]).catch(() => null)) !== null;
-    if (!handed && (waiting || (deps.talker && !now))) {
+    // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own. Gone from the
+    // inbox already (the run handed it on as it paused, or read it first): the run that has it answers, so
+    // nothing here speaks for this one either.
+    const holds = waiting && (await holdsMessages(deps.db, active));
+    if (holds) await handOnMessages(deps.db, deps.pubsub, active, [message.id]).catch(() => null);
+    else if (waiting || (deps.talker && !now)) {
       const followUp = async () => {
         let waited: WaitMessageOutcome | null = null;
         if (waiting) {

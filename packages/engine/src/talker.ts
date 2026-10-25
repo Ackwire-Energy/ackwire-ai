@@ -6,6 +6,7 @@ import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
+import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, isTerminal, replyThreadOf } from "./runs";
 import { loadTalkerSnapshot, type TalkerSnapshot } from "./talker-snapshot";
 import type { WaitMessageOutcome } from "./waits";
@@ -64,6 +65,7 @@ export type TalkerSkip =
   | "reads_soon"
   | "rate_limited"
   | "ended"
+  | "held"
   | "answered"
   | "no_agent";
 
@@ -301,6 +303,9 @@ async function postReply(
   const result = await deps.db.transaction(async (tx) => {
     const [locked] = await tx.select().from(agentRuns).where(eq(agentRuns.id, run.id)).for("update");
     if (!locked || isTerminal(locked.status)) return "ended" as const;
+    // Paused since on something a message can't move: what it was sent went to a run of its own (or was read
+    // before the pause), and that run answers; a fast reply here would be a second answer it never reads.
+    if (await holdsMessages(tx, locked)) return "held" as const;
     // Under the run's lock: two messages considered at once get one reply.
     const last = await lastReplyAt(tx, run, at);
     if (last && (at.getTime() - last.getTime() < TALKER_MIN_GAP_MS || last >= message.createdAt)) {

@@ -7,13 +7,18 @@ import {
   createTalker,
   drainOutbox,
   grantScopes,
+  insertMessage,
   listMessages,
   postPersonMessage,
+  queueOnRun,
+  releaseHeldInbox,
   stopChecksSettled,
   TALKER_MIN_GAP_MS,
+  TALKER_QUIET_MS,
   type TalkerDeps,
   talkerPolicy,
 } from "../src";
+import { afterSteered } from "../src/steering";
 import { type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
@@ -72,7 +77,7 @@ function talkerOn(trigger: { id: string }, options: TalkerOptions = {}) {
     await stopChecksSettled();
     return m;
   };
-  return { write, decisions };
+  return { talker, write, decisions };
 }
 
 /**
@@ -93,6 +98,56 @@ async function waitingOnQuestion(talker: Parameters<typeof script>[0], options: 
 const talkerCalls = () => f.provider.calls.filter((c) => isTalkerCall(c.request));
 const talkerMessages = async () =>
   (await f.db.select().from(schema.messages)).filter((m) => (m.meta as Record<string, unknown>).talker);
+
+const MERGE = {
+  name: "github_merge_pr",
+  input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
+};
+const ASKED = "já mergeou?";
+const ANSWER = "Ainda não: o merge espera a aprovação no card.";
+
+/**
+ * A run paused on an approval (merging PR 42). The agent answers `ASKED` with `ANSWER` and asks to merge
+ * otherwise; the talker answers with `talker(req)`.
+ */
+async function waitingOnApproval(talker: (req: ModelRequest) => FakeReply = () => replyJson(REPLY)) {
+  f = await setup({
+    toolSources: [fakeGithub().source],
+    reply: (req) =>
+      isTalkerCall(req)
+        ? talker(req)
+        : JSON.stringify(req.messages).includes(ASKED)
+          ? { chunks: [ANSWER] }
+          : { chunks: [], toolUses: [MERGE] },
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev merge PR 42",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [held] = await f.db.select().from(schema.agentRuns);
+  expect(held?.status).toBe("waiting_approval");
+  return { held: held as NonNullable<typeof held>, trigger };
+}
+
+/** `ASKED` in the trigger's thread, queued on the run as the insert does while the run works. */
+async function askedWhileWorking(run: { id: string }, trigger: { id: string }) {
+  const message = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    threadId: trigger.id,
+    author: { type: "person", userId: f.owner.id },
+    body: ASKED,
+  });
+  expect(await queueOnRun(f.db, run.id, message.id)).toBe(true);
+  return message;
+}
+
+/** What the agent said after `message`: fast replies and answers alike. */
+const saidAfter = async (message: { createdAt: Date }) =>
+  (await f.db.select().from(schema.messages)).filter(
+    (m) => m.authorAgentId === f.agent.id && m.createdAt > message.createdAt,
+  );
 
 describe("talker: fast replies while the task waits", () => {
   test("waiting on a question: replies as the agent, with the question in its snapshot, usage recorded", async () => {
@@ -200,27 +255,58 @@ describe("talker: fast replies while the task waits", () => {
   });
 
   test("waiting on an approval: the talker isn't asked", async () => {
-    const merge = {
-      name: "github_merge_pr",
-      input: { repo: "acme/app", pr: 42, why: "CI passed on the PR and it was reviewed: merging ships the fix." },
-    };
-    f = await setup({
-      toolSources: [fakeGithub().source],
-      reply: (req) => (isTalkerCall(req) ? replyJson(REPLY) : { chunks: [], toolUses: [merge] }),
-    });
-    await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
-    const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
-      body: "@dev merge PR 42",
-    });
-    await drainOutbox(f.db, f.handlers);
-    const [held] = await f.db.select().from(schema.agentRuns);
-    expect(held?.status).toBe("waiting_approval");
-
+    const { trigger } = await waitingOnApproval();
     const { write, decisions } = talkerOn(trigger);
-    await write("já mergeou?");
+    await write(ASKED);
     // The message gets a run of its own instead (waits.test.ts).
     expect(decisions).toEqual([]);
     expect(talkerCalls()).toHaveLength(0);
+  });
+
+  test("paused on an approval and handed the message on before the steering read the run: one answer", async () => {
+    const { held, trigger } = await waitingOnApproval();
+    const { talker, decisions } = talkerOn(trigger);
+    // In this order: the message lands while the run works, the run pauses on the approval and hands it
+    // on (the executor's `releaseHeldInbox`), and only then does the steering read the run.
+    const message = await askedWhileWorking(held, trigger);
+    const taken = await releaseHeldInbox(f.db, f.pubsub, held.id);
+    expect(taken?.messageIds).toEqual([message.id]);
+    const events = f.listen(f.general.id);
+    await afterSteered(
+      { db: f.db, pubsub: f.pubsub, talker },
+      { orgId: f.org.id, userId: f.owner.id, channelId: f.general.id, message, runIds: [held.id], now: false },
+    );
+    await stopChecksSettled();
+
+    // Nothing speaks for the held run: no fast reply, no "held" receipt for a message another run has.
+    expect(decisions).toEqual([]);
+    expect(talkerCalls()).toHaveLength(0);
+    expect(events.filter((e) => (e as { type: string }).type === "agent.run.wait_message")).toEqual([]);
+    await drainOutbox(f.db, f.handlers);
+    const said = await saidAfter(message);
+    expect(said.map((m) => [m.body, m.agentRunId])).toEqual([[ANSWER, taken?.runId ?? ""]]);
+  });
+
+  test("paused on an approval while the talker thought, handing the message on: no fast reply", async () => {
+    let pause = async () => {};
+    const { held, trigger } = await waitingOnApproval(() => ({ ...replyJson(REPLY), hold: pause() }));
+    // Working again, deep in a long step by the talker's clock: a message to it gets the talker.
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, held.id));
+    const message = await askedWhileWorking(held, trigger);
+    let taken = null as Awaited<ReturnType<typeof releaseHeldInbox>>;
+    // While the talker thinks, the run pauses on the approval again and hands the message on.
+    pause = async () => {
+      await f.db.update(schema.agentRuns).set({ status: "waiting_approval" }).where(eq(schema.agentRuns.id, held.id));
+      taken = await releaseHeldInbox(f.db, f.pubsub, held.id);
+    };
+    const { talker, decisions } = talkerOn(trigger, { now: () => new Date(Date.now() + TALKER_QUIET_MS + 1000) });
+    await talker.consider({ run: { ...held, status: "running" }, message, live: false, waited: null });
+
+    expect(decisions).toEqual(["held"]);
+    expect(taken).toMatchObject({ messageIds: [message.id] });
+    await drainOutbox(f.db, f.handlers);
+    const said = await saidAfter(message);
+    expect(said.map((m) => [m.body, m.agentRunId])).toEqual([[ANSWER, taken?.runId ?? ""]]);
   });
 });
 
