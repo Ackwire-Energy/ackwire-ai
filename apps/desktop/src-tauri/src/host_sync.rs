@@ -104,7 +104,8 @@ pub fn trigger(app: &AppHandle) {
     sync.ring.notify_one();
 }
 
-/// Every minute, or sooner when woken, for as long as the app runs.
+/// Every minute, or sooner when woken, for as long as the app runs (and Tailscale shares the server here again
+/// once it can, with reach on).
 pub fn start(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || loop {
@@ -120,6 +121,7 @@ pub fn start(app: &AppHandle) {
         if app.state::<crate::runners::Runners>().is_quitting() {
             return;
         }
+        local_server::ensure_served(&app);
         sync_now(&app, &[]);
     });
 }

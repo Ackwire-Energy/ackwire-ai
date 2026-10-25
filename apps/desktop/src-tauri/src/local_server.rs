@@ -13,7 +13,11 @@
 //!
 //! It starts the server with the app (at login too), restarts it after a crash (1 s doubling to 60 s), stops it
 //! gracefully on quit, and listens only on 127.0.0.1; reach from the person's other devices is Tailscale's
-//! `serve` (`tailscale.rs`), which also moves `PUBLIC_URL`.
+//! `serve` (`tailscale.rs`), which also moves `PUBLIC_URL`, and is shared only while the server runs here.
+//!
+//! Other programs and accounts on this computer can listen on the loopback port too, so only the app's own
+//! child counts as the server: it answers health and names its pid in `server.json` (in the folder only this
+//! person may write). Until then nothing gets the owner key, the computer's token or the main window's bridge.
 
 use std::collections::VecDeque;
 use std::fs;
@@ -34,7 +38,8 @@ const FOLDER: &str = ".agentes";
 const HERE_FILE: &str = "local-server.json";
 /// The ports a new folder may take (apps/server native.ts `NATIVE_PORTS`): not 3000, the Docker install's.
 const PORTS: std::ops::RangeInclusive<u16> = 4310..=4329;
-/// A start that doesn't answer `/api/health` in this long failed (a first start migrates a new database).
+/// Starts in a row that don't answer `/api/health` in this long, all together, failed: no more tries (a first
+/// start migrates a new database).
 const ANSWER_WITHIN: Duration = Duration::from_secs(180);
 /// How long the server gets to drain on a stop before it is killed (it drains in 20 s itself).
 const STOP_GRACE: Duration = Duration::from_secs(25);
@@ -447,25 +452,30 @@ pub fn http(port: u16, method: &str, path: &str, body: Option<&Value>) -> Option
     stream.write_all(request.as_bytes()).ok()?;
     let mut raw = Vec::new();
     stream.take(4 * 1024 * 1024).read_to_end(&mut raw).ok()?;
-    let text = String::from_utf8_lossy(&raw);
-    let (head, rest) = text.split_once("\r\n\r\n")?;
+    let split = raw.windows(4).position(|w| w == b"\r\n\r\n")?;
+    let head = String::from_utf8_lossy(&raw[..split]);
+    let rest = &raw[split + 4..];
     let status = head.split_whitespace().nth(1)?.parse().ok()?;
     let chunked = head.lines().any(|l| {
         let l = l.to_ascii_lowercase();
         l.starts_with("transfer-encoding:") && l.contains("chunked")
     });
-    Some((status, if chunked { dechunk(rest) } else { rest.to_string() }))
+    let body = if chunked { dechunk(rest) } else { rest.to_vec() };
+    Some((status, String::from_utf8_lossy(&body).into_owned()))
 }
 
-fn dechunk(mut rest: &str) -> String {
-    let mut out = String::new();
-    while let Some((size, after)) = rest.split_once("\r\n") {
-        let Ok(n) = usize::from_str_radix(size.split(';').next().unwrap_or("").trim(), 16) else { break };
+/// A chunked body, by bytes: chunk sizes count bytes, which may end inside a character.
+fn dechunk(mut rest: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    while let Some(end) = rest.windows(2).position(|w| w == b"\r\n") {
+        let size = std::str::from_utf8(&rest[..end]).ok().and_then(|s| s.split(';').next());
+        let Some(n) = size.and_then(|s| usize::from_str_radix(s.trim(), 16).ok()) else { break };
+        let after = &rest[end + 2..];
         if n == 0 || after.len() < n {
             break;
         }
-        out.push_str(&after[..n]);
-        rest = after[n..].strip_prefix("\r\n").unwrap_or(&after[n..]);
+        out.extend_from_slice(&after[..n]);
+        rest = after[n..].strip_prefix(b"\r\n").unwrap_or(&after[n..]);
     }
     out
 }
@@ -563,13 +573,23 @@ fn pid_alive(pid: u32) -> bool {
     unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
 }
 
-/// A server left running from this folder by an app that ended without stopping it (killed, crashed): the lock
-/// names its pid, and its own command line names this folder. Anything else is left alone.
-fn leftover(folder: &Folder) -> Option<u32> {
+/// The pid a file of the folder names (`server.lock`, `server.json`).
+fn pid_in(file: &Path) -> Option<u32> {
+    let value: Value = serde_json::from_str(&fs::read_to_string(file).ok()?).ok()?;
+    u32::try_from(value["pid"].as_u64()?).ok()
+}
+
+/// The pid `server.json` names: the server writes it once it listens, in the folder only this person can write.
+fn ready_pid(folder: &Folder) -> Option<u32> {
+    pid_in(&folder.ready())
+}
+
+/// A server of this folder that `file` names and that still runs: its own command line names `native.js` and
+/// this folder. Anything else is left alone.
+fn folder_server(folder: &Folder, file: &Path) -> Option<u32> {
     #[cfg(unix)]
     {
-        let lock: Value = serde_json::from_str(&fs::read_to_string(folder.lock()).ok()?).ok()?;
-        let pid = u32::try_from(lock["pid"].as_u64()?).ok()?;
+        let pid = pid_in(file)?;
         if pid == std::process::id() || !pid_alive(pid) {
             return None;
         }
@@ -579,8 +599,20 @@ fn leftover(folder: &Folder) -> Option<u32> {
     }
     #[cfg(not(unix))]
     {
-        let _ = folder;
+        let _ = (folder, file);
         None
+    }
+}
+
+/// A server left running from this folder by an app that ended without stopping it (killed, crashed).
+fn leftover(folder: &Folder) -> Option<u32> {
+    folder_server(folder, &folder.lock())
+}
+
+fn stop_leftover(app: &AppHandle, folder: &Folder) {
+    if let Some(pid) = leftover(folder) {
+        note(app, format!("stopping a server left running from this folder (pid {pid})"));
+        stop_pid(pid, STOP_GRACE, || leftover(folder).is_none());
     }
 }
 
@@ -625,6 +657,16 @@ pub fn next_after(on_purpose: bool, code: Option<i32>, answered: bool, failed: u
     Next::Restart(crate::runners::backoff(if answered { 0 } else { failed }))
 }
 
+/// Starts in a row that never answered, after one more: once their wait ran out it counts as all of them (no
+/// second three minutes).
+pub fn failed_starts(before: u32, timed_out: bool) -> u32 {
+    if timed_out {
+        MAX_FAILED_STARTS
+    } else {
+        before + 1
+    }
+}
+
 // ───────────────────────────── the server here, in the app ─────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -642,11 +684,14 @@ pub enum Phase {
     Failing,
 }
 
-/// The app's record (`local-server.json`): whether it runs the server here, and whether its owner was made.
+/// The app's record (`local-server.json`): whether it runs the server here, whether its owner was made, and an
+/// app version whose server didn't start, so it stays on the version it went back to until the next one.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct HereFile {
     run: bool,
     owner: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    skip: Option<String>,
 }
 
 #[derive(Default)]
@@ -660,12 +705,16 @@ struct Inner {
     on_purpose: bool,
     answered: bool,
     failed: u32,
+    /// The first of the starts in a row that haven't answered: together they get `ANSWER_WITHIN`.
+    trying_since: Option<Instant>,
     stops: VecDeque<Instant>,
     update_from: Option<String>,
     /// An update went back to this version (said once).
     back_to: Option<String>,
     lines: VecDeque<String>,
     https_url: Option<String>,
+    /// Tailscale shares it now (with reach on); false once the server stopped here.
+    served: bool,
 }
 
 #[derive(Default)]
@@ -736,9 +785,22 @@ pub fn is_here(app: &AppHandle, origin: &str) -> bool {
     runs(app) && (loopback(app).as_deref() == Some(origin) || public_url(app).as_deref() == Some(origin))
 }
 
-/// The server here answers now (host syncs wait for it).
+/// The server here answers now, as the app's own child (host syncs, the owner key and the main window's bridge
+/// wait for it).
 pub fn is_running(app: &AppHandle) -> bool {
     phase(app) == Phase::Running
+}
+
+/// Whether it runs, waiting up to `wait` while it is starting (a page that loaded as it came up asks at once).
+pub fn running_within(app: &AppHandle, wait: Duration) -> bool {
+    let deadline = Instant::now() + wait;
+    loop {
+        match phase(app) {
+            Phase::Running => return true,
+            Phase::Starting | Phase::Updating if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(100)),
+            _ => return false,
+        }
+    }
 }
 
 pub fn phase(app: &AppHandle) -> Phase {
@@ -794,7 +856,10 @@ pub struct Status {
     dir: String,
     /// The person's name on this computer, for the owner's name (the welcome window only).
     system_name: Option<String>,
-    /// A terminal install still waiting for its owner: its claim (the welcome window only).
+    /// A terminal install's server runs now: `server.json` names a live server of this folder (the welcome
+    /// window only).
+    serving: bool,
+    /// A terminal install still waiting for its owner, and running: its claim (the welcome window only).
     claim: Option<String>,
     back_to: Option<String>,
 }
@@ -828,9 +893,13 @@ pub fn status(app: &AppHandle, welcome: bool) -> Status {
         .as_ref()
         .and_then(|f| fs::read_to_string(f.ready()).ok())
         .and_then(|t| serde_json::from_str(&t).ok());
+    let serving = welcome
+        && installed == Installed::Terminal
+        && folder.as_ref().is_some_and(|f| folder_server(f, &f.ready()).is_some());
+    // Only while its own server holds the port: anything else listening there must never see the claim.
     let claim = folder
         .as_ref()
-        .filter(|_| welcome && installed == Installed::Terminal)
+        .filter(|_| serving)
         .and_then(|f| fs::read_to_string(f.claim()).ok())
         .map(|c| c.trim().to_string())
         .filter(|c| crate::servers::page_path(&format!("/owner#claim={c}")));
@@ -850,6 +919,7 @@ pub fn status(app: &AppHandle, welcome: bool) -> Status {
             .or_else(|| folder.as_ref().and_then(current_version)),
         dir: folder.map(|f| f.0.to_string_lossy().into_owned()).unwrap_or_default(),
         system_name: (welcome && installed != Installed::App).then(system_name).flatten(),
+        serving,
         claim,
         back_to,
     }
@@ -887,6 +957,7 @@ pub fn start(app: &AppHandle) {
         }
         inner.launching = true;
         inner.on_purpose = false;
+        inner.failed = 0;
     }
     let app = app.clone();
     std::thread::spawn(move || {
@@ -902,30 +973,52 @@ pub fn start(app: &AppHandle) {
 fn start_now(app: &AppHandle) -> Result<(), String> {
     let folder = folder(app).ok_or("no home folder")?;
     let version = app.package_info().version.to_string();
+    let current = current_version(&folder);
+    // This version's server didn't start before, and it went back: it stays back until the next version.
+    let skipped = state(app).here.skip.as_deref() == Some(version.as_str());
+    if let Some(back) = current.clone().filter(|c| skipped && *c != version && folder.entry(c).is_file()) {
+        state(app).back_to = Some(back);
+        set_phase(app, Phase::Starting);
+        stop_leftover(app, &folder);
+        return spawn(app, Phase::Starting);
+    }
     // From the first moment (copying a new version's files takes a little while).
-    let updating = current_version(&folder).is_some_and(|v| v != version);
+    let updating = current.is_some_and(|v| v != version);
     set_phase(app, if updating { Phase::Updating } else { Phase::Starting });
+    // Before the database is copied aside: never while a server runs on it.
+    stop_leftover(app, &folder);
     let bundle = bundle(app).ok_or("this build doesn't carry the server")?;
     let copied = install_version(&folder, &bundle, &version).map_err(|e| e.to_string())?;
     if let Copied::Update { from } = &copied {
         state(app).update_from = Some(from.clone());
     }
-    if let Some(pid) = leftover(&folder) {
-        note(app, format!("stopping a server left running from this folder (pid {pid})"));
-        stop_pid(pid, STOP_GRACE, || leftover(&folder).is_none());
-    }
     spawn(app, if matches!(copied, Copied::Update { .. }) { Phase::Updating } else { Phase::Starting })
+}
+
+/// The folder's port, or, when another program listens there now, the next free one (its address moves with
+/// it): the server never starts behind someone else's answers.
+fn port_here(app: &AppHandle, folder: &Folder) -> Result<u16, String> {
+    let port = port_of(folder).ok_or("no PORT in .env")?;
+    if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+        return Ok(port);
+    }
+    note(app, format!("port {port} is taken on this computer: moving to another"));
+    move_port(app, folder, port)
 }
 
 fn spawn(app: &AppHandle, phase: Phase) -> Result<(), String> {
     let launch = launch_of(app).ok_or("the server's files aren't in place")?;
-    let port = port_of(&launch.folder).ok_or("no PORT in .env")?;
+    let port = port_here(app, &launch.folder)?;
     let mut child = launch.spawn().map_err(|e| e.to_string())?;
     let generation = {
         let mut inner = state(app);
         inner.generation += 1;
         inner.pid = Some(child.id());
         inner.answered = false;
+        inner.served = false;
+        if inner.failed == 0 {
+            inner.trying_since = Some(Instant::now());
+        }
         inner.phase = Some(phase);
         inner.generation
     };
@@ -939,20 +1032,25 @@ fn spawn(app: &AppHandle, phase: Phase) -> Result<(), String> {
         });
     }
     let app = app.clone();
-    std::thread::spawn(move || watch(&app, child, generation, port));
+    let folder = launch.folder;
+    std::thread::spawn(move || watch(&app, child, generation, port, &folder));
     Ok(())
 }
 
 /// Waits for the child to answer, then for it to stop, and decides what comes next.
-fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16) {
-    let since = Instant::now();
+fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: &Folder) {
+    // Starts that keep stopping before they answer share one wait (3 minutes in all, not each).
+    let since = state(app).trying_since.unwrap_or_else(Instant::now);
+    let pid = child.id();
     let current = |app: &AppHandle| state(app).generation == generation;
+    let mut timed_out = false;
     let code = loop {
         if let Ok(Some(status)) = child.try_wait() {
             break status.code();
         }
         if !state(app).answered {
-            if healthy(port) {
+            // Its own answer only: whatever else holds the port answers health too.
+            if ready_pid(folder) == Some(pid) && healthy(port) {
                 {
                     let mut inner = state(app);
                     inner.answered = true;
@@ -961,8 +1059,11 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16) {
                 }
                 set_phase(app, Phase::Running);
                 crate::host_sync::trigger(app);
+                let app = app.clone();
+                std::thread::spawn(move || ensure_served(&app));
             } else if since.elapsed() > ANSWER_WITHIN && current(app) {
-                note(app, "it didn't answer in 3 minutes".into());
+                note(app, "it didn't answer within 3 minutes".into());
+                timed_out = true;
                 let _ = child.kill();
             }
         }
@@ -977,7 +1078,7 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16) {
         inner.pid = None;
         let answered = inner.answered;
         if !answered && !inner.on_purpose {
-            inner.failed += 1;
+            inner.failed = failed_starts(inner.failed, timed_out);
         }
         if !inner.on_purpose {
             let now = Instant::now();
@@ -998,11 +1099,7 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16) {
             set_phase(app, Phase::Stopped);
             // Refused because a server left from before still holds the folder: that one goes first.
             if code == Some(exit::LOCKED) {
-                if let Some(folder) = folder(app) {
-                    if let Some(pid) = leftover(&folder) {
-                        stop_pid(pid, STOP_GRACE, || leftover(&folder).is_none());
-                    }
-                }
+                stop_leftover(app, folder);
             }
             if answered && state(app).stops.len() >= 3 {
                 state(app).stops.clear();
@@ -1026,25 +1123,27 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16) {
                 set_phase(app, Phase::Failing);
             }
         }
+        // Its port was taken meanwhile: the start moves to a free one.
         Next::NewPort => {
-            if let Err(err) = new_port(app) {
+            if let Err(err) = spawn(app, Phase::Starting) {
                 note(app, format!("port: {err}"));
                 set_phase(app, Phase::Failing);
             }
         }
         Next::GoBack { to } => {
             let from = app.package_info().version.to_string();
-            let back = folder(app)
-                .ok_or_else(|| "no folder".to_string())
-                .and_then(|f| go_back(&f, &from, &to).map_err(|e| e.to_string()));
-            {
+            let back = go_back(folder, &from, &to).map_err(|e| e.to_string());
+            let here = {
                 let mut inner = state(app);
                 inner.update_from = None;
                 inner.failed = 0;
                 if back.is_ok() {
                     inner.back_to = Some(to.clone());
+                    inner.here.skip = Some(from.clone());
                 }
-            }
+                inner.here.clone()
+            };
+            save_here(app, &here);
             match back.and_then(|_| spawn(app, Phase::Starting)) {
                 Ok(()) => notify(app, "hereBack", "", Some(&to)),
                 Err(err) => {
@@ -1079,26 +1178,52 @@ fn upgrade(app: &AppHandle, from: Option<&str>) -> Result<(), String> {
         return Err(format!("restore: {err}"));
     }
     let _ = fs::remove_file(&dump);
+    // The copy took its own time: the upgraded start gets the whole wait.
+    fresh_start(app);
     spawn(app, Phase::Updating)
 }
 
-/// Its port was taken by something else: the next free one, and the address with it.
-fn new_port(app: &AppHandle) -> Result<(), String> {
-    let folder = folder(app).ok_or("no folder")?;
-    let old = port_of(&folder).ok_or("no PORT")?;
+/// Its port `old` is taken by something else: the next free one, and the address with it.
+fn move_port(app: &AppHandle, folder: &Folder, old: u16) -> Result<u16, String> {
     let port = free_port().ok_or("no free port between 4310 and 4329")?;
-    let reach = public_url(app).is_some_and(|u| u.starts_with("https://"));
+    let reach = reached(app);
     let mut entries = vec![("PORT", port.to_string())];
     if !reach {
         entries.push(("PUBLIC_URL", loopback_url(port)));
     }
-    write_env(&folder, &entries).map_err(|e| e.to_string())?;
-    if reach {
-        let _ = crate::tailscale::serve(port);
-    } else {
+    write_env(folder, &entries).map_err(|e| e.to_string())?;
+    if !reach {
         crate::servers::replace(app, &loopback_url(old), &loopback_url(port));
     }
-    spawn(app, Phase::Starting)
+    // With reach on, Tailscale shares the new port once the server answers there (`ensure_served`).
+    Ok(port)
+}
+
+/// Reach is on: its address for people is the Tailscale one.
+fn reached(app: &AppHandle) -> bool {
+    public_url(app).is_some_and(|u| u.starts_with("https://"))
+}
+
+/// With reach on, Tailscale shares the server while it runs here: again after every start, and every minute
+/// until that worked (`host_sync.rs`). It stops sharing whenever the server stops here (`unserve_here`), so
+/// the tailnet address never leads to whatever listens on the port meanwhile.
+pub fn ensure_served(app: &AppHandle) {
+    let Some(url) = public_url(app).filter(|u| u.starts_with("https://")) else { return };
+    if !is_running(app) || state(app).served {
+        return;
+    }
+    let Some(port) = folder(app).and_then(|f| port_of(&f)) else { return };
+    if crate::tailscale::serve(port).is_ok_and(|now| now == url) && is_running(app) {
+        state(app).served = true;
+    }
+}
+
+/// Tailscale stops sharing the server here (it stopped here, or the app quits).
+fn unserve_here(app: &AppHandle) {
+    if let Some(url) = public_url(app).filter(|u| u.starts_with("https://")) {
+        crate::tailscale::unserve(&url);
+    }
+    state(app).served = false;
 }
 
 /// Stops it and waits (at most the grace period, then it is killed). `forget`: no longer started with the app.
@@ -1127,7 +1252,7 @@ pub fn stop(app: &AppHandle, forget: bool) {
 
 /// Waits for a start to answer, or to give up; the phase it ended in.
 fn wait_running(app: &AppHandle) -> Phase {
-    let deadline = Instant::now() + ANSWER_WITHIN * MAX_FAILED_STARTS + Duration::from_secs(10);
+    let deadline = Instant::now() + ANSWER_WITHIN + Duration::from_secs(30);
     loop {
         let phase = state(app).phase.unwrap_or(Phase::Stopped);
         if matches!(phase, Phase::Running | Phase::Failing) || Instant::now() > deadline {
@@ -1137,9 +1262,16 @@ fn wait_running(app: &AppHandle) -> Phase {
     }
 }
 
+/// A start of the app's own doing (not after an exit): a new series of tries.
+fn fresh_start(app: &AppHandle) {
+    let mut inner = state(app);
+    inner.on_purpose = false;
+    inner.failed = 0;
+}
+
 fn restart(app: &AppHandle) -> Result<(), String> {
     stop(app, false);
-    state(app).on_purpose = false;
+    fresh_start(app);
     spawn(app, Phase::Starting)?;
     match wait_running(app) {
         Phase::Running => Ok(()),
@@ -1159,6 +1291,16 @@ pub fn load(app: &AppHandle) {
     }
 }
 
+/// The person stopped it (Stop, "Stop running it here…"): Tailscale stops sharing it too, and with `forget` the
+/// agents of its organizations stop working here (their homes stay, for when it runs here again).
+pub fn stop_by_hand(app: &AppHandle, forget: bool) {
+    stop(app, forget);
+    unserve_here(app);
+    if forget {
+        app.state::<crate::runners::Runners>().rescan(app);
+    }
+}
+
 /// Quitting, logging out, an update: the server finishes and stops (before the app goes).
 pub fn shutdown(app: &AppHandle) {
     let pid = {
@@ -1168,6 +1310,9 @@ pub fn shutdown(app: &AppHandle) {
     };
     if let Some(pid) = pid {
         stop_pid(pid, STOP_GRACE, || state(app).pid.is_none());
+    }
+    if runs(app) {
+        unserve_here(app);
     }
 }
 
@@ -1180,6 +1325,9 @@ fn open_signed_in(app: &AppHandle, origin: &str, token: &str) -> Result<(), Stri
 
 /// The site's sign-in asked to sign the owner in ("Continue on this Mac", `this_mac` `signIn`).
 pub fn sign_in_window(app: &AppHandle, origin: &str) -> Result<(), String> {
+    if !is_running(app) {
+        return Err("not running".into());
+    }
     let folder = folder(app).ok_or("no folder")?;
     let port = port_of(&folder).ok_or("no port")?;
     let token = owner_sign_in(&folder, port, None).map_err(|s| format!("sign-in refused ({s})"))?;
@@ -1241,39 +1389,27 @@ fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
             Err(e) => return Err(fail("database", format!("migrate: {e}"))),
         }
     }
+    // Reach left off this time: its address is this computer's again before it starts.
+    if !choice.reach && reached(app) {
+        address_here(app, &folder).map_err(|e| fail("database", format!("address: {e}")))?;
+    }
     step(app, "database", "done");
 
-    step(app, "start", "active");
-    {
+    let was_run = {
         let mut inner = state(app);
+        let was = inner.here.run;
         inner.here.run = true;
         inner.failed = 0;
         inner.back_to = None;
         inner.on_purpose = false;
+        was
+    };
+    let owned = start_with_owner(app, &folder, choice, &fail);
+    if owned.is_err() && !was_run {
+        // Nothing stays running or shown after a first setup that stopped here; Start tries again.
+        stop(app, true);
     }
-    if state(app).pid.is_none() {
-        if let Some(pid) = leftover(&folder) {
-            stop_pid(pid, STOP_GRACE, || leftover(&folder).is_none());
-        }
-        spawn(app, Phase::Starting).map_err(|e| fail("start", format!("start: {e}")))?;
-    }
-    if wait_running(app) != Phase::Running {
-        return Err(fail("start", "it didn't answer".into()));
-    }
-    step(app, "start", "done");
-
-    step(app, "account", "active");
-    let port = port_of(&folder).ok_or_else(|| fail("account", "no PORT in .env".into()))?;
-    let who = choice.name.as_deref().zip(choice.email.as_deref());
-    owner_sign_in(&folder, port, who)
-        .map_err(|status| fail("account", format!("the owner's account: the server answered {status}")))?;
-    {
-        let mut inner = state(app);
-        inner.here.owner = true;
-        let here = inner.here.clone();
-        drop(inner);
-        save_here(app, &here);
-    }
+    let port = owned?;
     {
         use tauri_plugin_autostart::ManagerExt;
         let _ = app.autolaunch().enable();
@@ -1300,6 +1436,37 @@ fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     Ok(())
 }
 
+/// F4's start and account steps: the server answers as the app's own child, then its owner exists. Its port.
+fn start_with_owner(
+    app: &AppHandle,
+    folder: &Folder,
+    choice: &Choice,
+    fail: &dyn Fn(&'static str, String) -> String,
+) -> Result<u16, String> {
+    step(app, "start", "active");
+    if state(app).pid.is_none() {
+        stop_leftover(app, folder);
+        spawn(app, Phase::Starting).map_err(|e| fail("start", format!("start: {e}")))?;
+    }
+    if wait_running(app) != Phase::Running {
+        return Err(fail("start", "it didn't answer".into()));
+    }
+    step(app, "start", "done");
+
+    step(app, "account", "active");
+    let port = port_of(folder).ok_or_else(|| fail("account", "no PORT in .env".into()))?;
+    let who = choice.name.as_deref().zip(choice.email.as_deref());
+    owner_sign_in(folder, port, who)
+        .map_err(|status| fail("account", format!("the owner's account: the server answered {status}")))?;
+    let here = {
+        let mut inner = state(app);
+        inner.here.owner = true;
+        inner.here.clone()
+    };
+    save_here(app, &here);
+    Ok(port)
+}
+
 /// Reach on: Tailscale shares the server, `PUBLIC_URL` becomes that address and the server starts again
 /// there; the server list follows. The address, or why it didn't work.
 fn reach_on(app: &AppHandle) -> Result<String, crate::tailscale::ServeError> {
@@ -1311,23 +1478,35 @@ fn reach_on(app: &AppHandle) -> Result<String, crate::tailscale::ServeError> {
         }
     })?;
     let old = public_url(app);
+    state(app).served = true;
+    // Already its address (reach was on before): the server has it, no restart.
+    if old.as_deref() == Some(url.as_str()) {
+        return Ok(url);
+    }
     write_env(&folder, &[("PUBLIC_URL", url.clone())]).map_err(|_| crate::tailscale::ServeError::Serve)?;
-    if let Some(old) = old.filter(|o| *o != url) {
+    if let Some(old) = old {
         crate::servers::replace(app, &old, &url);
     }
     restart(app).map_err(|_| crate::tailscale::ServeError::Serve)?;
     Ok(url)
 }
 
-fn reach_off(app: &AppHandle) -> Result<String, String> {
-    let folder = folder(app).ok_or("no folder")?;
-    let port = port_of(&folder).ok_or("no port")?;
+/// Its address back to this computer's loopback, and Tailscale stops sharing it; the server reads it at start.
+fn address_here(app: &AppHandle, folder: &Folder) -> Result<String, String> {
+    let port = port_of(folder).ok_or("no port")?;
     let local = loopback_url(port);
     if let Some(old) = public_url(app).filter(|o| *o != local) {
         crate::tailscale::unserve(&old);
         crate::servers::replace(app, &old, &local);
     }
-    write_env(&folder, &[("PUBLIC_URL", local.clone())]).map_err(|e| e.to_string())?;
+    state(app).served = false;
+    write_env(folder, &[("PUBLIC_URL", local.clone())]).map_err(|e| e.to_string())?;
+    Ok(local)
+}
+
+fn reach_off(app: &AppHandle) -> Result<String, String> {
+    let folder = folder(app).ok_or("no folder")?;
+    let local = address_here(app, &folder)?;
     restart(app)?;
     Ok(local)
 }
@@ -1348,7 +1527,7 @@ fn backup(app: &AppHandle) -> Result<String, String> {
     let parts: Vec<&str> = ["db", "files", ".env"].into_iter().filter(|p| folder.0.join(p).exists()).collect();
     let tar = Command::new("tar").arg("-czf").arg(&out).arg("-C").arg(&folder.0).args(&parts).status();
     if was_running {
-        state(app).on_purpose = false;
+        fresh_start(app);
         let _ = spawn(app, Phase::Starting);
     }
     match tar {
@@ -1448,7 +1627,7 @@ pub fn local_server_start(app: AppHandle, webview: tauri::Webview) -> Result<(),
 pub async fn local_server_stop(app: AppHandle, webview: tauri::Webview, forget: bool) -> Result<(), String> {
     app_window(&webview, &["popover", "prefs"])?;
     tauri::async_runtime::spawn_blocking(move || {
-        stop(&app, forget);
+        stop_by_hand(&app, forget);
         if forget {
             if let Some(origin) = public_url(&app) {
                 crate::servers::remove(&app, &origin);
@@ -1708,6 +1887,40 @@ mod tests {
     }
 
     #[test]
+    fn a_start_that_hangs_gets_no_more_tries() {
+        assert_eq!(failed_starts(0, false), 1);
+        // Killed after the whole wait: the way back at once (an update), or no more tries.
+        assert_eq!(next_after(false, None, false, failed_starts(0, true), Some("0.6.0")), Next::GoBack { to: "0.6.0".into() });
+        assert_eq!(next_after(false, None, false, failed_starts(0, true), None), Next::GiveUp);
+    }
+
+    #[test]
+    fn only_the_child_that_wrote_server_json_is_the_server() {
+        let folder = Folder(temp("ready").join(".agentes"));
+        fs::create_dir_all(&folder.0).unwrap();
+        assert_eq!(ready_pid(&folder), None, "nothing listens for this folder yet");
+        fs::write(folder.ready(), r#"{"pid":4242,"url":"http://127.0.0.1:4310"}"#).unwrap();
+        assert_eq!(ready_pid(&folder), Some(4242));
+        fs::write(folder.ready(), r#"{"pid":"4242"}"#).unwrap();
+        assert_eq!(ready_pid(&folder), None);
+        // A pid that is gone, or another program's, isn't a server of this folder.
+        fs::write(folder.ready(), format!(r#"{{"pid":{}}}"#, i32::MAX)).unwrap();
+        assert_eq!(folder_server(&folder, &folder.ready()), None);
+        let mut other = Command::new("sleep").arg("30").spawn().unwrap();
+        fs::write(folder.ready(), format!(r#"{{"pid":{}}}"#, other.id())).unwrap();
+        assert_eq!(folder_server(&folder, &folder.ready()), None);
+        let _ = other.kill();
+        let _ = other.wait();
+        // A live server of this folder: its command line names native.js and the folder.
+        let mut server = Command::new("sh").args(["-c", "sleep 30; :", "native.js"]).arg(&folder.0).spawn().unwrap();
+        fs::write(folder.ready(), format!(r#"{{"pid":{}}}"#, server.id())).unwrap();
+        assert_eq!(folder_server(&folder, &folder.ready()), Some(server.id()));
+        let _ = server.kill();
+        let _ = server.wait();
+        fs::remove_dir_all(folder.0.parent().unwrap()).unwrap();
+    }
+
+    #[test]
     fn the_server_here_s_pages_open_at_its_address_for_people() {
         let page = |u: &str| u.parse::<Url>().unwrap();
         let (local, public) = ("http://127.0.0.1:4310", "https://ana-mac.tail1234.ts.net");
@@ -1721,7 +1934,11 @@ mod tests {
 
     #[test]
     fn http_reads_plain_and_chunked_bodies() {
-        assert_eq!(dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"), "hello world");
+        assert_eq!(dechunk(b"5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"), b"hello world");
+        // Sizes count bytes: a chunk may end inside a character, and a crafted one never panics.
+        assert_eq!(dechunk("1\r\n\u{e9}\r\n0\r\n\r\n".as_bytes()), vec![0xc3]);
+        assert_eq!(dechunk(b"1\r\n\xc3\r\n1\r\n\xa9\r\n0\r\n\r\n"), "\u{e9}".as_bytes());
+        assert_eq!(dechunk(b"zz\r\nhello\r\n"), b"");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let server = std::thread::spawn(move || {
@@ -1771,6 +1988,9 @@ mod tests {
         eprintln!("answered in {:?}", since.elapsed());
         let ready: Value = serde_json::from_str(&fs::read_to_string(folder.ready()).unwrap()).unwrap();
         assert_eq!(ready["url"], json!(loopback_url(port)));
+        // The app trusts the answer only from the process it spawned: the server names that very pid.
+        assert_eq!(ready_pid(&folder), Some(child.id()));
+        assert_eq!(folder_server(&folder, &folder.ready()), Some(child.id()));
         // A second one on the same folder is refused (the lock): exit 3.
         let second = launch.run(&[]).unwrap();
         assert_eq!(second.0, Some(exit::LOCKED), "{}", second.1);

@@ -154,21 +154,37 @@ impl Runners {
             .collect()
     }
 
-    /// Finds the homes on disk and starts one runner for each of the app's own.
+    /// Finds the homes on disk and starts one runner for each of the app's own (before any runs, attempts that
+    /// never finished signing in go).
     pub fn start_all(&self, app: &AppHandle) {
+        if let Ok(root) = orgs_root(app) {
+            drop_unpaired(&root);
+        }
         self.rescan(app);
     }
 
-    /// Starts the runner of every home of the app's on disk that isn't running yet (new homes of the server
-    /// here, `host_sync.rs`).
+    /// Runs the homes of the app's on disk: the runner of each one that isn't running yet starts (new homes of
+    /// the server here, `host_sync.rs`), and those that stopped being the app's stop (the server here's, once
+    /// it no longer runs here); their homes stay on disk.
     pub fn rescan(&self, app: &AppHandle) {
         if self.is_quitting() {
             return;
         }
         let Ok(root) = orgs_root(app) else { return };
         let own = crate::local_server::loopback(app);
+        let homes = app_homes(&root, own.as_deref());
+        let gone: Vec<String> = {
+            let map = self.lock();
+            let running: Vec<(String, PathBuf)> = map.iter().map(|(id, r)| (id.clone(), r.dir.clone())).collect();
+            no_longer_ours(&running, &homes)
+        };
+        for id in gone {
+            self.stop(&id);
+            self.lock().remove(&id);
+            emit_state(app, &id, false, true);
+        }
         let mut ids = Vec::new();
-        for (name, dir) in app_homes(&root, own.as_deref()) {
+        for (name, dir) in homes {
             let mut map = self.lock();
             if !map.contains_key(&name) {
                 map.insert(name.clone(), Runner::new(dir));
@@ -501,21 +517,16 @@ fn handle_line(app: &AppHandle, home_id: &str, generation: u64, raw: &[u8]) {
     );
 }
 
-/// The homes the app runs, by id: every home on disk but the ones another program keeps (`managedBy:
-/// "host"`, a terminal install's `agentes-runner host` shares this folder), unless they are the server here's
-/// own (`own_server`, its loopback address). A home without a config never finished signing in (the runner
-/// writes it on pairing): it goes, so failed attempts don't pile up.
+/// The homes on disk the app runs, by id: every signed-in home but the ones another program keeps
+/// (`managedBy: "host"`, a terminal install's `agentes-runner host` shares this folder), unless they are the
+/// server here's own (`own_server`, its loopback address).
 pub fn app_homes(root: &std::path::Path, own_server: Option<&str>) -> Vec<(String, PathBuf)> {
     let Ok(entries) = fs::read_dir(root) else { return Vec::new() };
     let mut out = Vec::new();
     for entry in entries.flatten() {
         let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !is_dir || !valid_id(&name) {
-            continue;
-        }
-        if !entry.path().join("config.json").exists() {
-            let _ = fs::remove_dir_all(entry.path());
+        if !is_dir || !valid_id(&name) || !entry.path().join("config.json").exists() {
             continue;
         }
         let config = home_config(&entry.path());
@@ -526,6 +537,29 @@ pub fn app_homes(root: &std::path::Path, own_server: Option<&str>) -> Vec<(Strin
     }
     out.sort();
     out
+}
+
+/// Homes without a config never finished signing in (the runner writes it on pairing): they go, so failed
+/// attempts don't pile up. Only while no runner runs: a pairing in progress has none yet either.
+fn drop_unpaired(root: &std::path::Path) {
+    let Ok(entries) = fs::read_dir(root) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        if is_dir && valid_id(&name) && !entry.path().join("config.json").exists() {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
+/// The running homes that aren't among the app's homes any more (`homes`); one still signing in (no config
+/// yet) stays.
+fn no_longer_ours(running: &[(String, PathBuf)], homes: &[(String, PathBuf)]) -> Vec<String> {
+    running
+        .iter()
+        .filter(|(id, dir)| dir.join("config.json").exists() && !homes.iter().any(|(h, _)| h == id))
+        .map(|(id, _)| id.clone())
+        .collect()
 }
 
 fn home_config(dir: &std::path::Path) -> Option<serde_json::Value> {
@@ -599,7 +633,7 @@ fn paired_home(dir: &std::path::Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{app_homes, plan_move, LineSplitter, Move};
+    use super::{app_homes, drop_unpaired, no_longer_ours, plan_move, LineSplitter, Move};
     use serde_json::json;
     use std::path::PathBuf;
 
@@ -622,13 +656,38 @@ mod tests {
         }
         let ids: Vec<String> = app_homes(&root, None).into_iter().map(|(id, _)| id).collect();
         assert_eq!(ids, vec!["a1b2c3d4".to_string()]);
-        assert!(!root.join("deadbeef").exists(), "an attempt that never paired goes");
+        assert!(root.join("deadbeef").exists(), "a pairing in progress keeps its home while runners run");
+        drop_unpaired(&root);
+        assert!(!root.join("deadbeef").exists(), "at start, an attempt that never paired goes");
         assert!(root.join("0e7c1d2a-0000-4000-8000-000000000001").exists());
         // The server the app runs here at another address: still a terminal install's home.
         assert_eq!(app_homes(&root, Some("http://127.0.0.1:4310")).len(), 1);
         // The server the app runs here: its host homes are the app's.
         let ids: Vec<String> = app_homes(&root, Some("http://127.0.0.1:3000")).into_iter().map(|(id, _)| id).collect();
         assert_eq!(ids, vec!["0e7c1d2a-0000-4000-8000-000000000001".to_string(), "a1b2c3d4".to_string()]);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn the_server_here_s_homes_stop_once_it_no_longer_runs_here() {
+        let root = std::env::temp_dir().join(format!("agentes-ours-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let host = "0e7c1d2a-0000-4000-8000-000000000001";
+        for (id, config) in [
+            ("a1b2c3d4", Some(r#"{"server":"https://agentes.tail1234.ts.net","token":"agm_x"}"#)),
+            (host, Some(r#"{"server":"http://127.0.0.1:4310","managedBy":"host","token":"agm_y"}"#)),
+            ("feedf00d", None),
+        ] {
+            std::fs::create_dir_all(root.join(id)).unwrap();
+            if let Some(c) = config {
+                std::fs::write(root.join(id).join("config.json"), c).unwrap();
+            }
+        }
+        let running: Vec<(String, PathBuf)> =
+            ["a1b2c3d4", host, "feedf00d"].iter().map(|id| (id.to_string(), root.join(id))).collect();
+        assert!(no_longer_ours(&running, &app_homes(&root, Some("http://127.0.0.1:4310"))).is_empty());
+        // Stopped running here: its host home stops (and stays on disk); a pairing in progress goes on.
+        assert_eq!(no_longer_ours(&running, &app_homes(&root, None)), vec![host.to_string()]);
         std::fs::remove_dir_all(&root).unwrap();
     }
 

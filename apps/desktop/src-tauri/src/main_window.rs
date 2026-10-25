@@ -542,6 +542,19 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
     let mut request = checked(&request)?;
     let origin = page_origin(&app, &webview).ok_or("not a server of this app")?;
     let server_here = crate::local_server::is_here(&app, &origin);
+    // The server here's pages count only while its own child answers there: another program can listen on
+    // its port while it is down. A page that loaded as it came up waits for that a moment.
+    if server_here {
+        let waiter = app.clone();
+        let up = tauri::async_runtime::spawn_blocking(move || {
+            crate::local_server::running_within(&waiter, Duration::from_secs(10))
+        })
+        .await
+        .unwrap_or(false);
+        if !up {
+            return Err("not_ready".into());
+        }
+    }
     // What the app itself answers (the popover isn't needed).
     match request["kind"].as_str() {
         Some("badge") => {

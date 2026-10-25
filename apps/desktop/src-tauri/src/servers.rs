@@ -77,7 +77,10 @@ pub fn origin_of(url: &str) -> Option<String> {
         return None;
     }
     let host = parsed.host_str()?;
-    let loopback = matches!(host, "localhost" | "[::1]") || host.starts_with("127.");
+    // An address, not a name that starts like one (`127.evil.example`).
+    let loopback = host == "localhost"
+        || host.parse::<std::net::Ipv4Addr>().is_ok_and(|ip| ip.is_loopback())
+        || host.trim_start_matches('[').trim_end_matches(']').parse::<std::net::Ipv6Addr>().is_ok_and(|ip| ip.is_loopback());
     match parsed.scheme() {
         "https" => Some(parsed.origin().ascii_serialization()),
         "http" if loopback => Some(parsed.origin().ascii_serialization()),
@@ -199,6 +202,7 @@ fn grant(app: &AppHandle, origin: &str) {
     let id: String = origin.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
     let capability = CapabilityBuilder::new(format!("main-{id}"))
         .remote(format!("{origin}/*"))
+        .local(false)
         .webview(crate::main_window::LABEL)
         .permission("core:window:allow-start-dragging")
         .permission("core:window:allow-internal-toggle-maximize")
@@ -251,7 +255,11 @@ mod tests {
         assert_eq!(origin_of("http://127.0.0.1:4310").as_deref(), Some("http://127.0.0.1:4310"));
         assert_eq!(origin_of("http://localhost:3000/").as_deref(), Some("http://localhost:3000"));
         assert_eq!(origin_of("http://[::1]:4310").as_deref(), Some("http://[::1]:4310"));
+        assert_eq!(origin_of("http://127.0.0.2:4310").as_deref(), Some("http://127.0.0.2:4310"));
         for bad in [
+            "http://127.evil.example:4310",
+            "http://127.0.0.1.evil.example",
+            "http://[::2]:4310",
             "http://192.168.1.20:3000",
             "http://chat.example.com",
             "https://ana:secret@chat.example.com",

@@ -156,7 +156,7 @@ pub fn on_event(app: &AppHandle, id: &str) {
         "hereStart" => crate::local_server::start(app),
         "hereStop" => {
             let app = app.clone();
-            std::thread::spawn(move || crate::local_server::stop(&app, false));
+            std::thread::spawn(move || crate::local_server::stop_by_hand(&app, false));
         }
         // The popover owns updates, quitting (it asks first while agents are working), access requests, the
         // Servers tab and pausing.
