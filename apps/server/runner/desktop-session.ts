@@ -26,6 +26,7 @@ import {
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
 import type { Launcher } from "./agent-users";
+import { lookCommand, lookTheme } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
@@ -48,6 +49,8 @@ import { KeyedQueue } from "./queue";
  *   is root's: Xvnc reads it on every connection, so an agent that could
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
+ * - Its look (`desktop-look.ts`) is XFCE's settings in its HOME, written there
+ *   as the agent before a start when the HOME's marker names another look.
  * - Started the first time it is needed (`ensure`: the agent's screen or
  *   browser, a person opening it), then left on: none stops for being idle,
  *   so what a person left open on it is still there later. Started again (at
@@ -70,6 +73,11 @@ export const PARK_AFTER_MS = 60 * 60_000;
 const SWEEP_MS = 60_000;
 /** Xvnc listens within a few hundred ms. */
 const XVNC_START_MS = 5000;
+/**
+ * The steps before X, run as the agent (the prepare, the look), take milliseconds: one still running after this
+ * is held up (a pipe in its HOME, a hung disk), and is stopped rather than left to block the agent's desktop.
+ */
+const STEP_MS = 10_000;
 const KILL_WAIT_MS = 3000;
 /** A desktop that ended by itself starts again this many times within the window, then stays off. */
 const RESTARTS = { max: 3, windowMs: 10 * 60_000 };
@@ -276,6 +284,8 @@ export interface DesktopSystem {
   uid: number | null;
   /** A command's full path on `pathList` (default: the runner's PATH); null when it isn't there. */
   which(command: string, pathList?: string): string | null;
+  /** A file is there (the look's theme). */
+  exists(file: string): boolean;
   spawn(argv: string[], opts: DesktopSpawnOptions): DesktopProcess;
   /** A process's command line; null when it isn't running. */
   cmdline(pid: number): string[] | null;
@@ -313,6 +323,7 @@ export const hostSystem = (): DesktopSystem => ({
     const found = resolveCommand(command, pathList);
     return path.isAbsolute(found) ? found : null;
   },
+  exists: existsSync,
   spawn: spawnProcess,
   cmdline(pid) {
     try {
@@ -348,6 +359,8 @@ export interface DesktopSessionsOptions {
   /** Tests: the memory available now (default: `/proc/meminfo`; null: not known, never short). */
   memAvailable?: () => number | null;
   now?: () => number;
+  /** Tests: `STEP_MS`. */
+  stepMs?: number;
   /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): never parked then. */
   inUse?: (agentId: string) => boolean;
   /** A viewer of the agent's desktop came or went (`status().streams`). */
@@ -410,11 +423,13 @@ export class DesktopSessions {
   private readonly sys: DesktopSystem;
   private readonly dir: string;
   private readonly now: () => number;
+  private readonly stepMs: number;
 
   constructor(private readonly opts: DesktopSessionsOptions) {
     this.sys = opts.system ?? hostSystem();
     this.dir = path.join(opts.home, "desktop");
     this.now = opts.now ?? Date.now;
+    this.stepMs = opts.stepMs ?? STEP_MS;
   }
 
   /** `hello.desktop`: whether this computer can run the agents' desktops, and what to install when it can't. */
@@ -683,10 +698,24 @@ export class DesktopSessions {
           input: `add :${display} . ${randomBytes(16).toString("hex")}\n`,
           log,
         });
-        if ((await prepare.exited) !== 0) {
+        const prepared = await this.step(prepare);
+        if (prepared !== 0) {
           throw new RunnerError(
             "internal",
-            `The agent's desktop couldn't be prepared: ${tailLines(logFile, 3).join(" ")}`,
+            `The agent's desktop couldn't be prepared: ${prepared === "late" ? `still running after ${this.stepMs / 1000} s` : tailLines(logFile, 3).join(" ")}`,
+          );
+        }
+        // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
+        const look = lookCommand(
+          user.home,
+          lookTheme((f) => this.sys.exists(f)),
+        );
+        const looked = await this.step(
+          this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
+        );
+        if (looked !== 0) {
+          this.opts.log(
+            `the desktop of ${agent.handle} keeps the look its home has: writing the agentes.chat look ${looked === "late" ? `was stopped after ${this.stepMs / 1000} s` : `failed (exit ${looked})`}`,
           );
         }
         this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
@@ -743,6 +772,18 @@ export class DesktopSessions {
     } finally {
       if (display !== null) this.claimed.delete(display);
     }
+  }
+
+  /** A step before X: its exit code, or "late" once it has run `STEP_MS` (then it is stopped). */
+  private async step(p: DesktopProcess): Promise<number | null | "late"> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<"late">((resolve) => {
+      timer = setTimeout(() => resolve("late"), this.stepMs);
+    });
+    const code = await Promise.race([p.exited, late]);
+    clearTimeout(timer);
+    if (code === "late" && p.pid) this.sys.kill(p.pid, "SIGTERM");
+    return code;
   }
 
   /** Xvnc's own pid once it holds the display and its socket is there; its output says why when it doesn't. */

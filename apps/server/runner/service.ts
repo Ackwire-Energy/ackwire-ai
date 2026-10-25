@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { DEFAULT_AGENT_UID_RANGE, pairedConfig, runnerHome, updateConfig } from "./config";
 import { thisRunner } from "./launch";
+import { xmlEscape } from "./xml";
 
 export const SERVICE_NAME = "agentes-runner";
 export const LAUNCHD_LABEL = "chat.agentes.runner";
@@ -56,10 +57,6 @@ function systemdQuote(s: string) {
 /** `Environment=` takes no `$` expansion, only `%` specifiers. */
 function systemdEnv(name: string, value: string) {
   return `"${name}=${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/%/g, "%%")}"`;
-}
-
-function xmlEscape(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 export function systemdUnitPath(home = os.homedir(), unit = SERVICE_NAME) {
