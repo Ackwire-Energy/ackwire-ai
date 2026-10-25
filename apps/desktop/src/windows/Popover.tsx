@@ -40,7 +40,6 @@ const POP_WIDTH = 360;
 /** Transparent margin around the card, so its shadow (`.dk-pop`) isn't cut by the window's edge. */
 const POP_PAD = { x: 22, top: 6, bottom: 34 };
 const POP_PADDING = `${POP_PAD.top}px ${POP_PAD.x}px ${POP_PAD.bottom}px`;
-const POP_MAX_HEIGHT = 680;
 
 export function Popover() {
   const { t, i18n } = useTranslation();
@@ -166,14 +165,14 @@ export function Popover() {
     return () => window.removeEventListener("storage", reread);
   });
 
-  // The window follows the card's height.
+  // The window follows the card's height, which `.dk-pop` caps. Its layout height: the drawn box is smaller
+  // while the card's entrance animation scales it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe the new card after switching views
   useLayoutEffect(() => {
     const el = card.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const fit = () => {
-      const h = Math.min(POP_MAX_HEIGHT, Math.ceil(el.getBoundingClientRect().height) + POP_PAD.top + POP_PAD.bottom);
-      void host.resize(POP_WIDTH + POP_PAD.x * 2, h).catch(() => {});
+      void host.resize(POP_WIDTH + POP_PAD.x * 2, el.offsetHeight + POP_PAD.top + POP_PAD.bottom).catch(() => {});
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -406,18 +405,137 @@ export function Popover() {
     return (
       <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
         <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
+          <div className="dk-pop__body">
+            {hereCard || (
+              <header className="dk-ph">
+                <BrandFace size="md" />
+                <span className="dk-ph__text">
+                  <b>{current ? serverName(current) : t("desktop.tray.label")}</b>
+                  <small>
+                    {counts.waiting > 0
+                      ? t("desktop.tray.waiting", { count: counts.waiting })
+                      : t("desktop.tray.nothingWaiting")}
+                  </small>
+                </span>
+              </header>
+            )}
+            {!update.state.required && update.state.available && update.state.latest && (
+              <Banner
+                icon="download"
+                title={t("desktop.tray.updateTitle", { version: update.state.latest.version })}
+                actions={
+                  <Button size="sm" variant="primary" onClick={() => openPrefs("updates")}>
+                    {t("desktop.tray.updateSee")}
+                  </Button>
+                }
+              >
+                {t("desktop.tray.updateBody")}
+              </Banner>
+            )}
+          </div>
+          <div className="dk-pop__foot">
+            <section className="dk-psec">{appRows}</section>
+            {quitRow}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
+      <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
+        <div className="dk-pop__body">
           {hereCard || (
             <header className="dk-ph">
-              <BrandFace size="md" />
+              <MacPortrait state={macStateOf(homes)} />
               <span className="dk-ph__text">
-                <b>{current ? serverName(current) : t("desktop.tray.label")}</b>
+                <b>{machine}</b>
                 <small>
-                  {counts.waiting > 0
-                    ? t("desktop.tray.waiting", { count: counts.waiting })
-                    : t("desktop.tray.nothingWaiting")}
+                  {[current && serverName(current), t("desktop.orgCount", { count: homes.length })]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </small>
               </span>
             </header>
+          )}
+
+          {incompatible && (
+            <Banner icon="alert" title={t("desktop.tray.incompatibleTitle")}>
+              {t("desktop.tray.incompatibleBody")}
+            </Banner>
+          )}
+          {(update.state.required || outdated) && (
+            <Banner
+              icon="download"
+              title={t("desktop.tray.requiredTitle")}
+              actions={
+                <Button size="sm" variant="primary" onClick={() => openPrefs("updates")}>
+                  {t("desktop.tray.updateSee")}
+                </Button>
+              }
+            >
+              {t("desktop.tray.requiredBody")}
+            </Banner>
+          )}
+          {refused && (
+            <Banner
+              icon="alert"
+              title={t("desktop.tray.refusedTitle", { org: orgName(refused) })}
+              actions={
+                <>
+                  <Button size="sm" variant="primary" icon="refresh" onClick={() => reconnectMac(refused)}>
+                    {t("desktop.tray.reconnectMac")}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => openPrefs("general")}>
+                    {t("desktop.tray.prefs")}
+                  </Button>
+                </>
+              }
+            >
+              {t("desktop.tray.refusedBody")}
+            </Banner>
+          )}
+          {allOffline && !refused && !outdated && (
+            <Banner
+              lead={<PixelSpinner size={16} />}
+              title={
+                navigator.onLine
+                  ? t("desktop.tray.unreachable", { host: serverName(homeServer(homes[0] as Home) ?? current ?? "") })
+                  : t("desktop.tray.offlineTitle")
+              }
+              actions={
+                <Button size="sm" icon="refresh" onClick={() => void doReconnect()}>
+                  {t("desktop.tray.reconnect")}
+                </Button>
+              }
+            >
+              {navigator.onLine ? t("desktop.tray.unreachableBody") : t("desktop.tray.offlineBody")}
+            </Banner>
+          )}
+          {pause && (
+            <Banner
+              icon="pause"
+              title={
+                pause.until
+                  ? t("desktop.tray.pausedUntil", { time: clock(pause.until, i18n.language) })
+                  : t("desktop.tray.pausedUntilResume")
+              }
+              actions={
+                <>
+                  <Button size="sm" variant="primary" icon="play" onClick={() => void doResume()}>
+                    {t("desktop.tray.resumeNow")}
+                  </Button>
+                  {pause.until && (
+                    <Button size="sm" variant="ghost" onClick={() => void plusHour()}>
+                      {t("desktop.tray.plusHour")}
+                    </Button>
+                  )}
+                </>
+              }
+            >
+              {t("desktop.tray.pausedBody")}
+            </Banner>
           )}
           {!update.state.required && update.state.available && update.state.latest && (
             <Banner
@@ -432,187 +550,76 @@ export function Popover() {
               {t("desktop.tray.updateBody")}
             </Banner>
           )}
-          <section className="dk-psec">{appRows}</section>
-          {quitRow}
-        </main>
-      </div>
-    );
-  }
 
-  return (
-    <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
-      <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
-        {hereCard || (
-          <header className="dk-ph">
-            <MacPortrait state={macStateOf(homes)} />
-            <span className="dk-ph__text">
-              <b>{machine}</b>
-              <small>
-                {[current && serverName(current), t("desktop.orgCount", { count: homes.length })]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </small>
-            </span>
-          </header>
-        )}
+          {requests.length > 0 && (
+            <section className="dk-psec">
+              <div className="dk-pcap">
+                {t("desktop.tray.requests")} <Count n={requests.length} />
+              </div>
+              {requests.map(({ home, request }) => (
+                <RequestCard key={request.requestId} home={home} request={request} now={now} />
+              ))}
+            </section>
+          )}
 
-        {incompatible && (
-          <Banner icon="alert" title={t("desktop.tray.incompatibleTitle")}>
-            {t("desktop.tray.incompatibleBody")}
-          </Banner>
-        )}
-        {(update.state.required || outdated) && (
-          <Banner
-            icon="download"
-            title={t("desktop.tray.requiredTitle")}
-            actions={
-              <Button size="sm" variant="primary" onClick={() => openPrefs("updates")}>
-                {t("desktop.tray.updateSee")}
-              </Button>
-            }
-          >
-            {t("desktop.tray.requiredBody")}
-          </Banner>
-        )}
-        {refused && (
-          <Banner
-            icon="alert"
-            title={t("desktop.tray.refusedTitle", { org: orgName(refused) })}
-            actions={
-              <>
-                <Button size="sm" variant="primary" icon="refresh" onClick={() => reconnectMac(refused)}>
-                  {t("desktop.tray.reconnectMac")}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => openPrefs("general")}>
-                  {t("desktop.tray.prefs")}
-                </Button>
-              </>
-            }
-          >
-            {t("desktop.tray.refusedBody")}
-          </Banner>
-        )}
-        {allOffline && !refused && !outdated && (
-          <Banner
-            lead={<PixelSpinner size={16} />}
-            title={
-              navigator.onLine
-                ? t("desktop.tray.unreachable", { host: serverName(homeServer(homes[0] as Home) ?? current ?? "") })
-                : t("desktop.tray.offlineTitle")
-            }
-            actions={
-              <Button size="sm" icon="refresh" onClick={() => void doReconnect()}>
-                {t("desktop.tray.reconnect")}
-              </Button>
-            }
-          >
-            {navigator.onLine ? t("desktop.tray.unreachableBody") : t("desktop.tray.offlineBody")}
-          </Banner>
-        )}
-        {pause && (
-          <Banner
-            icon="pause"
-            title={
-              pause.until
-                ? t("desktop.tray.pausedUntil", { time: clock(pause.until, i18n.language) })
-                : t("desktop.tray.pausedUntilResume")
-            }
-            actions={
-              <>
-                <Button size="sm" variant="primary" icon="play" onClick={() => void doResume()}>
-                  {t("desktop.tray.resumeNow")}
-                </Button>
-                {pause.until && (
-                  <Button size="sm" variant="ghost" onClick={() => void plusHour()}>
-                    {t("desktop.tray.plusHour")}
-                  </Button>
-                )}
-              </>
-            }
-          >
-            {t("desktop.tray.pausedBody")}
-          </Banner>
-        )}
-        {!update.state.required && update.state.available && update.state.latest && (
-          <Banner
-            icon="download"
-            title={t("desktop.tray.updateTitle", { version: update.state.latest.version })}
-            actions={
-              <Button size="sm" variant="primary" onClick={() => openPrefs("updates")}>
-                {t("desktop.tray.updateSee")}
-              </Button>
-            }
-          >
-            {t("desktop.tray.updateBody")}
-          </Banner>
-        )}
-
-        {requests.length > 0 && (
           <section className="dk-psec">
             <div className="dk-pcap">
-              {t("desktop.tray.requests")} <Count n={requests.length} />
+              {t("desktop.tray.now")} <Count n={jobs.length} />
+              {jobs.length > 0 && (
+                <span className="dk-pcap__end">
+                  <button type="button" className="dk-link" onClick={openMain}>
+                    {t("desktop.tray.seeAll")} <Icon name="external" size={14} />
+                  </button>
+                </span>
+              )}
             </div>
-            {requests.map(({ home, request }) => (
-              <RequestCard key={request.requestId} home={home} request={request} now={now} />
-            ))}
+            <NowList homes={homes} paused={!!pause} now={now} />
           </section>
-        )}
+        </div>
 
-        <section className="dk-psec">
-          <div className="dk-pcap">
-            {t("desktop.tray.now")} <Count n={jobs.length} />
-            {jobs.length > 0 && (
-              <span className="dk-pcap__end">
-                <button type="button" className="dk-link" onClick={openMain}>
-                  {t("desktop.tray.seeAll")} <Icon name="external" size={14} />
-                </button>
-              </span>
+        <div className="dk-pop__foot dk-pop__foot--ruled">
+          <section className="dk-psec">
+            {pause ? (
+              <MenuRow icon="play" onClick={() => void doResume()}>
+                {t("desktop.tray.resume")}
+              </MenuRow>
+            ) : (
+              homes.length > 0 && (
+                <>
+                  <MenuRow
+                    icon="pause"
+                    expanded={pauseMenu}
+                    onClick={() => setPauseMenu((v) => !v)}
+                    trailing={<Icon name={pauseMenu ? "chevronDown" : "chevronRight"} size={14} />}
+                  >
+                    {t("desktop.tray.pause")}
+                  </MenuRow>
+                  {pauseMenu && (
+                    <div className="dk-sub">
+                      <MenuRow icon="clock" onClick={() => void doPause("1h")}>
+                        {t("desktop.tray.pause1h")}
+                      </MenuRow>
+                      <MenuRow icon="calendar" onClick={() => void doPause("tomorrow")}>
+                        {t("desktop.tray.pauseTomorrow")}
+                      </MenuRow>
+                      <MenuRow icon="pause" onClick={() => void doPause("manual")}>
+                        {t("desktop.tray.pauseManual")}
+                      </MenuRow>
+                      <span className="dk-help dk-sub__hint">{t("desktop.tray.pauseHint")}</span>
+                    </div>
+                  )}
+                </>
+              )
             )}
-          </div>
-          <NowList homes={homes} paused={!!pause} now={now} />
-        </section>
-
-        <section className="dk-psec">
-          {pause ? (
-            <MenuRow icon="play" onClick={() => void doResume()}>
-              {t("desktop.tray.resume")}
-            </MenuRow>
-          ) : (
-            homes.length > 0 && (
-              <>
-                <MenuRow
-                  icon="pause"
-                  expanded={pauseMenu}
-                  onClick={() => setPauseMenu((v) => !v)}
-                  trailing={<Icon name={pauseMenu ? "chevronDown" : "chevronRight"} size={14} />}
-                >
-                  {t("desktop.tray.pause")}
-                </MenuRow>
-                {pauseMenu && (
-                  <div className="dk-sub">
-                    <MenuRow icon="clock" onClick={() => void doPause("1h")}>
-                      {t("desktop.tray.pause1h")}
-                    </MenuRow>
-                    <MenuRow icon="calendar" onClick={() => void doPause("tomorrow")}>
-                      {t("desktop.tray.pauseTomorrow")}
-                    </MenuRow>
-                    <MenuRow icon="pause" onClick={() => void doPause("manual")}>
-                      {t("desktop.tray.pauseManual")}
-                    </MenuRow>
-                    <span className="dk-help dk-sub__hint">{t("desktop.tray.pauseHint")}</span>
-                  </div>
-                )}
-              </>
-            )
-          )}
-          {homes.length > 0 && (
-            <MenuRow icon="refresh" onClick={() => void doReconnect()}>
-              {t("desktop.tray.reconnect")}
-            </MenuRow>
-          )}
-          {appRows}
-        </section>
-        {quitRow}
+            {homes.length > 0 && (
+              <MenuRow icon="refresh" onClick={() => void doReconnect()}>
+                {t("desktop.tray.reconnect")}
+              </MenuRow>
+            )}
+            {appRows}
+          </section>
+          {quitRow}
+        </div>
       </main>
     </div>
   );

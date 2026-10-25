@@ -162,7 +162,7 @@ export const desktopEn: DesktopTranslations = {
     use: "Use",
     none: "Don't have one yet? Run this on it",
     noneText:
-      "In the terminal of a server or a Mac mini. When it's done, it shows a link that opens this app already connected.",
+      "In the terminal of a server or a Mac mini. When it's done, it shows a link that opens this app and asks whether to connect it to that server.",
     invalid: "Check the address, something like agentes.yourteam.ts.net.",
     httpRefused:
       "{{host}} uses plain http, which only works on this {{device}}. Use its Tailscale address or one with https.",

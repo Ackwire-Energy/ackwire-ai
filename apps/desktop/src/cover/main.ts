@@ -12,6 +12,7 @@ import { drawAgent, idlePose } from "@agenteschat/ui/agent/engine";
 import { startSky } from "@agenteschat/ui/sky/engine";
 import { SKY_TONES } from "@agenteschat/ui/sky/math";
 import { invoke } from "@tauri-apps/api/core";
+import "@fontsource-variable/onest/index.css";
 import "../fonts.css";
 import "./cover.css";
 import { coverHere, isHereServer, type LocalServerStatus } from "../control/local-server";
