@@ -2,7 +2,7 @@ import type { Message } from "@agenteschat/client";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
+import { LineIcon, Text } from "@/ui";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
@@ -27,7 +27,7 @@ export function EventLine({ message }: { message: Message }) {
   return (
     <View style={styles.line}>
       <View style={styles.head}>
-        <Icon name={line.icon} size={13} color={c.faint} />
+        <LineIcon name={line.icon} size={13} color={c.faint} variant="caption" />
         <Text variant="caption" tone="faint" style={styles.grow}>
           {t(line.key, line.values)} · {when.time(message.createdAt)}
           {line.text ? (

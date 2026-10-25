@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { CHROME_MAX_SCALE, type TypeStyle, typeScale, typeStyle, weights } from "../src/ui/type-scale";
+import { CHROME_MAX_SCALE, readingMiddle, type TypeStyle, typeScale, typeStyle, weights } from "../src/ui/type-scale";
 
 const STYLES: TypeStyle[] = [
   "largeTitle",
@@ -76,4 +76,11 @@ describe("native type scale", () => {
     expect(CHROME_MAX_SCALE).toBeGreaterThan(1);
     expect(CHROME_MAX_SCALE).toBeLessThanOrEqual(1.5);
   });
+});
+
+test("an icon beside text centers a hair under the line's middle, where the small letters are", () => {
+  // The list preview (15.5/21): 10.5 is the line's middle; the eye reads the letters ~1.2 pt lower.
+  expect(readingMiddle(15.5, 21)).toBeCloseTo(11.74, 2);
+  expect(readingMiddle(17, 22)).toBeGreaterThan(11);
+  expect(readingMiddle(17, 22)).toBeLessThan(13);
 });

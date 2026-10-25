@@ -3,10 +3,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ThemeProvider as NavigationThemeProvider, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { Entering } from "@/features/auth/Entering";
 import { forgetInvite, loadPendingInvite } from "@/features/auth/invite";
+import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
@@ -30,10 +31,13 @@ export default function RootLayout() {
 
 /**
  * Signed out → `(auth)`; signed in → `(app)` (the screens, which wait for the organization themselves). The
- * splash stays up until the fonts, the session and the organization are known, so nobody sees a flash of the
- * wrong side. Exactly one group is open at any moment: with both guarded (e.g. signed in while the
+ * splash (`LaunchSplash`) stays up until the fonts, the session and the organization are known, so nobody sees
+ * a flash of the wrong side. Exactly one group is open at any moment: with both guarded (e.g. signed in while the
  * organization still loads), expo-router sends the guarded screen to the first open route, `+not-found`, and
- * the app would stay there once the organization arrived.
+ * the app would stay there once the organization arrived. While the session is still being read (the saved
+ * one comes out of SecureStore a moment after launch) `(app)` is the open one, so the URL the app opened with
+ * ("/", a push's conversation) is kept: closing it then sent "/" to `+not-found`, still on screen when the
+ * session arrived ("Não achamos isso" on every launch). Each side sends a closed screen to the other's start.
  */
 function Gate() {
   const fontsReady = useAppFonts();
@@ -42,12 +46,18 @@ function Gate() {
   const { colors, scheme } = useTheme();
   const navigationTheme = useNavigationTheme();
   const signedIn = session.signedIn;
+  const inApp = signedIn || session.pending;
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
 
+  // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
+  // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
+  const [launching, setLaunching] = useState(true);
+  const hideNative = useCallback(() => void SplashScreen.hideAsync().catch(() => {}), []);
+  const launched = useCallback(() => setLaunching(false), []);
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
+    if (ready) hideNative();
+  }, [ready, hideNative]);
 
   // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in.
   const [entering, setEntering] = useState(false);
@@ -75,10 +85,10 @@ function Gate() {
         importantForAccessibility={suspended ? "no-hide-descendants" : "auto"}
       >
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Protected guard={signedIn}>
+          <Stack.Protected guard={inApp} redirectTo="/sign-in">
             <Stack.Screen name="(app)" />
           </Stack.Protected>
-          <Stack.Protected guard={!signedIn}>
+          <Stack.Protected guard={!inApp} redirectTo="/">
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
         </Stack>
@@ -87,6 +97,9 @@ function Gate() {
       {ready && signedIn && org.none && !accepting ? <OnboardingFlow /> : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
       {org.state && suspended ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
+      {launching ? (
+        <LaunchSplash ready={ready} fontsReady={fontsReady} onShown={hideNative} onDone={launched} />
+      ) : null}
     </NavigationThemeProvider>
   );
 }
