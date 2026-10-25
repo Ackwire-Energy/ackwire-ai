@@ -314,6 +314,21 @@ test("once: the homes written, every tool off, nothing started; what is new and 
   expect(children.started).toEqual([]);
 });
 
+test("once: the server at another port is the same server, its homes not new and its tools kept", async () => {
+  const { host, server, state, home } = makeHost();
+  server.answer([org(A, MA, "agm_a")]);
+  await host.once();
+  const opened = { ...readStoredConfig(home(A)), access: { folders: [], tools: { claude: true, commands: true } } };
+  writeFileSync(path.join(home(A), "config.json"), JSON.stringify(opened));
+
+  const moved = makeHost({ server: "http://127.0.0.1:4311", state, fetch: server.fetch }).host;
+  expect(await moved.once()).toMatchObject({ status: "on", homes: [{ orgId: A, new: false }], gone: [] });
+  expect(readStoredConfig(home(A))).toMatchObject({
+    server: "http://127.0.0.1:4311",
+    access: { tools: { claude: true, commands: true } },
+  });
+});
+
 test("once: says why it wrote nothing", async () => {
   const { host, server } = makeHost({ exec: false });
   server.answer(404);
