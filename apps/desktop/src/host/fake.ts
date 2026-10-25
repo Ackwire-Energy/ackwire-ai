@@ -22,6 +22,7 @@ import {
   type LocalPhase,
   type LocalServerStatus,
   NO_SERVER,
+  type ServeProblem,
   type SetupStep,
   type StepChange,
   setupSteps,
@@ -48,6 +49,8 @@ export interface HereOptions {
   claim?: boolean;
   serving?: boolean;
   fail?: SetupStep;
+  /** Why reach didn't turn on (`?reason=`; HTTPS off by default). */
+  reason?: ServeProblem["reason"];
   hold?: SetupStep;
 }
 
@@ -82,7 +85,7 @@ const instance = (url: string, over: Record<string, unknown> = {}) => ({
 /** What each fake server answers to `GET /api/instance` (the host decides); `waits`: the link's server has no owner yet. */
 function fakeCheck(server: string, waits: boolean): ServerCheck {
   const host = new URL(server).host;
-  if (host === "chat.example.com") return { ok: false, server, problem: "unreachable" };
+  if (host === "chat.example.com" || host === "127.0.0.1:4399") return { ok: false, server, problem: "unreachable" };
   if (host === "noowner.tail1234.ts.net") return readInstance(server, instance(server, { ownerClaim: true }));
   if (host === "old.example.com") return readInstance(server, instance(server, { api: 0, minApi: 0 }));
   if (server === FAKE_SERVER || server === CLOUD_SERVER || server === "http://127.0.0.1:4310")
@@ -93,7 +96,7 @@ function fakeCheck(server: string, waits: boolean): ServerCheck {
 export function createFakeHost(
   initial: WindowName,
   scenario: Scenario,
-  options: { link?: string | null; found?: boolean; here?: HereOptions } = {},
+  options: { link?: string | null; found?: boolean; here?: HereOptions; someCommands?: boolean } = {},
 ): FakeHost {
   const runners = new Map<string, FakeRunner>();
   const lineListeners = new Set<(homeId: string, line: string) => void>();
@@ -180,7 +183,10 @@ export function createFakeHost(
 
   if (scenario === "selfhost") {
     spawn("a1b2c3d4", acmeSeed());
-    spawn("e5f6a7b8", horizonteSeed());
+    // `?commands=some`: the second organization joined after commands were on, and starts without them.
+    const horizonte = horizonteSeed();
+    if (options.someCommands) horizonte.access.tools.commands = false;
+    spawn("e5f6a7b8", horizonte);
     signIns = 2;
   }
   if (running) {
@@ -350,7 +356,11 @@ export function createFakeHost(
         if (here.hold === step) await new Promise(() => {});
         await wait(step === "database" ? 1400 : 800);
         if (step === "reach" && (here.fail === "reach" || tailnet.state !== "on")) {
-          say({ step, state: "warn", reason: { reason: "https", url: null } });
+          const reason: ServeProblem =
+            here.reason === "operator" || here.reason === "serve"
+              ? { reason: here.reason }
+              : { reason: "https", url: null };
+          say({ step, state: "warn", reason });
           continue;
         }
         if (here.fail === step) {

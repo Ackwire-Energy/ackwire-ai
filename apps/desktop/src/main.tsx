@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import "./styles.css";
 import { AppProvider } from "./app";
-import type { LocalPhase, SetupStep, Tailnet } from "./control/local-server";
+import type { LocalPhase, ServeProblem, SetupStep, Tailnet } from "./control/local-server";
 import { DesktopStore } from "./control/store";
 import { DevFrame } from "./dev/DevFrame";
 import { readPref } from "./hooks";
@@ -26,6 +26,7 @@ const fakeHost = inTauri()
       {
         link: params.get("link"),
         found: params.get("found") !== "0",
+        someCommands: params.get("commands") === "some",
         here: {
           phase: (params.get("phase") as LocalPhase | null) ?? undefined,
           reach: params.get("reach") === "1",
@@ -37,6 +38,7 @@ const fakeHost = inTauri()
           claim: params.get("claim") === "1",
           serving: params.get("serving") !== "0",
           fail: (params.get("fail") as SetupStep | null) ?? undefined,
+          reason: (params.get("reason") as ServeProblem["reason"] | null) ?? undefined,
           hold: (params.get("hold") as SetupStep | null) ?? undefined,
         },
       },
