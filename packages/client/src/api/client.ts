@@ -33,6 +33,8 @@ import type {
   ArtifactDetail,
   ArtifactFilters,
   ArtifactVersion,
+  AuditPage,
+  AuditQuery,
   AuthConfig,
   BatchInviteResult,
   BrainKind,
@@ -245,6 +247,8 @@ export interface ApiClient {
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
     /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
+    /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
+    audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;

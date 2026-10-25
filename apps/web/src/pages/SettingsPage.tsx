@@ -52,6 +52,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
+import { AuditSection } from "@/components/Audit";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
@@ -143,6 +144,7 @@ export function SettingsPage({
         )}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
+        {current === "audit" && <AuditSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
         {current === "skills" && <SkillsSection />}

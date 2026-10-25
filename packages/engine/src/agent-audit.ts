@@ -1,11 +1,11 @@
 import { redactCommon } from "@agenteschat/adapters/redact";
-import { and, type Database, desc, eq, type Executor, inArray, lt, ne, schema } from "@agenteschat/db";
+import { and, type Database, desc, eq, type Executor, inArray, lt, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { requirePermission } from "./organizations";
 import { maskCredentials } from "./tool-detail";
 
-const { auditLog, agents, users } = schema;
+const { auditLog, agents, approvals, channels, users } = schema;
 
 /**
  * The audit of what agents do: every tool call that matters, written by the
@@ -70,6 +70,20 @@ export function auditsCall(
   return kind !== "directory" && kind !== "pass" && kind !== "here";
 }
 
+const MAX_TITLE = 200;
+
+/** The call in words, as its approval card says it ("Sentry: List issues"); null when the tool has none. */
+export function callTitle(
+  tool: { describe?: (input: Record<string, unknown>) => { title: string } },
+  input: Record<string, unknown>,
+): string | null {
+  try {
+    return tool.describe?.(input).title ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** One tool call an agent made (see `auditsCall`). Never fails the call. */
 export async function recordToolCall(
   db: Executor,
@@ -83,6 +97,8 @@ export async function recordToolCall(
     /** `toolKind`'s kind (`external`, `internal`, `computer`…). */
     kind: string;
     connector?: string | null;
+    /** `callTitle`, or an approval's title. */
+    title?: string | null;
     input: Record<string, unknown>;
     outcome: schema.AuditOutcome;
     /** Why it was refused or failed, or the agent's `why` for an approval. */
@@ -98,7 +114,11 @@ export async function recordToolCall(
     details: {
       kind: call.kind,
       ...(call.connector ? { connector: call.connector } : {}),
+      ...(call.title ? { title: masked(call.title).slice(0, MAX_TITLE) } : {}),
       behind: call.authority?.kind ?? null,
+      ...(call.authority?.kind === "routine" && call.authority.brief
+        ? { routine: { id: call.authority.brief.routineId, name: call.authority.brief.name } }
+        : {}),
       input: auditInput(call.input),
       ...(call.reason ? { reason: masked(call.reason).slice(0, MAX_STRING) } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
@@ -118,7 +138,10 @@ export interface AuditFilter {
   actorType?: AuditActorType;
   /** An agent's or a person's id. */
   actorId?: string;
-  outcome?: schema.AuditOutcome;
+  /** Any of these endings (`refused` and `failed` together: what went wrong). */
+  outcome?: schema.AuditOutcome[];
+  /** Only calls whose approval nobody has answered yet. */
+  waiting?: boolean;
   /** `tool`: agents' tool calls only; `change`: everything else. */
   kind?: "tool" | "change";
   /** Rows older than this id (ids grow with time): the next page. */
@@ -135,8 +158,12 @@ export interface AuditRow {
   details: Record<string, unknown>;
   runId: string | null;
   channelId: string | null;
+  /** Where it happened; null when there is no conversation or it was deleted. */
+  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" } | null;
   onBehalfOf: { id: string; name: string | null } | null;
   outcome: schema.AuditOutcome | null;
+  /** The approval a call waited for (or ran after), as it stands now: a `pending` row may be decided since. */
+  approval: { id: string; status: string; decidedBy: { id: string; name: string | null } | null } | null;
 }
 
 export const AUDIT_PAGE = 50;
@@ -163,7 +190,14 @@ export async function listAudit(
         eq(auditLog.orgId, orgId),
         filter.actorType ? eq(auditLog.actorType, filter.actorType) : undefined,
         filter.actorId ? eq(auditLog.actorId, filter.actorId) : undefined,
-        filter.outcome ? eq(auditLog.outcome, filter.outcome) : undefined,
+        filter.outcome?.length ? inArray(auditLog.outcome, filter.outcome) : undefined,
+        filter.waiting
+          ? and(
+              eq(auditLog.outcome, "pending"),
+              sql`exists (select 1 from ${approvals} where ${approvals.orgId} = ${auditLog.orgId}
+                and ${approvals.id}::text = ${auditLog.details}->>'approvalId' and ${approvals.status} = 'pending')`,
+            )
+          : undefined,
         filter.kind === "tool" ? eq(auditLog.action, TOOL_CALL) : undefined,
         filter.kind === "change" ? ne(auditLog.action, TOOL_CALL) : undefined,
         filter.before ? lt(auditLog.id, filter.before) : undefined,
@@ -173,6 +207,27 @@ export async function listAudit(
     .limit(limit + 1);
   const page = found.slice(0, limit);
 
+  const approvalOf = (r: (typeof page)[number]) =>
+    typeof r.details.approvalId === "string" ? r.details.approvalId : null;
+  const approvalIds = [...new Set(page.map(approvalOf).filter((id): id is string => Boolean(id)))];
+  const channelIds = [...new Set(page.map((r) => r.channelId).filter((id): id is string => Boolean(id)))];
+  const [approvalRows, channelRows] = await Promise.all([
+    approvalIds.length
+      ? db
+          .select({ id: approvals.id, status: approvals.status, decidedBy: approvals.decidedByUserId })
+          .from(approvals)
+          .where(and(eq(approvals.orgId, orgId), inArray(approvals.id, approvalIds)))
+      : Promise.resolve([]),
+    channelIds.length
+      ? db
+          .select({ id: channels.id, name: channels.name, kind: channels.kind })
+          .from(channels)
+          .where(and(eq(channels.orgId, orgId), inArray(channels.id, channelIds)))
+      : Promise.resolve([]),
+  ]);
+  const approvalById = new Map(approvalRows.map((a) => [a.id, a]));
+  const channelById = new Map(channelRows.map((c) => [c.id, c]));
+
   const agentIds = new Set<string>();
   const userIds = new Set<string>();
   for (const r of page) {
@@ -180,6 +235,7 @@ export async function listAudit(
     if (r.actorType === "person" && r.actorId) userIds.add(r.actorId);
     if (r.onBehalfOfUserId) userIds.add(r.onBehalfOfUserId);
   }
+  for (const a of approvalRows) if (a.decidedBy) userIds.add(a.decidedBy);
   const [agentRows, userRows] = await Promise.all([
     agentIds.size
       ? db
@@ -209,10 +265,20 @@ export async function listAudit(
       details: r.details,
       runId: r.runId,
       channelId: r.channelId,
+      channel: (r.channelId && channelById.get(r.channelId)) || null,
       onBehalfOf: r.onBehalfOfUserId
         ? { id: r.onBehalfOfUserId, name: userName.get(r.onBehalfOfUserId) ?? null }
         : null,
       outcome: r.outcome ?? null,
+      approval: (() => {
+        const a = approvalById.get(approvalOf(r) ?? "");
+        if (!a) return null;
+        return {
+          id: a.id,
+          status: a.status,
+          decidedBy: a.decidedBy ? { id: a.decidedBy, name: userName.get(a.decidedBy) ?? null } : null,
+        };
+      })(),
     })),
     next: found.length > limit ? (page.at(-1)?.id ?? null) : null,
   };

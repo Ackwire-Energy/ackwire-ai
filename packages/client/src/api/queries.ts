@@ -38,6 +38,7 @@ import type {
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
+  AuditQuery,
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
@@ -844,6 +845,20 @@ export const useUsageReport = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
 };
+
+/** Configurações › Auditoria: pages of 50, newest first (admins). */
+export function useAudit(orgId: string, query: AuditQuery, enabled = true) {
+  const api = useApi();
+  return useInfiniteQuery({
+    enabled,
+    queryKey: keys.audit(orgId, query),
+    queryFn: ({ pageParam }) => api.orgs.audit(orgId, { ...query, ...(pageParam ? { before: pageParam } : {}) }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.next ?? undefined,
+    placeholderData: (prev) => prev,
+    staleTime: 15_000,
+  });
+}
 
 /** Configurações › Uso: every plan account by computer and the API per agent (ADR 0063). */
 export const usePlanUsage = (orgId: string) => {

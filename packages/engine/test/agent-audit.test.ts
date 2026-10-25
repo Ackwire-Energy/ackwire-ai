@@ -107,7 +107,11 @@ describe("agents' tool calls in the audit log", () => {
       }),
       tool("close_all_issues", "issues:write", { sensitive: true }),
       tool("search_context", "context:read"),
-      tool("sentry_list_issues", "sentry:issues.read", { connectionId, connectorLabel: "Sentry" }),
+      tool("sentry_list_issues", "sentry:issues.read", {
+        connectionId,
+        connectorLabel: "Sentry",
+        describe: () => ({ title: "Sentry: List issues" }),
+      }),
       tool("drive_delete", "drive:write"),
     ];
     const source: ToolSource = { name: "fake", tools: async () => tools };
@@ -166,9 +170,15 @@ describe("agents' tool calls in the audit log", () => {
     expect(rows[0]?.details).toMatchObject({ kind: "internal", behind: "person", input: { title: "Login quebrado" } });
     expect(rows[1]?.details.reason).toContain("the issue tracker is down");
     expect(rows[2]?.details.reason).toContain("lacks the scope drive:write");
-    expect(rows[3]?.details).toMatchObject({ kind: "read", connector: "Sentry" });
+    expect(rows[3]?.details).toMatchObject({ kind: "read", connector: "Sentry", title: "Sentry: List issues" });
     const approvalId = asked.type === "approval" ? asked.approval.id : "";
     expect(rows[4]?.details).toMatchObject({ approvalId, reason: "the board was cleaned up by hand" });
+
+    // Waiting on a person: the reader says so until someone answers.
+    const waiting = await listAudit(f.db, f.owner.id, f.org.id, { waiting: true });
+    expect(waiting.rows.map((r) => r.target.id)).toEqual(["close_all_issues"]);
+    expect(waiting.rows[0]?.approval).toMatchObject({ id: approvalId, status: "pending", decidedBy: null });
+    expect(waiting.rows[0]?.channel).toMatchObject({ id: f.general.id, kind: "channel" });
 
     // A person approves: their decision, then the action the agent ran.
     await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approvalId, { decision: "approve" });
@@ -189,6 +199,10 @@ describe("agents' tool calls in the audit log", () => {
     const ran = (await toolRows(f)).at(-1);
     expect(ran).toMatchObject({ targetId: "close_all_issues", outcome: "done", onBehalfOfUserId: f.owner.id });
     expect(ran?.details.approvalId).toBe(approvalId);
+    // The row that waited now reads as answered, and nothing waits any more.
+    expect((await listAudit(f.db, f.owner.id, f.org.id, { waiting: true })).rows).toEqual([]);
+    const asked2 = (await listAudit(f.db, f.owner.id, f.org.id, { outcome: ["pending"] })).rows[0];
+    expect(asked2?.approval).toMatchObject({ status: "approved", decidedBy: { id: f.owner.id, name: "ana" } });
   });
 
   test("admins read it, newest first, with names, filters and pages; members can't", async () => {
@@ -208,8 +222,10 @@ describe("agents' tool calls in the audit log", () => {
     });
     expect(all.next).toBeNull();
 
-    const refused = await listAudit(f.db, f.owner.id, f.org.id, { outcome: "refused" });
+    const refused = await listAudit(f.db, f.owner.id, f.org.id, { outcome: ["refused"] });
     expect(refused.rows.map((r) => r.target.id)).toEqual(["drive_delete"]);
+    const wrong = await listAudit(f.db, f.owner.id, f.org.id, { outcome: ["refused", "failed"] });
+    expect(wrong.rows.map((r) => r.target.id)).toEqual(["drive_delete"]);
     const byAgent = await listAudit(f.db, f.owner.id, f.org.id, { actorType: "agent", actorId: f.agent.id });
     expect(byAgent.rows).toHaveLength(3);
 

@@ -63,6 +63,10 @@ test("the audit log: admins read agents' calls and people's changes, filtered; m
     await owner(`/api/app/organizations/${orgId}/audit?actorType=agent&outcome=done`)
   ).json()) as Page;
   expect(agentOnly.rows).toHaveLength(1);
+  const wrong = (await (await owner(`/api/app/organizations/${orgId}/audit?outcome=refused,failed`)).json()) as Page;
+  expect(wrong.rows).toEqual([]);
+  expect((await owner(`/api/app/organizations/${orgId}/audit?outcome=done,nope`)).status).toBe(400);
+  expect(page.rows[0]).toMatchObject({ channel: { id: channelId, kind: "channel" }, approval: null });
 
   const member = browser(t);
   await signUp(member, "ana@example.com");

@@ -3761,6 +3761,49 @@ export interface AppNotification {
   updatedAt: string;
 }
 
+// ── Audit (Configurações › Auditoria) ────────────────────────────────────────
+
+export type AuditOutcome = "done" | "failed" | "refused" | "pending";
+
+/**
+ * One row of the org's audit log (`GET …/audit`, admins): an agent's tool call
+ * (`action: "tool.call"`, with an `outcome`) or a change (`approval.approved`,
+ * `routine.created`…; `outcome` null).
+ */
+export interface AuditRow {
+  id: string;
+  at: string;
+  actor: { type: "person" | "agent" | "system"; id: string | null; name: string | null };
+  action: string;
+  target: { type: string; id: string | null };
+  /**
+   * A tool call's: `kind`, `connector`, `title` (the call in words), `behind` (`person`, `routine`,
+   * `unattended`), `routine` ({ id, name }), `input` (secrets masked), `reason`, `approvalId`.
+   */
+  details: Record<string, unknown>;
+  runId: string | null;
+  channelId: string | null;
+  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" } | null;
+  onBehalfOf: { id: string; name: string | null } | null;
+  outcome: AuditOutcome | null;
+  /** The approval the call waited for or ran after, as it stands now. */
+  approval: { id: string; status: string; decidedBy: { id: string; name: string | null } | null } | null;
+}
+
+export interface AuditPage {
+  rows: AuditRow[];
+  next: string | null;
+}
+
+export interface AuditQuery {
+  actorType?: "person" | "agent" | "system";
+  actorId?: string;
+  outcome?: AuditOutcome[];
+  /** Only calls whose approval nobody has answered yet. */
+  waiting?: boolean;
+  kind?: "tool" | "change";
+}
+
 export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions";
 
 export type NotificationCounts = Record<NotificationFilter, number>;

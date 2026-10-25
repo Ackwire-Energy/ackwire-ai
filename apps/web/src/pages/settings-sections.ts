@@ -8,6 +8,7 @@ import type { IconName } from "@agenteschat/ui";
 export type SettingsSection =
   | "general"
   | "members"
+  | "audit"
   | "access"
   | "connectors"
   | "skills"
@@ -28,6 +29,8 @@ export const SETTINGS_SECTIONS: {
 }[] = [
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
+  // What agents did and people changed: admins only (it shows everyone's work).
+  { id: "audit", icon: "shield", group: "org", allowed: (r) => can(r, "configure") },
   { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },

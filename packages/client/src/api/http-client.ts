@@ -28,6 +28,7 @@ import type {
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
+  AuditPage,
   AuthConfig,
   BatchInviteResult,
   BrowserHandoff,
@@ -356,6 +357,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
       planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
+      audit: (orgId, query = {}) =>
+        request<AuditPage>(`${org(orgId)}/audit`, {
+          query: {
+            actorType: query.actorType,
+            actorId: query.actorId,
+            outcome: query.outcome?.length ? query.outcome.join(",") : undefined,
+            waiting: query.waiting ? "true" : undefined,
+            kind: query.kind,
+            before: query.before,
+            limit: query.limit,
+          },
+        }),
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,

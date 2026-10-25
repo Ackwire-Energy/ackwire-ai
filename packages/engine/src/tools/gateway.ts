@@ -1,6 +1,6 @@
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
-import { auditsCall, recordToolCall } from "../agent-audit";
+import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { type RunAuthority, runAuthorityById } from "../authority";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
@@ -290,6 +290,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           tool: tool.name,
           kind,
           connector: tool.connectorLabel ?? null,
+          title: callTitle(tool, call.input),
           input: call.input,
           outcome,
           ...extra,
@@ -561,6 +562,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             tool: tool.name,
             kind,
             connector: tool.connectorLabel ?? null,
+            title: approval.title,
             input: approval.params,
             outcome,
             reason: outcome === "done" ? null : shown(output.content),
