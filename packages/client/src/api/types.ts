@@ -881,6 +881,8 @@ export interface OrgSettings {
   timezone: string;
   /** Admins only: monthly budget of every agent without its own (US$). Absent for members. */
   defaultAgentBudgetUsd?: number;
+  /** Agents check what the team already did before acting outside (ADR 0064). On by default. */
+  actionCheck: boolean;
 }
 
 /** Sidebar counts. */
@@ -1088,7 +1090,15 @@ export type CustomConnectStart =
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
-export type SearchKind = "message" | "context_item" | "issue" | "forum_topic" | "forum_reply" | "file";
+export type SearchKind =
+  | "message"
+  | "context_item"
+  | "issue"
+  | "forum_topic"
+  | "forum_reply"
+  | "file"
+  | "wiki"
+  | "action";
 
 export interface SearchHit {
   kind: SearchKind;
@@ -1099,6 +1109,27 @@ export interface SearchHit {
   snippet: string;
   score: number;
   createdAt: string;
+  /** Message hits: who wrote it; action hits: the agent that did it. */
+  author?: { type: AuthorType; id: string; name: string } | null;
+}
+
+/**
+ * `message.meta.teamChecks` (ADR 0064, server-made): outside actions the agent didn't repeat because the
+ * team already did them. `agentId` null = it happened where the agent can't see: only "someone" and when.
+ */
+export interface TeamCheck {
+  id: string;
+  tool: string;
+  /** What it touched, as people read it (`ana@acme.com`, `acme/app#212`). */
+  targets: string[];
+  matches: {
+    agentId: string | null;
+    agentName: string | null;
+    channelId: string | null;
+    channelName: string | null;
+    summary: string | null;
+    at: string;
+  }[];
 }
 
 /** `message.meta.replyTo`: the message a quote reply answers, as it was when quoted (server-made). */
