@@ -318,6 +318,62 @@ export function RunKey({ status }: { status: RunPixelStatus | "next" }) {
   return <canvas ref={ref} className="ac-run-key" width={3} height={5} />;
 }
 
+/** A day of an agent's month: its runs and how many failed. */
+export interface MonthDay {
+  day: number;
+  runs: number;
+  failed: number;
+}
+
+/**
+ * An agent's month in pixels (its Atividade tab): a dithered column per day in the agent's tones, as tall as
+ * that day's runs over the busiest day's; a day with a failure wears a cap in the danger tone; a day without
+ * runs, and every day to come, is a dot on the line. Decorative: the caller gives the words.
+ */
+export function MonthRuns({
+  days,
+  today,
+  perDay,
+  color = "sky",
+  className,
+}: {
+  /** Days in the month. */
+  days: number;
+  /** Today's day of the month: later days are still to come. */
+  today: number;
+  /** Only the days with runs. */
+  perDay: readonly MonthDay[];
+  color?: AgentColor;
+  className?: string;
+}) {
+  const ROWS = 40;
+  const ref = useCanvas((ctx, canvas) => {
+    const w = Math.max(days * 3, Math.round(canvas.clientWidth / CELL) || days * 8);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== ROWS) canvas.height = ROWS;
+    const p = paletteFor(canvas, color);
+    ctx.clearRect(0, 0, w, ROWS);
+    const byDay = new Map(perDay.map((d) => [d.day, d]));
+    const max = Math.max(1, ...perDay.map((d) => d.runs));
+    const slot = w / days;
+    const colW = Math.max(2, Math.floor(slot * 0.62));
+    const base = ROWS - 1;
+    for (let d = 1; d <= days; d++) {
+      const x0 = Math.round((d - 1) * slot + (slot - colW) / 2);
+      const day = byDay.get(d);
+      if (d > today || !day || day.runs === 0) {
+        ctx.fillStyle = p.dot;
+        ctx.fillRect(x0 + Math.floor(colW / 2), base, 1, 1);
+        continue;
+      }
+      const h = Math.max(2, Math.round((day.runs / max) * (ROWS - 5)));
+      column(ctx, x0, colW, h, base, p.ok);
+      if (day.failed > 0) column(ctx, x0, colW, 2, base - h - 1, p.failed);
+    }
+  }, false);
+  return <canvas ref={ref} className={cx("ac-month-runs", className)} />;
+}
+
 /**
  * An agent's browser steps in pixels: one dithered column per
  * step in the agent's tones, as a routine's runs. The height says what it was: an open the whole
