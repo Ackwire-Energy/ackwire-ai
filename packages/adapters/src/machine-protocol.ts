@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 21;
+export const MACHINE_PROTOCOL_VERSION = 22;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -279,6 +279,37 @@ export const PLAN_KEYS_PROTOCOL = 20;
  * an older runner.
  */
 export const DESKTOP_USE_PROTOCOL = 21;
+/**
+ * From this protocol on: how big the computer is and how busy it gets.
+ * `hello.size` gives its logical CPUs, memory and the disk of its workspace;
+ * a `pong` carries `load`, the last day's summary, after each new sample (every
+ * `LOAD_SAMPLE_MS`). Nothing new goes to the runner, so an older one simply
+ * sends neither: its size and load are unknown.
+ */
+export const MACHINE_STATS_PROTOCOL = 22;
+
+/** Protocol 22: a computer's size as its runner sees it (`hello.size`), rounded. */
+export interface MachineSize {
+  cpus: number;
+  memoryGb: number;
+  diskGb: number;
+}
+
+/**
+ * Protocol 22: how busy a computer got over the last day (`pong.load`): the 5-minute load average per
+ * logical CPU (1 = every CPU busy) and the share of memory in use (0 to 1), average and highest over
+ * `hours` of samples.
+ */
+export interface MachineLoad {
+  loadAvg: number;
+  loadPeak: number;
+  memoryAvg: number;
+  memoryPeak: number;
+  hours: number;
+}
+
+/** How often a computer's load is sampled (protocol 22). */
+export const LOAD_SAMPLE_MS = 5 * 60_000;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -1101,6 +1132,8 @@ export interface RunnerInfo {
   mode?: "system";
   /** Protocol 19: the usage of the computer's own sign-ins (no account folder). */
   ownUsage?: OwnPlanUsage;
+  /** Protocol 22: how big the computer is. */
+  size?: MachineSize;
 }
 
 export interface FileEntry {
@@ -1467,7 +1500,8 @@ export type RunnerFrame =
   | { type: "output"; id: string; stream: "stdout" | "stderr"; chunk: string }
   | { type: "result"; id: string; ok: true; data: unknown }
   | { type: "result"; id: string; ok: false; error: { code: MachineErrorCode; message: string } }
-  | { type: "pong"; at: number }
+  /** Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed). */
+  | { type: "pong"; at: number; load?: MachineLoad }
   /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
   | {
       type: "task.event";
@@ -1793,6 +1827,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       if (!isString(f.token) || !isString(f.version) || typeof f.protocol !== "number") return null;
       const paused = parsePause(f.paused);
       const access = parseAccess(f.access);
+      const size = parseMachineSize(f.size);
       return {
         type: "hello",
         token: f.token,
@@ -1821,6 +1856,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(isObject(f.desktopUse) ? { desktopUse: parseAvailability(f.desktopUse) } : {}),
         ...(f.mode === "system" ? { mode: "system" as const } : {}),
         ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
+        ...(size ? { size } : {}),
       };
     }
     case "browser.frame": {
@@ -1899,8 +1935,11 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         };
       }
       return null;
-    case "pong":
-      return typeof f.at === "number" ? { type: "pong", at: f.at } : null;
+    case "pong": {
+      if (typeof f.at !== "number") return null;
+      const load = parseMachineLoad(f.load);
+      return { type: "pong", at: f.at, ...(load ? { load } : {}) };
+    }
     case "task.event": {
       if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;
       const line = cut(f.line, TASK_LIMITS.line);
@@ -2449,6 +2488,23 @@ const smallJson = (raw: string, max: number): unknown => {
 export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInfo {
   const reason = cut(v.reason, BROWSER_LIMITS.message);
   return { available: v.available === true, ...(reason !== undefined ? { reason } : {}) };
+}
+
+const between = (v: unknown, min: number, max: number): v is number =>
+  typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+
+/** `hello.size` (protocol 22): sane numbers, else none. */
+export function parseMachineSize(v: unknown): MachineSize | null {
+  if (!isObject(v) || !inRange(v.cpus, [1, 4096])) return null;
+  if (!between(v.memoryGb, 0, 1 << 16) || !between(v.diskGb, 0, 1 << 24)) return null;
+  return { cpus: v.cpus, memoryGb: v.memoryGb, diskGb: v.diskGb };
+}
+
+/** `pong.load` (protocol 22): sane numbers, else none. */
+export function parseMachineLoad(v: unknown): MachineLoad | null {
+  if (!isObject(v) || !between(v.loadAvg, 0, 1000) || !between(v.loadPeak, 0, 1000)) return null;
+  if (!between(v.memoryAvg, 0, 1) || !between(v.memoryPeak, 0, 1) || !between(v.hours, 0, 24)) return null;
+  return { loadAvg: v.loadAvg, loadPeak: v.loadPeak, memoryAvg: v.memoryAvg, memoryPeak: v.memoryPeak, hours: v.hours };
 }
 
 /** `hello.desktop` (protocol 18), cut; a size only when both sides are sane. */

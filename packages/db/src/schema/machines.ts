@@ -55,6 +55,23 @@ export interface MachineExecutors {
   detectedAt?: string;
 }
 
+/** A computer's size as its runner reported it (protocol 22), the same shape as `MachineSize` in the protocol. */
+export interface MachineSizeRecord {
+  cpus: number;
+  memoryGb: number;
+  diskGb: number;
+}
+
+/** How busy a computer got over the last day (protocol 22: `MachineLoad` in the protocol), and when it said so. */
+export interface MachineLoadRecord {
+  loadAvg: number;
+  loadPeak: number;
+  memoryAvg: number;
+  memoryPeak: number;
+  hours: number;
+  at: string;
+}
+
 /**
  * What the machine allows beyond the agents' own folders (ADR 0036 §8,
  * protocol 10), as its runner last reported it (`hello.access`,
@@ -129,6 +146,10 @@ export const machines = pgTable(
     pausedUntil: timestamp({ withTimezone: true }),
     /** Folders and tools the machine allows (protocol 10); null: its runner doesn't report them. */
     access: jsonb().$type<MachineAccess>(),
+    /** Its size (protocol 22, kept from the last runner that said); null: unknown. */
+    size: jsonb().$type<MachineSizeRecord>(),
+    /** Its last day's load (protocol 22); null: unknown. */
+    load: jsonb().$type<MachineLoadRecord>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
     /**

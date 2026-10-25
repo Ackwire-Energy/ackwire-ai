@@ -194,6 +194,12 @@ export async function countUsers(db: Database): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** The installation's first account: the person who set it up. */
+export async function installOwner(db: Database): Promise<string | null> {
+  const [first] = await db.select({ id: users.id }).from(users).orderBy(asc(users.createdAt), asc(users.id)).limit(1);
+  return first?.id ?? null;
+}
+
 /**
  * Self-hosted sign-up policy: the first account may always register (there is
  * no other way in); after that, only with ALLOW_SIGNUP or a pending

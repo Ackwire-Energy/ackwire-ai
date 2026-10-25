@@ -1,7 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { MACHINE_PROTOCOL_VERSION, type RunnerInfo, type ServerFrame } from "@agenteschat/adapters/machine-protocol";
+import {
+  MACHINE_PROTOCOL_VERSION,
+  type MachineLoad,
+  type RunnerInfo,
+  type ServerFrame,
+} from "@agenteschat/adapters/machine-protocol";
 import { connectUrl } from "../../runner/config";
 import {
   backoffDelay,
@@ -127,6 +132,35 @@ test("hello first, ping → pong, request → result, refused → stops with exi
   expect(await done).toEqual({ exitCode: 2, reason: "revoked", message: "This computer was removed" });
   expect(s.closed).toBe(true);
   expect(sockets.length).toBe(1);
+});
+
+test("protocol 22: a new load summary rides on the next pong, once, and again on a new session", async () => {
+  let load: MachineLoad | null = null;
+  const { sockets, connection } = setup({ load: () => load });
+  const done = connection.run();
+  const open = async (i: number) => {
+    await waitFor(() => sockets.length === i + 1);
+    const s = sock(sockets, i);
+    s.handlers.onOpen();
+    await waitFor(() => s.sent.length === 1);
+    s.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25_000 });
+    return s;
+  };
+  const s = await open(0);
+  s.frame({ type: "ping", at: 1 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 1 });
+  load = { loadAvg: 0.2, loadPeak: 0.9, memoryAvg: 0.4, memoryPeak: 0.6, hours: 1 };
+  s.frame({ type: "ping", at: 2 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 2, load });
+  s.frame({ type: "ping", at: 3 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 3 });
+
+  connection.reconnect();
+  const again = await open(1);
+  again.frame({ type: "ping", at: 4 });
+  expect(again.sent.at(-1)).toEqual({ type: "pong", at: 4, load });
+  connection.stop();
+  await done;
 });
 
 test("tasks: hello carries the journal, each welcome re-sends unacknowledged task.done, task.ack marks it", async () => {

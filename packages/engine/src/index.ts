@@ -176,6 +176,7 @@ export * from "./streams";
 export * from "./talker";
 export * from "./team";
 export * from "./team-actions";
+export * from "./telemetry";
 export * from "./thread-assess";
 export * from "./threads";
 export * from "./tool-loading";
