@@ -114,7 +114,8 @@ export interface StreamPolicyDeps {
  * Whether a person's stream may open, and where (the broker's `authorize`):
  * at most `opensPerMinute` opens a minute per person, `streamAccess`, then the
  * computer (`desktopTarget`). A control stream opening is its holder back: the
- * grace of their control starts again.
+ * grace of their control starts again. A held agent's desktop (or one in a
+ * workspace on hold) may be watched while it runs; starting it is new work.
  */
 export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput): Promise<StreamTarget> {
   const rate = await deps.rateLimiter?.consume(`stream-open:${input.userId}`, {
@@ -129,6 +130,9 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
   // The agent moved to another computer meanwhile: who drives that one wasn't checked.
   if (access.driven && target.machineId !== access.driven) return refused(STREAM_CLOSE.forbidden, "forbidden");
   if (access.control) await touchControl(deps.db, access.control, input.userId, new Date(), true).catch(() => {});
+  if (input.request.kind === "desktop" && (await standingRefusal(deps.db, input.orgId, input.agentId))) {
+    return { ...target, held: true };
+  }
   return target;
 }
 

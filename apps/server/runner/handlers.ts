@@ -550,8 +550,8 @@ async function handleStream(
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
     if (req.mode !== "watch" && req.mode !== "control") throw new RunnerError("bad_request", "watch or control");
-    // Whoever opens one that isn't running starts it, and it stays on; except on a paused computer.
-    if (!ctx.desktops.status(agent).running) {
+    // One that isn't running starts when the server says so, and stays on; never on a paused computer.
+    if (req.start === true && !ctx.desktops.status(agent).running) {
       if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
       await ctx.desktops.ensure(agent);
     }

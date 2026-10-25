@@ -87,13 +87,14 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, AGENT_DEFAULT_MODEL: "Claude Sonnet" })).toThrow(/AGENT_DEFAULT_MODEL/);
   });
 
-  test("external provisioning needs the operator API, which serves its requests", () => {
+  test("external provisioning needs the operator API, which serves its requests, and no computer of the server's own", () => {
     expect(loadConfig(valid).MACHINE_PROVISIONING).toBe("off");
     expect(() => loadConfig({ ...valid, MACHINE_PROVISIONING: "external" })).toThrow(/OPERATOR_API_TOKEN/);
     const token = "t".repeat(32);
-    expect(
-      loadConfig({ ...valid, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: token }).MACHINE_PROVISIONING,
-    ).toBe("external");
+    const external = { ...valid, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: token };
+    expect(loadConfig(external).MACHINE_PROVISIONING).toBe("external");
+    expect(() => loadConfig({ ...external, HOST_COMPUTER_TOKEN: "h".repeat(32) })).toThrow(/HOST_COMPUTER_TOKEN/);
+    expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
   });
 
   test("ignores variables that are not in the schema", () => {

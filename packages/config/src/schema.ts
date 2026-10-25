@@ -619,7 +619,7 @@ export const envVars = {
       .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
       .optional(),
     description:
-      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true`. Unset: off.",
+      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true` or `MACHINE_PROVISIONING=external`. Unset: off.",
     section: "Sandbox",
     example: "<output of openssl rand -base64 48>",
     secret: true,
@@ -666,7 +666,7 @@ export const envVars = {
   MACHINE_PROVISIONING: {
     schema: z.enum(["off", "external"]).default("off"),
     description:
-      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. Needs `OPERATOR_API_TOKEN`.",
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People can't connect computers of their own then (pairing answers 403 `machine.pairing_off`). Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
     section: "Operator",
   },
   LOG_LEVEL: {

@@ -116,6 +116,7 @@ test("a server that gives each workspace its own computer refuses people's pairi
   >;
   expect(setup).toMatchObject({ mode: "external", state: "preparing", step: "installing", notifyByEmail: true });
   expect(setup.secondsLeft).toBeGreaterThan(350);
+  expect(setup.secondsWaited).toEqual(expect.any(Number));
   expect(setup).not.toHaveProperty("etaSeconds");
 });
 

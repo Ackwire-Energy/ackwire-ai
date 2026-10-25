@@ -525,6 +525,58 @@ test("parking: short of memory, the least recently used desktop untouched for an
   t.desktops.close();
 });
 
+test("parking: with every display taken, the least recently used desktop untouched for an hour makes room", async () => {
+  const t = setup();
+  // Every display but the first two is held by programs that aren't ours.
+  for (let slot = 2; slot < 50; slot++) {
+    writeFileSync(path.join(t.lockDir, `.X${20 + slot}-lock`), `${String(9000 + slot).padStart(10)}\n`);
+    t.fake.others.set(9000 + slot, ["/usr/lib/xorg/Xorg", `:${20 + slot}`]);
+  }
+  const qa: AgentScope = { id: "77aa0000-0000-7000-8000-000000000000", handle: "qa" };
+  await t.desktops.ensure(dev);
+  t.clock.now += 60_000;
+  await t.desktops.ensure(ops);
+  // Both used within the hour: no room, and both go on.
+  expect(await errorCode(() => t.desktops.ensure(qa))).toBe("desktop_busy");
+  t.clock.now += PARK_AFTER_MS;
+  expect(await t.desktops.ensure(qa)).toMatchObject({ display: 20, started: true });
+  expect([dev, ops, qa].map((a) => t.desktops.status(a).running)).toEqual([false, true, true]);
+  expect(t.logs.filter((l) => l.includes("was parked"))).toHaveLength(1);
+  t.desktops.close();
+});
+
+test("the agent's Chrome in use on its desktop touches it: parked an hour after that use, not as Chrome closes", async () => {
+  let chromeInUse = true;
+  // Short of memory while dev's desktop runs: only parking it makes room.
+  const t = setup({
+    memAvailable: () => (t.desktops.status(dev).running ? GiB : 4 * GiB),
+    inUse: (id) => id === dev.id && chromeInUse,
+  });
+  await t.desktops.ensure(dev);
+  // Hours of browsing on it, the sweep once a minute; then its Chrome closes.
+  for (let minute = 0; minute < 180; minute++) {
+    t.clock.now += 60_000;
+    t.desktops.sweep();
+  }
+  chromeInUse = false;
+  expect(await errorCode(() => t.desktops.ensure(ops))).toBe("desktop_busy");
+  expect(t.desktops.status(dev).running).toBe(true);
+  t.clock.now += PARK_AFTER_MS;
+  expect((await t.desktops.ensure(ops)).started).toBe(true);
+  expect(t.desktops.status(dev).running).toBe(false);
+  t.desktops.close();
+});
+
+test("the desktops of agents this computer no longer serves stop; the others go on", async () => {
+  const t = setup();
+  await t.desktops.ensure(dev);
+  await t.desktops.ensure(ops);
+  await t.desktops.stopAll(new Set([ops.id]));
+  expect([dev, ops].map((a) => t.desktops.status(a).running)).toEqual([false, true]);
+  await t.desktops.stopAll();
+  expect(t.desktops.status(ops).running).toBe(false);
+});
+
 test("where the memory isn't known there is always room", async () => {
   const t = setup({ memAvailable: () => null });
   for (const agent of [dev, ops]) expect((await t.desktops.ensure(agent)).started).toBe(true);

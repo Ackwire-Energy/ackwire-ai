@@ -134,7 +134,7 @@ const ACCESS = (tools: Partial<RunnerAccess["tools"]>): RunnerAccess => ({
 });
 const scope: RequestScope = { signal: new AbortController().signal, output: () => undefined };
 
-test("stream.open: each kind behind its switch; a desktop that isn't running starts for whoever opens it, unless paused", async () => {
+test("stream.open: each kind behind its switch; a desktop that isn't running starts when asked to, unless paused", async () => {
   const s = streamServer();
   const dir = tempDir("streams-x-");
   dirs.push(dir);
@@ -163,8 +163,8 @@ test("stream.open: each kind behind its switch; a desktop that isn't running sta
     errorCode(() =>
       handleRequest(ctx, { op: "stream.open", streamId: STREAM_ID, agent: dev, ...req } as MachineRequest, scope),
     );
-  const watch = { kind: "desktop", mode: "watch" };
-  const control = { kind: "desktop", mode: "control" };
+  const watch = { kind: "desktop", mode: "watch", start: true };
+  const control = { kind: "desktop", mode: "control", start: true };
   const terminal = { kind: "terminal", cols: 80, rows: 24 };
 
   expect(await open(terminal)).toBe("ok");
@@ -178,6 +178,10 @@ test("stream.open: each kind behind its switch; a desktop that isn't running sta
   expect(await open(terminal)).toBe("paused");
   expect(desktop.state.started).toEqual([]);
   paused = false;
+
+  // Not asked to start it (its agent is held): it stays as it is.
+  expect(await open({ kind: "desktop", mode: "watch" })).toBe("desktop_off");
+  expect(desktop.state.started).toEqual([]);
 
   // A viewer of a desktop that isn't running starts it, then watches it (logged in view-only).
   expect(await open(watch)).toBe("ok");

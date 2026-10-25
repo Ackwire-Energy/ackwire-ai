@@ -187,6 +187,9 @@ const ComputerSetup = z
       description:
         "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter.",
     }),
+    secondsWaited: z.number().int().nullable().openapi({
+      description: "This server's clock when it answered minus `requestedAt`, for the same reason.",
+    }),
     specs: z.object({ cpus: z.number().int(), memoryGb: z.number(), diskGb: z.number() }).nullable(),
     notifyByEmail: z.boolean().openapi({
       description: "The server sends email: after a wait over a minute, the owners get one once it's ready.",

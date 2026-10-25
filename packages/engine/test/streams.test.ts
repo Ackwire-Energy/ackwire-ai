@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  AgentHeldError,
   auditStream,
   authorizeStream,
   createStreamBroker,
@@ -22,6 +23,8 @@ import {
   type StreamBroker,
   type StreamBrokerDeps,
   type StreamInput,
+  setAgentHold,
+  setOrgStanding,
   startTakeover,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -266,6 +269,55 @@ describe("the broker", () => {
     expect(requests.slice(3).map((r) => r.op)).toEqual(["stream.open", "desktop.session.start", "stream.open"]);
   });
 
+  test("a desktop starts for whoever opens it, unless the agent is held: then one that isn't running stays so", async () => {
+    f = await setup();
+    const machine = await paired();
+    let held = false;
+    const { broker, requests } = brokerFor(machine, {
+      authorize: async (input) => ({
+        machineId: machine.machineId,
+        agent: { id: input.agentId, handle: "dev" },
+        ...(held ? { held } : {}),
+      }),
+      // A computer whose desktop isn't running: it opens only a stream asked to start it.
+      reply: async (request) => {
+        if (request.op !== "stream.open" || request.start !== true) {
+          throw new MachineRequestError("desktop_off", "The agent's desktop isn't running");
+        }
+        const link = broker.accept(fakeSocket().socket);
+        const hello = { type: "stream.hello", token: machine.token, streamId: request.streamId };
+        await broker.fromRunner(link, JSON.stringify(hello));
+        return { opened: true };
+      },
+    });
+    const viewer = fakeSocket();
+    const stream = broker.open(viewer.socket, input(WATCH));
+    await until(() => stream.runner !== null, "the data socket");
+    expect(requests).toMatchObject([{ op: "stream.open", kind: "desktop", start: true }]);
+
+    held = true;
+    const watcher = fakeSocket();
+    broker.open(watcher.socket, input(WATCH));
+    await until(() => watcher.closed !== null, "the refusal");
+    expect(watcher.closed).toEqual({ code: STREAM_CLOSE.refused, reason: "held" });
+    expect(requests.slice(1)).toHaveLength(1);
+    expect(requests[1]).not.toHaveProperty("start");
+  });
+
+  test("the hub's own refusal of a held agent's work reads as held", async () => {
+    f = await setup();
+    const machine = await paired();
+    const { broker } = brokerFor(machine, {
+      reply: async () => {
+        throw new AgentHeldError();
+      },
+    });
+    const viewer = fakeSocket();
+    broker.open(viewer.socket, input(CONTROL));
+    await until(() => viewer.closed !== null, "the refusal");
+    expect(viewer.closed).toEqual({ code: STREAM_CLOSE.refused, reason: "held" });
+  });
+
   test("a viewer that doesn't keep up ends the stream on both sides; too much or malformed input is 4400", async () => {
     f = await setup();
     const machine = await paired();
@@ -416,6 +468,21 @@ describe("who may open which stream, and where", () => {
     expect(await check(f.owner.id, WATCH)).toEqual(refused(4404, "no_desktop"));
     await f.db.update(schema.agents).set({ machineId: null }).where(eq(schema.agents.id, f.agent.id));
     expect(await check(f.owner.id, TERMINAL)).toEqual(refused(4404, "not_found"));
+  });
+
+  test("a held agent's desktop, or one in a workspace on hold, may be watched as it runs; nothing starts it", async () => {
+    const { check, target } = await start();
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "Review" });
+    expect(await check(f.owner.id, WATCH)).toEqual({ ...target, held: true });
+    expect(await check(f.owner.id, TERMINAL)).toEqual(target);
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: false, reason: null });
+    expect(await check(f.owner.id, WATCH)).toEqual(target);
+    await setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+      state: "hold",
+      reason: "Review",
+      notice: "silent",
+    });
+    expect(await check(f.owner.id, WATCH)).toEqual({ ...target, held: true });
   });
 
   test("at most 30 opens a minute per person", async () => {

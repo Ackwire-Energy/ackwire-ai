@@ -477,6 +477,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
     expectedReadyAt: null,
     specs: null,
     secondsLeft: null,
+    secondsWaited: null,
     notifyByEmail: false,
     machineId: null,
   });

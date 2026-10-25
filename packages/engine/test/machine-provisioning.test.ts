@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   agentComputerInfo,
   computerSetup,
@@ -163,6 +163,7 @@ describe("external provisioning", () => {
       expectedReadyAt: null,
       specs: null,
       secondsLeft: null,
+      secondsWaited: expect.any(Number),
       notifyByEmail: false,
       machineId: null,
     });
@@ -242,6 +243,14 @@ describe("external provisioning", () => {
     expect(first.secondsLeft).toBeGreaterThan(350);
     expect(first.secondsLeft).toBeLessThanOrEqual(360);
     expect(events.at(-1)).toMatchObject({ expectedReadyAt: sixMinutes.toISOString(), notifyByEmail: true });
+    // How long it has waited, counted here as well: the workspace was made two minutes ago.
+    await f.db
+      .update(schema.organizations)
+      .set({ createdAt: new Date(Date.now() - 120_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    const waited = (await status()).secondsWaited ?? 0;
+    expect(waited).toBeGreaterThanOrEqual(120);
+    expect(waited).toBeLessThan(130);
 
     // It runs over: the provisioner sends "now" again and again; the first time past stays, so the wait shows late.
     const overdue = new Date(Date.now() - 90_000);
@@ -251,8 +260,14 @@ describe("external provisioning", () => {
     await report(new Date(Date.now() - 1000));
     expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
     expect((await status()).secondsLeft).toBeLessThanOrEqual(-90);
+    // The provisioner's clock a little ahead of this one: its "now" arrives seconds in the future, and still is now.
+    await report(new Date(Date.now() + 10_000));
+    expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
     expect(events.length).toBe(heardBefore);
     // A time ahead replaces it.
+    const soon = new Date(Date.now() + 30_000);
+    await report(soon);
+    expect((await status()).expectedReadyAt).toBe(soon.toISOString());
     const later = new Date(Date.now() + 120_000);
     await report(later);
     expect((await status()).expectedReadyAt).toBe(later.toISOString());
@@ -412,6 +427,7 @@ describe("external provisioning", () => {
           expectedReadyAt: null,
           specs: null,
           secondsLeft: null,
+          secondsWaited: expect.any(Number),
           notifyByEmail: false,
           machineId,
         },
@@ -529,6 +545,50 @@ describe("external provisioning", () => {
     expect(email?.payload).toMatchObject({
       template: { kind: "computer_ready", orgName: "Beta", needsAi: true, hasAgents: false },
     });
+  });
+
+  test("the ready email goes out with the ready or not at all, and not to a workspace that isn't active", async () => {
+    f = await setup();
+    const readyEmail = { publicUrl: "https://chat.example.com", gateway: { hasModelCredential: async () => true } };
+    const queued = async (orgId = f.org.id) =>
+      (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send" && j.orgId === orgId);
+    const state = async (orgId = f.org.id) => {
+      const [row] = await f.db
+        .select({ state: schema.machineProvisioning.state })
+        .from(schema.machineProvisioning)
+        .where(eq(schema.machineProvisioning.orgId, orgId));
+      return row?.state;
+    };
+    await setProvisioning(deps(), f.org.id, { state: "problem" });
+    const { token } = await enrolled();
+    // The email can't be queued: the computer doesn't turn ready without it, and the next hello does both.
+    await f.db.execute(
+      sql.raw(
+        "create function no_email() returns trigger language plpgsql as $$ begin raise exception 'outbox down'; end $$",
+      ),
+    );
+    await f.db.execute(
+      sql.raw(
+        "create trigger no_email before insert on outbox for each row when (new.kind = 'email.send') execute function no_email()",
+      ),
+    );
+    const first = await hello(token, readyEmail);
+    expect(await state()).toBe("problem");
+    expect(await queued()).toEqual([]);
+    await f.db.execute(sql.raw("drop trigger no_email on outbox"));
+    await first.disconnect();
+    await hello(token);
+    expect(await state()).toBe("ready");
+    expect(await queued()).toHaveLength(1);
+
+    // Put on hold while its computer was being made: ready, but no email telling its owners to give a first task.
+    const held = await createOrganization(f.db, (await addUser(f.db, "bia")).id, { name: "Held" });
+    await setProvisioning(deps(), held.organization.id, { state: "problem" });
+    const heldComputer = await enrolled(held.organization.id);
+    await setOrgStanding(deps(), held.organization.id, { state: "hold", reason: "Review", notice: "silent" });
+    await hello(heldComputer.token);
+    expect(await state(held.organization.id)).toBe("ready");
+    expect(await queued(held.organization.id)).toEqual([]);
   });
 
   test("people see it without its insides and can't remove it; the provisioner can", async () => {

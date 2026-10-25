@@ -70,14 +70,16 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
 }
 
 /**
- * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left counted
- * here (a wrong clock on someone's device doesn't matter) and whether the owners get the ready email.
+ * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
+ * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
+ * whether the owners get the ready email.
  */
 function setupStatus(row: ProvisioningRow | null, orgCreatedAt: Date, emails: boolean, now = Date.now()) {
   const readyAt = row?.expectedReadyAt ?? null;
   return {
     ...provisioningStatus(row, orgCreatedAt),
     secondsLeft: readyAt ? Math.round((readyAt.getTime() - now) / 1000) : null,
+    secondsWaited: Math.round((now - (row?.requestedAt ?? orgCreatedAt).getTime()) / 1000),
     notifyByEmail: emails,
   };
 }
@@ -181,17 +183,20 @@ export interface ProvisioningInput {
   specs?: MachineSpecs | null;
 }
 
+/** How far ahead of this server's clock the provisioner's may run: its "now" can arrive that far in the future. */
+const CLOCK_SKEW_MS = 15_000;
+
 /**
  * When a report says it should be ready. While the last part runs over its estimate the provisioner keeps
- * sending the time of sending ("any moment now"): a time already past never replaces a stored one that is
- * past too, so how long ago the first one was tells "almost ready" from "taking a little longer".
+ * sending the time of sending ("any moment now"): a time that is now by its clock never replaces a stored one
+ * already past, so how long ago the first one was tells "almost ready" from "taking a little longer".
  */
 function readyTime(input: ProvisioningInput, stored: Date | null, now: Date): Date | null {
   const reported =
     input.expectedReadyAt ?? (input.etaSeconds == null ? null : new Date(now.getTime() + input.etaSeconds * 1000));
   if (!reported) return null;
-  const past = (t: Date) => t.getTime() <= now.getTime();
-  return stored && past(stored) && past(reported) ? stored : reported;
+  const overdue = stored !== null && stored.getTime() <= now.getTime();
+  return overdue && reported.getTime() <= now.getTime() + CLOCK_SKEW_MS ? stored : reported;
 }
 
 /**
@@ -426,53 +431,69 @@ export interface ReadyEmailDeps {
 }
 
 /**
- * The ready email to the workspace's owners, each group in its language, once per ready (the notification's
- * group key): when they were told to expect it, or the wait from `requested_at` (else the workspace's
- * creation) took over a minute.
+ * What the ready email says, read before the transaction that queues it (`orgHasAi` asks the computers).
+ * Null: nothing to send now, because the computer is ready already (a reconnect), the workspace isn't active
+ * (its agents can't take a first task), or it has no owner.
  */
-async function queueReadyEmail(
-  db: Database,
-  email: ReadyEmailDeps,
-  row: ProvisioningRow,
-  machineId: string,
-  readyAt: Date,
-) {
+async function readyEmailDraft(db: Database, email: ReadyEmailDeps, orgId: string) {
   const [org] = await db
-    .select({ name: organizations.name, createdAt: organizations.createdAt })
+    .select({
+      name: organizations.name,
+      createdAt: organizations.createdAt,
+      standing: organizations.standing,
+      state: machineProvisioning.state,
+    })
     .from(organizations)
-    .where(eq(organizations.id, row.orgId));
-  if (!org) return;
-  const waited = readyAt.getTime() - (row.requestedAt ?? org.createdAt).getTime();
-  if (!row.emailWhenReady && waited <= READY_EMAIL_AFTER_MS) return;
+    .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
+    .where(eq(organizations.id, orgId));
+  if (!org || org.state === "ready" || org.standing !== "active") return null;
   const owners = await db
     .select({ email: users.email, locale: users.locale })
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
-    .where(and(eq(organizationMembers.orgId, row.orgId), eq(organizationMembers.role, "owner")));
-  if (owners.length === 0) return;
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")));
+  if (owners.length === 0) return null;
   const [agent] = await db
     .select({ id: agents.id })
     .from(agents)
-    .where(and(eq(agents.orgId, row.orgId), isNull(agents.archivedAt)))
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .limit(1);
-  const needsAi = !(await orgHasAi({ db, gateway: email.gateway, machines: email.machines }, row.orgId));
+  // Not known now: the step that connects an AI stays in, rather than the computer's ready going unsaid.
+  const hasAi = await orgHasAi({ db, gateway: email.gateway, machines: email.machines }, orgId).catch(() => false);
+  return { org, owners, hasAgents: Boolean(agent), needsAi: !hasAi, publicUrl: email.publicUrl };
+}
+
+/**
+ * The ready email to the workspace's owners, each group in its language, once per ready (the notification's
+ * group key), in the transaction that makes the computer ready: when they were told to expect it, or the
+ * wait from `requested_at` (else the workspace's creation) took over a minute.
+ */
+async function queueReadyEmail(
+  tx: Executor,
+  draft: NonNullable<Awaited<ReturnType<typeof readyEmailDraft>>>,
+  row: ProvisioningRow,
+  machineId: string,
+  readyAt: Date,
+) {
+  const waited = readyAt.getTime() - (row.requestedAt ?? draft.org.createdAt).getTime();
+  if (!row.emailWhenReady && waited <= READY_EMAIL_AFTER_MS) return;
   const groups = emailsByLocale(
-    owners.map((o) => ({ email: o.email, locale: emailLocale(o.locale) })),
+    draft.owners.map((o) => ({ email: o.email, locale: emailLocale(o.locale) })),
     `computer_ready:${machineId}:${readyAt.getTime()}`,
   );
   for (const group of groups) {
-    await queueEmail(db, {
+    await queueEmail(tx, {
       orgId: row.orgId,
       key: group.key,
       to: group.to,
       template: {
         kind: "computer_ready",
         locale: group.locale,
-        orgName: org.name,
+        orgName: draft.org.name,
         specs: row.specs ?? null,
-        needsAi,
-        hasAgents: Boolean(agent),
-        url: `${email.publicUrl.replace(/\/$/, "")}/org/${row.orgId}`,
+        needsAi: draft.needsAi,
+        hasAgents: draft.hasAgents,
+        url: `${draft.publicUrl.replace(/\/$/, "")}/org/${row.orgId}`,
       },
     });
   }
@@ -490,6 +511,7 @@ export async function onManagedMachineHello(
 ) {
   if (machine.kind !== "managed") return;
   const { orgId } = machine;
+  const draft = deps.readyEmail ? await readyEmailDraft(deps.db, deps.readyEmail, orgId) : null;
   const now = new Date();
   const ready = { state: "ready", step: null, reason: null, expectedReadyAt: null, since: now, updatedAt: now };
   const done = await deps.db.transaction(async (tx) => {
@@ -504,6 +526,9 @@ export async function onManagedMachineHello(
       .set({ machineId: machine.id, updatedAt: now })
       .where(and(eq(agents.orgId, orgId), isNull(agents.machineId), isNull(agents.archivedAt)))
       .returning({ id: agents.id });
+    // The owners were told it would come: it goes out with the ready, or neither happens and the next hello
+    // tries both again.
+    if (draft) await queueReadyEmail(tx, draft, row, machine.id, now);
     return { row, agentIds: given.map((a) => a.id) };
   });
   if (!done) return;
@@ -522,7 +547,6 @@ export async function onManagedMachineHello(
   const { readyEmail, ...rest } = deps;
   await publishProvisioning({ ...rest, emails: Boolean(readyEmail) }, orgId, done.row, machine.id);
   await notifyComputerReady(deps, machine, now).catch(() => {});
-  if (readyEmail) await queueReadyEmail(deps.db, readyEmail, done.row, machine.id, now);
 }
 
 /** Whether the workspace's computer is on its way (reported, not ready): agents say so instead of "no computer". */
@@ -557,6 +581,7 @@ export async function computerSetup(
       expectedReadyAt: null,
       specs: null,
       secondsLeft: null,
+      secondsWaited: null,
       notifyByEmail: false,
       machineId: null,
     };
