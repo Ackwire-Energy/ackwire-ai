@@ -30,8 +30,9 @@ test("seeds are stable and small", () => {
   expect(seedOf("agent-1")).toBeLessThan(8);
 });
 
-test("layout leaves room for an accessory only from 26 points", () => {
-  expect(agentLayout(20, true).withAccessory).toBe(false);
+test("layout leaves room for an accessory at every size (the composer's and the bar's faces too)", () => {
+  expect(agentLayout(20, true).withAccessory).toBe(true);
+  expect(agentLayout(20, false).withAccessory).toBe(false);
   const big = agentLayout(40, true);
   expect(big.withAccessory).toBe(true);
   expect(big.inner).toBeCloseTo(29.6);
@@ -64,7 +65,7 @@ test("framed layout: the agent stands centered above the bottom edge, smaller wi
   const hat = framedLayout(50, true);
   expect(hat.withAccessory).toBe(true);
   expect(hat.inner).toBeLessThan(plain.inner);
-  expect(framedLayout(22, true).withAccessory).toBe(false);
+  expect(framedLayout(22, true).withAccessory).toBe(true);
 });
 
 test("the ink orbit: the head in full ink, a fading trail, the rest faint", () => {
