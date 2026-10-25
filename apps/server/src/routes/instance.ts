@@ -23,8 +23,7 @@ const InstanceResponse = z
     signIn: z.object({ email: z.boolean(), google: z.boolean(), github: z.boolean(), apple: z.boolean() }),
     signup: z.enum(["open", "invite"]).openapi({ description: "`invite`: only people with an invitation sign up." }),
     ownerClaim: z.boolean().openapi({
-      description:
-        "No account yet, and only the owner link its installer printed creates the first one (`/owner#claim=…`).",
+      description: "No account yet, and only the owner link (`/owner#claim=…`) creates the first one.",
     }),
   })
   .openapi("Instance");

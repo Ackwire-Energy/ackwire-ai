@@ -90,7 +90,7 @@ Usage:
       This server's own computer (HOST_COMPUTER_TOKEN on the server, the same token here): one
       connection per organization of the person who installed the server, each agent as its own
       user on Linux (run it as root). Organizations come and go with the server, checked every minute.
-      --state    where it keeps each organization's connection (default: the home; on a Mac, its host folder)
+      --state    where it keeps each organization's connection (default: the home; on a Mac, <home>/host)
       --no-exec  agents can't run commands here (Claude Code, Codex and the browser stay on)
   agentes-runner host --once --server <url> --token-file <path> [--state <dir>] [--name <name>] [--rotate <orgId>]...
       One sync for a program that runs the organizations' connections itself (the agentes.chat app):
@@ -107,7 +107,8 @@ Usage:
   agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...]
       Folders agents may use besides their own (an agent's handle, as on the site).
   agentes-runner tools [list | enable <tool> | disable <tool>]
-      Turns claude (Claude Code), codex (Codex) or commands on or off on this computer.
+      Turns claude (Claude Code), codex (Codex), commands, browser, desktop or terminal on or off on
+      this computer.
   agentes-runner desktop-check --agent <handle>
       Checks an agent's desktop and terminal here (Linux): starts its desktop, logs in to it as the
       person in control and as a watcher (who can't move the pointer), reads it and acts on it the

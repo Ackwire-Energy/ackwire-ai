@@ -57,7 +57,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       if (policy.ownerByLink && (await countUsers(db)) === 0) {
         throw new APIError("FORBIDDEN", {
           code: OWNER_CLAIM_REQUIRED,
-          message: "This server waits for its owner: open the link its installer gave you.",
+          message: "This server waits for its owner: open its owner link.",
         });
       }
       throw new APIError("FORBIDDEN", {

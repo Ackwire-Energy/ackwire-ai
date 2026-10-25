@@ -105,8 +105,8 @@ It asks only for what it needs and fills in only what's missing, so running it a
   --email-api-key <key>               Key of a Resend-compatible API (MillionSend, Resend)
   --email-api-url <url>               That API's address (default ${DEFAULT_EMAIL_API_URL})
   --email-from <sender>               "agentes <ola@example.com>"
-  --computer <yes|no>                 This machine as your agents' computer. Default yes on Linux with
-                                      4 GB of memory or more (as root) and on a Mac.
+  --computer <yes|no>                 This machine as your agents' computer. Default yes on a Mac, and
+                                      on Linux as root with systemd, apt-get and 4 GB of memory or more.
   --computer-commands <yes|no>        Whether agents may run commands there (default no on a Mac,
                                       where they work as you; yes on Linux, each agent its own user)
   --telemetry <on|off>                Send anonymous usage statistics to agentes.chat (default on)

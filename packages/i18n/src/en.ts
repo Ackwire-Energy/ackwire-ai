@@ -108,8 +108,7 @@ export const en: Translations = {
       sentLead: "It's valid for 1 hour. Not there in a minute? Check spam.",
       openMail: "Open {{app}}",
       ownerWaits: "This server waits for its owner.",
-      ownerWaitsLead:
-        "Open the link its installer showed at the end, on this computer or on your phone. To see it again, run the install command on the server once more.",
+      ownerWaitsLead: "Open this server's owner link (it ends in /owner#claim=…), on this computer or on your phone.",
       noPassword: "This account signs in from the agentes.chat app.",
       noPasswordLead:
         "Open the app on the computer that runs this server. There, in your account menu, choose Add a password: then you can sign in here too.",
@@ -140,11 +139,10 @@ export const en: Translations = {
       title: "Set up this server",
       lead: "Create its owner account. You'll invite your team after.",
       create: "Create the owner account",
-      noLink: "Open the link from the installer",
-      noLinkLead:
-        "This page needs the link the installer showed at the end. To see it again, run the install command on the server once more.",
+      noLink: "Open this server's owner link",
+      noLinkLead: "This page needs this server's owner link (it ends in #claim=…).",
       wrongLink: "This link isn't this server's.",
-      wrongLinkLead: "Open the newest link the installer showed.",
+      wrongLinkLead: "Open the newest owner link made for this server.",
       taken: "This server already has its owner.",
       takenLead: "Sign in with your account.",
     },

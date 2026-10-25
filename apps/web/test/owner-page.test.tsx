@@ -9,7 +9,7 @@ import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
 /**
- * The installation's first account when its installer left an owner link (ADR 0060 §6), and the
+ * The installation's first account when an owner link holds it (ADR 0060 §6), and the
  * account that signs in only through the app on the server's computer.
  */
 
@@ -63,7 +63,7 @@ describe("the owner link", () => {
 
   test("without the claim it says where the link is", async () => {
     await renderApp("/owner", { api: createFakeApi(seedState({ me: null })) });
-    expect(heading()).toBe("Abra o link do instalador");
+    expect(heading()).toBe("Abra o link de dono deste servidor");
     expect(screen().queryByRole("textbox")).toBeNull();
   });
 
