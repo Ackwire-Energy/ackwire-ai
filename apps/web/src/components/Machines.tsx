@@ -890,7 +890,10 @@ function GrantCard({ machine: m }: { machine: Machine }) {
   );
 }
 
-/** The workspace's own computer's page: what is on it for every agent, in a person's words. */
+/**
+ * The workspace's own computer's page: what is on it for every agent, in a person's words, and where a person
+ * opens it. The browser and the files are on each agent's screen, not cards of their own.
+ */
 function OnThisComputerCard() {
   const { t } = useTranslation();
   return (
@@ -902,6 +905,10 @@ function OnThisComputerCard() {
         <li>
           <Icon name="computer" size={14} />
           {t("computers.onIt.screens")}
+        </li>
+        <li>
+          <Icon name="globe" size={14} />
+          {t("computers.onIt.browser")}
         </li>
         <li>
           <ProviderLogo id="claude_code" size="xs" />

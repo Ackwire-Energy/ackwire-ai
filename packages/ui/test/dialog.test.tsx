@@ -5,7 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Button, Dialog, DialogFooter, DialogSearchList, Input } from "../src";
+import { Button, Dialog, DialogBody, DialogFooter, DialogSearchList, Input } from "../src";
 
 function Harness() {
   const [open, setOpen] = useState(false);
@@ -90,5 +90,23 @@ describe("Dialog", () => {
     await act(async () => fireEvent.change(search, { target: { value: "deploy" } }));
     expect(body().queryAllByRole("listitem")).toHaveLength(0);
     expect(body().getByText("Nada encontrado com “deploy”.")).toBeTruthy();
+  });
+});
+
+describe("Dialog without a footer", () => {
+  test("its body is the last thing in it, and then keeps the dialog's own edge under its last item", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar" width={480}>
+        <DialogBody>
+          <Button>Chave de API</Button>
+        </DialogBody>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    expect(dialog.lastElementChild?.classList.contains("ac-dialog__body")).toBe(true);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toMatch(/\n\.ac-dialog__body:last-child \{\s*padding-bottom: 20px;/);
+    // On a phone, the sheet's own 16 px.
+    expect(css).toMatch(/@media \(max-width: 640px\) \{[^@]*\.ac-dialog__body:last-child \{\s*padding-bottom: 16px;/);
   });
 });

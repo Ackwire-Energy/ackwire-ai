@@ -151,10 +151,10 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     await push({ state: "ready", machineId: m.id });
     expect(card().textContent).toContain("Online");
     expect(card().textContent).toContain("Usado por Ada");
-    // The page says what the agents' computer is here, in one line; nothing else to connect or pick.
-    expect(document.body.textContent).toContain(
-      "Onde os agentes trabalham: um computador só deste workspace, sempre ligado, com um usuário só para cada agente.",
-    );
+    // The page says where the agents work in one line, and leaves what the computer is to its card; nothing else
+    // to connect or pick.
+    expect(document.body.textContent).toContain("Onde os agentes trabalham: o computador deste workspace.");
+    expect(document.body.textContent?.split("sempre ligado")).toHaveLength(2);
     expect(card().textContent).not.toContain("Passo");
     expect(card().textContent).toContain("Um usuário para cada agente");
     expect(screen().queryByRole("region", { name: "Outros computadores" })).toBeNull();
@@ -200,7 +200,9 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     });
     expect(screen().getByRole("heading", { name: "Computador da Acme" })).toBeTruthy();
     const on = screen().getByRole("region", { name: "Neste computador" });
-    expect(on.textContent).toContain("Uma tela, um navegador e uma pasta para cada agente");
+    // What a person opens, and where: the agent's screen with Open, its browser and files on that screen.
+    expect(on.textContent).toContain("A tela de cada agente: Abrir mostra ao vivo, e você pode assumir o controle");
+    expect(on.textContent).toContain("O navegador e os arquivos dele abrem nessa tela, pela barra na parte de baixo");
     expect(on.textContent).toContain("O Claude Code e o Codex, prontos para cada agente entrar");
     expect(on.textContent).toContain("Planos de código da Z.ai (GLM), Kimi, MiniMax e OpenCode");
     expect(on.textContent).toContain("Sempre ligado, dia e noite");

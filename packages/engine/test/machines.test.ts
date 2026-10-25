@@ -12,6 +12,7 @@ import {
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
+  createAgent,
   createMachineHub,
   declineSecret,
   deleteMachine,
@@ -381,6 +382,23 @@ describe("pairing", () => {
 });
 
 describe("machines and targets", () => {
+  test("a computer lists its agents in the order they came, as the agents' own list does", async () => {
+    f = await setup();
+    const qa = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "QA", handle: "qa" },
+      { model: "claude-sonnet-5-5" },
+    );
+    const box = await pair();
+    // The newer agent moves there first: the order its rows were written in isn't the one people see.
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, qa.id, box.machineId);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, box.machineId);
+    const [machine] = await listMachines(f.db, f.owner.id, f.org.id);
+    expect(machine?.agents.map((a) => a.handle)).toEqual(["dev", "qa"]);
+  });
+
   test("list, rename and delete: every member sees them, only the pairer or an admin changes them", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");

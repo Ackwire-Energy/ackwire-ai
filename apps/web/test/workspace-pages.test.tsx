@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -334,11 +334,48 @@ describe("Equipe", () => {
     expect(sky.textContent).toContain("João");
     await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
     const card = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(card.textContent).toContain("Chame para");
+    expect(card.textContent).toContain("O que faz");
     expect(card.textContent).toContain("Arquivos");
     expect(within(card).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );
     expect(screen().getByText("Nenhum agente pediu ajuda a outro nas últimas 24 h.")).toBeTruthy();
+  });
+
+  test("the card: what it does, available or with no AI, each ability named and drawn its own way", async () => {
+    const state = seedState({
+      aiStatus: { any: true, agents: [{ agentId: ATLAS_ID, state: "no_ai", reason: "no_key" }] },
+    });
+    const api = createFakeApi(state);
+    const team = api.agents.team;
+    api.agents.team = async (orgId) => {
+      const t = await team(orgId);
+      return {
+        ...t,
+        agents: t.agents.map((a) => ({ ...a, capabilities: ["sandbox", "desktop", "browser", "drive"] })),
+      };
+    };
+    await renderApp(`/org/${ORG_ID}/team`, { api });
+    await settle(4);
+    // The same action as the sidebar's, in the same words.
+    const head = document.querySelector(".team-head") as HTMLElement;
+    expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    // Its role is beside its name; what it does comes from its instructions.
+    expect(ada.querySelector(".team-card__meta")?.textContent).toContain("Dev");
+    expect(ada.querySelector(".team-card__call")?.textContent).toBe("Instruções de Ada.");
+    expect(ada.querySelector(".team-card__status")?.textContent).toBe("Disponível");
+    expect(ada.textContent).not.toContain("Livre");
+    const chip = (name: string) =>
+      Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name) as HTMLElement;
+    for (const name of ["Computador", "Tela", "Navegador", "Arquivos"]) expect(chip(name)).toBeTruthy();
+    const drawn = new Set(["Computador", "Tela", "Navegador"].map((n) => chip(n).querySelector("svg")?.innerHTML));
+    expect(drawn.size).toBe(3);
+    await click(within(sky).getByRole("button", { name: "Atlas, ver detalhes" }));
+    const atlas = screen().getByRole("dialog", { name: "Detalhes de Atlas" });
+    expect(within(atlas).getByRole("button", { name: "Sem IA" })).toBeTruthy();
+    expect(atlas.textContent).not.toContain("Disponível");
   });
 });

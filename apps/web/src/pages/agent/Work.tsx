@@ -13,6 +13,7 @@ import {
   useAgentBrain,
   useAgentBrowserSettings,
   useAgentScopes,
+  useAiStatus,
   useApi,
   useComputer,
   useCredentials,
@@ -27,6 +28,7 @@ import {
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
@@ -70,6 +72,7 @@ import { CLOUD, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
+import { useConnectAi } from "@/components/ConnectAi";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import {
@@ -176,6 +179,10 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const edition = useComputerEdition(org.id);
   const models = useModels();
   const work = useWork();
+  const connect = useConnectAi();
+  const aiStatus = useAiStatus(org.id);
+  // With no AI it thinks with nothing, whatever it is set to: the cell says so, as the badge by its name does.
+  const noAi = aiStateOf(aiStatus.data, agent.id) === "no_ai";
   const view = work.brain.data;
   const kind: BrainKind = view?.brain ?? agent.brain?.kind ?? "model";
   const orgModel = isAuto(saved.model)
@@ -258,23 +265,35 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
               onOpen={can("machine") && edition === "selfhost" ? () => onOpen("computer") : undefined}
             />
           )}
-          <Cell
-            icon={
-              kind === "model" ? (
-                <Icon name="brainAgent" size={16} />
-              ) : plan ? (
-                <ProviderLogo id={(view ? thinkingAccount?.provider : agent.brain?.provider) ?? kind} size="sm" />
-              ) : (
-                <BrainLogo kind={kind} size="sm" />
-              )
-            }
-            label={t("agentPage.work.cell.brain")}
-            value={kind === "model" ? orgModel : t(`brain.card.${kind}`)}
-            more={kind === "model" ? null : [planModel, effort].filter(Boolean).join(" · ") || null}
-            sub={kind === "model" ? t("agentPage.work.orgModel") : sub}
-            openLabel={t("agentPage.work.open.brain")}
-            onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
-          />
+          {noAi ? (
+            <Cell
+              icon={<Icon name="plug" size={16} />}
+              label={t("agentPage.work.cell.brain")}
+              value={t("noAi.chip")}
+              sub={t("connectAi.title.any")}
+              muted
+              openLabel={t("connectAi.title.any")}
+              onOpen={connect ? () => connect.open({ agentId: agent.id }) : undefined}
+            />
+          ) : (
+            <Cell
+              icon={
+                kind === "model" ? (
+                  <Icon name="brainAgent" size={16} />
+                ) : plan ? (
+                  <ProviderLogo id={(view ? thinkingAccount?.provider : agent.brain?.provider) ?? kind} size="sm" />
+                ) : (
+                  <BrainLogo kind={kind} size="sm" />
+                )
+              }
+              label={t("agentPage.work.cell.brain")}
+              value={kind === "model" ? orgModel : t(`brain.card.${kind}`)}
+              more={kind === "model" ? null : [planModel, effort].filter(Boolean).join(" · ") || null}
+              sub={kind === "model" ? t("agentPage.work.orgModel") : sub}
+              openLabel={t("agentPage.work.open.brain")}
+              onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
+            />
+          )}
           {!member && (
             <Cell
               icon={<Icon name={work.browserWord === "off" ? "block" : "globe"} size={16} />}

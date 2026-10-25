@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
+import { excerpt } from "@agenteschat/client/lib/text";
 import { Avatar, Button, Card, CardFooter, Chip, Icon, Meter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,9 @@ import { Numbers } from "./Hero";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
 import { WorkCard } from "./Work";
+
+/** How much of its instructions "What it does" shows: about three lines; the rest is a click away. */
+const DOES_PREVIEW = 280;
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
 export function OverviewTab() {
@@ -125,7 +129,7 @@ export function OverviewTab() {
               }
             />
             {agent.instructions.trim() ? (
-              <p className="agp-prose agp-clamp">{agent.instructions}</p>
+              <p className="agp-prose">{excerpt(agent.instructions, DOES_PREVIEW)}</p>
             ) : (
               <p className="muted">{t("agent.noInstructions", g)}</p>
             )}

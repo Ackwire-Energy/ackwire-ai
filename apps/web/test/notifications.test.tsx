@@ -368,6 +368,29 @@ describe("a new computer connected (ADR 0036, admins)", () => {
   });
 });
 
+describe("what the workspace itself tells: nobody's face, its own", () => {
+  test("its computer ready, its standing: an icon where the face goes, and unread in the headline's weight", async () => {
+    const ready = notification({ id: "n-ready", kind: "computer_ready", updatedAt: ago(3) });
+    const hold = notification({
+      id: "n-hold",
+      kind: "org_standing",
+      latest: { statusTo: "hold" },
+      readAt: ago(1),
+      updatedAt: ago(2),
+    });
+    await go(seedState({ notifications: [ready, hold] }));
+    const row = (id: string) => document.querySelector(`[data-n="${id}"]`) as HTMLElement;
+    expect(row("n-ready").textContent).toContain("O computador do seu workspace está pronto");
+    for (const id of ["n-ready", "n-hold"]) expect(row(id).querySelector(".nt-who .nt-sys svg")).toBeTruthy();
+    expect(row("n-ready").classList.contains("is-unread")).toBe(true);
+    expect(row("n-hold").classList.contains("is-unread")).toBe(false);
+    // A headline with no name in it carries the unread weight whole.
+    const css = await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text();
+    expect(css).toMatch(/\.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 600/);
+    expect(css).toMatch(/\.nt-item:not\(\.is-unread\) \.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 500/);
+  });
+});
+
 describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
   test("in its browser, or on its computer when the request is on its desktop", async () => {
     const ask = (id: string, screen?: "desktop") =>

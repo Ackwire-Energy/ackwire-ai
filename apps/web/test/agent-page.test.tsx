@@ -111,6 +111,22 @@ describe("agent page: tabs and the URL", () => {
   });
 });
 
+describe("agent page: what it does", () => {
+  test("the start of its instructions in whole sentences, never a full stop before the ellipsis", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions =
+        "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder, e volta com o que achou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos; para mudanças grandes, abre o PR como rascunho e explica o plano ali.\nNunca faz merge sozinho: pede revisão a uma pessoa.";
+    await go("", state);
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    const text = does.querySelector(".agp-prose")?.textContent ?? "";
+    expect(text).toEndWith("explica o plano ali.");
+    expect(text).not.toContain("…");
+    expect(text).not.toContain("Nunca faz merge");
+  });
+});
+
 describe("agent page: its files", () => {
   test("Arquivos lists the Drive files it made or changed, filters by kind, and opens one", async () => {
     await go("?tab=files");

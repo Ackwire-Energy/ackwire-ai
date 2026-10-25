@@ -242,7 +242,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       name: a.name,
       handle: a.handle,
       role: a.role,
-      callFor: a.role.trim() || firstSentence(a.instructions),
+      summary: firstSentence(a.instructions),
       appearance: (a.appearance ?? null) as AgentAppearance | null,
       ownerUserId: a.ownerUserId,
       capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),

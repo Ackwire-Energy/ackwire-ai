@@ -1,6 +1,7 @@
 import type { Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
-import { useTeam } from "@agenteschat/client";
+import { useAiStatus, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Avatar,
@@ -23,6 +24,7 @@ import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingCards } from "@/components/Loading";
+import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useTheme } from "@/lib/theme";
@@ -44,6 +46,9 @@ const CAPS = {
   forum: "message",
   wiki: "book",
   sandbox: "computer",
+  desktop: "pointer",
+  browser: "globe",
+  database: "database",
   github: "repo",
   sentry: "alert",
   linear: "layers",
@@ -170,7 +175,7 @@ export function TeamPage() {
         {can(org.role, "manage_agents") && (
           <Button asChild variant="primary" icon="plus">
             <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-              {t("team.newAgent")}
+              {t("shell.createAgent")}
             </Link>
           </Button>
         )}
@@ -408,6 +413,7 @@ function TeamSky({ team }: { team: Team }) {
 function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const aiStatus = useAiStatus(org.id);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
   return (
@@ -435,18 +441,20 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
               <PixelSpinner size={14} color={colorOf(agent)} />
               {t("team.workingNow")}
             </span>
+          ) : aiStateOf(aiStatus.data, agent.id) === "no_ai" ? (
+            <NoAiChip agentId={agent.id} />
           ) : (
             <span className="team-card__status">
-              <Icon name="clock" size={14} />
-              {t("team.free")}
+              <span className="team-card__dot" aria-hidden="true" />
+              {t("team.available")}
             </span>
           )}
         </div>
       </div>
-      {agent.callFor && (
+      {agent.summary && (
         <div className="team-card__sec">
-          <span className="team-card__eyebrow">{t("team.callFor")}</span>
-          <p className="team-card__call">{agent.callFor}</p>
+          <span className="team-card__eyebrow">{t("team.does")}</span>
+          <p className="team-card__call">{agent.summary}</p>
         </div>
       )}
       <div className="team-card__sec">

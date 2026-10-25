@@ -13,6 +13,7 @@ import {
   useThreadMessages,
 } from "@agenteschat/client";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
@@ -32,6 +33,7 @@ import { routineNotificationWords, type Words } from "@agenteschat/client/lib/ro
 import {
   Button,
   Chip,
+  ComputerIcon,
   cx,
   ExpiryFuse,
   Icon,
@@ -136,6 +138,23 @@ function Face({
     return <AgentAvatar agentId={actor.id} name={name} size={size} state={state} className={className} labelled />;
   return (
     <ActorAvatar actor={{ type: "person", id: actor.id }} name={name} size={size} className={className} labelled />
+  );
+}
+
+/** Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. */
+function SystemFace({ n }: { n: AppNotification }) {
+  if (n.kind === "computer_ready")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
+      </span>
+    );
+  if (n.kind !== "org_standing") return null;
+  const status = n.latest.statusTo;
+  return (
+    <span className="nt-sys" aria-hidden="true">
+      <Icon name={status === "active" ? "check" : status === "suspended" ? "block" : "pause"} size={16} />
+    </span>
   );
 }
 
@@ -586,8 +605,10 @@ function Row({
       <Face actor={first} dir={dir} size="sm" className="nt-av22" />
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
-  ) : (
+  ) : first ? (
     <Face actor={first} dir={dir} className="nt-av28" />
+  ) : (
+    <SystemFace n={n} />
   );
   const l = n.latest;
   // Asked while nobody watched (ADR 0053 §8): who asked leads an approval's line, its why follows.

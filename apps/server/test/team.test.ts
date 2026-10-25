@@ -10,7 +10,7 @@ beforeEach(async () => {
 afterEach(() => t.close());
 
 type Team = {
-  agents: { id: string; handle: string; callFor: string; capabilities: string[]; busy: boolean; ownerUserId: string }[];
+  agents: { id: string; handle: string; summary: string; capabilities: string[]; busy: boolean; ownerUserId: string }[];
   people: { id: string; name: string }[];
   consultations: Record<string, unknown>[];
 };
@@ -24,6 +24,7 @@ test("team: agents with what they can do and who is busy, their people, and who 
       json: {
         name: "Infra",
         handle: "infra",
+        role: "Ops",
         instructions: "Cuida do deploy e dos servidores. Responde rápido.",
         credentialId,
       },
@@ -71,8 +72,9 @@ test("team: agents with what they can do and who is busy, their people, and who 
   const inf = team.agents.find((a) => a.id === infra.id);
   expect(dev?.busy).toBe(true);
   expect(inf?.busy).toBe(false);
-  // No role: the first sentence of its instructions says when to call it.
-  expect(inf?.callFor).toBe("Cuida do deploy e dos servidores.");
+  // What it does: the first sentence of its instructions, never its role (the card shows that by its name).
+  expect(inf?.summary).toBe("Cuida do deploy e dos servidores.");
+  expect(dev?.summary).toBe("");
   expect(inf?.capabilities).toContain("drive");
   expect(inf?.capabilities).not.toContain("drive:read");
   expect(team.people.map((p) => p.id)).toContain(inf?.ownerUserId ?? "");

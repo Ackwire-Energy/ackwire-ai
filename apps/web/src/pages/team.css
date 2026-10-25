@@ -208,6 +208,15 @@
 .team-card__status[data-busy] {
   color: var(--ink);
 }
+.team-card__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.team-card__title > .noai-chip {
+  align-self: flex-start;
+}
 .team-card__sec {
   display: flex;
   flex-direction: column;

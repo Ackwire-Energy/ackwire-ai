@@ -303,9 +303,9 @@ export function agentRoutes(deps: AppDeps) {
     name: z.string(),
     handle: z.string(),
     role: z.string(),
-    callFor: z
+    summary: z
       .string()
-      .openapi({ description: "When to call it: its role, or the first sentence of its instructions." }),
+      .openapi({ description: "What it does: the first sentence of its instructions (empty without any)." }),
     appearance: AgentAppearance.nullable(),
     ownerUserId: z.string().nullable(),
     capabilities: z

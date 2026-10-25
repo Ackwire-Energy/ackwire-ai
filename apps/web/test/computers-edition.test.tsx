@@ -49,9 +49,7 @@ const region = (name: string) => screen().queryByRole("region", { name });
 describe("Configurações → Computadores on the Cloud: one computer, nothing to connect or pick", () => {
   test("the lead line and the workspace's card, and nothing else", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`, { setup: { step: "installing", specs: null } });
-    expect(body()).toContain(
-      "Onde os agentes trabalham: um computador só deste workspace, sempre ligado, com um usuário só para cada agente.",
-    );
+    expect(body()).toContain("Onde os agentes trabalham: o computador deste workspace.");
     expect(region("Computador da Acme")).toBeTruthy();
     for (const name of [
       "Outros computadores",
@@ -116,7 +114,7 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Tentar de novo" })));
     await settle(8);
     expect(region("Computador da Acme")).toBeTruthy();
-    expect(body()).toContain("Onde os agentes trabalham: um computador só deste workspace");
+    expect(body()).toContain("Onde os agentes trabalham: o computador deste workspace.");
   });
 
   test("an agent on it: Trabalha no Computador da Acme, with no chevron and no picker in its settings", async () => {

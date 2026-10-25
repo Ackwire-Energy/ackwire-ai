@@ -95,3 +95,25 @@ export function webmailOf(
   if (domain.startsWith("yahoo.")) return { name: "Yahoo Mail", url: "https://mail.yahoo.com" };
   return null;
 }
+
+/** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
+const STOPS = /[.!?…](?=\s)|\n/g;
+
+/**
+ * The start of a text in at most `max` characters: whole sentences and lines while they fit, so a full stop is
+ * never followed by an ellipsis. A first sentence longer than that is cut at a word, with "…".
+ */
+export function excerpt(text: string, max: number) {
+  const whole = text.trim();
+  if (whole.length <= max) return whole;
+  let end = 0;
+  for (const stop of whole.matchAll(STOPS)) {
+    const at = stop.index + (stop[0] === "\n" ? 0 : 1);
+    if (at > max) break;
+    end = at;
+  }
+  if (end > 0) return whole.slice(0, end).trimEnd();
+  const cut = whole.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, "")}…`;
+}

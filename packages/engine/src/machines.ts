@@ -291,6 +291,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
         .select({ id: agents.id, name: agents.name, handle: agents.handle, machineId: agents.machineId })
         .from(agents)
         .where(and(eq(agents.orgId, orgId), inArray(agents.machineId, ids), isNull(agents.archivedAt)))
+        // The agents' order everywhere else (the sidebar, the team): who came first.
+        .orderBy(agents.createdAt)
     : [];
   return rows.map(({ machine: m, pairedByName }) => {
     const mine = m.pairedByUserId === actorId;

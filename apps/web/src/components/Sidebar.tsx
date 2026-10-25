@@ -831,7 +831,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         <Avatar name={me.user.name} size="sm" imageUrl={photo} />
         <span className="sidebar__user-text">
           <span className="sidebar__user-name">{me.user.name}</span>
-          {budgetUsed !== null && <BudgetBar percent={budgetUsed} />}
+          {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>
       </button>
       <MenuOverlay
@@ -1205,8 +1205,11 @@ export function isTimeZone(zone: string) {
   }
 }
 
-/** Thin bar + "37%": how much of the agents' monthly budgets the workspace used. */
-function BudgetBar({ percent }: { percent: number }) {
+/**
+ * Thin bar + "37%": how much of the agents' monthly budgets the workspace used, named where nothing else says
+ * what it is (under the person's name). Nothing used, nothing drawn: the bar's smallest mark means "a little".
+ */
+function BudgetBar({ percent, label }: { percent: number; label?: string }) {
   const { t, i18n } = useTranslation();
   const level = percent >= 100 ? "full" : percent >= 80 ? "high" : "ok";
   return (
@@ -1216,8 +1219,9 @@ function BudgetBar({ percent }: { percent: number }) {
       title={t("shell.budgetUsedHint", { percent: formatPercent(i18n.language, percent) })}
       aria-hidden="true"
     >
+      {label && <span className="sidebar__usage-label">{label}</span>}
       <span className="sidebar__usage-track">
-        <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
+        {percent > 0 && <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, percent)}%` }} />}
       </span>
       <span className="sidebar__usage-value">{formatPercent(i18n.language, percent)}</span>
     </span>
