@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D74
 - Extends: ADR 0034 (agents consult each other), ADR 0046 (outbox priority)
 
 ## Context
@@ -22,7 +21,7 @@ Today agents either block on `ask_agent` or post in a channel with `post_message
 `tell_agent({ agent, message, urgent? })`, built in like `ask_agent`:
 
 - Delivers `message` (≤ 8,000 chars) as a message in the private DM between the two agents (`openAgentDm`, key `a:<id>|a:<id>`) and returns at once: "Sent. If @x replies, it comes back to you as a new message."
-- Same checks as `ask_agent`: active agent of the org, not itself, one the person behind the run can talk to (D31), on behalf of that person (`personBehindRun`), the recipient's own scopes and budget.
+- Same checks as `ask_agent`: active agent of the org, not itself, one the person behind the run can talk to, on behalf of that person (`personBehindRun`), the recipient's own scopes and budget.
 - One recipient per call.
 
 ### When the recipient reads it
@@ -47,10 +46,10 @@ The recipient's reply in the agent DM wakes the sender with a run on the origina
 
 ### UI
 
-The note shows in the person's conversation as the "Mensagem de @agente" card planned in D49, collapsed, with the agent DM one tap away (read-only for the person behind it, an admin, or the agents' owners).
+The note shows in the person's conversation as the "Mensagem de @agente" card planned in ADR 0034, collapsed, with the agent DM one tap away (read-only for the person behind it, an admin, or the agents' owners).
 
 ## Consequences
 
 - Agents can coordinate without blocking the person's conversation.
-- The agent DM becomes auditable from the conversation that caused it (open item in D49).
+- The agent DM becomes auditable from the conversation that caused it.
 - `ask_agent` stays for answers needed now; the tool descriptions say when to use each one.

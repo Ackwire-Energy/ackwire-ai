@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, eq, inArray, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
+import { agentsByHandle } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
 import {
   createForumTopic,
@@ -20,17 +21,6 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** `@handles` → agent ids of the org; the missing ones are named in the error. */
-async function agentsByHandle(ctx: ToolContext, raw: unknown) {
-  const handles = (Array.isArray(raw) ? raw : []).map((h) => String(h).replace(/^@/, "").trim().toLowerCase());
-  const rows = await ctx.db
-    .select({ id: schema.agents.id, handle: schema.agents.handle })
-    .from(schema.agents)
-    .where(and(eq(schema.agents.orgId, ctx.orgId), inArray(schema.agents.handle, handles)));
-  const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
-  return { handles, rows, missing };
-}
-
 const FORMAT = {
   type: "string",
   enum: ["decision", "plan"],
@@ -41,7 +31,7 @@ const FORMAT = {
 /**
  * Forum tools (scope `forum:write`, on by default):
  * - `suggest_forum_topic`: a "Worth a forum?" card in this conversation; a
- *   person opens it (D45). What agents use when nobody asked for a forum.
+ *   person opens it. What agents use when nobody asked for a forum.
  * - `open_forum_topic`: only when a person asked ("@Theo take this to the
  *   forum" / "@Theo leva isso pro fórum"): the topic is that person's.
  * - `post_in_forum` and `read_forum_topic`.
@@ -75,7 +65,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
             .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
           if (channel[0]?.kind === "forum")
             return { content: "You are already in a forum topic: say it in your post.", isError: true };
-          const { handles, rows, missing } = await agentsByHandle(ctx, input.agents);
+          const { handles, rows, missing } = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
           if (missing.length > 0)
             return { content: `No agent ${missing.map((h) => `@${h}`).join(", ")}.`, isError: true };
           const [run] = await ctx.db
@@ -131,7 +121,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
         try {
           const requester = await personBehindCall(ctx);
           if (!requester) return { content: "Only a person's request can open a forum topic.", isError: true };
-          const { handles, rows, missing } = await agentsByHandle(ctx, input.agents);
+          const { handles, rows, missing } = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
           if (missing.length > 0)
             return { content: `No agent ${missing.map((h) => `@${h}`).join(", ")}.`, isError: true };
           const topic = await createForumTopic(

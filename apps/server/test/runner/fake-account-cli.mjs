@@ -4,13 +4,18 @@
 // `signed-in` in that folder is the sign-in.
 // $FAKE_ACCOUNT_MODE: "silent" prints nothing and waits; "fail" refuses.
 // $FAKE_ACCOUNT_CODE: the Claude code it accepts (default "good-code").
-// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder).
+// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder). `auth login --email <address>`
+// signs in like `auth login` (the address is only the account to offer). With
+// $ANTHROPIC_API_KEY set, `auth status` says it is signed in with that key, as
+// Claude Code does whatever the folder holds.
 import { appendFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
 const args = process.argv.slice(2).join(" ");
-const home = process.env.CLAUDE_CONFIG_DIR ?? process.env.CODEX_HOME ?? "";
+// Each reads only its own variable, as the real CLIs do (`auth …` is Claude Code, the rest Codex): a
+// CLAUDE_CONFIG_DIR inherited from the shell (set when tests run inside Claude Code) must not move Codex's folder.
+const home = (args.startsWith("auth ") ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?? "";
 const marker = path.join(home, "signed-in");
 const mode = process.env.FAKE_ACCOUNT_MODE ?? "";
 const log = process.env.FAKE_ACCOUNT_LOG;
@@ -23,7 +28,7 @@ const CLAUDE_URL =
 const end = (code, text = "", stream = process.stdout) => stream.write(text, () => process.exit(code));
 const waitForever = () => setInterval(() => {}, 1000);
 
-switch (args) {
+switch (args.replace(/^auth login --email \S+$/, "auth login")) {
   case "auth login": {
     if (mode === "silent") {
       waitForever();
@@ -82,7 +87,8 @@ switch (args) {
     break;
   }
   case "auth status --json":
-    if (existsSync(marker)) {
+    if (process.env.ANTHROPIC_API_KEY) end(0, `${JSON.stringify({ loggedIn: true, authMethod: "api_key" })}\n`);
+    else if (existsSync(marker)) {
       end(
         0,
         `${JSON.stringify({ loggedIn: true, authMethod: "claude.ai", email: "dev@acme.test", subscriptionType: "max" })}\n`,

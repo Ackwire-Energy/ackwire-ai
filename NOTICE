@@ -1,0 +1,25 @@
+agentes.chat — Copyright (C) 2026 Codari Global, LLC and contributors. AGPL-3.0-only (LICENSE).
+"agentes", "agentes.chat" and the agentes logo are trademarks of Codari Global, LLC (TRADEMARKS.md).
+Source: https://github.com/agentes-chat/agentes-chat. Release images and desktop app releases
+are built from the tag of their version.
+
+Third-party software keeps its own license. The license texts are next to what they cover:
+
+- apps/desktop/src-tauri/licenses/bun: the desktop app's runner is compiled with Bun (MIT),
+  which statically links JavaScriptCore and WebCore from WebKit (LGPL-2.0 or later) and tinycc
+  (LGPL-2.1). The README there gives the source of those libraries and how to rebuild the
+  runner from this repository with a modified one.
+- apps/desktop/src-tauri/licenses/agent-browser: agent-browser (Apache-2.0), bundled with the
+  desktop app, and axe-core (MPL-2.0), embedded in it.
+- apps/web/src/fonts, apps/web/public/email, apps/desktop/src/fonts, apps/mobile/assets/fonts:
+  the Doto and Funnel Display fonts (SIL Open Font License 1.1).
+- packages/engine/assets/fonts: the Onest and Martian Mono fonts (SIL Open Font License 1.1),
+  embedded in exported PDFs.
+- apps/web/public/connectors, and the Claude and OpenAI marks in
+  packages/ui/src/components/Brain.tsx: icons from Simple Icons (CC0 1.0). Each mark is a
+  trademark of its owner, used only to name its service.
+- apps/web/public/brands and apps/web/test/fixtures/agent-import: logos and sample files of
+  OpenBot (MIT, Copyright (c) 2026 CopilotKit) and OpenMausBot (Apache-2.0, "OpenMausBot,
+  Copyright 2026 Milind Soni and OpenMausBot contributors").
+- Packages installed from npm and crates.io: the license in each package. The container
+  image is built on the oven/bun image (Debian and Bun), whose parts keep their licenses.

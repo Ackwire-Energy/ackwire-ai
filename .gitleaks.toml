@@ -1,0 +1,35 @@
+[extend]
+useDefault = true
+
+# Tests never read .env and never touch the network: every key, token and password in them is made
+# up, most on purpose to check redaction, encryption at rest and masking. Only the generic rule is
+# off there: a real key in a provider's format (Anthropic, OpenAI, AWS, GitHub, a private key...)
+# pasted into a test still fails the scan.
+[[allowlists]]
+description = "Made-up keys and tokens in tests"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)test/''',
+  '''\.test\.tsx?$''',
+]
+
+# A Himetrica site key only names the site to the analytics tracker, which sends it from every page.
+[[allowlists]]
+description = "Himetrica site keys (public by design)"
+regexes = ['''^hm_[0-9a-f]{48}$''']
+
+# A test's made-up private keys (a run nobody is behind must never send a credential) once sat close enough
+# that the private-key rule read them as one key, in a commit already on main. History stays as it is, so
+# that commit is allowed for this rule only; a real key in any other commit still fails the scan.
+[[allowlists]]
+description = "Made-up private keys read as one in a test, in one past commit"
+targetRules = ["private-key"]
+commits = ["83ad3a9449549b2461cadc91b8d146f35d63f259"]
+
+# The characters the runner draws a desktop's VNC passwords from (letters and digits without look-alikes) sit
+# in a constant whose name says "password", so the generic rule reads the alphabet as a key. Only that exact
+# string is allowed.
+[[allowlists]]
+description = "The desktop's VNC password alphabet"
+targetRules = ["generic-api-key"]
+regexes = ['''^ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789$''']

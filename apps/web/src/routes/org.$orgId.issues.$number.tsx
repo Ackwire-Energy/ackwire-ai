@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Main } from "@/components/Main";
 import { IssuePage } from "@/pages/IssuePage";
 
-/** One issue (telas/Issue.dc.html). */
+/** One issue. */
 export const Route = createFileRoute("/org/$orgId/issues/$number")({
   component: function Page() {
     const { number } = Route.useParams();

@@ -247,7 +247,7 @@ describe("Configurações da missão", () => {
 
   test("an agent on Automático: the mission's model reads 'Automático', never the raw value", async () => {
     const { api } = await missionThread();
-    // The mission follows the agent's own Claude Code model, which is "auto" (D83).
+    // The mission follows the agent's own Claude Code model, which is "auto".
     const brain = api.missions.brain;
     api.missions.brain = async (orgId, missionId) => ({
       ...(await brain(orgId, missionId)),

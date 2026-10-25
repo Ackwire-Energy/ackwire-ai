@@ -30,7 +30,7 @@ test("capabilities come from the granted tools, grouped, with what needs approva
     { name: "ask_user", description: "Ask the person.", scope: "" },
   ]);
   expect(text).toContain("You can:");
-  // Names only: each tool's description is already in its schema (D65).
+  // Names only: each tool's description is already in its schema (ADR 0043).
   expect(text).toContain("- Files (Drive): `create_artifact`, `read_artifact`");
   expect(text).not.toContain("Save a file people can open");
   expect(text).toContain("- GitHub: `github_merge_pr`");

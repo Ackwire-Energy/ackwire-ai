@@ -3,6 +3,9 @@
  * apps/server/src/routes/machines.ts:
  * - `GET    …/machines` → `{ machines: Machine[] }`
  * - `PATCH  …/machines/{id}` `{ name }`, `DELETE …/machines/{id}`
+ * - `GET    …/machines/host` → `{ machineId, on }` (404 = `null`: no computer of the server's own here);
+ * - `GET    …/computer-setup` → `{ mode, state, step, reason, … }` (`pair` unless a test calls `setSetup()`);
+ *   `POST …/machines/host` → `{ machineId, on: true }`
  * - `GET    /api/app/machines/device/{userCode}` → the computer that made the code (404 once gone)
  * - `POST   …/organizations/{orgId}/machines/device/{userCode}/confirm` `{ name? }` → 201, the machine
  *   (the same one when the code's `reconnect` names a machine of that organization)
@@ -14,15 +17,22 @@
  * - `POST   …/machines/{id}/account-logins` `{ kind }` → 201 `{ loginId, kind, url, publicKey? | userCode?, expiresAt }`
  * - `POST   …/account-logins/{loginId}/code` `{ box }` → 204; `GET …/account-logins/{loginId}` → `{ state, account? }`
  * - `DELETE …/account-logins/{loginId}` → 204
+ * - `POST   …/ai-accounts/refresh` → 202 (the usage arrives later as `machine.updated`; nothing here)
+ * - `GET    …/ai-accounts` → what `setAiAccounts()` set (none by default); `PATCH`/`DELETE …/accounts/{id}`
+ *   rename or drop one of them
+ * - `POST   …/account-logins` `{ kind, provider }` → a coding plan's key: no sign-in page but the plan's own
  * Sign-ins wait until a test calls `endLogin()`.
  * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
  * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
  */
 import type {
   AccountLoginStatus,
+  AiAccounts,
   ApiClient,
+  ComputerSetup,
   DesktopRelease,
   DeviceRequest,
+  HostComputer,
   Machine,
   MachineAccountKind,
   MachineOutages,
@@ -30,6 +40,7 @@ import type {
   SecretBox,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { clone, type MockContext, MockNotFoundError } from "./context";
 
 export interface FakeMachines {
@@ -51,10 +62,16 @@ export interface FakeMachines {
   setOutages(outages: MachineOutages): void;
   /** What `moveAgents` answers (default: every agent moved, nothing else). */
   setMoveResult(result: MoveAgentsResult | null): void;
+  /** The server's own computer in the organization; `null` (default): it has none. */
+  setHost(state: HostComputer | null): void;
+  /** How far the workspace's own computer is (ADR 0056 §10); the default is `pair` (people connect theirs). */
+  setSetup(setup: Partial<ComputerSetup>): void;
   /** The newest sign-in started (ADR 0041), with the code box sent for it, if any. */
   lastLogin(): { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean } | undefined;
   /** The computer finished (or gave up on) a sign-in. */
   endLogin(loginId: string, status: AccountLoginStatus): void;
+  /** What "Contas de IA" lists. */
+  setAiAccounts(view: AiAccounts): void;
 }
 
 let seq = 0;
@@ -67,7 +84,20 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   let release: DesktopRelease | null = null;
   let outages: MachineOutages = { outages: [], targets: [] };
   let moveResult: MoveAgentsResult | null = null;
+  let host: HostComputer | null = null;
+  const PAIR: ComputerSetup = {
+    mode: "pair",
+    state: null,
+    step: null,
+    reason: null,
+    since: null,
+    etaSeconds: null,
+    specs: null,
+    machineId: null,
+  };
+  let setup: ComputerSetup = PAIR;
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
+  let ai: AiAccounts = { accounts: [], computers: [] };
   const logins: Login[] = [];
   const loginStatus = new Map<string, AccountLoginStatus>();
   const login = (loginId: string) => {
@@ -117,10 +147,20 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       remove: async (orgId, machineId) => {
         log("machines.remove", orgId, machineId);
         find(machineId);
+        // The server's own computer is only stopped here: it can come back.
+        if (host?.machineId === machineId) host = { ...host, on: false };
         machines.splice(
           machines.findIndex((m) => m.id === machineId),
           1,
         );
+      },
+      host: async () => clone(host),
+      computerSetup: async () => clone(setup),
+      hostOn: async (orgId) => {
+        log("machines.hostOn", orgId);
+        if (!host) throw new MockNotFoundError("Sem computador deste servidor.");
+        host = { ...host, on: true };
+        return clone(host);
       },
       device: async (userCode) => {
         log("machines.device", userCode);
@@ -176,8 +216,8 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.moveAgents", orgId, machineId, input);
         return clone(moveResult ?? { moved: input.agentIds, skipped: [], resumed: 0, stillWaiting: 0 });
       },
-      beginAccountLogin: async (orgId, machineId, kind) => {
-        log("machines.beginAccountLogin", orgId, machineId, kind);
+      beginAccountLogin: async (orgId, machineId, kind, options = {}) => {
+        log("machines.beginAccountLogin", orgId, machineId, kind, ...(Object.keys(options).length ? [options] : []));
         const loginId = `login_${logins.length + 1}`;
         logins.push({ loginId, kind, box: null, cancelled: false });
         const expiresAt = new Date(ctx.now().getTime() + 15 * 60_000).toISOString();
@@ -188,7 +228,17 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         const eph = (await crypto.subtle.generateKey(curve, true, ["deriveBits"])) as CryptoKeyPair;
         const raw = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
         const publicKey = btoa(String.fromCharCode(...raw));
-        return { loginId, kind, url: "https://claude.ai/oauth/authorize?code=true", publicKey, expiresAt };
+        const plan = planOf(options.provider);
+        if (plan && isPlanId(options.provider)) {
+          return { loginId, kind, url: plan.site, provider: options.provider, publicKey, expiresAt };
+        }
+        return {
+          loginId,
+          kind,
+          url: "https://claude.ai/oauth/authorize?code=true&state=st4te",
+          publicKey,
+          expiresAt,
+        };
       },
       sendAccountCode: async (orgId, machineId, loginId, box) => {
         log("machines.sendAccountCode", orgId, machineId, loginId);
@@ -204,6 +254,25 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.cancelAccountLogin", orgId, machineId, loginId);
         const l = logins.find((x) => x.loginId === loginId);
         if (l) l.cancelled = true;
+      },
+      refreshAccountUsage: async (orgId) => {
+        log("machines.refreshAccountUsage", orgId);
+      },
+      // Read whenever an accounts screen renders: not logged.
+      aiAccounts: async () => clone(ai),
+      renameAccount: async (orgId, machineId, accountId, label) => {
+        log("machines.renameAccount", orgId, machineId, accountId, label);
+        // One listed, or one a sign-in here just finished.
+        const a =
+          ai.accounts.find((x) => x.id === accountId) ??
+          [...loginStatus.values()].find((st) => st.account?.id === accountId)?.account;
+        if (!a) throw new MockNotFoundError("Conta não encontrada.");
+        a.label = label;
+        return clone(a);
+      },
+      removeAccount: async (orgId, machineId, accountId) => {
+        log("machines.removeAccount", orgId, machineId, accountId);
+        ai = { ...ai, accounts: ai.accounts.filter((x) => x.id !== accountId) };
       },
     },
     pair,
@@ -223,12 +292,21 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     setMoveResult: (next) => {
       moveResult = next;
     },
+    setSetup: (next) => {
+      setup = { ...PAIR, mode: "external", state: "preparing", ...next };
+    },
+    setHost: (next) => {
+      host = clone(next);
+    },
     lastLogin: () => {
       const l = logins.at(-1);
       return l ? { ...l } : undefined;
     },
     endLogin: (loginId, status) => {
       loginStatus.set(loginId, status);
+    },
+    setAiAccounts: (view) => {
+      ai = clone(view);
     },
     addDevice: (userCode, input = {}) => {
       const now = ctx.now();

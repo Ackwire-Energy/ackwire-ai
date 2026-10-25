@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { authorizeSubscription, parseClientFrame } from "../src/realtime/ws";
-import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
 
 describe("parseClientFrame", () => {
   test("accepts subscribe/unsubscribe with a uuid and ping; rejects the rest", () => {
@@ -59,20 +59,6 @@ function connect(url: string, headers: Record<string, string>) {
     ws.onclose = (e) => reject(new Error(`closed ${e.code}`));
   });
   return { ws, frames, next, opened, send: (f: unknown) => ws.send(JSON.stringify(f)) };
-}
-
-/** Upgrade status for refused connections (plain HTTP request with upgrade headers). */
-async function upgradeStatus(url: string, headers: Record<string, string>) {
-  const res = await fetch(url.replace("ws://", "http://"), {
-    headers: {
-      ...headers,
-      connection: "Upgrade",
-      upgrade: "websocket",
-      "sec-websocket-version": "13",
-      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
-    },
-  });
-  return res.status;
 }
 
 test("upgrade requires a session, our Origin and org membership", async () => {
@@ -178,7 +164,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   const reply = events[10] as {
     message: { body: string; threadId: string | null; author: { type: string; id: string } };
   };
-  // Asked in the channel, answered in the channel (D67).
+  // Asked in the channel, answered in the channel.
   expect(reply.message).toMatchObject({
     body: "Hello there",
     threadId: null,

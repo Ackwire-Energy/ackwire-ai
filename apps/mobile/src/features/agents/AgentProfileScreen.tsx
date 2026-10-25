@@ -9,6 +9,7 @@ import {
   useMemoryAction,
   useUsage,
 } from "@agenteschat/client";
+import { brainLine } from "@agenteschat/client/lib/brain";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -25,6 +26,7 @@ import {
   Icon,
   type IconName,
   PixelOrbit,
+  ProviderLogo,
   Row,
   Section,
   Sky,
@@ -72,7 +74,7 @@ const AREA_ICON: Record<string, IconName> = {
 };
 
 /**
- * An agent's profile as a teammate (MobileIntencional.html, "Perfil do agente"): its sky and living body, its
+ * An agent's profile as a teammate: its sky and living body, its
  * role in one plain sentence, who answers for it, what it is on now (or what waits on you), one button
  * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
  * admins), what it can use in plain levels and the approval rule, and its month last.
@@ -126,6 +128,8 @@ function Profile({ id }: { id: string }) {
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
+  // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
+  const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,
@@ -216,6 +220,9 @@ function Profile({ id }: { id: string }) {
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
+        // The browser card's own text field: its buttons and the page take a tap with the keyboard up.
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
         <View style={[styles.cover, { paddingTop: insets.top + 56 }]}>
@@ -354,7 +361,18 @@ function Profile({ id }: { id: string }) {
           </Section>
         ) : null}
 
-        <AgentBrowserRow agentId={id} />
+        <AgentBrowserRow agentId={id} decides={decides} busy={busy} />
+
+        {thinks ? (
+          <Section title={t("mobile.intentAgents.thinks")}>
+            <Card>
+              <Row
+                leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
+                title={thinks.text}
+              />
+            </Card>
+          </Section>
+        ) : null}
 
         {access.data ? (
           <Section title={t("mobile.intentAgents.uses.title")}>

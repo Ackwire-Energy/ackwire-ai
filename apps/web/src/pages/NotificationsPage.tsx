@@ -70,7 +70,7 @@ const TTL_MS = 24 * 3_600_000;
 const LATE_MS = 20 * 60_000;
 /** An approval this close to expiring is urgent. */
 const URGENT_MS = 3 * 3_600_000;
-/** The exit: slide out, then fold the space (approvals and the prototype use the same timing). */
+/** The exit: slide out, then fold the space (approvals use the same timing). */
 const LEAVE_MS = 450;
 
 type Dir = ReturnType<typeof useDirectory>;
@@ -170,7 +170,12 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
-  else if (n.kind === "machine_connected") [icon, label] = ["computer", t("notifications.source.machine")];
+  else if (
+    n.kind === "machine_connected" ||
+    n.kind === "computer_ready" ||
+    (n.kind === "browser_handoff" && s.screen === "desktop")
+  )
+    [icon, label] = ["computer", t("notifications.source.machine")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
   else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
   else if (s.issueNumber != null)
@@ -214,6 +219,7 @@ type WhatKey =
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
+  | "desktopHandoff"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -271,9 +277,14 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
         ? k("machineConnected", { name, label: n.source.label })
         : k("machineConnectedAny", { name });
     case "browser_handoff":
-      return k("browserHandoff", { name });
+      return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
     case "reaction":
       return k("reaction", { names, count });
+    case "org_standing":
+      if (n.latest.statusTo === "suspended") return t("standing.notification.suspended");
+      return n.latest.statusTo === "active" ? t("standing.notification.active") : t("standing.notification.hold");
+    case "computer_ready":
+      return t("computerSetup.notification.ready");
   }
 }
 
@@ -1190,7 +1201,7 @@ function useArrivals(items: AppNotification[], filter: NotificationFilter, ready
   return { fresh, pulse };
 }
 
-/** Notificações (telas/Notificacoes.html): what waits on me on top, the rest by day, grouped by conversation. */
+/** Notificações: what waits on me on top, the rest by day, grouped by conversation. */
 export function NotificationsPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -1229,7 +1240,7 @@ export function NotificationsPage() {
   const waitingTotal = counts?.waiting ?? 0;
   const nothing = list.isSuccess && (counts?.all ?? 0) === 0 && items.length === 0;
 
-  // The tab says how many are unread, like the prototype.
+  // The tab says how many are unread.
   useEffect(() => {
     const previous = document.title;
     document.title = unreadTotal ? t("notifications.docTitleUnread", { count: unreadTotal }) : t("notifications.title");

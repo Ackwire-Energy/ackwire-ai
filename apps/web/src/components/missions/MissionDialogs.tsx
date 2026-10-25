@@ -48,7 +48,7 @@ import { CommandApprovalSelect, executorOptions } from "./MissionBits";
 import "./missions.css";
 
 /**
- * The mission dialogs (Threads.html): "Nova missão" (objective, agent, where
+ * The mission dialogs: "Nova missão" (objective, agent, where
  * it lives, the computer it runs on), closing it (Concluída / Cancelada,
  * "Salvar decisões e lições na wiki"), and "Compartilhar" (who can decide or
  * comment, handing it over; the computer never moves by itself).
@@ -184,7 +184,7 @@ export function NewMissionDialog({
               <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
             <span>{t("missions.new.noEligibleText")}</span>
-            {/* agentes for Mac: this Mac first, then the agent points at it (D79). */}
+            {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}
             <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />
             {setupAgent && (
               <Link

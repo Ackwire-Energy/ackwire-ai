@@ -165,7 +165,7 @@ describe("missions with executor agent (ADR 0029)", () => {
     await drainOutbox(f.db, f.handlers);
     let mission = await missionRow();
     expect(mission).toMatchObject({ executor: "agent", status: "proposed" });
-    // Asked in the channel: the mission's home is a thread of its own (D67).
+    // Asked in the channel: the mission's home is a thread of its own.
     expect(mission.threadRootId).not.toBe(ask.id);
     // No executor session on the machine: the agent planned it itself.
     expect(runner.started).toHaveLength(0);
@@ -241,7 +241,7 @@ describe("missions with executor agent (ADR 0029)", () => {
     });
     await drainOutbox(f.db, f.handlers);
     expect((await missionRow()).planTotal).toBe(2);
-    // The proposal's reply is in the channel (D67), the planning turn in the mission's own thread: both count.
+    // The proposal's reply is in the channel, the planning turn in the mission's own thread: both count.
     const fromAgent = await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, f.agent.id));
     expect(fromAgent.some((m) => m.meta.missionReport)).toBe(true);
     // The planning turn left only its cards: no reply repeating the report, no empty or failed one.
@@ -623,7 +623,7 @@ describe("missions arrive investigated (ADR 0037 round 2)", () => {
     const mission = await missionRow();
     expect(mission).toMatchObject({ status: "proposed", planVersion: 1, planTotal: 3 });
     expect(mission.findings).toHaveLength(3);
-    // Asked in the channel: the mission's cards are in its own thread (D67).
+    // Asked in the channel: the mission's cards are in its own thread.
     const lines = await threadMessages(mission.threadRootId);
     // Arrives planned: no plan-mode notice to the main session.
     expect(lines.some((m) => JSON.stringify(m.meta.missionInbox ?? "").includes("PLAN MODE"))).toBe(false);

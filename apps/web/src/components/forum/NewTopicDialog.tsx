@@ -36,7 +36,7 @@ import { useToast } from "@/lib/toast";
 import { useForumWho } from "./pieces";
 import "@/pages/forum.css";
 
-/** The four starting points of "Novo tópico" (telas/Forum.html): format, rounds and the goal's wording. */
+/** The four starting points of "Novo tópico": format, rounds and the goal's wording. */
 export const TEMPLATES: {
   key: "tech" | "review" | "brain" | "postmortem";
   icon: IconName;

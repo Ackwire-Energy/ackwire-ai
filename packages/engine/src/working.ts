@@ -83,7 +83,7 @@ export async function listWorkingRuns(db: Database, userId: string, orgId: strin
       channelId: r.channel_id,
       channelKind: r.kind,
       channelName: r.kind === "dm" ? null : r.name,
-      // Where it answers (`replyThreadOf`): asked in the main timeline, there (D67).
+      // Where it answers (`replyThreadOf`): asked in the main timeline, there.
       threadId: r.thread_root_id === r.trigger_message_id ? null : r.thread_root_id,
       status: r.status,
       startedAt: iso(r.started_at),

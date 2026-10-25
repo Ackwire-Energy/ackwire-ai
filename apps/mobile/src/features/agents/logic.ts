@@ -118,7 +118,7 @@ export interface TeamLine {
 }
 
 /**
- * Agentes (MobileIntencional): "Esperando você" (agents with a request you may decide, the one closest to
+ * Agentes: "Esperando você" (agents with a request you may decide, the one closest to
  * expiring first; `waiting` as `waitingApprovals` gives it), "Trabalhando agora" (in `workByAgent` order:
  * missions, then the newest runs) and "Livres" (the latest conversation first, then by name), each agent once.
  */
@@ -202,7 +202,7 @@ export function agoOf(iso: string, now = Date.now()): Ago {
 }
 
 /**
- * "Este mês": money only when the API gives it to this person (D39: members
+ * "Este mês": money only when the API gives it to this person (ADR 0026: members
  * see a percentage), else the share of the budget used.
  */
 export type Spend =
@@ -240,7 +240,7 @@ export function canUse(access: AgentAccess | null | undefined): { key: string; l
   return [...apps, ...builtins];
 }
 
-/* ---------- The profile as a teammate (MobileIntencional "Perfil do agente") ---------- */
+/* ---------- The profile as a teammate ("Perfil do agente") ---------- */
 
 /** Openings of a system prompt that name the agent ("Você é o Theo, …", "You are Theo, …"). */
 const SELF_INTRO = /^(voc[eê] [eé]|you are|tu [eé]s)(?=[\s,]|$)/i;

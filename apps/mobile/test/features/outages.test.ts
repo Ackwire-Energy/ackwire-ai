@@ -62,7 +62,7 @@ const office: OutageTargetLike = {
 };
 
 describe("Computador desconectado (phone)", () => {
-  test("the notice, as in the prototype", async () => {
+  test("the notice, as designed", async () => {
     const t = await translator("pt-BR");
     expect(noticeText(t, air)).toEqual({
       title: "O MacBook Air desconectou",

@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-23
-- Planning: D82
 - Builds on: ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other), ADR 0037 (agents investigate first, act with undo), the chat-delivery work (background runs, `hand_off`, run inbox)
 - Evaluates: ADRs 0045–0052 and the `feat/agent-runtime` branch (taken where they fit, see the end)
 - Code: `packages/engine/src/authority.ts`, `routine-brief.ts`, `routine-ledger.ts`, `untrusted.ts` (the shared base this ADR builds on)

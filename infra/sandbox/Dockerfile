@@ -1,4 +1,4 @@
-# The agents' computer (D30), image v3 (build tools, Go, Rust, sudo): what every agent's sandbox starts from.
+# The agents' computer (ADR 0021), image v3 (build tools, Go, Rust, sudo): what every agent's sandbox starts from.
 # Registered as a Daytona snapshot by apps/server/scripts/sandbox-snapshot.ts
 # (SANDBOX_SNAPSHOT names it). No secrets here, ever: agents run arbitrary code.
 FROM node:22-bookworm-slim AS node

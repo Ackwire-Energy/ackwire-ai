@@ -9,7 +9,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { CenteredLayout } from "@/components/AuthLayout";
 
-/** telas/Convite.dc.html — valid and expired states. */
+/** An invitation, valid or expired. */
 export function InvitePage({ token }: { token: string }) {
   const { t } = useTranslation();
   const api = useApi();

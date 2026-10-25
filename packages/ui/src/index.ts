@@ -191,7 +191,18 @@ export {
   type PixelSpinnerProps,
   type PixelSpinnerSize,
 } from "./components/PixelSpinner";
+export {
+  PLAN_ALMOST,
+  PlanMeter,
+  type PlanMeterText,
+  type PlanMeterUsage,
+  type PlanMeterWindow,
+  type PlanState,
+  planState,
+  planWindows,
+} from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
+export { ProviderLogo, type ProviderLogoProps } from "./components/ProviderLogo";
 export {
   modeOf,
   monthlyKindOf,
@@ -274,6 +285,7 @@ export {
   ToolLevelSwatch,
   toolLevelTones,
 } from "./components/ToolPixels";
+export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";

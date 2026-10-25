@@ -1,5 +1,5 @@
 /*
- * Threads in the conversation (telas/ThreadContexto.html, Threads.html): the
+ * Threads in the conversation: the
  * marker and stub a range leaves in its channel, a closed thread's line, the
  * "Threads (N)" popover, the thread view's header and context block, and the
  * "Ajustar trecho" selection (neutral: ink and gray only; blue is for agents).
@@ -775,7 +775,7 @@
 }
 
 /*
- * A "Responder" thread under its message (telas/ThreadPainel.html, "D · Linha simples"): no card, one
+ * A "Responder" thread under its message: no card, one
  * line that lights on hover: who is in it, "N respostas", what it needs, when. Pressed while the
  * thread is open in the panel.
  */

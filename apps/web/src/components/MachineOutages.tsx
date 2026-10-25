@@ -26,6 +26,7 @@ import {
   Icon,
   OptionList,
   type OptionListItem,
+  ProviderLogo,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -38,7 +39,7 @@ import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): the notice at the top of the work area,
+ * "Computador desconectado": the notice at the top of the work area,
  * the "Trocar o computador" dialog, and the agent's one waiting card in the chat.
  */
 
@@ -100,7 +101,7 @@ function OutageNotice({
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
-  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (D79).
+  // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, o.machineId);
   // "há 12 min" moves on by itself.
   const [now, setNow] = useState(() => Date.now());
@@ -375,7 +376,10 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
         <Icon name="waiting" size={16} />
         <span>{t("outage.card.waiting", { name })}</span>
       </span>
-      <p>{[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}</p>
+      <p>
+        <ProviderLogo id={notice.brain} size="xs" />
+        {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
+      </p>
       {manage && outage && outages.data && (
         <span className="waitcard__acts">
           <Button size="sm" onClick={() => setOpen(true)}>

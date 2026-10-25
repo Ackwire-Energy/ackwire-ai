@@ -192,7 +192,7 @@ export function accountUnavailable(
   if (account.status === "signed_out") {
     return {
       code: "not_logged_in",
-      message: `The ${name} account "${account.label}"${where} is signed out; the computer's owner can sign in again in the agent's settings.`,
+      message: `The ${name} account "${account.label}"${where} is signed out; its owner can sign in again in Settings, AI accounts.`,
     };
   }
   return null;
@@ -451,6 +451,9 @@ export async function recordPlanUsage(
     runId: string;
     /** `claude_code` or `codex`. */
     provider: string;
+    /** The computer the turn ran on and the account it spent; `accountId` null: that computer's own sign-in. */
+    machineId?: string;
+    accountId?: string | null;
     model?: string;
     /** Every input token the turn read, cache included. */
     inputTokens: number;
@@ -480,6 +483,8 @@ export async function recordPlanUsage(
       cacheWriteTokens: cacheWrite,
       costNanoUsd: 0,
       billedTo: "plan",
+      machineId: input.machineId ?? null,
+      brainAccountId: input.machineId ? (input.accountId ?? null) : null,
     })
     .returning({ id: schema.usageRecords.id });
   return row?.id ?? null;

@@ -2,12 +2,11 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D78 (item 8 of D41)
-- Extends: ADR 0017 (context items), ADR 0028 (memory judgments)
+- Extends: ADR 0017 (context items), ADR 0028 (memory judgments; its §3, people and agents as subjects)
 
 ## Context
 
-Memory is organized around the organization's work (`context_items`: facts, decisions, preferences, lessons, summaries). What an agent learns about a person (how they like answers, their role, what they own, when they work) lands in that pool as a generic `preference` or `fact`, competes for the 3,500-char memory budget with everything else, and only shows up when retrieval happens to match the message. A new agent knows nobody. D41 lists "profiles of people and agents" as item 8, not built.
+Memory is organized around the organization's work (`context_items`: facts, decisions, preferences, lessons, summaries). What an agent learns about a person (how they like answers, their role, what they own, when they work) lands in that pool as a generic `preference` or `fact`, competes for the 3,500-char memory budget with everything else, and only shows up when retrieval happens to match the message. A new agent knows nobody. ADR 0028 §3 plans profiles of people and agents; they aren't built.
 
 ## Decision
 
@@ -38,4 +37,4 @@ Once a day per org, a consolidation agent with exactly four tools (read excerpts
 - Every agent starts each conversation knowing the person, at a fixed, small token cost.
 - Privacy: facts never cross the visibility of their source. The settings page makes the profile inspectable and deletable (LGPD: access and erasure).
 - New migration (kind + tombstones). `eval:memory` gains profile cases: preference kept across agents, DM fact not shown in a channel, deleted fact not re-learned.
-- Out of scope: agent profiles (what an agent is good at), D41 items 5–7 and 9.
+- Out of scope: agent profiles (what an agent is good at), and ADR 0028 §2 (time on facts), §4 (outcome weighting), §5 (choosing what goes into the prompt) and §6 (capture on signal).

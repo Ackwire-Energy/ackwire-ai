@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { engineOfBrain, engineOfExecutor, engineStateOfOption } from "../src/lib/brain";
 
-describe("the engine an agent thinks with (IconesMotor.html)", () => {
+describe("the engine an agent thinks with", () => {
   test("agents.brain maps to its engine; the API and anything unknown is the agent itself", () => {
     expect(engineOfBrain("claude_code")).toBe("claude_code");
     expect(engineOfBrain("codex")).toBe("codex");

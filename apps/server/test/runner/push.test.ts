@@ -131,6 +131,38 @@ test("push: limits, missing files, escapes and server errors", async () => {
   expect(message).toBe("upload_failed: The upload expired");
 });
 
+test("push goes to the paired server, at the path the server gave (its public address may not be reachable here)", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  writeFileSync(path.join(ws, "a.txt"), "a");
+  const { calls, fetch } = capture();
+  await pushPath({
+    workspaceReal: ws,
+    token: "agm_x",
+    server: "http://agentes:3000",
+    path: "a.txt",
+    url: "https://box.tailnet.ts.net/api/machines/uploads/u4?v=1",
+    uploadId: "u4",
+    maxBytes: 100,
+    fetch,
+  });
+  expect(calls.map((c) => c.url)).toEqual(["http://agentes:3000/api/machines/uploads/u4?v=1"]);
+  const refused = await errorCode(() =>
+    pushPath({
+      workspaceReal: ws,
+      token: "agm_x",
+      server: "http://agentes:3000",
+      path: "a.txt",
+      url: "file:///etc/passwd",
+      uploadId: "u5",
+      maxBytes: 100,
+      fetch,
+    }),
+  );
+  expect(refused).toBe("bad_request");
+  expect(calls).toHaveLength(1);
+});
+
 test("content types by extension", () => {
   expect(contentTypeFor("a.ZIP")).toBe("application/zip");
   expect(contentTypeFor("photo.jpeg")).toBe("image/jpeg");

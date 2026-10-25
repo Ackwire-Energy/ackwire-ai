@@ -1,7 +1,7 @@
 import type { ConnectorDef } from "@agenteschat/client";
 import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
-import { API_URL } from "@/config";
+import { serverUrl } from "@/lib/server";
 import { Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { brandOf, iconUri, monogram } from "./logic";
@@ -22,7 +22,7 @@ export function ConnectorIcon({
   check?: boolean;
 }) {
   const c = useColors();
-  const uri = def ? iconUri(API_URL, def.iconUrl) : null;
+  const uri = def ? iconUri(serverUrl(), def.iconUrl) : null;
   const tint = (def ? brandOf(def.brandColor) : null) ?? c.ink;
   const radius = Math.round(size * 0.3);
   return (

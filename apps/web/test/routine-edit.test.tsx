@@ -155,7 +155,7 @@ describe("routine titles", () => {
     const { routineTitle } = await import("@/pages/RoutinesPage");
     expect(routineTitle({ name: "Resumo da semana", prompt: "Resuma a semana." })).toBe("Resumo da semana");
     const prompt =
-      "Relatório de visitantes do site wescld com origem, páginas mais vistas e conversões da semana passada\nDetalhes: …";
+      "Relatório de visitantes do site com origem, páginas mais vistas e conversões da semana passada\nDetalhes: …";
     const title = routineTitle({ name: prompt, prompt });
     expect(title.length).toBeLessThanOrEqual(61);
     expect(title.endsWith("…")).toBe(true);

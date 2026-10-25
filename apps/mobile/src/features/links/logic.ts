@@ -25,9 +25,9 @@ export const chatHref = (channelId: string, threadId?: string | null): AppHref =
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
 
 /**
- * An agent's request for help in its browser opens in its conversation, with its card in control
- * (NavegadorNoChat A): `/chat/<id>[?thread=<id>]&handoff=<id>`. Without the conversation (a bare deep
- * link), `/handoff/<id>` finds it first.
+ * An agent's request for help in its browser opens in its conversation, with its card in control:
+ * `/chat/<id>[?thread=<id>]&handoff=<id>`. Without the conversation (a bare deep link), `/handoff/<id>`
+ * finds it first.
  */
 export function handoffHref(handoffId: string, channelId?: unknown, threadId?: unknown): AppHref {
   if (!isSafeId(channelId)) return `/handoff/${handoffId}`;

@@ -1,5 +1,5 @@
 /**
- * "Computador desconectado" (telas/ComputadorOffline.html): when the computer that runs some agents' brain
+ * "Computador desconectado": when the computer that runs some agents' brain
  * (Claude Code / Codex) goes offline, the app says so once (a notice), each waiting agent says what it waits
  * for, and "Trocar computador" moves the agents to another computer that can run their brain. Pure helpers
  * shared by the web and the phone app: the notice's inputs, the waiting counts, which targets the switch
@@ -23,6 +23,8 @@ export interface OutageLike {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: readonly OutageAgentLike[];
   waitingRuns: number;
@@ -34,6 +36,8 @@ export type OutageTargetLike =
       machineId: string;
       name: string;
       platform: string;
+      /** The workspace's own computer (ADR 0056 §10). */
+      managed?: boolean;
       online: boolean;
       brains: readonly ComputerBrain[];
       /** "offline" | "paused" | null. */
@@ -127,6 +131,8 @@ export interface TargetOption {
   /** The computer's name (null for the cloud computer, which the UI names itself). */
   name: string | null;
   platform: string | null;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed: boolean;
   online: boolean;
   brains: ComputerBrain[];
   enabled: boolean;
@@ -170,6 +176,7 @@ export function targetOptions(
         kind: "cloud",
         name: null,
         platform: null,
+        managed: false,
         online: t.available,
         brains: brains ?? [],
         enabled: reason === null,
@@ -194,6 +201,7 @@ export function targetOptions(
       kind: "machine",
       name: t.name,
       platform: t.platform,
+      managed: t.managed === true,
       online: t.online,
       brains: [...t.brains],
       enabled: reason === null,

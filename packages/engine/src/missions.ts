@@ -68,6 +68,7 @@ import {
   tellMainSession,
 } from "./missions-engine";
 import { notifyMissionEnded } from "./notification-producers";
+import { recordTaskFinished } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { SearchDeps } from "./search";
@@ -372,7 +373,7 @@ export function requireOpen(mission: MissionRow) {
   if (!OPEN.includes(mission.status)) throw new ConflictError("This mission is closed", "mission.closed");
 }
 
-/** The mission's agent answers this person (D31) and is still in the mission's conversation. */
+/** The mission's agent answers this person and is still in the mission's conversation. */
 export async function agentAnswers(
   db: Executor,
   mission: Pick<MissionRow, "orgId" | "channelId" | "agentId">,
@@ -1112,7 +1113,7 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
 
 /**
  * `/mission <goal>` from the web, or "Nova missão": the caller must be able
- * to talk to the agent (D31) in that conversation. In a thread, that thread
+ * to talk to the agent in that conversation. In a thread, that thread
  * is the home; otherwise a new top-level message starts it.
  */
 export async function createMission(
@@ -1356,7 +1357,7 @@ export async function tellSession(
   if (mission.status === "awaiting_close" && (options.requestedBy || options.kind === "person")) {
     mission = await reactivateMission(deps, mission, "message");
   }
-  // Work on someone's computer only for people the agent answers (D31).
+  // Work on someone's computer only for people the agent answers.
   if (options.requestedBy && !(await agentAnswers(deps.db, mission, options.requestedBy))) {
     throw new ForbiddenError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
   }
@@ -1718,7 +1719,10 @@ async function cancelMissionTasks(deps: MissionDeps, mission: MissionRow, actorI
         .set({ status: "canceled", endedAt: new Date(), wokeAt: new Date(), updatedAt: new Date() })
         .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.endedAt)))
         .returning();
-      if (ended) await publishTaskEvent(deps.pubsub, ended);
+      if (ended) {
+        await recordTaskFinished(deps.db, ended);
+        await publishTaskEvent(deps.pubsub, ended);
+      }
     }
     canceled++;
   }
@@ -1942,7 +1946,7 @@ export async function setParticipant(
   if (input.userId === mission.ownerId)
     throw new ValidationError("The owner already does everything", "mission.is_owner");
   await requireSeesHome(deps.db, orgId, mission, input.userId);
-  // Deciding makes work run on someone's computer: only for people the agent answers (D31).
+  // Deciding makes work run on someone's computer: only for people the agent answers.
   if (input.role === "decide" && !(await agentAnswers(deps.db, mission, input.userId))) {
     throw new ValidationError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
   }
@@ -3261,7 +3265,7 @@ export interface EligibleAgent {
 /**
  * "Nova missão": every agent of the organization, each saying whether it can
  * run a mission for the caller: a connected computer that allows commands
- * with a runner on protocol 14 or later (ADR 0044), and the caller in its audience (D31).
+ * with a runner on protocol 14 or later (ADR 0044), and the caller in its audience.
  * The others carry the reason (`cloud`: the server has cloud computers, so an
  * agent without a connected one is on the cloud computer). Eligible first. One query.
  */

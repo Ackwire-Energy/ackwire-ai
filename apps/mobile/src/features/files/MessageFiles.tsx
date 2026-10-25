@@ -12,7 +12,7 @@ import { encodeFileList, extensionOf, type FileInfo, fileInfo, imageRows, single
 import { useArtifacts, useRemoteFile } from "./source";
 
 /**
- * A message's files (MobileRefinos.html, "Na conversa"): pictures inline (one at its own shape, or two
+ * A message's files: pictures inline (one at its own shape, or two
  * side by side), tapping opens the viewer at that picture; other files as a card with the type's tile,
  * the real name and "Documento · 4 KB", tapping opens the document screen. `align="end"`: the viewer's own
  * message, its files sit on the right.

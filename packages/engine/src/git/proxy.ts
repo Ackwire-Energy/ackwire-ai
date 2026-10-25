@@ -3,6 +3,7 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { connectorScope } from "../connectors/catalog";
 import { type ConnectorDeps, connectionHeaders } from "../connectors/connections";
+import { standingRefusal } from "../standing";
 import { CONNECTOR_ALL, freshGrantedKeys, grantKey } from "../tools/scopes";
 import { machineGitGen, verifyGitToken } from "./credential";
 import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
@@ -122,7 +123,7 @@ async function readBody(req: Request, max: number) {
 }
 
 /**
- * Smart-HTTP git for agents' computers (D35): `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/…`.
+ * Smart-HTTP git for agents' computers (ADR 0024): `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/…`.
  * - The computer authenticates with our short-lived per-computer credential.
  * - Policy is checked here: the agent's `github:git.read` / `github:git.write`
  *   grants on that connection (and repo list, when set); pushes only to
@@ -193,6 +194,9 @@ export async function handleGitProxy(
     where = { sandboxId: computer.id };
   }
   if (!agent || agent.archivedAt) return text(403, "agentes: this agent is archived");
+  // Work already on a computer reaches GitHub through us: a hold or suspension stops it here too.
+  const paused = await standingRefusal(deps.db, claims.orgId, claims.agentId);
+  if (paused) return text(403, `agentes: ${paused.message}`);
 
   // 2. Which GitHub connection, and what this agent may do with it.
   const [connection] = await deps.db

@@ -18,10 +18,13 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AgentPlanUsage,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AiAccounts,
+  AiStatus,
   ApiRule,
   AppNotification,
   Approval,
@@ -41,6 +44,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -52,6 +56,7 @@ import type {
   DatabaseConnectionInput,
   DatabaseTable,
   DesktopRelease,
+  DesktopStatus,
   DeviceRequest,
   DirectMessage,
   DmRead,
@@ -68,6 +73,9 @@ import type {
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
+  HostComputer,
+  ImportInput,
+  ImportPlan,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -80,6 +88,7 @@ import type {
   Machine,
   MachineAccess,
   MachineAccessReduce,
+  MachineAccount,
   MachineAccountKind,
   MachineOutages,
   MachineTask,
@@ -121,8 +130,10 @@ import type {
   NotificationPage,
   Organization,
   OrgOverview,
+  OrgPlanUsage,
   OrgSettings,
   Person,
+  PhoneSignIn,
   Proposal,
   ReactionCount,
   Reminder,
@@ -141,6 +152,7 @@ import type {
   SandboxSettingsInput,
   ScheduleParse,
   ScopeGrant,
+  ScreenKind,
   SearchHit,
   SearchKind,
   SecretBox,
@@ -194,6 +206,8 @@ export interface ApiClient {
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
+    /** A one-time sign-in for the phone app, shown as a QR code. */
+    phoneSignIn(): Promise<PhoneSignIn>;
   };
   orgs: {
     create(input: {
@@ -230,10 +244,14 @@ export interface ApiClient {
     /** New link (the old one stops working), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
+    /** Every plan account by computer and the API per agent, this month (ADR 0063). */
+    planUsage(orgId: string): Promise<OrgPlanUsage>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
-    /** The agents as a team (D54): grouped by person, with who consulted whom in the last day. */
+    /** Its month by account and day, and the account it thinks with now (ADR 0063). */
+    planUsage(orgId: string, agentId: string): Promise<AgentPlanUsage>;
+    /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
@@ -263,8 +281,17 @@ export interface ApiClient {
     removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
+    /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
+    aiStatus(orgId: string): Promise<AiStatus>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
-    importFromGithub(orgId: string, url: string): Promise<{ files: { path: string; text: string }[] }>;
+    importFromGithub(
+      orgId: string,
+      url: string,
+    ): Promise<{
+      files: { path: string; text: string }[];
+      /** Files the link has that fit the import but not the limits (200 files, 8 MB): not read. */
+      skipped?: string[];
+    }>;
     detail(orgId: string, agentId: string): Promise<AgentDetail>;
     channels(orgId: string, agentId: string): Promise<AgentChannel[]>;
     setChannels(
@@ -292,6 +319,13 @@ export interface ApiClient {
     activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
+  };
+  /** Bringing agents and what's around them from another app or another agentes.chat (ADR 0055); admins. */
+  imports: {
+    /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
+    apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
+    /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
+    exportUrl(orgId: string): string;
   };
   chat: {
     channels(orgId: string): Promise<Channel[]>;
@@ -337,6 +371,11 @@ export interface ApiClient {
     unreact(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
     /** Corrects an agent's reply: it becomes a lesson for that agent. */
     correct(orgId: string, messageId: string, body: string): Promise<void>;
+    /**
+     * "Responder agora" once an AI is connected: the agent answers what it couldn't. `messageId` is its
+     * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
+     */
+    answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
   };
 
   approvals: {
@@ -397,6 +436,12 @@ export interface ApiClient {
     rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
     /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
     remove(orgId: string, machineId: string): Promise<void>;
+    /** The server's own computer in this organization; null when the server has none or doesn't serve it. */
+    host(orgId: string): Promise<HostComputer | null>;
+    /** Uses the server's computer again (admins); `remove` is how it stops. */
+    hostOn(orgId: string): Promise<HostComputer>;
+    /** ADR 0056 §10: whether the workspace gets its own computer, and how far it is (every member). */
+    computerSetup(orgId: string): Promise<ComputerSetup>;
     /**
      * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
      * (`machine.device_not_found` once expired, used or unknown).
@@ -414,19 +459,29 @@ export interface ApiClient {
     outages(orgId: string): Promise<MachineOutages>;
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
-    /** ADR 0041 §2: the computer starts the provider's own sign-in (its owner only). */
-    /** `accountId`: sign in again to that (signed out) account instead of adding a new one. */
+    /**
+     * ADR 0041 §2: the computer starts the provider's own sign-in. `accountId`: sign in again to that account
+     * of the viewer's; `email` (Claude): which account, as the CLI's hint; `provider`: a coding plan's key.
+     */
     beginAccountLogin(
       orgId: string,
       machineId: string,
       kind: MachineAccountKind,
-      accountId?: string,
+      options?: { accountId?: string; email?: string; provider?: string },
     ): Promise<AccountLoginStart>;
-    /** Claude Code: the code Claude showed, sealed in the browser to the computer's key (`sealSecret`). */
+    /** Claude Code: the code Claude showed (or a plan's key), sealed in the browser to the computer's key (`sealSecret`). */
     sendAccountCode(orgId: string, machineId: string, loginId: string, box: SecretBox): Promise<void>;
     accountLogin(orgId: string, machineId: string, loginId: string): Promise<AccountLoginStatus>;
     /** Gives up on a sign-in (Voltar, the dialog closed): the computer stops it. */
     cancelAccountLogin(orgId: string, machineId: string, loginId: string): Promise<void>;
+    /** An accounts screen opened: the viewer's plans look their usage up again (it arrives as `machine.updated`). */
+    refreshAccountUsage(orgId: string): Promise<void>;
+    /** "Contas de IA": the viewer's accounts on every computer, and where they can add one. */
+    aiAccounts(orgId: string): Promise<AiAccounts>;
+    /** Its owner names it (1 to 40 characters). */
+    renameAccount(orgId: string, machineId: string, accountId: string, label: string): Promise<MachineAccount>;
+    /** Its owner (or whoever connected the computer) disconnects it; the computer signs it out and deletes it. */
+    removeAccount(orgId: string, machineId: string, accountId: string): Promise<void>;
   };
   skills: {
     /** The org library. */
@@ -526,7 +581,7 @@ export interface ApiClient {
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
     askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
-    /** The board's columns (D55), board order: by stage, then position. */
+    /** The board's columns, board order: by stage, then position. */
     columns(orgId: string): Promise<IssueColumn[]>;
     /** Adds a column to a stage (after `afterId` when it is in the same stage, else at the stage's end). */
     addColumn(
@@ -781,7 +836,7 @@ export interface ApiClient {
     /** "Agora não": the card stays, marked dismissed. */
     dismissSuggestion(orgId: string, messageId: string): Promise<{ suggestion: ForumSuggestion }>;
   };
-  /** My inbox in this organization: mentions, replies, what waits on me (telas/Notificacoes.html). */
+  /** My inbox in this organization: mentions, replies, what waits on me. */
   notifications: {
     /** Visible ones (not done, not snoozed), waiting first, then the newest; counts for every filter. */
     list(
@@ -956,13 +1011,16 @@ export interface ApiClient {
     settings(orgId: string, agentId: string): Promise<AgentBrowserSettings>;
     /** The sites (owner or admins); null or empty = any site. */
     setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
-    /** The agent's open request or take over, if any. */
-    agentHandoff(orgId: string, agentId: string): Promise<BrowserHandoff | null>;
+    /** The agent's open request or take over on that screen (the browser by default), if any. */
+    agentHandoff(orgId: string, agentId: string, screen?: ScreenKind): Promise<BrowserHandoff | null>;
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;
-    /** "Pronto" (also hands back a take over): the agent reads the page again and goes on. */
-    done(orgId: string, handoffId: string): Promise<BrowserHandoff>;
+    /**
+     * "Pronto", or "Devolver" for a take over: the agent reads the page again and goes on, told who
+     * had it, for how long, the pages, and `note` as the person's own words.
+     */
+    done(orgId: string, handoffId: string, note?: string): Promise<BrowserHandoff>;
     /** "Não consegui", with an optional reason the agent reads. */
     failed(orgId: string, handoffId: string, note?: string): Promise<BrowserHandoff>;
     cancel(orgId: string, handoffId: string): Promise<BrowserHandoff>;
@@ -970,9 +1028,23 @@ export interface ApiClient {
      * Take over while watching; the agent waits until handed back. `runId`: the run whose card it
      * was taken from (the take over is bound to it, so its card stays in that conversation).
      */
-    takeover(orgId: string, agentId: string, runId?: string): Promise<BrowserHandoff>;
-    /** "Parar": closes the agent's browser now (its logins stay). */
-    stop(orgId: string, agentId: string): Promise<void>;
+    takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind): Promise<BrowserHandoff>;
+    /**
+     * The person in control opens a site (a bare host gets https://); a closed browser opens. 409
+     * `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
+     * `browser.bad_address` or `browser.open_failed`.
+     */
+    open(orgId: string, agentId: string, url: string): Promise<void>;
+    /** "Parar": closes the agent's browser now (its logins stay), or stops that screen. */
+    stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
+  };
+  /**
+   * The agent's desktop (ADR 0058): its state and "Ligar". The screen itself is a WebSocket
+   * (`desktopSocketUrl`); control, "Devolver" and "Desligar" are the browser's screen routes with `desktop`.
+   */
+  desktop: {
+    status(orgId: string, agentId: string): Promise<DesktopStatus>;
+    start(orgId: string, agentId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

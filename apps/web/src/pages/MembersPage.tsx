@@ -47,7 +47,6 @@ export function invitationStatus(
   return t("members.sentAgo", { ago: relativeTime(t, locale, invitation.createdAt, now), left });
 }
 
-/** telas/Membros.dc.html */
 export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();

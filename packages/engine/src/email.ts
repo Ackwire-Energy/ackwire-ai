@@ -157,10 +157,9 @@ const WAITLIST = {
 
 /**
  * The waiting list confirmation, written as a message in the product: the
- * list's agent asks the person to approve (docs/design/telas/Email.html,
- * direction C). Tables and inline styles for Gmail/Outlook; the art is PNGs
- * from apps/web/public/email (EmailArt.html); a dark palette where the client
- * supports `prefers-color-scheme`.
+ * list's agent asks the person to approve. Tables and inline styles for
+ * Gmail/Outlook; the art is PNGs from apps/web/public/email; a dark palette
+ * where the client supports `prefers-color-scheme`.
  */
 function waitlistEmail(t: Extract<EmailTemplate, { kind: "waitlist_confirm" }>) {
   const lang = t.locale === "en" ? "en" : "pt-BR";

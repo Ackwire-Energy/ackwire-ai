@@ -1,4 +1,4 @@
-//! The main window (D79, telas/AppDesktop.html B): the whole agentes.chat inside the app. It loads the site
+//! The main window (ADR 0036): the whole agentes.chat inside the app. It loads the site
 //! itself, so every change to the web shows here at once, and gets no access to the Mac: no app command,
 //! only dragging the window by its title bar (capabilities/main.json). Links to anywhere else open in the
 //! person's browser, and so does social sign-in (Google and Apple refuse embedded web views): the site
@@ -275,7 +275,7 @@ fn front(app: &AppHandle) -> Result<(), String> {
     window.set_focus().map_err(|e| e.to_string())
 }
 
-/// What the site may ask of this Mac (D79): which organizations it is connected to (`status`), connecting it
+/// What the site may ask of this Mac (ADR 0036): which organizations it is connected to (`status`), connecting it
 /// to the person's organization (`connect`: the site confirms the code with its own session, as on
 /// `/conectar`), reconnecting it (`reconnect`), Preferences on a tab (`prefs`) and the menu bar's access
 /// requests (`requests`). Rust only checks the request and relays it: the popover's

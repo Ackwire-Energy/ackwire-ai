@@ -1,8 +1,7 @@
 /*
- * The hero's "product in view" layout (docs/design/telas/LandingNova.html,
- * variant B): the copy centered on the sky, the app rising from the sky's
- * bottom edge with a live sample conversation, the giant sitting on its
- * window. Scoped under `.lp`.
+ * The hero's "product in view" layout: the copy centered on the sky, the app
+ * rising from the sky's bottom edge with a live sample conversation, the
+ * giant sitting on its window. Scoped under `.lp`.
  */
 .lp .lp-hero--app .lp-sky {
   min-height: 0;

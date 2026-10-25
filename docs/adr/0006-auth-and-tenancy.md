@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D19. Same split as Tierbird ADR 0011.
 
 ## Decision
 
@@ -21,4 +20,4 @@
 
 - No external identity provider; self-host stays one container + Postgres.
 - Composite foreign keys `(org_id, id)` keep channel memberships, messages, runs and usage from pointing across organizations.
-- Later: Better Auth `jwt` + `oauthProvider` for MCP clients (D19).
+- Later: Better Auth `jwt` + `oauthProvider` for MCP clients.

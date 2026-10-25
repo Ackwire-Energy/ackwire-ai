@@ -2,6 +2,7 @@ import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
+import installScript from "../../../install.sh" with { type: "text" };
 import { registerAppLinks } from "./app-links";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
@@ -20,6 +21,7 @@ import { connectorRoutes } from "./routes/app/connectors";
 import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import type { AppDeps } from "./routes/app/context";
 import { databaseRoutes } from "./routes/app/databases";
+import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
@@ -31,6 +33,7 @@ import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { missionRoutes } from "./routes/app/missions";
 import { notificationRoutes } from "./routes/app/notifications";
+import { planUsageRoutes } from "./routes/app/plan-usage";
 import { pushRoutes } from "./routes/app/push";
 import { questionRoutes } from "./routes/app/questions";
 import { routineRoutes } from "./routes/app/routines";
@@ -44,6 +47,7 @@ import { createDesktopReleases, registerDesktopRoutes } from "./routes/desktop";
 import { registerGitProxy } from "./routes/git";
 import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
+import { registerInstance } from "./routes/instance";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
@@ -69,16 +73,18 @@ export interface AppOptions {
  *
  * Layout:
  * - `/api/health`         health probe
+ * - `/api/instance`       public: what this server is, for the phone and desktop apps choosing a server
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
  * - `/api/app/*`          private API of the web and phone apps (cookie session + CSRF, ADR 0035)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/github-app/webhook` our GitHub App's events (installs, suspensions), signature-checked
- * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
+ * - `/api/git/*`          git proxy for agents' computers (their own credential, ADR 0024)
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
- * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page)
+ * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page, only with LANDING_PAGE)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
+ * - `/install`            the self-host installer, `install.sh` (`curl -fsSL <server>/install | sh`)
  * - everything else       web app (single-page app), when built
  */
 export function createApp(options: AppOptions) {
@@ -102,6 +108,7 @@ export function createApp(options: AppOptions) {
     const { auth } = options.services;
     api.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
     const deps = options.services;
+    registerInstance(api, deps, options.version);
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));
@@ -119,6 +126,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", browserRoutes(deps));
+    api.route("/app", desktopRoutes(deps));
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));
     api.route("/app", secretRoutes(deps));
@@ -137,6 +145,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
+    api.route("/app", planUsageRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);
@@ -152,7 +161,7 @@ export function createApp(options: AppOptions) {
         fetch: deps.extras?.desktopFetch,
       }),
     );
-    registerWaitlist(api, deps);
+    if (deps.config.LANDING_PAGE) registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 
@@ -184,6 +193,11 @@ export function createApp(options: AppOptions) {
   app.notFound((c) =>
     c.req.path.startsWith("/api/") ? apiError(c, 404, "not_found", "Route not found") : c.text("Not found", 404),
   );
+  for (const path of ["/install", "/install.sh"]) {
+    app.get(path, (c) =>
+      c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
+    );
+  }
 
   if (options.webDir) {
     const assets = serveStatic({ root: options.webDir });

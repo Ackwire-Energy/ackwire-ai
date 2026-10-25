@@ -5,7 +5,7 @@
 
 ## Decision
 
-We keep short ADRs in `docs/adr/`, in English, one decision per file: context, decision, consequences. Product decisions and their reasons stay in `docs/planejamento.md` (Portuguese, D-numbers); an ADR cites the D-number it implements.
+We keep short ADRs in `docs/adr/`, in English, one decision per file: context, decision, consequences.
 
 ## Consequences
 

@@ -398,11 +398,18 @@ describe("machines and targets", () => {
       agents: [{ id: f.agent.id, handle: "dev" }],
       workspace: null,
       canManage: false,
+      mode: "single",
     });
     expect((await listMachines(f.db, bia.id, f.org.id))[0]).toMatchObject({
       workspace: RUNNER.workspace,
       canManage: true,
     });
+    // A runner in system mode (ADR 0057) says so at hello: each agent its own user, not the pairing folder.
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { mode: "system" } })
+      .where(eq(schema.machines.id, mine.machineId));
+    expect((await listMachines(f.db, carl.id, f.org.id))[0]?.mode).toBe("system");
 
     await expect(renameMachine(deps(), carl.id, f.org.id, mine.machineId, { name: "x" })).rejects.toThrow(
       ForbiddenError,

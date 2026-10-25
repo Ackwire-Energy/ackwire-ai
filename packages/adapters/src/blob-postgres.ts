@@ -2,18 +2,24 @@ import { type Database, eq, like, schema } from "@agenteschat/db";
 import type { BlobStore } from "./blob";
 
 const { blobs } = schema;
-const ORG_KEY = /^orgs\/([0-9a-f-]{36})\//i;
+/** An org's files (`orgs/{orgId}/…`) and its logo (`org-logos/{orgId}/…`). */
+const ORG_KEY = /^(?:orgs|org-logos)\/([0-9a-f-]{36})\//i;
+/** A person's photo (`avatars/{userId}/…`): theirs in every org, so it belongs to none. */
+const PERSON_KEY = /^avatars\/[^/]+\//;
 
 /**
- * Platform storage in Postgres, for deployments without a bucket. Keys must
- * start with `orgs/{orgId}/` (every row carries its org). Can't sign URLs:
- * downloads are streamed by the server after its checks.
+ * Platform storage in Postgres, for deployments without a bucket. A key
+ * starts with `orgs/{orgId}/` or `org-logos/{orgId}/` (the row carries that
+ * org and is deleted with it) or `avatars/{userId}/` (no org); any other key
+ * is refused. Can't sign URLs: downloads are streamed by the server after its
+ * checks.
  */
 export function createPostgresBlobStore(db: Database): BlobStore {
   const orgOf = (key: string) => {
     const orgId = ORG_KEY.exec(key)?.[1];
-    if (!orgId) throw new Error(`blob key must start with orgs/{orgId}/: ${key}`);
-    return orgId;
+    if (orgId) return orgId;
+    if (PERSON_KEY.test(key)) return null;
+    throw new Error(`blob key must start with orgs/{orgId}/, org-logos/{orgId}/ or avatars/{userId}/: ${key}`);
   };
   return {
     kind: "postgres",

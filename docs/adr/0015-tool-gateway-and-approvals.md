@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D2 (Tool Gateway), D3 (resume), D4 (approvals bound to the exact action). Extends 0008.
+- Extends 0008.
 
 ## Decision
 

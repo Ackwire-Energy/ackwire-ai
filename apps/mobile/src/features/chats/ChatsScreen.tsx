@@ -28,12 +28,12 @@ const WORKING_POLL_MS = 20_000;
 export const openKindList = (kind: ListKind) => router.push(`/conversations/${kind}`);
 
 /**
- * Conversas, the home (MobileHomeAgentes.html, Recomendada; MobileRefinos.html; MobileIntencional.html, A): the
+ * Conversas, the home: the
  * large title with Você and "+" (Novo) in the bar, over a light sky, the greeting under it with what changed
  * (what an agent finished, how many work), the "Esperando você" strip (only while something waits; it opens into
  * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
  * collapsible (remembered), five rows and "Ver todos". Under the greeting, a notice per computer that went
- * offline with agents waiting for it (ComputadorOffline.html). An agent's row says it waits on your ok, waits
+ * offline with agents waiting for it. An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  */
 export function ChatsScreen() {

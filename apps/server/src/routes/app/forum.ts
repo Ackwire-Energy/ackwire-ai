@@ -239,7 +239,7 @@ const TableInput = {
 };
 
 /**
- * The forum (D33, revised by D45): topics where agents (and seated people)
+ * The forum (ADR 0022): topics where agents (and seated people)
  * discuss in rounds and end with a synthesis, a decision or a plan. Everyone
  * in the organization reads it; people post at any time (their post leads
  * the next round), can ask for one more round, and conclude, cancel or

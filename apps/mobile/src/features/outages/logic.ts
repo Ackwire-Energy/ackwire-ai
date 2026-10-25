@@ -15,7 +15,7 @@ import { computerKind } from "@agenteschat/client/lib/machines";
 import type { TFunction } from "i18next";
 
 /**
- * "Computador desconectado" on the phone (ComputadorOffline.html, Celular): the words of the notice under
+ * "Computador desconectado" on the phone: the words of the notice under
  * the greeting, the agents' rows, the "Trocar o computador" sheet, its toast and the chat's waiting card.
  * Pure: the screens turn these into views; the counts and the targets come from
  * `@agenteschat/client/lib/machine-outages`.
@@ -33,6 +33,8 @@ export interface MachineOutage {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: MachineOutageAgent[];
   waitingRuns: number;
@@ -125,6 +127,8 @@ export function targetText(t: TFunction, x: TargetOption) {
   }
   if (x.kind === "cloud")
     return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.cloudDesc") };
+  // The workspace's own computer: always on, a user of its own for each agent.
+  if (x.managed) return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.managedDesc") };
   const brains = x.brains.map((b) => BRAIN_NAME[b]).join(t("mobile.outage.sheet.and"));
   return {
     title,

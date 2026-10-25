@@ -1,11 +1,14 @@
+import type { ScreenKind } from "@agenteschat/adapters";
 import type { Judge } from "../judge";
-import { checkCondition, findDismiss, findInPage } from "./checks";
+import { type ConditionResult, checkCondition, findDismiss, findInPage } from "./checks";
 import {
   diffObservations,
+  SCREEN_NOUN,
   type ScreenChanges,
   type ScreenElement,
   type ScreenImage,
   type ScreenObservation,
+  type ScreenRegion,
   screenDigest,
   screenRef,
 } from "./observation";
@@ -18,7 +21,7 @@ import { locateOnImage, resolveTarget, type TargetCache, type TargetUse } from "
  * left to settle and, when the step says what it expects, checked. The plan
  * stops at the first step that fails or doesn't show what it expected, and
  * says what the screen looks like then. Surface-agnostic: the browser is one
- * surface; a desktop can be another.
+ * surface, the agent's desktop another (ADR 0062).
  */
 
 export type ScreenVerb =
@@ -34,7 +37,12 @@ export type ScreenVerb =
   | "hover"
   | "wait"
   | "back"
-  | "read";
+  | "read"
+  | "focus"
+  | "double_click"
+  | "right_click"
+  | "drag"
+  | "type";
 
 /** One step as the agent writes it. */
 export interface ScreenStep {
@@ -44,6 +52,11 @@ export interface ScreenStep {
   text?: string;
   value?: string;
   url?: string;
+  /** `open` on a desktop: an app (its name), or a file in the agent's home. */
+  app?: string;
+  path?: string;
+  /** `drag`: where it is dropped, as a number or words like `target`. */
+  to?: string;
   key?: string;
   secret?: string;
   direction?: "up" | "down" | "left" | "right";
@@ -57,31 +70,91 @@ export interface ScreenStep {
   expect?: string;
 }
 
-/** Where an action lands: an element, or a point (CSS pixels) found on an image. */
+/** Where an action lands: an element, or a point found on an image (the surface's pixels). */
 export type ActTarget = { ref: string } | { x: number; y: number };
 
-/** A step resolved for the surface. */
+const STEP_TEXT = [
+  "target",
+  "to",
+  "app",
+  "path",
+  "url",
+  "text",
+  "value",
+  "key",
+  "secret",
+  "until",
+  "find",
+  "expect",
+] as const;
+
+/** A step from a model's input when its `do` is one of `verbs`; fields that aren't a step's are dropped. */
+export function screenStepOf(v: unknown, verbs: readonly ScreenVerb[]): ScreenStep | null {
+  if (!v || typeof v !== "object") return null;
+  const s = v as Record<string, unknown>;
+  if (typeof s.do !== "string" || !(verbs as readonly string[]).includes(s.do)) return null;
+  const out: ScreenStep = { do: s.do as ScreenVerb };
+  for (const k of STEP_TEXT) if (typeof s[k] === "string") out[k] = s[k] as string;
+  if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
+    out.direction = s.direction;
+  }
+  if (typeof s.pixels === "number") out.pixels = s.pixels;
+  if (typeof s.seconds === "number") out.seconds = s.seconds;
+  return out;
+}
+
+/**
+ * The plan acts on the screen the agent last saw: a step acts before any `open`. After a person changed
+ * the screen, such a plan waits until the agent looked at it again.
+ */
+export function actsBeforeOpening(steps: ScreenStep[]) {
+  for (const s of steps) {
+    if (s.do === "open") return false;
+    if (s.do !== "read" && s.do !== "wait" && s.do !== "back") return true;
+  }
+  return false;
+}
+
+type Scroll = { kind: "scroll"; direction: "up" | "down" | "left" | "right"; pixels: number };
+
+/**
+ * A step resolved for the surface. A `type` or a `scroll` either has `at` or has no such key, so
+ * `"at" in action` says it acts on an element or a point.
+ */
 export type ScreenAction =
   | { kind: "open"; url: string }
+  | { kind: "launch"; app: string }
+  | { kind: "open_file"; path: string }
   | { kind: "back" }
-  | { kind: "click" | "hover" | "check" | "uncheck"; at: ActTarget }
+  | { kind: "click" | "double_click" | "right_click" | "hover" | "focus" | "check" | "uncheck"; at: ActTarget }
+  | { kind: "drag"; from: ActTarget; to: ActTarget }
   | { kind: "fill"; at: ActTarget; text: string }
+  | { kind: "type"; text: string }
+  | { kind: "type"; text: string; at: ActTarget }
   | { kind: "select"; at: ActTarget; value: string }
   | { kind: "type_secret"; at: { ref: string }; secret: string }
   | { kind: "press"; key: string }
-  | { kind: "scroll"; direction: "up" | "down" | "left" | "right"; pixels: number }
+  | Scroll
+  | (Scroll & { at: ActTarget })
   | { kind: "pause"; ms: number };
 
 export type ScreenActOutcome = { ok: true; observation: ScreenObservation | null } | { ok: false; error: string };
 
 /** What a plan drives: looking, acting, and (when it can) taking an image. */
 export interface ScreenSurface {
+  /** Which of the agent's screens it is (default the browser): how plans word it and images are read. */
+  kind?: ScreenKind;
   /** The screen now. */
   observe(): Promise<ScreenObservation>;
   /** One action; with `settle`, waits until the screen stops changing and looks again. */
   perform(action: ScreenAction, options: { settle: boolean }): Promise<ScreenActOutcome>;
-  /** An image of the screen with its elements marked, or null when this surface can't. */
-  capture?(): Promise<ScreenImage | null>;
+  /**
+   * An image of the screen with its elements marked, or null when this surface can't. With a `region`
+   * (only when `regions` is set), that part of the screen at its native size.
+   */
+  capture?(region?: ScreenRegion): Promise<ScreenImage | null>;
+  /** `capture` takes a region: a small target found on the image is looked at again up close. */
+  regions?: boolean;
 }
 
 export interface PlanDeps {
@@ -102,6 +175,12 @@ export interface PlanDeps {
   before?: ScreenObservation | null;
   /** The judge may look at images (Jev's vision): the fallback for targets the text lacks. */
   vision?: boolean;
+  /**
+   * Something covering a target is closed once (a cookie banner) and the step runs again; default on.
+   * Off on a desktop, where what covers is usually a real dialog ("Save changes?") whose buttons can
+   * throw work away: the plan stops there and says what covers it.
+   */
+  dismiss?: boolean;
   /** How long an `expect` that isn't true yet may take to become true (default `EXPECT_GRACE_MS`). */
   expectGraceMs?: number;
   now?: () => number;
@@ -114,7 +193,7 @@ export interface StepReport {
   status: StepStatus;
   /** What happened, in a few words ("button "Sign in" (e7)", "not on the page"). */
   note?: string;
-  /** The element acted on. */
+  /** The element acted on (for a drag, the one dragged). */
   element?: Pick<ScreenElement, "ref" | "role" | "name"> | null;
   /** How the target was found. */
   via?: "ref" | "exact" | "cache" | "judge" | "image";
@@ -135,6 +214,8 @@ export interface StepReport {
 }
 
 export interface PlanReport {
+  /** The screen it ran on (default the browser). */
+  kind?: ScreenKind;
   steps: StepReport[];
   /** The first step that didn't go through, and why. */
   stopped?: { index: number; reason: string; candidates?: ScreenElement[] };
@@ -147,7 +228,11 @@ export interface PlanReport {
 
 const USES: Partial<Record<ScreenVerb, TargetUse>> = {
   click: "click",
+  double_click: "click",
+  right_click: "click",
+  drag: "click",
   hover: "hover",
+  focus: "window",
   fill: "fill",
   select: "select",
   check: "check",
@@ -155,7 +240,7 @@ const USES: Partial<Record<ScreenVerb, TargetUse>> = {
   type_secret: "type_secret",
 };
 
-/** Steps that need a target. */
+/** Steps that need a target (`type` and `scroll` act on one only when it is given). */
 export const needsTarget = (step: ScreenStep) => step.do in USES;
 
 const COVERED = /covered by|intercept|obscured|another element would receive/i;
@@ -195,10 +280,22 @@ const elementOf = (e: ScreenElement | null | undefined) => (e ? { ref: e.ref, ro
  */
 const quoted = (e: Pick<ScreenElement, "role" | "ref">) => `${e.role} (${e.ref})`;
 
+type Found = { at: ActTarget; element: ScreenElement | null; via: NonNullable<StepReport["via"]> };
+
+/** What a step that acts on elements acts on (one, or two for a drag), and its action on them. */
+interface Targets {
+  words: string[];
+  use: TargetUse;
+  act: (at: ActTarget[]) => ScreenAction;
+}
+
 /** Runs `steps` in order on `deps.surface` (see the file's comment). */
 export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<PlanReport> {
   const now = deps.now ?? Date.now;
   const started = now();
+  const kind = deps.surface.kind ?? "browser";
+  const noun = SCREEN_NOUN[kind];
+  const ids = { judge: deps.judge, orgId: deps.orgId, agentId: deps.agentId, runId: deps.runId };
   const reports: StepReport[] = steps.map((step) => ({ step, status: "skipped", ms: 0 }));
   let screen: ScreenObservation | null = deps.last ?? null;
   const before = deps.before ?? screen;
@@ -224,11 +321,40 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     await lookAfter(out.observation);
   };
 
+  /**
+   * A check the text left unsure, judged once more on an image of the screen when the judge sees
+   * images: much only shows (a progress bar, a window that drew).
+   */
+  const onImage = async (
+    r: ConditionResult,
+    condition: string,
+    observation: ScreenObservation,
+    changes?: ScreenChanges,
+  ): Promise<ConditionResult> => {
+    if (r.met !== null || !deps.vision || !deps.surface.capture) return r;
+    const image = await deps.surface.capture().catch(() => null);
+    if (!image) return r;
+    return checkCondition({ ...ids, condition, observation, changes, image }).catch(() => r);
+  };
+
   async function runStep(step: ScreenStep, report: StepReport) {
     switch (step.do) {
       case "open": {
+        const app = step.app?.trim();
+        const path = step.path?.trim();
+        if (app || path) {
+          await settleOn(app ? { kind: "launch", app } : { kind: "open_file", path: path as string });
+          report.note = app || path;
+          return;
+        }
         const url = (step.url ?? step.target ?? "").trim();
-        if (!/^https?:\/\//i.test(url)) throw new Stop("give a full address starting with https://");
+        if (!/^https?:\/\//i.test(url)) {
+          throw new Stop(
+            kind === "browser"
+              ? "give a full address starting with https://"
+              : "say which app (`app`) or file (`path`)",
+          );
+        }
         await settleOn({ kind: "open", url });
         report.note = url;
         return;
@@ -241,11 +367,10 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
         await settleOn({ kind: "press", key: step.key.trim() });
         return;
       case "scroll":
-        await settleOn({
-          kind: "scroll",
-          direction: step.direction ?? "down",
-          pixels: Math.min(10_000, Math.max(50, Math.round(step.pixels ?? 800))),
-        });
+      case "type":
+        // Over or into an element when one is named; else wherever the screen is.
+        if (step.target?.trim()) await targeted(step, report);
+        else await settleOn(untargeted(step));
         return;
       case "wait":
         await waitStep(step, report);
@@ -258,22 +383,31 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     }
   }
 
+  const scrollOf = (step: ScreenStep, at?: ActTarget): ScreenAction => {
+    const scroll: Scroll = {
+      kind: "scroll",
+      direction: step.direction ?? "down",
+      pixels: Math.min(10_000, Math.max(50, Math.round(step.pixels ?? 800))),
+    };
+    return at ? { ...scroll, at } : scroll;
+  };
+
+  /** A `scroll` or a `type` with no target. */
+  function untargeted(step: ScreenStep): ScreenAction {
+    if (step.do === "scroll") return scrollOf(step);
+    if (!step.text) throw new Stop("say what to type (`text`)");
+    return { kind: "type", text: step.text };
+  }
+
   /** A look at the screen as a step: with `find`, only the lines that answer it go into the report. */
   async function readStep(step: ScreenStep, report: StepReport) {
     const current = await look();
     const question = step.find?.trim() || step.target?.trim();
     if (!question) {
-      report.note = "the page";
+      report.note = `the ${noun}`;
       return;
     }
-    const found = await findInPage({
-      judge: deps.judge,
-      orgId: deps.orgId,
-      agentId: deps.agentId,
-      runId: deps.runId,
-      question,
-      observation: current,
-    });
+    const found = await findInPage({ ...ids, question, observation: current });
     report.note = `"${question}"`;
     report.found = {
       question,
@@ -306,14 +440,11 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
         // The judge only looks again when the screen changed.
         const digest = screenDigest(current);
         if (until && digest !== checked) {
-          const r = await checkCondition({
-            judge: deps.judge,
-            orgId: deps.orgId,
-            agentId: deps.agentId,
-            runId: deps.runId,
-            condition: until,
-            observation: current,
-          });
+          const r = await onImage(
+            await checkCondition({ ...ids, condition: until, observation: current }),
+            until,
+            current,
+          );
           checked = digest;
           if (r.met === true) {
             report.note = `"${until}" is true`;
@@ -330,130 +461,158 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     }
   }
 
-  async function targeted(step: ScreenStep, report: StepReport) {
-    const use = USES[step.do] as TargetUse;
+  /** Where `words` are on the screen (see the comments inside); `fresh`: never on the look kept from before. */
+  async function find(words: string, use: TargetUse, fresh: boolean): Promise<Found> {
+    // A number from the page needs no look: the surface checks it (a stale one fails and says so).
+    const given = screenRef(words);
+    if (given)
+      return { at: { ref: given }, element: screen?.elements.find((e) => e.ref === given) ?? null, via: "ref" };
+    const resolveOn = (observation: ScreenObservation) =>
+      resolveTarget({ ...ids, target: words, use, observation, cache: deps.cache, scope: deps.scope });
+    // A look kept from before may predate the target (seconds old): when it isn't there, look once more.
+    const kept = fresh ? null : screen;
+    let current = kept ?? (await look());
+    let r = await resolveOn(current);
+    if (!r.found && kept) {
+      current = await look();
+      r = await resolveOn(current);
+    }
+    if (r.found) return { at: { ref: r.ref }, element: r.element, via: r.via };
+    // Not in the text (an icon without a name, a canvas): look at the screen itself.
+    if (deps.vision && deps.surface.capture && use !== "type_secret") {
+      const image = await deps.surface.capture().catch(() => null);
+      if (image) {
+        const spot = await locateOnImage({
+          ...ids,
+          target: words,
+          image,
+          url: current.url,
+          kind,
+          ...(deps.surface.regions
+            ? { zoom: async (region: ScreenRegion) => (await deps.surface.capture?.(region)) ?? null }
+            : {}),
+        });
+        if (spot.found) {
+          const element = spot.ref ? (current.elements.find((e) => e.ref === spot.ref) ?? null) : null;
+          return { at: spot.ref ? { ref: spot.ref } : { x: spot.x, y: spot.y }, element, via: "image" };
+        }
+        if (spot.refused) {
+          throw new Stop(
+            `found "${words}" only on the ${noun} image, not as an element: something that can't be undone isn't done at a bare spot. Do it another way (a menu, keys) or ask a person`,
+          );
+        }
+      }
+    }
+    throw new Stop(
+      r.reason === "unsure"
+        ? `"${words}" could be more than one thing on the ${noun}`
+        : r.reason === "unjudged"
+          ? `couldn't match "${words}" to an element by its words here: give its number or its exact name (read the ${noun} for them)`
+          : `couldn't find "${words}" on the ${noun}`,
+      r.candidates,
+    );
+  }
+
+  /** What `step` acts on and how, its fields checked first. */
+  function targetsOf(step: ScreenStep): Targets {
     const words = step.target?.trim();
     if (!words) throw new Stop("say what to act on (`target`)");
     if (step.do === "fill" && step.text === undefined) throw new Stop("say what to write (`text`)");
     if (step.do === "select" && !step.value?.trim()) throw new Stop("say which option (`value`)");
     if (step.do === "type_secret" && !step.secret?.trim()) throw new Stop("say which secret (`secret`)");
-
-    const find = async (fresh: boolean): Promise<{ at: ActTarget; element: ScreenElement | null }> => {
-      // A number from the page needs no look: the browser checks it (a stale one fails and says so).
-      const given = screenRef(words);
-      if (given) {
-        report.via = "ref";
-        return { at: { ref: given }, element: screen?.elements.find((e) => e.ref === given) ?? null };
-      }
-      const resolveOn = (observation: ScreenObservation) =>
-        resolveTarget({
-          judge: deps.judge,
-          orgId: deps.orgId,
-          agentId: deps.agentId,
-          runId: deps.runId,
-          target: words,
-          use,
-          observation,
-          cache: deps.cache,
-          scope: deps.scope,
+    if (step.do === "type" && !step.text) throw new Stop("say what to type (`text`)");
+    const to = step.to?.trim();
+    if (step.do === "drag" && !to) throw new Stop("say where to drop it (`to`)");
+    const one = (use: TargetUse, act: (at: ActTarget) => ScreenAction): Targets => ({
+      words: [words],
+      use,
+      act: ([at]) => act(at as ActTarget),
+    });
+    switch (step.do) {
+      case "fill":
+        return one("fill", (at) => ({ kind: "fill", at, text: step.text ?? "" }));
+      case "select":
+        return one("select", (at) => ({ kind: "select", at, value: (step.value ?? "").trim() }));
+      case "type_secret":
+        return one("type_secret", (at) => {
+          if (!("ref" in at)) throw new Stop(`a password goes only into a field found on the ${noun}`);
+          return { kind: "type_secret", at, secret: (step.secret ?? "").trim() };
         });
-      // A look kept from before may predate the target (seconds old): when it isn't there, look once more.
-      const kept = fresh ? null : screen;
-      let current = kept ?? (await look());
-      let r = await resolveOn(current);
-      if (!r.found && kept) {
-        current = await look();
-        r = await resolveOn(current);
+      case "type":
+        return one("click", (at) => ({ kind: "type", text: step.text ?? "", at }));
+      case "scroll":
+        return one("hover", (at) => scrollOf(step, at));
+      case "drag":
+        return {
+          words: [words, to as string],
+          use: "click",
+          act: ([from, at]) => ({ kind: "drag", from: from as ActTarget, to: at as ActTarget }),
+        };
+      case "click":
+      case "double_click":
+      case "right_click":
+      case "hover":
+      case "focus":
+      case "check":
+      case "uncheck": {
+        const verb = step.do;
+        return one(USES[verb] as TargetUse, (at) => ({ kind: verb, at }));
       }
-      if (r.found) {
-        report.via = r.via;
-        return { at: { ref: r.ref }, element: r.element };
+      default:
+        throw new Stop(`can't ${step.do} a target`);
+    }
+  }
+
+  async function targeted(step: ScreenStep, report: StepReport) {
+    const { words, use, act } = targetsOf(step);
+    // Each end of a drag is found on the screen as it is: the second on the look the first was found on.
+    const findAll = async (fresh: boolean) => {
+      const out: Found[] = [];
+      for (const [i, w] of words.entries()) out.push(await find(w, use, fresh && i === 0));
+      return out;
+    };
+    const noteOf = (f: Found) =>
+      f.element ? quoted(f.element) : "ref" in f.at ? `element ${f.at.ref}` : `a spot on the ${noun}`;
+    const describe = (found: Found[]) => {
+      report.element = elementOf(found[0]?.element);
+      report.note = found.map(noteOf).join(" to ");
+      report.via = found.some((f) => f.via === "image") ? "image" : found[0]?.via;
+    };
+    const perform = (found: Found[]) => deps.surface.perform(act(found.map((f) => f.at)), { settle: true });
+
+    let found = await findAll(false);
+    describe(found);
+    let out = await perform(found);
+    if (!out.ok && COVERED.test(out.error)) {
+      // On a desktop, what covers it may be asking to save or discard work: never closed on a guess. The
+      // report shows the screen as it is now, so what covers it (named only by its number) is in it.
+      if (deps.dismiss === false) {
+        screen = (await deps.surface.observe().catch(() => null)) ?? screen;
+        throw new Stop(`${out.error}: nothing was done; deal with what covers it first`);
       }
-      // Not in the text (an icon without a name, a canvas): look at the screen itself.
-      if (deps.vision && deps.surface.capture && step.do !== "type_secret") {
-        const image = await deps.surface.capture().catch(() => null);
-        if (image) {
-          const spot = await locateOnImage({
-            judge: deps.judge,
-            orgId: deps.orgId,
-            agentId: deps.agentId,
-            runId: deps.runId,
-            target: words,
-            image,
-            url: current.url,
-          });
-          if (spot.found) {
-            report.via = "image";
-            const element = spot.ref ? (current.elements.find((e) => e.ref === spot.ref) ?? null) : null;
-            return { at: spot.ref ? { ref: spot.ref } : { x: spot.x, y: spot.y }, element };
+      // Something covers it (a cookie banner, a dialog): close it once, then the step again.
+      if (!dismissedOnce) {
+        dismissedOnce = true;
+        const current = await look();
+        const close = await findDismiss({ ...ids, observation: current, covering: out.error });
+        if (close) {
+          const closed = await deps.surface.perform({ kind: "click", at: { ref: close.ref } }, { settle: true });
+          if (closed.ok) {
+            report.dismissed = quoted(close);
+            await lookAfter(closed.observation);
+            found = await findAll(false);
+            out = await perform(found);
           }
         }
       }
-      throw new Stop(
-        r.reason === "unsure"
-          ? `"${words}" could be more than one thing on the page`
-          : r.reason === "unjudged"
-            ? `couldn't match "${words}" to an element by its words here: give its number or its exact name (read the page for them)`
-            : `couldn't find "${words}" on the page`,
-        r.candidates,
-      );
-    };
-
-    const act = (at: ActTarget): ScreenAction => {
-      switch (step.do) {
-        case "fill":
-          return { kind: "fill", at, text: step.text ?? "" };
-        case "select":
-          return { kind: "select", at, value: (step.value ?? "").trim() };
-        case "type_secret":
-          if (!("ref" in at)) throw new Stop("a password goes only into a field found on the page");
-          return { kind: "type_secret", at, secret: (step.secret ?? "").trim() };
-        case "click":
-        case "hover":
-        case "check":
-        case "uncheck":
-          return { kind: step.do, at };
-        default:
-          throw new Stop(`can't ${step.do} a target`);
-      }
-    };
-
-    const noteOf = (f: { at: ActTarget; element: ScreenElement | null }) =>
-      f.element ? quoted(f.element) : "ref" in f.at ? `element ${f.at.ref}` : "a spot on the page";
-    let found = await find(false);
-    report.element = elementOf(found.element);
-    report.note = noteOf(found);
-    let out = await deps.surface.perform(act(found.at), { settle: true });
-    // Something covers it (a cookie banner, a dialog): close it once, then the step again.
-    if (!out.ok && COVERED.test(out.error) && !dismissedOnce) {
-      dismissedOnce = true;
-      const current = await look();
-      const close = await findDismiss({
-        judge: deps.judge,
-        orgId: deps.orgId,
-        agentId: deps.agentId,
-        runId: deps.runId,
-        observation: current,
-        covering: out.error,
-      });
-      if (close) {
-        const closed = await deps.surface.perform({ kind: "click", at: { ref: close.ref } }, { settle: true });
-        if (closed.ok) {
-          report.dismissed = quoted(close);
-          await lookAfter(closed.observation);
-          found = await find(false);
-          out = await deps.surface.perform(act(found.at), { settle: true });
-        }
-      }
     }
-    // The page changed since the target was found (its number went stale): find it again once.
-    if (!out.ok && STALE.test(out.error) && report.via !== "ref") {
-      found = await find(true);
-      out = await deps.surface.perform(act(found.at), { settle: true });
+    // The screen changed since the target was found (its number went stale): find it again once.
+    if (!out.ok && STALE.test(out.error) && found.some((f) => f.via !== "ref")) {
+      found = await findAll(true);
+      out = await perform(found);
     }
     if (!out.ok) throw new ActFailed(out.error);
-    report.element = elementOf(found.element);
-    report.note = noteOf(found);
+    describe(found);
     await lookAfter(out.observation);
   }
 
@@ -472,15 +631,7 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
       if (step.expect?.trim()) {
         const condition = step.expect.trim();
         const judgeOn = (o: ScreenObservation) =>
-          checkCondition({
-            judge: deps.judge,
-            orgId: deps.orgId,
-            agentId: deps.agentId,
-            runId: deps.runId,
-            condition,
-            observation: o,
-            changes: diffObservations(prior, o),
-          });
+          checkCondition({ ...ids, condition, observation: o, changes: diffObservations(prior, o) });
         let after = screen ?? (await look());
         let check = await judgeOn(after);
         // Not true yet: the page may still be on its way (a submit that navigates later, a server's answer).
@@ -509,12 +660,13 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
             changedAt = now();
           }
         }
+        check = await onImage(check, condition, after, diffObservations(prior, after));
         report.expected = check;
         if (check.met !== true) {
           throw new Stop(
             check.met === false
-              ? `the page doesn't show "${condition}"`
-              : `couldn't confirm "${condition}" on the page`,
+              ? `the ${noun} doesn't show "${condition}"`
+              : `couldn't confirm "${condition}" on the ${noun}`,
           );
         }
       }
@@ -536,6 +688,7 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
   }
   const after: ScreenObservation | null = screen;
   return {
+    ...(kind !== "browser" ? { kind } : {}),
     steps: reports,
     ...(stopped ? { stopped } : {}),
     before,

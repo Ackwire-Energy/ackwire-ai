@@ -142,7 +142,7 @@ export async function currentThreadSummary(db: Database, orgId: string, threadRo
 }
 
 /**
- * Lazily summarizes a thread (D13 "generate on demand"): only when it is long
+ * Lazily summarizes a thread (ADR 0017): only when it is long
  * (`minMessages`) or asked for (`force`), and only when newer messages exist
  * than the current summary covers. New versions supersede old ones. Usage
  * kind `summary`, billed to the org.

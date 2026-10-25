@@ -66,6 +66,7 @@ import {
   type ScheduleRule,
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
+import { standingRefusal } from "./standing";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -94,7 +95,7 @@ export type RoutineTarget =
    * `forUserId` (no run); otherwise the agent is asked, as in any routine.
    */
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string }
-  /** Opens a forum topic each time (D33): the prompt is its goal, these agents discuss it. */
+  /** Opens a forum topic each time (ADR 0022): the prompt is its goal, these agents discuss it. */
   | { type: "forum"; agentIds: string[]; rounds?: number };
 export const ROUTINE_EVENTS = [
   "sentry.issue_created",
@@ -987,7 +988,7 @@ export async function createRoutine(
   await requireRoutineManager(db, actorId, orgId, input.agentId);
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  // A routine asks the agent on its creator's behalf: only people who can talk to it create one (D31).
+  // A routine asks the agent on its creator's behalf: only people who can talk to it create one.
   if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
@@ -1091,7 +1092,7 @@ export interface RoutinePatch {
 
 /**
  * Edits a routine (`PATCH …/routines/{id}`), validated like create: a new
- * agent must be one the person manages and can talk to (D31); the target is
+ * agent must be one the person manages and can talk to; the target is
  * checked against the agent and the routine's creator; a new schedule is
  * parsed again in the routine's own zone (unless one is given), checked
  * against the minimum interval, and `nextRunAt` recomputed; resuming counts
@@ -1504,6 +1505,10 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
   if (!routine || routine.deletedAt) return skip("deleted");
   if (!routine.active && run.trigger !== "manual") return skip("paused");
+  // Its workspace is on hold or suspended, or its agent held: the slot passes, the routine keeps its
+  // schedule (`standing.ts`).
+  const refusal = await standingRefusal(db, run.orgId, routine.agentId);
+  if (refusal) return skip(refusal.code.replace(".", "_"));
   const paused = async (reason: RoutinePausedReason) => {
     await pauseRoutine(deps, routine, reason);
     return skip(reason);
@@ -1513,7 +1518,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   if (!creator || !membership) return paused("creator_left");
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");
-  // Its creator can no longer talk to the agent (D31).
+  // Its creator can no longer talk to the agent.
   if (!canTalkTo(agent, creator)) return paused("audience");
   const once = routine.triggerType === "once";
   // It ran: a one-off is done (it stays listed, inactive).

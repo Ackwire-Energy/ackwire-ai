@@ -15,6 +15,18 @@ export const organizations = pgTable("organizations", {
   context: text().notNull().default(""),
   /** The workspace logo (`/api/app/org-logos/{orgId}/{hash}.{ext}`), uploaded by an admin; null = the agent mark. */
   logo: text(),
+  /**
+   * Set by the people who run this server through the operator API (ADR 0056): `hold` stops its agents,
+   * `suspended` the whole workspace. With the notice `silent` the workspace is told only that it is paused,
+   * never why (`standing.ts`).
+   */
+  standing: text().$type<"active" | "hold" | "suspended">().notNull().default("active"),
+  standingReason: text(),
+  /** The operator's own note: never shown to the workspace. */
+  standingNote: text(),
+  standingNotice: text().$type<"shown" | "silent">().notNull().default("shown"),
+  /** When `standing` last changed; null: never. */
+  standingChangedAt: timestamp({ withTimezone: true }),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

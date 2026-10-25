@@ -9,7 +9,7 @@ import {
 
 /**
  * The phone app's colors (pure: no React Native import, so it is unit-tested). The design system's tokens,
- * with the light theme made native like iOS (MobileIntencional.html, feedback 2026-10-18): white lists and
+ * with the light theme made native like iOS: white lists and
  * chat, the grouped gray only where iOS groups (profile, Atividade, sheets) with white cards on it, lighter
  * fills, darker secondary text and lighter hairlines. The dark theme stays the tokens'.
  */

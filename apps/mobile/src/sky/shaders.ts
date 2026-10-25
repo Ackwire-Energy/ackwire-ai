@@ -1,6 +1,6 @@
 /**
- * The dither drawings as SkSL runtime shaders: one pass per screen pixel, the same steps as Mobile.html's
- * `drawDithers` loop (see ./math.ts, which mirrors these functions and is tested against the web's loop).
+ * The dither drawings as SkSL runtime shaders: one pass per screen pixel, the same steps as the web's
+ * dither loop (see ./math.ts, which mirrors these functions and is tested against that loop).
  *
  * Uniforms shared by all: `size` (points), `px` (points per cell), `t` (seconds), `last` (index of the
  * last tone), `pal[8]` (tones, padded), `fade` (from this height, as a share, the drawing fades out to

@@ -8,7 +8,7 @@ import {
   useDecideApproval,
   usePostMessage,
 } from "@agenteschat/client";
-import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -36,6 +36,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { approvalAction, approvalRisk, approvalTitle, approvalTraits, decisionLabel } from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { EmailLetter } from "@/components/EmailLetter";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import {
   MissionCommandsPending,
@@ -117,10 +118,12 @@ const TRAIT_ICON: Record<ReturnType<typeof approvalTraits>[number], IconName> = 
   irreversible: "alert",
   reversible: "undo",
   external: "send",
+  unsent: "archiveBox",
+  deletable: "undo",
 };
 
 /**
- * Aprovações (telas/Aprovacoes.html): who waits on you, each request with its
+ * Aprovações: who waits on you, each request with its
  * exact action, then the history. Under the requests, the missions' command
  * cards and the decisions and reviews waiting on you in missions (ADR 0029).
  * A request's details open in the centered details dialog (`?open=<id>`).
@@ -438,6 +441,8 @@ function ConnectorLine({ approval }: { approval: Approval }) {
 
 /** The exact action: connector, then its values (names are the tool's own identifiers, shown as code). */
 export function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
+  // An email shows as the email itself (folded in lists, whole in the details).
+  if (approval.email) return <EmailLetter email={approval.email} full={!max} />;
   const values = scalars(approval.params);
   const shown = max ? values.slice(0, max) : values;
   return (
@@ -680,6 +685,9 @@ function RequestCard({
   const leftMs = new Date(a.expiresAt).getTime() - Date.now();
   const owner = a.ownerUserId ?? agent?.ownerUserId;
   const title = approvalTitle(t, a);
+  const origin = approvalOriginShort(a);
+  const why = approvalWhy(a);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <article
       className={cx("ap-card", selected && "is-selected", running && "is-running")}
@@ -700,6 +708,12 @@ function RequestCard({
       <div className="ap-card__meta">
         <b>{name}</b>
         <span>{t(`approvals.verb.${approvalAction(a)}`)}</span>
+        {origin && (
+          <span className="ap-card__origin">
+            · <Icon name="routines" size={13} />
+            {tt(origin.key, origin.values)}
+          </span>
+        )}
         <span>
           · {channel ? `#${channel} · ` : ""}
           {relativeTime(t, i18n.language, a.createdAt)}
@@ -721,9 +735,15 @@ function RequestCard({
         </button>
       </h3>
       <div className="ap-card__body">
-        <ApprovalOrigin approval={a} />
-        {approvalWhy(a) && <p className="ap-why">{approvalWhy(a)}</p>}
         <ExactAction approval={a} max={4} />
+        {why && (
+          <p className="ap-said">
+            <AgentAvatar agentId={a.agentId} name={name} size="xs" />
+            <span>
+              <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} />
+            </span>
+          </p>
+        )}
         <Traits approval={a} />
         {running && <p className="ap-card__running">{t("approvals.running", { The: g.The, name })}</p>}
         {refusing && a.canDecide && <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />}

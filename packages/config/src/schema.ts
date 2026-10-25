@@ -29,6 +29,7 @@ export interface EnvVarDefinition {
     | "Email"
     | "Email for agents"
     | "Push"
+    | "Operator"
     | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
@@ -69,6 +70,12 @@ export const envVars = {
       "Directory containing the built web app (single-page app). Served by this server when it exists; otherwise only the API runs.",
     section: "Server",
   },
+  LANDING_PAGE: {
+    schema: z.stringbool().default(false),
+    description:
+      "Show the agentes.chat marketing page, with its waiting list and analytics, to signed-out visitors at `/`. Default: on when `PUBLIC_URL` is https://agentes.chat (the official site), off elsewhere (`/` goes to sign-in).",
+    section: "Server",
+  },
   DATABASE_URL: {
     schema: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
     description:
@@ -101,6 +108,20 @@ export const envVars = {
     description:
       "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
     section: "Sign-in",
+  },
+  TERMS_URL: {
+    schema: z.url().optional(),
+    description:
+      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on https://agentes.chat: its /terms page.",
+    section: "Sign-in",
+    example: "https://example.com/terms",
+  },
+  PRIVACY_URL: {
+    schema: z.url().optional(),
+    description:
+      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on https://agentes.chat: its /privacy page.",
+    section: "Sign-in",
+    example: "https://example.com/privacy",
   },
   TRUSTED_PROXIES: {
     schema: z.string().optional(),
@@ -188,13 +209,13 @@ export const envVars = {
   AGENT_DEFAULT_MODEL: {
     schema: modelId.default("claude-sonnet-5-5"),
     description:
-      "Unused since D83: new agents start on Automático (`auto`, each run picks the model and effort), whatever this says. Still checked when set; to be removed.",
+      "Unused: new agents start on Automático (`auto`, each run picks the model and effort), whatever this says. Still checked when set; to be removed.",
     section: "Agents",
   },
   ROUTER_ENABLED: {
     schema: z.stringbool().default(true),
     description:
-      "Let the router pick which agents (at most 2) answer messages that mention nobody. Off = agents answer only when @mentioned.",
+      "Let the router pick which agents (at most 4) answer messages that mention nobody. Off = agents answer only when @mentioned.",
     section: "Agents",
   },
   ROUTER_MODEL: {
@@ -418,14 +439,34 @@ export const envVars = {
   MILLIONSEND_API_KEY: {
     schema: z.string().optional(),
     description:
-      "MillionSend API key (transactional email: invitations, password reset, email verification, budget and approval alerts). Without it, emails are written to the log instead of sent, and password reset and email verification stay off.",
+      "MillionSend API key (transactional email: invitations, password reset, email verification, budget and approval alerts). Without it or `SMTP_URL`, emails are written to the log instead of sent, and password reset and email verification stay off.",
     section: "Email",
     secret: true,
   },
-  EMAIL_FROM: {
-    schema: z.string().default("agentes <ola@agentes.chat>"),
+  MILLIONSEND_API_URL: {
+    schema: z.url().default("https://api.millionsend.com"),
     description:
-      "Sender of transactional emails, e.g. `agentes <ola@agentes.chat>` (the domain must be verified in MillionSend).",
+      "Base URL of the email API used with `MILLIONSEND_API_KEY`. Any Resend-compatible API works (Resend, a self-hosted MillionSend).",
+    section: "Email",
+  },
+  SMTP_URL: {
+    // Parsed, not only prefix-checked: nodemailer prints a URL it can't parse, password included, then throws at boot.
+    schema: z
+      .url({
+        protocol: /^smtps?$/,
+        error: "must be an smtp:// or smtps:// URL, with any / # ? in the user and password percent-encoded",
+      })
+      .optional(),
+    description:
+      "SMTP server for transactional email when `MILLIONSEND_API_KEY` is not set: `smtps://` for implicit TLS (port 465), `smtp://` for STARTTLS (port 587), which is then required; `?requireTLS=false` at the end allows a relay without TLS on a trusted network. Percent-encode special characters in the user and password.",
+    section: "Email",
+    example: "smtps://user:password@smtp.example.com:465",
+    secret: true,
+  },
+  EMAIL_FROM: {
+    schema: z.string().optional(),
+    description:
+      "Sender of transactional emails, e.g. `agentes <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes <ola@HOST>`, HOST being the host of `PUBLIC_URL`.",
     section: "Email",
   },
   COMPOSIO_API_KEY: {
@@ -481,10 +522,17 @@ export const envVars = {
     section: "Push",
     secret: true,
   },
+  FILES_DIR: {
+    schema: z.string().regex(/^\//, "must be an absolute path").optional(),
+    description:
+      "Absolute path of a folder on this server's disk for platform file storage (Drive files, uploads, photos), used when the `S3_*` bucket is not set. Without either, files are stored in Postgres. Choose before the first upload: files stay in the store they were written to.",
+    section: "Storage",
+    example: "/data/files",
+  },
   S3_ENDPOINT: {
     schema: z.url().optional(),
     description:
-      "S3-compatible endpoint for platform file storage (artifacts, uploads), e.g. a Cloudflare R2 endpoint. Without S3_ENDPOINT and S3_BUCKET, files are stored in Postgres.",
+      "S3-compatible endpoint for platform file storage (artifacts, uploads), e.g. a Cloudflare R2 endpoint. Used when S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are all set.",
     section: "Storage",
     example: "https://<account>.r2.cloudflarestorage.com",
   },
@@ -508,6 +556,12 @@ export const envVars = {
     description: "Secret access key for the platform bucket.",
     section: "Storage",
     secret: true,
+  },
+  S3_PATH_STYLE: {
+    schema: z.stringbool().default(false),
+    description:
+      "Path-style bucket URLs (`https://endpoint/bucket/key`), for MinIO, Garage and similar stores. Off: virtual-hosted URLs (`https://bucket.endpoint/key`), as R2 and AWS expect.",
+    section: "Storage",
   },
   DAYTONA_API_KEY: {
     schema: z.string().optional(),
@@ -559,6 +613,17 @@ export const envVars = {
     description: "Price of one GiB of disk per hour, for sandbox usage.",
     section: "Sandbox",
   },
+  HOST_COMPUTER_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true`. Unset: off.",
+    section: "Sandbox",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
   DESKTOP_RELEASES_TOKEN: {
     schema: z.string().optional(),
     description:
@@ -573,6 +638,36 @@ export const envVars = {
       .default("agentes-chat/agentes.chat"),
     description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
     section: "Sandbox",
+  },
+  OPERATOR_API_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Turns on the operator API (ADR 0056): a second listener on `OPERATOR_API_PORT` that serves `/api/operator/v1` to your own automation, called with this value as `Authorization: Bearer`. It reaches every workspace and account on the instance, so never publish that port or put it behind your reverse proxy. While it is set the server also keeps 90 days of events for it (sign-ups, sign-ins with their IP address, workspaces, agents, runs; metadata only). Unset (default): nothing listens there and nothing is recorded. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  OPERATOR_API_PORT: {
+    schema: z.coerce.number().int().min(1).max(65535).default(3001),
+    description:
+      "Port of the operator API's listener, on the same `HOST`; only with `OPERATOR_API_TOKEN`. The compose file doesn't publish it: containers on the same Docker network reach it as `agentes:3001`.",
+    section: "Operator",
+  },
+  SUPPORT_EMAIL: {
+    schema: z.email().optional(),
+    description:
+      "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
+    section: "Operator",
+    example: "support@example.com",
+  },
+  MACHINE_PROVISIONING: {
+    schema: z.enum(["off", "external"]).default("off"),
+    description:
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. Needs `OPERATOR_API_TOKEN`.",
+    section: "Operator",
   },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),

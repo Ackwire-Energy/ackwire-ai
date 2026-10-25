@@ -42,7 +42,7 @@ const input = {
   tools: true,
 };
 
-describe("chooseAutoModel (D83)", () => {
+describe("chooseAutoModel", () => {
   test("one judge request with two choices: the tier and the effort, with a one-line reason", async () => {
     const judge = createFakeJudge((kind, id) =>
       kind === "auto_model" ? (id === "tier" ? "large" : "high") : undefined,
@@ -54,8 +54,9 @@ describe("chooseAutoModel (D83)", () => {
     const call = judge.calls[0];
     expect(call).toMatchObject({ kind: "auto_model", orgId: "o", agentId: "a", runId: "r" });
     expect(Object.keys(call?.questions ?? {})).toEqual(["tier", "effort"]);
-    expect(Object.keys(call?.questions.tier?.criteria ?? {})).toEqual(["small", "medium", "large"]);
-    expect(Object.keys(call?.questions.effort?.criteria ?? {})).toEqual(["low", "medium", "high"]);
+    const { tier, effort } = call?.questions ?? {};
+    expect(Object.keys((tier as { criteria: Record<string, string> }).criteria)).toEqual(["small", "medium", "large"]);
+    expect(Object.keys((effort as { criteria: Record<string, string> }).criteria)).toEqual(["low", "medium", "high"]);
     expect(call?.state).toMatchObject({
       message: input.message,
       recent: "person: a cobrança está falhando",
@@ -85,7 +86,7 @@ describe("chooseAutoModel (D83)", () => {
   });
 });
 
-describe("one decision, mapped per brain (D83)", () => {
+describe("one decision, mapped per brain", () => {
   const agent = { model: AUTO_MODEL, brain: "model", brainModel: null, brainEffort: null };
   const choice = { tier: "small" as const, effort: "low" as const };
 
@@ -94,7 +95,7 @@ describe("one decision, mapped per brain (D83)", () => {
     expect(modelForTier("anthropic", "medium")).toBe("claude-sonnet-5-5");
     expect(modelForTier("anthropic", "large")).toBe("claude-opus-5-5");
     expect(modelForTier("openai", "small")).toBe("gpt-6-luna");
-    expect(modelForTier("openai", "large")).toBe("gpt-6-sol");
+    expect(modelForTier("openai", "large")).toBe("gpt-6.1-sol");
     expect(modelForTier("nobody", "large")).toBeNull();
   });
 
@@ -103,7 +104,7 @@ describe("one decision, mapped per brain (D83)", () => {
     expect(brainModelForTier("claude_code", "medium")).toBe("sonnet");
     expect(brainModelForTier("claude_code", "large")).toBe("opus");
     expect(brainModelForTier("codex", "small")).toBe("gpt-6-luna");
-    expect(brainModelForTier("codex", "large")).toBe("gpt-6-sol");
+    expect(brainModelForTier("codex", "large")).toBe("gpt-6.1-sol");
     expect(brainModelForTier("model", "large")).toBeUndefined();
   });
 
@@ -113,7 +114,7 @@ describe("one decision, mapped per brain (D83)", () => {
     const applied = autoApplied(agent, plan, choice, "anthropic");
     expect(applied).toEqual({ apiModel: "claude-haiku-5-5", effort: "low" });
     expect(autoApplied(agent, plan, { tier: "large", effort: "high" }, "openai")).toEqual({
-      apiModel: "gpt-6-sol",
+      apiModel: "gpt-6.1-sol",
       effort: "high",
     });
     const run = withAuto({ ...agent, id: "a" }, plan, applied);
@@ -178,7 +179,7 @@ describe("one decision, mapped per brain (D83)", () => {
   });
 });
 
-describe("new agents start on Automático (D83)", () => {
+describe("new agents start on Automático", () => {
   test("no model chosen: auto for the API and for any computer brain; a fixed model leaves the brain's default", async () => {
     f = await setup();
     const born = await createAgent(f.db, f.owner.id, f.org.id, { name: "Eva", handle: "eva" }, NEW_AGENT_DEFAULTS);
@@ -203,7 +204,7 @@ describe("new agents start on Automático (D83)", () => {
   });
 });
 
-describe("a run of an agent on Automático (D83)", () => {
+describe("a run of an agent on Automático", () => {
   const judgeAnswers = (tier: { current: string }) => (kind: string, id: string) =>
     kind === "auto_model" ? (id === "tier" ? tier.current : "high") : undefined;
 
@@ -317,6 +318,24 @@ describe("a run of an agent on Automático (D83)", () => {
     await drainOutbox(f.db, f.handlers);
     expect(f.provider.calls).toHaveLength(0);
     expect(f.openaiProvider.calls[0]?.request).toMatchObject({ model: "gpt-6-luna", effort: "high" });
+  });
+
+  test("a workspace whose only key is DeepSeek's: an agent without a key of its own picks from DeepSeek's line", async () => {
+    f = await setup({ judge: judgeAnswers({ current: "large" }), reply: () => ({ chunks: ["ok"] }) });
+    await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+    await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "deepseek",
+      label: "ds",
+      apiKey: "sk-deepseek-test-1234567890",
+      makeDefault: true,
+    });
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: AUTO_MODEL, credentialId: null });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls[0]).toMatchObject({
+      apiKey: "sk-deepseek-test-1234567890",
+      request: { model: "deepseek-v4-pro", effort: "high" },
+    });
   });
 
   test("an agent without auto never asks the judge about its model", async () => {

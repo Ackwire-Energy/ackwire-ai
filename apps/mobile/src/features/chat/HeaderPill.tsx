@@ -6,7 +6,7 @@ import { softTones } from "@/sky/math";
 import { Glass, PressScale, Text, useTheme } from "@/ui";
 
 /**
- * The conversation's title as a glass pill in the header (telas/CabecalhoVidro.html, B · Céu na pílula): who
+ * The conversation's title as a glass pill in the header: who
  * or where on the left, the name and a quiet line under it. An agent's pill carries a little of its sky at
  * the right end; while it works, a pixel sweep in its color crosses the pill (the sidebar's trail) and the
  * quiet line says what it is doing. A channel shows who is in on the right.

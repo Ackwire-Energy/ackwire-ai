@@ -1,4 +1,4 @@
-/** Types for portrait.js (plain JavaScript so the HTML prototypes can import it as is). */
+/** Types for portrait.js (plain JavaScript so plain HTML pages can import it as is). */
 import type { AccessoryName, AgentColorName, EyeStyle } from "../agent/engine.js";
 
 /** The engines an agent thinks and works with: Claude Code, Codex, or the agent itself (through the API). */

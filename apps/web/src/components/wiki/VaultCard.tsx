@@ -4,7 +4,7 @@ import { ObsidianMark } from "./ObsidianMark";
 import { type useVaultReader, VaultDropZone, VaultLines, VaultReading, VaultStats, vaultMapping } from "./WikiImport";
 
 /**
- * Onboarding, step 2 (prototype: docs/design/telas/OnboardingV2.html): an
+ * Onboarding, step 2: an
  * Obsidian vault becomes the workspace's wiki. Read here; imported when the
  * person continues (the workspace exists by then).
  */

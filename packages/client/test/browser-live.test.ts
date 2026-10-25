@@ -249,6 +249,92 @@ describe("agent browser live connection (ADR 0040)", () => {
       code: "forbidden",
     });
   });
+
+  test("a closed browser is its own reason, retried with backoff so the view picks it up once it opens", () => {
+    expect(parseBrowserLiveMessage({ type: "browser.unavailable", agentId: AGENT, reason: "closed" })).toEqual({
+      type: "browser.unavailable",
+      agentId: AGENT,
+      reason: "closed",
+    });
+    // A reason this app doesn't know yet reads as unavailable.
+    expect(parseBrowserLiveMessage({ type: "browser.unavailable", agentId: AGENT, reason: "asleep" })).toMatchObject({
+      reason: "unavailable",
+    });
+    const sent: { type: string }[] = [];
+    const reasons: string[] = [];
+    const t = fakeTimers();
+    const live = createBrowserLiveConnection({
+      send: (f) => sent.push(f),
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      onUnavailable: (reason) => reasons.push(reason),
+      timers: t.timers,
+      backoffMs: [100, 200],
+    });
+    live.start();
+    live.handleMessage({ type: "browser.unavailable", agentId: AGENT, reason: "closed" });
+    expect(reasons).toEqual(["closed"]);
+    expect(t.pending[0]?.ms).toBe(100);
+    t.run();
+    expect(sent.filter((f) => f.type === "browser.watch")).toHaveLength(2);
+    // As the server answers a watch: a status first, then the browser is still closed. The wait still grows.
+    live.handleMessage({
+      type: "browser.status",
+      agentId: AGENT,
+      mode: "watch",
+      controllerUserId: null,
+      handoff: null,
+    });
+    live.handleMessage({ type: "browser.unavailable", agentId: AGENT, reason: "closed" });
+    expect(t.pending[0]?.ms).toBe(200);
+    // It opened meanwhile (a person opened a site): the view works, so the retry is dropped.
+    live.handleMessage({
+      type: "browser.status",
+      agentId: AGENT,
+      mode: "control",
+      controllerUserId: "u1",
+      handoff: null,
+    });
+    expect(t.pending).toHaveLength(0);
+    // Frames flow again: the next closed browser starts the wait over.
+    live.handleMessage({
+      type: "browser.frame",
+      agentId: AGENT,
+      seq: 1,
+      data: "abc",
+      metadata: { deviceWidth: 10, deviceHeight: 10 },
+    });
+    live.handleMessage({ type: "browser.unavailable", agentId: AGENT, reason: "closed" });
+    expect(t.pending[0]?.ms).toBe(100);
+    live.close();
+  });
+
+  test("a status says when someone else's control hides the page; a frame carries the tab's title", () => {
+    expect(
+      parseBrowserLiveMessage({
+        type: "browser.status",
+        agentId: AGENT,
+        mode: "watch",
+        controllerUserId: "u-ana",
+        handoff: null,
+        hidden: true,
+      }),
+    ).toMatchObject({ controllerUserId: "u-ana", hidden: true });
+    // An older server says nothing: nothing is hidden.
+    expect(
+      parseBrowserLiveMessage({ type: "browser.status", agentId: AGENT, mode: "watch", controllerUserId: null }),
+    ).toMatchObject({ hidden: false });
+    expect(
+      parseBrowserLiveMessage({
+        type: "browser.frame",
+        agentId: AGENT,
+        seq: 1,
+        data: "abc",
+        metadata: { deviceWidth: 10, deviceHeight: 10, url: "https://shop.example.com/", title: "Loja" },
+      }),
+    ).toMatchObject({ metadata: { url: "https://shop.example.com/", title: "Loja" } });
+  });
 });
 
 describe("agent browser requests (ADR 0040)", () => {

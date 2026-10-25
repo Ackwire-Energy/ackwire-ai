@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR, resources } from "../src/index";
+import { leaves } from "./leaves";
 
-/** Every leaf key ("chat.work.steps_one") and its value. */
-function leaves(obj: unknown, prefix = ""): [string, unknown][] {
-  if (obj === null || typeof obj !== "object") return [[prefix, obj]];
-  return Object.entries(obj as Record<string, unknown>).flatMap(([k, v]) => leaves(v, prefix ? `${prefix}.${k}` : k));
-}
 /** Plural forms differ by language ("_one"/"_other" vs others): compare the base key. */
 const base = (k: string) => k.replace(/_(zero|one|two|few|many|other)$/, "");
 

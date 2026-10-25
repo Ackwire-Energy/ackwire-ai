@@ -10,12 +10,12 @@
 @import "./desktop.css";
 
 :root {
-  /* The app reads in Source Sans 3 (telas/FonteApp.html), titles too; code in JetBrains Mono. */
+  /* The app reads in Source Sans 3, titles too; code in JetBrains Mono. */
   --font-sans: "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
   --font-display: var(--font-sans);
   --font-display-weight: 600;
-  /* Source Sans 3 draws small (x-height .486): as tall as 16px where the app says 15 (telas/FonteApp.html). */
+  /* Source Sans 3 draws small (x-height .486): as tall as 16px where the app says 15. */
   --font-size-adjust: 0.52;
   /* The wordmark (and the landing headings), and its dot-matrix ".chat". */
   --font-brand: "Funnel Display", var(--font-sans);

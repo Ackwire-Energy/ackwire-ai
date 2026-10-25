@@ -38,7 +38,7 @@ import {
   SESSION_MAX_INPUT_TOKENS,
   type ToolSource,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
@@ -105,7 +105,7 @@ function scriptedComputerBrain(script: (n: number, turn: BrainTurn) => AsyncIter
 const post = (fx: Fixture, body: string) =>
   postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, { body });
 
-/** The channel's main timeline: a run asked there answers there (D67). */
+/** The channel's main timeline: a run asked there answers there. */
 const timeline = (fx: Fixture) => listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
 
 test("brainFor: the mission's brain first, then the agent's; unknown values are the model brain", () => {
@@ -200,7 +200,7 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(seen[0]?.model).toBe("sonnet");
   const [run] = await f.db.select().from(schema.agentRuns);
   // A new session for this run, kept on it (a pause resumes the same one). Asked in the channel, its
-  // conversation is the channel's main timeline (D67).
+  // conversation is the channel's main timeline.
   expect(seen[0]?.session).toEqual({
     id: brainSessionId(f.agent.id, `${f.general.id}:${run?.id}`, "claude_code"),
     resume: false,
@@ -217,8 +217,17 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
     .select()
     .from(schema.usageRecords)
     .where(eq(schema.usageRecords.runId, run?.id ?? ""));
+  // On the computer's own sign-in: its computer, no account (the usage views, ADR 0063).
   expect(usage).toMatchObject([
-    { provider: "claude_code", billedTo: "plan", costNanoUsd: 0, inputTokens: 40, outputTokens: 9 },
+    {
+      provider: "claude_code",
+      billedTo: "plan",
+      costNanoUsd: 0,
+      inputTokens: 40,
+      outputTokens: 9,
+      machineId,
+      brainAccountId: null,
+    },
   ]);
   // The turn's bridge token died with the run.
   const tokens = await f.db
@@ -437,6 +446,7 @@ test("the agent's account and effort reach its turn; a refused sign-in falls bac
     kind: "claude_code",
     label: "Trabalho",
     status: "active",
+    createdBy: f.owner.id,
   });
   await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
   const { brain, seen } = scriptedComputerBrain(() => [
@@ -476,6 +486,7 @@ test("the agent's account and effort apply to its own brain; signed out or an ol
     kind: "claude_code",
     label: "Trabalho",
     status: "active",
+    createdBy: f.owner.id,
   });
   await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
   const question = await post(f, "@dev oi");
@@ -507,6 +518,56 @@ test("the agent's account and effort apply to its own brain; signed out or an ol
     question.id,
   );
   expect(old.unavailable).toMatchObject({ code: "runner_outdated" });
+});
+
+test("someone else's plan never thinks for the agent: plan_not_owner falls back to the API, or the run waits", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+  const machineId = await computerAgent(f);
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  // Bia owns the agent now; the computer's own sign-in is Ana's.
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pelo plano da Ana." }]);
+  const machines = { status: async (id: string) => statusOf(id) };
+  const handlers = createJobHandlers({ ...f.jobDeps, brains: { claude_code: () => brain }, machines });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toEqual([]);
+  expect((await timeline(f)).at(-1)?.meta.brainFallback).toMatchObject({ from: "claude_code", code: "plan_not_owner" });
+
+  // Her own account on that computer thinks for her agent, while she is in the organization.
+  const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
+  await f.db.insert(schema.machineAccounts).values({
+    id: ACCOUNT,
+    orgId: f.org.id,
+    machineId,
+    kind: "claude_code",
+    label: "Pessoal",
+    status: "active",
+    createdBy: bia.id,
+  });
+  await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
+  const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!agent || !run) throw new Error("missing rows");
+  const statusAccounts = { status: async (id: string) => statusOf(id, { protocol: ACCOUNTS_PROTOCOL }) };
+  const mine = await resolveBrain({ db: f.db, machines: statusAccounts }, agent, run, f.general.id);
+  expect(mine.unavailable).toBeUndefined();
+  // She left: her account no longer thinks for anyone.
+  await f.db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bia.id));
+  const gone = await resolveBrain({ db: f.db, machines: statusAccounts }, agent, run, f.general.id);
+  expect(gone.unavailable).toMatchObject({ code: "plan_not_owner" });
+
+  // Ana's agent on a computer Bia connected, nothing to stand in: the run waits instead.
+  await f.db.update(schema.agents).set({ ownerUserId: f.owner.id, brainAccountId: null });
+  await f.db.update(schema.machines).set({ pairedByUserId: bia.id }).where(eq(schema.machines.id, machineId));
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  await post(f, "@dev de novo");
+  await drainOutbox(f.db, handlers);
+  const runs = await f.db.select().from(schema.agentRuns);
+  expect(runs.map((r) => r.status).sort()).toEqual(["done", "waiting_input"]);
+  const waiting = runs.find((r) => r.status === "waiting_input")?.transcript as { waitingForBrain?: { code: string } };
+  expect(waiting.waitingForBrain?.code).toBe("plan_not_owner");
+  expect(seen).toEqual([]);
 });
 
 test("with no model credential, an offline computer: the agent says so once and the run waits until it is back", async () => {

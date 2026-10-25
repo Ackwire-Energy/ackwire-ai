@@ -52,8 +52,10 @@ export interface Host {
   onRunnerState(cb: (change: RunnerStateChange) => void): () => void;
   /** A window was brought up (`show_window`). */
   onShown(cb: (name: WindowName) => void): () => void;
-  /** Opens an https://agentes.chat link in the person's browser. */
+  /** Opens a page of agentes.chat or of a server this app signs in to, in the person's browser. */
   openExternal(url: string): Promise<void>;
+  /** The server the next sign-in goes to, so its pages may open too (`openExternal`). */
+  setServer(url: string): Promise<void>;
   /** Shows a local folder in Finder. */
   revealFolder(path: string): Promise<void>;
   pickFolder(): Promise<string | null>;
@@ -75,7 +77,7 @@ export interface Host {
   notchPlace(width: number, height: number): Promise<NotchInfo | null>;
   /** The current window's size in points (the popover follows its content). */
   resize(width: number, height: number): Promise<void>;
-  /** The site in the main window asking this Mac (D79; the popover answers, `this_mac` in main_window.rs). */
+  /** The site in the main window asking this Mac (ADR 0036; the popover answers, `this_mac` in main_window.rs). */
   onThisMac(cb: (id: number, request: ThisMacRequest) => void): () => void;
   thisMacReply(id: number, ok: boolean, data: unknown): Promise<void>;
   /** The Mac's menu bar, in the app's language (only the popover sets it; `app_menu_set` in menus.rs). */

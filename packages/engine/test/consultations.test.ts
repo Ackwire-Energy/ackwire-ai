@@ -99,7 +99,7 @@ describe("ask_agent", () => {
     expect((await listDms(f.db, f.owner.id, f.org.id)).map((d) => d.channelId)).not.toContain(c?.channelId);
 
     // The asking run never paused: it told the person and ended. The answer came as a notice where it
-    // was asked (D67), and a run of the asker relayed it there.
+    // was asked, and a run of the asker relayed it there.
     const all = await runs();
     expect(all.every((r) => r.status === "done")).toBe(true);
     expect(all.some((r) => r.status === "waiting_input")).toBe(false);
@@ -156,7 +156,7 @@ describe("ask_agent", () => {
       threadRootId: ask.id,
       status: "pending",
     });
-    // The card is in the channel's timeline, where the person asked (D67); the approval keeps the conversation.
+    // The card is in the channel's timeline, where the person asked; the approval keeps the conversation.
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     const card = timeline.find((m) => m.meta.approvalId === approval?.id);
     expect(card?.author).toMatchObject({ type: "agent", id: infra.id });

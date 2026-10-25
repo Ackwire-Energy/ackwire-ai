@@ -11,9 +11,10 @@
     "icons": "bun scripts/icons.ts",
     "tauri": "tauri"
   },
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "@agenteschat/adapters": "workspace:*",
+    "@agenteschat/client": "workspace:*",
     "@agenteschat/i18n": "workspace:*",
     "@agenteschat/ui": "workspace:*",
     "@fontsource-variable/martian-mono": "^5.3.0",

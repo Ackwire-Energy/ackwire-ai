@@ -28,7 +28,7 @@ test("agent messages carry model, tokens and cost; include=replies summarizes th
     usage?: { model: string; inputTokens: number; outputTokens: number; costUsd?: number };
     replies?: { count: number; lastAt: string | null; latest: { body: string }[] };
   };
-  // Asked in the channel: the agent answers in the main timeline (D67).
+  // Asked in the channel: the agent answers in the main timeline.
   const plain = (await (await api(`/channels/${channelId}/messages`)).json()) as { messages: Msg[] };
   const reply = plain.messages.find((m) => m.author.type === "agent");
   expect(reply?.usage).toMatchObject({ model: "claude-sonnet-5-5", inputTokens: 100, outputTokens: 10 });

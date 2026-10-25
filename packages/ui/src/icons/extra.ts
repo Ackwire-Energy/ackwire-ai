@@ -1,12 +1,12 @@
 import type { IconShape } from "./types";
 
 /**
- * Icons drawn in the approved screens (docs/design/telas) that don't have a
- * file in docs/design/icons yet. Same grid (20px), stroke (1.6) and rules.
- * Move them to docs/design/icons when the design files are added.
+ * Icons the app needs that don't have a file in docs/design/icons yet. Same
+ * grid (20px), stroke (1.6) and rules. Move them to docs/design/icons when
+ * the design files are added.
  */
 /*
- * IconesMotor.html: the engines an agent thinks and works with, small (the
+ * The engines an agent thinks and works with, small (the
  * 16 px form of their portraits), redrawn from the 24px grid. Our own glyphs,
  * no logos. The accent classes take each engine's color (components.css).
  */
@@ -49,21 +49,21 @@ const BRAIN_AGENT: IconShape[] = [
 ];
 
 export const extraIcons = {
-  /** Sidebar.dc.html: Issues (closed shape keeps the cut corner). */
+  /** Sidebar: Issues (closed shape keeps the cut corner). */
   issues: [
     ["path", { d: "M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z" }],
     ["path", { d: "M7 8h6M7 12h4" }],
   ],
-  /** Sidebar.dc.html: Drive. */
+  /** Sidebar: Drive. */
   drive: [["path", { d: "M3 6.5A2.5 2.5 0 0 1 5.5 4H8l2 2h4.5A2.5 2.5 0 0 1 17 8.5v5a2.5 2.5 0 0 1-2.5 2.5H3z" }]],
-  /** Sidebar.dc.html: Membros. */
+  /** Sidebar: Membros. */
   members: [
     ["circle", { cx: "8", cy: "7", r: "2.8" }],
     ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4M13.5 4.5a2.6 2.6 0 0 1 0 5M15 12.3c1.1.6 1.8 1.9 2 3.7" }],
   ],
-  /** Sidebar.dc.html: Criar agente. */
+  /** Sidebar: Criar agente. */
   plus: [["path", { d: "M10 4.5v11M4.5 10h11" }]],
-  /** Tarefas.html: the stages of a task, a circle that fills as the work goes (to do, doing, review, done). */
+  /** The stages of a task, a circle that fills as the work goes (to do, doing, review, done). */
   stageTodo: [["circle", { cx: "10", cy: "10", r: "6.75" }]],
   stageProgress: [
     ["circle", { cx: "10", cy: "10", r: "6.75" }],
@@ -79,16 +79,16 @@ export const extraIcons = {
   ],
   /** Onboarding / Agente dialogs: remove, close. */
   close: [["path", { d: "m6 6 8 8M14 6l-8 8" }]],
-  /** Select.dc.html: trigger chevron. */
+  /** Select: trigger chevron. */
   chevronDown: [["path", { d: "m6 8 4 4 4-4" }]],
-  /** Main.dc.html: approved chip; Select.dc.html: selected option. */
+  /** Channel: approved chip; select: selected option. */
   check: [["path", { d: "m5.5 10.5 3 3 6-7" }]],
-  /** Entrar.dc.html: error alert. */
+  /** Sign-in: error alert. */
   alert: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M10 6.5v4M10 13.5v.01" }],
   ],
-  /** Main.dc.html: pull request attachment. */
+  /** Channel: pull request attachment. */
   pullRequest: [["path", { d: "M6 3v14M14 9v8M6 7a3 3 0 0 0 3 3h2a3 3 0 0 1 3 3" }]],
   /** Organization settings (sliders). Not in the screens yet; drawn on the same grid. */
   settings: [
@@ -96,19 +96,19 @@ export const extraIcons = {
     ["circle", { cx: "13", cy: "6", r: "2" }],
     ["circle", { cx: "7", cy: "14", r: "2" }],
   ],
-  /** Memoria.dc.html: fact. */
+  /** Memory: fact. */
   info: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M10 9v4.5M10 6.5v.01" }],
   ],
-  /** Memoria.dc.html: preference. */
+  /** Memory: preference. */
   preference: [
     ["circle", { cx: "8", cy: "7", r: "2.8" }],
     ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4" }],
   ],
-  /** Memoria.dc.html: "Sempre no contexto". */
+  /** Memory: "Sempre no contexto". */
   pin: [["path", { d: "M7 3h6l-1 5 3 3H5l3-3zM10 11v6" }]],
-  /** Memoria.dc.html, Propostas.dc.html: back link. */
+  /** Memory, proposals: back link. */
   chevronLeft: [["path", { d: "M12 5 7 10l5 5" }]],
   /** Receipts: an agent answered (two checks, same stroke as `check`). */
   checks: [["path", { d: "m2.5 10.5 3 3 6-7M9 13l.5.5 6-7" }]],
@@ -120,7 +120,7 @@ export const extraIcons = {
   ],
   /** "Corrigir resposta". */
   edit: [["path", { d: "M4 16l1-4 8-8 3 3-8 8zM12 5l3 3" }]],
-  /** Artifacts (from the prototype's Drive icons, redrawn on the 20px grid): document. */
+  /** Artifacts (the Drive's icons, redrawn on the 20px grid): document. */
   document: [["path", { d: "M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5M8.5 10h4M8.5 12.5h4M8.5 15h2.5" }]],
   /** Artifacts: table. */
   table: [
@@ -141,22 +141,22 @@ export const extraIcons = {
     ["rect", { x: "3", y: "4", width: "14", height: "12", rx: "2" }],
     ["path", { d: "M3 7.5h14" }],
   ],
-  /** Sidebar.dc.html: Rotinas (clock with a refresh arrow). */
+  /** Sidebar: Rotinas (clock with a refresh arrow). */
   routines: [
     ["path", { d: "M16 10a6 6 0 1 1-1.8-4.3" }],
     ["path", { d: "M16 4v3h-3" }],
     ["path", { d: "M10 7v3l2 1.5" }],
   ],
-  /** Sidebar.dc.html: Calendário. */
+  /** Sidebar: Calendário. */
   calendar: [
     ["path", { d: "M6 3.5h8a3 3 0 0 1 3 3V14a3 3 0 0 1-3 3H3V6.5a3 3 0 0 1 3-3z" }],
     ["path", { d: "M3 8h14M7 2v3M13 2v3" }],
   ],
-  /** Rotinas.dc.html: event trigger. */
+  /** Routines: event trigger. */
   bolt: [["path", { d: "M11 3 5 11h5l-1 6 6-8h-5z" }]],
-  /** Issues.dc.html: high priority. */
+  /** Issues: high priority. */
   arrowUp: [["path", { d: "M10 15V5M5.5 9.5 10 5l4.5 4.5" }]],
-  /** Calendario.dc.html: next week. */
+  /** Calendar: next week. */
   chevronRight: [["path", { d: "m8 5 5 5-5 5" }]],
   /** "…" menu (more actions). */
   more: [
@@ -184,7 +184,7 @@ export const extraIcons = {
   ],
   /** "Parar" (stop an agent's run). */
   stop: [["rect", { x: "5.5", y: "5.5", width: "9", height: "9", rx: "2" }]],
-  /** NavegadorDepois.html: the agent's browser closed (a power button). */
+  /** The agent's browser closed (a power button). */
   power: [
     ["path", { d: "M10 3.5v6" }],
     ["path", { d: "M6.25 6a5.75 5.75 0 1 0 7.5 0" }],
@@ -262,8 +262,13 @@ export const extraIcons = {
   ],
   /** The cloud computer. */
   cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
+  /** "Abrir no celular". */
+  phone: [
+    ["rect", { x: "5.5", y: "2.5", width: "9", height: "15", rx: "2" }],
+    ["path", { d: "M9 14.5h2" }],
+  ],
   /**
-   * IconesComputador.html: each computer's line icon (the small form of its
+   * Computers: each computer's line icon (the small form of its
    * portrait, `ComputerIcon`), redrawn from the 24px grid. A laptop with the notch.
    */
   computerMac: [
@@ -271,7 +276,7 @@ export const extraIcons = {
     ["path", { d: "M8.67 3.75h2.67v.58a.75 .75 0 0 1-.75 .75h-1.17a.75 .75 0 0 1-.75-.75Z" }],
     ["path", { d: "M2.08 15.17h15.83l-.75 .92a1.33 1.33 0 0 1-1 .5H3.83a1.33 1.33 0 0 1-1-.5Z" }],
   ],
-  /** IconesComputador.html: a monitor on a stand with four tiles. */
+  /** Computers: a monitor on a stand with four tiles. */
   computerWindows: [
     ["rect", { x: "2.5", y: "3.17", width: "15", height: "10.58", rx: "1.67" }],
     ["path", { d: "M7.5 16.83h5M10 13.75v3.08" }],
@@ -280,13 +285,13 @@ export const extraIcons = {
     ["rect", { x: "6.83", y: "8.83", width: "2.75", height: "2.17", rx: ".33" }],
     ["rect", { x: "10.42", y: "8.83", width: "2.75", height: "2.17", rx: ".33" }],
   ],
-  /** IconesComputador.html: a terminal window (Linux's face). */
+  /** Computers: a terminal window (Linux's face). */
   computerLinux: [
     ["rect", { x: "2.5", y: "3.75", width: "15", height: "12.5", rx: "2.08" }],
     ["path", { d: "M2.5 7.17h15" }],
     ["path", { d: "m6 10 2.17 1.75-2.17 1.75M10 13.58h3.83" }],
   ],
-  /** IconesComputador.html: the cloud computer, a cloud with a screen set in it. */
+  /** Computers: the cloud computer, a cloud with a screen set in it. */
   computerCloud: [
     ["path", { d: "M5.83 15.42h8.75a3.33 3.33 0 0 0 .5-6.62A4.58 4.58 0 0 0 6.25 8 3.75 3.75 0 0 0 5.83 15.42Z" }],
     ["rect", { x: "7.92", y: "9.67", width: "5", height: "3.33", rx: ".67" }],
@@ -327,23 +332,23 @@ export const extraIcons = {
   ],
   /** Composer formatting: quote. */
   quote: [["path", { d: "M4.5 4.5v11M8.5 6.5H16M8.5 10H16M8.5 13.5h5" }]],
-  /** NovoAgente.html: the model key. */
+  /** Criar agente: the model key. */
   key: [
     ["circle", { cx: "7", cy: "12.5", r: "3.2" }],
     ["path", { d: "m9.3 10.2 7-7M14 5.5l2.3 2.3M12.3 7.2l1.7 1.7" }],
   ],
-  /** NovoAgente.html: the monthly budget. */
+  /** Criar agente: the monthly budget. */
   wallet: [
     ["path", { d: "M3.5 6.5a2 2 0 0 1 2-2H15v3" }],
     ["rect", { x: "3.5", y: "7.5", width: "13", height: "9", rx: "2" }],
     ["path", { d: "M13.5 12h.01" }],
   ],
-  /** NovoAgente.html: "Sortear" (a random look). */
+  /** Criar agente: "Sortear" (a random look). */
   shuffle: [
     ["rect", { x: "3.5", y: "3.5", width: "13", height: "13", rx: "3.5" }],
     ["path", { d: "M7.5 7.5h.01M12.5 12.5h.01M12.5 7.5h.01M7.5 12.5h.01" }],
   ],
-  /** IconesMotor.html: the engines' line icons (`BrainIcon`); missions keep the executor names. */
+  /** The engines' line icons (`BrainIcon`); missions keep the executor names. */
   executorClaude: BRAIN_CLAUDE_CODE,
   executorCodex: BRAIN_CODEX,
   brainClaudeCode: BRAIN_CLAUDE_CODE,
@@ -371,45 +376,45 @@ export const extraIcons = {
     ["rect", { x: "12.25", y: "12.75", width: "5.5", height: "4.25", rx: "1" }],
     ["path", { d: "M13.5 12.75v-1.1a1.5 1.5 0 0 1 3 0v1.1" }],
   ],
-  /** NovoAgente.html: sensitive actions always ask for approval. */
+  /** Criar agente: sensitive actions always ask for approval. */
   shield: [["path", { d: "M10 3 4 5.5v4.5c0 3.6 2.6 6.4 6 7 3.4-.6 6-3.4 6-7V5.5z" }]],
-  /** NovoAgente.html: "Conectar outro app". */
+  /** Criar agente: "Conectar outro app". */
   plug: [["path", { d: "M7.5 3v4M12.5 3v4M5 7h10v2.5a5 5 0 0 1-10 0zM10 14.5V17" }]],
-  /** NovoAgente.html: "Voltar ao original". */
+  /** Criar agente: "Voltar ao original". */
   undo: [["path", { d: "M7.5 11.5 3.5 7.5l4-4M3.5 7.5h8a5 5 0 0 1 0 10H9" }]],
-  /** NovoAgente.html: go somewhere (a channel). */
+  /** Criar agente: go somewhere (a channel). */
   arrowRight: [["path", { d: "M4 10h12M11 5l5 5-5 5" }]],
-  /** Drive.html: grid view. */
+  /** Drive: grid view. */
   grid: [
     ["rect", { x: "3.5", y: "3.5", width: "5.5", height: "5.5", rx: "1.6" }],
     ["rect", { x: "11", y: "3.5", width: "5.5", height: "5.5", rx: "1.6" }],
     ["rect", { x: "3.5", y: "11", width: "5.5", height: "5.5", rx: "1.6" }],
     ["rect", { x: "11", y: "11", width: "5.5", height: "5.5", rx: "1.6" }],
   ],
-  /** Drive.html: list view. */
+  /** Drive: list view. */
   list: [["path", { d: "M7.5 5h9M7.5 10h9M7.5 15h9M3.8 5h.01M3.8 10h.01M3.8 15h.01" }]],
-  /** Drive.html: group and sort ("Organizar"). */
+  /** Drive: group and sort ("Organizar"). */
   layers: [
     ["path", { d: "m10 2.8 7 3.9-7 3.9-7-3.9z" }],
     ["path", { d: "m3 10.6 7 3.9 7-3.9" }],
   ],
-  /** Drive.html: time left in the trash, group by date. */
+  /** Drive: time left in the trash, group by date. */
   clock: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M10 6.5V10l2.5 1.7" }],
   ],
-  /** Drive.html: open (in the viewer). */
+  /** Drive: open (in the viewer). */
   external: [
     ["path", { d: "M11.5 3.5h5v5M16.5 3.5 9.5 10.5M15 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" }],
   ],
-  /** ThreadContexto.html / Threads.html: a thread (a speech box with a line). */
+  /** Threads: a thread (a speech box with a line). */
   thread: [
     ["path", { d: "M3.5 4h13v7.5H9l-3.5 3v-3h-2z" }],
     ["path", { d: "M7.5 7.75h5" }],
   ],
-  /** ThreadContexto.html: "Tirar do canal" (out of the conversation, into the thread). */
+  /** Threads: "Tirar do canal" (out of the conversation, into the thread). */
   move: [["path", { d: "M3.5 10h9M9 6l4 4-4 4M16.5 4v12" }]],
-  /** ThreadContexto.html: the drag handle on a range's start and end caps; Forum.html: drag to reorder the table. */
+  /** Threads: the drag handle on a range's start and end caps; forum: drag to reorder the table. */
   grip: [
     ["circle", { cx: "7.5", cy: "5", r: "0.6" }],
     ["circle", { cx: "12.5", cy: "5", r: "0.6" }],
@@ -418,34 +423,34 @@ export const extraIcons = {
     ["circle", { cx: "7.5", cy: "15", r: "0.6" }],
     ["circle", { cx: "12.5", cy: "15", r: "0.6" }],
   ],
-  /** Threads.html: "Reabrir". */
+  /** Threads: "Reabrir". */
   refresh: [["path", { d: "M16.5 10a6.5 6.5 0 1 1-1.9-4.6M16.5 3.5v3.8h-3.8" }]],
-  /** Threads.html: "Arquivar" a thread (a box; `archive` is a zip file). */
+  /** Threads: "Arquivar" a thread (a box; `archive` is a zip file). */
   archiveBox: [
     ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
     ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M8.3 10.4h3.4" }],
   ],
-  /** Threads.html: "Desarquivar". */
+  /** Threads: "Desarquivar". */
   unarchive: [
     ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
     ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M10 14v-4.2M7.9 11.9 10 9.8l2.1 2.1" }],
   ],
-  /** Threads.html: Missões (a flag on a pole); Forum.html: conclude, a turn, where a round starts. */
+  /** Threads: Missões (a flag on a pole); forum: conclude, a turn, where a round starts. */
   flag: [["path", { d: "M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5" }]],
-  /** FazerDesfazer.html: numbers a mission's investigation found (analytics, logs, errors). */
+  /** Numbers a mission's investigation found (analytics, logs, errors). */
   chart: [["path", { d: "M3.5 16.5h13M6.5 13.5v-3M10 13.5v-7.5M13.5 13.5v-5" }]],
-  /** Forum.html: a stance that proposes. */
+  /** Forum: a stance that proposes. */
   bulb: [["path", { d: "M7.5 15h5M8.3 17.5h3.4M10 2.5a5 5 0 0 0-2.9 9.1v1.7h5.8v-1.7A5 5 0 0 0 10 2.5z" }]],
-  /** Forum.html: a stance that disagrees. */
+  /** Forum: a stance that disagrees. */
   disagree: [["path", { d: "M4 7.5h12M4 12.5h12M12.5 3.5l-5 13" }]],
-  /** Forum.html: a stance that changes position. */
+  /** Forum: a stance that changes position. */
   shift: [["path", { d: "M3.5 6.5h11L12 4M16.5 13.5h-11L8 16" }]],
-  /** Forum.html: a stance that asks. */
+  /** Forum: a stance that asks. */
   question: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M8 7.9a2.1 2.1 0 1 1 2.8 1.9c-.5.3-.8.7-.8 1.3v.3M10 14v.01" }],
   ],
-  /** Forum.html: an agent's budget ("Ver orçamento"). */
+  /** Forum: an agent's budget ("Ver orçamento"). */
   coin: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     [
@@ -455,24 +460,24 @@ export const extraIcons = {
       },
     ],
   ],
-  /** Forum.html: move up in the table. */
+  /** Forum: move up in the table. */
   chevronUp: [["path", { d: "m6 12 4-4 4 4" }]],
-  /** RepositoriosAgente.html: a GitHub repository. */
+  /** Repositories: a GitHub repository. */
   repo: [
     ["path", { d: "M5 4.3A1.3 1.3 0 0 1 6.3 3H15v11.5H6.3A1.3 1.3 0 0 0 5 15.8Z" }],
     ["path", { d: "M5 15.8A1.3 1.3 0 0 0 6.3 17H15v-2.5M8 6.5h4" }],
   ],
-  /** RepositoriosAgente.html: every repository; a public one. */
+  /** Repositories: every repository; a public one. */
   globe: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M3 10h14M10 3a10.5 10.5 0 0 1 0 14M10 3a10.5 10.5 0 0 0 0 14" }],
   ],
-  /** NavegadorCardScroll.html: the special keys (Tab, Enter, Apagar, Esc) of the agent's browser. */
+  /** The special keys (Tab, Enter, Apagar, Esc) of the agent's browser. */
   keyboard: [
     ["rect", { x: "2.5", y: "5", width: "15", height: "10", rx: "2" }],
     ["path", { d: "M5.5 8h.01M8.5 8h.01M11.5 8h.01M14.5 8h.01M5.5 11h.01M14.5 11h.01M8 11.5h4" }],
   ],
-  /** NavegadorCardScroll.html: where the typed text goes (the field clicked on the page). */
+  /** The agent's browser: where the typed text goes (the field clicked on the page). */
   pointer: [
     ["path", { d: "m5 4 10 4.17-4.17 1.66L9.17 14 5 4Z" }],
     ["path", { d: "m11 11 3.5 3.5" }],
@@ -485,7 +490,7 @@ export const extraIcons = {
     ],
     ["circle", { cx: "10", cy: "10", r: "2.4" }],
   ],
-  /** ConversaAgentes.html: a talk only between two agents (the consultation card's footer). */
+  /** Consultations: a talk only between two agents (the consultation card's footer). */
   eyeOff: [
     ["path", { d: "M3.3 3.3 16.7 16.7" }],
     [

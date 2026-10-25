@@ -19,13 +19,15 @@ describe("legal pages", () => {
 
 describe("legalInline", () => {
   test("bold, emails and links", () => {
-    expect(legalInline("**Railway:** hosting. Write to privacy@agentes.chat, or see https://agentes.chat/en.")).toEqual([
-      { kind: "bold", text: "Railway:" },
-      { kind: "text", text: " hosting. Write to " },
-      { kind: "link", text: "privacy@agentes.chat", href: "mailto:privacy@agentes.chat" },
-      { kind: "text", text: ", or see " },
-      { kind: "link", text: "https://agentes.chat/en", href: "https://agentes.chat/en" },
-      { kind: "text", text: "." },
-    ]);
+    expect(legalInline("**Railway:** hosting. Write to privacy@agentes.chat, or see https://agentes.chat/en.")).toEqual(
+      [
+        { kind: "bold", text: "Railway:" },
+        { kind: "text", text: " hosting. Write to " },
+        { kind: "link", text: "privacy@agentes.chat", href: "mailto:privacy@agentes.chat" },
+        { kind: "text", text: ", or see " },
+        { kind: "link", text: "https://agentes.chat/en", href: "https://agentes.chat/en" },
+        { kind: "text", text: "." },
+      ],
+    );
   });
 });

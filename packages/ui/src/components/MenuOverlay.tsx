@@ -7,7 +7,7 @@ import { CountChip } from "./Chip";
 import { Kbd } from "./Kbd";
 
 /**
- * A menu that takes the whole screen (telas/MenuOverlay.html, approved): the
+ * A menu that takes the whole screen: the
  * app behind blurs (`html[data-menu-overlay]`), the card that opened it grows
  * into the header, and the options are our menu items, larger. Radix Dialog
  * underneath: focus trap, Esc, focus back to the trigger. ↑↓ move between

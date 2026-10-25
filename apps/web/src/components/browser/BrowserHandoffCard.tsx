@@ -2,6 +2,7 @@ import type { BrowserHandoff } from "@agenteschat/client";
 import {
   handoffFuse,
   handoffMinutesLeft,
+  handoffScreen,
   isWaitingHandoff,
   keys,
   useApi,
@@ -16,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "../AgentAvatar";
+import { DesktopView } from "../desktop/DesktopView";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { BrowserCard } from "./BrowserCard";
@@ -47,8 +49,9 @@ export function useCurrentHandoff(orgId: string, handoff: BrowserHandoff) {
 
 /**
  * An agent asks a person for help in its browser (`browser_ask_person`,
- * ADR 0040 §6): the request, the time left, "Abrir" to the live view; who is
- * helping; and how it ended. Same family as the approval card.
+ * ADR 0040 §6) or on its desktop (`desktop_ask_person`, ADR 0058): the
+ * request, the time left, "Abrir" to the live view; who is helping; and how
+ * it ended. Same family as the approval card.
  */
 export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const { t, i18n } = useTranslation();
@@ -72,7 +75,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const settled = !waiting && !active;
   const status = current.status === "pending" ? "expired" : current.status;
   const minutes = handoffMinutesLeft(current);
-  // The agent's browser opens right here, under the request (telas/NavegadorNoChat.html, A).
+  // The agent's browser opens right here, under the request.
   const [here, setHere] = useState(false);
   const take = () =>
     actions.takeControl.mutate(current.id, {
@@ -94,13 +97,15 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   }, [asked]);
   const showBrowser = (here && (waiting || active)) || mineInControl;
   const time = current.resolvedAt ? formatTime(i18n.language, current.resolvedAt) : "";
+  const onDesktop = handoffScreen(current) === "desktop";
+  const screenIcon = onDesktop ? "computer" : "globe";
   return (
     <>
       {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
       <div
         className={settled ? "brw-rq brw-rq--settled" : "brw-rq"}
         role="group"
-        aria-label={t("browser.card.group", g)}
+        aria-label={onDesktop ? t("desktop.card.group", g) : t("browser.card.group", g)}
       >
         <span className="brw-rq__face">
           <AgentAvatar
@@ -151,10 +156,10 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
         <div className="brw-rq__body">
           <div className="brw-exact">
             <span className="brw-exact__ic">
-              <Icon name="globe" size={16} />
+              <Icon name={screenIcon} size={16} />
             </span>
             <span className="brw-exact__t">
-              <b>{t("browser.card.where", g)}</b>
+              <b>{onDesktop ? t("desktop.card.where", g) : t("browser.card.where", g)}</b>
               {agent?.handle && <small>@{agent.handle}</small>}
             </span>
           </div>
@@ -162,8 +167,13 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             <div className="brw-rq__res brw-rq__res--ok">
               <Icon name="check" size={16} />
               {current.controllerUserId === me.user.id
-                ? t("browser.card.doneByYou", { time, ...g, agent: name })
-                : t("browser.card.doneBy", { ...g, time, agent: name, name: helper ?? "" })}
+                ? t(onDesktop ? "desktop.card.doneByYou" : "browser.card.doneByYou", { time, ...g, agent: name })
+                : t(onDesktop ? "desktop.card.doneBy" : "browser.card.doneBy", {
+                    ...g,
+                    time,
+                    agent: name,
+                    name: helper ?? "",
+                  })}
             </div>
           )}
           {status === "failed" && settled && (
@@ -189,7 +199,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           )}
           {waiting && !showBrowser && (
             <div className="brw-rq__acts">
-              <Button variant="primary" icon="globe" loading={actions.takeControl.isPending} onClick={take}>
+              <Button variant="primary" icon={screenIcon} loading={actions.takeControl.isPending} onClick={take}>
                 {t("browser.inCard.openHere")}
               </Button>
               <span className="brw-rq__hint">{t("browser.inCard.openHereHint")}</span>
@@ -197,7 +207,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           )}
           {active && !showBrowser && (
             <div className="brw-rq__acts">
-              <Button icon="globe" onClick={() => setHere(true)}>
+              <Button icon={screenIcon} onClick={() => setHere(true)}>
                 {t("browser.card.watch")}
               </Button>
             </div>
@@ -213,15 +223,18 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
         </div>
         {waiting && <ExpiryFuse left={handoffFuse(current)} color={colorOf(agent)} />}
       </div>
-      {showBrowser && (
-        <BrowserCard
-          agentId={current.agentId}
-          name={name}
-          handoff={current}
-          defaultOpen
-          onSettled={() => setHere(false)}
-        />
-      )}
+      {showBrowser &&
+        (onDesktop ? (
+          <DesktopView agentId={current.agentId} name={name} onSettled={() => setHere(false)} />
+        ) : (
+          <BrowserCard
+            agentId={current.agentId}
+            name={name}
+            handoff={current}
+            defaultOpen
+            onSettled={() => setHere(false)}
+          />
+        ))}
     </>
   );
 }

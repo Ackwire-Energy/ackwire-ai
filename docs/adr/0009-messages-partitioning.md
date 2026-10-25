@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements planejamento D15.2.
 
 ## Decision
 

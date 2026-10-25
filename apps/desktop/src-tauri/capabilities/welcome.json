@@ -1,6 +1,6 @@
 {
   "identifier": "welcome",
-  "description": "First run and adding an organization: sign-in by code, folders, tools, start at login.",
+  "description": "First run and adding an organization: the server, sign-in by code, folders, tools, start at login.",
   "windows": ["welcome"],
   "permissions": [
     "core:default",
@@ -9,6 +9,7 @@
     "allow-runner-add",
     "allow-runner-remove",
     "allow-open-external",
+    "allow-set-server",
     "allow-pick-folder",
     "allow-show-window",
     "allow-hide-window",

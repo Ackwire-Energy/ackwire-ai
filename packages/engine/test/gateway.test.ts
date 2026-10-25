@@ -39,7 +39,7 @@ test("decrypts the org credential, streams, and records tokens and cost with org
   expect(deltas).toEqual(["Hi", " there"]);
   expect(f.provider.calls[0]?.apiKey).toBe("sk-ant-test-key-1234");
   expect(f.provider.calls[0]?.request.model).toBe("claude-sonnet-5-5");
-  const expected = 1000 * 2000 + 200 * 10000 + 50 * 200;
+  const expected = 1000 * 2000 + 200 * 10000 + 50 * 100;
   expect(result.costNanoUsd).toBe(expected);
   const [record] = await f.db.select().from(schema.usageRecords);
   expect(record).toMatchObject({

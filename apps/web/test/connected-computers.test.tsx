@@ -435,6 +435,34 @@ describe("Configurações → Computadores", () => {
     expect(document.querySelector(".machine-row")).toBeNull();
   });
 
+  test("this server's own computer: labelled, stopped here with its own words, and turned back on", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    const m = machines?.pair({ name: "srv-1", kind: "host" }) as Machine;
+    machines?.setHost({ machineId: m.id, on: true });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    const row = document.querySelector(".machine-row") as HTMLElement;
+    expect(row.textContent).toContain("srv-1");
+    expect(row.textContent).toContain("Computador deste servidor");
+
+    const menu = await openMenu(within(row).getByRole("button", { name: "Ações de srv-1" }));
+    await click(within(menu).getByRole("menuitem", { name: "Parar de usar nesta organização" }));
+    const confirm = screen().getByRole("dialog", { name: "Parar de usar o computador deste servidor?" });
+    expect(confirm.textContent).toContain("Dá para voltar a usar quando quiser");
+    await click(within(confirm).getByRole("button", { name: "Parar de usar nesta organização" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);
+
+    const off = document.querySelector(".machine-row") as HTMLElement;
+    expect(off.textContent).toContain("Esta organização não usa o computador deste servidor.");
+    await click(within(off).getByRole("button", { name: "Usar o computador deste servidor" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "machines.hostOn")?.args).toEqual([ORG_ID]);
+    expect(document.body.textContent).toContain("Pronto. Ele conecta em até um minuto.");
+  });
+
   test("someone else's machine: no actions", async () => {
     const api = createFakeApi(seedState());
     fakeMachinesOf.get(api)?.pair({ name: "Servidor do João", canManage: false, workspace: null });
@@ -449,9 +477,9 @@ describe("Configurações → Computadores", () => {
 describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
   // The server sends `path` and `computer`; the agent is the note's author.
   const params = {
-    path: "/Users/walter/Projects/loja-v5",
+    path: "/Users/you/Projects/loja-v5",
     computer: "MacBook do Walter",
-    command: "agentes-runner folders allow /Users/walter/Projects/loja-v5 --agent ada",
+    command: "agentes-runner folders allow /Users/you/Projects/loja-v5 --agent ada",
   };
   const post = (state: ReturnType<typeof seedState>, id: string, bodyCode: string, bodyParams: object) => {
     const base = state.messages[0] as (typeof state.messages)[number];
@@ -497,8 +525,8 @@ describe("an agent's folder request in the chat (ADR 0036 §8)", () => {
 });
 
 describe("the computer page: pause, folders and tools (ADR 0036)", () => {
-  const LOJA = "/Users/walter/Projects/loja-v5";
-  const DOCS = "/Users/walter/Documents";
+  const LOJA = "/Users/you/Projects/loja-v5";
+  const DOCS = "/Users/you/Documents";
   const mac = (over: Partial<Machine> = {}): Partial<Machine> & { name: string } => ({
     name: "MacBook do Walter",
     os: "darwin",
@@ -661,6 +689,47 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     // Allowed on the machine but not for Ada.
     expect(section.textContent).not.toContain(DOCS);
     expect(section.textContent).toContain("Liberar outra pasta é no próprio computador");
+  });
+
+  test("browser: an agent at work in its browser stays in use between its calls (ADR 0040)", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
+    const m = machines.pair(
+      mac({
+        access: { folders: [], tools: { claude: true, codex: false, commands: true, browser: true } },
+        browser: { available: true, version: "0.39.1", chrome: "Chrome 141", reason: null },
+      }),
+    );
+    // Ada works in its browser in #eng (a conversation this tab listens to); then that call ends.
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const threadId = state.messages.filter((x) => x.channelId === ENG_ID).at(-1)?.id;
+    const ev = (event: Record<string, unknown>) =>
+      act(async () =>
+        socket.push({
+          type: "event",
+          channelId: ENG_ID,
+          event: { channelId: ENG_ID, threadId, runId: "r-browse", agentId: ADA_ID, ...event },
+        }),
+      );
+    await ev({ type: "agent.thinking" });
+    await ev({ type: "agent.tool", tool: "browser_open", detail: "loja.example.com" });
+    await ev({ type: "agent.tool", tool: null });
+    await act(() =>
+      r.router.navigate({
+        to: "/org/$orgId/settings/computers/$machineId",
+        params: { orgId: ORG_ID, machineId: m.id },
+      }),
+    );
+    await settle(8);
+    const card = document.querySelector('[aria-labelledby="sec-machine-browser"]') as HTMLElement;
+    expect(card.textContent).toContain("Em uso agora");
+    expect(card.textContent).not.toContain("Ninguém usa o navegador agora.");
+    expect(card.querySelector(".brw-use")?.textContent).toContain("No navegador");
+    expect(within(card).getByRole("button", { name: "Ver" })).toBeTruthy();
   });
 });
 

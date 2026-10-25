@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { deriveSecret } from "../crypto";
 
 /**
- * The credential a computer uses with our git proxy (D35). It is ours, not
+ * The credential a computer uses with our git proxy (ADR 0024). It is ours, not
  * GitHub's: an HMAC over org, agent, computer, a revocation generation and
  * an expiry. GitHub's token stays on the server and never enters a computer.
  */
@@ -80,6 +80,10 @@ export const machineGitGen = (tokenHash: string) => Number.parseInt(tokenHash.sl
 export const gitProxyBase = (publicUrl: string, orgId: string, connectionId: string) =>
   `${publicUrl.replace(/\/$/, "")}/api/git/${orgId}/${connectionId}/`;
 
+/** An agent's commit email, on our host: `theo@agents.agentes.chat` for `https://agentes.chat` (or any URL under it). */
+export const agentCommitEmail = (publicUrl: string, handle: string) =>
+  `${handle}@agents.${new URL(publicUrl).hostname}`;
+
 const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 /**
@@ -88,7 +92,7 @@ const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
  *   credential helper that returns it, only for our host;
  * - `url.<proxy>.insteadOf https://github.com/` (and `git@github.com:`), so
  *   `git clone https://github.com/owner/repo` goes through the proxy;
- * - the commit author: "Theo (agentes) <theo@agents.agentes.chat>".
+ * - the commit author: "Theo (agentes) <theo@agents.{our host}>".
  * Nothing goes in the environment, and no GitHub token is ever here.
  */
 export function gitSetupScript(input: { base: string; token: string; agentName: string; agentHandle: string }) {
@@ -116,7 +120,7 @@ export function gitSetupScript(input: { base: string; token: string; agentName: 
     `git config --global --add ${shq(`url.${input.base}.insteadOf`)} https://github.com/`,
     `git config --global --add ${shq(`url.${input.base}.insteadOf`)} git@github.com:`,
     `git config --global user.name ${shq(`${input.agentName} (agentes)`)}`,
-    `git config --global user.email ${shq(`${input.agentHandle}@agents.agentes.chat`)}`,
+    `git config --global user.email ${shq(agentCommitEmail(input.base, input.agentHandle))}`,
     "git config --global init.defaultBranch main",
     "git config --global push.autoSetupRemote true",
     "echo ok",

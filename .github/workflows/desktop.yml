@@ -2,12 +2,12 @@ name: Desktop
 
 # The macOS app (ADR 0036): compile the runner for both architectures, fetch the pinned agent-browser
 # (ADR 0040), build a universal .app + .dmg
-# with Tauri, signed with a Developer ID and notarized, plus the updater bundle
-# signed with the updater key. On a `desktop-v*` tag publish a GitHub Release with
+# with Tauri, signed with our Developer ID and notarized, plus the updater bundle
+# signed with the updater key. Started by hand on a `desktop-v*` tag, it publishes a GitHub Release with
 # `agentes_<version>_universal.dmg`, its `.sha256`, `…universal.app.tar.gz` and its `.sig`
 # (the server reads those names).
-# Nothing runs on a developer's machine: testing means installing this build.
-# macOS runners cost about 10x Linux minutes: this runs only by hand, never per PR.
+# Testing means installing this build.
+# macOS runners cost about 10x Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
 # Run by hand on main with `release` = fix/feature/major: bumps the version (patch/minor/major) in
 # tauri.conf.json, package.json, Cargo.toml and Cargo.lock, commits and tags `desktop-v<version>` on main,
 # then builds and publishes the release. `none` only builds the current version as an artifact.
@@ -225,6 +225,9 @@ jobs:
           codesign --verify --strict --verbose=2 "$APP/Contents/MacOS/agent-browser"
           "$APP/Contents/MacOS/agent-browser" --version
           test -s "$APP/Contents/Resources/licenses/agent-browser/LICENSE"
+          test -s "$APP/Contents/Resources/licenses/bun/LICENSE.md"
+          test -s "$APP/Contents/Resources/LICENSE"
+          test -s "$APP/Contents/Resources/NOTICE"
           # Apple may take a moment to hand out the ticket after accepting the notarization, and the build's
           # own stapling then gives up quietly (0.5.4): staple again for a few minutes before checking. The
           # .dmg and the update keep the app as built; without a ticket, the Mac checks it online.

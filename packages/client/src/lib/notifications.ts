@@ -1,5 +1,5 @@
 /**
- * The inbox's pure rules (telas/Notificacoes.html): which filter an item is
+ * The inbox's pure rules: which filter an item is
  * in, what is visible, how live events and my own actions change a loaded
  * page (and its counts), the day groups, where an item opens, how I answer
  * it, and the "Lembrar depois" times. No React, no i18n: the page turns these
@@ -223,7 +223,7 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
-  if (n.kind === "machine_connected")
+  if (n.kind === "machine_connected" || n.kind === "computer_ready")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
       : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };

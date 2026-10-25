@@ -1,7 +1,6 @@
 import {
   type BrowserFrame,
   type BrowserInputEvent,
-  type BrowserLiveUnavailable,
   clickEvents,
   createBrowserLiveConnection,
   fitFrame,
@@ -16,10 +15,10 @@ import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View }
 import { Icon, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
-import { LIVE_KEYS, type LiveKey } from "./logic";
+import { LIVE_KEYS, type LiveKey, type PageGap } from "./logic";
 
 /** Why the page can't be shown: the server's reason, or the stream ended / not allowed. */
-export type Unavailable = BrowserLiveUnavailable | "ended" | null;
+export type Unavailable = PageGap | null;
 
 /** The page as a picture; a tap on it clicks the page (only for the person in control). */
 export function FrameView({
@@ -69,7 +68,7 @@ export function FrameView({
 const KEYCAP: Record<LiveKey, string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
 
 /**
- * Typing into the page (NavegadorCardScroll.html, 4): one quiet field like the composer, whole text into
+ * Typing into the page: one quiet field like the composer, whole text into
  * the page's focused field (tap it on the page first). The lock hides it and makes it a password field,
  * so the phone offers the saved passwords; the keyboard button shows the special keys; send is round.
  */
@@ -165,6 +164,8 @@ export interface LiveState {
   controllerUserId: string | null;
   /** The handoff the last status carried (undefined until a status arrives). */
   handoff: { controllerUserId: string | null } | null | undefined;
+  /** Someone else is in control: no page reaches this view until they hand it back. */
+  hidden: boolean;
   sendInput: (events: BrowserInputEvent[]) => void;
 }
 
@@ -179,6 +180,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [unavailable, setUnavailable] = useState<Unavailable>(null);
   const [controllerUserId, setControllerUserId] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
+  const [hidden, setHidden] = useState(false);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
 
   useEffect(() => {
@@ -193,9 +195,13 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
         setFrame(f);
       },
       onStatus: (st) => {
-        setUnavailable(null);
+        // Every retry on a closed browser gets a status first: only a frame says it's open again.
+        setUnavailable((u) => (u === "closed" || u === "ended" ? u : null));
         setControllerUserId(st.controllerUserId);
         setHandoff(st.handoff ? { controllerUserId: st.handoff.controllerUserId } : null);
+        setHidden(st.hidden);
+        // What the person in control does isn't ours to keep on screen either.
+        if (st.hidden) setFrame(null);
       },
       onUnavailable: (reason) => setUnavailable(reason),
       onEnded: () => setUnavailable("ended"),
@@ -217,13 +223,18 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       offStatus();
       live.close();
       liveRef.current = null;
+      // Unwatched, the rest goes stale (the last frame stays as the card's picture).
+      setUnavailable(null);
+      setControllerUserId(null);
+      setHandoff(undefined);
+      setHidden(false);
     };
   }, [connection, agentId, enabled]);
 
   const sendInput = useCallback((events: BrowserInputEvent[]) => {
     liveRef.current?.sendInput(events);
   }, []);
-  return { frame, unavailable, controllerUserId, handoff, sendInput };
+  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput };
 }
 
 const styles = StyleSheet.create({

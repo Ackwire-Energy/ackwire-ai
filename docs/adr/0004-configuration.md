@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Same as Tierbird ADR 0005. Implements planejamento D18 (single secret).
 
 ## Decision
 

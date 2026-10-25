@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { Judge, JudgeAnswer, JudgeQuestion } from "../judge";
+import type { ScreenKind } from "@agenteschat/adapters";
+import type { Judge, JudgeAnswer, JudgeBox, JudgeQuestion } from "../judge";
 import {
   describeElement,
   type ScreenElement,
   type ScreenImage,
   type ScreenObservation,
+  type ScreenRegion,
   screenRef,
 } from "./observation";
 
@@ -24,7 +26,7 @@ import {
  */
 
 /** What an action needs its target to be: only fitting elements are offered. */
-export type TargetUse = "click" | "fill" | "select" | "check" | "type_secret" | "upload" | "hover";
+export type TargetUse = "click" | "fill" | "select" | "check" | "type_secret" | "upload" | "hover" | "window";
 
 const FIELDS = new Set(["textbox", "searchbox", "combobox", "spinbutton", "textarea"]);
 const ROLES: Partial<Record<TargetUse, ReadonlySet<string>>> = {
@@ -99,7 +101,8 @@ export function createTargetCache(max = 2000): TargetCache {
   };
 }
 
-const normalize = (s: string) =>
+/** Words as targets and names are compared: lowercase, no accents or quotes, single spaces. */
+export const normalizeWords = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFKD")
@@ -124,20 +127,29 @@ export function pageKey(url: string | null): string {
 }
 
 export const targetKey = (scope: string, url: string | null, use: TargetUse, words: string) =>
-  `${scope}|${pageKey(url)}|${use}|${normalize(words)}`;
+  `${scope}|${pageKey(url)}|${use}|${normalizeWords(words)}`;
 
-const fits = (use: TargetUse, e: ScreenElement) => ROLES[use]?.has(e.role) ?? true;
+const WINDOWS = new Set(["window", "dialog", "alertdialog"]);
+/**
+ * A panel's button for a window (`button "Files - Thunar" [window, ref=e3]`): read from the attributes
+ * right after the quoted name, so a name with "[window]" in it can't pass for one.
+ */
+const WINDOW_BUTTON = /^-\s+button(?:\s+"(?:[^"\\]|\\.)*")?\s*\[(?:[^\]]*?,\s*)?window\s*[,\]]/;
+
+const fits = (use: TargetUse, e: ScreenElement) =>
+  use === "window" ? WINDOWS.has(e.role) || WINDOW_BUTTON.test(e.line) : (ROLES[use]?.has(e.role) ?? true);
 
 /** The elements an action may target, best guesses first when there are too many for one question. */
 function candidatesFor(words: string, use: TargetUse, o: ScreenObservation, max: number): ScreenElement[] {
   const fitting = o.elements.filter((e) => fits(use, e));
-  const pool = fitting.length > 0 ? fitting : o.elements;
+  // Only a window is brought to the front: with none on the screen, nothing else stands in.
+  const pool = fitting.length > 0 || use === "window" ? fitting : o.elements;
   if (pool.length <= max) return pool;
-  const terms = normalize(words)
+  const terms = normalizeWords(words)
     .split(" ")
     .filter((t) => t.length > 1);
   const scored = pool.map((e) => {
-    const text = normalize(`${e.role} ${e.name} ${e.context.join(" ")}`);
+    const text = normalizeWords(`${e.role} ${e.name} ${e.context.join(" ")}`);
     return { e, score: terms.reduce((n, t) => n + (text.includes(t) ? 1 : 0), 0) };
   });
   return scored
@@ -149,9 +161,9 @@ function candidatesFor(words: string, use: TargetUse, o: ScreenObservation, max:
 
 /** The one element with exactly these words as its name (and a fitting role), if there is exactly one. */
 function exactMatch(words: string, use: TargetUse, o: ScreenObservation): ScreenElement | null {
-  const w = normalize(words.replace(/^(the|o|a|os|as)\s+/i, ""));
+  const w = normalizeWords(words.replace(/^(the|o|a|os|as)\s+/i, ""));
   if (!w) return null;
-  const same = o.elements.filter((e) => fits(use, e) && normalize(e.name) === w);
+  const same = o.elements.filter((e) => fits(use, e) && normalizeWords(e.name) === w);
   if (same.length === 1) return same[0] as ScreenElement;
   // The same name on a heading and a button: the button is what one acts on.
   const controls = same.filter((e) => CONTROLS.has(e.role));
@@ -160,8 +172,8 @@ function exactMatch(words: string, use: TargetUse, o: ScreenObservation): Screen
   const m = /^([a-z]+)\s+"(.+)"$/i.exec(words.trim());
   if (m) {
     const role = (m[1] as string).toLowerCase();
-    const name = normalize(m[2] as string);
-    const hits = o.elements.filter((e) => e.role.toLowerCase() === role && normalize(e.name) === name);
+    const name = normalizeWords(m[2] as string);
+    const hits = o.elements.filter((e) => e.role.toLowerCase() === role && normalizeWords(e.name) === name);
     if (hits.length === 1) return hits[0] as ScreenElement;
   }
   return null;
@@ -184,12 +196,12 @@ const MAX_OPTIONS = 200;
 export const PICK_AT = 0.55;
 const PICK_MARGIN = 0.2;
 /**
- * An element whose wrong pick costs (it pays, deletes, sends): the judge must be this sure,
- * else the closest ones go back to the agent, which picks by number.
+ * An element whose wrong pick costs (it pays, deletes, sends, throws work away): the judge must be this
+ * sure, else the closest ones go back to the agent, which picks by number.
  */
 export const COSTLY_PICK_AT = 0.85;
 const COSTLY =
-  /\b(delete|remove|erase|destroy|pay|purchase|buy|place order|checkout|send|transfer|confirm|unsubscribe|close account|cancel (my )?(account|subscription|plan)|excluir|apagar|remover|pagar|comprar|finalizar|enviar|transferir|confirmar|encerrar|cancelar (a )?(conta|assinatura|plano))\b/i;
+  /\b(delete|remove|erase|destroy|trash|discard|don['’]?t save|do not save|close without saving|overwrite|replace|empty|uninstall|format|pay|purchase|buy|place order|checkout|send|transfer|confirm|unsubscribe|close account|cancel (my )?(account|subscription|plan)|excluir|apagar|remover|lixeira|descartar|n[ãa]o salvar|(sair|fechar) sem salvar|sobrescrever|substituir|esvaziar|desinstalar|formatar|pagar|comprar|finalizar|enviar|transferir|confirmar|encerrar|cancelar (a )?(conta|assinatura|plano))\b/i;
 /** A plain "Yes" or "OK" does what its dialog asks ("Delete project Acme?"): costly when the dialog is. */
 const isCostly = (e: ScreenElement) =>
   COSTLY.test(e.name) || e.context.some((c) => /^(?:alert)?dialog "/.test(c) && COSTLY.test(c));
@@ -284,10 +296,10 @@ export async function resolveTarget(input: ResolveInput): Promise<TargetResult> 
  * role, then where it sits; a control comes before text with the same words.
  */
 function closestByWords(words: string, candidates: ScreenElement[]): ScreenElement[] {
-  const terms = normalize(words)
+  const terms = normalizeWords(words)
     .split(" ")
     .filter((t) => t.length > 1);
-  const hits = (text: string) => terms.filter((t) => normalize(text).includes(t)).length;
+  const hits = (text: string) => terms.filter((t) => normalizeWords(text).includes(t)).length;
   return candidates
     .map((e) => ({
       e,
@@ -336,15 +348,109 @@ function decide(
   return { found: false, reason: "unsure", candidates: top };
 }
 
-/** Where a target is on an image of the screen (CSS pixels of the page), with the element there if marked. */
+/** Where a target is on an image of the screen (the surface's pixels), with the element there if marked. */
 export type Located =
   | { found: true; x: number; y: number; ref: string | null; confidence: number }
-  | { found: false; reason: string };
+  | {
+      found: false;
+      reason: string;
+      /** It is there, but only as a spot on the image, and its words say it can't be undone. */
+      refused?: true;
+    };
+
+/** How the judge is asked about each kind of screen: the whole of it, and a close-up of part of it. */
+const ON_IMAGE: Record<ScreenKind, { where: string; closeUp: string; present: string; absent: string }> = {
+  browser: {
+    where:
+      "In `screenshot` (a web page), box the one control that does what `target` describes, tightly. It may be only an icon: a gear for settings, a trash can for delete, a pencil for edit, a magnifier for search, × for close.",
+    closeUp:
+      "`screenshot` is a close-up of part of a web page. Box the one control that does what `target` describes, tightly. It may be only an icon.",
+    present: "Does `screenshot` show a control that does what `target` describes (maybe only as an icon)?",
+    absent: "It isn't on the screenshot (hidden, scrolled away or not on this page).",
+  },
+  desktop: {
+    where:
+      "In `screenshot` (a computer's desktop: windows, menus, a panel), box the one control that does what `target` describes, tightly. It may be only an icon: a gear for settings, a trash can for delete, a magnifier for search, x for close.",
+    closeUp:
+      "`screenshot` is a close-up of part of a computer's desktop. Box the one control that does what `target` describes, tightly. It may be only an icon.",
+    present: "Does `screenshot` show a control that does what `target` describes?",
+    absent: "It isn't on the screenshot.",
+  },
+};
+/** The judge must say it's there at least this sure, on the whole image and on a close-up. */
+const PRESENT_AT = 0.6;
+/** A first box this small (of each side) is looked at again on a close-up, when the surface takes one. */
+const ZOOM_BELOW = 0.15;
+/** The image Jev sees of a close-up, whatever part of the screen it shows: Jev takes none under 280 px a side. */
+const CLOSE_UP = { width: 480, height: 300 };
+/**
+ * The most a close-up enlarges the screen. At native size Jev's box on a 14 px control (a title bar's ×)
+ * lands on its neighbor; on 240×150 of the screen enlarged twice, it doesn't.
+ */
+const CLOSE_UP_ZOOM = 2;
+/**
+ * A close-up shows at least this many times the first box's height and width. Up close Jev may box the
+ * target whole, larger than at first (a folder with its name under it); a box over half the close-up's
+ * height or 80% of its width isn't one control, so this leaves room for 1.5 times the first box's height
+ * and 1.2 times its width.
+ */
+const CLOSE_UP_ROOM = { height: 3, width: 1.5 };
+
+/** One control: a box taller than half the image or wider than 80% of it isn't one. */
+const clearBox = (b: JudgeBox) => {
+  const w = b.right - b.left;
+  const h = b.bottom - b.top;
+  return w > 0 && h > 0 && h <= 0.5 && w <= 0.8;
+};
+
+/** A box's center on the screen. */
+const centerOf = (image: ScreenImage, b: JudgeBox) => ({
+  x: Math.round((image.origin?.x ?? 0) + ((b.left + b.right) / 2) * image.viewport.width),
+  y: Math.round((image.origin?.y ?? 0) + ((b.top + b.bottom) / 2) * image.viewport.height),
+});
+
+/**
+ * The part of the screen a close-up of `box` shows: `CLOSE_UP_ROOM` times the box, and at least
+ * `CLOSE_UP` over `CLOSE_UP_ZOOM`, in `CLOSE_UP`'s shape, centered on the box and kept inside the screen.
+ */
+function closeUpAround(box: JudgeBox, image: ScreenImage): ScreenRegion {
+  const origin = image.origin ?? { x: 0, y: 0 };
+  const screen = image.viewport;
+  const perPixel = Math.max(
+    1 / CLOSE_UP_ZOOM,
+    (CLOSE_UP_ROOM.height * (box.bottom - box.top) * screen.height) / CLOSE_UP.height,
+    (CLOSE_UP_ROOM.width * (box.right - box.left) * screen.width) / CLOSE_UP.width,
+  );
+  const width = Math.min(Math.round(CLOSE_UP.width * perPixel), screen.width);
+  const height = Math.min(Math.round(CLOSE_UP.height * perPixel), screen.height);
+  const center = centerOf(image, box);
+  const within = (at: number, from: number, side: number, span: number) =>
+    Math.round(Math.min(Math.max(at - span / 2, from), from + side - span));
+  return {
+    x: within(center.x, origin.x, screen.width, width),
+    y: within(center.y, origin.y, screen.height, height),
+    width,
+    height,
+  };
+}
+
+/** `image` drawn at `CLOSE_UP`'s size (a JPEG at the runner's quality); what it shows, and where, stay the same. */
+async function asCloseUp(image: ScreenImage): Promise<ScreenImage> {
+  const data = await new Bun.Image(Buffer.from(image.data, "base64"))
+    .resize(CLOSE_UP.width, CLOSE_UP.height)
+    .jpeg({ quality: 70 })
+    .toBase64();
+  return { ...image, data, ...CLOSE_UP };
+}
 
 /**
  * Looks for the target on an image of the screen (Jev's Box, plus whether it's
  * there). With marks (an annotated screenshot), the point lands on a marked
  * element's ref, so the action stays as exact as a ref; else it's a point.
+ * With `zoom`, a small first box is boxed again on a close-up of the screen
+ * around it, up to twice as large (small desktop targets: menu items, icons,
+ * a title bar's buttons), and the close-up's answer is the one taken. Words
+ * that can't be undone (delete, discard…) are never taken at a bare point.
  */
 export async function locateOnImage(input: {
   judge: Judge;
@@ -354,47 +460,66 @@ export async function locateOnImage(input: {
   target: string;
   image: ScreenImage;
   url?: string | null;
+  /** Which screen the image shows (default the browser's page). */
+  kind?: ScreenKind;
+  /** A close-up of a region of the screen, at its native size, or null when it can't be taken. */
+  zoom?: (region: ScreenRegion) => Promise<ScreenImage | null>;
 }): Promise<Located> {
-  const placeholder = `screen_${randomUUID()}`;
-  let answers: Record<string, JudgeAnswer>;
-  try {
-    answers = await input.judge.ask({
+  const words = ON_IMAGE[input.kind ?? "browser"];
+  const target = input.target.trim();
+  const boxOn = async (image: ScreenImage, where: string) => {
+    const placeholder = `screen_${randomUUID()}`;
+    const answers: Record<string, JudgeAnswer> = await input.judge.ask({
       orgId: input.orgId,
       agentId: input.agentId,
       runId: input.runId,
       kind: "screen_locate",
-      state: { screenshot: placeholder, address: input.url ?? null, target: input.target.trim() },
-      images: { [placeholder]: { data: input.image.data, format: "jpeg" } },
+      state: { screenshot: placeholder, address: input.url ?? null, target },
+      images: { [placeholder]: { data: image.data, format: "jpeg" } },
       questions: {
-        where: {
-          type: "box",
-          instructions:
-            "In `screenshot` (a web page), box the one control that does what `target` describes, tightly. It may be only an icon: a gear for settings, a trash can for delete, a pencil for edit, a magnifier for search, × for close.",
-        },
+        where: { type: "box", instructions: where },
         present: {
           type: "noul",
-          instructions: "Does `screenshot` show a control that does what `target` describes (maybe only as an icon)?",
-          criteria: {
-            true: "It is visible on the screenshot.",
-            false: "It isn't on the screenshot (hidden, scrolled away or not on this page).",
-          },
+          instructions: words.present,
+          criteria: { true: "It is visible on the screenshot.", false: words.absent },
         },
       },
     });
+    return { box: answers.where?.box, present: answers.present?.noul ?? 0 };
+  };
+
+  let first: Awaited<ReturnType<typeof boxOn>>;
+  try {
+    first = await boxOn(input.image, words.where);
   } catch (error) {
     return { found: false, reason: error instanceof Error ? error.message : String(error) };
   }
-  const box = answers.where?.box;
-  const present = answers.present?.noul ?? 0;
-  if (!box || present < 0.6) return { found: false, reason: "not on the screen" };
-  const w = box.right - box.left;
-  const h = box.bottom - box.top;
-  // A box over most of the image isn't an element.
-  if (w <= 0 || h <= 0 || w * h > 0.4) return { found: false, reason: "no clear element there" };
-  const x = Math.round(((box.left + box.right) / 2) * input.image.viewport.width);
-  const y = Math.round(((box.top + box.bottom) / 2) * input.image.viewport.height);
+  if (!first.box || first.present < PRESENT_AT) return { found: false, reason: "not on the screen" };
+  if (!clearBox(first.box)) return { found: false, reason: "no clear element there" };
+  let point = centerOf(input.image, first.box);
+  let present = first.present;
+
+  const small = first.box.right - first.box.left <= ZOOM_BELOW && first.box.bottom - first.box.top <= ZOOM_BELOW;
+  if (input.zoom && small) {
+    const taken = await input.zoom(closeUpAround(first.box, input.image)).catch(() => null);
+    // Only an image that says where it sits maps back; without one the first answer stands.
+    const close = taken?.origin ? await asCloseUp(taken).catch(() => null) : null;
+    const second = close ? await boxOn(close, words.closeUp).catch(() => null) : null;
+    if (close && second) {
+      // Up close it isn't there, or isn't one control: the first box was most likely on a neighbor.
+      if (!second.box || second.present < PRESENT_AT || !clearBox(second.box)) {
+        return { found: false, reason: "not clear on a close-up" };
+      }
+      point = centerOf(close, second.box);
+      present = second.present;
+    }
+  }
+
+  const { x, y } = point;
   const hit = (input.image.marks ?? [])
     .filter((m) => x >= m.box.x && x <= m.box.x + m.box.width && y >= m.box.y && y <= m.box.y + m.box.height)
     .sort((a, b) => a.box.width * a.box.height - b.box.width * b.box.height)[0];
+  // A spot is only as exact as the box: something that can't be undone is done on an element, or not at all.
+  if (!hit && COSTLY.test(target)) return { found: false, reason: "only a spot on the image", refused: true };
   return { found: true, x, y, ref: hit?.ref ?? null, confidence: present };
 }

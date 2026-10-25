@@ -58,7 +58,7 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
 export const forgetTeam = (orgId: string) => caches.agents.delete(`${orgId}:team`);
 
 /**
- * "# Your team" for the system prompt (D54): the other agents the person
+ * "# Your team" for the system prompt: the other agents the person
  * behind the run can talk to, one short line each, so an agent knows who
  * exists even in a DM. Details stay behind `find_agent`. Agents already
  * described in "Where you are" (channel members) are left out.
@@ -82,7 +82,7 @@ const words = (s: string) =>
     .filter((w) => w.length >= 3);
 
 /**
- * The built-in `find_agent` tool (D54): who else works here, searchable by
+ * The built-in `find_agent` tool: who else works here, searchable by
  * name, role or what they do. Lists only agents the person behind the run can
  * talk to, with what they can do, who is responsible and whether they are
  * busy. Read-only; asking one is `ask_agent`.
@@ -176,7 +176,7 @@ const firstSentence = (text: string) => {
 };
 
 /**
- * The team screen (D54): the org's agents grouped by their responsible person,
+ * The team screen: the org's agents grouped by their responsible person,
  * what each can do (stable capability keys), who is working now, and which
  * agents consulted each other in the last day. Questions and answers stay out:
  * a conversation between agents is private.

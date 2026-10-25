@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useEffect, useMemo } from "react";
-import { authClient, readCookie } from "@/lib/auth";
+import { type authClient, readCookie } from "@/lib/auth";
 
 export interface SessionState {
   /** Signed in (a session from the server or SecureStore's cache). */
@@ -14,11 +14,11 @@ export interface SessionState {
 const SessionContext = createContext<SessionState | null>(null);
 
 /**
- * The Better Auth session (cached in SecureStore by the Expo plugin, so a signed-in person opens the app
- * straight into it). When it ends, cached server data is dropped.
+ * The Better Auth session of the current server's client (cached in SecureStore by the Expo plugin, so a
+ * signed-in person opens the app straight into it). When it ends, cached server data is dropped.
  */
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const session = authClient.useSession();
+export function SessionProvider({ auth, children }: { auth: ReturnType<typeof authClient>; children: ReactNode }) {
+  const session = auth.useSession();
   const queryClient = useQueryClient();
   const user = session.data?.user ?? null;
   const signedIn = Boolean(user);

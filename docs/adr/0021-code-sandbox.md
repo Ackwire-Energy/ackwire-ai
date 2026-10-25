@@ -2,7 +2,6 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Planning: D30
 
 ## Decision
 
@@ -60,4 +59,4 @@ Migration 0030 maps existing rows: domains present means `allowlist`, otherwise 
 - Running code is opt-in twice: the server needs a provider, and each agent needs the scope.
 - The idle-tail estimate can miss the last idle period before an agent stops using its computer. That error makes us under-bill, never over-bill.
 - A shared computer means conversations of the same agent can see each other's files; that is intended (the workspace is trusted) and is narrowed by the agent's audience.
-- Self-host needs another `SandboxProvider` (or keeps it off); this is listed under the open-source tasks in the planning doc.
+- Self-host needs another `SandboxProvider` (or keeps it off).

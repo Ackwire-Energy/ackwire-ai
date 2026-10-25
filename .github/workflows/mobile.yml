@@ -1,6 +1,6 @@
 name: Mobile build (EAS)
 
-# Builds the phone app on EAS (never on a developer's machine). Runs only by hand (Actions → Run workflow),
+# Builds the phone app on EAS. Runs only by hand (Actions → Run workflow),
 # so builds spend the EAS quota on purpose; skips quietly without the EXPO_TOKEN secret.
 # Verification of the app's code (lint, typecheck, unit tests) runs in ci.yml like everything else.
 on:

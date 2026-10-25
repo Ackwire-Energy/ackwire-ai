@@ -71,7 +71,7 @@ describe("message action bars", () => {
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
     await click(within(bar).getByRole("button", { name: "Responder" }));
     await settle(6);
-    // The thread beside the channel: João's message on top. Ada answered in the channel (D67), so her
+    // The thread beside the channel: João's message on top. Ada answered in the channel, so her
     // reply stays there and is not repeated in the new thread.
     const panel = screen().getByRole("complementary", { name: "Thread" });
     expect(within(panel).getByRole("button", { name: "Fechar a thread" })).toBeTruthy();

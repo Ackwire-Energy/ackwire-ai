@@ -5,7 +5,7 @@ import { Sky } from "@/sky/Sky";
 import { AgentAvatar, Text, useTheme } from "@/ui";
 
 /**
- * The passage into the app after signing in (telas/OnboardingMobile.html, 6 · Entrando): the sky rises, the
+ * The passage into the app after signing in: the sky rises, the
  * agent smiles, and the screen becomes the conversations (or the first run when there is no workspace yet).
  */
 export function Entering({ org }: { org: string | null }) {

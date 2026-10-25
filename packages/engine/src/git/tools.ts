@@ -73,7 +73,7 @@ function progressPublisher(pubsub: PubSub | undefined, c: ToolContext) {
 }
 
 /**
- * Git in the agent's computer (D35), through our proxy:
+ * Git in the agent's computer (ADR 0024), through our proxy:
  * - `git_clone` (`github:git.read`): on a cloud computer, `git clone
  *   https://github.com/owner/repo` in the workspace (the computer's git is
  *   set up for the proxy; it needs the computer, `sandbox:run`); on a

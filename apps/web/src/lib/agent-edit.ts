@@ -15,7 +15,7 @@ import type { AgentAppearance } from "@agenteschat/ui";
 export * from "@agenteschat/client/lib/agent-edit";
 
 /*
- * The agent page (docs/design/telas/AgentePerfil.html): one draft over
+ * The agent page: one draft over
  * everything that can be edited, one save bar. What the server says is
  * `Saved`; what the person changed is `Edits` (only the touched fields), so
  * parts that load later (access, skills, the computer) never reset a draft.

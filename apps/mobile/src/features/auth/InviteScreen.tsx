@@ -14,7 +14,7 @@ import { SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
 import { forgetInvite, rememberInvite } from "./invite";
 
 /**
- * An invitation's link opened in the app (telas/OnboardingMobile.html, 5 · Convite): who invited, the org, the
+ * An invitation's link opened in the app: who invited, the org, the
  * role and who already works there; the e-mail locked. Signed out: Apple, a password, or "Já tenho conta"
  * (the invitation waits and is accepted once the person is in). Signed in: one tap to join. Expired:
  * "Pedir um novo convite" (the person who invited gets the request at once).

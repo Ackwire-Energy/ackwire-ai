@@ -19,7 +19,7 @@ import "./missions.css";
  * wait on you, each a link to its card in the thread. Only missions you own
  * or decide in (`status=waiting_you`); live through the mission events
  * (`mission.needs_you` reaches you in any channel). Drawn in the Approvals
- * screen's own language (telas/Aprovacoes.html): request cards and rows.
+ * screen's own language: request cards and rows.
  */
 export function useMissionsWaitingYou() {
   const { org } = useOrg();

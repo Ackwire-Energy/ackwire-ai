@@ -1,7 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { AgentBrowserSettings, BrowserHandoff } from "../api/types";
+import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
 
@@ -21,6 +21,8 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 
 /** The scope that lets an agent use its browser (not covered by "all tools"). */
 export const BROWSER_TOOL_SCOPE = "browser:use";
+/** The scope that lets an agent use apps on its desktop (it also needs Run code). */
+export const DESKTOP_TOOL_SCOPE = "desktop:use";
 
 /** The request on an agent's chat card (`meta.browserHandoff`), checked. */
 export function browserHandoffOf(meta: unknown): BrowserHandoff | null {
@@ -34,6 +36,9 @@ export function browserHandoffOf(meta: unknown): BrowserHandoff | null {
 
 /** Still waiting for someone, or someone is in it now. */
 export const isOpenHandoff = (h: Pick<BrowserHandoff, "status">) => h.status === "pending" || h.status === "active";
+
+/** Which screen a handoff is on (servers older than screens name none: the browser). */
+export const handoffScreen = (h: Pick<BrowserHandoff, "screen">): ScreenKind => h.screen ?? "browser";
 
 /** Waiting for someone to open it, not yet expired. */
 export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">, now = Date.now()): boolean {
@@ -58,9 +63,12 @@ export function handoffFuse(h: Pick<BrowserHandoff, "createdAt" | "expiresAt">, 
   return Math.min(1, Math.max(0, (end - now) / (end - start)));
 }
 
+/** A tool of one of the agent's screens: its browser (`browser_open`, …) or its desktop (`desktop_do`, …). */
+export const isScreenTool = (tool: string | null | undefined, screen: ScreenKind) =>
+  Boolean(tool?.replace(/^mcp__agentes__/, "").startsWith(`${screen}_`));
+
 /** A tool of the agent browser (`browser_open`, `browser_click`, …). */
-export const isBrowserTool = (tool: string | null | undefined) =>
-  Boolean(tool?.replace(/^mcp__agentes__/, "").startsWith("browser_"));
+export const isBrowserTool = (tool: string | null | undefined) => isScreenTool(tool, "browser");
 
 /**
  * The agent is in its browser now: its current tool, or its latest call, is a browser tool
@@ -128,9 +136,24 @@ export function applyBrowserHandoff(
 ) {
   if (place) noteHandoffPlace(handoff, place.channelId, place.threadId);
   qc.setQueryData(keys.browserHandoff(orgId, handoff.id), handoff);
-  qc.setQueryData<BrowserHandoff | null>(keys.agentBrowserHandoff(orgId, handoff.agentId), (old) =>
-    isOpenHandoff(handoff) ? handoff : old?.id === handoff.id || old === undefined ? null : old,
+  qc.setQueryData<BrowserHandoff | null>(
+    keys.agentBrowserHandoff(orgId, handoff.agentId, handoffScreen(handoff)),
+    (old) => (isOpenHandoff(handoff) ? handoff : old?.id === handoff.id || old === undefined ? null : old),
   );
+  qc.setQueryData<DesktopStatus>(keys.agentDesktop(orgId, handoff.agentId), (old) =>
+    old ? desktopWithHandoff(old, handoff) : old,
+  );
+}
+
+/**
+ * The desktop's state once a handoff changed: its own handoff, or the one it already named (the browser's,
+ * when its Chrome shows on the desktop; only the server knows that one holds it, so a new one waits for it).
+ */
+export function desktopWithHandoff(status: DesktopStatus, handoff: BrowserHandoff): DesktopStatus {
+  const known = status.handoff?.id === handoff.id;
+  if (!isOpenHandoff(handoff)) return known ? { ...status, handoff: null, controllerUserId: null } : status;
+  if (!known && handoffScreen(handoff) !== "desktop") return status;
+  return { ...status, handoff, controllerUserId: handoff.status === "active" ? handoff.controllerUserId : null };
 }
 
 export const useAgentBrowserSettings = (orgId: string, agentId: string, enabled = true) => {
@@ -155,14 +178,20 @@ export function useUpdateAgentBrowserSettings(orgId: string, agentId: string) {
 }
 
 /**
- * The agent's open request or take over (who is in control), if any. `staleTime`: how long a
- * fetched answer is trusted (the realtime event keeps it current meanwhile).
+ * The agent's open request or take over (who is in control) on that screen, if any. `staleTime`:
+ * how long a fetched answer is trusted (the realtime event keeps it current meanwhile).
  */
-export const useAgentBrowserHandoff = (orgId: string, agentId: string, enabled = true, staleTime = 0) => {
+export const useAgentBrowserHandoff = (
+  orgId: string,
+  agentId: string,
+  enabled = true,
+  staleTime = 0,
+  screen: ScreenKind = "browser",
+) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.agentBrowserHandoff(orgId, agentId),
-    queryFn: () => api.browser.agentHandoff(orgId, agentId),
+    queryKey: keys.agentBrowserHandoff(orgId, agentId, screen),
+    queryFn: () => api.browser.agentHandoff(orgId, agentId, screen),
     enabled,
     retry: false,
     staleTime,
@@ -179,16 +208,35 @@ export const useBrowserHandoff = (orgId: string, handoffId: string | null | unde
   });
 };
 
-/** "Assumir" from a run's card: the run it is bound to (its card stays in that conversation). */
+/** "Assumir" from a run's card: the run it is bound to (its card stays in that conversation); `screen`: the browser by default. */
 export interface TakeoverInput {
   agentId: string;
   runId?: string;
+  screen?: ScreenKind;
+}
+
+/** "Parar" one of the agent's screens: the browser by default ("Desligar" for its desktop). */
+export interface StopInput {
+  agentId: string;
+  screen?: ScreenKind;
+}
+
+/** "Pronto" or "Devolver" with what the person wants the agent to know (it reads it as their words). */
+export interface DoneInput {
+  handoffId: string;
+  note?: string;
+}
+
+/** A site the person in control opens in the agent's browser (a bare host gets https://). */
+export interface OpenPageInput {
+  agentId: string;
+  url: string;
 }
 
 /**
- * "Abrir" (take control), "Pronto", "Não consegui", cancel, "Assumir" while watching,
- * and "Parar" (close the agent's browser), as React Query mutations (`.mutate`,
- * `.isPending`). Each answer updates the cached request.
+ * "Abrir" (take control), "Pronto"/"Devolver", "Não consegui", cancel, "Assumir" while
+ * watching, opening a site while in control, and "Parar" (close the agent's browser), as
+ * React Query mutations (`.mutate`, `.isPending`). Each answer updates the cached request.
  */
 export function useBrowserHandoffMutations(orgId: string) {
   const api = useApi();
@@ -201,9 +249,15 @@ export function useBrowserHandoffMutations(orgId: string) {
       onSuccess: apply,
     }),
     done: useMutation({
-      mutationFn: (handoffId: string) => api.browser.done(orgId, handoffId),
+      mutationFn: (v: string | DoneInput) =>
+        typeof v === "string" ? api.browser.done(orgId, v) : api.browser.done(orgId, v.handoffId, v.note),
       meta: { silent: true },
       onSuccess: apply,
+    }),
+    /** 403 `browser.not_allowed` (outside the agent's sites), 409 `browser.not_in_control`, 400 `browser.bad_address` / `browser.open_failed`. */
+    open: useMutation({
+      mutationFn: ({ agentId, url }: OpenPageInput) => api.browser.open(orgId, agentId, url),
+      meta: { silent: true },
     }),
     failed: useMutation({
       mutationFn: ({ handoffId, note }: { handoffId: string; note?: string }) =>
@@ -218,13 +272,21 @@ export function useBrowserHandoffMutations(orgId: string) {
     }),
     takeover: useMutation({
       mutationFn: (v: string | TakeoverInput) =>
-        typeof v === "string" ? api.browser.takeover(orgId, v) : api.browser.takeover(orgId, v.agentId, v.runId),
+        typeof v === "string"
+          ? api.browser.takeover(orgId, v)
+          : api.browser.takeover(orgId, v.agentId, v.runId, v.screen),
       meta: { silent: true },
       onSuccess: apply,
     }),
     stop: useMutation({
-      mutationFn: (agentId: string) => api.browser.stop(orgId, agentId),
+      mutationFn: (v: string | StopInput) =>
+        typeof v === "string" ? api.browser.stop(orgId, v) : api.browser.stop(orgId, v.agentId, v.screen),
       meta: { silent: true },
+      onSuccess: (_done, v) => {
+        if (typeof v !== "string" && v.screen === "desktop") {
+          void qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, v.agentId) });
+        }
+      },
     }),
   };
 }
@@ -238,11 +300,14 @@ export function useBrowserHandoffActions(orgId: string) {
   const m = useBrowserHandoffMutations(orgId);
   return {
     takeControl: (handoffId: string) => m.takeControl.mutateAsync(handoffId),
-    done: (handoffId: string) => m.done.mutateAsync(handoffId),
+    done: (handoffId: string, note?: string) => m.done.mutateAsync(note ? { handoffId, note } : handoffId),
     failed: (handoffId: string, note?: string) => m.failed.mutateAsync({ handoffId, ...(note ? { note } : {}) }),
     cancel: (handoffId: string) => m.cancel.mutateAsync(handoffId),
     takeover: (agentId: string, runId?: string) => m.takeover.mutateAsync(runId ? { agentId, runId } : agentId),
     stop: (agentId: string) => m.stop.mutateAsync(agentId),
+    /** Not in `pending`: a page may take a while to open, and the rest stays usable meanwhile. */
+    open: (agentId: string, url: string) => m.open.mutateAsync({ agentId, url }),
+    opening: m.open.isPending,
     pending:
       m.takeControl.isPending ||
       m.done.isPending ||

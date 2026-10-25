@@ -13,6 +13,7 @@ import type {
   MemoryUpdate,
   Message as MessageType,
   ReplyRef,
+  ScreenKind,
   SecretRequest,
   ThreadInfo,
 } from "@agenteschat/client";
@@ -22,10 +23,11 @@ import {
   browserTrailOf,
   type ConnectionStatus,
   consultsIn,
+  desktopTrailOf,
   heldRowsIn,
   inMainTimeline,
-  isBrowserTool,
   isQuiet,
+  isScreenTool,
   keys,
   type LiveRun,
   MESSAGES_PAGE,
@@ -59,7 +61,9 @@ import {
   useUpdateChannel,
   useWikiTree,
 } from "@agenteschat/client";
+import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import {
@@ -71,7 +75,7 @@ import {
 } from "@agenteschat/client/lib/chat";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
-import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, standingRefusalText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -89,6 +93,7 @@ import {
   parseMissionCommand,
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
+import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -163,6 +168,7 @@ import {
   saysNothingYet,
 } from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
+import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
@@ -211,6 +217,7 @@ import {
 import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
+import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
@@ -304,7 +311,7 @@ export interface ChannelChrome {
   composerReplacement?: ReactNode;
   /** Under the composer (a mission someone only reads: "para pedir algo, peça para participar"). */
   composerNote?: ReactNode;
-  /** A thread in the panel beside its channel (telas/ThreadPainel.html): a section, not the page's main. */
+  /** A thread in the panel beside its channel: a section, not the page's main. */
   panel?: boolean;
   /** A thread view where a person's reply makes it a "Responder" thread (`openThread` on the post). */
   openThread?: boolean;
@@ -318,13 +325,16 @@ const FOCUS_MAX_PAGES = 10;
 const HIGHLIGHT_MS = 2400;
 /** A scroll within this long after a wheel/touch/key/pointer counts as the person's. */
 const GESTURE_MS = 1500;
+/**
+ * Scrolled up but idle this long (no wheel/touch/key/pointer on the list), or away from the window:
+ * a new message brings the list to it instead of waiting behind the pill.
+ */
+const IDLE_CATCH_UP_MS = 20_000;
 /** Older messages per scroll-up page. */
 const OLDER_PAGE = 50;
-/** Per channel, for this session: older pages already loaded, channels with no more, and scroll positions. */
+/** Per channel, for this session: older pages already loaded, and channels with no more. */
 const olderPages = new Map<string, MessageType[]>();
 const olderDone = new Set<string>();
-/** Where the person left a conversation: the first row in view and how far it sat from the top. */
-const scrollPositions = new Map<string, { id: string | null; offset: number; top: number }>();
 /** Same limit as the server (`MAX_MESSAGE_ATTACHMENTS`). */
 const MAX_ATTACHMENTS = 10;
 
@@ -383,7 +393,7 @@ function QuotedMessage({ reply }: { reply: ReplyRef }) {
   );
 }
 
-/** telas/Main.dc.html — a channel with real-time messages, streaming agent replies and inline approvals. */
+/** A channel with real-time messages, streaming agent replies and inline approvals. */
 export function ChannelPage({
   channelId,
   chrome,
@@ -511,7 +521,7 @@ function ChannelView({
     [openThreads.data, archivedThreads.data],
   );
   // Live runs shown here: a thread view shows its own; the channel, those answering in the channel
-  // (asked there, D67). A thread's runs are in its panel; the channel shows its line. A "pensando…"
+  // (asked there). A thread's runs are in its panel; the channel shows its line. A "pensando…"
   // the app guessed hangs off the message sent: shown here when that message is in the channel.
   const topLevelIds = useMemo(
     () => new Set((channelMessages.data ?? []).flatMap((m) => (m.threadId ? [] : [m.id]))),
@@ -594,6 +604,7 @@ function ChannelView({
     [t],
   );
   useChannelRealtime(org.id, channel.id, isMember);
+  useNoAiAutoOpen(channel.id, isMember);
 
   const channelAgents = useMemo(
     () =>
@@ -756,7 +767,7 @@ function ChannelView({
     el.scrollTop = el.scrollHeight - a.height + a.top;
   }, [older]);
 
-  // The channel's messages: only what was said in the channel (agents asked there answer there, D67).
+  // The channel's messages: only what was said in the channel (agents asked there answer there).
   // Every thread with replies is one line under its root; its replies live in the panel.
   const channelList = useMemo(() => {
     if (thread) return null;
@@ -852,12 +863,9 @@ function ChannelView({
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
-  // Coming back to a channel scrolled up: restore that position (else the bottom).
-  // A thread view (page or panel) keeps its own place, apart from its channel's.
-  const scrollKey = thread ? `${channel.id}:${thread.id}` : channel.id;
-  const savedScroll = useRef(scrollPositions.get(scrollKey));
+  // Every conversation opens at its last message (coming back to one included).
   // Opened at a message: not pinned to the bottom until the person scrolls down.
-  const stick = useRef(savedScroll.current === undefined && !focusMessageId);
+  const stick = useRef(!focusMessageId);
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
@@ -871,7 +879,7 @@ function ChannelView({
     stick.current = false;
     autoScrollUntil.current = 0;
   };
-  // Long answers open at their start (RefinoUI "Nova leitura"): agent rows (`data-read-id`, the run's
+  // Long answers open at their start: agent rows (`data-read-id`, the run's
   // id, shared by the live row and its final message) that already landed, and whether one is held
   // with its first line at the top ("Fim da resposta" shows until the person reaches the end).
   const landed = useRef(new Set<string>());
@@ -943,6 +951,16 @@ function ChannelView({
     ];
   };
   const openedAt = useRef(Date.now());
+  // A new message came while the person was scrolled up and idle: go to it once the divider is drawn.
+  const catchUp = useRef(false);
+  /** Scrolled up but not reading: no gesture on the list for a while, or the window elsewhere; never mid-selection. */
+  const idleAway = () => {
+    const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
+    if (selection && !selection.isCollapsed && scroller.current?.contains(selection.anchorNode)) return false;
+    if (document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus())) return true;
+    // Right after opening, the same grace as a fresh scroll.
+    return Date.now() - Math.max(lastGesture.current, openedAt.current) > IDLE_CATCH_UP_MS;
+  };
   /**
    * At the bottom: follow it, unless the newest row is an agent's answer taller than the list. That
    * one lands once with its first line at the top (and a brief highlight); then nothing pulls the list.
@@ -1047,7 +1065,15 @@ function ChannelView({
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
       const first = newRow ? firstNewKey(timeline, before) : null;
-      if (first) markUnseen(first);
+      if (first) {
+        const drawn = unseenFromRef.current !== null;
+        markUnseen(first);
+        // Nobody reading up there: go to what is new (as the pill would), once its divider is drawn.
+        if (settled && idleAway()) {
+          if (drawn) openUnseen();
+          else catchUp.current = true;
+        }
+      }
       if (newBlock) setUnseenRun(true);
     }
   }, [lastKey, slotsKey]);
@@ -1064,36 +1090,6 @@ function ChannelView({
     row?.scrollIntoView?.({ block: "end", behavior: reducedMotion ? "auto" : "smooth" });
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the rows are there
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    const saved = savedScroll.current;
-    if (!el || saved === undefined || timeline.length === 0) return;
-    savedScroll.current = undefined;
-    // Back to the same row (rows off screen have estimated heights, so a raw scrollTop would drift).
-    const row = saved.id ? el.querySelector<HTMLElement>(`[data-message-id="${saved.id}"]`) : null;
-    if (row) el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - saved.offset;
-    else el.scrollTop = saved.top;
-  }, [timeline.length > 0]);
-  // Leaving: remember where they were (only when scrolled up). A layout effect: the rows are still there.
-  useLayoutEffect(
-    () => () => {
-      const el = scroller.current;
-      if (stick.current || lastScrollTop.current === null || !el) {
-        scrollPositions.delete(scrollKey);
-        return;
-      }
-      const top = el.getBoundingClientRect().top;
-      const rows = el.querySelectorAll<HTMLElement>("[data-message-id]");
-      const first = Array.from(rows).find((r) => r.getBoundingClientRect().bottom > top);
-      scrollPositions.set(scrollKey, {
-        id: first?.dataset.messageId ?? null,
-        offset: first ? first.getBoundingClientRect().top - top : 0,
-        top: lastScrollTop.current,
-      });
-    },
-    [scrollKey],
-  );
   // Dev only: "click → first paint of messages".
   const fromCache = useRef(messages.data !== undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reports once the rows (or an empty channel) are on screen
@@ -1358,8 +1354,15 @@ function ChannelView({
   const attached = files.flatMap((f) => (f.status === "done" && f.ref ? [f.ref] : []));
   const uploading = files.some((f) => f.status === "uploading");
 
-  const onSend = (text: string, opts?: { interrupt?: boolean }) => {
+  // A key pasted in the message: nothing goes out until the person chooses (`KeyGuardDialog`).
+  const [keyAsk, setKeyAsk] = useState<{ text: string; key: string; interrupt?: boolean } | null>(null);
+  const onSend = (text: string, opts?: { interrupt?: boolean; keyChecked?: boolean }) => {
     if (uploading || (!text && attached.length === 0)) return;
+    const key = opts?.keyChecked ? null : looksLikeApiKey(text);
+    if (key) {
+      setKeyAsk({ text, key, interrupt: opts?.interrupt });
+      return;
+    }
     if (attached.length === 0 && parseMissionCommand(text)) {
       void runCommand(text);
       return;
@@ -1450,6 +1453,12 @@ function ChannelView({
     }
     toBottom(true);
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once the divider a catch-up asked for is drawn
+  useEffect(() => {
+    if (!catchUp.current || unseenFrom === null) return;
+    catchUp.current = false;
+    openUnseen();
+  }, [unseenFrom]);
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions;
     const first = channelAgents[0];
@@ -1584,7 +1593,7 @@ function ChannelView({
       <ChannelActionsContext.Provider value={actions}>
         <ChannelThreadsContext.Provider value={threadsView}>
           {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
-            are a left-aligned team chat (telas/RefinoUI.html, "Conversa: Nova leitura"). */}
+            are a left-aligned team chat. */}
           <Tag className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}>
             {chrome?.header ?? (
               <header className="channel__header">
@@ -1792,6 +1801,7 @@ function ChannelView({
                 </div>
                 <div className="channel__composer">
                   <ConnectionBanner status={status} />
+                  <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
                   <ActivityBar
                     channelId={channel.id}
                     visible={runVisible}
@@ -1891,6 +1901,19 @@ function ChannelView({
                       {offer && (
                         <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
                       )}
+                      <KeyGuardDialog
+                        ask={keyAsk}
+                        onClose={() => setKeyAsk(null)}
+                        onSend={() => {
+                          setKeyAsk(null);
+                          if (keyAsk) onSend(keyAsk.text, { interrupt: keyAsk.interrupt, keyChecked: true });
+                        }}
+                        onEdit={(text) => {
+                          setKeyAsk(null);
+                          setDraft(text);
+                          composer.current?.focus();
+                        }}
+                      />
                       {chrome?.composerNote && !chrome.locked && (
                         <p className="ac-composer__hint">{chrome.composerNote}</p>
                       )}
@@ -2188,7 +2211,7 @@ function liveMessageOf(r: LiveRun): MessageType {
 }
 
 /**
- * One agent's answer, from "pensando" to its final message (telas/Mensagens.html, "Um bloco só"): the
+ * One agent's answer, from "pensando" to its final message: the
  * live run while it works, then the message, in the same component (same element: nothing remounts or
  * flashes). Until the message lands, the last live state stays on screen. Subscribed by run id, so a
  * streaming delta re-renders only this block.
@@ -2373,7 +2396,7 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
 }
 
 /**
- * Under a stopped answer (telas/Mensagens.html): "Parado por você · Continuar". Continuar starts a new
+ * Under a stopped answer: "Parado por você · Continuar". Continuar starts a new
  * run of the same agent from where it stopped; it goes away for everyone once someone pressed it.
  */
 function StoppedLine({
@@ -2594,7 +2617,7 @@ function useBlocksInView(scroller: { current: HTMLElement | null }, key: string)
 }
 
 /**
- * The card right above the composer (telas/CardTrabalhando.html, A): while an agent works, the glass
+ * The card right above the composer: while an agent works, the glass
  * pill in its color with a turning phrase (a light line while it thinks, what it does, what it said
  * last), the time, "Ver" when its block is out of view and the stop; and who is typing.
  */
@@ -2772,6 +2795,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
   const revealed = useRevealedText(live?.text ?? "");
   const liveFailed = live?.status === "failed";
+  // Refused by the workspace's standing: its own words, not the server's English.
+  const refusal = liveFailed ? standingRefusalText(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
@@ -2855,10 +2880,22 @@ export const TimelineMessage = memo(function TimelineMessage({
   const secretRequest = isSecretRequest(meta.secretRequest) ? meta.secretRequest : null;
   // The agent needs a person in its browser (ADR 0040): the request card.
   const browserHandoff = m.author.type === "agent" ? browserHandoffOf(meta) : null;
-  // Where it browsed (`meta.browser`): the card stays after the run, its steps leave the work list.
+  // Where it browsed (`meta.browser`) and what it did on its desktop (`meta.desktop`): each card stays
+  // after the run, and its steps leave the work list.
   const browserTrail = useMemo(
     () => (m.author.type === "agent" ? browserTrailOf(m.meta) : []),
     [m.author.type, m.meta],
+  );
+  const desktopTrail = useMemo(
+    () => (m.author.type === "agent" ? desktopTrailOf(m.meta) : []),
+    [m.author.type, m.meta],
+  );
+  const onCards = useMemo(
+    (): ScreenKind[] => [
+      ...(browserTrail.length > 0 ? (["browser"] as const) : []),
+      ...(desktopTrail.length > 0 ? (["desktop"] as const) : []),
+    ],
+    [browserTrail, desktopTrail],
   );
   // Files an agent made, or a person attached.
   const artifacts = artifactRefs(meta);
@@ -2902,9 +2939,15 @@ export const TimelineMessage = memo(function TimelineMessage({
   // "O Claude Code não está disponível agora": its computer is offline; one card that waits, then says it's back.
   const brainNotice = m.author.type === "agent" ? brainUnavailableOf(meta) : null;
   const waitNotice = brainNotice && isOfflineNotice(brainNotice) ? brainNotice : null;
+  // "Ada não vai responder porque não tem uma IA conectada": one card with Connect, in place of its text.
+  const noAi = m.author.type === "agent" && noAiCardOf(meta) !== null;
+  // An agent's card whose button opens the app's own dialog, filled in ("Conectar uma IA para Ada").
+  const actionCard = m.author.type === "agent" && actionCardOf(meta) !== null;
   const card =
     approvalId ||
     waitNotice ||
+    noAi ||
+    actionCard ||
     proposalId ||
     memoryUpdates.length > 0 ||
     question ||
@@ -2917,7 +2960,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
   const keptAll = seenLive?.work?.length ? seenLive.work : null;
   const keptWork =
-    keptAll && browserTrail.length > 0 ? keptAll.filter((w) => !(w.kind === "call" && isBrowserTool(w.tool))) : keptAll;
+    keptAll && onCards.length > 0
+      ? keptAll.filter((w) => !(w.kind === "call" && onCards.some((s) => isScreenTool(w.tool, s))))
+      : keptAll;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
   const details = [
@@ -3037,9 +3082,11 @@ export const TimelineMessage = memo(function TimelineMessage({
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />
               <span style={{ flex: 1 }}>
-                {live.error
-                  ? t("channel.runFailed", { agent: name, reason: live.error })
-                  : t("channel.runFailedNoReason", { agent: name })}
+                {refusal
+                  ? t("channel.runRefused", { agent: name, reason: refusal })
+                  : live.error
+                    ? t("channel.runFailed", { agent: name, reason: live.error })
+                    : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"
@@ -3088,6 +3135,8 @@ export const TimelineMessage = memo(function TimelineMessage({
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&
+            !noAi &&
+            !actionCard &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0)) && (
@@ -3130,6 +3179,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />
             ))}
           {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+          {noAi && <NoAiCard message={m} />}
+          {actionCard && <ActionCard message={m} />}
           {question && <QuestionCard question={question} />}
           {secretRequest && <SecretCard request={secretRequest} />}
           {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
@@ -3143,6 +3194,16 @@ export const TimelineMessage = memo(function TimelineMessage({
               recent={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
+          {desktopTrail.length > 0 && m.author.id && !m.local && (
+            <BrowserTrailCard
+              agentId={m.author.id}
+              runId={m.agentRunId ?? null}
+              name={name}
+              steps={desktopTrail}
+              stopped={stopped.canceled ? { byUserId: stopped.byUserId } : null}
+              screen="desktop"
+            />
+          )}
           {lastOfRun && m.author.type === "agent" && m.author.id && m.agentRunId && !m.local && (
             <HeldBrowserCard
               agentId={m.author.id}
@@ -3152,12 +3213,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             />
           )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
-            <MessageWork
-              runId={m.agentRunId}
-              meta={m.meta}
-              agentName={agent?.name ?? name}
-              skipBrowser={browserTrail.length > 0}
-            />
+            <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} skipScreens={onCards} />
           )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
           {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
@@ -3264,7 +3320,7 @@ function MessageApproval({
 const DETAILS_SEARCH_FROM = 8;
 
 /**
- * "Detalhes do canal" (telas/CanalDetalhes.html B): the description edited in place under the name
+ * "Detalhes do canal": the description edited in place under the name
  * (saves on blur, Enter or close), members grouped as agents and people, one "⋯" per row with how an
  * agent replies and "Tirar do canal".
  */

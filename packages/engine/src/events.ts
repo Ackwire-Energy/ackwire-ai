@@ -1,5 +1,6 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import type { AgentActionView } from "./agent-actions";
+import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
 import type { BrowserHandoffView } from "./browser/handoff";
@@ -270,12 +271,17 @@ export type ChannelEvent =
       pickedBy: string[];
       /** The run each picked agent answers with (new, steered into, or resumed by an answer). */
       runs?: { agentId: string; runId: string }[];
-      /** Agents it mentions that won't answer (they don't reply to this person, D31). */
+      /** Agents it mentions that won't answer (they don't reply to this person). */
       blocked?: string[];
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy: "mention" | "dm" | "router" | "none";
+      /** `no_ai`: the organization has no AI; `mention_needed`: no key to route with (plans only), mentions still answer. */
       reason?: string;
+      /** With `no_ai`: the Connect step the message asks for (`aiConnectIntent`). */
+      intent?: ConnectIntent["intent"];
+      provider?: string;
+      autoOpen?: true;
     }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId: string }
   | {
@@ -285,6 +291,8 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
+      /** `no_ai`: the agent has no AI to think with. */
+      reason?: string;
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {
@@ -436,6 +444,40 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     messageId: message.id,
     ...(inline ? { message } : {}),
   });
+}
+
+/** Receipts of a routed message (`message.routed`), then "thinking" for each run it started, where the message is. */
+export async function publishRouted(
+  pubsub: PubSub | undefined,
+  message: { id: string; channelId: string; threadId: string | null },
+  routed: {
+    strategy: "mention" | "dm" | "router" | "none";
+    seenBy: string[];
+    runs: { id: string; agentId: string }[];
+    reason?: string;
+  } & Partial<ConnectIntent>,
+) {
+  const { strategy, seenBy, runs, reason, ...intent } = routed;
+  await publishChannelEvent(pubsub, {
+    type: "message.routed",
+    channelId: message.channelId,
+    messageId: message.id,
+    seenBy,
+    pickedBy: runs.map((r) => r.agentId),
+    runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
+    strategy,
+    ...(reason ? { reason } : {}),
+    ...intent,
+  });
+  for (const run of runs) {
+    await publishChannelEvent(pubsub, {
+      type: "agent.thinking",
+      channelId: message.channelId,
+      threadId: message.threadId,
+      agentId: run.agentId,
+      runId: run.id,
+    });
+  }
 }
 
 /**

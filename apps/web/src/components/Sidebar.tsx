@@ -75,9 +75,10 @@ import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
+import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, SidebarOrgSky } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
@@ -125,7 +126,20 @@ export function useSidebarCollapsed(): [boolean, () => void] {
 /** File → Novo canal in the desktop app's menu bar (DesktopMenus.tsx): the sidebar opens its dialog. */
 export const NEW_CHANNEL_EVENT = "agentes:new-channel";
 
-/** The workspace sidebar (telas/Sidebar.dc.html). */
+/**
+ * On the icon rail every channel would be the same "#": its initials instead ("eng-backend" → "Eb",
+ * "general" → "Ge"), so the rail still reads which is which.
+ */
+export function channelInitials(name: string) {
+  const words = name
+    .split(/[-_.\s]+/)
+    .filter(Boolean)
+    .map((w) => Array.from(w));
+  const letters = (words.length > 1 ? [words[0]?.[0], words[1]?.[0]] : (words[0] ?? []).slice(0, 2)).join("");
+  return letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase();
+}
+
+/** The workspace sidebar. */
 export function Sidebar() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -196,7 +210,6 @@ export function Sidebar() {
     const busy = runningAgents(st);
     return agentIds ? agentIds.split(",").filter((id) => busy.has(id)).length : 0;
   });
-  const orgRef = useRef<HTMLDivElement>(null);
   // Narrow screens: the sidebar is a drawer (id, open state, close on link / swipe).
   const drawer = useNavDrawer();
   // Desktop: the person can shrink the sidebar to an icon rail (remembered). Tablets always get the rail.
@@ -272,8 +285,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
       <div className="sidebar__top">
-        <div className="sidebar__org" ref={orgRef}>
-          <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
+        <div className="sidebar__org">
           <WorkspaceMenu
             summary={
               overview.data
@@ -322,8 +334,7 @@ export function Sidebar() {
           />
         )}
 
-        {/* The tools people use most stay in sight; the rest open beside the sidebar from More
-            (telas/SidebarAPartirDaD.html, option 5). */}
+        {/* The tools people use most stay in sight; the rest open beside the sidebar from More. */}
         <div className="sidebar__group sidebar__tools">
           <Link
             to="/org/$orgId/notifications"
@@ -413,6 +424,9 @@ export function Sidebar() {
                 onContextMenu={channelMenu(c)}
               >
                 <Icon name="channel" className="sidebar__channel-icon" />
+                <span className="sidebar__channel-abbr" aria-hidden="true">
+                  {channelInitials(c.name)}
+                </span>
                 <span className="sidebar__item-label">{c.name}</span>
               </Link>
             ))}
@@ -490,7 +504,7 @@ export function Sidebar() {
       <div className="sidebar__foot">
         <SidebarHorizon working={working} total={dir.agents.length} />
         {can(org.role, "manage_agents") && (
-          <Button asChild block className="ac-btn--cut sidebar__create">
+          <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />
               <span className="sidebar__item-label">{t("shell.createAgent")}</span>
@@ -757,9 +771,9 @@ function UnreadCount({ count }: { count: number }) {
 
 /**
  * The account button; under the name, the workspace's budget use this month
- * (a percentage, never money). It opens the account's full-screen menu
- * (telas/MenuOverlay.html): profile, time zone, theme, language, the budget
- * and signing out.
+ * (a percentage, never money). It opens the account's full-screen menu:
+ * profile, time zone, opening the phone app, theme, language, the budget and
+ * signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -773,6 +787,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
+  const [phone, setPhone] = useState(false);
   const mine = dir.memberById.get(me.user.id);
   const photo = mine?.image ?? me.user.image;
   const zone = mine?.timezone || browserTimezone() || "UTC";
@@ -835,6 +850,14 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
           >
             {t("shell.timezone")}
           </MenuOverlayItem>
+          <MenuOverlayItem
+            icon="phone"
+            shortcut="3"
+            description={t("shell.openOnPhoneHint")}
+            onSelect={pick(() => setPhone(true))}
+          >
+            {t("shell.openOnPhone")}
+          </MenuOverlayItem>
           <MenuOverlayRow icon="bulb" label={t("shell.theme")}>
             <Segmented
               size="sm"
@@ -875,7 +898,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             (can(org.role, "view_usage") ? (
               <MenuOverlayItem
                 icon="wallet"
-                shortcut="3"
+                shortcut="4"
                 description={t("shell.thisMonth")}
                 hint={<BudgetBar percent={budgetUsed} />}
                 onSelect={pick(
@@ -905,13 +928,14 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         </MenuOverlayGroup>
       </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
+      <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
     </>
   );
 }
 
 /**
  * The workspace header ("Acme · 2 membros · 3 agentes") opens the workspace's
- * full-screen menu (telas/MenuOverlay.html): invite, members, connectors,
+ * full-screen menu: invite, members, connectors,
  * agents' access, skills and settings as far as the role allows, then the
  * other workspaces to switch to.
  */

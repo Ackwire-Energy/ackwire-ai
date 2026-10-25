@@ -253,10 +253,11 @@ test("the runner's WebSocket: no Origin, hello → welcome, online in the list",
   await new Promise<void>((resolve) => {
     ws.onopen = () => resolve();
   });
-  ws.send(JSON.stringify({ type: "hello", token, ...RUNNER, exec: true }));
+  const desktopUse = { available: false, reason: "Install what desktop use needs: …" };
+  ws.send(JSON.stringify({ type: "hello", token, ...RUNNER, exec: true, desktopUse }));
   expect(await welcome).toMatchObject({ type: "welcome", machineId });
   const list = (await (await api("/machines")).json()) as { machines: { online: boolean }[] };
-  expect(list.machines[0]?.online).toBe(true);
+  expect(list.machines[0]).toMatchObject({ online: true, desktopUse });
   ws.onclose = null;
   ws.close();
 });

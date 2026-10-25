@@ -12,8 +12,8 @@ export interface CarouselProps {
 }
 
 /**
- * One row of choices that slides sideways (telas/PerfilAgente.html: the
- * agent's eyes and what it wears), item by item, with an arrow on each side.
+ * One row of choices that slides sideways (the agent's eyes and what it
+ * wears), item by item, with an arrow on each side.
  * The arrows step back when everything fits; trackpads and touch scroll it too.
  */
 export function Carousel({ label, previousLabel, nextLabel, children, className }: CarouselProps) {

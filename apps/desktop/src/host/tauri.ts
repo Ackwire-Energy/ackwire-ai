@@ -46,6 +46,7 @@ export function createTauriHost(): Host {
     onRunnerState: (cb) => subscribe<RunnerStateChange>("runner://state", cb),
     onShown: (cb) => subscribe<WindowName>("window://shown", cb),
     openExternal: (url) => invoke<void>("open_external", { url }),
+    setServer: (url) => invoke<void>("set_server", { url }),
     revealFolder: (path) => invoke<void>("reveal_folder", { path }),
     pickFolder: () => invoke<string | null>("pick_folder"),
     setTrayState: (state: TrayState) => invoke<void>("set_tray_state", { state }),

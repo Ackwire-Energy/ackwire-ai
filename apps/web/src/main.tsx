@@ -23,7 +23,7 @@ import { routeTree } from "./routeTree.gen";
 
 const i18n = await loadI18n(savedLocale());
 document.documentElement.lang = i18n.language;
-// In agentes for Mac (D79): the site draws the window's title bar (desktop.css).
+// In agentes for Mac (ADR 0036): the site draws the window's title bar (desktop.css).
 if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";
 const toasts = createToastStore();
 const api = createApiClient();

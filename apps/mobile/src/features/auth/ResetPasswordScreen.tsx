@@ -23,7 +23,7 @@ export function ResetPasswordScreen({ token }: { token: string | null }) {
     if (!token || !ready || pending) return;
     setPending(true);
     try {
-      const res = await authClient.resetPassword({ newPassword: password, token });
+      const res = await authClient().resetPassword({ newPassword: password, token });
       if (res.error) {
         haptics.warning();
         setState("expired");

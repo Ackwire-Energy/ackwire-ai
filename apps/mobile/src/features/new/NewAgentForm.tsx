@@ -14,7 +14,7 @@ import { SheetHeader } from "./parts";
 import { useOpenDm } from "./useOpenDm";
 
 /**
- * "Novo agente" (MobileIntencional.html): one question first, "O que ele vai fazer?", with the examples
+ * "Novo agente": one question first, "O que ele vai fazer?", with the examples
  * as taps that fill it in; the name comes after, already suggested. The rest is suggested and adjusted
  * later. `initialWhat` comes from an example in the empty Conversas. Created, it opens the direct
  * conversation with it.

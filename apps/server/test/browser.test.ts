@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import type { MachineRequest } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
+import { BROWSER_SCOPE, grantScopes, MachineRequestError } from "@agenteschat/engine";
 import { parseBrowserClientFrame } from "../src/realtime/browser";
 import { parseClientFrame } from "../src/realtime/ws";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
@@ -96,18 +98,84 @@ describe("handoff routes", () => {
     expect(await (await api(`/agents/${org.agentId}/browser/handoff`)).json()).toEqual({ handoff: null });
   });
 
-  test("couldn't takes a note; cancel ends it", async () => {
+  test("couldn't takes a note, and so does a hand back; cancel ends it", async () => {
     const { org, api } = await seeded();
-    const first = (await (await api(`/agents/${org.agentId}/browser/takeover`, { json: {} })).json()) as {
-      id: string;
-    };
+    const takeover = async () =>
+      (await (await api(`/agents/${org.agentId}/browser/takeover`, { json: {} })).json()) as { id: string };
+    const first = await takeover();
     const failed = await api(`/browser/handoffs/${first.id}/failed`, { json: { note: "pediu o código da Ana" } });
     expect(await failed.json()).toMatchObject({ status: "failed", note: "pediu o código da Ana" });
-    const second = (await (await api(`/agents/${org.agentId}/browser/takeover`, { json: {} })).json()) as {
-      id: string;
-    };
+    const second = await takeover();
     const canceled = await api(`/browser/handoffs/${second.id}/cancel`, { json: {} });
     expect(await canceled.json()).toMatchObject({ status: "cancelled" });
+    const third = await takeover();
+    const handedBack = await api(`/browser/handoffs/${third.id}/done`, {
+      json: { note: "Entrei com a conta da loja" },
+    });
+    expect(await handedBack.json()).toMatchObject({ status: "done", note: "Entrei com a conta da loja" });
+  });
+
+  test("open a site: only the person in control; outside the agent's sites 403; a bad address 400", async () => {
+    const { org, api } = await seeded();
+    const path = `/api/app/organizations/${org.orgId}/agents/${org.agentId}/browser/open`;
+    const json = { url: "https://shop.example.com" };
+    expect((await browser(t)(path, { json })).status).toBe(401);
+    const other = browser(t);
+    await signUp(other, "zed@example.com");
+    expect((await other(path, { json })).status).toBe(403);
+    const notInControl = await api(`/agents/${org.agentId}/browser/open`, { json });
+    expect(notInControl.status).toBe(409);
+    expect(((await notInControl.json()) as { error: { code: string } }).error.code).toBe("browser.not_in_control");
+
+    // The computer answers here: its browser is on, and it opens the page (starting the browser when closed) or refuses the site.
+    const hub = t.engine.machineHub;
+    const { call, status } = hub;
+    const asked: MachineRequest[] = [];
+    hub.status = (async (id: string) => ({
+      id,
+      orgId: org.orgId,
+      name: "mac",
+      online: true,
+      execAllowed: true,
+      os: "darwin",
+      protocol: 12,
+      executors: { browser: { available: true, version: "0.39.1" } },
+      paused: null,
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+    })) as unknown as typeof hub.status;
+    hub.call = (async (_machineId: string, request: MachineRequest) => {
+      asked.push(request);
+      if (request.op !== "browser.act" || request.command !== "open") return { success: false, data: null };
+      if (request.args[0]?.includes("evil")) {
+        throw new MachineRequestError("not_allowed", "evil.example is outside the sites this agent may use");
+      }
+      return { success: true, data: { url: request.args[0] } };
+    }) as typeof hub.call;
+    try {
+      await api(`/agents/${org.agentId}/browser/takeover`, { json: {} });
+      // Not while the agent may not use its browser (`browser:use` taken away), as for its own tools.
+      await t.db
+        .delete(schema.agentScopes)
+        .where(and(eq(schema.agentScopes.agentId, org.agentId), eq(schema.agentScopes.scope, BROWSER_SCOPE)));
+      expect((await api(`/agents/${org.agentId}/browser/open`, { json })).status).toBe(403);
+      expect(asked.some((r) => r.op === "browser.act" && r.command === "open")).toBe(false);
+      await grantScopes(t.db, org.orgId, org.agentId, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+      expect(
+        (await api(`/agents/${org.agentId}/browser/open`, { json: { url: "shop.example.com/login" } })).status,
+      ).toBe(204);
+      expect(asked.find((r) => r.op === "browser.act" && r.command === "open")).toMatchObject({
+        args: ["https://shop.example.com/login"],
+      });
+      const refused = await api(`/agents/${org.agentId}/browser/open`, { json: { url: "https://evil.example" } });
+      expect(refused.status).toBe(403);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("browser.not_allowed");
+      const bad = await api(`/agents/${org.agentId}/browser/open`, { json: { url: "file:///etc/passwd" } });
+      expect(bad.status).toBe(400);
+      expect(((await bad.json()) as { error: { code: string } }).error.code).toBe("browser.bad_address");
+    } finally {
+      hub.call = call;
+      hub.status = status;
+    }
   });
 
   test("stop: refused to outsiders; for the owner it reaches the computer (offline here)", async () => {

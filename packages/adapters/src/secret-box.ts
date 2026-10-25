@@ -15,6 +15,13 @@ export const SECRET_BOX_VERSION = 1;
 export const MAX_SECRET_BYTES = 16 * 1024;
 /** `GITHUB_TOKEN`, `NPM_TOKEN`… */
 export const SECRET_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
+/**
+ * Names a secret can't have: what decides where an AI CLI's sign-in, key or requests go (its endpoint, its
+ * proxy, the certificates it trusts, what loads into it). A person asked for one would hand the agent a
+ * way to send someone's plan elsewhere.
+ */
+export const isReservedSecretName = (name: string) =>
+  /^(ANTHROPIC_|CLAUDE_|OPENAI_|CODEX_|OPENCODE_|NODE_|SSL_CERT_|LD_|DYLD_)|_PROXY$/.test(name.toUpperCase());
 
 export interface SecretBox {
   v: number;

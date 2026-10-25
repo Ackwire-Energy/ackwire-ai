@@ -2,12 +2,31 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runnerHome } from "./config";
+import { DEFAULT_AGENT_UID_RANGE, pairedConfig, runnerHome, updateConfig } from "./config";
 import { thisRunner } from "./launch";
 
 export const SERVICE_NAME = "agentes-runner";
 export const LAUNCHD_LABEL = "chat.agentes.runner";
 export const WINDOWS_TASK = "agentes-runner";
+export const SYSTEM_UNIT_PATH = `/etc/systemd/system/${SERVICE_NAME}.service`;
+/** The root service's PATH: only folders root owns, never the installing shell's. */
+const SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+
+/** Whether systemd runs this computer (PID 1). */
+export const systemdBooted = () => existsSync("/run/systemd/system");
+
+/** System mode: each agent's processes run in its own slice, `agents-<uid>.slice` (inside `agents.slice`). */
+const AGENT_SLICE_PREFIX = "agents-";
+export const agentSlice = (uid: number) => `${AGENT_SLICE_PREFIX}${uid}.slice`;
+/**
+ * What every agent's slice may use, as a drop-in for the slice prefix: room
+ * for a desktop, a headed Chrome and one coding CLI, and no agent can starve
+ * the others or the computer.
+ */
+export const AGENT_SLICE_LIMITS = "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n";
+/** The drop-in sits next to the unit (`/etc/systemd/system`). */
+export const agentSliceLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
+  path.join(path.dirname(unitPath), `${AGENT_SLICE_PREFIX}.slice.d`, "limits.conf");
 
 /**
  * How the service starts the runner: this runtime (node or bun) and this
@@ -52,33 +71,61 @@ export function launchdPlistPath(home = os.homedir()) {
 }
 
 /**
- * The systemd user unit. Exit codes 0 (another runner took over), 2 (token
- * revoked) and 3 (runner too old) don't restart: retrying can't fix them.
- * `KillMode=process`: stopping or restarting the runner (an update) leaves
- * its background tasks running (ADR 0029); they are in the unit's cgroup.
+ * A systemd unit for the runner. Exit codes 0 (another runner took over), 2
+ * (token revoked) and 3 (runner too old) don't restart: retrying can't fix
+ * them. `KillMode=process`: stopping or restarting the runner (an update)
+ * leaves its background tasks running (ADR 0029); they are in the unit's cgroup.
  */
-export function systemdUnit(launch: Launch): string {
+function unitFile(
+  launch: Launch,
+  o: { description: string; path: string; wantedBy: string; args?: readonly string[] },
+): string {
+  const runner = [launch.runtime, ...(launch.script ? [launch.script] : [])].map(systemdQuote);
+  // Plain words (a command, a URL, a path) as they are; anything else quoted.
+  const args = (o.args ?? ["start"]).map((a) => (/^[\w./:-]+$/.test(a) ? a : systemdQuote(a)));
   return [
     "[Unit]",
-    "Description=agentes.chat runner (connected computer)",
+    `Description=${o.description}`,
     "After=network-online.target",
     "Wants=network-online.target",
     "",
     "[Service]",
-    `ExecStart=${[launch.runtime, ...(launch.script ? [launch.script] : [])].map(systemdQuote).join(" ")} start`,
+    `ExecStart=${[...runner, ...args].join(" ")}`,
     `Environment=${systemdEnv("AGENTES_RUNNER_HOME", launch.home)}`,
     "Environment=AGENTES_RUNNER_SERVICE=systemd",
-    // The install-time PATH (like the launchd plist): tasks find claude, codex, git, node, gh.
-    `Environment=${systemdEnv("PATH", launch.path ?? process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin")}`,
+    `Environment=${systemdEnv("PATH", o.path)}`,
     "Restart=always",
     "RestartSec=5",
     "RestartPreventExitStatus=0 2 3",
     "KillMode=process",
     "",
     "[Install]",
-    "WantedBy=default.target",
+    `WantedBy=${o.wantedBy}`,
     "",
   ].join("\n");
+}
+
+/**
+ * The user unit, with the install-time PATH (like the launchd plist): tasks find claude, codex, git, node, gh.
+ * `args`: the runner's command (default `start`; `host …` for the server's own computer).
+ */
+export function systemdUnit(launch: Launch, args?: readonly string[]): string {
+  return unitFile(launch, {
+    description: "agentes.chat runner (connected computer)",
+    path: launch.path ?? process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
+    wantedBy: "default.target",
+    ...(args ? { args } : {}),
+  });
+}
+
+/** System mode's unit (`SYSTEM_UNIT_PATH`): root, for the whole computer, from boot. */
+export function systemdSystemUnit(launch: Launch, args?: readonly string[]): string {
+  return unitFile(launch, {
+    description: "agentes.chat runner (each agent as its own user)",
+    path: SYSTEM_PATH,
+    wantedBy: "multi-user.target",
+    ...(args ? { args } : {}),
+  });
 }
 
 /**
@@ -86,7 +133,7 @@ export function systemdUnit(launch: Launch): string {
  * launchd the runner exits 0 when retrying can't help (see main.ts).
  * `AbandonProcessGroup`: background tasks outlive a runner restart.
  */
-export function launchdPlist(launch: Launch): string {
+export function launchdPlist(launch: Launch, args: readonly string[] = ["start"]): string {
   const log = path.join(launch.home, "runner.log");
   const s = (v: string) => `<string>${xmlEscape(v)}</string>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -97,7 +144,7 @@ export function launchdPlist(launch: Launch): string {
   ${s(LAUNCHD_LABEL)}
   <key>ProgramArguments</key>
   <array>
-    ${[launch.runtime, ...(launch.script ? [launch.script] : []), "start"].map(s).join("\n    ")}
+    ${[launch.runtime, ...(launch.script ? [launch.script] : []), ...args].map(s).join("\n    ")}
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -145,7 +192,7 @@ interface RunResult {
 
 export type RunCommand = (file: string, args: string[]) => RunResult;
 
-const runSync: RunCommand = (file, args) => {
+export const runSync: RunCommand = (file, args) => {
   const r = spawnSync(file, args, { encoding: "utf8" });
   if (r.error) return { code: 127, output: r.error.message };
   return { code: r.status ?? 1, output: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
@@ -160,6 +207,8 @@ export interface ServiceIo {
   run?: RunCommand;
   launch?: Launch;
   sleep?: (ms: number) => void;
+  /** The runner's command the service runs (default `start`; `host …`: the server's own computer). */
+  args?: readonly string[];
 }
 
 const sleepSync = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -177,7 +226,7 @@ export function installService(io: ServiceIo): number {
     }
     const file = systemdUnitPath();
     mkdirSync(path.dirname(file), { recursive: true });
-    writeFileSync(file, systemdUnit(launch));
+    writeFileSync(file, systemdUnit(launch, io.args));
     for (const args of [
       ["--user", "daemon-reload"],
       ["--user", "enable", "--now", SERVICE_NAME],
@@ -206,7 +255,7 @@ export function installService(io: ServiceIo): number {
     if (run("launchctl", ["bootout", service]).code === 0) {
       for (let i = 0; i < 50 && run("launchctl", ["print", service]).code === 0; i++) sleep(100);
     }
-    writeFileSync(file, launchdPlist(launch));
+    writeFileSync(file, launchdPlist(launch, io.args));
     let r = run("launchctl", ["bootstrap", `gui/${uid}`, file]);
     for (let i = 0; i < 5 && r.code !== 0; i++) {
       sleep(500);
@@ -235,9 +284,96 @@ export function installService(io: ServiceIo): number {
   return 1;
 }
 
-export function uninstallService(io: ServiceIo): number {
+export interface SystemServiceIo extends ServiceIo {
+  /** False (`--no-start`): install or update without starting or restarting anything. */
+  start?: boolean;
+  /** `--agent-uid-range`; absent keeps the home's range, or the default. */
+  agentUidRange?: [number, number];
+  uid?: number;
+  platform?: NodeJS.Platform;
+  unitPath?: string;
+  /** Whether systemd runs this computer (default: `/run/systemd/system` exists). */
+  booted?: boolean;
+}
+
+/**
+ * System mode (`install.sh --system`): marks the home as a system home and
+ * installs the root unit. It starts only once paired: an unpaired runner
+ * would just restart in a loop. With `args` (`host …`, the server's own
+ * computer) the unit runs that instead, which pairs nothing and starts at once.
+ */
+export function installSystemService(io: SystemServiceIo): number {
+  const run = io.run ?? runSync;
+  const launch = io.launch ?? currentLaunch();
+  const { print } = io;
+  if ((io.platform ?? process.platform) !== "linux") {
+    print("System mode is for Linux.");
+    return 1;
+  }
+  if ((io.uid ?? process.getuid?.()) !== 0) {
+    print("System mode installs the runner for the whole computer: run it as root.");
+    return 1;
+  }
+  const stored = io.args
+    ? null
+    : updateConfig(
+        (c) => ({
+          ...c,
+          mode: "system",
+          agentUidRange: io.agentUidRange ?? c.agentUidRange ?? DEFAULT_AGENT_UID_RANGE,
+        }),
+        launch.home,
+      );
+  const file = io.unitPath ?? SYSTEM_UNIT_PATH;
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, systemdSystemUnit(launch, io.args));
+  const limits = agentSliceLimitsPath(file);
+  mkdirSync(path.dirname(limits), { recursive: true });
+  writeFileSync(limits, AGENT_SLICE_LIMITS);
+  const start = io.start !== false;
+  if (!(io.booted ?? systemdBooted())) {
+    print(`Installed ${file}, but systemd isn't running here.`);
+    if (start) print(`Start the runner yourself: ${plainCommand(launch)} start`);
+    return start ? 1 : 0;
+  }
+  // `host` pairs nothing itself: it starts at once.
+  let paired = io.args !== undefined;
+  try {
+    if (stored) paired = pairedConfig(stored) !== null;
+  } catch {
+    // incomplete: same as not paired
+  }
+  const steps = [["daemon-reload"]];
+  if (start && paired) steps.push(["enable", SERVICE_NAME], ["restart", SERVICE_NAME]);
+  for (const args of steps) {
+    const r = run("systemctl", args);
+    if (r.code !== 0) {
+      print(`systemctl ${args.join(" ")} failed: ${r.output}`);
+      return 1;
+    }
+  }
+  if (!start) print(`Installed ${file} (not started).`);
+  else if (!paired) {
+    print(`Installed ${file}. Connect this computer first (agentes-runner pair --server <url>), then start it:`);
+    print(`  systemctl enable --now ${SERVICE_NAME}`);
+  } else {
+    print(`Installed ${file} and started it.`);
+    print(`Logs: journalctl -u ${SERVICE_NAME} -f`);
+  }
+  return 0;
+}
+
+export function uninstallService(io: ServiceIo & { system?: boolean }): number {
   const run = io.run ?? runSync;
   const { print } = io;
+  if (io.system) {
+    run("systemctl", ["disable", "--now", SERVICE_NAME]);
+    if (existsSync(SYSTEM_UNIT_PATH)) rmSync(SYSTEM_UNIT_PATH);
+    rmSync(agentSliceLimitsPath(), { force: true });
+    run("systemctl", ["daemon-reload"]);
+    print(`Removed ${SYSTEM_UNIT_PATH}.`);
+    return 0;
+  }
   if (process.platform === "linux") {
     const file = systemdUnitPath();
     run("systemctl", ["--user", "disable", "--now", SERVICE_NAME]);
@@ -264,7 +400,12 @@ export function uninstallService(io: ServiceIo): number {
 }
 
 /** Where the service is installed, or null. */
-export function serviceStatus(run: RunCommand = runSync): string | null {
+export function serviceStatus(run: RunCommand = runSync, system = false): string | null {
+  if (system) {
+    if (!existsSync(SYSTEM_UNIT_PATH)) return null;
+    const active = run("systemctl", ["is-active", SERVICE_NAME]).output || "unknown";
+    return `systemd unit ${SYSTEM_UNIT_PATH} (${active})`;
+  }
   if (process.platform === "linux") {
     const file = systemdUnitPath();
     if (!existsSync(file)) return null;

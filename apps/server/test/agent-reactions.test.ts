@@ -30,7 +30,7 @@ test("an agent reacts to a thanks instead of replying: no message, its reaction 
     author: { type: string };
     reactions?: { reaction: string; count: number; userIds: string[]; agentIds: string[] }[];
   };
-  // Asked in the channel: a reply would be in the main timeline (D67); there is none.
+  // Asked in the channel: a reply would be in the main timeline; there is none.
   const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
     messages: Msg[];
   };

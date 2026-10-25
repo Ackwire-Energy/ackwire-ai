@@ -2,6 +2,9 @@ import type { BrainEffort } from "@agenteschat/adapters";
 
 export type BrainKind = "model" | "claude_code" | "codex";
 
+/** Brains that run on the agent's computer with a person's plan. */
+export const isComputerBrain = (v: unknown): v is "claude_code" | "codex" => v === "claude_code" || v === "codex";
+
 /** The account a computer brain runs with (ADR 0041): a folder on the agent's machine. */
 export interface BrainAccount {
   id: string;

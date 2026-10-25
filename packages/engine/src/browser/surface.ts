@@ -144,6 +144,8 @@ export function actionCommands(
       if (!site) throw new Error(`no secret named ${action.secret} was delivered for a site`);
       return [c("agentes:type_secret", ref(action.at), action.secret, site)];
     }
+    default:
+      throw new Error(`${action.kind.replace("_", " ")} is not in the browser: it is for a desktop`);
   }
 }
 

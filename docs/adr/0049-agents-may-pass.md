@@ -2,7 +2,6 @@
 
 - Status: Proposed
 - Date: 2026-10-21
-- Planning: D75
 - Extends: ADR 0013 (router), ADR 0034 (an agent's message may bring in one more agent)
 
 ## Context

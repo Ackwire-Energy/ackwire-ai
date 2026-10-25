@@ -1,4 +1,4 @@
-//! The app's menus (telas/MenusDesktop.html): the menu bar and the site's right-click menu when the person
+//! The app's menus: the menu bar and the site's right-click menu when the person
 //! chose the system's look. The popover sends the menu bar's labels in the app's language (`app_menu_set`);
 //! the site sends what its right-click menu has (`context_menu`) and the system draws it. What the site
 //! handles goes back to it through `window.__agentesMenu(action)` and `window.__agentesContextMenu(token, id)`,

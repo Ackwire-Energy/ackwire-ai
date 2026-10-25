@@ -29,7 +29,7 @@ export const issueCounters = pgTable("issue_counters", {
 });
 
 /**
- * The board's columns (D55). Each one sits in a fixed stage (the issue
+ * The board's columns. Each one sits in a fixed stage (the issue
  * status), so the status still moves on its own; an issue moved by the
  * system lands in the first column of its stage. `name` null: the stage's
  * own name, in the reader's language. Created on first use with one column
@@ -54,7 +54,7 @@ export const issueColumns = pgTable(
 );
 
 /**
- * Native issues (D28). Visible to the whole org, or like the channel they
+ * Native issues. Visible to the whole org, or like the channel they
  * came from (`channel_id`, e.g. "Transformar em issue" in a private
  * channel). Acceptance criteria are a checklist; assignee is a person or an
  * agent.
@@ -72,7 +72,7 @@ export const issues = pgTable(
     title: text().notNull(),
     description: text().notNull().default(""),
     status: issueStatusEnum().notNull().default("todo"),
-    /** Its board column (D55); null: the first column of its stage. Cleared when the status changes. */
+    /** Its board column; null: the first column of its stage. Cleared when the status changes. */
     columnId: uuid().references(() => issueColumns.id, { onDelete: "set null" }),
     /** Order inside its column, lowest first; a move by the system puts it on top (minus the time). */
     boardRank: doublePrecision().notNull().default(0),
@@ -91,7 +91,7 @@ export const issues = pgTable(
     /** `{ type: "manual" | "message" | "forum" | "agent" | "webhook", … }`. */
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),
-    /** A sub-issue of this one (e.g. a step of a plan the forum made for it, D45). */
+    /** A sub-issue of this one (e.g. a step of a plan the forum made for it). */
     parentIssueId: uuid().references((): AnyPgColumn => issues.id, { onDelete: "set null" }),
     /** `[{ number, url, openedBy }]`. */
     pullRequests: jsonb().$type<Record<string, unknown>[]>().notNull().default([]),
@@ -134,7 +134,7 @@ export const issueActivity = pgTable(
 );
 
 /**
- * Routines (D28): an agent runs `prompt` on a schedule (cron in the org's
+ * Routines: an agent runs `prompt` on a schedule (cron in the org's
  * time zone, from a phrase) or when an event happens (webhooks, new issue),
  * and delivers to a channel, a DM with the creator, or a Drive file.
  */
@@ -247,7 +247,7 @@ export const webhookEndpoints = pgTable(
 );
 
 /**
- * Native calendar (D28): events people create (agents only propose), with
+ * Native calendar: events people create (agents only propose), with
  * attendees (people and agents) and their RSVP, a linked channel or issue,
  * and a simple recurrence.
  */

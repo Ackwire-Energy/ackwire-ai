@@ -43,7 +43,7 @@ describe("dispatchMentions", () => {
     ]);
   });
 
-  test("a message without mentions goes to the router; an agent's only below the chime-in hop (D49)", async () => {
+  test("a message without mentions goes to the router; an agent's only below the chime-in hop (ADR 0034)", async () => {
     const message = await post("hello everyone");
     const posted = async () =>
       (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "message.posted").map((j) => j.payload);

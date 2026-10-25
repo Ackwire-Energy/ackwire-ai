@@ -1,6 +1,14 @@
 import type { RunnerExecutorInfo, RunnerTools } from "@agenteschat/adapters/machine-protocol";
 import type { ControlStatus } from "@agenteschat/adapters/runner-control";
-import { BrainPortrait, type BrainPortraitState, Chip, Icon, type IconName, Switch } from "@agenteschat/ui";
+import {
+  BrainPortrait,
+  type BrainPortraitState,
+  Chip,
+  Icon,
+  type IconName,
+  ProviderLogo,
+  Switch,
+} from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
@@ -45,7 +53,7 @@ export function Tools() {
       </Chip>
     );
 
-  /** Found and logged in: the engine at rest; not found or logged out: off (IconesMotor.html, Ferramentas). */
+  /** Found and logged in: the engine at rest; not found or logged out: off. */
   const engineState = (info: RunnerExecutorInfo | undefined): BrainPortraitState =>
     info && info.loggedIn !== false ? "idle" : "off";
 
@@ -64,6 +72,7 @@ export function Tools() {
           htmlFor="tool-claude"
           title={
             <>
+              <ProviderLogo id="claude_code" size="xs" />
               {t("desktop.tools.claudeName")} {exec(executors.claude)}
             </>
           }
@@ -82,6 +91,7 @@ export function Tools() {
           htmlFor="tool-codex"
           title={
             <>
+              <ProviderLogo id="codex" size="xs" />
               {t("desktop.tools.codexName")} {exec(executors.codex)}
             </>
           }

@@ -18,7 +18,7 @@ import { ThreadStatusChip, useThreadControls, useThreadFlows } from "./ThreadBit
 import "./threads.css";
 
 /**
- * The thread view's own parts (ThreadContexto.html, steps 2–5): the header
+ * The thread view's own parts: the header
  * with the title edited in place and the ⋯ menu, the context block on top,
  * and the read-only note of an archived thread. The conversation itself is
  * the channel's (ChannelPage in thread mode).

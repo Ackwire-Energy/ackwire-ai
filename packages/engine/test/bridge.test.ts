@@ -314,7 +314,7 @@ describe("mission tools through the bridge", () => {
         runId: run.id,
       }),
     );
-    // A big connector stands as its directory (D58), so the list stays under the cap; the mission tools are there.
+    // A big connector stands as its directory (ADR 0043), so the list stays under the cap; the mission tools are there.
     expect(listed.ok && listed.tools.length).toBeLessThanOrEqual(MCP_TOOLS_MAX);
     expect(names(listed)).toEqual(
       expect.arrayContaining(["update_plan", "report", "complete_mission", "ads_find_tools", "ads_use_tool"]),

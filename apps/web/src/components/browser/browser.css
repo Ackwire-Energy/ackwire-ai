@@ -1,4 +1,4 @@
-/* The agent browser (ADR 0040), from docs/design/telas/NavegadorAgente.html. */
+/* The agent browser (ADR 0040). */
 
 /* ---------- agent page and computer page ---------- */
 .brw-note {
@@ -479,7 +479,7 @@
   color: var(--ink);
 }
 
-/* ---------- the agent's browser in its card (telas/NavegadorNoChat.html, A + "Céu") ---------- */
+/* ---------- the agent's browser in its card ---------- */
 .brw-ac {
   position: relative;
   margin-top: 6px;
@@ -493,7 +493,7 @@
 .brw-ac:not(.is-open) {
   max-width: 600px;
 }
-/* Closed (telas/NavegadorCardScroll.html, 4): the small live picture, the site, what the agent does now. */
+/* Closed: the small live picture, the site, what the agent does now. */
 .brw-ac__compact {
   display: flex;
   align-items: center;
@@ -802,7 +802,7 @@
   font-size: 14px;
   font-weight: 650;
 }
-/* Typing (NavegadorCardScroll.html, 4): one quiet field like the composer. */
+/* Typing: one quiet field like the composer. */
 .brw-type {
   position: relative;
   padding: 8px 10px 10px;
@@ -916,7 +916,7 @@
   }
 }
 
-/* The three clicks on the computer that turn its browser on (telas/PerfilAgente.html), drawn small, one lit
+/* The three clicks on the computer that turn its browser on, drawn small, one lit
    after the other; the page updates by itself when the computer says so. */
 .brw-steps {
   display: flex;
@@ -1157,7 +1157,7 @@
   }
 }
 
-/* ---------- after the run: where it browsed (telas/NavegadorDepois.html, A + "Página em silhueta") ---------- */
+/* ---------- after the run: where it browsed ---------- */
 .brw-trail,
 .brw-ac.brw-trail.is-open {
   max-width: 600px;
@@ -1268,7 +1268,7 @@
 .brw-trail__page ol li.is-failed > .ac-icon {
   color: var(--danger);
 }
-/* NavegadorResumo.html, B: the steps as pixel columns in the header, one column marking each line. */
+/* The steps as pixel columns in the header, one column marking each line. */
 .brw-ac__tx small.brw-trail__sum {
   gap: 8px;
 }
@@ -1297,4 +1297,190 @@
   border-radius: 6px;
   padding: 1px 6px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- the agent's browser outside a conversation (agent page, its panel, the DM's dialog) ---------- */
+.brw-now {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.brw-now .brw-ac,
+.brw-dialog .brw-ac {
+  max-width: none;
+  margin-top: 0;
+}
+.brw-now__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.brw-now__row[data-tone="warn"] {
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
+    var(--e1);
+}
+.brw-now__ic {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+}
+.brw-now__row[data-tone="warn"] .brw-now__ic {
+  background: var(--warn-soft);
+  box-shadow: none;
+  color: var(--warn);
+}
+.brw-now__t {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.brw-now__t b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.brw-now__t span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brw-dialog .ac-dialog__body {
+  padding-bottom: 20px;
+}
+
+/* The DM header's "Navegador": a dot while the agent is in its browser, amber while a request waits. */
+.brw-dm.ac-btn {
+  position: relative;
+}
+.brw-dm[data-state]::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 2px var(--raised);
+}
+.brw-dm[data-state="waiting"]::after {
+  background: var(--warn);
+}
+@media (max-width: 640px) {
+  .brw-dm .brw-dm__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* Closed, or someone else in control: the small picture says so instead of pulsing. */
+.brw-ac__thumb-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--sunken);
+  color: var(--faint);
+}
+.brw-dim__row > .ac-icon {
+  color: var(--muted);
+}
+.brw-ac__tt.is-static {
+  cursor: default;
+}
+
+/* The address bar while in control: under the card's head, like a browser's own. */
+.brw-go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.brw-go__field {
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: var(--control-h-sm);
+  padding: 0 10px;
+  border-radius: var(--control-r-sm);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+}
+.brw-go__field:focus-within {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.brw-go__field:has(input[aria-invalid="true"]) {
+  box-shadow: inset 0 0 0 1.5px var(--danger);
+}
+.brw-go__field input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.brw-go__field input::placeholder {
+  color: var(--faint);
+}
+.brw-go__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+/* Full screen (the browser's own, or the card filling the window): the page takes all the room left. */
+.brw-ac.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+.brw-ac.is-full > * {
+  flex: none;
+}
+.brw-ac.is-full > .brw-ac__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.brw-ac.is-full .brw-ac__page {
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+}
+.brw-ac.is-full .brw-log {
+  min-height: 0;
 }

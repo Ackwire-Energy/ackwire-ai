@@ -13,7 +13,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("Missões (Threads.html)", () => {
+describe("Missões", () => {
   test("the sidebar item opens the Threads page on the Missões tab; empty: a designed state", async () => {
     const { router } = await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api: createFakeApi() });
     await settle();
@@ -54,7 +54,7 @@ describe("Missões (Threads.html)", () => {
     const line = row.querySelector(".thread-row__mission") as HTMLElement;
     expect(line.textContent).toContain("Missão");
     expect(line.textContent).toContain("4 de 12 itens");
-    // The mission's agent leads the row (ThreadsRefino.html), no flag icon.
+    // The mission's agent leads the row, no flag icon.
     expect(row.querySelector(".thread-row__face .ac-avatar")).toBeTruthy();
     expect(within(row).getByText("Esperando você")).toBeTruthy();
     const plain = screen().getByRole("article", { name: "Só conversa" });

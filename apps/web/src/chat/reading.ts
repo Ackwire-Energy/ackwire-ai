@@ -1,5 +1,5 @@
 /**
- * Long answers open at their start (telas/RefinoUI.html, "Conversa: Nova leitura").
+ * Long answers open at their start.
  *
  * While the person follows the bottom of the conversation, a new agent answer
  * (or a streamed one growing) that is taller than the list lands with its

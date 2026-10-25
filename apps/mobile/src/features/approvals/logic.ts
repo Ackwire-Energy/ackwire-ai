@@ -6,40 +6,14 @@ import type { Approval } from "@agenteschat/client";
  * of what waits on you.
  */
 
-export type ApprovalAction = "merge" | "deploy" | "rollback" | "publish" | "delete" | "send" | "other";
-
-/** The verb of the action, from the tool and scope the agent asked for (same rule as the web). */
-export function approvalAction(a: Pick<Approval, "tool" | "scope">): ApprovalAction {
-  const text = `${a.tool} ${a.scope}`.toLowerCase();
-  if (text.includes("merge")) return "merge";
-  if (text.includes("rollback")) return "rollback";
-  if (text.includes("deploy") || text.includes("workflow") || text.includes("actions.run")) return "deploy";
-  if (/delete|remove|destroy|drop|purge/.test(text)) return "delete";
-  if (/send|email|mail\b|sms/.test(text) && !text.includes("post_message")) return "send";
-  if (text.includes("share") || text.includes("publish")) return "publish";
-  return "other";
-}
-
-/** Production, can't be undone, or leaves the company: approving takes a hold. */
-export function approvalRisk(a: Pick<Approval, "tool" | "scope">): "high" | "normal" {
-  const action = approvalAction(a);
-  return action === "deploy" || action === "rollback" || action === "delete" || action === "send" ? "high" : "normal";
-}
-
-/** What the action touches, as plain words (keys under `mobile.approval.trait.*`). */
-export function approvalTraits(a: Pick<Approval, "tool" | "scope" | "params">) {
-  const action = approvalAction(a);
-  const values = Object.values(a.params ?? {})
-    .filter((v) => typeof v === "string")
-    .join(" ")
-    .toLowerCase();
-  const traits: ("production" | "irreversible" | "reversible" | "external")[] = [];
-  if (action === "deploy" || action === "rollback" || /\bprod(uction)?\b/.test(values)) traits.push("production");
-  if (action === "delete" || action === "send") traits.push("irreversible");
-  else if (action === "merge" || action === "deploy") traits.push("reversible");
-  if (action === "send" || action === "publish") traits.push("external");
-  return traits;
-}
+// The verb, the risk and the chips are the web's own rules (`@agenteschat/client/lib/approval-kind`).
+export {
+  type ApprovalAction,
+  type ApprovalTrait,
+  approvalAction,
+  approvalRisk,
+  approvalTraits,
+} from "@agenteschat/client/lib/approval-kind";
 
 /** The exact values the action runs with: top-level text, numbers and yes/no (at most `max`). */
 export function approvalFacts(params: Record<string, unknown> | undefined, max = 6): [string, string][] {
@@ -70,7 +44,7 @@ export function waitingApprovals(list: Approval[], now = Date.now()): Approval[]
 }
 
 /**
- * The details table of a request (MobileIntencional.html, "Por onde / Muda / Testes"): where it goes
+ * The details table of a request: where it goes
  * (`via`: the connector and its account) first, then the exact values it runs with. Only what the
  * request carries; nothing is made up. `label: null` is the "Por onde" row (its label is translated).
  */

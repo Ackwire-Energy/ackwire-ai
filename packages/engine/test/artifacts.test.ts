@@ -91,7 +91,7 @@ describe("artifacts made by agents", () => {
 
     const [created] = await f.db.select().from(schema.artifacts);
     expect(created).toMatchObject({ kind: "document", title: "Relatório de março", currentVersion: 1 });
-    // Asked in the channel: the file and the reply are in the channel itself (D67).
+    // Asked in the channel: the file and the reply are in the channel itself.
     expect(created).toMatchObject({ channelId: f.general.id, threadId: null, createdByType: "agent" });
     const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
     expect(reply?.meta.artifacts).toEqual([{ id: created?.id, version: 1 }]);

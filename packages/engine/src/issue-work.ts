@@ -3,7 +3,7 @@ import { and, desc, type Executor, eq, inArray, schema } from "@agenteschat/db";
 const { issues, issueActivity, users, agents } = schema;
 
 /**
- * "Ask Ada to implement" (D28, revised): the work conversation lives in the
+ * "Ask Ada to implement": the work conversation lives in the
  * requester's DM with the agent, as a thread whose root is a compact card
  * (`meta.issueWork`). The agent's instructions never show in the chat: they
  * are built from the issue at run time (`issueWorkBrief`) for every run in

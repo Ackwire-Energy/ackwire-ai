@@ -1,13 +1,15 @@
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
+import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
 import { quotedLine } from "./context";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage } from "./messages";
-import type { AgentRun } from "./runs";
+import { type AgentRun, NO_AI } from "./runs";
+import { standingRefusal } from "./standing";
 
 const {
   agents,
@@ -61,7 +63,7 @@ export interface RoutingResult {
 /**
  * Ranks the candidates for one message (docs/adr/0013-router.md). A strategy
  * only scores agents code already allowed; it never adds candidates, never
- * grants permissions, and policy (threshold, at most 2, hop limit) is applied
+ * grants permissions, and policy (threshold, `maxAgents`, hop limit) is applied
  * by `routeMessage`, not by the strategy.
  *
  * Core ships `createLlmRouterStrategy`. Other implementations (e.g. an
@@ -292,36 +294,48 @@ export async function cheapModelForOrg(db: Database, orgId: string, perProvider:
 /**
  * The provider of an organization's own model calls: its default key's, else
  * its newest key's, else Anthropic (the platform key). Also the line an agent
- * on "Automático" without a key of its own picks from (D83).
+ * on "Automático" without a key of its own picks from. Cached with the org's
+ * default keys (`invalidateDefaults` drops both on any key or settings change).
  */
 export async function orgModelProvider(db: Executor, orgId: string): Promise<string> {
-  const [settings] = await db
-    .select({ provider: schema.providerCredentials.provider })
-    .from(organizationSettings)
-    .innerJoin(schema.providerCredentials, eq(schema.providerCredentials.id, organizationSettings.defaultCredentialId))
-    .where(and(eq(organizationSettings.orgId, orgId), isNull(schema.providerCredentials.revokedAt)));
-  let provider = settings?.provider;
-  if (!provider) {
+  return (await caches.credentials.getOrLoad(`${orgId}:default:@provider`, async () => {
+    const [settings] = await db
+      .select({ provider: schema.providerCredentials.provider })
+      .from(organizationSettings)
+      .innerJoin(
+        schema.providerCredentials,
+        eq(schema.providerCredentials.id, organizationSettings.defaultCredentialId),
+      )
+      .where(and(eq(organizationSettings.orgId, orgId), isNull(schema.providerCredentials.revokedAt)));
+    if (settings?.provider) return settings.provider;
     const [newest] = await db
       .select({ provider: schema.providerCredentials.provider })
       .from(schema.providerCredentials)
       .where(and(eq(schema.providerCredentials.orgId, orgId), isNull(schema.providerCredentials.revokedAt)))
       .orderBy(desc(schema.providerCredentials.createdAt))
       .limit(1);
-    provider = newest?.provider ?? "anthropic";
-  }
-  return provider;
+    return newest?.provider ?? "anthropic";
+  })) as string;
 }
 
 export interface RouterDeps {
   db: Database;
   strategy: RouterStrategy;
   policy: RouterPolicy;
+  /** Whether the organization has any AI (`orgHasAi`); without it the strategy is always asked. */
+  hasAi?(orgId: string): Promise<boolean>;
 }
 
 export interface RouteResult {
   runs: AgentRun[];
-  skipped?: "message_missing" | "not_a_person" | "has_mentions" | "hop_limit" | "no_candidates" | "already_routed";
+  skipped?:
+    | "message_missing"
+    | "not_a_person"
+    | "has_mentions"
+    | "hop_limit"
+    | "no_candidates"
+    | "already_routed"
+    | "org_paused";
   selected?: string[];
   /** Candidates the strategy evaluated (receipts: "seen by"). */
   seenBy?: string[];
@@ -333,7 +347,7 @@ export interface RouteResult {
 /** A follow-up goes to another agent than the one just spoken to only when the router is this much surer of it. */
 export const NAMED_OVER_CONTINUITY = 0.3;
 
-/** An agent's message may bring in one more agent, only when it clearly should (D5, revised 2026-10-17). */
+/** An agent's message may bring in one more agent, only when it clearly should (ADR 0034). */
 export const AGENT_CHIME_IN_SCORE = 0.75;
 // An agent's message at this hop (an answer to an answer) brings in nobody; defined next to the outbox insert.
 export { AGENT_CHIME_IN_MAX_HOP };
@@ -342,15 +356,16 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * Router for a message without mentions (job `message.posted`). Code picks
  * the candidates: active agents that are members of the channel with
  * auto-reply on. The strategy only scores them; policy picks at most
- * `maxAgents` above `minScore`. An agent's message goes through it too (D5,
- * revised): the author is never a candidate, at most one agent is picked,
+ * `maxAgents` above `minScore`. An agent's message goes through it too
+ * (ADR 0034): the author is never a candidate, at most one agent is picked,
  * only a clear pick (`AGENT_CHIME_IN_SCORE`), and never from an answer to an
  * answer (`AGENT_CHIME_IN_MAX_HOP`). One decision per message (unique),
  * stored with every score.
  *
  * Transient strategy failures rethrow (the outbox retries); on the final
  * attempt, or for permanent ones (no credential, invalid output), the
- * decision is stored with the error and nobody answers.
+ * decision is stored with the error and nobody answers. With no AI in the
+ * organization (`hasAi`) the strategy isn't asked: the decision is `no_ai`.
  */
 export async function routeMessage(
   deps: RouterDeps,
@@ -358,6 +373,8 @@ export async function routeMessage(
   options: { finalAttempt?: boolean } = {},
 ): Promise<RouteResult> {
   const { db } = deps;
+  // A workspace on hold or suspended asks no strategy (Jev bills the server): nobody answers there now.
+  if (await standingRefusal(db, input.orgId)) return { runs: [], skipped: "org_paused" };
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message) return { runs: [], skipped: "message_missing" };
   const byAgent = message.authorType === "agent" && message.authorAgentId !== null;
@@ -400,10 +417,12 @@ export async function routeMessage(
       and(
         eq(agents.orgId, message.orgId),
         isNull(agents.archivedAt),
+        // Held (`standing.ts`): the others answer instead.
+        isNull(agents.operatorHoldAt),
         eq(channelMembers.autoReply, true),
         // Never the agent that wrote it.
         byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,
-        // Never an agent this person can't talk to (D31): not as a pick, not as "the last agent" of a follow-up.
+        // Never an agent this person can't talk to: not as a pick, not as "the last agent" of a follow-up.
         audienceSql("agents", sql`${personId}::text`),
       ),
     );
@@ -415,6 +434,23 @@ export async function routeMessage(
     about: r.instructions.slice(0, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
+  // No AI anywhere in the organization: nobody could answer, whatever the strategy (Jev only scores, so it
+  // never misses a key). Stored as `no_ai`, which "Responder agora" routes again once an AI is connected.
+  if (deps.hasAi && !(await deps.hasAi(message.orgId))) {
+    const stored = await db
+      .insert(routingDecisions)
+      .values({
+        orgId: message.orgId,
+        channelId: message.channelId,
+        messageId: message.id,
+        strategy: deps.strategy.name,
+        candidates: [],
+        error: NO_AI,
+      })
+      .onConflictDoNothing()
+      .returning({ id: routingDecisions.id });
+    return stored.length > 0 ? { runs: [], selected: [], reason: NO_AI } : { runs: [], skipped: "already_routed" };
+  }
   // What each one can reach, by name ("Sentry"): a question about an app goes to who has it.
   const [granted, connections] = await Promise.all([
     db
@@ -517,7 +553,7 @@ export async function routeMessage(
     const addressed = previous.mentionedAgentIds.filter((id) => candidateIds.has(id));
     if (addressed.length === 1) continuityAgentId = addressed[0] ?? null;
     else {
-      // Its answers come after it, where it was asked (D67).
+      // Its answers come after it, where it was asked.
       const answers = recent.filter((m) => m.createdAt > previous.createdAt && m.authorAgentId);
       const first = answers
         .filter((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))
@@ -584,7 +620,13 @@ export async function routeMessage(
         error: error instanceof Error ? error.message.slice(0, 500) : String(error),
       })
       .onConflictDoNothing();
-    return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId) };
+    return {
+      runs: [],
+      selected: [],
+      seenBy: candidates.map((c) => c.agentId),
+      // No key the router can use while the organization has AI (only plans, on computers): mentions answer.
+      ...(error instanceof MissingCredentialError ? { reason: "mention_needed" } : {}),
+    };
   }
 
   // The router's own pick; when it picks several agents, the message speaks to several.

@@ -11,6 +11,7 @@ import {
   Carousel,
   Field,
   Icon,
+  ProviderLogo,
   Select,
   type SelectOption,
 } from "@agenteschat/ui";
@@ -42,7 +43,7 @@ export function priceTier(model: Model, models: Model[]) {
   return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
 }
 
-/** Model descriptions of the approved screen, by model family. */
+/** Model descriptions, by model family. */
 export function modelDescription(t: TFunction, locale: string, model: Model) {
   const id = model.id.toLowerCase();
   if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");
@@ -52,7 +53,10 @@ export function modelDescription(t: TFunction, locale: string, model: Model) {
   return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
 }
 
-/** Key choices: the workspace default first (with its masked hint), then the other stored keys. */
+/**
+ * Key choices by their provider's mark: the workspace default first (with its masked hint), then the other
+ * stored keys.
+ */
 export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
   const live = credentials.filter((c) => !c.revokedAt);
   const def = live.find((c) => c.id === defaultId);
@@ -63,6 +67,13 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
       description: def
         ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
         : undefined,
+      leading: def ? (
+        <ProviderLogo id={def.provider} size="sm" />
+      ) : (
+        <span className="newag__ib">
+          <Icon name="key" size={16} />
+        </span>
+      ),
     },
     ...live
       .filter((c) => c.id !== defaultId)
@@ -70,6 +81,7 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
         value: c.id,
         label: c.label,
         description: t("newAgent.otherKeyDesc", { provider: providerLabel(c.provider), hint: c.keyHint }),
+        leading: <ProviderLogo id={c.provider} size="sm" />,
       })),
   ];
 }
@@ -215,7 +227,7 @@ function AccessoryChoices({ look, onPick, carousel }: LookPickProps & { carousel
 }
 
 /**
- * The look right on the agent's settings (telas/PerfilAgente.html): the colors, then the eyes and what it
+ * The look right on the agent's settings: the colors, then the eyes and what it
  * wears as one sliding row each, so the section stays short. Each pick shows at once.
  */
 export function LookRows({
@@ -316,14 +328,7 @@ export function KeySelect({
       value={value}
       onValueChange={onChange}
       placeholder={t("newAgent.noKeys")}
-      options={options.map((k) => ({
-        ...k,
-        leading: (
-          <span className="newag__ib">
-            <Icon name="key" size={16} />
-          </span>
-        ),
-      }))}
+      options={options}
       renderValue={pickerValue}
     />
   );
@@ -354,7 +359,10 @@ function ModelCard({
     <>
       <span className="newag__model-head">
         <b>{model.label}</b>
-        <span className="newag__model-prov">{providerLabel(provider)}</span>
+        <span className="newag__model-prov">
+          <ProviderLogo id={provider} size="xs" />
+          {providerLabel(provider)}
+        </span>
       </span>
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || /sonnet|opus|haiku/i.test(model.id)) && (
@@ -414,7 +422,7 @@ export function ModelCards({
 }) {
   const { t } = useTranslation();
   const all = choices.flatMap(([, list]) => list.map((c) => c.model));
-  // "Automático" (D83) picks from the line of the agent's key: usable once any model is.
+  // "Automático" picks from the line of the agent's key: usable once any model is.
   const autoAvailable = choices.some(([, list]) => list.some((c) => c.available));
   return (
     // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset

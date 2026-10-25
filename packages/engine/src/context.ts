@@ -208,7 +208,7 @@ export interface RunContext {
 }
 
 /**
- * Builds the fixed context of a run (layer 1 of D9): organization context,
+ * Builds the fixed context of a run (ADR 0008): organization context,
  * agent instructions, channel and members, and the recent conversation up to
  * the trigger message. Search, memory and summaries (layers 2–4) come later as
  * tools behind the Tool Gateway.
@@ -229,7 +229,7 @@ export async function buildRunContext(
     capabilities?: string;
     /** Skills enabled for the agent (name and description; the body loads on demand). */
     skills?: { name: string; description: string }[];
-    /** `find_agent` is available: name the other agents in "# Your team" (D54). */
+    /** `find_agent` is available: name the other agents in "# Your team". */
     team?: boolean;
     trigger?: Message;
     /** A routine started the run: its own task, so no "Your recent work" from other conversations. */
@@ -274,7 +274,7 @@ export async function buildRunContext(
 
   const upToTrigger = lte(messages.createdAt, trigger.createdAt);
   const rootIsTrigger = run.threadRootId === trigger.id;
-  // Asked in the main timeline: the run answers there, not in a thread (D67).
+  // Asked in the main timeline: the run answers there, not in a thread.
   const flat = rootIsTrigger;
   // A routine's background run (ADR 0053 §4): its room's history (earlier briefs) is no conversation;
   // it reads its brief, and what people said where it reports comes in the routine block.
@@ -387,7 +387,7 @@ export async function buildRunContext(
   // A quote reply ("why did the clone hang?"): what the run behind the quoted message did counts as here.
   const quoted = (trigger.meta?.replyTo as { messageId?: unknown } | undefined)?.messageId;
   const quotedId = typeof quoted === "string" ? quoted : null;
-  // A channel's conversations: its main timeline (runs asked there answer there, D67) and each thread.
+  // A channel's conversations: its main timeline (runs asked there answer there) and each thread.
   const sameConversation = flat
     ? sql`r.thread_root_id = r.trigger_message_id`
     : sql`r.thread_root_id = ${run.threadRootId}::uuid`;
@@ -479,7 +479,7 @@ export async function buildRunContext(
     })
     .join("; ");
   // The router (or the addressee check of a message mentioning several agents) sent this message to
-  // several agents (D49): each answers its own part, at the same time.
+  // several agents (ADR 0034): each answers its own part, at the same time.
   const [routed] =
     (run.trigger === "router" || run.trigger === "mention") && others.length > 0
       ? await db
@@ -500,7 +500,7 @@ export async function buildRunContext(
   const referenced = others
     .filter((m) => m.agentId && referencedIds.includes(m.agentId))
     .map((m) => `@${m.agentHandle}`);
-  // The rest of the org's agents (D54): channel members are described in "Where you are".
+  // The rest of the org's agents: channel members are described in "Where you are".
   const team =
     options.team && channel.kind !== "forum"
       ? teamPrompt(await loadTeam(db, run.orgId), agent.id, requester, new Set(others.map((m) => m.agentId as string)))
@@ -552,7 +552,7 @@ export async function buildRunContext(
             : "",
           "- Reply in the language of the message you are answering; if that is unclear, in the language the organization uses (its context and recent messages). Tool names, ids and code stay as they are.",
           "- Write like a colleague texting the team, not a report: plain sentences in short paragraphs, in a natural spoken tone. No headings, no bold, no labeled bullets ('Size:', 'Cause:', 'Logs:') and no numbered recommendations: say each thing in a sentence. A list only for a plain enumeration the reader will scan, like several files or ids.",
-          "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Hanna, from Heerlen, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
+          "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
           "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
           "- When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the person's first message of the morning ('Now' below gives their local time). Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.",
           options.toolsAvailable

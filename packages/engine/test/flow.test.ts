@@ -70,7 +70,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     pickedBy: [f.agent.id],
     strategy: "mention",
   });
-  // Asked in the channel: the run's events and reply are in the main timeline (D67).
+  // Asked in the channel: the run's events and reply are in the main timeline.
   expect(events[2]).toMatchObject({ agentId: f.agent.id, runId: run?.id, threadId: null });
   expect(events.at(-1)).toMatchObject({ type: "message.handled", messageId: question.id, status: "done" });
   const deltas = events.filter((e) => e.type === "agent.delta");

@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Implements the backend decision of 2026-10-14 ("saída de canal/org derruba as assinaturas na hora"). Extends 0010.
+- Extends 0010.
 
 ## Decision
 

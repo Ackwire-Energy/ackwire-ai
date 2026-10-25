@@ -27,7 +27,7 @@ const colors = (draw: (ctx: ReturnType<typeof fakeCtx>["ctx"]) => void) => {
   return new Set(cells.values());
 };
 
-describe("engine portraits (IconesMotor.html, direction C)", () => {
+describe("engine portraits", () => {
   test("every kind and state draws inside the 48×48 grid", () => {
     for (const kind of BRAIN_KINDS)
       for (const state of BRAIN_STATES) {

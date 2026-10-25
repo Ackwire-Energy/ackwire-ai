@@ -1,21 +1,30 @@
 import {
   ARTIFACT_LIMITS,
   authenticateMachine,
+  computerSetup,
   confirmDeviceCode,
   DeviceCodeLimitError,
   deleteMachine,
   denyDeviceCode,
   getDeviceCode,
+  hostComputerState,
+  hostKey,
   listMachineOutages,
   listMachines,
   machineOrgLogo,
   moveAgentsFromMachine,
+  PROVISIONING_REASONS,
+  PROVISIONING_STATES,
+  PROVISIONING_STEPS,
   pollDeviceToken,
   receiveMachineUpload,
   reduceMachineAccess,
   renameMachine,
+  restoreHostComputer,
+  safeEqual,
   setAgentComputerTarget,
   startDeviceCode,
+  syncHostComputer,
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
@@ -55,6 +64,14 @@ export const MachineAccess = z
         .boolean()
         .optional()
         .openapi({ description: "The agent browser (protocol 12, ADR 0040); absent = off." }),
+      desktop: z
+        .boolean()
+        .optional()
+        .openapi({ description: "The agents' desktops (protocol 18, ADR 0058); absent = off." }),
+      terminal: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Terminals people open as an agent (protocol 18, ADR 0058); absent = off." }),
     }),
   })
   .openapi("MachineAccess");
@@ -63,11 +80,19 @@ export const Machine = z
   .object({
     id: z.uuid(),
     name: z.string(),
+    kind: z.enum(["connected", "host", "managed"]).openapi({
+      description:
+        "`connected`: a person paired it; `host`: this server's own computer (`HOST_COMPUTER_TOKEN`); `managed`: the workspace's own computer (ADR 0056 §10), which people can't remove and whose hostname, OS and arch aren't shown.",
+    }),
     online: z.boolean().openapi({ description: "Runner connected now. Changes come as `machine.status` events." }),
     lastSeenAt: z.string().nullable(),
     hostname: z.string(),
     os: z.string().openapi({ description: "`linux`, `darwin`, `windows` or `other`." }),
     arch: z.string(),
+    mode: z.enum(["system", "single"]).openapi({
+      description:
+        "`system`: each agent works as its own OS user, in its own folder (ADR 0057); `single`: every agent as the runner's user.",
+    }),
     runnerVersion: z.string(),
     protocol: z.number().int().openapi({ description: "The runner's machine protocol (9+: pause; 10+: access)." }),
     execAllowed: z.boolean().openapi({ description: "`false`: started with `--no-exec` (files and uploads only)." }),
@@ -97,6 +122,16 @@ export const Machine = z
         description:
           "Whether the agent browser can run there (protocol 12, ADR 0040); null when its runner doesn't report it. Turned on by the person at the computer (`access.tools.browser`).",
       }),
+    desktopUse: z
+      .object({
+        available: z.boolean(),
+        reason: z.string().nullable().openapi({ description: "Why it can't, from the runner (what to install)." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Whether agents can use their own desktops there (protocol 21, ADR 0062): only where each agent works as its own OS user. Null when its runner doesn't report it.",
+      }),
     canManage: z.boolean().openapi({ description: "This person may rename, delete or reduce its access." }),
     createdAt: z.string(),
   })
@@ -109,7 +144,34 @@ export const ComputerTarget = z
   ])
   .openapi("ComputerTarget");
 
+const HostComputer = z
+  .object({ machineId: z.uuid(), on: z.boolean().openapi({ description: "false: an admin stopped it here." }) })
+  .openapi("HostComputer");
+
 const MachineParams = OrgParams.extend({ machineId: z.uuid() });
+
+const ComputerSetup = z
+  .object({
+    mode: z.enum(["external", "pair"]).openapi({
+      description:
+        "`pair`: people connect their own computers (the other fields are null). `external`: the workspace gets its own computer, being prepared until `state` is `ready`.",
+    }),
+    state: z.enum(PROVISIONING_STATES).nullable(),
+    step: z
+      .enum(PROVISIONING_STEPS)
+      .nullable()
+      .openapi({ description: "While `preparing`: reserving, starting, installing or connecting." }),
+    reason: z
+      .enum(PROVISIONING_REASONS)
+      .nullable()
+      .openapi({ description: "While `waiting`: `approval` (soon) or `capacity` (taking longer than usual)." }),
+    since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
+    etaSeconds: z.number().int().nullable(),
+    specs: z.object({ cpus: z.number().int(), memoryGb: z.number(), diskGb: z.number() }).nullable(),
+    machineId: z.uuid().nullable().openapi({ description: "The workspace's computer, once it has one." }),
+  })
+  .openapi("ComputerSetup");
+
 const UserCode = z.string().min(6).max(16).openapi({ example: "K7Q4ZP" });
 const UserCodeParams = z.object({ userCode: UserCode });
 
@@ -146,6 +208,9 @@ const MachineOutage = z
     machineId: z.uuid(),
     name: z.string(),
     platform: Platform,
+    managed: z
+      .boolean()
+      .openapi({ description: "The workspace's own computer (ADR 0056 §10): its platform is `other`." }),
     offlineSince: z.string().openapi({ description: "ISO time of its last sign of life." }),
     agents: z.array(
       z.object({
@@ -169,6 +234,9 @@ const OutageTarget = z
       machineId: z.uuid(),
       name: z.string(),
       platform: Platform,
+      managed: z
+        .boolean()
+        .openapi({ description: "The workspace's own computer (ADR 0056 §10): its platform is `other`." }),
       online: z.boolean(),
       brains: z.array(ComputerBrain).openapi({ description: "Computer brains it can run (`brainOptions`)." }),
       reasonOff: z
@@ -308,7 +376,7 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "commands", "browser"]).optional(),
+              disableTool: z.enum(["claude", "codex", "commands", "browser", "desktop", "terminal"]).optional(),
             })
             .strict(),
         ),
@@ -354,7 +422,8 @@ export function machineAppRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/machines/{machineId}",
       tags,
       security,
-      summary: "Remove it: the token stops working and its runner is disconnected at once",
+      summary:
+        "Remove it: the token stops working and its runner is disconnected at once (never the workspace's own computer: `machine.managed`)",
       request: { params: MachineParams },
       responses: { 204: noContent[204], ...errors },
     }),
@@ -362,6 +431,63 @@ export function machineAppRoutes(deps: AppDeps) {
       const { orgId, machineId } = c.req.valid("param");
       await deleteMachine({ db, pubsub }, c.get("user").id, orgId, machineId);
       return c.body(null, 204);
+    },
+  );
+
+  const noHost = (c: Parameters<typeof apiError>[0]) =>
+    apiError(c, 404, "machine.host_none", "This server's computer doesn't work for this organization");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/machines/host",
+      tags,
+      security,
+      summary:
+        "Whether the organization uses this server's own computer (404: the server has none, or doesn't serve this organization)",
+      request: { params: OrgParams },
+      responses: { 200: json(HostComputer), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const state = deps.config.HOST_COMPUTER_TOKEN ? await hostComputerState(db, c.get("user").id, orgId) : null;
+      if (!state) return noHost(c);
+      return c.json(state, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/machines/host",
+      tags,
+      security,
+      summary:
+        "Use this server's computer again in the organization (admins); it connects at its next sync. Stopping is removing its row (`DELETE …/machines/{machineId}`)",
+      request: { params: OrgParams },
+      responses: { 200: json(HostComputer), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      if (!deps.config.HOST_COMPUTER_TOKEN) return noHost(c);
+      return c.json(await restoreHostComputer({ db, pubsub }, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/computer-setup",
+      tags,
+      security,
+      summary: "Whether the workspace gets its own computer, and how far it is (every member)",
+      description: "Changes come as `machine.provisioning` org events, with the same fields but `mode`.",
+      request: { params: OrgParams },
+      responses: { 200: json(ComputerSetup), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await computerSetup(db, deps.config.MACHINE_PROVISIONING, c.get("user").id, orgId), 200);
     },
   );
 
@@ -475,6 +601,23 @@ const DeviceBody = z.object({
   previousMachineId: z.string().max(64).optional(),
 });
 
+const HostSyncBody = z.object({
+  name: z.string().max(80).default(""),
+  hostname: z.string().max(200).default(""),
+  os: z.string().max(20).default("other"),
+  arch: z.string().max(40).default(""),
+  runnerVersion: z.string().max(40).default(""),
+  have: z.array(z.uuid()).max(1000).default([]).openapi({ description: "Organizations it holds a token for." }),
+  rotate: z
+    .array(z.uuid())
+    .max(1000)
+    .default([])
+    .openapi({ description: "Organizations whose token the server refused: they get new ones." }),
+});
+
+/** The server's computer syncs every minute; this leaves room for restarts. */
+const HOST_SYNC_LIMIT = { limit: 30, windowMs: 60_000 };
+
 /** New codes per address per minute, and polls (every 3 s by contract: 20 a minute, with room for two computers). */
 const DEVICE_START_LIMIT = { limit: 10, windowMs: 60_000 };
 const DEVICE_POLL_LIMIT = { limit: 60, windowMs: 60_000 };
@@ -482,7 +625,8 @@ const DEVICE_POLL_LIMIT = { limit: 60, windowMs: 60_000 };
 /**
  * What the runner calls, with no session (ADR 0025, ADR 0036): the
  * device-code connection (`POST /api/machines/device`, `…/device/token`;
- * rate limited per address), `PUT /api/machines/uploads/{uploadId}` and
+ * rate limited per address), the server's own computer's sync
+ * (`POST /api/machines/host/sync`, its `HOST_COMPUTER_TOKEN`), `PUT /api/machines/uploads/{uploadId}` and
  * `GET /api/machines/org-logo` (its machine token) and
  * `GET /api/machines/install.sh`. No CSRF: no cookie is
  * read here. The WebSocket `/api/machines/connect` lives in `Bun.serve`
@@ -564,6 +708,59 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       if (!result.ok) return c.json({ error: result.error }, 400);
       const { ok: _ok, ...token } = result;
       return c.json(token, 200);
+    },
+  );
+
+  api.openapi(
+    createRoute({
+      method: "post",
+      path: "/machines/host/sync",
+      tags,
+      summary:
+        "This server's own computer (`agentes-runner host`, `Authorization: Bearer <HOST_COMPUTER_TOKEN>`): its organizations, one computer each, with a token when it needs one",
+      request: { body: body(HostSyncBody) },
+      responses: {
+        200: json(
+          z
+            .object({
+              orgs: z.array(
+                z.object({
+                  orgId: z.uuid(),
+                  orgName: z.string(),
+                  machineId: z.uuid(),
+                  token: z
+                    .string()
+                    .optional()
+                    .openapi({ description: "A new machine token (`agm_…`), given once; absent: keep yours." }),
+                }),
+              ),
+            })
+            .openapi("HostSync"),
+        ),
+        401: errorResponse("Wrong token"),
+        404: errorResponse("This server has no computer of its own (`HOST_COMPUTER_TOKEN` unset)"),
+        429: errorResponse("Too many syncs from this address"),
+      },
+    }),
+    async (c) => {
+      const expected = config.HOST_COMPUTER_TOKEN;
+      if (!expected) return apiError(c, 404, "machine.host_off", "This server has no computer of its own");
+      const limit = await adapters.rateLimiter.consume(`machine-host:${requestIp(c.req.raw.headers)}`, HOST_SYNC_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      const auth = c.req.header("authorization") ?? "";
+      if (!auth.startsWith("Bearer ") || !safeEqual(auth.slice(7).trim(), expected)) {
+        return apiError(c, 401, "machine.unauthorized", "This server's computer token is not valid");
+      }
+      const result = await syncHostComputer(
+        {
+          db,
+          pubsub: adapters.pubsub,
+          cloudAvailable: Boolean(deps.extras?.sandbox?.provider),
+          hostKey: hostKey(expected),
+        },
+        c.req.valid("json"),
+      );
+      return c.json(result, 200);
     },
   );
 

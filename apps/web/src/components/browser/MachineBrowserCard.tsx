@@ -1,14 +1,15 @@
 import type { BrowserHandoff, Machine, ScopeGrant } from "@agenteschat/client";
 import {
+  agentStateOfRun,
   BROWSER_TOOL_SCOPE,
-  isActiveStatus,
-  isBrowserTool,
   isOpenHandoff,
   keys,
   useApi,
   useBrowserHandoffMutations,
+  usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { canReduceAccess, commandInReason } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -19,18 +20,12 @@ import { AgentAvatar } from "../AgentAvatar";
 import { CommandBlock } from "../Machines";
 import { useOrg } from "../org-context";
 import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
+import { NotWorkingNote } from "../WorkspaceComputer";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
 
-/** The first command in the runner's own words ("…run `agentes-runner browser install --with-deps`"). */
-function commandIn(reason: string | null | undefined): string | null {
-  const m = reason ? /`([^`]+)`/.exec(reason) : null;
-  return m?.[1] ?? null;
-}
-
 /**
- * "Navegador" on a computer's page (ADR 0040, telas/NavegadorAgente.html
- * "Computador"): whether the browser is ready here, which agents are in it
+ * "Navegador" on a computer's page (ADR 0040): whether the browser is ready here, which agents are in it
  * now (Ver, Parar), and which agents may use it. Turning it on happens on
  * the computer; the owner can only turn it off here.
  */
@@ -41,7 +36,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (D79).
+  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);
@@ -67,10 +62,11 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
       retry: false,
     })),
   });
-  // Agents whose run is in the browser right now (its current tool), from the live store.
+  // Agents at work whose latest call is in the browser, from the live store: between two calls the run
+  // has no current tool, and while it works its status reads "thinking", so neither alone says it.
   const busy = useStreams((s) =>
     Object.values(s.runs)
-      .filter((r) => agentIds.includes(r.agentId) && isActiveStatus(r.status) && isBrowserTool(r.tool))
+      .filter((r) => agentIds.includes(r.agentId) && agentStateOfRun(r) !== "idle" && usesBrowser(r))
       .map((r) => r.agentId)
       .sort()
       .join(","),
@@ -79,7 +75,9 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   if (!access && !m.browser) return null;
   const switchedOn = access?.tools.browser === true;
   const ready = switchedOn && m.browser?.available === true;
-  const command = commandIn(m.browser?.reason);
+  // The workspace's own computer: no way in to turn it on or run a command (`NotWorkingNote`).
+  const managed = m.kind === "managed";
+  const command = managed ? null : commandInReason(m.browser?.reason);
   const uses = m.agents.flatMap((a, i) => {
     const h = handoffs[i]?.data as BrowserHandoff | null | undefined;
     const open = h && isOpenHandoff(h) ? h : null;
@@ -109,7 +107,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         subtitle={t("browser.machine.description")}
         action={
           switchedOn &&
-          m.canManage && (
+          canReduceAccess(m) && (
             <Button size="sm" variant="ghost" aria-label={t("browser.machine.turnOffLabel")} onClick={onTurnOff}>
               {t("browser.machine.turnOff")}
             </Button>
@@ -132,7 +130,8 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         )}
         {ready && m.browser?.version && <span className="small muted">{m.browser.chrome ?? ""}</span>}
       </div>
-      {!switchedOn && (
+      {managed && !ready && (!switchedOn || m.browser?.reason) && <NotWorkingNote />}
+      {!switchedOn && !managed && (
         <div className="brw-note">
           <Icon name="computer" size={16} />
           {here ? (
@@ -145,7 +144,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
           )}
         </div>
       )}
-      {switchedOn && !ready && m.browser?.reason && (
+      {switchedOn && !ready && m.browser?.reason && !managed && (
         <div className="brw-note">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>

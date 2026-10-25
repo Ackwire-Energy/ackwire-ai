@@ -108,7 +108,7 @@ describe("Criar agente: steps", () => {
     expect(screen().getByRole("checkbox", { name: "#general" }).getAttribute("aria-checked")).toBe("false");
 
     await proceed();
-    // "Automático" (D83) comes first and is chosen for every role; the fixed models follow.
+    // "Automático" comes first and is chosen for every role; the fixed models follow.
     const auto = screen().getByRole("button", { name: /^Automático/ });
     expect(auto.getAttribute("aria-pressed")).toBe("true");
     expect(auto.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");

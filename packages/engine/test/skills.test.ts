@@ -110,6 +110,43 @@ describe("SKILL.md", () => {
     expect(() => parseSkillMarkdown(`---\nname: ok\ndescription: ${"x".repeat(1025)}\n---\nbody`)).toThrow("1024");
     expect(() => parseSkillMarkdown(`---\nname: ${"a".repeat(65)}\ndescription: x\n---\nb`)).toThrow("64");
   });
+
+  test("nested YAML survives (OpenClaw and Hermes metadata, multi-line blocks); YAML that isn't is read by line", () => {
+    const openclaw = parseSkillMarkdown(`---
+name: github-triage
+description: |
+  Triage new issues.
+  Label and assign them.
+metadata:
+  openclaw:
+    emoji: "🦞"
+    requires:
+      bins: [gh]
+      env:
+        - GITHUB_TOKEN
+    user-invocable: true
+  hermes:
+    tags: [github, triage]
+---
+Body.`);
+    expect(openclaw.description).toBe("Triage new issues.\nLabel and assign them.");
+    expect(openclaw.metadata).toEqual({
+      metadata: {
+        openclaw: { emoji: "🦞", requires: { bins: ["gh"], env: ["GITHUB_TOKEN"] }, "user-invocable": true },
+        hermes: { tags: ["github", "triage"] },
+      },
+    });
+    // Not YAML (a second colon), as many published skills are: the line reading, as before.
+    const loose = parseSkillMarkdown("---\nname: pdf\ndescription: Use when: the user sends a PDF\n---\nBody.");
+    expect(loose.description).toBe("Use when: the user sends a PDF");
+    // YAML would make these a boolean and a number: the text as written.
+    expect(parseSkillMarkdown("---\nname: yes-no\ndescription: Yes\n---\nb").description).toBe("Yes");
+    // Aliases that expand past the budget are refused as YAML (then read by line: no nested fields).
+    const bomb = ["a: &a [x, x, x, x, x, x, x, x, x, x]", "b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]"];
+    bomb.push("c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b]", "d: [*c, *c, *c, *c, *c, *c, *c, *c, *c, *c]");
+    const expanded = parseSkillMarkdown(`---\nname: bomb\ndescription: x\n${bomb.join("\n")}\n---\nb`);
+    expect(Array.isArray(expanded.metadata.d)).toBe(false);
+  });
 });
 
 describe("import", () => {

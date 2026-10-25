@@ -1,5 +1,5 @@
 /**
- * The app's design system for React Native (Componentes.dc.html, Mobile.html). Screens import only from
+ * The app's design system for React Native. Screens import only from
  * here: `import { Button, Card, Text, useTheme } from "@/ui"`.
  */
 export { AgentAvatar, type AgentAvatarProps } from "@/agent/AgentAvatar";
@@ -58,6 +58,7 @@ export {
   useScrollUnderPushedOptions,
 } from "./navigation";
 export { PressScale, type PressScaleProps } from "./PressScale";
+export { ProviderLogo, type ProviderLogoProps } from "./ProviderLogo";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";

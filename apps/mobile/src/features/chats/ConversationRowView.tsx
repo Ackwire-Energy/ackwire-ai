@@ -17,12 +17,12 @@ import type { AgentRowState } from "./now";
 const AVATAR = LIST_AVATAR;
 
 /**
- * One conversation in the list (MobileConversas.html, readable per MobileIntencional.html), in the shared
+ * One conversation in the list, in the shared
  * `ListRow`: the agent's living body (moving while it works), a person's face, or the tile of a channel;
  * the name and the time; the last line ("Nome: …", two lines). An agent's row says what matters instead
  * (`agent`): it waits on your ok (amber, "espera seu ok · PR #128"), it waits for its offline computer
- * (dozing, "Esperando o MacBook Air"), or what it is doing with the pixel orbit. Unread: bold name, darker time and preview, the count. Threads and missions (MobileRefinos.html
- * `trowApp`) add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
+ * (dozing, "Esperando o MacBook Air"), or what it is doing with the pixel orbit. Unread: bold name, darker time and preview, the count. Threads and missions
+ * add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
  * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
  * line of its last reply. `live`: the agent moves (the first rows only).
  */

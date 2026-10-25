@@ -22,4 +22,4 @@
 - One code path for every store; the org's bucket is just another config row.
 - Old files keep working after a switch without a migration; the migration is optional and safe to re-run.
 - The Postgres fallback keeps development free of external services, but is meant for small files only.
-- Self-host still needs a local-disk store (listed under "Pendências para o open source").
+- Self-host can also keep files on local disk (`FILES_DIR`).

@@ -4,13 +4,16 @@ import { StatusBar } from "expo-status-bar";
 import { keys, useApi } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
 import { Entering } from "@/features/auth/Entering";
 import { forgetInvite, loadPendingInvite } from "@/features/auth/invite";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
+import { suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
+import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
 import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
@@ -40,6 +43,7 @@ function Gate() {
   const navigationTheme = useNavigationTheme();
   const signedIn = session.signedIn;
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
+  const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => {});
@@ -64,17 +68,25 @@ function Gate() {
     // The native bars (headers, back button tint, interface style) read React Navigation's theme: ours.
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Protected guard={signedIn}>
-          <Stack.Screen name="(app)" />
-        </Stack.Protected>
-        <Stack.Protected guard={!signedIn}>
-          <Stack.Screen name="(auth)" />
-        </Stack.Protected>
-      </Stack>
+      {/* Under the suspended screen the app stays mounted, out of screen readers' reach. */}
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={suspended !== null}
+        importantForAccessibility={suspended ? "no-hide-descendants" : "auto"}
+      >
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack.Protected guard={signedIn}>
+            <Stack.Screen name="(app)" />
+          </Stack.Protected>
+          <Stack.Protected guard={!signedIn}>
+            <Stack.Screen name="(auth)" />
+          </Stack.Protected>
+        </Stack>
+      </View>
       {/* Signed in with no workspace yet: the first run (an invitation waiting is accepted instead). */}
       {ready && signedIn && org.none && !accepting ? <OnboardingFlow /> : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
+      {org.state && suspended ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
     </NavigationThemeProvider>
   );
 }

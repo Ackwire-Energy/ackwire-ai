@@ -44,6 +44,8 @@ export interface CommandScope {
   folders: string[];
   /** The person's home, for `~`. */
   home?: string;
+  /** The runner's own home wherever it is (`AGENTES_RUNNER_HOME`): its accounts, tokens and settings are secrets. */
+  runnerHome?: string;
 }
 
 type Word = { text: string; op?: undefined } | { text: string; op: "pipe" | "list" | "redirect" | "input" };
@@ -221,8 +223,25 @@ const insideOrTmp = (scope: CommandScope, p: string) => {
 };
 
 /**
- * Folders that hold keys and tokens, anywhere (the runner's own home too): nothing under them is read.
- * One list for the server's checks (`SECRET_PATH`) and Claude Code's own rules (`SECRET_READ_DENY_RULES`).
+ * System mode: where each agent's worker keeps its own secrets, git credentials and task journal
+ * (`<this>/<the agent's user>`). The agent's commands run as that user too, so only these rules keep its
+ * model from reading them.
+ */
+export const AGENT_WORKER_HOMES = "/var/lib/agentes-runner-agents";
+
+/**
+ * System mode's runner home (`install.sh --system`), and the state of the server's own computer
+ * (`agentes-runner host`): every organization's machine token is in it.
+ */
+export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
+
+/** In the person's home only: the native install (the app, its `.env`, its database). Agents' own folders have a `.agentes` of theirs. */
+const HOME_SECRET_DIRS = [".agentes"] as const;
+
+/**
+ * Folders that hold keys and tokens, anywhere (the runner's own home and its agents' workers' too): nothing
+ * under them is read. One list for the server's checks (`SECRET_PATH`) and Claude Code's own rules
+ * (`SECRET_READ_DENY_RULES`).
  */
 const SECRET_DIRS = [
   ".ssh",
@@ -235,10 +254,12 @@ const SECRET_DIRS = [
   ".password-store",
   "Keychains",
   ".agentes-runner",
+  path.basename(AGENT_WORKER_HOMES),
+  SYSTEM_RUNNER_HOME.slice(1),
   ".config/gh",
   ".config/gcloud",
 ] as const;
-/** Files that hold tokens, anywhere (a project's `.npmrc` or service account too). */
+/** Files that hold tokens, anywhere (a project's `.npmrc` or service account too; Claude Code's own sign-in). */
 const SECRET_FILES = [
   ".netrc",
   ".npmrc",
@@ -247,8 +268,14 @@ const SECRET_FILES = [
   ".pgpass",
   "credentials",
   "credentials.json",
+  ".credentials.json",
   "mcp-token",
 ] as const;
+/**
+ * Sign-ins by a name too common to refuse everywhere: Codex's own, and what an account folder
+ * (`accounts/<kind>/<id>`) holds (Codex's sign-in, a coding plan's key).
+ */
+const SECRET_SIGN_IN_FILES = [".codex/auth.json", "accounts/*/*/auth.json", "accounts/*/*/provider.json"] as const;
 /** Env files with values in them; `.env.example` and the like hold none (`SECRET_PATH` refuses every other `.env.*`). */
 const SECRET_ENV_FILES = [
   ".env",
@@ -280,21 +307,35 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
  * and the like, which hold none), the runner's own home.
  */
 const SECRET_PATH = new RegExp(
-  `(^|/)(${SECRET_DIRS.map(escapeRe).join("|")})(/|$)|(^|/)(${SECRET_FILES.map(escapeRe).join("|")}|\\.env(\\.(?!(example|sample|template|dist|defaults)$)[\\w.-]+)?|id_[a-z0-9]+(\\.pub)?|.*\\.pem|.*\\.key)$`,
+  `(^|/)(${SECRET_DIRS.map(escapeRe).join("|")})(/|$)|^~/(${HOME_SECRET_DIRS.map(escapeRe).join("|")})(/|$)|(^|/)(${SECRET_FILES.map(escapeRe).join("|")}|\\.env(\\.(?!(example|sample|template|dist|defaults)$)[\\w.-]+)?|id_[a-z0-9]+(\\.pub)?|.*\\.pem|.*\\.key)$|(^|/)(${SECRET_SIGN_IN_FILES.map((f) => escapeRe(f).replaceAll("\\*", "[^/]+")).join("|")})$`,
   "i",
 );
 
 function secretPath(scope: CommandScope, p: string) {
   const r = resolveIn(scope, p);
-  return r === null || SECRET_PATH.test(r) || SECRET_PATH.test(p);
+  const home = scope.home;
+  return (
+    r === null ||
+    SECRET_PATH.test(r) ||
+    SECRET_PATH.test(p) ||
+    (home !== undefined && HOME_SECRET_DIRS.some((d) => under(r, path.join(home, d)))) ||
+    (scope.runnerHome !== undefined && under(r, path.resolve(scope.runnerHome)))
+  );
 }
+
+/** A command that names the variables pointing at an account's sign-in, or holding a plan's key. */
+const SECRET_VARIABLE = /\$\{?(CLAUDE_CONFIG_DIR|CODEX_HOME|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY)\b/;
 
 /** A word of a line that can't be parsed plainly, without the quotes and substitution marks around it (`$(cat`, `x)`). */
 const bareWord = (w: string) => w.replace(/^[$('"`{]+|[)'"`};]+$/g, "");
 
-/** A path or pattern names a secret (resolved in the scope when there is one; a bare one is tested as written). */
+/**
+ * A path or pattern names a secret (resolved in the scope when there is one, if it can leave the folder it
+ * runs in; a bare one is tested as written).
+ */
 const namesSecret = (p: string, scope?: CommandScope) =>
-  SECRET_PATH.test(p) || (scope ? (p.startsWith("/") || p.startsWith("~") ? secretPath(scope, p) : false) : false);
+  SECRET_PATH.test(p) ||
+  (scope !== undefined && (p.startsWith("/") || p.startsWith("~") || p.includes("..")) && secretPath(scope, p));
 
 /** Claude Code's own tools that read files, and the arguments that say where (Grep's `pattern` is a search, not a path). */
 const FILE_READ_TOOLS: Record<string, readonly string[]> = {
@@ -321,6 +362,7 @@ export function secretRead(
   if (keys) return keys.some((k) => typeof i[k] === "string" && namesSecret(i[k] as string, scope));
   if (toolName !== "Bash") return false;
   const command = typeof i.command === "string" ? i.command : "";
+  if (SECRET_VARIABLE.test(command)) return true;
   const cmds = simpleCommands(command);
   if (cmds) {
     return cmds.some(
@@ -701,12 +743,7 @@ function readOnlySimple(s: Simple, scope: CommandScope, plan = false): boolean {
   if (s.writes.some((w) => !insideFolders(scope, w))) return false;
   if (s.reads.some((r) => secretPath(scope, r))) return false;
   // Nothing that reads a secret, wherever it is named.
-  const pathArgs = args.filter((a) => !a.startsWith("-"));
-  if (
-    pathArgs.some((a) => SECRET_PATH.test(a) || (a.startsWith("/") || a.startsWith("~") ? secretPath(scope, a) : false))
-  ) {
-    return false;
-  }
+  if (args.some((a) => !a.startsWith("-") && namesSecret(a, scope))) return false;
   if (READ_ANY.has(cmd)) return true;
   if (READ_WITH_FLAGS.has(cmd)) return !args.some((a) => (WRITE_FLAGS[cmd] as RegExp).test(a));
   switch (cmd) {
@@ -855,9 +892,10 @@ export const INLINE_CODE_DENY_RULES: readonly string[] = [
 ];
 
 /**
- * Credential stores in the person's home, named in a shell command: refused by
- * Claude Code itself even where a settings rule allows the command (`Bash(cat *)`
- * in a mission). Our own check is `secretRead`, which covers more.
+ * Credential stores in the person's home (and the system-mode workers' own), named
+ * in a shell command: refused by Claude Code itself even where a settings rule
+ * allows the command (`Bash(cat *)` in a mission). Our own check is `secretRead`,
+ * which covers more.
  */
 export const SECRET_BASH_DENY_RULES: readonly string[] = [
   ".ssh",
@@ -869,11 +907,15 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
   ".config/gh",
   ".config/gcloud",
   ".agentes-runner",
+  path.basename(AGENT_WORKER_HOMES),
+  SYSTEM_RUNNER_HOME.slice(1),
   ".git-credentials",
   ".netrc",
   ".pgpass",
   "Library/Keychains",
-].flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`]);
+]
+  .flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`])
+  .concat(HOME_SECRET_DIRS.map((p) => `Bash(*~/${p}*)`));
 
 /**
  * The same secrets for Claude Code's own read tools (Read, and best effort Glob and Grep), from the
@@ -882,8 +924,12 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
  */
 export const SECRET_READ_DENY_RULES: readonly string[] = [
   ...SECRET_DIRS.flatMap((p) => [`Read(~/${p}/**)`, `Read(**/${p}/**)`]),
+  ...HOME_SECRET_DIRS.map((p) => `Read(~/${p}/**)`),
   "Read(~/Library/Keychains/**)",
-  ...[...SECRET_FILES, ...SECRET_ENV_FILES, ...SECRET_KEY_FILES].flatMap((p) => [`Read(~/${p})`, `Read(**/${p})`]),
+  ...[...SECRET_FILES, ...SECRET_ENV_FILES, ...SECRET_KEY_FILES, ...SECRET_SIGN_IN_FILES].flatMap((p) => [
+    `Read(~/${p})`,
+    `Read(**/${p})`,
+  ]),
 ];
 
 /** Global options of git before its subcommand that take a value (`git -C <dir> push`, `git -c k=v push`). */
