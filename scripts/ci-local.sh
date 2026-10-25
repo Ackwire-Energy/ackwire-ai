@@ -5,7 +5,7 @@
 # Usage: bun run ci:local
 set -u
 cd "$(dirname "$0")/.." || exit 2
-log=$(mktemp -t agentes-ci-local.XXXXXX)
+log=$(mktemp "${TMPDIR:-/tmp}/agentes-ci-local.XXXXXX")
 export CI=true
 results=()
 failed=0
