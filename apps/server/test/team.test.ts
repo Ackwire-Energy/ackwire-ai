@@ -25,7 +25,7 @@ test("team: agents with what they can do and who is busy, their people, and who 
         name: "Infra",
         handle: "infra",
         role: "Ops",
-        instructions: "Cuida do deploy e dos servidores. Responde rápido.",
+        instructions: "# Infra\n\n- **Cuida** do deploy e dos _servidores_. Responde rápido.",
         credentialId,
       },
     })
@@ -72,7 +72,8 @@ test("team: agents with what they can do and who is busy, their people, and who 
   const inf = team.agents.find((a) => a.id === infra.id);
   expect(dev?.busy).toBe(true);
   expect(inf?.busy).toBe(false);
-  // What it does: the first sentence of its instructions, never its role (the card shows that by its name).
+  // What it does: the first sentence of its instructions in plain words (past Markdown's heading, list and
+  // emphasis marks), never its role (the card shows that by its name).
   expect(inf?.summary).toBe("Cuida do deploy e dos servidores.");
   expect(dev?.summary).toBe("");
   expect(inf?.capabilities).toContain("drive");
