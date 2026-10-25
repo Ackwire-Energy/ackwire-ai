@@ -1,4 +1,5 @@
 import { CLOUD_SERVER } from "../lib/server";
+import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
@@ -98,6 +99,7 @@ import type {
   MoveAgentsResult,
   NotificationCount,
   NotificationPage,
+  OpenConsult,
   Organization,
   OrgOverview,
   OrgPlanUsage,
@@ -411,10 +413,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       activeRuns: async (orgId, channelId) => {
         const askedAt = Date.now();
         const res = await nullOn(404, () =>
-          request<{ runs: ActiveRun[] }>(`${org(orgId)}/channels/${enc(channelId)}/active-runs`),
+          request<{ runs: ActiveRun[]; consults?: OpenConsult[] }>(
+            `${org(orgId)}/channels/${enc(channelId)}/active-runs`,
+          ),
         );
         // What the agents working here haven't read yet ("lê na próxima pausa" after a reload).
         if (res) steerStore.reconcile(channelId, res.runs, askedAt);
+        // Questions agents asked from here still out ("Theo está perguntando à Ada…" after a reload).
+        if (res?.consults) consultSeeds.publish(channelId, res.consults, askedAt);
         return res ? res.runs : null;
       },
       usage: async (orgId) => {

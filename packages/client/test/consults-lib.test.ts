@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ChannelEvent } from "../src/api/types";
-import { applyConsultEvent, type ConsultsState, consultsIn } from "../src/realtime/consults";
+import { applyConsultEvent, type ConsultsState, consultsIn, reconcileConsults } from "../src/realtime/consults";
 
 type Ev = Parameters<typeof applyConsultEvent>[1];
 const at = 1_000;
@@ -56,5 +56,36 @@ describe("live consultations", () => {
     const back = apply([asked("r1"), answered("r1")]);
     const delta = { type: "agent.delta", channelId: "c1", threadId: "t1", runId: "r9", agentId: "lisa" } as Ev;
     expect(consultsIn(applyConsultEvent(back, delta, at), "c1", at)).toHaveLength(1);
+  });
+});
+
+describe("questions still out, from the server (load, reconnect)", () => {
+  const open = (runId: string, since = "2026-10-25T12:00:00.000Z") => ({
+    runId,
+    agentId: "theo",
+    consultedAgentId: "ada",
+    channelId: "c1",
+    threadId: "t1",
+    since,
+  });
+
+  test("after a reload the line comes back with its real clock", () => {
+    const s = reconcileConsults({}, "c1", [open("r1")], at, at);
+    expect(consultsIn(s, "c1", at)).toEqual([
+      expect.objectContaining({ runId: "r1", status: "asking", since: Date.parse("2026-10-25T12:00:00.000Z") }),
+    ]);
+  });
+
+  test("a line the server no longer has (answered while away) goes; one heard after the request stays", () => {
+    const s = apply([asked("r1")]);
+    expect(reconcileConsults(s, "c1", [], at + 1, at + 2)).toEqual({});
+    expect(reconcileConsults(s, "c1", [], at, at + 2).r1?.status).toBe("asking");
+    // Another channel's lines are left alone.
+    expect(reconcileConsults(s, "c2", [], at + 1, at + 2).r1?.status).toBe("asking");
+  });
+
+  test("an answer heard live is not turned back into a question", () => {
+    const s = apply([asked("r1"), answered("r1")]);
+    expect(reconcileConsults(s, "c1", [open("r1")], at + 1, at + 2).r1?.status).toBe("answered");
   });
 });
