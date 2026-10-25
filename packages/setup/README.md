@@ -43,7 +43,7 @@ removes the old one's container.
 8. **Start:** downloads `docker-compose.yml` when the directory has none, runs `docker compose up -d`,
    waits for Tailscale, the HTTPS certificate and `/api/health`, writes `PUBLIC_URL` from the
    address Tailscale gives the server, and sets up the agents' computer.
-9. **The end:** the address, the link that opens the agentes.chat phone app on it with its QR code
+9. **The end:** the address, the link that opens the agentes.chat phone or desktop app on it with its QR code
    (for an https address), and what to do next.
 
 ## For scripts and AI agents

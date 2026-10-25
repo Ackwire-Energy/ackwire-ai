@@ -72,7 +72,14 @@ import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { SharePlanDialog } from "@/components/ai/SharePlanDialog";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
-import { OpenPrefsButton, ReconnectThisMacButton, ThisMacButton, useIsThisMac, useThisMac } from "@/components/ThisMac";
+import {
+  OpenPrefsButton,
+  ReconnectThisMacButton,
+  ThisMacButton,
+  useAgentsHere,
+  useIsThisMac,
+  useThisMac,
+} from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
@@ -1096,9 +1103,11 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   // browser) and when, never what the cloud computer lacks.
   const workspace = cloud === "workspace" ? noComputer.setup : null;
   const [choice, setChoice] = useState(work.machineId);
-  // In agentes for Mac, this Mac not yet in the organization: connect it from here and pick it (ADR 0036).
+  // In the desktop app, this computer not yet in the organization (where agents may work on it): connect it
+  // from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
-  const thisMacFree = inDesktopApp() && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
+  const agentsHere = useAgentsHere();
+  const thisMacFree = agentsHere && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
   const [busy, setBusy] = useState(false);
   const view = work.brain.data;
   const brain = view?.brain ?? "model";

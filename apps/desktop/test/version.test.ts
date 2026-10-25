@@ -6,6 +6,7 @@ import {
   latestUrl,
   noteLines,
   parseLatest,
+  targetParam,
   updateStateOf,
 } from "../src/control/version";
 
@@ -29,10 +30,15 @@ describe("compareVersions", () => {
 });
 
 describe("latest release", () => {
-  test("URL with Node-style arch names", () => {
+  test("the URL names the platform and the architecture as the server reads them", () => {
     expect(archParam("aarch64")).toBe("arm64");
     expect(archParam("x86_64")).toBe("x64");
-    expect(latestUrl("aarch64")).toBe("https://agentes.chat/api/desktop/latest?target=darwin&arch=arm64");
+    expect(targetParam("macos")).toBe("darwin");
+    expect(targetParam("windows")).toBe("windows");
+    expect(targetParam("linux")).toBe("linux");
+    expect(latestUrl("macos", "aarch64")).toBe("https://agentes.chat/api/desktop/latest?target=darwin&arch=arm64");
+    expect(latestUrl("windows", "x86_64")).toBe("https://agentes.chat/api/desktop/latest?target=windows&arch=x64");
+    expect(latestUrl("linux", "x86_64")).toBe("https://agentes.chat/api/desktop/latest?target=linux&arch=x64");
   });
   test("parses the endpoint and refuses downloads off our site", () => {
     const ok = parseLatest({

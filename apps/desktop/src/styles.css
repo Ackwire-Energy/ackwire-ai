@@ -620,8 +620,8 @@ body[data-window="popover"] {
   border-top: 1px solid var(--line);
 }
 
-/* ---------- Welcome (first run, add organization) ---------- */
-.dk-wel {
+/* ---------- First run (FirstRun.tsx): agentes.chat big, your own server small ---------- */
+.dk-fr {
   position: relative;
   isolation: isolate;
   height: 100%;
@@ -629,34 +629,457 @@ body[data-window="popover"] {
   flex-direction: column;
   background: var(--bg);
 }
-.dk-wel__body {
+.dk-fr__body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 28px 44px 24px;
+  padding: 26px 48px 28px;
   display: flex;
   flex-direction: column;
   animation: dk-fade-up 0.3s var(--out) both;
 }
-.dk-wel__body h1 {
+.dk-fr__body h1 {
   font-family: var(--font-display);
   font-weight: 300;
-  font-size: 36px;
+  font-size: 34px;
   letter-spacing: -0.03em;
-  line-height: 1.05;
-  max-width: 20ch;
+  line-height: 1.08;
+  max-width: 28ch;
+  text-wrap: balance;
 }
-.dk-wel__foot {
-  border-top: 1px solid var(--line);
+.dk-fr__hello {
+  flex: 1;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding-bottom: 92px;
+}
+.dk-fr__hello .dk-lead {
+  max-width: 44ch;
+}
+.dk-fr__mark {
+  margin-bottom: 18px;
+}
+.dk-fr__cloud {
+  margin: 28px 0 12px;
+  min-width: 320px;
+  justify-content: center;
+}
+.dk-fr__own {
+  all: unset;
+  cursor: pointer;
+  position: absolute;
+  left: 24px;
+  bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+.dk-fr__own:hover {
+  color: var(--ink);
+}
+.dk-fr__own:focus-visible,
+.dk-fr__back:focus-visible,
+.dk-fr__card:focus-visible {
+  outline: 2px solid var(--agent2);
+  outline-offset: 2px;
+}
+.dk-fr__back {
+  all: unset;
+  cursor: pointer;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 18px -6px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.dk-fr__back:hover {
+  color: var(--ink);
+}
+.dk-fr__cards {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.dk-fr__card {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 40px 18px 18px;
+  min-height: 150px;
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  transition: box-shadow 0.15s;
+}
+.dk-fr__card:hover {
+  box-shadow: var(--e2), var(--top);
+}
+.dk-fr__card b {
+  font-weight: 650;
+  font-size: 15px;
+}
+.dk-fr__card small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.dk-fr__card[data-later] b,
+.dk-fr__card[data-later] .dk-fr__card-art {
+  opacity: 0.7;
+}
+.dk-fr__card-art {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+  color: var(--ink2);
+}
+.dk-fr__card-go {
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  color: var(--faint);
+}
+.dk-fr__form {
+  margin-top: 24px;
+  display: flex;
+  gap: 8px;
+  max-width: 560px;
+}
+.dk-fr__form .ac-input {
+  flex: 1;
+}
+.dk-fr__problem {
+  margin-top: 12px;
+  max-width: 560px;
+}
+.dk-fr__looking {
+  margin-top: 20px;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  padding: 14px 44px 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.dk-fr__found {
+  margin-top: 20px;
+  max-width: 560px;
+}
+.dk-fr__foundrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 4px;
+}
+.dk-fr__foundrow + .dk-fr__foundrow {
+  border-top: 1px solid var(--line);
+}
+.dk-fr__foundtext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dk-fr__foundtext b {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.dk-fr__foundtext small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.dk-fr__none {
+  margin-top: auto;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 560px;
+}
+.dk-fr__none h2 {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+.dk-fr__cmd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.dk-fr__cmd code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.dk-fr__word {
+  white-space: nowrap;
+}
+/* A command under a line of text (Tailscale's, on Linux). */
+.dk-honest .dk-fr__cmd {
+  margin-top: 6px;
+}
+/* A short command inside a line of text, with its copy button. */
+.dk-fr__cmd--inline {
+  display: inline-flex;
+  vertical-align: middle;
+  gap: 2px;
+  padding: 0 0 0 8px;
+  border-radius: 8px;
+}
+.dk-fr__cmd--inline code {
   flex: none;
 }
-.dk-foot__note {
-  margin-right: auto;
+.dk-fr__cmd--inline .dk-iconbtn {
+  width: 24px;
+  height: 22px;
+}
+.dk-fr__ways {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 600px;
+}
+.dk-fr__ways li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.dk-fr__ways li > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dk-fr__num {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px 8px 8px 3px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-dot);
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--plate);
+}
+.dk-fr__end {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+.dk-fr__sheet {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+.dk-fr__server {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.dk-fr__host {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.dk-fr__question {
+  font-size: 16px;
+  font-weight: 600;
+  max-width: 44ch;
+}
+.dk-fr__checking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dk-fr__sheet .dk-fr__problem {
+  margin: 0;
+  max-width: 48ch;
+  text-align: left;
+}
+.dk-fr__acts {
+  margin-top: 18px;
+  display: flex;
+  gap: 8px;
+}
+/* Run agentes.chat here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
+   longer), and two fields side by side. */
+.dk-fr__body h1.dk-fr__h1sm {
+  font-size: 28px;
+  max-width: none;
+}
+.dk-fr__here {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 600px;
+}
+.dk-fr__who {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dk-fr__body .dk-fr__wide {
+  max-width: 66ch;
+}
+.dk-fr__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Start stays in view when the form is taller than the window: it sticks to the bottom edge. */
+.dk-fr__here .dk-fr__end {
+  position: sticky;
+  /* The scroller's own bottom padding (28px) counts: the bar meets the window's edge. */
+  bottom: -28px;
+  margin: 0 -48px -28px;
+  padding: 10px 48px 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg) 10px);
+}
+/* After a short screen's text, not at the window's bottom. */
+.dk-fr__end[data-near] {
+  margin-top: 24px;
+  max-width: 600px;
+}
+/* Run here's steps as they run. */
+.dk-fr__steps {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 600px;
+}
+.dk-fr__steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.dk-fr__steps li[data-state="todo"] {
+  color: var(--faint);
+}
+.dk-fr__stepmark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+.dk-fr__steps li[data-state="done"] .dk-fr__stepmark {
+  color: var(--ok);
+}
+.dk-fr__steps li[data-state="failed"] .dk-fr__stepmark {
+  color: var(--danger);
+}
+.dk-fr__steps li[data-state="warn"] .dk-fr__stepmark {
+  color: var(--warn);
+}
+.dk-fr__stepdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.dk-fr__steptext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dk-fr__stepname {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.dk-fr__stepname b {
+  font-weight: 600;
+  font-size: 14px;
+}
+.dk-fr__stepname small {
+  color: var(--faint);
+  font-size: 12px;
+}
+.dk-fr__stepfail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dk-fr__stepacts {
+  display: flex;
+  gap: 8px;
+}
+.dk-fr__steps .dk-fr__problem {
+  margin: 0;
+}
+.dk-fr__bar {
+  margin-top: 28px;
+  height: 6px;
+  max-width: 600px;
+  border-radius: 3px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.dk-fr__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--agent2);
+  transition: width 0.4s var(--out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dk-fr__bar span {
+    transition: none;
+  }
 }
 .dk-wel__horizon {
   position: absolute;
@@ -673,63 +1096,8 @@ body[data-window="popover"] {
   height: 100%;
   display: block;
 }
-.dk-steps {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 22px;
-}
-.dk-steps i {
-  height: 4px;
-  flex: 1;
-  max-width: 48px;
-  border-radius: 999px;
-  background: var(--line2);
-  transition: background 0.3s;
-}
-.dk-steps i[data-on] {
-  background: var(--ink);
-}
-.dk-hello {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  padding-bottom: 80px;
-}
-.dk-hello__mark {
-  margin-bottom: 18px;
-  margin-left: -8px;
-}
-/* The "Pronto" step: this Mac's portrait above the title. */
-.dk-done__mark {
-  margin: -6px 0 10px -6px;
-}
-.dk-hello__acts {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: 26px;
-}
-/* "Servidor: agentes.chat · Trocar", and the "Seu servidor" screen's one field and its answer. */
-.dk-server-line {
-  margin-top: 18px;
-}
-.dk-server-form {
-  margin-top: 26px;
-  max-width: 420px;
-}
-.dk-server-form .ac-input {
-  width: 100%;
-}
-.dk-server-error {
-  margin-top: 12px;
-  max-width: 420px;
-}
-.dk-codebox {
-  margin-top: 26px;
-}
+
+/* A sign-in code (Preferences > Tools, "Add account"): big, in Doto. */
 .dk-code {
   display: inline-flex;
   align-items: baseline;
@@ -746,8 +1114,7 @@ body[data-window="popover"] {
   -webkit-user-select: text;
   user-select: text;
 }
-.dk-code__dot,
-.dk-code--empty {
+.dk-code__dot {
   color: var(--faint);
 }
 .dk-waitline {
@@ -759,7 +1126,6 @@ body[data-window="popover"] {
   font-weight: 600;
   color: var(--muted);
 }
-/* "Adicionar conta" (Preferências > Ferramentas): the waiting line and Codex's code inside a dialog. */
 .dk-acct-wait {
   margin-top: 4px;
 }
@@ -779,130 +1145,40 @@ body[data-window="popover"] {
 .dk-acct-who b {
   color: var(--ink);
 }
-.dk-fail {
-  margin-top: 22px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.dk-picklist {
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  padding: 6px;
-  max-width: 560px;
-}
-.dk-pick {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 14px;
-}
-.dk-pick--add {
-  cursor: pointer;
-}
-.dk-pick--add:hover,
-.dk-pick--add:focus-visible {
-  background: var(--plate);
-}
-.dk-pick__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.dk-pick__text b {
-  font-weight: 600;
-}
-.dk-under {
-  margin-top: 10px;
-}
-.dk-picklist--tools {
-  padding: 2px 4px;
-}
-.dk-tl {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-}
-.dk-tl + .dk-tl {
-  border-top: 1px solid var(--line);
-}
-.dk-tl__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.dk-tl__text b {
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.dk-tl__text small {
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.dk-tl .ac-switch {
-  margin-top: 4px;
-}
-.dk-mini {
-  position: relative;
-  margin-top: 22px;
-  width: min(420px, 100%);
-  height: 96px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.dk-mini__bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--raised);
-  box-shadow: 0 1px 0 var(--line);
-}
-.dk-mini__icon {
-  display: inline-flex;
-  padding: 3px 6px;
-  border-radius: 6px;
-  background: var(--plate);
-}
-.dk-mini__arrow {
-  position: absolute;
-  top: 34px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink2);
-}
 
 /* ---------- Preferences ---------- */
+/* "This Mac" over its tabs in the sidebar. */
+.dk-pnav__group {
+  margin: 14px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+/* The action under a card ("Add a server…"). */
+.dk-under-card {
+  margin-top: 12px;
+}
+/* The server here: Restart and Stop under its card, "Stop running it here…" at the far end. */
+.dk-here__acts {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dk-here__end {
+  margin-left: auto;
+}
+/* Its card on top of the popover. */
+.dk-here__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.dk-here__more {
+  margin-top: 0;
+}
+
 .dk-prefs {
   height: 100%;
   display: grid;

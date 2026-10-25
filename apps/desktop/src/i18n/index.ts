@@ -1,8 +1,9 @@
 import { resources as shared } from "@agenteschat/i18n";
 import i18next, { type i18n as I18n } from "i18next";
 import { initReactI18next } from "react-i18next";
+import type { Platform } from "../control/platform";
 import { desktopEn } from "./keys.en";
-import { desktopPtBR } from "./keys.pt-BR";
+import { type DesktopTranslations, desktopPtBR } from "./keys.pt-BR";
 
 /** pt-BR is the default, English the alternative (same as the web and the phone). */
 export type AppLocale = "pt-BR" | "en";
@@ -40,13 +41,18 @@ export function systemLocale(): AppLocale {
   return pickLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
 }
 
-export function createDesktopI18n(lng: AppLocale = systemLocale()): I18n {
+/** This computer's name in `lng` ("Mac", "PC", "computador"). */
+export const deviceName = (lng: AppLocale, platform: Platform) =>
+  (DESKTOP_STRINGS[lng] as DesktopTranslations).device[platform];
+
+/** `{{device}}` is filled in for every string, so callers never pass it. */
+export function createDesktopI18n(lng: AppLocale = systemLocale(), platform: Platform = "mac"): I18n {
   const instance = i18next.createInstance();
   void instance.use(initReactI18next).init({
     resources: withDesktopKeys(shared),
     lng,
     fallbackLng: DEFAULT_LOCALE,
-    interpolation: { escapeValue: false },
+    interpolation: { escapeValue: false, defaultVariables: { device: deviceName(lng, platform) } },
     initAsync: false,
     returnNull: false,
   });

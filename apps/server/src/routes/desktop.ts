@@ -8,11 +8,10 @@ const tags = ["Desktop app"];
 /**
  * Where desktop builds live (ADR 0036 §9): GitHub Releases of a private
  * repository, read with a fine-grained token. Convention (the desktop CI
- * follows it): tag `desktop-v<semver>`; assets `agentes_<version>_universal.dmg`
- * and `agentes_<version>_universal.dmg.sha256`; an optional line
+ * follows it): tag `desktop-v<semver>`; per platform a download with its
+ * `.sha256` and an updater bundle with its minisign signature `.sig` (Tauri
+ * updater), named as `desktopAssets` says; an optional line
  * `min-version: x.y.z` in the release body (the rest of the body is the notes).
- * Signed builds also carry the updater bundle `agentes_<version>_universal.app.tar.gz`
- * and its minisign signature `….app.tar.gz.sig` (Tauri updater).
  */
 export const DESKTOP_TAG_PREFIX = "desktop-v";
 const LATEST_TTL_MS = 5 * 60_000;
@@ -51,6 +50,34 @@ interface GitHubRelease {
 export const dmgName = (version: string) => `agentes_${version}_universal.dmg`;
 export const updaterName = (version: string) => `agentes_${version}_universal.app.tar.gz`;
 
+/** The platforms the app is built for, as the Tauri updater names them (`{{target}}`). */
+export type DesktopTarget = "darwin" | "windows" | "linux";
+
+/**
+ * A platform's files in a release: what a person downloads, and what the app's updater installs. Windows'
+ * installer is its own updater bundle; on Linux the deb is the download (a deb updates by downloading again)
+ * and the AppImage updates itself.
+ */
+export function desktopAssets(target: DesktopTarget, version: string): { download: string; updater: string } {
+  if (target === "windows")
+    return { download: `agentes_${version}_x64-setup.exe`, updater: `agentes_${version}_x64-setup.exe` };
+  if (target === "linux")
+    return { download: `agentes_${version}_amd64.deb`, updater: `agentes_${version}_amd64.AppImage` };
+  return { download: dmgName(version), updater: updaterName(version) };
+}
+
+/** Mac architectures, as Rust (`aarch64`, `x86_64`) and Node (`arm64`, `x64`) name them. */
+const MAC_ARCHES = new Set(["aarch64", "arm64", "x86_64", "x64"]);
+/** Windows and Linux builds are x64 only for now. */
+const X64 = new Set(["x86_64", "x64"]);
+
+/** The query's platform when there is a build for it (one universal Mac build; x64 elsewhere). */
+export function desktopTarget(target: string | undefined, arch: string | undefined): DesktopTarget | null {
+  if (target === "darwin") return !arch || MAC_ARCHES.has(arch) ? "darwin" : null;
+  if (target === "windows" || target === "linux") return !arch || X64.has(arch) ? target : null;
+  return null;
+}
+
 /** `min-version: x.y.z` out of a release body, and the notes without that line. */
 export function parseReleaseBody(body: string | null | undefined): { notes: string; minVersion?: string } {
   let minVersion: string | undefined;
@@ -85,13 +112,21 @@ interface ReleaseFiles {
 
 /**
  * Reads one kind of release, by tag prefix (`desktop-v*`, or `v*` for the server), with the token
- * (`fetch` injectable: tests use a fake GitHub). The newest one, as `read` makes it, is cached 5
- * minutes per process.
+ * (`fetch` injectable: tests use a fake GitHub). The newest one with what `key` needs (`has`: a
+ * release may lack a platform), as `read` makes it, is cached 5 minutes per process and key; the
+ * release list too, once for every key.
  */
-function releaseReader<T>(options: ReleaseSource & { prefix: string; read: (r: ReleaseFiles) => Promise<T | null> }) {
+function releaseReader<T, K extends string>(
+  options: ReleaseSource & {
+    prefix: string;
+    has?: (assets: GitHubAsset[], version: string, key: K) => boolean;
+    read: (r: ReleaseFiles, key: K) => Promise<T | null>;
+  },
+) {
   const http = options.fetch ?? fetch;
   const now = options.now ?? Date.now;
-  let latest: { at: number; value: T | null } | null = null;
+  const latest = new Map<K, { at: number; value: T | null }>();
+  let list: { at: number; value: GitHubRelease[] } | null = null;
   const headers = () => ({
     authorization: `Bearer ${options.token}`,
     accept: "application/vnd.github+json",
@@ -120,23 +155,33 @@ function releaseReader<T>(options: ReleaseSource & { prefix: string; read: (r: R
   const versionOf = (tag: string) => tag.slice(options.prefix.length);
   const ours = (r: GitHubRelease) => r.tag_name.startsWith(options.prefix) && SEMVER.test(versionOf(r.tag_name));
 
-  async function readLatest(): Promise<T | null> {
-    const releases = await getJson<GitHubRelease[]>(`/repos/${options.repo}/releases?per_page=30`);
-    const release = (releases ?? []).find((r) => !r.draft && !r.prerelease && ours(r));
+  async function releaseList(): Promise<GitHubRelease[]> {
+    if (list && now() - list.at < LATEST_TTL_MS) return list.value;
+    const value = (await getJson<GitHubRelease[]>(`/repos/${options.repo}/releases?per_page=30`)) ?? [];
+    list = { at: now(), value };
+    return value;
+  }
+
+  async function readLatest(key: K): Promise<T | null> {
+    const release = (await releaseList()).find(
+      (r) =>
+        !r.draft && !r.prerelease && ours(r) && (options.has?.(r.assets ?? [], versionOf(r.tag_name), key) ?? true),
+    );
     if (!release) return null;
     const text = async (asset: GitHubAsset) => (await assetResponse(asset)).text();
-    return options.read({ release, version: versionOf(release.tag_name), assets: release.assets ?? [], text });
+    return options.read({ release, version: versionOf(release.tag_name), assets: release.assets ?? [], text }, key);
   }
 
   return {
     enabled: Boolean(options.token),
 
-    /** The newest published release of this kind, as `read` makes it; null when there is none. */
-    async latest(): Promise<T | null> {
+    /** The newest published release of this kind with what `key` needs, as `read` makes it; null when there is none. */
+    async latest(key: K): Promise<T | null> {
       if (!options.token) return null;
-      if (latest && now() - latest.at < LATEST_TTL_MS) return latest.value;
-      const value = await readLatest();
-      latest = { at: now(), value };
+      const cached = latest.get(key);
+      if (cached && now() - cached.at < LATEST_TTL_MS) return cached.value;
+      const value = await readLatest(key);
+      latest.set(key, { at: now(), value });
       return value;
     },
 
@@ -155,25 +200,30 @@ function releaseReader<T>(options: ReleaseSource & { prefix: string; read: (r: R
   };
 }
 
-/** The newest `desktop-v*` release with its `.dmg` and checksum (and the updater bundle, when signed). */
+/**
+ * The newest `desktop-v*` release with a platform's download and checksum (and the updater bundle, when
+ * signed): a release may lack a platform, which then keeps the newest one that has it.
+ */
 export function createDesktopReleases(options: ReleaseSource & { publicUrl: string }) {
   const base = options.publicUrl.replace(/\/+$/, "");
-  return releaseReader<DesktopRelease>({
+  return releaseReader<DesktopRelease, DesktopTarget>({
     ...options,
     prefix: DESKTOP_TAG_PREFIX,
-    read: async ({ release, version, assets, text }) => {
-      const dmg = assets.find((a) => a.name === dmgName(version));
-      if (!dmg) return null;
-      const sumAsset = assets.find((a) => a.name === `${dmgName(version)}.sha256`);
+    has: (assets, version, target) => assets.some((a) => a.name === desktopAssets(target, version).download),
+    read: async ({ release, version, assets, text }, target) => {
+      const names = desktopAssets(target, version);
+      const file = assets.find((a) => a.name === names.download);
+      if (!file) return null;
+      const sumAsset = assets.find((a) => a.name === `${names.download}.sha256`);
       const sha256 = sumAsset ? parseSha256(await text(sumAsset)) : null;
       if (!sha256) return null;
       const { notes, minVersion } = parseReleaseBody(release.body);
-      const bundle = assets.find((a) => a.name === updaterName(version));
-      const sigAsset = assets.find((a) => a.name === `${updaterName(version)}.sig`);
+      const bundle = assets.find((a) => a.name === names.updater);
+      const sigAsset = assets.find((a) => a.name === `${names.updater}.sig`);
       const signature = bundle && sigAsset ? (await text(sigAsset)).trim() : "";
       return {
         version,
-        url: `${base}/api/desktop/download/${version}/${dmg.name}`,
+        url: `${base}/api/desktop/download/${version}/${file.name}`,
         sha256,
         notes,
         publishedAt: release.published_at ?? release.created_at ?? "",
@@ -203,7 +253,7 @@ export interface NativeRelease {
 }
 
 export function createNativeReleases(options: ReleaseSource) {
-  return releaseReader<NativeRelease>({
+  const reader = releaseReader<NativeRelease, "native">({
     ...options,
     prefix: NATIVE_TAG_PREFIX,
     read: async ({ version, assets, text }) => {
@@ -213,21 +263,20 @@ export function createNativeReleases(options: ReleaseSource) {
       return { version, manifest: await text(manifest), signature: (await text(signature)).trim() };
     },
   });
+  return { ...reader, latest: () => reader.latest("native") };
 }
 
 export type DesktopReleases = ReturnType<typeof createDesktopReleases>;
 export type NativeReleases = ReturnType<typeof createNativeReleases>;
 
 /** Light limits: the app checks every 6 hours; downloads are people clicking. */
-/** Mac architectures, as Rust (`aarch64`, `x86_64`) and Node (`arm64`, `x64`) name them. */
-const MAC_ARCHES = new Set(["aarch64", "arm64", "x86_64", "x64"]);
 const LATEST_LIMIT = { limit: 60, windowMs: 60_000 };
 const DOWNLOAD_LIMIT = { limit: 20, windowMs: 60_000 };
 
 const Latest = z
   .object({
     version: z.string().openapi({ example: "0.1.0" }),
-    url: z.string().openapi({ description: "Our download URL for the `.dmg` (opens in the browser)." }),
+    url: z.string().openapi({ description: "Our download URL for the platform's file (opens in the browser)." }),
     sha256: z.string(),
     notes: z.string(),
     publishedAt: z.string(),
@@ -264,7 +313,7 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       summary: "The newest desktop app build (notes, download link, minimum version)",
       request: {
         query: z.object({
-          target: z.string().max(20).openapi({ example: "darwin" }),
+          target: z.string().max(20).openapi({ example: "darwin", description: "darwin, windows or linux" }),
           arch: z.string().max(20).optional().openapi({ example: "arm64", description: "arm64 or x64" }),
         }),
       },
@@ -278,9 +327,9 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
       const limit = await rateLimiter.consume(`desktop-latest:${requestIp(c.req.raw.headers)}`, LATEST_LIMIT);
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
       const { target, arch } = c.req.valid("query");
-      // One universal build for both Mac architectures (Rust and Node names alike).
-      const known = target === "darwin" && (!arch || MAC_ARCHES.has(arch));
-      const release = known ? await releases.latest().catch(() => null) : null;
+      // One universal build for both Mac architectures (Rust and Node names alike); x64 on Windows and Linux.
+      const platform = desktopTarget(target, arch);
+      const release = platform ? await releases.latest(platform).catch(() => null) : null;
       if (!release) return apiError(c, 404, "desktop.no_release", "No desktop build for this computer yet");
       const { updater: _, ...latest } = release;
       return c.json(latest, 200);
@@ -292,9 +341,11 @@ export function registerDesktopRoutes(api: OpenAPIHono, deps: AppDeps, releases:
   api.get("/desktop/update", async (c) => {
     const limit = await rateLimiter.consume(`desktop-update:${requestIp(c.req.raw.headers)}`, LATEST_LIMIT);
     if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again in a minute");
-    const arch = c.req.query("arch");
-    const known = c.req.query("target") === "darwin" && (!arch || MAC_ARCHES.has(arch));
-    const release = known ? await releases.latest().catch(() => null) : null;
+    const platform = desktopTarget(c.req.query("target"), c.req.query("arch"));
+    // On Linux the updater bundle is the AppImage, which only an AppImage install takes in place: a deb (or an
+    // app that doesn't say which it is, `bundle`) updates by downloading again, from `/desktop/latest`'s link.
+    if (platform === "linux" && c.req.query("bundle") !== "appimage") return c.body(null, 204);
+    const release = platform ? await releases.latest(platform).catch(() => null) : null;
     if (!release?.updater) return c.body(null, 204);
     return c.json(
       {

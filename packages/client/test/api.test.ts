@@ -382,6 +382,24 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     ]);
   });
 
+  test("the desktop app's newest build: the server's own, else agentes.chat's, asked without the cookie", async () => {
+    const release = {
+      version: "0.6.0",
+      url: "https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_x64-setup.exe",
+      sha256: "ab",
+      publishedAt: "t",
+    };
+    const { fetch, calls } = fakeFetch({
+      "GET https://agentes.chat/api/desktop/latest?target=windows&arch=x64": { status: 200, body: release },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.machines.desktopLatest("windows", "x64")).toEqual(release);
+    expect(calls.map((c) => [c.url, c.init.credentials])).toEqual([
+      ["/api/desktop/latest?target=windows&arch=x64", "same-origin"],
+      ["https://agentes.chat/api/desktop/latest?target=windows&arch=x64", "omit"],
+    ]);
+  });
+
   test("connected computers: list, rename, remove, and the agent's target", async () => {
     const machine = { id: "m1", name: "Escritório", online: true };
     const { fetch, calls } = fakeFetch({

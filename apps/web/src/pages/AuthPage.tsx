@@ -12,7 +12,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
-import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH } from "@/lib/desktop";
+import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH, thisMac } from "@/lib/desktop";
 
 /**
  * Sign in and sign up in one flow: the e-mail
@@ -20,7 +20,9 @@ import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PAT
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.
  * In the Mac app, Google/GitHub/Apple open in the browser and the window
- * waits for the sign-in to come back ("browser", ADR 0036).
+ * waits for the sign-in to come back ("browser", ADR 0036). On the server the
+ * app runs on this computer, its owner has no password: "Continue on this Mac"
+ * asks the app, which signs them in (ADR 0060 §6).
  */
 type Step =
   | "email"
@@ -103,6 +105,27 @@ export function AuthPage({
   const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
     null,
   );
+  // This server runs inside the app here: the app signs its owner in.
+  const [local, setLocal] = useState(false);
+  const [ownerPending, setOwnerPending] = useState(false);
+  useEffect(() => {
+    if (!desktop) return;
+    void thisMac
+      .status()
+      .then((s) => setLocal(s.local === true))
+      .catch(() => {});
+  }, [desktop]);
+  const continueHere = async () => {
+    setOwnerPending(true);
+    setError(null);
+    try {
+      // The app moves this window to the sign-in it made; nothing to do here after.
+      await thisMac.signIn();
+    } catch {
+      setError(t("common.unknownError"));
+      setOwnerPending(false);
+    }
+  };
 
   const go = (next: Step) => {
     setError(null);
@@ -271,7 +294,7 @@ export function AuthPage({
       ? [t("auth.flow.wrong"), canReset ? t("auth.flow.wrongLead") : t("auth.flow.wrongLeadNoReset")]
       : [t("auth.flow.password"), t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
-    noPassword: [t("auth.flow.noPassword"), t("auth.flow.noPasswordLead")],
+    noPassword: [t("auth.flow.noPassword"), local ? t("auth.desktopOwner.text") : t("auth.flow.noPasswordLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
     newPassword: [
       first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
@@ -372,6 +395,27 @@ export function AuthPage({
           <div className="auth__step" key={shown}>
             {who}
 
+            {local && (step === "email" || step === "noPassword") && (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
+                  block
+                  loading={ownerPending}
+                  onClick={() => void continueHere()}
+                >
+                  {t("auth.desktopOwner.continue")}
+                </Button>
+                {step === "email" && (
+                  <>
+                    <p className="auth__fine">{t("auth.desktopOwner.text")}</p>
+                    <div className="auth__or">{t("common.or")}</div>
+                  </>
+                )}
+              </>
+            )}
+
             {(step === "email" || step === "forgot") && (
               <div className="auth__field">
                 <Input
@@ -429,7 +473,15 @@ export function AuthPage({
             )}
 
             {submitLabel[step] && (
-              <Button type="submit" variant="primary" size="lg" block kbd={["↵"]} loading={pending} disabled={!ready}>
+              <Button
+                type="submit"
+                variant={local && step === "email" ? "default" : "primary"}
+                size="lg"
+                block
+                kbd={["↵"]}
+                loading={pending}
+                disabled={!ready}
+              >
                 {submitLabel[step]}
               </Button>
             )}

@@ -167,12 +167,36 @@ Agents run commands and code, drive a browser, and can think with Claude Code or
 you connect (Agent computers, below). A computer must reach the instance, so on Tailscale, install
 Tailscale on it and sign in to the same tailnet first.
 
-- **A Mac:** the agentes.chat desktop app. On its first screen, click the server line
-  (**Server: agentes.chat · Change**), paste your address (`https://agentes.<your-tailnet>.ts.net`),
-  click **Use this server**, and sign in when the browser opens. **Add organization** has the same
-  line.
+The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a window of its own:
+
+1. On its first screen, under **Sign in to agentes.chat**, click **Use your own server**, then
+   **Connect to my server**.
+2. Type your address (`https://agentes.<your-tailnet>.ts.net`), or click **Use** next to one the app
+   found: it looks on this computer and, when Tailscale is connected, on your tailnet. Plain http works
+   only for an instance on the same computer (`http://127.0.0.1:…`), which the app then opens at the
+   address it gives itself (`PUBLIC_URL`, such as `http://localhost:3000`): it accepts sign-ins only there.
+3. Sign in, as in the browser. The link the setup prints at the end (`agenteschat://connect?…`) does
+   steps 1 and 2 for you; the app shows the address in large type and asks before it connects.
+
+**Servers** in the app's Preferences (and its menus) switches between instances; each keeps its own
+sign-in.
+
+- **Agents on that Mac or Linux computer:** in the instance's onboarding or **Settings → Computers**,
+  click **Use this Mac** (**Use this computer** on Linux). The app asks first, in its own dialog naming
+  the instance and the organization. Its agents start with no folders of yours and commands off, even
+  when other organizations' agents there have commands on; you choose more in the app's Preferences. On
+  Windows, and with agentes.chat Cloud, the app is only a window onto the workspace and nothing of the
+  computer is used. Nor on the computer that runs the instance: its agents work there through the
+  instance itself (This server as the agents' computer, below), so the app doesn't offer it.
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
+
+Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), the page that offers the app (Settings →
+Computers, and onboarding's computer step) asks agentes.chat for its newest version as it opens, from
+your browser or the app's window: the request names the system and, like any request a page makes to
+another site, carries this instance's address (its `Origin` header) and the browser's IP. The app asks
+agentes.chat for its own updates when it starts and every 6 hours, naming its system and processor (its
+version too, when it installs one). On Linux the AppImage updates itself; a deb downloads the new deb.
 
 </details>
 
@@ -240,10 +264,10 @@ Done:
 }
 ```
 
-Give the person `url`, `appLink` (it opens the agentes.chat phone app on this server; `null` for an
-http address, which the phone app doesn't open) and `nextSteps`: the first account, created from a
-device in the tailnet, owns the instance. `computer` is `on` when this server is its agents'
-computer, `off` when answered no, and `skipped` where it can't be.
+Give the person `url`, `appLink` (it opens the agentes.chat phone or desktop app on this server;
+`null` for an http address, which the phone app doesn't open) and `nextSteps`: the first account,
+created from a device in the tailnet, owns the instance. `computer` is `on` when this server is its
+agents' computer, `off` when answered no, and `skipped` where it can't be.
 A failure names the check, what happened and the fix:
 
 ```json
@@ -411,8 +435,8 @@ port past the host's firewall.
 
 agentes.chat also runs as one program with its database built in, with nothing else to install: no
 Docker, no Postgres to set up. The desktop app's **Run agentes.chat on this computer** does it with no
-terminal (coming with the next version of the app), and on a computer without a screen the installer
-will do it with `install.sh --native`. By hand, from a release package, below.
+terminal (below), and on a computer without a screen the installer will do it with
+`install.sh --native`. By hand, from a release package, further below.
 
 - **The database is PGlite:** real Postgres compiled to WebAssembly, running inside that program,
   with pgvector. It's the same engine the tests run on, so the migrations and the queries are the
@@ -432,13 +456,53 @@ It listens on this computer only (`127.0.0.1`), and answers only at its own addr
 `localhost`, it sends the browser there). To reach it from your phone or a teammate's computer, put it
 on your tailnet with `tailscale serve` (on this computer:
 `tailscale serve --bg --https=443 http://127.0.0.1:4310`) and set `PUBLIC_URL` in `~/.agentes/.env` to
-the `https://…ts.net` address it prints, then start it again.
+the `https://…ts.net` address it prints, then start it again. The desktop app does both with one
+switch.
+
+**From the desktop app** (macOS and Linux). On its first screen, click **Use your own server**, then
+**Run agentes.chat on this Mac** (this computer, on Linux). Your name comes from this computer; type
+your email (your team sees it). **Reach it from your phone and teammates** puts it on your tailnet
+(off; you can turn it on later), and **Send anonymous usage statistics** is on (it writes `TELEMETRY`
+in `~/.agentes/.env`). **Start agentes.chat** then prepares the folder and the database (the first time
+takes a little longer), starts it, creates your owner account, makes this computer your agents'
+computer and opens agentes.chat, signed in.
+
+- **It runs inside the app.** It starts with the app (Open at login turns on), starts again by itself
+  if it stops, and stops when you quit the app (which asks first: nobody can use it until you open the
+  app again). Its files come with the app and update with it; the previous version and a copy of the
+  database stay in `~/.agentes`, and an update that doesn't answer within 3 minutes goes back to them by
+  itself, and stays there until the next version.
+- **Only its own answer counts.** Other programs and accounts on this computer can listen on its port,
+  so the app trusts the server only once its own process answers there (it names itself in
+  `~/.agentes/server.json`, which only you can write). Until then nothing of yours goes to that port: not
+  your sign-in, not this computer's token, not your agents' connections (they pause while it is down).
+  If something else holds the port when it starts, it moves to a free one. With reach on, Tailscale
+  shares it only while it runs.
+- **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
+  whenever your session ends. For a browser on another device, add one in your account menu, **Add a
+  password**.
+- **Preferences › Servers › agentes.chat on this Mac:** reach (Tailscale needs HTTPS turned on for your
+  tailnet, which **Turn it on** opens; on Linux, connect Tailscale with `sudo tailscale up`, and run
+  `sudo tailscale set --operator=$USER` once), the phone's QR code, usage statistics, **Back up now**
+  (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
+  and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
+  brings both back.
+- **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
+  `~/.agentes/logs/server.log`.
+- A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
+  offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
+  running, start it the way you installed it.
+- **Moving it to a server:** quit the app, dump the database with the app's own copy of the server,
+  then follow Moving to Docker (below) from step 2. On a Mac:
+  `BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql`
+  (on Linux, the deb's `/usr/bin/agentes-runner` in its place).
 
 **Usage statistics.** Like any self-hosted install, it sends agentes.chat an anonymous usage report
 once a day (Optional services and what they receive lists every field in it). To turn it off, put
-`TELEMETRY=off` in `~/.agentes/.env` and start it again, or use the switch in **Settings → General →
-Usage statistics**. `agentes-server telemetry` prints the next report and sends nothing (with the
-server stopped; while it runs, **See what is sent** there shows the same).
+`TELEMETRY=off` in `~/.agentes/.env` and start it again (the desktop app's **Send anonymous usage
+statistics** switch does that), or use the switch in **Settings → General → Usage statistics**.
+Installed by hand, `agentes-server telemetry` prints the next report and sends nothing (with the server
+stopped); while it runs, and from the desktop app, **See what is sent** there shows the same.
 
 **By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
 (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
@@ -685,8 +749,11 @@ carry nothing about the instance beyond what any download does: the installer
 (`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has
 none (`https://agentes.chat/install/docker-compose.yml`), the packages that run it without Docker
 (`https://agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and the
-Mac app's check for its own new version, at start and every 6 hours
-(`https://agentes.chat/api/desktop/latest`). The instance itself downloads nothing from agentes.chat.
+desktop app's own updates: a check at start and every 6 hours (`https://agentes.chat/api/desktop/latest`,
+naming its system and processor) and, when it installs one, `https://agentes.chat/api/desktop/update`
+(its version and package type too) and `/api/desktop/download/…`. The page that offers the app asks
+for its newest version from the browser (Connect a computer, above, says what that request carries).
+The instance itself downloads nothing from agentes.chat.
 
 An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, Chrome
 for Testing from Google the first time an agent opens the browser there, and, on Linux, the packages
@@ -704,7 +771,7 @@ party only when you turn that service on:
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
-| Tailscale | `COMPOSE_PROFILES=tailscale` | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
+| Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.
@@ -788,7 +855,7 @@ can. Give the runner a user of its own, or a VM. On a Linux server, the installe
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
-(`agentes-runner tools enable terminal`); the Mac app doesn't have them yet.
+(`agentes-runner tools enable terminal`); the desktop app doesn't have them yet.
 
 Use HTTPS with a certificate from a public authority (Tailscale and the Caddy profile get one). Over
 plain http the computer's token travels unencrypted, and the runner's background service doesn't

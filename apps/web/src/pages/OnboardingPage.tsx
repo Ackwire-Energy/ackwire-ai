@@ -61,12 +61,12 @@ import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
-import { OpenPrefsButton } from "@/components/ThisMac";
+import { OpenPrefsButton, useAgentsHere, useOrgName } from "@/components/ThisMac";
 import { SetupWait, type WaitReader } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
-import { inDesktopApp, thisMac } from "@/lib/desktop";
+import { thisMac } from "@/lib/desktop";
 import { importedModel } from "@/lib/import";
 import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
@@ -1271,15 +1271,17 @@ function ComputerStep({
     if (found && !machine) onPaired(found);
   }, [found, machine, onPaired]);
 
-  // In the app: picking "Este Mac" is the consent; the app hands the runner's code over and we confirm it.
-  const app = inDesktopApp();
+  // In the app, where agents may work on this computer: picking "This Mac" asks in the app's own dialog, then
+  // the app hands the runner's code over and we confirm it.
+  const app = useAgentsHere();
+  const orgName = useOrgName(orgId);
   const confirm = useConfirmDevice();
   const [linking, setLinking] = useState<"idle" | "connecting" | "failed">("idle");
   const [other, setOther] = useState(false);
   const linkThisMac = async () => {
     setLinking("connecting");
     try {
-      const { userCode } = await thisMac.connect(orgId);
+      const { userCode } = await thisMac.connect(orgId, orgName);
       if (userCode) {
         onPaired(await confirm.mutateAsync({ orgId, userCode }));
       } else {

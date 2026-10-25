@@ -2785,6 +2785,15 @@ a.ac-list__row:focus-visible {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Off and unavailable: an outline, not a filled track, so it never reads as a switch that is just off (in dark
+   mode dimming alone barely shows). */
+.ac-switch[data-disabled]:not([data-state="checked"]) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+.ac-switch[data-disabled]:not([data-state="checked"]) .ac-switch__thumb {
+  background: var(--line-strong);
+}
 .ac-switch__thumb {
   display: block;
   width: 16px;

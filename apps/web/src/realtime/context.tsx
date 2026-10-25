@@ -74,6 +74,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { checkAppVersion } from "@/lib/app-version";
+import { desktopNotice, inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
@@ -417,6 +418,11 @@ export function RealtimeProvider({
       if (isAgentUnavailable(event)) streams.unavailable(event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
+      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
+      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
+        const notice = desktopNotice(tRef.current, orgId, event.notification);
+        if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
+      }
       // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);

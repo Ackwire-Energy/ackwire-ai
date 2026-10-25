@@ -1240,7 +1240,7 @@ async function finish(
     ui.write(`    App:  ${end.link}`);
     ui.write("");
     ui.qr(end.link);
-    ui.note("  Point your phone's camera here to open the agentes.chat app on this server.");
+    ui.note("  Open the App link where the agentes.chat app is installed, or point your phone's camera here.");
   }
   ui.list("Next", end.steps, true);
   return end.result;

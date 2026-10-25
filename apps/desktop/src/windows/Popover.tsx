@@ -1,8 +1,10 @@
 /**
- * The menu bar popover: what the agents are doing now on
- * this Mac, grouped by organization, folder requests on top, pause for the whole computer, and the
- * way to Preferences, the site and Quit. This window also owns the tray icon's state and raises the
- * macOS notification for folder requests (it lives, hidden, for as long as the app runs).
+ * The menu bar popover. While agents work on this computer: what they are doing now, grouped by
+ * organization, folder requests on top, pause for the whole computer, and the way to the app, Preferences and
+ * Quit. Otherwise (agentes.chat, or a server whose agents work elsewhere) a small card: what waits for you and
+ * the way in. With agentes.chat running on this computer, its card comes first (its state, restart, stop) with
+ * its banners. This window also owns the tray icon's state, answers the site's questions about this computer
+ * and raises the notifications for folder requests (it lives, hidden, for as long as the app runs).
  */
 import type { ControlAccessRequest, ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
 import { Button, Icon, Kbd, normalizeAppearance, PixelSpinner, Segmented } from "@agenteschat/ui";
@@ -17,15 +19,20 @@ import {
   newHelpRequests,
   siteLink,
 } from "../control/browser";
-import { DOCK_PREF } from "../control/dock";
+import { DOCK_PREF, MENU_BAR_PREF, menuBarShown } from "../control/dock";
+import { hereBanner, hereLine, type LocalServerStatus } from "../control/local-server";
+import { menuLabels } from "../control/menu-labels";
 import { NOTCH_PREF } from "../control/notch";
+import { SITE_NOTIFY_PREF } from "../control/notify";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
-import { openSiteLabel, siteOf } from "../control/server";
-import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes, RECONNECT_PREF } from "../control/store";
-import { answerThisMac, type PrefsTab } from "../control/this-mac";
+import { homeServer, type ServerList, serverName } from "../control/server";
+import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes } from "../control/store";
+import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
-import { agentOf, chosenServer, readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import { agentOf, readPref, useLocalServer, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import type { BadgeCounts } from "../host/types";
 import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
+import { CopyDiagnostics } from "../ui/here";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
 
@@ -58,13 +65,56 @@ export function Popover() {
   const refused = homes.find(isRefusedHome);
   const outdated = homes.some((h) => h.status?.connection === "outdated");
   const machine = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? t("desktop.tray.label");
-  const site = siteOf(homes, chosenServer());
+  const [list, setList] = useState<ServerList>({ current: null, servers: [] });
+  const [counts, setCounts] = useState<BadgeCounts>({ waiting: 0, unread: 0 });
+  const local = useLocalServer();
+  const localRuns = useRef(false);
+  localRuns.current = local.run;
+  const current = list.current;
+  const readList = () =>
+    void host
+      .servers()
+      .then(setList)
+      .catch(() => {});
+  useEffect(readList, [host]);
+  useEffect(() => host.onBadge(setCounts), [host]);
+  // The server here's address moves with reach: the list again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when its address or whether it runs changes
+  useEffect(readList, [local.publicUrl, local.run]);
+
+  // The server here's sync made a home: its first tools once its runner is up.
+  useEffect(() => host.onNewHostHome((homeId) => whenHostHomeReady(store, homeId)), [host, store]);
+  // One of its homes was refused by its organization (its token): the next sync asks for a new one, once a
+  // while per organization.
+  const rotated = useRef(new Map<string, number>());
+  const refusedHere = homes
+    .filter((h) => isRefusedHome(h) && !!local.url && homeServer(h) === local.url)
+    .flatMap((h) => (h.status?.org?.id ? [h.status.org.id] : []))
+    .filter((org) => Date.now() - (rotated.current.get(org) ?? 0) > 10 * 60_000);
+  const refusedKey = refusedHere.join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the set of refused homes changes
+  useEffect(() => {
+    if (refusedHere.length === 0) return;
+    for (const org of refusedHere) rotated.current.set(org, Date.now());
+    void host.syncLocalHomes(refusedHere).catch(() => {});
+  }, [host, refusedKey]);
 
   // The tray icon follows the aggregate state.
   const tray = trayStateOf(homes, update.state.available || update.state.required || outdated);
   useEffect(() => {
     void host.setTrayState(tray).catch(() => {});
   }, [host, tray]);
+
+  // On a Mac the menu bar icon shows while this computer works for agents or runs agentes.chat, unless the
+  // person chose.
+  const works = homes.length > 0;
+  const busyHere = works || local.run;
+  const [menuBarPref, setMenuBarPref] = useState(() => readPref<boolean | null>(MENU_BAR_PREF, null));
+  const [dockPref, setDockPref] = useState(() => readPref(DOCK_PREF, true));
+  const iconShown = menuBarShown(menuBarPref, dockPref, busyHere);
+  useEffect(() => {
+    void host.setTrayVisible(iconShown).catch(() => {});
+  }, [host, iconShown]);
 
   // The notch window lives only while it's on (Preferências → Geral): this window starts with the app.
   useEffect(() => {
@@ -103,6 +153,17 @@ export function Popover() {
     setPauseMenu(false);
     setConfirmQuit(false);
     setNow(Date.now());
+    readList();
+  });
+  // Preferences changes these two in its own window: read them again when this one is in front.
+  useEffect(() => {
+    const reread = () => {
+      setMenuBarPref(readPref<boolean | null>(MENU_BAR_PREF, null));
+      setDockPref(readPref(DOCK_PREF, true));
+      readList();
+    };
+    window.addEventListener("storage", reread);
+    return () => window.removeEventListener("storage", reread);
   });
 
   // The window follows the card's height.
@@ -140,22 +201,28 @@ export function Popover() {
     return off;
   }, [host, store]);
 
-  // In the Dock like Slack, unless the person took it out (Preferências → Geral).
+  // In the Dock like Slack, unless the person took it out (Preferences › General); the site's notifications too.
   useEffect(() => {
     void host.setDock(readPref(DOCK_PREF, true)).catch(() => {});
+    void host.setSiteNotify(readPref(SITE_NOTIFY_PREF, true)).catch(() => {});
   }, [host]);
 
-  // The Mac's menu bar in the app's language (menus.rs); the choices the popover owns come back here.
+  // The menus and the pairing dialog in the app's language (menus.rs); the choices the popover owns come back here.
   useEffect(() => {
-    void host.setAppMenu(t("desktop.menu", { returnObjects: true }) as Record<string, string>).catch(() => {});
+    void host.setAppMenu(menuLabels(t)).catch(() => {});
   }, [host, t]);
+  const pauseRef = useRef<(choice: PauseChoice | "resume") => void>(() => {});
   useEffect(
     () =>
       host.onMenuAction((action) => {
-        if (action === "updates" || action === "thisMac") {
-          if (action === "updates") writePref("prefsTab", "updates");
+        if (action === "updates" || action === "thisMac" || action === "servers") {
+          if (action !== "thisMac") writePref("prefsTab", action);
           void host.showWindow("prefs").catch(() => {});
-        } else if (action === "quit" && runningJobs.current === 0) {
+        } else if (action === "pause1h" || action === "pauseTomorrow" || action === "pauseManual") {
+          pauseRef.current(action === "pause1h" ? "1h" : action === "pauseTomorrow" ? "tomorrow" : "manual");
+        } else if (action === "resume") {
+          pauseRef.current("resume");
+        } else if (action === "quit" && runningJobs.current === 0 && !localRuns.current) {
           // Nothing running on this Mac: quits at once, like any Mac app.
           void host.quit().catch(() => {});
         } else {
@@ -167,19 +234,30 @@ export function Popover() {
     [host],
   );
 
-  const openSite = () => {
-    void host.openExternal(site).catch(() => {});
+  /** Asks first only while agents work here or agentes.chat runs here; otherwise quits at once, like any app. */
+  const quit = () => {
+    if (busyHere) setConfirmQuit(true);
+    else void host.quit().catch(() => {});
+  };
+
+  /** The main window on the server open now; the first run while there is none. */
+  const openMain = () => {
+    void (current ? host.openExternal(current) : host.showWindow("welcome")).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
   const openPrefs = (tab?: string) => {
     if (tab) writePref("prefsTab", tab);
     void host.showWindow("prefs").catch(() => {});
   };
-  const addOrg = () => void host.showWindow("welcome").catch(() => {});
-  /** "Reconectar este Mac": the connect window, on the refused organization's home (same computer back). */
+  /**
+   * "Reconnect this Mac": that organization's Computers settings in the main window, where its one-click
+   * "This Mac" pairs the same home again (the same computer, with its agents and permissions).
+   */
   const reconnectMac = (home: Home) => {
-    writePref(RECONNECT_PREF, home.homeId);
-    void host.showWindow("welcome").catch(() => {});
+    const server = homeServer(home);
+    const orgId = home.status?.org?.id;
+    if (server && orgId)
+      void host.openExternal(`${server}/org/${encodeURIComponent(orgId)}/settings/computers`).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
 
@@ -195,13 +273,13 @@ export function Popover() {
       const k = e.key.toLowerCase();
       if (k === "o") {
         e.preventDefault();
-        openSite();
+        openMain();
       } else if (k === ",") {
         e.preventDefault();
         openPrefs();
       } else if (k === "q") {
         e.preventDefault();
-        setConfirmQuit(true);
+        quit();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -243,6 +321,7 @@ export function Popover() {
       toast(t("desktop.common.error"), "alert");
     }
   };
+  pauseRef.current = (choice) => void (choice === "resume" ? doResume() : doPause(choice));
   const plusHour = async () => {
     if (!pause) return;
     try {
@@ -258,7 +337,7 @@ export function Popover() {
         <main className="dk-pop" ref={card} aria-label={t("desktop.tray.quitTitle")}>
           <div className="dk-confirm">
             <h2>{t("desktop.tray.quitTitle")}</h2>
-            <p>{t("desktop.tray.quitBody")}</p>
+            <p>{local.run ? t("desktop.tray.quitHereBody") : t("desktop.tray.quitBody")}</p>
             <div className="dk-confirm__foot">
               <Button variant="ghost" size="sm" onClick={() => setConfirmQuit(false)}>
                 {t("desktop.common.cancel")}
@@ -274,18 +353,108 @@ export function Popover() {
   }
 
   const mod = "⌘";
+  const appRows = (
+    <>
+      <MenuRow
+        icon="external"
+        onClick={openMain}
+        trailing={
+          <>
+            <Kbd>{mod}</Kbd>
+            <Kbd>O</Kbd>
+          </>
+        }
+      >
+        {t("desktop.tray.open")}
+      </MenuRow>
+      <MenuRow
+        icon="settings"
+        onClick={() => openPrefs(update.state.available ? "updates" : undefined)}
+        trailing={
+          <>
+            {update.state.available && <Icon name="download" size={14} />}
+            <Kbd>{mod}</Kbd>
+            <Kbd>,</Kbd>
+          </>
+        }
+      >
+        {t("desktop.tray.prefs")}
+      </MenuRow>
+    </>
+  );
+  const quitRow = (
+    <section className="dk-psec">
+      <MenuRow
+        icon="stop"
+        onClick={quit}
+        trailing={
+          <>
+            <Kbd>{mod}</Kbd>
+            <Kbd>Q</Kbd>
+          </>
+        }
+      >
+        {t("desktop.tray.quit")}
+      </MenuRow>
+    </section>
+  );
+
+  const hereCard = local.run && <HereCard local={local} onPrefs={() => openPrefs("servers")} />;
+
+  // Nothing of this computer works for agents: the way into the app, and what waits there.
+  if (!works) {
+    return (
+      <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
+        <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
+          {hereCard || (
+            <header className="dk-ph">
+              <BrandFace size="md" />
+              <span className="dk-ph__text">
+                <b>{current ? serverName(current) : t("desktop.tray.label")}</b>
+                <small>
+                  {counts.waiting > 0
+                    ? t("desktop.tray.waiting", { count: counts.waiting })
+                    : t("desktop.tray.nothingWaiting")}
+                </small>
+              </span>
+            </header>
+          )}
+          {!update.state.required && update.state.available && update.state.latest && (
+            <Banner
+              icon="download"
+              title={t("desktop.tray.updateTitle", { version: update.state.latest.version })}
+              actions={
+                <Button size="sm" variant="primary" onClick={() => openPrefs("updates")}>
+                  {t("desktop.tray.updateSee")}
+                </Button>
+              }
+            >
+              {t("desktop.tray.updateBody")}
+            </Banner>
+          )}
+          <section className="dk-psec">{appRows}</section>
+          {quitRow}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="dk-pop-shell" style={{ padding: POP_PADDING }}>
       <main className="dk-pop" ref={card} aria-label={t("desktop.tray.label")}>
-        <header className="dk-ph">
-          <MacPortrait state={macStateOf(homes)} />
-          <span className="dk-ph__text">
-            <b>{machine}</b>
-            <small>
-              {homes.length ? t("desktop.orgCount", { count: homes.length }) : t("desktop.tray.noOrgsTitle")}
-            </small>
-          </span>
-        </header>
+        {hereCard || (
+          <header className="dk-ph">
+            <MacPortrait state={macStateOf(homes)} />
+            <span className="dk-ph__text">
+              <b>{machine}</b>
+              <small>
+                {[current && serverName(current), t("desktop.orgCount", { count: homes.length })]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </small>
+            </span>
+          </header>
+        )}
 
         {incompatible && (
           <Banner icon="alert" title={t("desktop.tray.incompatibleTitle")}>
@@ -326,14 +495,18 @@ export function Popover() {
         {allOffline && !refused && !outdated && (
           <Banner
             lead={<PixelSpinner size={16} />}
-            title={t("desktop.tray.offlineTitle")}
+            title={
+              navigator.onLine
+                ? t("desktop.tray.unreachable", { host: serverName(homeServer(homes[0] as Home) ?? current ?? "") })
+                : t("desktop.tray.offlineTitle")
+            }
             actions={
               <Button size="sm" icon="refresh" onClick={() => void doReconnect()}>
                 {t("desktop.tray.reconnect")}
               </Button>
             }
           >
-            {t("desktop.tray.offlineBody")}
+            {navigator.onLine ? t("desktop.tray.unreachableBody") : t("desktop.tray.offlineBody")}
           </Banner>
         )}
         {pause && (
@@ -390,7 +563,7 @@ export function Popover() {
             {t("desktop.tray.now")} <Count n={jobs.length} />
             {jobs.length > 0 && (
               <span className="dk-pcap__end">
-                <button type="button" className="dk-link" onClick={openSite}>
+                <button type="button" className="dk-link" onClick={openMain}>
                   {t("desktop.tray.seeAll")} <Icon name="external" size={14} />
                 </button>
               </span>
@@ -437,68 +610,130 @@ export function Popover() {
               {t("desktop.tray.reconnect")}
             </MenuRow>
           )}
-          <MenuRow icon="plus" onClick={addOrg}>
-            {t("desktop.tray.addOrg")}
-          </MenuRow>
-          <MenuRow
-            icon="external"
-            onClick={openSite}
-            trailing={
-              <>
-                <Kbd>{mod}</Kbd>
-                <Kbd>O</Kbd>
-              </>
-            }
-          >
-            {openSiteLabel(site, t)}
-          </MenuRow>
-          <MenuRow
-            icon="settings"
-            onClick={() => openPrefs(update.state.available ? "updates" : undefined)}
-            trailing={
-              <>
-                {update.state.available && <Icon name="download" size={14} />}
-                <Kbd>{mod}</Kbd>
-                <Kbd>,</Kbd>
-              </>
-            }
-          >
-            {t("desktop.tray.prefs")}
-          </MenuRow>
+          {appRows}
         </section>
-        <section className="dk-psec">
-          <MenuRow
-            icon="stop"
-            onClick={() => setConfirmQuit(true)}
-            trailing={
-              <>
-                <Kbd>{mod}</Kbd>
-                <Kbd>Q</Kbd>
-              </>
-            }
-          >
-            {t("desktop.tray.quit")}
-          </MenuRow>
-        </section>
+        {quitRow}
       </main>
     </div>
   );
 }
 
-/** "Agora": live jobs grouped by organization (each one is its own runner on this Mac). */
+/**
+ * The server here, on top: its state in a few words, `···` with Restart, Stop and Preferences (inline, as the
+ * pause menu: the popover is a window of its own size), and its banners: stopped (Start it), not starting
+ * (Copy diagnostics, Try again), an update that went back.
+ */
+function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () => void }) {
+  const { t } = useTranslation();
+  const host = useHost();
+  const toast = useToast();
+  const [more, setMore] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const act = (run: () => Promise<void>) => async () => {
+    setMore(false);
+    setBusy(true);
+    try {
+      await run();
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const banner = hereBanner(local);
+  const running = local.phase === "running" || local.phase === "starting" || local.phase === "updating";
+  return (
+    <>
+      <header className="dk-ph">
+        <span className="dk-logo dk-logo--soft dk-here__icon">
+          <Icon name="computer" size={18} />
+        </span>
+        <span className="dk-ph__text">
+          <b>{t("desktop.server.title")}</b>
+          <small className={running && local.phase !== "running" ? "dk-shimmer" : undefined}>
+            {t(hereLine(local))}
+          </small>
+        </span>
+        <button
+          type="button"
+          className="dk-iconbtn"
+          aria-expanded={more}
+          aria-label={t("desktop.servers.more", { host: t("desktop.server.title") })}
+          onClick={() => setMore((v) => !v)}
+        >
+          <Icon name="more" size={16} />
+        </button>
+      </header>
+      {more && (
+        <div className="dk-sub dk-here__more">
+          {running && (
+            <MenuRow icon="refresh" onClick={act(() => host.restartLocalServer())}>
+              {t("desktop.server.restart")}
+            </MenuRow>
+          )}
+          {running ? (
+            <MenuRow icon="stop" onClick={act(() => host.stopLocalServer(false))}>
+              {t("desktop.server.stop")}
+            </MenuRow>
+          ) : (
+            <MenuRow icon="play" onClick={act(() => host.startLocalServer())}>
+              {t("desktop.server.start")}
+            </MenuRow>
+          )}
+          <MenuRow icon="settings" onClick={onPrefs}>
+            {t("desktop.tray.prefs")}
+          </MenuRow>
+        </div>
+      )}
+      {banner === "stopped" && (
+        <Banner
+          icon="alert"
+          title={t("desktop.server.stoppedBanner")}
+          actions={
+            <Button size="sm" variant="primary" icon="play" loading={busy} onClick={act(() => host.startLocalServer())}>
+              {t("desktop.server.start")}
+            </Button>
+          }
+        >
+          {t("desktop.server.stoppedBody")}
+        </Banner>
+      )}
+      {banner === "failing" && (
+        <Banner
+          icon="alert"
+          title={t("desktop.server.failingBanner")}
+          actions={
+            <>
+              <CopyDiagnostics />
+              <Button
+                size="sm"
+                variant="primary"
+                icon="refresh"
+                loading={busy}
+                onClick={act(() => host.startLocalServer())}
+              >
+                {t("desktop.common.retry")}
+              </Button>
+            </>
+          }
+        >
+          {t("desktop.server.failingBody")}
+        </Banner>
+      )}
+      {banner === "back" && (
+        <Banner
+          icon="alert"
+          title={t("desktop.server.updateBack", { version: local.backTo })}
+          actions={<CopyDiagnostics />}
+        />
+      )}
+    </>
+  );
+}
+
+/** "Now": live jobs grouped by organization (each one has its own home on this computer). */
 function NowList({ homes, paused, now }: { homes: Home[]; paused: boolean; now: number }) {
   const { t } = useTranslation();
-  if (homes.length === 0) {
-    return (
-      <div className="dk-empty">
-        <BrandFace size="sm" />
-        <span className="dk-empty__text">
-          <b>{t("desktop.tray.noOrgsTitle")}</b>
-          <span>{t("desktop.tray.noOrgsBody")}</span>
-        </span>
-      </div>
-    );
-  }
   const rows = homes.map((h) => {
     const browsers = browsersOf(h.status);
     const inBrowser = new Set(browsers.map((b) => b.agentId));
@@ -565,7 +800,8 @@ function BrowserRow({ home, browser }: { home: Home; browser: ControlBrowser }) 
   const color = normalizeAppearance(agent.look).color;
   const state = browserRowState(browser);
   const open = (path?: string) => {
-    void host.openExternal(siteLink(home.status?.server, path, siteOf([home], chosenServer()))).catch(() => {});
+    const server = homeServer(home);
+    if (server) void host.openExternal(siteLink(server, path, server)).catch(() => {});
     void host.hideWindow("popover").catch(() => {});
   };
   const stop = async () => {

@@ -84,7 +84,8 @@ export async function loadI18n(lng: LocaleCode): Promise<I18n> {
     resources: { [lng]: { translation: strings } },
     lng,
     fallbackLng: DEFAULT_LOCALE,
-    interpolation: { escapeValue: false },
+    // `device`: this computer's name in the desktop app's words ("Use this Mac"; lib/desktop.ts sets it there).
+    interpolation: { escapeValue: false, defaultVariables: { device: "Mac" } },
     initAsync: false,
     returnNull: false,
   });
@@ -98,7 +99,8 @@ export function createI18n(lng: LocaleCode = DEFAULT_LOCALE): I18n {
     resources,
     lng,
     fallbackLng: DEFAULT_LOCALE,
-    interpolation: { escapeValue: false },
+    // `device`: this computer's name in the desktop app's words ("Use this Mac"; lib/desktop.ts sets it there).
+    interpolation: { escapeValue: false, defaultVariables: { device: "Mac" } },
     initAsync: false,
     returnNull: false,
   });

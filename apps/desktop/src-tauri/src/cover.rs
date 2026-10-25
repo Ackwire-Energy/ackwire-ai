@@ -1,8 +1,8 @@
-//! The main window's cover: a page of the app itself (`cover.html`, local, no network)
-//! over the site, so the window is never blank. It shows when the app opens (at least 1 s), whenever the site
-//! loads a whole page again (⌘R, macOS ending the page) and while the site can't be reached; it goes when the
-//! site says it painted (`page_ready`). The cover only sees the network to tell offline from down, and may
-//! only ask to load the site again or to step aside (capabilities/cover.json).
+//! The main window's cover: a page of the app itself (`cover.html`, local) over the server's page, so the
+//! window is never blank. It shows when the app opens (at least 1 s), whenever the page loads whole again
+//! (⌘R, macOS ending the page, switching servers) and while the server can't be reached; it goes when the
+//! page says it painted (`page_ready`). The cover only asks the server open now whether it answers, to tell
+//! offline from down, and may only ask to load the page again or to step aside (capabilities/cover.json).
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -132,9 +132,19 @@ pub fn cover_retry(app: AppHandle, webview: tauri::Webview) -> Result<(), String
     if webview.label() != LABEL {
         return Err("only the cover asks this".into());
     }
-    let site = app.get_webview(main_window::LABEL).ok_or("no site")?;
-    // A first load that never arrived leaves nothing to reload: go to the site again.
-    site.navigate(main_window::site()).map_err(|e| e.to_string())
+    let page = app.get_webview(main_window::LABEL).ok_or("no site")?;
+    // A first load that never arrived leaves nothing to reload: go to the server again.
+    let site = main_window::site(&app).ok_or("no server chosen")?;
+    page.navigate(site).map_err(|e| e.to_string())
+}
+
+/// The cover: which server the window opens, to ask whether it answers and to name it when it doesn't.
+#[tauri::command]
+pub fn cover_server(app: AppHandle, webview: tauri::Webview) -> Result<Option<String>, String> {
+    if webview.label() != LABEL {
+        return Err("only the cover asks this".into());
+    }
+    Ok(main_window::site(&app).map(|s| s.origin().ascii_serialization()))
 }
 
 /// The cover: the site is up but never said it painted (an older site): stop covering it.

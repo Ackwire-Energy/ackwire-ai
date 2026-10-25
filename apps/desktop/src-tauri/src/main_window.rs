@@ -1,22 +1,27 @@
-//! The main window (ADR 0036): the whole agentes.chat inside the app. It loads the site
-//! itself, so every change to the web shows here at once, and gets no access to the Mac: no app command,
-//! only dragging the window by its title bar (capabilities/main.json). Links to anywhere else open in the
-//! person's browser, and so does social sign-in (Google and Apple refuse embedded web views): the site
-//! hands the session back through `/desktop/sign-in` and `/desktop/signed-in` (apps/server desktop-sign-in.ts).
-//! The site may ask three things of this Mac through `this_mac` (see `Bridge`), never more.
+//! The main window: the server open now, inside the app (agentes.chat, or a server of the person's own,
+//! `servers.rs`). It loads the server's pages itself, so every change to the web shows here at once, and
+//! gets no access to this computer: no app command, only dragging the window by its title bar and `this_mac`
+//! (capabilities/main.json, and the same one added at runtime for another server's origin). Links to
+//! anywhere else open in the person's browser, and so does social sign-in (Google and Apple refuse embedded
+//! web views): the site hands the session back through `/desktop/sign-in` and `/desktop/signed-in`
+//! (apps/server desktop-sign-in.ts). What the site may ask of this computer is `this_mac` (see `Bridge`).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
 use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, Theme, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
+
+use crate::servers;
 
 pub const LABEL: &str = "main";
 
@@ -25,19 +30,32 @@ const BROWSER_SIGN_IN: &str = "/desktop/sign-in";
 /// The site comes here once the browser handed the session over: the window comes to the front.
 const SIGNED_IN: &str = "/desktop/signed-in";
 
-/// The site the window loads; a debug build may point it elsewhere (`AGENTES_SITE_URL`, e.g. a local web).
-pub fn site() -> Url {
-    #[cfg(debug_assertions)]
-    if let Some(url) = std::env::var("AGENTES_SITE_URL").ok().and_then(|u| u.parse().ok()) {
-        return url;
-    }
-    crate::SITE.parse().expect("SITE is a valid URL")
+/// The server the window loads: the one open now (`servers.json`); None before the first run chose one.
+pub fn site(app: &AppHandle) -> Option<Url> {
+    servers::current(app)
 }
 
 fn same_site(url: &Url, site: &Url) -> bool {
     url.scheme() == site.scheme()
         && url.host_str() == site.host_str()
         && url.port_or_known_default() == site.port_or_known_default()
+}
+
+/// This computer's system, as `window.__agentesDesktop.platform` names it for the site.
+pub const PLATFORM: &str = if cfg!(target_os = "macos") {
+    "mac"
+} else if cfg!(target_os = "windows") {
+    "windows"
+} else {
+    "linux"
+};
+
+/// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
+/// computer of its own), a server on this computer itself, the server here included at its Tailscale address
+/// (`server_here`: its own computer is set up with it), or on Windows (no program for agents ships there yet).
+/// Another server on this computer at its address for people is `discover::served_here`, which asks it.
+pub fn agents_here(origin: &str, server_here: bool) -> bool {
+    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here && PLATFORM != "windows"
 }
 
 /// What a navigation in the window does.
@@ -64,6 +82,11 @@ fn route(url: &Url, site: &Url) -> Route {
         // mailto:, tel: and other apps.
         _ => Route::Outside,
     }
+}
+
+/// The route for `url` against the server open now; with none, everything goes outside.
+fn route_now(app: &AppHandle, url: &Url) -> Route {
+    site(app).map(|s| route(url, &s)).unwrap_or(Route::Outside)
 }
 
 fn open_outside(app: &AppHandle, url: &Url) {
@@ -101,9 +124,42 @@ fn go_in_page(url: &Url) -> Option<String> {
     Some(format!("(window.__agentesNavigate || ((p) => location.assign(p)))({path})"))
 }
 
-/// Shows the window (made on first use), on `url` when given (a page of the site).
+/// The window on `url`, a page of a server in the list, which becomes the one open now. Another server than
+/// the page shows, or a page whose fragment carries a one-time secret (the router keeps fragments in its
+/// history), loads as a whole page.
+pub fn show_url(app: &AppHandle, url: Url) -> Result<(), String> {
+    let url = crate::local_server::page_for_people(app, url);
+    let origin = url.origin().ascii_serialization();
+    if !servers::get(app).servers.contains(&origin) {
+        return Err("not a server of this app".into());
+    }
+    if site(app).map(|s| s.origin().ascii_serialization()).as_deref() != Some(origin.as_str()) {
+        servers::choose(app, &origin);
+    }
+    if let Some(page) = app.get_webview(LABEL) {
+        let shows_it = page.url().is_ok_and(|u| same_site(&u, &url));
+        if !shows_it || url.fragment().is_some() {
+            page.navigate(url).map_err(|e| e.to_string())?;
+            return front(app);
+        }
+    }
+    open(app, Some(url))
+}
+
+/// The server here left the address `old` (its port was taken): a window still on it goes to the server open
+/// now, shown or not, so it never stays on whatever answers at the old port.
+pub fn follow_move(app: &AppHandle, old: &str) {
+    let Some(page) = app.get_webview(LABEL) else { return };
+    if page.url().is_ok_and(|u| u.origin().ascii_serialization() == old) {
+        if let Some(site) = site(app) {
+            let _ = page.navigate(site);
+        }
+    }
+}
+
+/// Shows the window (made on first use), on `url` when given (a page of the server open now).
 pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
-    let site = site();
+    let site = site(app).ok_or("no server chosen yet")?;
     let url = url.filter(|u| same_site(u, &site));
     // The window holds two web views (the site, and the app's cover over it), so it is found by its parts.
     // Already open: never a reload (where the person was, drafts, scroll stay), only the route moves.
@@ -119,8 +175,6 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     let on_download = app.clone();
     let on_load = app.clone();
     let on_title = app.clone();
-    let nav_site = site.clone();
-    let new_site = site.clone();
     let saved = crate::window_state::load(app);
     let version = app.package_info().version.to_string();
     // The popover is made at start, so it already knows the system's appearance.
@@ -149,9 +203,12 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
                 let _ = window.set_title(window_title(&title));
             }
         })
-        // The site knows it is in the app (its own title bar, sign-in through the browser); nothing else.
-        .initialization_script(format!("window.__agentesDesktop = Object.freeze({{ version: {version:?} }});"))
-        .on_navigation(move |url| match route(url, &nav_site) {
+        // The site knows it is in the app and on which system (its own title bar, sign-in through the
+        // browser, the device's name in its words); nothing else.
+        .initialization_script(format!(
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?} }});"
+        ))
+        .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
             Route::Front => {
                 let app = on_nav.clone();
@@ -166,10 +223,10 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
                 false
             }
         })
-        // `target="_blank"`, ⌘-click and window.open: a page of the site moves the window there; anything
+        // `target="_blank"`, ⌘-click and window.open: a page of the server moves the window there; anything
         // else opens in the browser. Never a second app window.
         .on_new_window(move |url, _| {
-            if route(&url, &new_site) == Route::Stay && matches!(url.scheme(), "http" | "https") {
+            if route_now(&on_new, &url) == Route::Stay && matches!(url.scheme(), "http" | "https") {
                 let app = on_new.clone();
                 std::thread::spawn(move || {
                     let _ = open(&app, Some(url));
@@ -275,19 +332,27 @@ fn front(app: &AppHandle) -> Result<(), String> {
     window.set_focus().map_err(|e| e.to_string())
 }
 
-/// What the site may ask of this Mac (ADR 0036): which organizations it is connected to (`status`), connecting it
-/// to the person's organization (`connect`: the site confirms the code with its own session, as on
-/// `/conectar`), reconnecting it (`reconnect`), Preferences on a tab (`prefs`) and the menu bar's access
-/// requests (`requests`). Rust only checks the request and relays it: the popover's
-/// code owns the runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The
-/// machine's token never leaves the runner.
+/// What the site may ask of this computer: which of its organizations this computer works for (`status`),
+/// pairing it with one (`connect`: the system's own dialog asks first, then the site confirms the runner's
+/// code with its own session), reconnecting it (`reconnect`), Preferences on a tab (`prefs`), the menu bar's
+/// access requests (`requests`), the Dock's badge (`badge`), the Go menu's organizations (`orgs`), a
+/// notification while the app is in the background (`notify`) and, on the server here, signing its owner in
+/// (`signIn`: the app spends its owner key on a one-time sign-in, which the window trades itself). Rust checks
+/// each request, rebuilds it from the keys it may have, adds the asking page's own `origin`, whether agents may
+/// work here for it and whether it is the server here (`local`), and relays it: the popover's code owns the
+/// runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The machine's token
+/// and the owner key never leave the app.
 #[derive(Default)]
 pub struct Bridge {
     next: AtomicU64,
     waiting: Mutex<HashMap<u64, mpsc::Sender<Result<Value, String>>>>,
     /// The popover listens (`this_mac_listening`): before that a request would be lost, so it waits.
     listening: AtomicBool,
+    /// The last owner sign-in, at most one every 10 seconds.
+    signed_in: Mutex<Option<Instant>>,
 }
+
+const SIGN_IN_GAP: Duration = Duration::from_secs(10);
 
 /// How long the popover has to answer (`connect` waits for the runner's code).
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -298,6 +363,15 @@ const MAX_WAITING: usize = 16;
 /// Organizations in the Go menu (⌘⌥1–9 for the first nine).
 const MAX_ORGS: usize = 20;
 const PREF_TABS: &[&str] = &["folders", "tools", "updates"];
+/// A notification's size, as a phone push's (apps/server push-messages.ts).
+const NOTIFY_TITLE_MAX: usize = 80;
+const NOTIFY_BODY_MAX: usize = 180;
+
+/// A short display name the page sends (an organization's): trimmed, at most 80 characters.
+fn display_name(value: Option<&Value>) -> Option<String> {
+    let name: String = value?.as_str()?.trim().chars().take(80).collect();
+    (!name.is_empty() && !name.chars().any(char::is_control)).then_some(name)
+}
 
 /// The request rebuilt from the keys it may have; anything else is refused.
 fn checked(request: &Value) -> Result<Value, String> {
@@ -316,7 +390,15 @@ fn checked(request: &Value) -> Result<Value, String> {
     match text("kind") {
         Some("status") => Ok(json!({ "kind": "status" })),
         Some("requests") => Ok(json!({ "kind": "requests" })),
-        Some(kind @ ("connect" | "reconnect")) => Ok(json!({ "kind": kind, "orgId": org()? })),
+        Some("signIn") => Ok(json!({ "kind": "signIn" })),
+        Some("connect") => {
+            let mut out = json!({ "kind": "connect", "orgId": org()? });
+            if let Some(name) = display_name(request.get("orgName")) {
+                out["orgName"] = json!(name);
+            }
+            Ok(out)
+        }
+        Some("reconnect") => Ok(json!({ "kind": "reconnect", "orgId": org()? })),
         Some("prefs") => match text("tab") {
             Some(tab) if PREF_TABS.contains(&tab) => Ok(json!({ "kind": "prefs", "tab": tab })),
             _ => Err("unknown tab".into()),
@@ -334,22 +416,133 @@ fn checked(request: &Value) -> Result<Value, String> {
                 .take(MAX_ORGS)
                 .map(|o| {
                     let id = o.get("id").and_then(Value::as_str).unwrap_or_default();
-                    let name: String = o.get("name").and_then(Value::as_str).unwrap_or_default().chars().take(80).collect();
                     let ok = !id.is_empty()
                         && id.len() <= 64
-                        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-                        && !name.trim().is_empty();
-                    if ok {
-                        Ok(json!({ "id": id, "name": name.trim() }))
-                    } else {
-                        Err("bad organization".to_string())
+                        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+                    match display_name(o.get("name")) {
+                        Some(name) if ok => Ok(json!({ "id": id, "name": name })),
+                        _ => Err("bad organization".to_string()),
                     }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(json!({ "kind": "orgs", "orgs": orgs }))
         }
+        // A notification: short text, and a path of the same server to open when the app comes back.
+        Some("notify") => {
+            let title = text("title").map(str::trim).unwrap_or_default();
+            let body = text("body").map(str::trim).unwrap_or_default();
+            let path = text("path").unwrap_or("/");
+            let fits = !title.is_empty()
+                && title.chars().count() <= NOTIFY_TITLE_MAX
+                && body.chars().count() <= NOTIFY_BODY_MAX
+                && !format!("{title}{body}").chars().any(|c| c.is_control() && c != '\n');
+            let local = path.starts_with('/') && !path.starts_with("//") && !path.contains('\\') && path.len() <= 512;
+            if !fits || !local {
+                return Err("bad notification".into());
+            }
+            Ok(json!({ "kind": "notify", "title": title, "body": body, "path": path }))
+        }
         _ => Err("unknown request".into()),
     }
+}
+
+/// The site's notifications: at most one every 3 seconds and 60 an hour, only while the window isn't in
+/// front, and only while the person wants them (Preferences › General). Coming back to the app within 30
+/// seconds opens the last one's page.
+pub struct Notices(Mutex<NoticeState>);
+
+struct NoticeState {
+    on: bool,
+    sent: VecDeque<Instant>,
+    pending: Option<(Url, Instant)>,
+}
+
+impl Default for Notices {
+    fn default() -> Self {
+        Self(Mutex::new(NoticeState { on: true, sent: VecDeque::new(), pending: None }))
+    }
+}
+
+const NOTIFY_GAP: Duration = Duration::from_secs(3);
+const NOTIFY_PER_HOUR: usize = 60;
+const NOTIFY_OPENS_FOR: Duration = Duration::from_secs(30);
+
+/// Whether one more notification fits the limits at `now` (and counts it).
+fn notice_fits(sent: &mut VecDeque<Instant>, now: Instant) -> bool {
+    while sent.front().is_some_and(|t| now.duration_since(*t) > Duration::from_secs(3600)) {
+        sent.pop_front();
+    }
+    if sent.back().is_some_and(|t| now.duration_since(*t) < NOTIFY_GAP) || sent.len() >= NOTIFY_PER_HOUR {
+        return false;
+    }
+    sent.push_back(now);
+    true
+}
+
+fn notify(app: &AppHandle, request: &Value, site: &Url) {
+    let in_front = app.get_window(LABEL).and_then(|w| w.is_focused().ok()).unwrap_or(false);
+    let Ok(url) = site.join(request["path"].as_str().unwrap_or("/")) else { return };
+    {
+        let notices = app.state::<Notices>();
+        let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
+        if in_front || !state.on || !notice_fits(&mut state.sent, Instant::now()) {
+            return;
+        }
+        state.pending = Some((url, Instant::now()));
+    }
+    let _ = app
+        .notification()
+        .builder()
+        .title(request["title"].as_str().unwrap_or_default())
+        .body(request["body"].as_str().unwrap_or_default())
+        .show();
+}
+
+/// The main window came to the front: within 30 seconds of a notification, its page.
+pub fn focused(app: &AppHandle) {
+    let pending = {
+        let notices = app.state::<Notices>();
+        let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
+        state.pending.take()
+    };
+    if let Some((url, at)) = pending {
+        if at.elapsed() <= NOTIFY_OPENS_FOR {
+            let _ = open(app, Some(url));
+        }
+    }
+}
+
+/// Preferences › General › "Let me know about messages and requests" (the popover sends it at start).
+#[tauri::command]
+pub fn notify_site_set(app: AppHandle, window: tauri::Window, on: bool) -> Result<(), String> {
+    if !matches!(window.label(), "popover" | "prefs") {
+        return Err("only the app's own windows set this".into());
+    }
+    app.state::<Notices>().0.lock().unwrap_or_else(|e| e.into_inner()).on = on;
+    Ok(())
+}
+
+/// The page's own server, when it is one of the app's (the window shows only those).
+fn page_origin(app: &AppHandle, webview: &tauri::Webview) -> Option<String> {
+    let origin = webview.url().ok()?.origin().ascii_serialization();
+    servers::get(app).servers.contains(&origin).then_some(origin)
+}
+
+/// The system's own dialog before a page pairs this computer: the server's host from the app, the
+/// organization's name from the page (display only). False when declined, or before the labels arrived.
+fn ask_to_pair(app: &AppHandle, org: &str, host: &str) -> bool {
+    let labels = crate::menus::labels(app);
+    let (Some(title), Some(body), Some(allow), Some(not_now)) =
+        (labels.get("pairTitle"), labels.get("pairBody"), labels.get("pairAllow"), labels.get("pairNotNow"))
+    else {
+        return false;
+    };
+    app.dialog()
+        .message(body.replace("{host}", host))
+        .title(title.replace("{org}", org))
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(allow.clone(), not_now.clone()))
+        .blocking_show()
 }
 
 #[tauri::command]
@@ -358,7 +551,22 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
     if webview.label() != LABEL {
         return Err("only the main window asks this".into());
     }
-    let request = checked(&request)?;
+    let mut request = checked(&request)?;
+    let origin = page_origin(&app, &webview).ok_or("not a server of this app")?;
+    let server_here = crate::local_server::is_here(&app, &origin);
+    // The server here's pages count only while its own child answers there: another program can listen on
+    // its port while it is down. A page that loaded as it came up waits for that a moment.
+    if server_here {
+        let (waiter, asking) = (app.clone(), origin.clone());
+        let up = tauri::async_runtime::spawn_blocking(move || {
+            crate::local_server::answers_within(&waiter, &asking, Duration::from_secs(10))
+        })
+        .await
+        .unwrap_or(false);
+        if !up {
+            return Err("not_ready".into());
+        }
+    }
     // What the app itself answers (the popover isn't needed).
     match request["kind"].as_str() {
         Some("badge") => {
@@ -367,10 +575,73 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             return Ok(json!({}));
         }
         Some("orgs") => {
-            crate::menus::set_orgs(&app, &request["orgs"]);
+            // A new organization on the server here: this computer works for it within seconds.
+            if crate::menus::set_orgs(&app, &request["orgs"]) && server_here {
+                crate::host_sync::trigger(&app);
+            }
+            return Ok(json!({}));
+        }
+        Some("signIn") => {
+            if !server_here {
+                return Err("not_here".into());
+            }
+            {
+                let bridge = app.state::<Bridge>();
+                let mut last = bridge.signed_in.lock().unwrap_or_else(|e| e.into_inner());
+                if last.is_some_and(|at| at.elapsed() < SIGN_IN_GAP) {
+                    return Err("too_soon".into());
+                }
+                *last = Some(Instant::now());
+            }
+            let signer = app.clone();
+            return tauri::async_runtime::spawn_blocking(move || crate::local_server::sign_in_window(&signer, &origin))
+                .await
+                .map_err(|e| e.to_string())?
+                .map(|()| json!({}));
+        }
+        Some("notify") => {
+            if let Ok(site) = origin.parse::<Url>() {
+                notify(&app, &request, &site);
+            }
             return Ok(json!({}));
         }
         _ => {}
+    }
+    let asks_here = matches!(request["kind"].as_str(), Some("status" | "connect" | "reconnect"));
+    let here = asks_here && agents_here(&origin, server_here) && {
+        let (home, asking) = (app.path().home_dir().ok(), origin.clone());
+        tauri::async_runtime::spawn_blocking(move || home.is_some_and(|h| !crate::discover::served_here(&h, &asking)))
+            .await
+            .unwrap_or(false)
+    };
+    if asks_here {
+        request["origin"] = json!(origin);
+        request["agentsHere"] = json!(here);
+        // The server here's own homes point at its loopback address, whichever address the page has.
+        if server_here {
+            request["local"] = json!(true);
+            if let Some(loopback) = crate::local_server::loopback(&app) {
+                request["also"] = json!(loopback);
+            }
+        }
+    }
+    if request["kind"] == "connect" {
+        if !here {
+            return Err("not_here".into());
+        }
+        let host = origin.parse::<Url>().ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default();
+        let org = request["orgName"]
+            .as_str()
+            .map(str::to_string)
+            .or_else(|| crate::menus::org_name(&app, request["orgId"].as_str().unwrap_or_default()))
+            .unwrap_or_else(|| host.clone());
+        let asker = app.clone();
+        let allowed = tauri::async_runtime::spawn_blocking(move || ask_to_pair(&asker, &org, &host))
+            .await
+            .unwrap_or(false);
+        if !allowed {
+            return Err("declined".into());
+        }
     }
     let id = app.state::<Bridge>().next.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
@@ -379,20 +650,20 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
         let bridge = app.state::<Bridge>();
         let mut waiting = bridge.waiting.lock().map_err(|e| e.to_string())?;
         if waiting.len() >= MAX_WAITING {
-            return Err("this Mac is busy".into());
+            return Err("this computer is busy".into());
         }
         waiting.insert(id, tx);
     }
     tauri::async_runtime::spawn_blocking(move || {
         // Right after the app opens, the popover may not listen yet: the request waits for it.
         let bridge = app.state::<Bridge>();
-        let since = std::time::Instant::now();
+        let since = Instant::now();
         while !bridge.listening.load(Ordering::Relaxed) && since.elapsed() < LISTEN_TIMEOUT {
             std::thread::sleep(Duration::from_millis(50));
         }
         let sent = app.emit_to("popover", "this-mac://request", json!({ "id": id, "request": request }));
         let answer = match sent {
-            Ok(()) => rx.recv_timeout(BRIDGE_TIMEOUT).unwrap_or_else(|_| Err("this Mac didn't answer".into())),
+            Ok(()) => rx.recv_timeout(BRIDGE_TIMEOUT).unwrap_or_else(|_| Err("this computer didn't answer".into())),
             Err(e) => Err(e.to_string()),
         };
         let _ = bridge.waiting.lock().map(|mut w| w.remove(&id));
@@ -434,8 +705,8 @@ pub fn this_mac_reply(app: AppHandle, window: tauri::Window, id: u64, ok: bool, 
 mod tests {
     use super::*;
 
-    fn r(url: &str) -> Route {
-        route(&url.parse().unwrap(), &"https://agentes.chat".parse().unwrap())
+    fn r(url: &str, site: &str) -> Route {
+        route(&url.parse().unwrap(), &site.parse().unwrap())
     }
 
     #[test]
@@ -466,23 +737,46 @@ mod tests {
     }
 
     #[test]
-    fn routes() {
-        assert_eq!(r("https://agentes.chat/org/x/c/y"), Route::Stay);
-        assert_eq!(r("https://agentes.chat/desktop/sign-in?provider=google&challenge=a"), Route::Outside);
-        assert_eq!(r("https://agentes.chat/desktop/signed-in?to=%2F"), Route::Front);
-        assert_eq!(r("https://accounts.google.com/o/oauth2"), Route::Outside);
-        assert_eq!(r("http://agentes.chat/"), Route::Outside);
-        assert_eq!(r("https://agentes.chat.evil.com/"), Route::Outside);
-        assert_eq!(r("blob:https://agentes.chat/abc"), Route::Stay);
-        assert_eq!(r("mailto:a@b.c"), Route::Outside);
+    fn routes_follow_the_server_open_now() {
+        for site in ["https://agentes.chat", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
+            assert_eq!(r(&format!("{site}/org/x/c/y"), site), Route::Stay);
+            assert_eq!(r(&format!("{site}/desktop/sign-in?provider=google&challenge=a"), site), Route::Outside);
+            assert_eq!(r(&format!("{site}/desktop/signed-in?to=%2F"), site), Route::Front);
+            assert_eq!(r(&format!("blob:{site}/abc"), site), Route::Stay);
+        }
+        let own = "https://agentes.tail1234.ts.net";
+        assert_eq!(r("https://agentes.chat/org/x", own), Route::Outside);
+        assert_eq!(r("https://accounts.google.com/o/oauth2", own), Route::Outside);
+        assert_eq!(r("http://agentes.tail1234.ts.net/", own), Route::Outside);
+        assert_eq!(r("https://agentes.tail1234.ts.net.evil.com/", own), Route::Outside);
+        assert_eq!(r("http://127.0.0.1:4311/", "http://127.0.0.1:4310"), Route::Outside);
+        assert_eq!(r("mailto:a@b.c", own), Route::Outside);
+    }
+
+    #[test]
+    fn agents_work_here_only_for_a_server_elsewhere() {
+        assert!(!agents_here("https://agentes.chat", false));
+        assert!(!agents_here("http://127.0.0.1:4310", false));
+        assert!(!agents_here("http://localhost:3000", false));
+        assert_eq!(agents_here("https://agentes.tail1234.ts.net", false), PLATFORM != "windows");
+        assert!(!agents_here("https://ana-mac.tail1234.ts.net", true), "the server here, at its Tailscale address");
     }
 
     #[test]
     fn bridge_requests() {
         assert_eq!(checked(&json!({ "kind": "status", "extra": 1 })), Ok(json!({ "kind": "status" })));
         assert_eq!(
-            checked(&json!({ "kind": "connect", "orgId": "org_1-a" })),
+            checked(&json!({ "kind": "connect", "orgId": "org_1-a", "origin": "https://evil.example" })),
             Ok(json!({ "kind": "connect", "orgId": "org_1-a" }))
+        );
+        assert_eq!(
+            checked(&json!({ "kind": "connect", "orgId": "o1", "orgName": "  Acme  " })),
+            Ok(json!({ "kind": "connect", "orgId": "o1", "orgName": "Acme" }))
+        );
+        assert_eq!(
+            checked(&json!({ "kind": "connect", "orgId": "o1", "orgName": "a".repeat(200) }))
+                .map(|v| v["orgName"].as_str().map(str::len)),
+            Ok(Some(80))
         );
         assert!(checked(&json!({ "kind": "connect", "orgId": "../x" })).is_err());
         assert!(checked(&json!({ "kind": "connect" })).is_err());
@@ -491,6 +785,41 @@ mod tests {
         assert_eq!(checked(&json!({ "kind": "reconnect", "orgId": "o1" })), Ok(json!({ "kind": "reconnect", "orgId": "o1" })));
         assert!(checked(&json!({ "kind": "reconnect" })).is_err());
         assert_eq!(checked(&json!({ "kind": "requests", "x": 1 })), Ok(json!({ "kind": "requests" })));
+        assert_eq!(checked(&json!({ "kind": "signIn", "key": "x" })), Ok(json!({ "kind": "signIn" })));
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
+    }
+
+    #[test]
+    fn notifications_are_checked() {
+        let ok = checked(&json!({ "kind": "notify", "title": "Ana mentioned you", "body": "in #general", "path": "/org/o1/c/c1" }));
+        assert_eq!(
+            ok,
+            Ok(json!({ "kind": "notify", "title": "Ana mentioned you", "body": "in #general", "path": "/org/o1/c/c1" }))
+        );
+        for bad in [
+            json!({ "kind": "notify", "title": "", "body": "x" }),
+            json!({ "kind": "notify", "title": "a".repeat(81), "body": "x" }),
+            json!({ "kind": "notify", "title": "x", "body": "b".repeat(181) }),
+            json!({ "kind": "notify", "title": "x", "body": "", "path": "//evil.example/x" }),
+            json!({ "kind": "notify", "title": "x", "body": "", "path": "https://evil.example/x" }),
+            json!({ "kind": "notify", "title": "x\u{7}", "body": "" }),
+        ] {
+            assert!(checked(&bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn notification_limits() {
+        let mut sent = VecDeque::new();
+        let start = Instant::now();
+        assert!(notice_fits(&mut sent, start));
+        assert!(!notice_fits(&mut sent, start + Duration::from_secs(1)));
+        let mut at = start;
+        for _ in 1..NOTIFY_PER_HOUR {
+            at += Duration::from_secs(4);
+            assert!(notice_fits(&mut sent, at));
+        }
+        assert!(!notice_fits(&mut sent, at + Duration::from_secs(10)), "60 an hour");
+        assert!(notice_fits(&mut sent, start + Duration::from_secs(3601)), "an hour later the oldest is gone");
     }
 }
