@@ -15,7 +15,7 @@ People saw an agent's computer as three cards (its browser, its desktop, its ter
 
 - Each agent has one entry, "Desk's computer": a status line and one button (Open, or Help when the agent asks this person), on its page, in its DM header and on its computer's page. Open shows its computer in a dialog: watch, take control, hand back, full screen.
 - A computer with screens shows the agent's screen, where its browser is a window; one without (a Mac) shows the agent's page. Whoever helps with a browser request gets the page, never the whole screen.
-- No terminal view: in control, the screen's own Terminal app is there for whoever wants it. The terminal's backend (`/api/terminal`, the runner's terminal and its switch) goes in a later change; the machine protocol stays 21, since those fields were optional.
+- No terminal view: in control, the screen's own Terminal app is there for whoever wants it. The terminal's backend (`/api/terminal`, the runner's terminal and its switch) goes in a later change; the machine protocol isn't bumped for it, since those fields were optional.
 - `?computer=1` opens the dialog; `?browser=1`, `?desktop=1` and `?terminal=1` keep working for older links. The links the server makes (`agentBrowserLink`: the desktop app's tray, notifications) say `?computer=1`.
 
 ### 2. A screen starts the first time it is needed, then stays on

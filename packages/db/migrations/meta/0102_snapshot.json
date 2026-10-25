@@ -1,5 +1,5 @@
 {
-  "id": "9027d048-26db-41d4-9622-d22f6dd04263",
+  "id": "81e345a9-4669-4c8d-932a-177b575616f5",
   "prevId": "8fd93cbc-299d-4c81-a0d3-50b52fee84a6",
   "version": "7",
   "dialect": "postgresql",
@@ -5902,25 +5902,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "expected_ready_at": {
-          "name": "expected_ready_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requested_at": {
-          "name": "requested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_when_ready": {
-          "name": "email_when_ready",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "specs": {
           "name": "specs",
           "type": "jsonb",
@@ -6175,6 +6156,18 @@
         },
         "access": {
           "name": "access",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "size": {
+          "name": "size",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "load": {
+          "name": "load",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -14112,6 +14105,58 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.instance_telemetry": {
+      "name": "instance_telemetry",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "host_load": {
+          "name": "host_load",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "instance_telemetry_one_row": {
+          "name": "instance_telemetry_one_row",
+          "value": "\"instance_telemetry\".\"id\" = 1"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.organization_invitations": {

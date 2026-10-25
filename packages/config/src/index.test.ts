@@ -97,6 +97,17 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
   });
 
+  test("the usage report is on unless TELEMETRY says off (on/off, or any yes/no word)", () => {
+    expect(loadConfig(valid).TELEMETRY).toBe("on");
+    expect(loadConfig(valid).TELEMETRY_URL).toBe("https://telemetry.agentes.chat/v1/report");
+    expect(loadConfig({ ...valid, TELEMETRY: "off" }).TELEMETRY).toBe("off");
+    expect(loadConfig({ ...valid, TELEMETRY: "false" }).TELEMETRY).toBe("off");
+    expect(loadConfig({ ...valid, TELEMETRY: "on" }).TELEMETRY).toBe("on");
+    expect(() => loadConfig({ ...valid, TELEMETRY: "sometimes" })).toThrow(/TELEMETRY/);
+    expect(loadConfig(valid).INSTALL_MODE).toBeUndefined();
+    expect(() => loadConfig({ ...valid, INSTALL_MODE: "kubernetes" })).toThrow(/INSTALL_MODE/);
+  });
+
   test("ignores variables that are not in the schema", () => {
     const config = loadConfig({ ...valid, SOMETHING_ELSE: "1" }) as Record<string, unknown>;
     expect(config.SOMETHING_ELSE).toBeUndefined();

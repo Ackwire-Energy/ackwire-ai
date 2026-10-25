@@ -7145,6 +7145,15 @@ export const en: Translations = {
     actionCheck: "Agents check what the team already did",
     actionCheckHelp:
       "Before an email, a message or a pull request, the agent checks whether anyone on the team already did it to the same person or place in the last 30 days, and doesn't repeat it.",
+    telemetry: {
+      title: "Usage statistics",
+      label: "Send anonymous usage statistics to agentes.chat",
+      help: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
+      envOff: "Turned off in this server's settings (TELEMETRY=off). It can't be turned on from here.",
+      see: "See what is sent",
+      dialogTitle: "What is sent",
+      dialogText: "Once a day. This is the next report, exactly.",
+    },
     tilesTitle: "Everything in the organization",
     tile: {
       members: "Who is in the organization",

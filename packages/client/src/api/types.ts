@@ -9,6 +9,16 @@ export interface Health {
   edition: Edition;
 }
 
+/** The usage report's switch, for the installation's owner (`GET /api/app/telemetry`). */
+export interface ServerTelemetry {
+  /** The owner's switch. */
+  enabled: boolean;
+  /** `TELEMETRY=off` on the server: nothing is sent, whatever the switch says. */
+  envOff: boolean;
+  /** Exactly what the next report sends (shown as is). */
+  report: Record<string, unknown>;
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
