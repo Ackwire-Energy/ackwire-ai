@@ -14,7 +14,7 @@ import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Sky } from "@/sky/Sky";
-import { AgentAvatar, Button, Icon, IconButton, type IconName, systemText, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, Icon, IconButton, type IconName, LineIcon, systemText, Text, useTheme } from "@/ui";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { TextArea } from "../shared/TextArea";
@@ -675,7 +675,7 @@ function Note({ icon, text, danger = false }: { icon: IconName; text: string; da
   const { colors: c } = useTheme();
   return (
     <View style={styles.note}>
-      <Icon name={icon} size={14} color={danger ? c.danger : c.faint} />
+      <LineIcon name={icon} size={14} color={danger ? c.danger : c.faint} variant="small" />
       <Text variant="small" tone={danger ? "danger" : "muted"} style={styles.grow}>
         {text}
       </Text>

@@ -4,14 +4,17 @@ import {
   keys,
   useAgentAccess,
   useApi,
+  useCatalog,
   useCompleteOAuth,
   useConnections,
   useConnectWithKey,
   useCustomServerAction,
+  useCustomServers,
   useDisconnect,
   useStartOAuth,
 } from "@agenteschat/client";
 import { type Level, levelOf, resourcesOf, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { connectedItems } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,7 +24,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Segmented, systemText, Text, useToast } from "@/ui";
+import { Button, LineIcon, Segmented, systemText, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
@@ -56,10 +59,16 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
   const { org } = useOrg();
   const sheet = useSheet();
   const toast = useToast();
+  const catalog = useCatalog();
   const connections = useConnections(orgId);
+  const servers = useCustomServers(orgId);
   const disconnect = useDisconnect(orgId);
+  const { disconnect: disconnectServer } = useCustomServerAction(orgId);
   const admin = can(org?.role, "configure");
-  const existing = connectionOf(def, connections.data ?? []);
+  const existing = connectionOf(
+    def,
+    connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]),
+  );
   const [connectionId, setConnectionId] = useState<string | null>(existing?.id ?? null);
   const [step, setStep] = useState<Step>(existing ? "who" : "about");
   const name = connectorName(t, def);
@@ -91,7 +100,7 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
           <View style={styles.caps}>
             {lines.map((l) => (
               <View key={l.text} style={styles.cap}>
-                <Icon name={l.asks ? "shield" : "eye"} size={18} color={l.asks ? c.warn : c.muted} />
+                <LineIcon name={l.asks ? "shield" : "eye"} size={18} color={l.asks ? c.warn : c.muted} />
                 <Text variant="body" style={styles.grow}>
                   {l.asks ? t("mobile.connectors.asks", { text: l.text }) : l.text}
                 </Text>
@@ -134,15 +143,18 @@ export function ConnectSheet({ def }: { def: ConnectorDef }) {
               variant="ghost"
               wide
               label={t("mobile.connectors.disconnect")}
-              disabled={disconnect.isPending}
-              onPress={() =>
-                disconnect.mutate(existing.id, {
+              disabled={disconnect.isPending || disconnectServer.isPending}
+              onPress={() => {
+                const done = {
                   onSuccess: () => {
                     sheet.close();
                     toast({ title: t("mobile.connectors.disconnected", { name }) });
                   },
-                })
-              }
+                };
+                // A server connected by address is removed through its own endpoint (as on the web).
+                if (existing.custom) disconnectServer.mutate(existing.id, done);
+                else disconnect.mutate(existing.id, done);
+              }}
             />
           ) : null}
         </>
@@ -362,7 +374,7 @@ function ConnectStep({
               </Pressable>
             </View>
             <View style={styles.note}>
-              <Icon name="lock" size={14} color={c.faint} />
+              <LineIcon name="lock" size={14} color={c.faint} variant="small" />
               <Text variant="small" tone="muted" style={styles.grow}>
                 {t("mobile.connectors.keyHelp")}
               </Text>
@@ -464,7 +476,7 @@ function SafeNote() {
   const c = useColors();
   return (
     <View style={styles.note}>
-      <Icon name="shield" size={14} color={c.faint} />
+      <LineIcon name="shield" size={14} color={c.faint} variant="small" />
       <Text variant="small" tone="muted" style={styles.grow}>
         {t("mobile.connectors.safe")}
       </Text>
