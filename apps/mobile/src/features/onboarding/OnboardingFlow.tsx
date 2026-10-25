@@ -375,7 +375,12 @@ export function OnboardingFlow() {
           <Line
             lead={<Faces presets={PRESETS.filter((p) => agentIds[p])} />}
             title={t("onboarding.done.agents")}
-            sub={t("mobile.onb.doneAgents", { names: names(t, PRESETS.filter((p) => agentIds[p])) })}
+            sub={t("mobile.onb.doneAgents", {
+              names: names(
+                t,
+                PRESETS.filter((p) => agentIds[p]),
+              ),
+            })}
           />
           <Line
             lead={<Icon name="mail" size={18} />}
@@ -463,21 +468,14 @@ function AgentsStep({
               </Text>
             </View>
             <View
-              style={[
-                styles.box,
-                { borderColor: on ? c.ink : c.line2, backgroundColor: on ? c.ink : "transparent" },
-              ]}
+              style={[styles.box, { borderColor: on ? c.ink : c.line2, backgroundColor: on ? c.ink : "transparent" }]}
             >
               {on ? <Icon name={locked ? "lock" : "check"} size={14} color={c.bg} /> : null}
             </View>
           </Pressable>
         );
       })}
-      <Line
-        lead={<Icon name="bolt" size={18} />}
-        title={t("mobile.onb.thinkOwn")}
-        sub={t("mobile.onb.thinkOwnSub")}
-      />
+      <Line lead={<Icon name="bolt" size={18} />} title={t("mobile.onb.thinkOwn")} sub={t("mobile.onb.thinkOwnSub")} />
     </>
   );
 }
@@ -613,10 +611,7 @@ function Faces({ presets }: { presets: Preset[] }) {
   );
 }
 
-function Field({
-  label,
-  ...props
-}: { label: string } & ComponentProps<typeof TextInput>) {
+function Field({ label, ...props }: { label: string } & ComponentProps<typeof TextInput>) {
   const { colors: c } = useTheme();
   return (
     <TextInput

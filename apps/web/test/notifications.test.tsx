@@ -150,7 +150,7 @@ describe("Notificações", () => {
     expect(document.body.textContent).toContain("reagiram à sua mensagem");
   });
 
-  test("an approval a routine asked while nobody watched says so, then the agent's why", async () => {
+  test("an approval says who wants what in one sentence, who asked, and the agent's why behind Por quê?", async () => {
     const asked = notification({
       id: "n-ap",
       kind: "approval",
@@ -167,10 +167,17 @@ describe("Notificações", () => {
       updatedAt: ago(5),
     });
     await go(seedState({ notifications: [asked] }));
-    const text = screen().getByRole("region", { name: "Esperando você" }).textContent ?? "";
-    const origin = text.indexOf("Pedido pela rotina «Vigiar erros» enquanto ninguém acompanhava.");
-    expect(origin).toBeGreaterThan(-1);
-    expect(text.indexOf("O erro 500 voltou depois do deploy 2.14.")).toBeGreaterThan(origin);
+    const region = screen().getByRole("region", { name: "Esperando você" });
+    const text = region.textContent ?? "";
+    expect(text).toContain("Pedido pela rotina «Vigiar erros» enquanto ninguém acompanhava");
+    expect(text).toContain("Atlas quer fazer um deploy");
+    expect(text).not.toContain("O erro 500 voltou depois do deploy 2.14.");
+    await click(within(region).getByRole("button", { name: "Por quê?" }));
+    expect(region.textContent).toContain("O erro 500 voltou depois do deploy 2.14.");
+    // Decided right here: a deploy takes a hold, and Recusar asks for the reason.
+    expect(within(region).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
+    await click(within(region).getByRole("button", { name: "Recusar" }));
+    expect(region.querySelector("textarea")).toBeTruthy();
   });
 
   test("Feito leaves at once (optimistic) and Desfazer brings it back", async () => {

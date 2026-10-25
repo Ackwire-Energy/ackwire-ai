@@ -5,8 +5,8 @@ import { Icon, type IconName } from "../icons/Icon";
 export type ChipTone = "neutral" | "waiting" | "done";
 
 export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
-  /** Required: state is said with an icon and a word, never a colored dot. */
-  icon: IconName;
+  /** A state is said with an icon and a word, never a colored dot; a value ("Issue: ACME-177") goes without. */
+  icon?: IconName;
   /** In place of the icon: e.g. a `PixelSpinner` in the working agent's color. */
   lead?: ReactNode;
   /** `waiting` (attention) only for what waits on a person. */
@@ -17,7 +17,7 @@ export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
 export function Chip({ icon, lead, tone = "neutral", className, children, ...rest }: ChipProps) {
   return (
     <span className={cx("ac-chip", tone !== "neutral" && `ac-chip--${tone}`, className)} {...rest}>
-      {lead ?? <Icon name={icon} size={14} />}
+      {lead ?? (icon && <Icon name={icon} size={14} />)}
       <span className="ac-chip__text">{children}</span>
     </span>
   );

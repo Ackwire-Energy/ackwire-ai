@@ -1148,9 +1148,9 @@ export function useCorrectMessage(orgId: string) {
 
 // ── Invites, custom MCP ─────────────────────────────────────────────────────
 
-export const useCustomServers = (orgId: string) => {
+export const useCustomServers = (orgId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId) });
+  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId), enabled });
 };
 
 export function useCustomServerAction(orgId: string) {

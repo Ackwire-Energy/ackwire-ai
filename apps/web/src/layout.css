@@ -3902,35 +3902,14 @@ p {
 }
 
 /*
- * Route transitions: only the main column moves (opacity + 4 px), 160 ms.
- * View Transitions where supported; otherwise the page fades in on mount.
- * Nothing moves with prefers-reduced-motion.
+ * Route transitions: only the main column moves (opacity + 4 px), 160 ms, as each page's main mounts.
+ * No View Transitions: the browser freezes the whole page while the new one renders, so the
+ * sidebar's sliding pill stopped halfway and jumped. Nothing moves with prefers-reduced-motion.
  */
-.shell__main {
-  view-transition-name: page;
-}
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-}
 @media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(page) {
-    animation: page-out 120ms ease-in both;
-  }
-  ::view-transition-new(page) {
+  /* A thread opening in the side panel has its own entrance. */
+  .shell__main:not(.thread-panel__chat) {
     animation: page-in 160ms ease-out both;
-  }
-  @supports not (view-transition-name: page) {
-    .shell__main {
-      animation: page-in 160ms ease-out both;
-    }
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
   }
 }
 @keyframes page-in {
@@ -3941,14 +3920,6 @@ p {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-@keyframes page-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
   }
 }
 /* "Carregando mensagens anteriores…": floats over the top, takes no space (no jump). */
@@ -4156,12 +4127,23 @@ p {
 .sidebar__jump-row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   margin-top: -8px;
 }
+/* The same 40px tile as the field beside it (a bare icon looked smaller than the field). */
 .sidebar__collapse.ac-btn {
   flex: none;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--control-r-md);
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
+}
+.sidebar__collapse.ac-btn:hover {
+  background: var(--side-active);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
   .sidebar {
@@ -8344,15 +8326,89 @@ a.machine-row__name:hover {
   align-items: center;
   gap: 8px;
 }
+/*
+ * Atividade: the month (NumerosAgente C). Runs per day in pixels on the left, the numbers as its legend on
+ * the right; no cards, a hairline under it like the page's other sections.
+ */
+.agp-month {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.agp-month__chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.agp-month__cap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.agp-month__cap b {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.agp-month__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.agp-month__legend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 9px 14px;
+  margin: 0;
+  font-size: 14px;
+}
+.agp-month__legend dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.agp-month__legend dt .ac-icon {
+  color: var(--faint);
+}
+.agp-month__legend dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 650;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.agp-month__legend dd small {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.agp-month__meter {
+  grid-column: 1 / -1;
+}
+@media (max-width: 900px) {
+  .agp-month {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
 /* Memória */
 .agp-tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
-}
-.agp-tiles--four {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .agp-tile {
   display: flex;
@@ -9261,9 +9317,13 @@ html[data-menu-overlay] .shell {
   }
 }
 
-/* Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler". */
+/*
+ * Under my message sent while an agent works: "lê na próxima pausa" → "leu" / "parou para ler".
+ * At the right edge like "Visto": on the left, the agent's face read as the author of my next message.
+ */
 .msg-steer {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   min-height: 20px;
   margin: 4px 0 0;

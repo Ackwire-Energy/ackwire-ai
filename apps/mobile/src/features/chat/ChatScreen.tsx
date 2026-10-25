@@ -43,7 +43,7 @@ import { router, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, type LayoutChangeEvent, Platform, Pressable, StyleSheet, View } from "react-native";
+import { AppState, type LayoutChangeEvent, Platform, StyleSheet, View } from "react-native";
 import { KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
