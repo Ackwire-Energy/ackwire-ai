@@ -525,9 +525,13 @@ describe("the dialog's size (computer.css)", () => {
 
   test("the dialog wraps the screen, and in control on a wide window grows by the tools' column beside it", async () => {
     const text = await css();
-    const wrap = rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage))");
-    expect(wrap).toContain("width: calc(var(--cmp-screen) + 32px + var(--cmp-side))");
-    expect(wrap).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 100px)");
+    // The wait for the workspace's computer is as wide, so its screen opens in place.
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep))")).toContain(
+      "width: calc(var(--cmp-screen) + 32px + var(--cmp-side))",
+    );
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage))")).toContain(
+      "height: calc(var(--cmp-screen) * 900 / 1280 + 100px)",
+    );
     const wide = text.split("@media (min-width: 1080px) and (min-aspect-ratio: 4 / 3) {")[1] ?? "";
     expect(rule(wide, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain("--cmp-side: 252px");
     expect(wide).toMatch(/grid-template-columns: minmax\(0, 1fr\) 240px/);

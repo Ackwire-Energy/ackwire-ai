@@ -64,12 +64,15 @@
 /*
  * With the agent's screen, or a cover where it goes, the dialog wraps the screen: as large as 96vw × 94vh allow
  * and no larger than the screen itself (1280×900), keeping its shape. Around it: the head (70 px), the sky strip
- * (6) and the body's padding (8 + 16).
+ * (6) and the body's padding (8 + 16). The wait for the workspace's computer is as wide, so the screen that
+ * follows it opens in place.
  */
-.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage)) {
+.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep)) {
   --cmp-side: 0px;
   --cmp-screen: min(96vw - 32px - var(--cmp-side), 1280px, (94dvh - 100px) * 1280 / 900);
   width: calc(var(--cmp-screen) + 32px + var(--cmp-side));
+}
+.ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage)) {
   height: calc(var(--cmp-screen) * 900 / 1280 + 100px);
 }
 /* In control the tools go under the screen (the paste field and the keyboard, 112 px): the dialog grows by them. */
