@@ -158,6 +158,7 @@ import type {
   SecretBox,
   SecretRequest,
   SeriesScope,
+  ServerTelemetry,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -197,7 +198,12 @@ import type {
  * (test/fake-api.ts). Components never call `fetch` directly.
  */
 export interface ApiClient {
-  system: { health(): Promise<Health> };
+  system: {
+    health(): Promise<Health>;
+    /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
+    telemetry(): Promise<ServerTelemetry | null>;
+    setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+  };
   account: {
     authConfig(): Promise<AuthConfig>;
     /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */

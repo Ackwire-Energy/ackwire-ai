@@ -30,6 +30,7 @@ export interface EnvVarDefinition {
     | "Email for agents"
     | "Push"
     | "Operator"
+    | "Usage report"
     | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
@@ -668,6 +669,26 @@ export const envVars = {
     description:
       "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. Needs `OPERATOR_API_TOKEN`.",
     section: "Operator",
+  },
+  TELEMETRY: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("on"),
+    description:
+      "Send anonymous usage statistics to agentes.chat once a day: counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names. `off` stops it, whatever the switch in Settings → General says (the installation's owner can turn it off there too). `docker compose run --rm agentes telemetry` prints exactly what would be sent; SELF_HOSTING.md lists every field.",
+    section: "Usage report",
+  },
+  TELEMETRY_URL: {
+    schema: z.url().default("https://telemetry.agentes.chat/v1/report"),
+    description: "Where the usage report is sent (the report as JSON in a POST).",
+    section: "Usage report",
+  },
+  INSTALL_MODE: {
+    schema: z.enum(["docker", "native", "desktop"]).optional(),
+    description:
+      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it. Unset: `docker` inside a container, else `native`.",
+    section: "Usage report",
   },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),

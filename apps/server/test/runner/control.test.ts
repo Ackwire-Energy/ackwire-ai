@@ -184,6 +184,8 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
     exec: false,
     paused: { paused: false },
     access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+    // Protocol 22: how big this computer is.
+    size: { cpus: expect.any(Number), memoryGb: expect.any(Number), diskGb: expect.any(Number) },
   });
   await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "online"));
   s.frame({ type: "agents", agents: [{ id: AGENT.id, handle: "dev", name: "Dev", look: { color: "amber" } }] });
