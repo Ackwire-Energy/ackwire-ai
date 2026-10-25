@@ -411,8 +411,8 @@ port past the host's firewall.
 
 agentes.chat also runs as one program with its database built in, with nothing else to install: no
 Docker, no Postgres to set up. The desktop app's **Run agentes.chat on this computer** does it with no
-terminal (coming with the next version of the app), and on a computer without a screen the installer
-will do it with `install.sh --native`. By hand, from a release package, below.
+terminal (below), and on a computer without a screen the installer will do it with
+`install.sh --native`. By hand, from a release package, further below.
 
 - **The database is PGlite:** real Postgres compiled to WebAssembly, running inside that program,
   with pgvector. It's the same engine the tests run on, so the migrations and the queries are the
@@ -428,7 +428,32 @@ will do it with `install.sh --native`. By hand, from a release package, below.
 It listens on this computer only (`127.0.0.1`), and answers only at its own address. To reach it from
 your phone or a teammate's computer, put it on your tailnet with `tailscale serve` (on this computer:
 `tailscale serve --bg --https=443 http://127.0.0.1:4310`) and set `PUBLIC_URL` in `~/.agentes/.env` to
-the `https://…ts.net` address it prints, then start it again.
+the `https://…ts.net` address it prints, then start it again. The desktop app does both with one
+switch.
+
+**From the desktop app** (macOS and Linux). On its first screen, click **Use your own server**, then
+**Run agentes.chat on this Mac** (this computer, on Linux). Your name comes from this computer; type
+your email (your team sees it). **Reach it from your phone and teammates** puts it on your tailnet
+(off; you can turn it on later), and **Send anonymous usage statistics** is on (it writes `TELEMETRY`
+in `~/.agentes/.env`). **Start agentes.chat** then prepares the folder and the database (the first time
+takes a little longer), starts it, creates your owner account, makes this computer your agents'
+computer and opens agentes.chat, signed in.
+
+- **It runs inside the app.** It starts with the app (Open at login turns on), starts again by itself
+  if it stops, and stops when you quit the app (which asks first: nobody can use it until you open the
+  app again). Its files come with the app and update with it; the previous version and a copy of the
+  database stay in `~/.agentes`, and an update that doesn't start goes back to them by itself.
+- **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
+  whenever your session ends. For a browser on another device, add one in your account menu, **Add a
+  password**.
+- **Preferences › Servers › agentes.chat on this Mac:** reach (Tailscale needs HTTPS turned on for your
+  tailnet, which **Turn it on** opens; on Linux, run `sudo tailscale set --operator=$USER` once), the
+  phone's QR code, usage statistics, **Back up now** (`~/.agentes/backups/agentes-<date>.tar.gz`, with the
+  database, the files and `.env`), Restart, Stop, and **Stop running it here…**, which keeps its data.
+- **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
+  `~/.agentes/logs/server.log`.
+- A server you installed in `~/.agentes` from the terminal stays the terminal's: the app offers **Use
+  it** instead, and opens its owner link while it waits for its owner.
 
 **By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
 (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
@@ -617,7 +642,7 @@ service on:
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
-| Tailscale | `COMPOSE_PROFILES=tailscale` | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
+| Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.

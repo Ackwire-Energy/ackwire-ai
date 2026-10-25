@@ -1,6 +1,6 @@
 # 0060. One-command install, native mode, and the server's computer
 
-- Status: Accepted. Built: the installer, the server's computer, plain words, native mode's server and its packages (§2), and the first account by an owner link or key (§6), which the setup and the desktop app don't hand out yet. Not built yet: the installer's native path (`install.sh --native`, which uses those packages), so a Mac without Docker installs by hand for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
+- Status: Accepted. Built: the installer, the server's computer, plain words, native mode's server and its packages (§2), and the first account by an owner link or key (§6), with the desktop app's server on the same computer running on its owner key (ADR 0066 §7); the setup doesn't hand out its owner link yet. Not built yet: the installer's native path (`install.sh --native`, which uses those packages), so a Mac without Docker installs by hand for now, and the setup's question for the server's computer (§3), which is set up by hand until then (`SELF_HOSTING.md`).
 - Date: 2026-10-24
 - Extends: ADR 0003 (PGlite), ADR 0025 (connected computers), ADR 0030 (isolation on computers), ADR 0036 (one runner per organization), ADR 0041 (accounts on a computer)
 - Out of scope for now: Windows as the server (the desktop app is a client there, ADR 0066; WSL2 follows the Linux path), a container image as the agents' computer, native mode as a server database at scale
@@ -72,7 +72,7 @@ It listens on `127.0.0.1` only and answers only requests whose `Host` is `127.0.
 - A `v*` tag's release carries `agentes-native-<version>-<os>-<arch>.tar.gz` (66 MB for Linux x64), `native.json` (`{ version, pgMajor, pglite, files: { "<os>-<arch>": { name, sha256, size } } }`) and `native.json.sig`, its minisign signature with the desktop updater's key (`tauri signer sign`). The installer checks the signature with that key, pinned in it, then each archive's SHA-256, before it extracts anything.
 - They are fetched through agentes.chat, like the desktop app's builds (ADR 0036 §9): `GET /api/native/latest` answers the newest `v*` release's `native.json` and its signature, `GET /api/native/download/<version>/<file>` one of its assets, read with the same token and cache as the desktop app's. A `desktop-v*` release is never taken for one of these. The signature makes the route untrusted.
 - A package extracts to `~/.agentes/app/<version>`, with `current` as a symlink and the previous version kept.
-- The desktop app can carry the same `server/` and `web/` and run `server/native.js` with the program it already ships for agents' work on that computer, acting as Bun (`BUN_BE_BUN=1`): that program, compiled for `bun-linux-x64-baseline`, runs it.
+- The desktop app carries the same `server/` and `web/` and runs `server/native.js` itself, as its child, with the program it already ships for agents' work on that computer acting as Bun (`BUN_BE_BUN=1`; that program, compiled for `bun-linux-x64-baseline`, runs it): its own copy in `~/.agentes/app/<version>`, updated with the app, and no service, which is for installs from a terminal (ADR 0066 §7).
 
 **Service:**
 
@@ -86,6 +86,7 @@ The machine that runs agentes.chat is also a computer for its agents, "Computado
 
 - **Linux:** the runner is installed on the host in its system mode: a root supervisor that runs no agent code, and each agent as its own OS user with its own folder and memory limit. A container isn't used, because Chrome's sandbox doesn't start in a container with dropped capabilities and the default seccomp and AppArmor profiles, `--no-sandbox` next to every organization's tokens is not acceptable, and a container can't hold one OS user and one desktop per agent.
 - **macOS:** the runner on the Mac. Agents run as the person there, so with native mode the wizard keeps their commands off until the person says yes ("they run as you and can reach this server's files"). A dedicated macOS user is the safer yes (ADR 0030). Run by hand, `agentes-runner host` turns commands on unless given `--no-exec`, like `pair`.
+- **The desktop app's server here** (macOS and Linux, ADR 0066 §7): the same, as the person, on a Linux desktop too (`host --once` writes single-user homes there and the app runs them), with commands off until the person turns them on.
 
 **How it joins organizations:**
 
@@ -132,6 +133,7 @@ An instance sends agentes.chat nothing on its own. If a usage report is added:
 - The wizard asks one yes/no question with one plain line saying what it is, and never prints the report. `agentes telemetry` prints it on request.
 - Settings shows a card with its title, the switch and "Ver o que é enviado", and nothing else.
 - Before a release sends it, `SELF_HOSTING.md` ("Optional services and what they receive") lists what it sends and how to turn it off.
+- Its setting is `TELEMETRY=on|off` in the install's `.env`. The desktop app's server here writes it from its switch, on by default, with `INSTALL_MODE=desktop` (ADR 0066 §7).
 
 The terminal and the card stay short, and the full explanation lives in one public place.
 
