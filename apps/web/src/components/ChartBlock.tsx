@@ -1,5 +1,5 @@
 import { type ChartSpec, chartShares, chartTable, formatChartValue, parseChart } from "@agenteschat/client/lib/chart";
-import { type AgentColor, Button, Dialog, DialogBody, parseColor, PixelSpinner } from "@agenteschat/ui";
+import { type AgentColor, Button, Dialog, DialogBody, PixelSpinner, parseColor } from "@agenteschat/ui";
 import {
   areaCells,
   barCells,

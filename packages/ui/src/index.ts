@@ -328,7 +328,6 @@ export {
 } from "./recurrence";
 export { pixelBurst } from "./sky/burst";
 export { ditherCells, ditherSvg, ditherTones, ditherUrl } from "./sky/dither";
-export { selectionSkyUrl } from "./sky/selection";
 export {
   drawSprite,
   prefersReducedMotion,
@@ -339,6 +338,7 @@ export {
   SPRITE,
   startSky,
 } from "./sky/engine";
+export { selectionSkyUrl } from "./sky/selection";
 export { agentTones, EYE, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones, spriteTone } from "./sky/tones";
 export {
   allZones,
