@@ -527,6 +527,14 @@ const HIDDEN: Record<string, string> = {
 };
 const hidden = (name: string) => `[Desktop Entry]\nType=Application\nName=${name}\nHidden=true\n`;
 
+/**
+ * XFCE's Internet menu (there once some other network app is installed) has Browser's globe for its icon: it gets
+ * the theme's network sphere instead, a purple one, at every size in elementary-xfce 0.16 to 0.21. The file takes
+ * the place of XFCE's own (`xfce-network.directory`), with its name and comment.
+ */
+const INTERNET_MENU =
+  "[Desktop Entry]\nVersion=1.0\nType=Directory\nName=Internet\nComment=Applications for Internet access\nIcon=preferences-system-network\n";
+
 interface LookFile {
   /** Under HOME. */
   path: string;
@@ -553,6 +561,7 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
     ...dock,
     [".config/gtk-3.0/gtk.css", GTK_CSS],
     [".config/menus/xfce-applications.menu", menu(apps)],
+    [".local/share/desktop-directories/xfce-network.directory", INTERNET_MENU],
     ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),
     [`.local/share/applications/${WAIT_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, WAIT_WM_CLASS, BROWSER_ICON)],
     [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, NOTE_WM_CLASS, NOTE_ICON)],

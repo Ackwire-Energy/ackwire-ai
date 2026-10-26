@@ -374,6 +374,16 @@ test("the apps menu: Browser, Files and Terminal first, then whatever else is in
   ]) {
     expect(textOf(home, look(), `.local/share/applications/${entry}.desktop`)).toContain("Hidden=true");
   }
+  // XFCE's Internet menu (once another network app is installed): its own icon is Browser's globe.
+  expect(textOf(home, look(), ".local/share/desktop-directories/xfce-network.directory").split("\n")).toEqual([
+    "[Desktop Entry]",
+    "Version=1.0",
+    "Type=Directory",
+    "Name=Internet",
+    "Comment=Applications for Internet access",
+    "Icon=preferences-system-network",
+    "",
+  ]);
 });
 
 test("the rest: one workspace, the wallpaper 1:1, no desktop icons, the theme the computer has, the terminal's colors", () => {
@@ -505,7 +515,7 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
     version: 5,
-    files: "97c2df90e400a9b7",
+    files: "8b294ae1558cf237",
   });
 });
 
