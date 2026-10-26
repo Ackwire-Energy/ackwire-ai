@@ -10,6 +10,13 @@ import {
 } from "../src";
 
 const msg = { to: ["ana@example.com"], subject: "Oi", html: "<p>Oi</p>", text: "Oi", idempotencyKey: "invite:1" };
+/** A picture the HTML shows as `cid:logo-ink@agentes.chat`. */
+const logo = {
+  cid: "logo-ink@agentes.chat",
+  filename: "logo-ink.png",
+  contentType: "image/png",
+  content: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+};
 
 describe("MillionSend sender", () => {
   test("POST /emails with bearer key, Resend-compatible fields and an Idempotency-Key", async () => {
@@ -37,6 +44,31 @@ describe("MillionSend sender", () => {
       reply_to: "suporte@agentes.chat",
       tags: [{ name: "kind", value: "invitation" }],
     });
+  });
+
+  test("pictures attached to the message go as attachments with their content id", async () => {
+    const bodies: unknown[] = [];
+    const sender = createMillionSendSender({
+      apiKey: "k",
+      from: "f@x.y",
+      fetch: (async (_url: string, init: RequestInit) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return Response.json({ id: "e1" });
+      }) as unknown as typeof fetch,
+    });
+    await sender.send({ ...msg, inline: [logo] });
+    expect(bodies[0]).toMatchObject({
+      attachments: [
+        {
+          filename: "logo-ink.png",
+          content: "iVBORw==",
+          content_type: "image/png",
+          content_id: "logo-ink@agentes.chat",
+        },
+      ],
+    });
+    await sender.send(msg);
+    expect(bodies[1]).not.toHaveProperty("attachments");
   });
 
   test("409 (same idempotency key) counts as sent; 429/5xx retry; 4xx don't", async () => {
@@ -157,6 +189,27 @@ describe("SMTP sender", () => {
       transport: nodemailer.createTransport({ jsonTransport: true }),
     });
     expect((await json.send(msg)).id).toMatch(/^<.+>$/);
+  });
+
+  test("pictures attached to the message carry their content id, so the HTML's cid: finds them", async () => {
+    const json = nodemailer.createTransport({ jsonTransport: true });
+    const built: string[] = [];
+    const sender = createSmtpEmailSender({
+      url: "smtp://unused",
+      from: "f@x.y",
+      transport: {
+        sendMail: async (mail: Mail.Options) => {
+          const info = await json.sendMail(mail);
+          built.push(String(info.message));
+          return info;
+        },
+      },
+    });
+    await sender.send({ ...msg, inline: [logo] });
+    const message = JSON.parse(built[0] ?? "{}") as { attachments?: Record<string, unknown>[] };
+    expect(message.attachments).toEqual([
+      expect.objectContaining({ filename: "logo-ink.png", contentType: "image/png", cid: "logo-ink@agentes.chat" }),
+    ]);
   });
 
   test("5xx answers (recipient refused, bad login) don't retry; 4xx and connection failures do", async () => {

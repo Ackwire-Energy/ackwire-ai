@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   type Adapters,
   createComposioClient,
@@ -38,7 +38,9 @@ import {
 import {
   adoptRestoredOperatorEvents,
   createLocalKeyWrapper,
+  defaultEmailFrom,
   drainLocalRuns,
+  emailArtFor,
   enableCaches,
   enableOperatorEvents,
   isBlockedAddress,
@@ -159,6 +161,23 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     const adopted = await adoptRestoredOperatorEvents(database.db);
     if (adopted > 0) log.info("operator events from a restored dump moved to the front of the feed", { adopted });
   }
+  const webDir = resolve(config.WEB_DIR);
+  const emailArt = await emailArtFor(config.PUBLIC_URL, existsSync(webDir) ? webDir : undefined, config.EMAIL_ART);
+  const because = {
+    attach: "EMAIL_ART=attach",
+    blocked: "PUBLIC_URL's host is private",
+    unreachable: "PUBLIC_URL's host didn't resolve, until a restart",
+  };
+  const pictures = {
+    from: emailArt.base ?? "attached to each message",
+    ...(emailArt.attached && { because: because[emailArt.attached] }),
+  };
+  // A failed lookup attaches them for the whole run, though the host may well be public.
+  if (emailArt.attached === "unreachable") log.warn("email pictures", pictures);
+  else log.info("email pictures", pictures);
+  if (!existsSync(join(webDir, "email", "logo-ink.png"))) {
+    log.warn("emails' pictures not found: their logo and art won't show", { dir: join(webDir, "email") });
+  }
   const engine = buildEngine({
     db: database.db,
     config,
@@ -166,6 +185,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     modelProviders,
     onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
     onRunProfile: (p) => log.debug("run profile", p),
+    emailArt,
   });
   const workers = startWorkers({
     db: database.db,
@@ -182,7 +202,6 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   const telemetry = startTelemetry({ db: database.db, config, log });
 
   const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
-  const webDir = resolve(config.WEB_DIR);
   const app = createApp({
     edition,
     version,
@@ -319,8 +338,7 @@ export async function prepareDatabase(database: DatabaseHandle, log: Logger, mig
 
 /** MillionSend (or another Resend-compatible API) when keyed, else SMTP when `SMTP_URL` is set, else only the log. */
 function emailSender(config: Config, log: Logger): EmailSender {
-  // The Cloud (PUBLIC_URL https://agentes.chat) sends as ola@agentes.chat.
-  const from = config.EMAIL_FROM ?? `agentes <ola@${new URL(config.PUBLIC_URL).hostname}>`;
+  const from = config.EMAIL_FROM ?? defaultEmailFrom(config.PUBLIC_URL);
   const replyTo = config.EMAIL_REPLY_TO;
   if (config.MILLIONSEND_API_KEY) {
     return createMillionSendSender({

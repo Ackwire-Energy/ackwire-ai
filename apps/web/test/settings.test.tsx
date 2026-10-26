@@ -171,10 +171,10 @@ describe("Configurações da organização", () => {
     await click(within(add).getByRole("button", { name: "Salvar chave" }));
     expect(add.textContent).toContain("As que começam com sk-cp- são do plano");
 
-    // A DeepSeek key while Anthropic is chosen: whose is it?
-    await choose("Anthropic");
+    // A DeepSeek key while Claude is chosen: whose is it?
+    await choose("Claude");
     await type(field, "sk-0123456789abcdef0123456789abcdef");
-    expect(add.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
+    expect(add.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
     expect(add.textContent).toContain("É de outro provedor?");
     for (const name of ["OpenAI", "DeepSeek", "Kimi", "MiniMax"])
       expect(within(add).getByRole("button", { name })).toBeTruthy();
@@ -192,8 +192,8 @@ describe("Configurações da organização", () => {
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
-    expect(keys().textContent).toContain("Anthropic da Acme");
-    expect(keys().textContent).toContain("Anthropic · Termina em 7f2a");
+    expect(keys().textContent).toContain("Claude da Acme");
+    expect(keys().textContent).toContain("Claude · Termina em 7f2a");
     expect(keys().textContent).toContain("Padrão do workspace");
     // Platform key not offered by this server: not mentioned.
     expect(keys().textContent).not.toContain("chave do agentes");
@@ -201,7 +201,7 @@ describe("Configurações da organização", () => {
     expect(del.hasAttribute("disabled")).toBe(true);
     expect(keys().textContent).toContain("Escolha outra chave padrão antes de apagar esta.");
     await click(within(keys()).getByRole("button", { name: "Trocar a chave" }));
-    const rotate = screen().getByRole("dialog", { name: "Trocar a chave Anthropic da Acme" });
+    const rotate = screen().getByRole("dialog", { name: "Trocar a chave Claude da Acme" });
     await type(within(rotate).getByLabelText("Chave da API"), "sk-ant-api03-new-key-9999");
     await click(within(rotate).getByRole("button", { name: "Trocar a chave" }));
     await settle(4);
@@ -232,7 +232,7 @@ describe("Configurações da organização", () => {
     expect(state.calls.filter((c) => c.method === "orgs.updateSettings").at(-1)?.args[1]).toEqual({
       defaultCredentialId: state.credentials[1]?.id,
     });
-    const anthropicRow = within(keys()).getByText("Anthropic da Acme").closest(".ac-list__row") as HTMLElement;
+    const anthropicRow = within(keys()).getByText("Claude da Acme").closest(".ac-list__row") as HTMLElement;
     const delOld = within(anthropicRow).getByRole("button", { name: "Apagar" });
     expect(delOld.hasAttribute("disabled")).toBe(false);
     await click(delOld);

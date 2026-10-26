@@ -64,7 +64,6 @@ export {
   type AvatarKind,
   type AvatarProps,
   AvatarStack,
-  initialsOf,
 } from "./components/Avatar";
 export {
   BRAIN_ICONS,
@@ -313,6 +312,7 @@ export {
   wrapSelection,
 } from "./format";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
+export { initialsOf } from "./names";
 export {
   BUSINESS_DAYS,
   nextOccurrences,

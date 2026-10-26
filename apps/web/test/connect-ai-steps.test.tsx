@@ -116,7 +116,7 @@ describe("Conectar uma IA", () => {
     const { dialog } = await connect();
     await click(within(dialog).getByRole("button", { name: /^ChatGPT/ }));
     await settle(6);
-    const block = within(dialog).getByRole("region", { name: "Adicionar conta do Codex" });
+    const block = within(dialog).getByRole("region", { name: "Adicionar conta do ChatGPT" });
     expect(within(block).getByRole("status", { name: "" }).textContent).toContain("Esperando");
     expect(within(block).getByLabelText("Código para o ChatGPT").textContent).toBe("ABCD-1234");
   });

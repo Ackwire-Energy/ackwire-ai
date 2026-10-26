@@ -61,7 +61,7 @@ const brainDialog = async () => {
 const shareSwitch = (d: HTMLElement, name = /^Só responde a você/) => within(d).getByRole("switch", { name });
 
 describe("Só responde a você (Quem pensa)", () => {
-  test("on by default; off shows Anthropic's words, Manter keeps it, Responder a todos saves it with the terms", async () => {
+  test("on by default; off shows Claude's terms, Manter keeps it, Responder a todos saves it with the terms", async () => {
     const state = await ada({});
     const d = await brainDialog();
     const on = shareSwitch(d);
@@ -71,7 +71,7 @@ describe("Só responde a você (Quem pensa)", () => {
     await click(on);
     let share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
     expect(share.textContent).toContain(
-      "A Anthropic diz que as assinaturas pessoais do Claude são para uso pessoal. Usar a sua para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+      "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
     );
     await click(within(share).getByRole("button", { name: "Manter só comigo" }));
     expect(screen().queryByRole("dialog", { name: "Agora a Ada responde a todos" })).toBeNull();
@@ -118,7 +118,7 @@ describe("Só responde a você (Quem pensa)", () => {
     d = await brainDialog();
     await click(shareSwitch(d));
     expect(screen().getByRole("dialog", { name: "Agora a Ada responde a todos" }).textContent).toContain(
-      "A Anthropic diz que cada assento do plano é de uma pessoa.",
+      "Os termos do Claude dizem que cada assento é de uma pessoa.",
     );
     cleanup();
     const glm: MachineAccount = {

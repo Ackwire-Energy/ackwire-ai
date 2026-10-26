@@ -1,5 +1,8 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
+import { sql } from "drizzle-orm";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
@@ -42,6 +45,17 @@ function migratedTemplate(): Promise<Blob> {
     return dump;
   })();
   return template;
+}
+
+/**
+ * Runs one migration's statements again, as the migrator does, on rows a test wrote. It is found by its name,
+ * which a renumbering keeps.
+ */
+export async function runMigration(db: Database, name: string) {
+  const file = readdirSync(migrationsFolder).find((f) => f.endsWith(`_${name}.sql`));
+  if (!file) throw new Error(`No migration named ${name}`);
+  const statements = readFileSync(join(migrationsFolder, file), "utf8").split("--> statement-breakpoint");
+  for (const statement of statements) await db.execute(sql.raw(statement));
 }
 
 async function createOnServer(serverUrl: string) {

@@ -250,14 +250,14 @@ describe("models by provider and the default key", () => {
     expect(cards[0]?.querySelector(".newag__model-head b")?.textContent).toBe("Automático");
     expect(cards[0]?.getAttribute("aria-pressed")).toBe("true");
     expect(cards.slice(1).map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
-      "Anthropic",
-      "Anthropic",
-      "Anthropic",
+      "Claude",
+      "Claude",
+      "Claude",
       "OpenAI",
     ]);
     const gpt = within(models).getByRole("button", { name: /GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Adicione uma chave da OpenAI para usar");
+    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
     const key = screen().getByRole("combobox", { name: "Chave" });
     expect(key.textContent).toContain("Chave padrão do workspace");
   });

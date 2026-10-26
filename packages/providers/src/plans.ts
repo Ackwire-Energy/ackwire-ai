@@ -26,6 +26,8 @@ export interface PlanModel {
 export interface CodingPlan {
   /** The account's first name ("GLM Coding"), numbered per owner. */
   label: string;
+  /** The plan as its maker sells it ("GLM Coding Plan"), for titles. */
+  name: string;
   /** Who sells it, for the logo's neighbors and the terms notice ("{{maker}} says…"). */
   maker: string;
   /** Where its owner makes the key. */
@@ -49,6 +51,7 @@ export interface CodingPlan {
 export const CODING_PLANS = {
   zai: {
     label: "GLM Coding",
+    name: "GLM Coding Plan",
     maker: "Z.ai",
     site: "https://z.ai/manage-apikey/apikey-list",
     keyPattern: "^[A-Za-z0-9._-]{16,256}$",
@@ -65,6 +68,7 @@ export const CODING_PLANS = {
   },
   kimi: {
     label: "Kimi Code",
+    name: "Kimi Code",
     maker: "Kimi",
     site: "https://www.kimi.com/code/console",
     keyPattern: "^[A-Za-z0-9._-]{16,256}$",
@@ -81,6 +85,7 @@ export const CODING_PLANS = {
   },
   minimax: {
     label: "MiniMax",
+    name: "MiniMax M Plan",
     maker: "MiniMax",
     site: "https://platform.minimax.io/console/plan",
     keyPattern: "^[A-Za-z0-9._-]{16,2048}$",
@@ -92,6 +97,7 @@ export const CODING_PLANS = {
   },
   opencode: {
     label: "OpenCode Go",
+    name: "OpenCode Go",
     maker: "OpenCode",
     site: "https://opencode.ai/console",
     keyPattern: "^oc_sk_[A-Za-z0-9._-]{8,256}$",

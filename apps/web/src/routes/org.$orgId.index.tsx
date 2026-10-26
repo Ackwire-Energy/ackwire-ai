@@ -4,14 +4,15 @@ import { useTranslation } from "react-i18next";
 import { EmptyPage } from "@/components/EmptyPage";
 import { Main } from "@/components/Main";
 
-/** `/org/$orgId` → #general (or the first channel you're in). */
+/** `/org/$orgId` → #general (or the first channel you're in), with the link's query (`?connect=ai`). */
 export const Route = createFileRoute("/org/$orgId/")({
-  beforeLoad: async ({ context, params }) => {
+  beforeLoad: async ({ context, params, search }) => {
     const channels = await context.queryClient
       .ensureQueryData(channelsQuery(context.api, params.orgId))
       .catch(() => []);
     const home = channels.find((c) => c.name === "general" && c.isMember) ?? channels.find((c) => c.isMember);
-    if (home) throw redirect({ to: "/org/$orgId/c/$channelId", params: { orgId: params.orgId, channelId: home.id } });
+    if (home)
+      throw redirect({ to: "/org/$orgId/c/$channelId", params: { orgId: params.orgId, channelId: home.id }, search });
   },
   component: function NoChannel() {
     const { t } = useTranslation();

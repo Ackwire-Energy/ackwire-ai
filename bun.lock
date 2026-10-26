@@ -219,6 +219,8 @@
         "@agenteschat/db": "workspace:*",
         "@agenteschat/i18n": "workspace:*",
         "@agenteschat/providers": "workspace:*",
+        "@agenteschat/tokens": "workspace:*",
+        "@agenteschat/ui": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.32.1",
         "libpg-query": "17",
         "zod": "^4.6.5",

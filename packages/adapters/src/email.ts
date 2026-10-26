@@ -16,6 +16,16 @@ export interface EmailMessage {
   idempotencyKey: string;
   replyTo?: string;
   tags?: { name: string; value: string }[];
+  /** Pictures attached to the message. */
+  inline?: InlinePart[];
+}
+
+/** A picture attached to a message, shown where its HTML says `cid:{cid}`. */
+export interface InlinePart {
+  cid: string;
+  filename: string;
+  contentType: string;
+  content: Uint8Array;
 }
 
 /** A marketing contact (e.g. a confirmed waiting list address), keyed by email. */
@@ -81,6 +91,16 @@ export function createMillionSendSender(options: {
             text: message.text,
             ...(message.replyTo || options.replyTo ? { reply_to: message.replyTo ?? options.replyTo } : {}),
             ...(message.tags?.length ? { tags: message.tags } : {}),
+            ...(message.inline?.length
+              ? {
+                  attachments: message.inline.map((a) => ({
+                    filename: a.filename,
+                    content: Buffer.from(a.content).toString("base64"),
+                    content_type: a.contentType,
+                    content_id: a.cid,
+                  })),
+                }
+              : {}),
           }),
         });
       } catch (error) {
@@ -161,6 +181,16 @@ export function createSmtpEmailSender(options: {
           html: message.html,
           text: message.text,
           replyTo: message.replyTo ?? options.replyTo,
+          ...(message.inline?.length
+            ? {
+                attachments: message.inline.map((a) => ({
+                  filename: a.filename,
+                  content: Buffer.from(a.content),
+                  contentType: a.contentType,
+                  cid: a.cid,
+                })),
+              }
+            : {}),
         });
         return { id: String(info.messageId) };
       } catch (error) {
