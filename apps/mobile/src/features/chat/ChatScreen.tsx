@@ -162,6 +162,9 @@ const COMPOSER_INPUT_ID = "chat-composer";
  * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
  * for help a push or the inbox opened it for (its card opens in place, in control).
  */
+/** "Revisor, Dev" for a screen reader, or just "Revisor" while there is no role or status (never "Revisor, ."). */
+const who = (name: string, status: string) => (status ? `${name}, ${status}` : name);
+
 export function ChatScreen({
   channelId,
   threadId,
@@ -869,7 +872,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         title={title}
         subtitle={subtitle}
         onPress={openOptions}
-        label={t("mobile.chat.headerChannel", { name: title, status: subtitle ?? "" })}
+        label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : dm ? (
       <HeaderPill
@@ -887,8 +890,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         label={
           dmAgentId
-            ? t("mobile.chat.headerAgent", { name: dm.with.name, status: dmDoing ?? subtitle ?? "" })
-            : t("mobile.chat.headerChannel", { name: dm.with.name, status: "" })
+            ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmDoing ?? subtitle ?? "") })
+            : t("mobile.chat.headerChannel", { who: who(dm.with.name, "") })
         }
       />
     ) : channel ? (
@@ -908,7 +911,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           ) : undefined
         }
         onPress={openOptions}
-        label={t("mobile.chat.headerChannel", { name: title, status: subtitle ?? "" })}
+        label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
   const right =

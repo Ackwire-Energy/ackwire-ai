@@ -187,22 +187,23 @@ function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void
         <Text variant="small" tone="muted">
           {t("mobile.connectors.emptySub")}
         </Text>
+        {admin ? (
+          // Under the text, spelled out: beside it, it squeezed the text into a narrow column; a globe alone
+          // didn't say it connects a service by its MCP address.
+          <Pressable
+            onPress={onAddress}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.connectors.addressTitle")}
+            hitSlop={6}
+            style={styles.byAddress}
+          >
+            <Icon name="globe" size={15} color={c.muted} />
+            <Text variant="small" style={styles.bold}>
+              {t("mobile.connectors.byAddress")}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
-      {admin ? (
-        // Spelled out: a globe alone didn't say it connects a service by its MCP address.
-        <Pressable
-          onPress={onAddress}
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.connectors.addressTitle")}
-          hitSlop={6}
-          style={styles.byAddress}
-        >
-          <Icon name="globe" size={16} color={c.muted} />
-          <Text variant="small" tone="muted" style={styles.bold}>
-            {t("mobile.connectors.byAddress")}
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -331,7 +332,7 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  byAddress: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "center" },
+  byAddress: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 8 },
   suggestions: { gap: 10, paddingHorizontal: 16 },
   filters: { paddingTop: 20 },
   card: {
