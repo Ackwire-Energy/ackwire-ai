@@ -211,8 +211,10 @@ function ComputerError({ life }: { life: Lifecycle }) {
   if (!error) return null;
   return (
     <p className="computer-error small" role="alert">
-      <Icon name="alert" size={16} />
-      <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
+      <span className="ac-iconline">
+        <Icon name="alert" size={16} />
+        <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
+      </span>
       <Button size="sm" variant="ghost" onClick={() => life.run(error.action)}>
         {t("computer.retry")}
       </Button>
@@ -810,7 +812,7 @@ function CloudComputerDialog({
               ))}
             </RadioGroup>
             {draft.network === "open" && (
-              <p className="sandbox-warning small" role="note">
+              <p className="sandbox-warning small ac-iconline" role="note">
                 <Icon name="alert" size={16} />
                 {t("sandbox.openWarning")}
               </p>
@@ -912,7 +914,7 @@ function CloudComputerDialog({
             />
             <label htmlFor="sb-approval">{t("sandbox.requireApproval")}</label>
           </span>
-          <p className="computers-note small" role="note">
+          <p className="computers-note small ac-iconline" role="note">
             <Icon name="info" size={16} />
             <span>{t("computers.cloud.note")}</span>
           </p>

@@ -273,7 +273,7 @@ function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: ()
         </Button>
         <span className="dk-help">
           {t("desktop.first.create")}{" "}
-          <button type="button" className="dk-link" onClick={() => onCloud("/signup")}>
+          <button type="button" className="ac-link dk-link" onClick={() => onCloud("/signup")}>
             {t("desktop.first.createLink")}
           </button>
         </span>
@@ -332,7 +332,7 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
 function ProblemLine({ problem, host }: { problem: ConnectProblem; host: string }) {
   const { t } = useTranslation();
   return (
-    <span className="dk-honest dk-fr__problem" role="alert">
+    <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
       <Icon name="alert" size={16} />
       <span>{t(PROBLEM_TEXT[problem], PROBLEM_HOSTLESS.has(problem) ? {} : { host })}</span>
     </span>
@@ -748,7 +748,7 @@ function HereSetup({
         {steps.map((step) => {
           const state = states[step];
           return (
-            <li key={step} data-state={state}>
+            <li key={step} className="ac-iconline" data-state={state}>
               <span className="dk-fr__stepmark" aria-hidden="true">
                 {state === "active" ? (
                   <PixelSpinner size={16} color="sky" />
@@ -773,7 +773,7 @@ function HereSetup({
                 </span>
                 {state === "failed" && (
                   <span className="dk-fr__stepfail">
-                    <span className="dk-honest">
+                    <span className="dk-honest ac-iconline">
                       <Icon name="alert" size={16} />
                       {step === "account" ? t("desktop.here.fail.account") : t("desktop.here.fail.start")}
                     </span>

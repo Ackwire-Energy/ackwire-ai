@@ -57,7 +57,7 @@ export function EmailTriggerFields({
   }, [value, folders.data, folders.isError, onChange]);
   if (accounts.isSuccess && list.length === 0) {
     return (
-      <p className="newag__note">
+      <p className="newag__note ac-iconline">
         <Icon name="mail" size={16} />
         <span>
           {t("mail.routine.noMailbox")}{" "}

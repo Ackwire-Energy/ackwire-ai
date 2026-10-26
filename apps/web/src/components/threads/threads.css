@@ -21,8 +21,6 @@
   background: color-mix(in srgb, var(--ink) 18%, transparent);
 }
 .thread-marker {
-  display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 6px 8px;
   padding: 0 12px 8px var(--thread-indent);
@@ -30,7 +28,6 @@
   color: var(--faint);
 }
 .thread-marker > .ac-icon {
-  flex: none;
   width: 14px;
   height: 14px;
 }
@@ -289,6 +286,7 @@
   background: var(--sunken);
   box-shadow: inset 0 0 0 1.5px var(--line2);
   font: inherit;
+  line-height: normal;
   color: var(--ink);
   outline: none;
 }
@@ -296,9 +294,6 @@
   box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 .thread-origin {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   padding: 4px 12px;
   font-size: 12.5px;
@@ -442,18 +437,12 @@
   color: var(--muted);
 }
 .thread-context__note {
-  display: flex;
-  align-items: flex-start;
   gap: 7px;
   margin: 4px 0 0;
   padding: 9px 12px 10px;
   border-top: 1px solid var(--line);
   font-size: 12.5px;
   color: var(--faint);
-}
-.thread-context__note .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 .thread-archived {
   display: flex;
@@ -469,6 +458,7 @@
 .thread-archived > span {
   flex: 1 1 220px;
   min-width: 0;
+  gap: 10px;
 }
 .thread-archived b {
   color: var(--ink);

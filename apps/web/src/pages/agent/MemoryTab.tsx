@@ -257,11 +257,11 @@ export function MemoryTab() {
           </Card>
         </div>
         <div className="agp-col">
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="info" size={16} />
             <span>{t("memory.subtitle", g)}</span>
           </p>
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="shield" size={16} />
             <span>{t("agentPage.memory.noPermission", g)}</span>
           </p>

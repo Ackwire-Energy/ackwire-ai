@@ -65,7 +65,7 @@ function EventLine({
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
   return (
-    <div className="cn-line" data-message-id={message.id}>
+    <div className="cn-line ac-iconline" data-message-id={message.id}>
       <Icon name={icon} size={14} />
       <span className="cn-line__text">
         {label} · {formatTime(i18n.language, message.createdAt)}

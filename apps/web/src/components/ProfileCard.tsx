@@ -221,7 +221,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         <dt>{t("profile.model")}</dt>
         <dd>
           {thinks ? (
-            <span className="profile-card__brain">
+            <span className="profile-card__brain ac-iconline">
               {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
               {thinks.text}
             </span>

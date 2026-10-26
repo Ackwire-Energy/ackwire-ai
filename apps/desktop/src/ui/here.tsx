@@ -51,7 +51,7 @@ export function ReachRow({
                 {" "}
                 <button
                   type="button"
-                  className="dk-link"
+                  className="ac-link dk-link"
                   onClick={() =>
                     void host.openTailscale(tailnet.state === "missing" ? "download" : "app").catch(() => {})
                   }
@@ -85,14 +85,18 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
   const host = useHost();
   const reason = t(REASON_TEXT[problem.reason]);
   return (
-    <span className="dk-honest dk-fr__problem" role="alert">
+    <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
       <Icon name="alert" size={16} />
       <span>
         {text === "fail" ? t("desktop.here.fail.reach", { reason }) : t("desktop.server.reachFailed", { reason })}
         {problem.reason === "https" && (
           <>
             {" "}
-            <button type="button" className="dk-link" onClick={() => void host.openTailscale("https").catch(() => {})}>
+            <button
+              type="button"
+              className="ac-link dk-link"
+              onClick={() => void host.openTailscale("https").catch(() => {})}
+            >
               {t("desktop.here.turnOn")}
             </button>
           </>

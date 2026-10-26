@@ -195,7 +195,7 @@ export function RangeRows({
 
   if (!sel || !info || !runs) {
     return (
-      <p className="channel__notice" role="status">
+      <p className="channel__notice ac-iconline" role="status">
         <Icon name="spinner" size={16} />
         {t("threads.adjust.loading")}
       </p>

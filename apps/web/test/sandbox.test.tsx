@@ -257,7 +257,13 @@ describe("creating the PC feels alive", () => {
     const pc = screen().getByRole("region", { name: "PC do Atlas" });
     await click(within(pc).getByRole("button", { name: "Criar PC do Atlas" }));
     await settle(4);
-    expect(within(pc).getByRole("alert").textContent).toContain("Não deu para ligar: sem cota no provedor");
+    const alert = within(pc).getByRole("alert");
+    expect(alert.textContent).toContain("Não deu para ligar: sem cota no provedor");
+    // The icon leads the words in a line of their own; the button sits beside it, so the row centres it on them.
+    const line = alert.querySelector(".ac-iconline") as HTMLElement;
+    expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
+    expect(line.textContent).toContain("sem cota no provedor");
+    expect(line.contains(within(pc).getByRole("button", { name: "Tentar de novo" }))).toBe(false);
     await click(within(pc).getByRole("button", { name: "Tentar de novo" }));
     await settle(4);
     expect(calls).toBe(2);

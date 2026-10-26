@@ -107,7 +107,7 @@ export function Folders() {
           />
         ))}
       </PrefCard>
-      <p className="dk-note">
+      <p className="dk-note ac-iconline">
         <Icon name="info" size={16} />
         <span>{t("desktop.prefs.folders.note", { org, path: shortPath(home.status?.workspace ?? "~/agentes") })}</span>
       </p>

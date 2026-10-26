@@ -308,13 +308,13 @@ export function ActivityTab() {
                             {x.routine && <Chip icon="routines">{t("agentPage.activity.routine")}</Chip>}
                           </span>
                           {r.status === "failed" && (
-                            <span className="agp-run__fail">
+                            <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
                               {failure(t, r)}
                             </span>
                           )}
                           {r.deniedRepo && saved.repos?.mode === "some" && !covers(saved.repos.list, r.deniedRepo) && (
-                            <span className="agp-run__fail">
+                            <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
                               {t("repos.deniedRun", { repo: r.deniedRepo, ...g })}
                             </span>

@@ -64,7 +64,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
   if (!taken) return null;
   const name = dir.authorName(message.author);
   return (
-    <div className="iw-line" data-message-id={message.id}>
+    <div className="iw-line ac-iconline" data-message-id={message.id}>
       <Icon name="issues" size={14} />
       <span>
         {t("chat.issueWork.taken", { name })}{" "}

@@ -507,7 +507,7 @@ export function AddColumnDialog({
               }))}
             />
           </div>
-          <p className="issues-explain">
+          <p className="issues-explain ac-iconline">
             <Icon name="arrowRight" size={16} />
             <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
           </p>
@@ -637,7 +637,7 @@ function DeleteColumnDialog({
             })}
           </div>
           {to && to.stage !== col.stage && (
-            <p className="issues-explain">
+            <p className="issues-explain ac-iconline">
               <Icon name="arrowRight" size={16} />
               <span>
                 {t("issues.columns.stageChange", {

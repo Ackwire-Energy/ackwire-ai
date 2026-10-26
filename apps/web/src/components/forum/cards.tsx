@@ -202,7 +202,7 @@ export function ForumSuggestionCard({ message, suggestion }: { message: Message;
   }
   if (suggestion.state === "dismissed")
     return (
-      <p className="forum-sg-note">
+      <p className="forum-sg-note ac-iconline">
         <Icon name="dash" size={14} />
         {suggestion.decidedByUserId === who.me
           ? t("forum.suggestion.dismissedMe")
@@ -211,12 +211,12 @@ export function ForumSuggestionCard({ message, suggestion }: { message: Message;
     );
   if (leaving)
     return (
-      <p className="forum-sg-note" role="status">
+      <p className="forum-sg-note ac-iconline" role="status">
         <Icon name="dash" size={14} />
         {t("forum.suggestion.dismissedMe")}{" "}
         <button
           type="button"
-          className="forum-vlink"
+          className="ac-link forum-vlink"
           onClick={() => {
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;
@@ -281,7 +281,7 @@ export function ForumSuggestionCard({ message, suggestion }: { message: Message;
           </Button>
         </div>
       </section>
-      <p className="forum-sg-note">
+      <p className="forum-sg-note ac-iconline">
         <Icon name="shield" size={14} />
         {t("forum.suggestion.note")}
       </p>

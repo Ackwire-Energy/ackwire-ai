@@ -634,7 +634,9 @@ export function OnboardingPage() {
                 // Its answer is long: the "skip" Theo says is the way out, right where it's said.
                 <Trans
                   i18nKey="onboarding.import.leadWithSkip"
-                  components={{ skip: <button type="button" className="onb__link" onClick={skip} disabled={busy} /> }}
+                  components={{
+                    skip: <button type="button" className="ac-link onb__link" onClick={skip} disabled={busy} />,
+                  }}
                 />
               ) : (
                 t(`onboarding.${step.id}.lead`)
@@ -775,7 +777,7 @@ export function OnboardingPage() {
               ) : (
                 <p className="onb__help">
                   {t("onboarding.workspace.zone", { zone })} ·{" "}
-                  <button type="button" className="onb__link" onClick={() => setZoneOpen(true)}>
+                  <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
                     {t("onboarding.workspace.zoneChange")}
                   </button>
                 </p>
@@ -1096,7 +1098,7 @@ export function OnboardingPage() {
                     {" "}
                     <button
                       type="button"
-                      className="onb__link"
+                      className="ac-link onb__link"
                       onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
                     >
                       {t("onboarding.keyStep.useComputer", { computer: machine?.name ?? t("outage.someComputer") })}
@@ -1183,7 +1185,7 @@ export function OnboardingPage() {
               </>
             )}
             {step.id === "workspace" && confirmation && (
-              <p className="onb__help onb__note" role="status">
+              <p className="onb__help onb__note ac-iconline" role="status">
                 <Icon name={confirmation === "confirmed" ? "check" : "mail"} size={14} />
                 <span>
                   {t(`onboarding.confirmation.${confirmation}`, { email })}
@@ -1192,7 +1194,7 @@ export function OnboardingPage() {
                       <br />
                       <button
                         type="button"
-                        className="onb__link"
+                        className="ac-link onb__link"
                         onClick={() => resend.mutate()}
                         disabled={resend.isPending}
                       >
@@ -1452,14 +1454,14 @@ function ComputerStep({
       </div>
 
       {computer === "cloud" && (
-        <p className="onb__status" role="status">
+        <p className="onb__status ac-iconline" role="status">
           <Icon name="check" />
           <span>{t("onboarding.computer.cloudReady")}</span>
         </p>
       )}
 
       {computer === "host" && (
-        <p className="onb__status" role="status">
+        <p className="onb__status ac-iconline" role="status">
           <Icon name="check" />
           <span>{host?.online ? t("onboarding.computer.hostReady") : t("onboarding.computer.hostConnecting")}</span>
         </p>
@@ -1469,7 +1471,7 @@ function ComputerStep({
         <Card as="div">
           {machine ? (
             <>
-              <p className="onb__status" role="status">
+              <p className="onb__status ac-iconline" role="status">
                 <Icon name="check" />
                 <span>{t("onboarding.computer.thisMacConnected", { name: machine.name })}</span>
               </p>
@@ -1491,7 +1493,7 @@ function ComputerStep({
               </Button>
             </div>
           ) : (
-            <span className="row small muted" role="status" style={{ gap: 8 }}>
+            <span className="small muted ac-iconline" role="status">
               <Spinner />
               {t("onboarding.computer.thisMacConnecting")}
             </span>
@@ -1502,7 +1504,7 @@ function ComputerStep({
       {computer === "machine" && !app && (
         <Card as="div">
           {machine ? (
-            <p className="onb__status" role="status">
+            <p className="onb__status ac-iconline" role="status">
               <Icon name="check" />
               <span>
                 {t("onboarding.computer.connected", {
@@ -1514,7 +1516,7 @@ function ComputerStep({
           ) : (
             <>
               <ConnectComputer orgId={orgId} />
-              <span className="row small muted" role="status" style={{ gap: 8 }}>
+              <span className="small muted ac-iconline" role="status">
                 <Spinner />
                 {t("machines.download.waiting")}
               </span>
@@ -1553,14 +1555,14 @@ function WorkspaceComputerStep({
         </span>
       </div>
       {hold && (
-        <p className="setup-line" role="status">
+        <p className="setup-line ac-iconline" role="status">
           <Icon name="pause" size={14} />
           <span>{hold}</span>
         </p>
       )}
       <SetupWait view={view} reader={reader} />
       {view.phase !== "ready" && (
-        <p className="onb__status">
+        <p className="onb__status ac-iconline">
           <Icon name="check" />
           <span>{t("computerSetup.continue")}</span>
         </p>

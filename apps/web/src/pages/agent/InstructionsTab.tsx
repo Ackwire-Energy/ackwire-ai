@@ -103,7 +103,7 @@ export function InstructionsTab() {
               />
             </Card>
           )}
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="info" size={16} />
             <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
           </p>

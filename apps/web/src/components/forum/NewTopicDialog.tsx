@@ -266,7 +266,7 @@ export function NewTopicDialog({
             />
           </div>
           {preset?.originText && (
-            <p className="forum-oline">
+            <p className="forum-oline ac-iconline">
               <Icon name="issues" size={16} />
               <span>{t("forum.form.origin", { origin: preset.originText })}</span>
             </p>

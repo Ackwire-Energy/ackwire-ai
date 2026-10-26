@@ -318,8 +318,6 @@
   padding: 12px 8px 16px;
 }
 .lp .lp-dev-forum {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   margin-top: 8px;
   padding: 10px 12px;
@@ -328,8 +326,6 @@
   font-size: 13.5px;
 }
 .lp .lp-dev-forum .ac-icon {
-  flex: none;
-  margin-top: 2px;
   color: var(--muted);
 }
 .lp .lp-dev-forum div {

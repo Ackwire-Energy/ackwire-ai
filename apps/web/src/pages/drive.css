@@ -613,8 +613,6 @@ button.drive-where:focus-visible {
 /* Trash. */
 .drive-note {
   margin: 0;
-  display: flex;
-  align-items: center;
   gap: 10px;
   padding: 12px 14px;
   border-radius: 16px;

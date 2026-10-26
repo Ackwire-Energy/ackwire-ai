@@ -301,7 +301,7 @@ export function RoutinesPage() {
           <div>
             <h1>{t("routines.title")}</h1>
             <p className="routines-head__sub">{t("routines.subtitle")}</p>
-            <p className="routines-head__guard">
+            <p className="routines-head__guard ac-iconline">
               <Icon name="shield" size={14} />
               {t("routines.guard")}
             </p>
@@ -663,7 +663,7 @@ function RoutineRow({
           {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
         </span>
       </div>
-      <div className="routine-row__when">
+      <div className="routine-row__when ac-iconline">
         <span className="routine-row__when-icon" aria-hidden="true">
           <Icon
             name={
@@ -1109,7 +1109,7 @@ function RoutineDetails({
       <DetailsSection title={t("routines.panel.runsOn")}>
         <p className="routine-details__sentence">{say(whereItRuns(r.brain))}</p>
         {busy && (
-          <p className="routine-note small">
+          <p className="routine-note small ac-iconline">
             <Icon name="computer" size={14} />
             <span>{say(busy)}</span>
           </p>
@@ -1675,7 +1675,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </>
           )}
           {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
-            <p className="routine-utc-hint small">
+            <p className="routine-utc-hint small ac-iconline">
               <Icon name="waiting" size={14} />
               <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
               <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
@@ -1697,7 +1697,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </Field>
           )}
           {busy && (
-            <p className="routine-note small" role="status">
+            <p className="routine-note small ac-iconline" role="status">
               <Icon name="computer" size={14} />
               <span>{say(busy)}</span>
             </p>
