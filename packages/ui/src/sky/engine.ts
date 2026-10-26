@@ -176,6 +176,8 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
   const flock: Sprite[] = [];
   // The first frame stands the agents about the sky; after it they rise from below (with reduced motion, all stand).
   let first = true;
+  // A new size: the agents it leaves outside the sky make way on the next frame.
+  let refit = false;
   const light = { x: 0.5, y: 0.5 };
   let surfaceAt = -1;
   let surface = "";
@@ -225,6 +227,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     img = ctx.createImageData(w, h);
     buf = new Uint32Array(img.data.buffer);
     // The agents keep their places: a new size (a scrollbar, a font arriving) never moves them about.
+    refit = true;
     sky.dirty = true;
   };
   /** The elements' boxes in sky pixels of `r` (the host's box). */
@@ -309,6 +312,16 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
       (o.clear?.() ?? []).flatMap((el) => (el ? [el, ...el.querySelectorAll(".ac-avatar__canvas")] : [])),
       r,
     );
+    const top = o.ceil ? h * o.ceil : 0;
+    if (refit) {
+      refit = false;
+      // Those still wholly inside stay put; the rest give way to new ones, placed (or rising) as below.
+      const inside = flock.filter((p) => {
+        const [x0, y0, x1, y1] = at(p);
+        return x0 >= 0 && y0 >= top && x1 <= w && y1 <= h;
+      });
+      flock.splice(0, flock.length, ...inside);
+    }
     const want = wanted(o);
     if (flock.length > want) flock.length = want;
     if (flock.length < want) {
@@ -324,6 +337,8 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
           : null;
       while (flock.length < want) {
         const p = spawn(o, avoid, clear, pad, mx);
+        // Nothing rises with reduced motion: one with no room to stand is left out, and a later frame looks again.
+        if (reduced && p.y > h) break;
         flock.push(p);
         avoid?.push(at(p));
       }
@@ -333,7 +348,6 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     // Far agents are faint light silhouettes; near ones are solid, both with white eyes.
     const ghostBody = tones[Math.max(0, levels - 1)] as number;
     const rise = (o.rise ?? 1) * (o.speed ?? 1);
-    const top = o.ceil ? h * o.ceil : 0;
     const skip = zones.length ? (x: number, y: number) => calmAt(zones, PAD, x, y) > 0.35 : undefined;
     for (let i = 0; i < flock.length; i++) {
       const p = flock[i] as Sprite;

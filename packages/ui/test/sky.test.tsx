@@ -19,6 +19,7 @@ import {
   SKY_TONES,
   SkyGlow,
   type SkyOptions,
+  SPRITE,
   softTones,
   spriteTone,
   startSky,
@@ -224,6 +225,33 @@ describe("pixel agents and what stands on the sky", () => {
       if (c === BODY || c === WHITE) out.push([i % (img?.w ?? 1), Math.floor(i / (img?.w ?? 1))]);
     return out;
   };
+  /** Every pixel of one whole near agent (2×2 per sprite pixel): a frame of whole ones has a multiple of it. */
+  const WHOLE = SPRITE.join("").replaceAll(".", "").length * 4;
+  /** The connected figures (4-neighbours) in the last frame, as [width, height]. */
+  const figures = (page: Parameters<typeof agentPixels>[0]) => {
+    const w = page.image()?.w ?? 0;
+    const isAgent = new Set(agentPixels(page).map(([x, y]) => y * w + x));
+    const seen = new Set<number>();
+    const out: [number, number][] = [];
+    for (const start of isAgent) {
+      if (seen.has(start)) continue;
+      const stack = [start];
+      seen.add(start);
+      let [x0, y0, x1, y1] = [w, Number.POSITIVE_INFINITY, 0, 0];
+      while (stack.length) {
+        const i = stack.pop() as number;
+        const [x, y] = [i % w, Math.floor(i / w)];
+        [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+        for (const j of [i - 1, i + 1, i - w, i + w])
+          if (isAgent.has(j) && !seen.has(j) && Math.abs((j % w) - x) <= 1) {
+            seen.add(j);
+            stack.push(j);
+          }
+      }
+      out.push([x1 - x0 + 1, y1 - y0 + 1]);
+    }
+    return out;
+  };
   const pad = CLEAR_PX / 4;
   const nearFace = ([x, y]: [number, number]) => x >= 40 - pad && x < 60 + pad && y >= 20 - pad && y < 40 + pad;
 
@@ -248,32 +276,16 @@ describe("pixel agents and what stands on the sky", () => {
     }
   });
 
-  test("standing ones never touch: each figure is one agent", async () => {
+  test("standing ones never touch: each figure is one agent, before and after the sky grows", async () => {
     for (let run = 0; run < 12; run++) {
+      // Crowded: some find no room to stand at first.
       const page = await faceSky(true, { clear: undefined });
       try {
-        const img = page.image();
-        const w = img?.w ?? 0;
-        const isAgent = new Set(agentPixels(page).map(([x, y]) => y * w + x));
-        // Connected figures (4-neighbours): none wider or taller than one 18×18 agent.
-        const seen = new Set<number>();
-        for (const start of isAgent) {
-          if (seen.has(start)) continue;
-          const stack = [start];
-          seen.add(start);
-          let [x0, y0, x1, y1] = [w, Number.POSITIVE_INFINITY, 0, 0];
-          while (stack.length) {
-            const i = stack.pop() as number;
-            const [x, y] = [i % w, Math.floor(i / w)];
-            [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
-            for (const j of [i - 1, i + 1, i - w, i + w])
-              if (isAgent.has(j) && !seen.has(j) && Math.abs((j % w) - x) <= 1) {
-                seen.add(j);
-                stack.push(j);
-              }
-          }
-          expect([x1 - x0 + 1 <= 18, y1 - y0 + 1 <= 18]).toEqual([true, true]);
-        }
+        for (const [w, h] of figures(page)) expect([w <= 18, h <= 18]).toEqual([true, true]);
+        // Taller: the new room fills with agents standing apart from those already there.
+        page.resize(400, 400);
+        page.frames(200);
+        for (const [w, h] of figures(page)) expect([w <= 18, h <= 18]).toEqual([true, true]);
       } finally {
         page.done();
       }
@@ -288,12 +300,33 @@ describe("pixel agents and what stands on the sky", () => {
       redrawSkies();
       page.frames(200);
       expect(agentPixels(page)).toEqual(before);
-      // A scrollbar arriving: the same places (those still inside the sky).
+      // A scrollbar arriving: those still wholly inside keep their places, and none is cut by the new edge.
       page.resize(384, 240);
       page.frames(200);
-      expect(agentPixels(page)).toEqual(before.filter(([x]) => x < 96));
+      const after = agentPixels(page);
+      expect(after).toEqual(expect.arrayContaining(before.filter(([x]) => x < 96 - 18)));
+      expect(after.length % WHOLE).toBe(0);
     } finally {
       page.done();
+    }
+  });
+
+  test("narrowed with reduced motion, those it leaves outside give way to new ones standing inside", async () => {
+    for (let run = 0; run < 12; run++) {
+      await new Promise((r) => setTimeout(r, 50));
+      // A cover at 1440 px, then at a phone's width: two agents before, two whole ones after.
+      const page = canvasPage({ width: 1168, height: 176, reduced: true });
+      const stop = startSky(page.canvas, () => ({ ...opts, sprites: 2, near: 1 }));
+      try {
+        expect(agentPixels(page)).toHaveLength(2 * WHOLE);
+        page.resize(392, 176);
+        page.frames(200);
+        expect(agentPixels(page)).toHaveLength(2 * WHOLE);
+      } finally {
+        stop();
+        page.frames(100);
+        page.close();
+      }
     }
   });
 
