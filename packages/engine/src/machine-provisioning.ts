@@ -201,7 +201,7 @@ export interface ProvisioningInput {
   stage?: string | null;
   /** Kept with `waiting` only; `approval` reads as `capacity`. */
   reason?: ProvisioningReason | "approval" | null;
-  /** Kept with `preparing` only: when it should be ready, unless the wait was told an earlier time. */
+  /** Kept with `preparing` only: when it should be ready, unless the wait was told an earlier time; none keeps it. */
   expectedReadyAt?: Date | null;
   /** An older provisioner's countdown, read as that many seconds from now. */
   etaSeconds?: number | null;
@@ -243,8 +243,9 @@ export async function setProvisioning(
         ? null
         : (input.expectedReadyAt ??
           (input.etaSeconds == null ? null : new Date(now.getTime() + input.etaSeconds * 1000)));
-    const kept = before?.state === "preparing" ? before.expectedReadyAt : null;
-    const expectedReadyAt = reported && kept && kept.getTime() < reported.getTime() ? kept : reported;
+    // A report without a time is still the same wait: it keeps the earliest time the wait was told.
+    const kept = input.state === "preparing" && before?.state === "preparing" ? before.expectedReadyAt : null;
+    const expectedReadyAt = !reported || (kept && kept.getTime() < reported.getTime()) ? kept : reported;
     const long =
       input.state !== "preparing" ||
       (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);

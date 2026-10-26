@@ -88,7 +88,7 @@ const ProvisioningInput = z.object({
     .optional()
     .openapi({
       description:
-        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A wait counts down to the earliest time it was told: a later one is kept out, so people see the wait run over.",
+        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A wait counts down to the earliest time it was told: a later one, or a report without one, leaves it as it is, so people see the wait run over.",
     }),
   etaSeconds: z
     .number()

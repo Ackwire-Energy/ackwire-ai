@@ -237,15 +237,14 @@ describe("external provisioning", () => {
     expect(await status()).toEqual({ ...reserving, secondsLeft: expect.any(Number) });
     expect(events).toHaveLength(1);
     await Bun.sleep(5);
-    // A reason only goes with `waiting`.
+    // A reason only goes with `waiting`; a new step with no time is the same wait, with its time.
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", reason: "capacity" });
     const installing = await status();
     expect(installing).toMatchObject({
       state: "preparing",
       step: "installing",
       reason: null,
-      expectedReadyAt: null,
-      secondsLeft: null,
+      expectedReadyAt: at.toISOString(),
       specs,
     });
     expect(installing.since).not.toBe(reserving.since);
@@ -373,6 +372,13 @@ describe("external provisioning", () => {
     await report("16:13:05.000", "reserving", "ordering", "16:25:30.000");
     expect(events).toHaveLength(heardBefore);
     expect((await status()).expectedReadyAt).toBe(at("16:25:00.000").toISOString());
+    // A report with no time is the same wait: its time stays, and a later one after it is still kept out.
+    setSystemTime(at("16:13:10.000"));
+    await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", stage: "ordering" });
+    expect(await status()).toMatchObject({ expectedReadyAt: at("16:25:00.000").toISOString(), secondsLeft: 710 });
+    await report("16:13:15.000", "reserving", "ordering", "16:26:00.000");
+    expect(events).toHaveLength(heardBefore);
+    expect(await status()).toMatchObject({ expectedReadyAt: at("16:25:00.000").toISOString(), secondsLeft: 705 });
     // Its computer taken away: a new wait too.
     const { machineId } = await enrolled();
     await revokeManagedMachine(deps(), f.org.id, machineId);
