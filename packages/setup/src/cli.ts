@@ -883,7 +883,7 @@ function tailscaleSteps(ui: Ui, hostname: string, tag: string) {
     ],
     "numbered",
   );
-  ui.list("Unattended, or an AI agent installing? An OAuth client secret instead of step 2", [
+  ui.list("Unattended, or an AI agent installing? An OAuth client secret replaces step 2", [
     `Access controls, ${TS.policy}: under "tagOwners" add "${tag}": ["autogroup:admin"], and save.`,
     `Trust credentials, ${TS.trust}: click "Credential", choose OAuth, give "Auth Keys" Write access with the tag ${tag}, and click "Generate credential".`,
     `Paste its secret (tskey-client-…) below, or pass it as --tailscale-key. The server joins as ${tag}, approved, with a key that never expires.`,

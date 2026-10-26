@@ -245,7 +245,12 @@ async function pair(p: Parsed): Promise<number> {
   }
   const serverRaw = flagString(p, "server");
   if (!serverRaw) return refuse(usage);
-  const server = normalizeServerUrl(serverRaw);
+  let server: string;
+  try {
+    server = normalizeServerUrl(serverRaw);
+  } catch (err) {
+    return refuse(err instanceof Error ? err.message : String(err));
+  }
   const home = runnerHome();
   const prev = storedOrNull(home);
   const managed = managedMessage(prev);

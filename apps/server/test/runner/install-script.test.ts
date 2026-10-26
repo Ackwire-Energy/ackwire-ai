@@ -215,6 +215,19 @@ test.skipIf(process.platform === "win32")(
   },
 );
 
+test.skipIf(process.platform === "win32")("a download cut short runs nothing: everything is inside main", () => {
+  const script = installScript("https://x.test");
+  const empty = tempDir("cut-");
+  dirs.push(empty);
+  const lastLine = script.trimEnd().lastIndexOf("\n");
+  for (const cut of [script.slice(0, lastLine), script.slice(0, Math.floor(script.length / 2))]) {
+    // No command on the PATH: running one would say it isn't found.
+    const r = spawnSync("/bin/sh", ["-s"], { input: cut, encoding: "utf8", env: { PATH: empty } });
+    expect(r.stdout).toBe("");
+    expect(r.stderr).not.toContain("not found");
+  }
+});
+
 test("every Bun build the installer picks has its SHA-256", () => {
   const picked = new Set([...installScript("https://x.test").matchAll(/BUN_TARGET=([\w-]+)/g)].map((m) => m[1]));
   expect([...picked].sort()).toEqual(Object.keys(RUNNER_BUN_SHA256).sort());
