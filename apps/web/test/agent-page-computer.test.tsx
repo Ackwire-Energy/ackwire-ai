@@ -48,29 +48,37 @@ async function entryOf(o: Options = {}) {
 const line = (row: HTMLElement | null) => row?.querySelector(".cmp-entry__line")?.textContent ?? null;
 
 describe("the agent page's one entry: its status line", () => {
-  test("Cloud, its computer on its way: the time left, almost ready, or nothing said yet", async () => {
-    const at = (secondsLeft: number | null) => ({
-      step: "installing" as const,
+  test("Cloud, its computer on its way: the time left as every screen says it, or nothing said yet", async () => {
+    const at = (secondsLeft: number | null, step: "installing" | "connecting" = "installing") => ({
+      step,
       secondsLeft,
       expectedReadyAt: secondsLeft === null ? null : new Date(Date.now() + secondsLeft * 1000).toISOString(),
     });
     expect(line(await entryOf({ setup: at(330), machine: null }))).toBe("Sendo preparado · faltam uns 6 min");
     cleanup();
-    expect(line(await entryOf({ setup: at(50), machine: null }))).toBe("Sendo preparado · quase pronto");
+    expect(line(await entryOf({ setup: at(50), machine: null }))).toBe("Sendo preparado · falta menos de um minuto");
+    cleanup();
+    expect(line(await entryOf({ setup: at(10, "connecting"), machine: null }))).toBe("Sendo preparado · quase pronto…");
+    cleanup();
+    expect(line(await entryOf({ setup: at(-30), machine: null }))).toBe(
+      "Sendo preparado · demorando um pouco mais que o previsto",
+    );
     cleanup();
     expect(line(await entryOf({ setup: at(null), machine: null }))).toBe("Sendo preparado");
   });
 
-  test("Cloud, taking longer: owners are promised the email when the server sends it; nobody else is", async () => {
-    const slow = { state: "waiting" as const, reason: "capacity" as const, notifyByEmail: true };
-    expect(line(await entryOf({ setup: slow, machine: null }))).toBe(
-      "Demorando mais que o normal · avisamos por e-mail",
+  test("Cloud, waiting for a computer: owners are promised the email when the server sends it; nobody else is", async () => {
+    const wait = { state: "waiting" as const, reason: "capacity" as const, notifyByEmail: true };
+    expect(line(await entryOf({ setup: wait, machine: null }))).toBe(
+      "Esperando um computador disponível · avisamos por e-mail",
     );
     cleanup();
-    expect(line(await entryOf({ setup: slow, machine: null, role: "admin" }))).toBe("Demorando mais que o normal");
+    expect(line(await entryOf({ setup: wait, machine: null, role: "admin" }))).toBe(
+      "Esperando um computador disponível",
+    );
     cleanup();
-    expect(line(await entryOf({ setup: { ...slow, notifyByEmail: false }, machine: null }))).toBe(
-      "Demorando mais que o normal",
+    expect(line(await entryOf({ setup: { ...wait, notifyByEmail: false }, machine: null }))).toBe(
+      "Esperando um computador disponível",
     );
     cleanup();
     expect(line(await entryOf({ setup: { state: "problem" }, machine: null }))).toBe(

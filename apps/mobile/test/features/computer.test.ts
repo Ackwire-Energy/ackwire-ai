@@ -10,6 +10,7 @@ import { type SetupView, setupEta, setupView } from "@agenteschat/client/lib/com
 import { clockAt } from "@agenteschat/client/lib/format";
 import { resources } from "@agenteschat/i18n";
 import { bannedIn, CLOUD_BANNED } from "../../../../packages/i18n/test/edition-words";
+import { offersKeyNow } from "../../src/features/ai/logic";
 import { pageGapKey, stepText } from "../../src/features/browser/logic";
 import {
   offersSwitch,
@@ -17,7 +18,9 @@ import {
   phoneEntryButton,
   phoneStage,
   screenRequest,
+  setupLine,
   setupNoticeLine,
+  setupSub,
 } from "../../src/features/computer/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
@@ -269,14 +272,58 @@ describe("the profile's Computador entry on the phone", () => {
 });
 
 describe("the workspace's computer on its way, on Conversas", () => {
-  test("its notice: the time left, else where it is", async () => {
+  test("its notice: the time left, else where it is; waiting for a computer, the email for those who get it", async () => {
     const t = await translator("pt-BR");
     expect(t("computerSetup.notice.title", { org: "Acme" })).toBe("Preparando o computador da Acme");
     const view = viewOf();
-    expect(setupNoticeLine(t, view, setupEta(view, NOW))).toBe("Faltam uns 6 min");
-    const slow = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
-    expect(setupNoticeLine(t, slow, setupEta(slow, NOW))).toBe("Está demorando mais que o normal.");
+    expect(setupNoticeLine(t, view, setupEta(view, NOW), true)).toBe("Faltam uns 6 min");
+    const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
+    expect(setupNoticeLine(t, wait, setupEta(wait, NOW), false)).toBe("Esperando um computador disponível");
+    expect(setupNoticeLine(t, wait, setupEta(wait, NOW), true)).toBe(
+      "Esperando um computador disponível · avisamos por e-mail",
+    );
     // On hold no time is said: where it is instead.
-    expect(setupNoticeLine(t, view, null)).toBe("Instalando os programas");
+    expect(setupNoticeLine(t, view, null, false)).toBe("Instalando os programas");
+  });
+
+  test("the full screen's header says the chip's word: being prepared, in line or a problem", async () => {
+    const t = await translator("pt-BR");
+    expect(setupSub(t, viewOf())).toBe("Sendo preparado");
+    expect(setupSub(t, viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null }))).toBe(
+      "Na fila",
+    );
+    expect(setupSub(t, viewOf({ state: "problem", step: null, secondsLeft: null }))).toBe("Com problema");
+    const en = await translator("en");
+    expect(setupSub(en, viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null }))).toBe(
+      "In line",
+    );
+  });
+
+  test("the first run's AI step: where it is on a line of its own, led by the orbit, or the x of a problem", async () => {
+    const t = await translator("pt-BR");
+    const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
+    expect(setupLine(t, wait)).toEqual({ icon: "orbit", text: "Esperando um computador disponível" });
+    expect(setupLine(t, viewOf())).toEqual({ icon: "orbit", text: "Instalando os programas" });
+    expect(setupLine(t, viewOf({ state: "problem", step: null, secondsLeft: null }))).toEqual({
+      icon: "x",
+      text: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+    });
+  });
+
+  test("the AI step offers an API key now in every wait, a page away on the phone, but not on hold", () => {
+    const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
+    for (const view of [viewOf(), wait, viewOf({ state: "problem", step: null, secondsLeft: null })]) {
+      expect(offersKeyNow({ state: "preparing", view }, false)).toBe(true);
+      expect(offersKeyNow({ state: "preparing", view }, true)).toBe(false);
+    }
+    // Ready, its agent getting it at the next refresh: seconds, nothing to offer.
+    expect(offersKeyNow({ state: "preparing", view: null }, false)).toBe(false);
+    // Where the plan can't sign in there: as before.
+    expect(offersKeyNow({ state: "offline" }, false)).toBe(true);
+    expect(offersKeyNow({ state: "missing" }, false)).toBe(true);
+    expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false)).toBe(true);
+    expect(offersKeyNow({ state: "ready" }, false)).toBe(false);
+    expect(offersKeyNow({ state: "loading" }, false)).toBe(false);
+    expect(offersKeyNow({ state: "locked", who: "owner" }, false)).toBe(false);
   });
 });

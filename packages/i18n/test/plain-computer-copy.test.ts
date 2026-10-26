@@ -27,7 +27,7 @@ const NAMESPACES = [
  */
 const SETUP_KEYS = [
   ...["reserving", "starting", "installing", "connecting"].map((s) => `computerSetup.step.${s}`),
-  ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall", "finishing"].map(
+  ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall"].map(
     (s) => `computerSetup.stage.${s}`,
   ),
   ...["preparing", "capacity", "problem", "ready", "paused"].flatMap((s) => [
@@ -37,6 +37,7 @@ const SETUP_KEYS = [
   ...["minutes_one", "minutes_other", "underMinute", "almost", "late"].map((s) => `computerSetup.eta.${s}`),
   "computerSetup.email.you",
   "computerSetup.email.here",
+  "computerSetup.email.short",
   "computerSetup.title",
   "computerSetup.specs",
   "computerSetup.users",

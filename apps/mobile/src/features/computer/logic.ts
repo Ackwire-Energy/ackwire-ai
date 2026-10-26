@@ -71,6 +71,26 @@ export const screenRequest = (h: BrowserHandoff | null, nowMs = Date.now()) =>
 export const offersSwitch = (f: Pick<AgentComputerFacts, "edition">, manages: boolean, hasOutage: boolean) =>
   f.edition === "selfhost" && manages && hasOutage;
 
-/** The wait notice's line under "Preparando o computador da Acme": the time left (`setupEta`), else where it is. */
-export const setupNoticeLine = (t: TFunction, view: SetupView, eta: EtaView | null): string =>
-  eta ? etaLine(t, eta) : t(view.textKey);
+/**
+ * The wait notice's line under "Preparando o computador da Acme": the time left (`setupEta`), else where it is; in
+ * the wait for a computer, "avisamos por e-mail" after it for those who get the email (`emailed`).
+ */
+export function setupNoticeLine(t: TFunction, view: SetupView, eta: EtaView | null, emailed: boolean): string {
+  if (eta) return etaLine(t, eta);
+  return view.phase === "waiting" && emailed
+    ? `${t(view.textKey)} · ${t("computerSetup.email.short")}`
+    : t(view.textKey);
+}
+
+/**
+ * Where the computer is, on the AI step where the whole wait doesn't show (the first run, before a workspace is
+ * chosen): a line of its own, led by the orbit as work under way, or by the x of a problem. The clock leads only the
+ * "as soon as it's ready" card under it.
+ */
+export const setupLine = (t: TFunction, view: SetupView): { icon: "orbit" | "x"; text: string } => ({
+  icon: view.phase === "problem" ? "x" : "orbit",
+  text: t(view.textKey),
+});
+
+/** The full screen's header while the workspace's computer is on its way: the chip's word ("Na fila"). */
+export const setupSub = (t: TFunction, view: SetupView): string => t(view.chipKey);

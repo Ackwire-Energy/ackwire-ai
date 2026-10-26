@@ -89,7 +89,6 @@ export const SETUP_STAGES = {
   restarting: "installing",
   network: "installing",
   firewall: "installing",
-  finishing: "installing",
 } as const satisfies Record<string, ComputerSetupStep>;
 type SetupStage = keyof typeof SETUP_STAGES;
 
@@ -104,7 +103,7 @@ export interface SetupView {
   /** While preparing: the step, and its number from 1 (0 before the provisioner names one). */
   step: ComputerSetupStep | null;
   stepNumber: number;
-  /** While waiting: `capacity` (longer than usual). */
+  /** While waiting: `capacity` (no computer on its way yet). */
   reason: "capacity" | null;
   /** The status line: the stage within the step when it has words, else the step, else the phase. */
   textKey:
@@ -119,8 +118,6 @@ export interface SetupView {
   machineId: string | null;
   /** The server's seconds left when its answer came (`receivedAt`, this device's clock); null: no time said. */
   secondsLeft: number | null;
-  /** How many seconds from `receivedAt` they stay as they are before counting down (a part running long). */
-  steady: number;
   receivedAt: number;
   /** Seconds people had waited when the server answered, on the server's clock; null when it doesn't say. */
   waited: number | null;
@@ -156,7 +153,6 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     specs: setup.specs,
     machineId: setup.machineId,
     secondsLeft,
-    steady: typeof setup.secondsSteady === "number" ? Math.max(0, setup.secondsSteady) : 0,
     receivedAt,
     waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,
     notifyByEmail: setup.notifyByEmail === true,
@@ -171,17 +167,17 @@ export type EtaView =
   | { kind: "late" };
 
 /**
- * The time left now: the server's `secondsLeft` less the seconds since its answer came, once its first `steady`
- * seconds have gone. A minute or more: whole minutes, rounded up; under 15 s, or up to a minute past the time:
- * almost; past that: a little longer than expected. Null without a time.
+ * The time left now: the server's `secondsLeft` less the seconds since its answer came. Run out, it says a little
+ * longer than expected until the computer is ready: the server never moves a wait's time later. Else almost ready
+ * in the last step (`last`), whole minutes rounded up from a minute, less than a minute under that. Null without
+ * a time.
  */
-export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number, steady = 0): EtaView | null {
+export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number, last = false): EtaView | null {
   if (secondsLeft === null) return null;
-  const left = secondsLeft - Math.max(0, (nowMs - receivedAtMs) / 1000 - steady);
-  if (left >= 60) return { kind: "minutes", count: Math.ceil(left / 60) };
-  if (left >= 15) return { kind: "underMinute" };
-  if (left >= -60) return { kind: "almost" };
-  return { kind: "late" };
+  const left = secondsLeft - Math.max(0, (nowMs - receivedAtMs) / 1000);
+  if (left <= 0) return { kind: "late" };
+  if (last) return { kind: "almost" };
+  return left >= 60 ? { kind: "minutes", count: Math.ceil(left / 60) } : { kind: "underMinute" };
 }
 
 /** "About 6 min left", "Almost ready…" (`computerSetup.eta.*`). */
@@ -190,7 +186,9 @@ export const etaLine = (t: TFunction, eta: EtaView) =>
 
 /** Only while it is being prepared: a wait and a problem have no time. */
 export const setupEta = (view: SetupView, nowMs: number) =>
-  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs, view.steady) : null;
+  view.phase === "preparing"
+    ? etaView(view.secondsLeft, view.receivedAt, nowMs, view.step === SETUP_STEPS.at(-1))
+    : null;
 
 /** How often every time line repaints, all together. No ticking seconds. */
 const ETA_TICK_MS = 5_000;

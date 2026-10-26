@@ -39,17 +39,20 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  InkOrbit,
   ProviderLogo,
   ProviderQuad,
   Text,
   useTheme,
   useToast,
 } from "@/ui";
+import { setupLine } from "../computer/logic";
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
+import { offersKeyNow } from "./logic";
 import { useAiOrg, useInWorkspace } from "./org";
 import { Note, openPage } from "./parts";
 
@@ -441,33 +444,32 @@ function PlanSteps({
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "preparing") {
     const setup = gate.view;
+    const line = setup && !inWorkspace ? setupLine(t, setup) : null;
     // A hold decides when anything runs there: it speaks alone.
     wait = hold ? (
       <InfoCard icon="pause">{hold}</InfoCard>
     ) : (
       <View style={styles.gap}>
         {setup && inWorkspace ? <SetupWait view={setup} /> : null}
-        <InfoCard icon="clock">
-          {setup && !inWorkspace ? `${t(setup.textKey)} ` : ""}
-          {t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}
-        </InfoCard>
-        {setup?.phase === "waiting" || setup?.phase === "problem" ? useKey : null}
+        {line ? (
+          <Note icon={line.icon === "orbit" ? <InkOrbit size={15} /> : line.icon} live>
+            {line.text}
+          </Note>
+        ) : null}
+        <InfoCard icon="clock">{t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}</InfoCard>
       </View>
     );
   } else if (gate.state === "offline") {
     wait = (
-      <View style={styles.gap}>
-        <InfoCard icon="laptop">
-          {edition === "cloud"
-            ? t("aiAccounts.connect.needsCloud.online", { computer })
-            : t("brain.offline", { computer })}
-        </InfoCard>
-        {useKey}
-      </View>
+      <InfoCard icon="laptop">
+        {edition === "cloud"
+          ? t("aiAccounts.connect.needsCloud.online", { computer })
+          : t("brain.offline", { computer })}
+      </InfoCard>
     );
   } else if (gate.state === "missing") {
     wait = (
-      <View style={styles.gap}>
+      <>
         <InfoCard
           icon="laptop"
           action={
@@ -477,21 +479,17 @@ function PlanSteps({
           {t("aiAccounts.connect.noComputer")}
         </InfoCard>
         <Note icon="lock">{t("mobile.ai.meanwhile")}</Note>
-        {useKey}
-      </View>
+      </>
     );
   } else if (gate.state === "unsupported") {
     wait = (
-      <View style={styles.gap}>
-        <InfoCard icon="laptop">
-          {edition === "cloud"
-            ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
-            : gate.reason === "keys"
-              ? t("aiAccounts.connect.needs.keys")
-              : t(`brain.reasons.${gate.reason}`, { computer })}
-        </InfoCard>
-        {useKey}
-      </View>
+      <InfoCard icon="laptop">
+        {edition === "cloud"
+          ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
+          : gate.reason === "keys"
+            ? t("aiAccounts.connect.needs.keys")
+            : t(`brain.reasons.${gate.reason}`, { computer })}
+      </InfoCard>
     );
   } else if (gate.state === "locked") {
     const pairer = machines.data?.find((m) => m.id === view?.computer?.machineId)?.pairedBy?.name.split(" ")[0];
@@ -515,6 +513,7 @@ function PlanSteps({
   return (
     <View style={styles.gap}>
       {wait}
+      {offersKeyNow(gate, hold !== null) ? useKey : null}
       {ready && waited ? (
         <Note icon="check" live>
           {t("connectAi.wait.ready", { computer })}
