@@ -4,9 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useHost } from "../../app";
 import { noteLines } from "../../control/version";
 import { type UpdateCheck, useLocalServer } from "../../hooks";
+import { CardTitle, PrefCard, PrefHead } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { clock } from "../../ui/time";
-import { CardTitle, PrefCard, PrefHead } from "./shared";
 
 /**
  * Updates (ADR 0036 §9): one click installs the signed update and reopens the app. When that can't
@@ -43,7 +43,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
 
   return (
     <>
-      <PrefHead title={t("desktop.prefs.updates.title")} lead={t("desktop.prefs.updates.lead")} />
+      <PrefHead title={t("desktop.prefs.updates.title")} />
       <PrefCard>
         <div className="dk-ver">
           <span className="dk-ver__big ac-num">{update.version ?? "…"}</span>
@@ -86,7 +86,6 @@ export function Updates({ update }: { update: UpdateCheck }) {
                 <Button variant="primary" icon="download" loading={installing} onClick={() => void install()}>
                   {t("desktop.prefs.updates.install")}
                 </Button>
-                <span className="dk-help">{t("desktop.prefs.updates.keepNote")}</span>
               </div>
             </PrefCard>
           )}

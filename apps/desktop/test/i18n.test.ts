@@ -44,7 +44,7 @@ describe("desktop strings", () => {
   test("a path to a setting stays on one line: no-break spaces around its ›", () => {
     for (const tree of [desktopPtBR, desktopEn]) {
       const paths = values(tree).filter((s) => s.includes("›"));
-      expect(paths.length).toBeGreaterThanOrEqual(2);
+      expect(paths.length).toBeGreaterThanOrEqual(1);
       for (const s of paths)
         expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
     }
@@ -117,7 +117,6 @@ describe("desktop strings", () => {
       "prefs.nav.servers",
       "prefs.nav.updates",
       "prefs.general.title",
-      "prefs.general.lead",
       "prefs.general.behavior",
       "prefs.general.launchTitle",
       "prefs.general.notifySiteTitle",
@@ -125,7 +124,6 @@ describe("desktop strings", () => {
       "prefs.general.dockTitle",
       "prefs.general.dockDesc",
       "prefs.general.menuBarTitle",
-      "prefs.general.menuBarDesc",
       ...leaves(desktopEn.prefs.updates).map((k) => `prefs.updates.${k}`),
     ];
     for (const tree of [desktopEn, desktopPtBR]) {
