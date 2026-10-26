@@ -392,6 +392,62 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
 }
 
+const isMessageList = (key: readonly unknown[]) => key[4] === "messages" || key[4] === "thread";
+
+/**
+ * Reads a channel's open lists again once its events reach us (`subscribed`: what happened there before was
+ * never sent to us) and adds what they lack, taking nothing away: a message heard live while this read was on
+ * its way stays. A read already on its way lands first, so it can't put an older list back over what this one
+ * adds. Returns what it read.
+ */
+export async function catchUpChannel(
+  api: ApiClient,
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+): Promise<Message[]> {
+  const prefix = ["org", orgId, "channel", channelId];
+  await qc.refetchQueries({ queryKey: prefix, fetchStatus: "fetching" }, { cancelRefetch: false });
+  const reads = qc
+    .getQueryCache()
+    .findAll({ queryKey: prefix, type: "active" })
+    .flatMap(({ queryKey: [, , , , list, rootId] }) =>
+      list === "messages"
+        ? [api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE })]
+        : list === "thread" && typeof rootId === "string"
+          ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
+          : [],
+    );
+  const read = (await Promise.all(reads).catch(() => [])).flat();
+  const known = new Set(
+    qc
+      .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
+      .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
+  );
+  for (const m of read) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
+  return read;
+}
+
+/** A read's receipts on the copies of its messages the channel's lists hold (nothing else of them changes). */
+export function cacheReceipts(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  read: Message[],
+) {
+  const receipts = new Map(read.flatMap((m) => (m.receipts ? [[m.id, m.receipts] as const] : [])));
+  qc.setQueriesData<Message[]>(
+    { queryKey: ["org", orgId, "channel", channelId], predicate: (q) => isMessageList(q.queryKey) },
+    (list) =>
+      list?.some((m) => receipts.has(m.id) && m.receipts !== receipts.get(m.id))
+        ? list.map((m) => {
+            const r = receipts.get(m.id);
+            return r && m.receipts !== r ? { ...m, receipts: r } : m;
+          })
+        : list,
+  );
+}
+
 /**
  * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
  * the message's `meta.forumSuggestion` in every loaded list of that channel.

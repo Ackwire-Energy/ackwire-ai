@@ -611,4 +611,98 @@ describe("caught up once the server confirms the channel's subscription", () => 
     await settle(4);
     expect(rowsWith("Corrigido: o refresh usa segundos agora.")).toHaveLength(1);
   });
+
+  /** João's message to Ada, read while her run was at `status`. */
+  const askedAda = (state: ReturnType<typeof seedState>, status: "running" | "waiting_input") => {
+    const m1 = state.messages.find((m) => m.id === "m-1");
+    if (m1)
+      m1.receipts = {
+        seenBy: [ADA_ID],
+        pickedBy: [ADA_ID],
+        handled: [{ agentId: ADA_ID, runId: "r-ada", status }],
+        blocked: [],
+      };
+  };
+  const question = {
+    id: "q1",
+    agentId: ADA_ID,
+    runId: "r-ada",
+    channelId: ENG_ID,
+    threadId: null,
+    messageId: "msg-q",
+    text: "Reverto o deploy das 9h?",
+    choices: ["Sim", "Não"],
+    status: "open",
+    answer: null,
+    answeredByUserId: null,
+  };
+  const questionCard = {
+    id: "msg-q",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "agent" as const, id: ADA_ID },
+    body: "",
+    mentionedAgentIds: [],
+    agentRunId: "r-ada",
+    meta: { question },
+    createdAt: new Date().toISOString(),
+  };
+  const receiptOfM1 = () =>
+    rowsWith("o login está devolvendo 401")[0]?.querySelector(".ac-receipt__check")?.getAttribute("aria-label");
+  const event = (e: Record<string, unknown>) => ({
+    type: "event",
+    channelId: ENG_ID,
+    event: { channelId: ENG_ID, ...e },
+  });
+
+  test("her question after then: the receipt waits for the answer, and the page seeding its list again keeps that", async () => {
+    const state = seedState();
+    askedAda(state, "running");
+    const { socket } = await open(state);
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(receiptOfM1()).toBe("Vista por Ada; Ada está respondendo");
+    // Her card, her question and her run's wait arrive together, before the page draws the card.
+    await act(async () => {
+      socket.push(event({ type: "message.created", messageId: "msg-q", message: questionCard }));
+      socket.push(event({ type: "question.asked", threadId: null, question }));
+      socket.push(
+        event({ type: "agent.run", threadId: null, runId: "r-ada", agentId: ADA_ID, status: "waiting_input" }),
+      );
+    });
+    await settle(4);
+    expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
+    expect(receiptOfM1()).toBe("Vista por Ada; Ada está esperando sua resposta");
+  });
+
+  test("her question before then: its card and the wait for the answer show, and stay as the list changes", async () => {
+    const state = seedState();
+    askedAda(state, "running");
+    const { socket } = await open(state);
+    expect(receiptOfM1()).toBe("Vista por Ada; Ada está respondendo");
+    // She asks while the channel's subscription opens: no event carries it.
+    state.messages.push(questionCard);
+    askedAda(state, "waiting_input");
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
+    expect(receiptOfM1()).toBe("Vista por Ada; Ada está esperando sua resposta");
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-atlas",
+      message: {
+        id: "m-atlas",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ATLAS_ID },
+        body: "Deploy das 9h no ar.",
+        mentionedAgentIds: [],
+        agentRunId: "r-atlas",
+        createdAt: new Date(Date.now() + 1000).toISOString(),
+      },
+    });
+    await settle(4);
+    expect(rowsWith("Deploy das 9h no ar.")).toHaveLength(1);
+    expect(receiptOfM1()).toBe("Vista por Ada; Ada está esperando sua resposta");
+  });
 });
