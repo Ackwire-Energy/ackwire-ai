@@ -503,7 +503,7 @@ function NewAgentFlow() {
       </span>
     ) : null;
   const mailChip = (account: (typeof mailboxes)[number]) => (
-    <span key={account.id} className="ac-chip newag__chip">
+    <span key={account.id} className="ac-chip">
       <MailIcon choice={choiceOf(account)} />
       {t(mailLevels[account.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", {
         name: account.address,
@@ -513,7 +513,7 @@ function NewAgentFlow() {
   const connectorChip = (item: ConnectedItem) => {
     const n = itemName(t, item);
     return (
-      <span key={item.id} className="ac-chip newag__chip">
+      <span key={item.id} className="ac-chip">
         <ConnectorIcon def={item.def} label={n} />
         {t(levels[item.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", { name: n })}
       </span>
@@ -583,7 +583,7 @@ function NewAgentFlow() {
                       {(kit.length > 0 || room) && (
                         <span className="newag__chips">
                           {kit.slice(0, 3).map((i) => (
-                            <span key={i.id} className="ac-chip newag__chip">
+                            <span key={i.id} className="ac-chip">
                               <ConnectorIcon def={i.def} label={itemName(t, i)} />
                               {itemName(t, i)}
                             </span>

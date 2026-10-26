@@ -394,6 +394,36 @@ describe("Equipe", () => {
     expect(atlas.textContent).not.toContain("Disponível");
   });
 
+  test("the card names another company's service by its own mark, from the connector catalog", async () => {
+    const api = createFakeApi(seedState());
+    const team = api.agents.team;
+    api.agents.team = async (orgId) => {
+      const t = await team(orgId);
+      return {
+        ...t,
+        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "gdrive", "sentry", "browser"] })),
+      };
+    };
+    await renderApp(`/org/${ORG_ID}/team`, { api });
+    await settle(4);
+    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
+    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
+    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
+    const mark = (name: string) => {
+      const chip = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name);
+      const el = chip?.querySelector<HTMLElement>(".connector-icon__mark");
+      return el && [el.style.getPropertyValue("--connector-icon"), el.style.getPropertyValue("--connector-color")];
+    };
+    expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
+    expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
+    expect(mark("Google Drive")).toEqual(['url("/connectors/googledrive.svg")', "#4285F4"]);
+    expect(mark("Erros em produção")).toEqual(['url("/connectors/sentry.svg")', ""]);
+    // Our own abilities keep their icons.
+    expect(mark("Navegador")).toBeNull();
+    const browser = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Navegador");
+    expect(browser?.querySelector("svg.ac-icon")).not.toBeNull();
+  });
+
   test("the card of an agent waiting for its computer says neither Available nor No AI", async () => {
     await go("team", seedState({ aiStatus: { any: true, agents: [{ agentId: ADA_ID, state: "waiting" }] } }));
     const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
