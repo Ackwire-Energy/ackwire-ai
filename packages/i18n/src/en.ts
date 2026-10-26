@@ -7008,7 +7008,7 @@ export const en: Translations = {
       tool: { claude: "Claude Code", codex: "Codex", commands: "Commands", browser: "Browser" },
       toolText: {
         claude: "Writes and changes files, only in the allowed folders.",
-        codex: "Like Claude Code, with the OpenAI account. Also only in the allowed folders.",
+        codex: "Like Claude Code, with the ChatGPT account. Also only in the allowed folders.",
         commands: "Runs Terminal commands, like tests and builds.",
       },
       commandsWarn: "Commands can reach other parts of the computer, not only the allowed folders.",

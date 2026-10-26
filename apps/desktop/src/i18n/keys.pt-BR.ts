@@ -348,7 +348,7 @@ export const desktopPtBR = {
     claudeName: "Claude Code",
     claudeDesc: "Escreve e muda código nas pastas liberadas, com a sua conta do Claude.",
     codexName: "Codex",
-    codexDesc: "Escreve e muda código nas pastas liberadas, com a sua conta da OpenAI.",
+    codexDesc: "Escreve e muda código nas pastas liberadas, com a sua conta do ChatGPT.",
     notInstalled: "Não está instalado neste {{device}}. Se instalar depois, ele aparece aqui.",
     found: "Encontrado",
     notFound: "Não encontrado",

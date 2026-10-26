@@ -7031,7 +7031,7 @@ export const ptBR = {
       tool: { claude: "Claude Code", codex: "Codex", commands: "Comandos", browser: "Navegador" },
       toolText: {
         claude: "Escreve e muda arquivos, só nas pastas liberadas.",
-        codex: "Como o Claude Code, com a conta da OpenAI. Também só nas pastas liberadas.",
+        codex: "Como o Claude Code, com a conta do ChatGPT. Também só nas pastas liberadas.",
         commands: "Roda comandos do Terminal, como testes e builds.",
       },
       commandsWarn: "Comandos podem chegar a outras partes do computador, não só às pastas liberadas.",
