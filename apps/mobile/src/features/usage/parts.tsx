@@ -143,13 +143,11 @@ function Tag({ text, color }: { text: string; color: string }) {
 export function UsageCard({
   icon,
   title,
-  subtitle,
   footer,
   children,
 }: {
   icon: IconName;
   title: string;
-  subtitle?: string;
   footer?: string;
   children: ReactNode;
 }) {
@@ -158,16 +156,9 @@ export function UsageCard({
     <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line }]}>
       <View style={styles.cardHead}>
         <Icon name={icon} size={16} color={c.muted} />
-        <View style={styles.grow}>
-          <Text variant="callout" tone="ink" accessibilityRole="header" style={styles.heavy}>
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text variant="small" tone="muted">
-              {subtitle}
-            </Text>
-          ) : null}
-        </View>
+        <Text variant="callout" tone="ink" accessibilityRole="header" style={[styles.grow, styles.heavy]}>
+          {title}
+        </Text>
       </View>
       {children}
       {footer ? (

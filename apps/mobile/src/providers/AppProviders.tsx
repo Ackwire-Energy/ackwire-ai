@@ -11,6 +11,7 @@ import { createApi } from "@/lib/api";
 import { authClient } from "@/lib/auth";
 import { useServer } from "@/lib/server";
 import { snapshotStore } from "@/lib/snapshot";
+import { hintTouches } from "@/ui/hints";
 import { ToastHost } from "@/ui/Toast";
 import { ThemeProvider } from "@/ui/theme";
 import { setupI18n } from "./i18n";
@@ -60,7 +61,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    // Every touch passes here: a tap away from an open ⓘ hint closes it.
+    <GestureHandlerRootView style={{ flex: 1 }} {...hintTouches}>
       <SafeAreaProvider>
         <KeyboardProvider>
           <ThemeProvider>

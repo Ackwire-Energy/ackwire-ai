@@ -1,3 +1,6 @@
+import type { TFunction } from "i18next";
+import { joinNames } from "../shared/logic";
+
 /**
  * Você's pure logic: the Conta form (what changed, what is wrong with it, the server's error as our
  * text), the photo's upload type and the app's version line.
@@ -73,4 +76,14 @@ export function openIssuesWithMe(
   return issues.filter(
     (i) => i.assignee?.type === "person" && i.assignee.id === meId && i.status !== "done" && i.status !== "canceled",
   ).length;
+}
+
+/**
+ * Apagar conta refused while this person is the only owner of organizations with other people: one line, which ones
+ * (when the server says) and what to do.
+ */
+export function deleteBlockedText(t: TFunction, organizations: string[]): string {
+  return organizations.length > 0
+    ? t("mobile.delete.blocked", { names: joinNames(organizations, t("newAgent.and")) })
+    : t("mobile.account.deleteSoleOwner");
 }

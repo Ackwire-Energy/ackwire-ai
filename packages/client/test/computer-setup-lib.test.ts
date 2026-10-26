@@ -82,8 +82,9 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
       textKey: "computerSetup.stage.updating",
     });
     expect(setupView(external({ step: "starting", stage: "wiping" }))?.textKey).toBe("computerSetup.stage.wiping");
-    // A stage its step already says, one under another step, one this app doesn't know yet, or none: the step.
-    for (const stage of ["apps", "wiping", "defragmenting", "toString", null, undefined])
+    // A stage its step already says, one under another step, one this app doesn't know yet (an older provisioner's
+    // last checks among them), or none: the step.
+    for (const stage of ["apps", "wiping", "defragmenting", "finishing", "toString", null, undefined])
       expect(setupView(external({ step: "installing", stage }))?.textKey).toBe("computerSetup.step.installing");
     // No step said, or not preparing: no stage either.
     expect(setupView(external({ stage: "updating" }))?.textKey).toBe("computerSetup.status.preparing");
@@ -92,7 +93,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     );
   });
 
-  test("a wait takes longer than usual, whatever reason it gives; problem and ready have their own words", () => {
+  test("a wait is for an available computer, whatever reason it gives; problem and ready have their own words", () => {
     expect(setupView(external({ state: "waiting", reason: "capacity", step: "starting" }))).toMatchObject({
       phase: "waiting",
       step: null,
@@ -129,7 +130,6 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
       "computerSetup.chip.problem",
       "computerSetup.chip.ready",
       "computerSetup.stage.booting",
-      "computerSetup.stage.finishing",
       "computerSetup.stage.firewall",
       "computerSetup.stage.network",
       "computerSetup.stage.ordering",
@@ -271,7 +271,6 @@ describe("live: machine.provisioning and org.standing", () => {
       requestedAt: "2026-10-24T18:49:00.000Z",
       expectedReadyAt: null,
       secondsLeft: null,
-      secondsSteady: null,
       secondsWaited: 660,
       // The event doesn't say whether the server sends email: what the answer said stays.
       notifyByEmail: false,
@@ -279,19 +278,17 @@ describe("live: machine.provisioning and org.standing", () => {
       machineId: null,
     });
     expect(refetched).toBe(0);
-    // What it is doing within its step comes with it, and how long its time left holds still.
+    // What it is doing within its step comes with it.
     applyWorkspaceEvent(qc, "o1", {
       type: "machine.provisioning",
       state: "preparing",
       step: "installing",
       stage: "restarting",
       secondsLeft: 257,
-      secondsSteady: 60,
     } as { type: string });
     expect(qc.getQueryData<ComputerSetup>(keys.computerSetup("o1"))).toMatchObject({
       stage: "restarting",
       secondsLeft: 257,
-      secondsSteady: 60,
     });
     applyWorkspaceEvent(qc, "o1", { type: "machine.provisioning", state: "ready", machineId: "m1" } as {
       type: string;

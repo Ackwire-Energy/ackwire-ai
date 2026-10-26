@@ -2237,20 +2237,15 @@ export interface ComputerSetup {
    * its own word; one the app has no words for reads as its step. Absent from an older server.
    */
   stage?: string | null;
-  /** While `waiting`: `capacity` (taking longer than usual). */
+  /** While `waiting`: `capacity` (no computer on its way yet). */
   reason: "capacity" | null;
   since: string | null;
   /** When people started waiting: the workspace's creation, or the computer's last revoke. */
   requestedAt: string | null;
-  /** When the provisioner expects it ready; null while it can't say. */
+  /** The earliest ready time this wait was told, never moved later; null while the provisioner can't say. */
   expectedReadyAt: string | null;
   /** `expectedReadyAt` less the server's clock when it answered (negative once past), so a device's clock doesn't matter. */
   secondsLeft: number | null;
-  /**
-   * How many seconds from this answer `secondsLeft` stays as it is before counting down: a part running long moves
-   * the ready time later with the clock. 0 or absent (an older server): it counts down at once.
-   */
-  secondsSteady?: number | null;
   /** The server's clock when it answered less `requestedAt`, for the same reason. */
   secondsWaited: number | null;
   /** The server sends email: the workspace's owners get one when it's ready after a wait. */
