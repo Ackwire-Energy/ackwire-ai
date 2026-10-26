@@ -4,8 +4,8 @@ import { parseReleaseBody, parseSha256 } from "../src/routes/desktop";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer | null = null;
-afterEach(() => {
-  t?.close();
+afterEach(async () => {
+  await t?.close();
   t = null;
 });
 /** The current test's server (set by the test). */
@@ -137,7 +137,7 @@ test("update: Tauri's format for signed builds, 204 when the release has no upda
   expect((await server().app.request("/api/desktop/update?target=windows&arch=x64")).status).toBe(204);
 
   const old = fakeGithub([release("0.2.0")]);
-  t.close();
+  await t.close();
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: old.fetch });
   expect((await server().app.request("/api/desktop/update?target=darwin&arch=x86_64")).status).toBe(204);
 });
@@ -220,7 +220,7 @@ test("native packages: the newest v* release's manifest and signature, never a d
   ]);
   const first = await createTestServer({ desktopFetch: github.fetch });
   expect((await first.app.request("/api/native/latest")).status).toBe(404);
-  first.close();
+  await first.close();
   expect(github.calls).toEqual([]);
 
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
@@ -285,4 +285,6 @@ test("reduce over HTTP: admins or the pairer, only removing or turning off", asy
   expect(res.status).toBe(200);
   expect(((await res.json()) as { access: typeof access }).access.tools.commands).toBe(false);
   expect(sent.some((s) => s.type === "request" && s.op === "access.reduce" && s.disableTool === "commands")).toBe(true);
-});
+  // A sign-up and a pairing on a fresh database: seconds on a loaded runner, and the preload's longer
+  // default timeout reaches only the first test file of a run.
+}, 30_000);

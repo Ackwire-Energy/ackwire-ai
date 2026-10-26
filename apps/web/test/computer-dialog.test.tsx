@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -146,7 +146,10 @@ const screenAsk = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
 });
 
 beforeEach(() => localStorage.clear());
-afterEach(() => cleanup());
+afterEach(() => {
+  setSystemTime();
+  cleanup();
+});
 
 describe("the computer dialog, Cloud: the workspace's own computer", () => {
   test("being prepared: the steps, the time left, the email to owners, the plans; no screen yet", async () => {
@@ -335,6 +338,8 @@ describe("the computer dialog, self-host", () => {
   });
 
   test("offline: since when, Ada waits, and Trocar computador for who may move her", async () => {
+    // Mid-day: half an hour ago is still today, so the time shows without its date.
+    setSystemTime(new Date(2026, 9, 21, 12));
     const seen = new Date(Date.now() - 30 * 60_000).toISOString();
     const t = await dialog({
       machine: { online: false, lastSeenAt: seen },
