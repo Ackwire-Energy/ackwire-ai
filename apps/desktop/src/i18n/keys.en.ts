@@ -145,7 +145,6 @@ export const desktopEn: DesktopTranslations = {
     connect: "Connect to my server",
     connectText: "It runs on another computer: a Mac mini, a spare laptop or a server online.",
     here: "Run agentes.chat on this {{device}}",
-    hereLater: "On Mac and Linux for now.",
     hereText: "This {{device}} becomes the server, in one click.",
   },
   connect: {
@@ -239,15 +238,6 @@ export const desktopEn: DesktopTranslations = {
     running: "agentes.chat already runs on this {{device}}",
     runningText: "This app runs it, at {{url}}. Its settings are in Preferences › Servers.",
     openIt: "Open it",
-    win: {
-      title: "Run agentes.chat on this PC",
-      lead: "On Windows, this comes later. Two ways for now:",
-      later:
-        "On Windows, this comes later. For now, run agentes.chat on another computer, a Mac, a Linux or a server online, then choose Connect to my server.",
-      other:
-        "On another computer, a Mac, a Linux or a server online: run the one-command install, then choose Connect to my server.",
-      wsl: "On this PC, with WSL 2: open Ubuntu from the Start menu, run this, then choose Connect to my server. It finds it here.",
-    },
   },
   link: {
     question: "Connect the app to this server?",

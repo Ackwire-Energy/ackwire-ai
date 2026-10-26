@@ -2,11 +2,6 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "targets": ["nsis"],
-    "externalBin": [],
-    "resources": {
-      "licenses/agent-browser/*": null,
-      "licenses/bun/*": null
-    },
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper" },
       "nsis": { "installMode": "currentUser" }

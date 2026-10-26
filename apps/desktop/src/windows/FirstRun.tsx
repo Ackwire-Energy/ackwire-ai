@@ -2,7 +2,7 @@
  * The welcome window: how the app finds its server. agentes.chat is the one big action; your own server is a
  * small line under it, leading to Connect (an address, or one found on this computer or the Tailscale
  * network, and the one-command setup for a server that has none yet) or to running agentes.chat on this
- * computer (on Windows, the two ways to run one for now). A connect link (`agenteschat://connect`) opens here
+ * computer. A connect link (`agenteschat://connect`) opens here
  * too: the server in large type, nothing changes before Connect. Choosing a server opens the main window there
  * and closes this one.
  */
@@ -43,9 +43,7 @@ import {
   linkView,
   ownServerScreen,
   PROBLEM_TEXT,
-  runHereScreen,
   typedServer,
-  WSL_INSTALL_COMMAND,
 } from "../control/first-run";
 import {
   hereView,
@@ -159,7 +157,7 @@ export function FirstRun() {
   useEffect(() => {
     void host
       .localServer()
-      .then((s) => setCanRunHere(s.bundled && host.platform !== "windows"))
+      .then((s) => setCanRunHere(s.bundled))
       .catch(() => {});
   }, [host]);
 
@@ -213,11 +211,11 @@ export function FirstRun() {
         {screen === "choose" && (
           <Choose
             onCloud={(page) => void finish(CLOUD_SERVER, page)}
-            onOwn={() => go(ownServerScreen(host.platform, canRunHere))}
+            onOwn={() => go(ownServerScreen(canRunHere))}
           />
         )}
         {screen === "own" && (
-          <Own onBack={back} onConnect={() => go("connect")} onHere={() => go(runHereScreen(host.platform))} />
+          <Own onBack={back} onConnect={() => go("connect")} onHere={() => go("here")} />
         )}
         {screen === "connect" && (
           <Connect
@@ -230,7 +228,6 @@ export function FirstRun() {
         {screen === "here" && (
           <RunHere onBack={back} onUse={finish} onConfirm={confirm} onLink={openLink} onBusy={setSettingUp} />
         )}
-        {screen === "windows" && <WindowsWays onBack={back} onConnect={() => go("connect")} />}
         {screen === "link" && link && (
           <LinkSheet
             view={link.view}
@@ -299,7 +296,6 @@ function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
 function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () => void; onHere: () => void }) {
   const { t } = useTranslation();
   const host = useHost();
-  const later = host.platform === "windows";
   return (
     <>
       <BackLink label={t("desktop.own.back")} onClick={onBack} />
@@ -316,12 +312,12 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
           <small>{t("desktop.own.connectText")}</small>
           <Icon name="chevronRight" size={16} className="dk-fr__card-go" />
         </button>
-        <button type="button" className="dk-fr__card" data-later={later || undefined} onClick={onHere}>
+        <button type="button" className="dk-fr__card" onClick={onHere}>
           <span className="dk-fr__card-art" aria-hidden="true">
             <Icon name={host.platform === "windows" ? "computerWindows" : "computer"} size={18} />
           </span>
           <b>{t("desktop.own.here")}</b>
-          <small>{later ? t("desktop.own.hereLater") : t("desktop.own.hereText")}</small>
+          <small>{t("desktop.own.hereText")}</small>
           <Icon name="chevronRight" size={16} className="dk-fr__card-go" />
         </button>
       </div>
@@ -806,42 +802,6 @@ function HereSetup({
           </Button>
         </div>
       )}
-    </>
-  );
-}
-
-/** On Windows, the two ways to run a server for now. */
-function WindowsWays({ onBack, onConnect }: { onBack: () => void; onConnect: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <BackLink label={t("desktop.own.title")} onClick={onBack} />
-      <h1>{t("desktop.here.win.title")}</h1>
-      {INSTALL_COMMAND_LIVE ? (
-        <>
-          <p className="dk-lead">{t("desktop.here.win.lead")}</p>
-          <ol className="dk-fr__ways">
-            <li>
-              <span className="dk-fr__num">1</span>
-              <p>{t("desktop.here.win.other")}</p>
-            </li>
-            <li>
-              <span className="dk-fr__num">2</span>
-              <div>
-                <p>{t("desktop.here.win.wsl")}</p>
-                <CommandCopy command={WSL_INSTALL_COMMAND} />
-              </div>
-            </li>
-          </ol>
-        </>
-      ) : (
-        <p className="dk-lead">{t("desktop.here.win.later")}</p>
-      )}
-      <div className="dk-fr__end">
-        <Button variant="primary" onClick={onConnect}>
-          {t("desktop.connect.title")}
-        </Button>
-      </div>
     </>
   );
 }
