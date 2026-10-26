@@ -30,7 +30,7 @@ const SETUP_KEYS = [
   ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall", "finishing"].map(
     (s) => `computerSetup.stage.${s}`,
   ),
-  ...["preparing", "capacity", "problem", "ready"].flatMap((s) => [
+  ...["preparing", "capacity", "problem", "ready", "paused"].flatMap((s) => [
     `computerSetup.status.${s}`,
     `computerSetup.chip.${s}`,
   ]),

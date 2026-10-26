@@ -75,6 +75,8 @@ import {
   resolveChoice,
   SYSTEM_RUNNER_HOME,
   secretEntries,
+  senderAt,
+  senderFor,
   sentence,
   smtpUrlProblem,
   sshTarget,
@@ -111,7 +113,7 @@ It asks only for what it needs and fills in only what's missing, so running it a
   --smtp-url <url>                    smtps://user:password@smtp.example.com:465
   --email-api-key <key>               Key of a Resend-compatible API (MillionSend, Resend)
   --email-api-url <url>               That API's address (default ${DEFAULT_EMAIL_API_URL})
-  --email-from <sender>               "agentes <ola@example.com>"
+  --email-from <sender>               "${senderAt("example.com")}"
   --computer <yes|no>                 This machine as your agents' computer. Default yes on a Mac, and
                                       on Linux as root with systemd, apt-get and 4 GB of memory or more.
   --computer-commands <yes|no>        Whether agents may run commands there (default no on a Mac,
@@ -952,11 +954,12 @@ async function emailEntries(
       (ui.canAsk ? await ui.ask("API address", { initial: DEFAULT_EMAIL_API_URL, validate: httpUrlProblem }) : null);
     if (url && url !== DEFAULT_EMAIL_API_URL) entries.MILLIONSEND_API_URL = url;
   }
+  // A sender .env already has stays as written. Without one, mail goes out as ola@ the server's own host, which no
+  // provider verifies for a ts.net name or localhost.
   if (!envValue(content, "EMAIL_FROM")) {
-    // Without one, mail goes out as ola@ the server's own host, which no provider verifies for a ts.net name or localhost.
-    const fallback = network === "domain" && domain ? `agentes <ola@${domain}>` : undefined;
+    const fallback = senderFor(network, domain);
     entries.EMAIL_FROM = await value(opts.emailFrom ?? (ui.canAsk ? undefined : fallback), "--email-from", "Sender", {
-      placeholder: "agentes <ola@example.com>",
+      placeholder: senderAt("example.com"),
       validate: emailFromProblem,
       ...(fallback ? { initial: fallback } : {}),
     });

@@ -71,6 +71,9 @@ export class RotatingFile {
   }
 }
 
+/** A duration as the log says it, to the hundredth of a second ("0.42 s"). */
+export const seconds = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
+
 /** The last `lines` lines of a file (reads at most `maxBytes` from its end). */
 export function tailLines(file: string, lines: number, maxBytes = 256 * 1024): string[] {
   let fd: number | undefined;

@@ -600,6 +600,7 @@ export const ptBR = {
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
       leadCloud: "Num computador só deste workspace, que está sendo preparado agora.",
       leadCloudReady: "Num computador só deste workspace, que já está pronto.",
+      leadCloudPaused: "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
     },
     team: {
       title: "Quem mais trabalha com você?",
@@ -1059,7 +1060,7 @@ export const ptBR = {
     },
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
-      text: "No ChatGPT, abra Configurações › Segurança e permita o login com código de dispositivo para o Codex. Num plano Business ou Enterprise, quem administra o workspace permite.",
+      text: "No ChatGPT, abra Configurações\u00a0›\u00a0Segurança e permita o login com código de dispositivo para o Codex. Num plano Business ou Enterprise, quem administra o workspace permite.",
       open: "Abrir as configurações do ChatGPT",
     },
     zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
@@ -3821,7 +3822,8 @@ export const ptBR = {
       dmWith: "DM com {{name}}",
       homeHint: "A missão ganha uma thread: é lá que {{name}} conversa, pede decisões e mostra o que fez.",
       offline: "{{name}} está offline. O plano começa quando ele voltar.",
-      needsMachine: "Missões rodam num computador conectado. Conecte um ao {{name}} em Configurações › Computadores.",
+      needsMachine:
+        "Missões rodam num computador conectado. Conecte um ao {{name}} em Configurações\u00a0›\u00a0Computadores.",
       commandHint: "Também dá para começar escrevendo no composer de qualquer conversa:",
       approvals: "Merge, deploy e rollback sempre pedem aprovação",
       start: "Começar missão",
@@ -7367,7 +7369,7 @@ export const ptBR = {
       help: "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
       envOff: "Desligado nas configurações deste servidor (TELEMETRY=off). Daqui não dá para ligar.",
       envOffDesktop:
-        "Desligado no app do agentes.chat no computador onde este servidor roda, em Preferências › Servidores. Daqui não dá para ligar.",
+        "Desligado no app do agentes.chat no computador onde este servidor roda, em Preferências\u00a0›\u00a0Servidores. Daqui não dá para ligar.",
       see: "Ver o que é enviado",
       dialogTitle: "O que é enviado",
       dialogText: "Uma vez por dia. Este é o próximo envio, exatamente.",
@@ -8426,6 +8428,7 @@ export const ptBR = {
       capacity: "Demorando mais",
       problem: "Com problema",
       ready: "Pronto",
+      paused: "Pausado",
     },
     step: {
       reserving: "Reservando o computador",
@@ -8449,6 +8452,7 @@ export const ptBR = {
       capacity: "Está demorando mais que o normal. Nada se perde.",
       problem: "Algo deu errado ao preparar o computador. Já estamos cuidando: nada a fazer do seu lado.",
       ready: "Pronto. Os agentes trabalham nele.",
+      paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
     notice: {
       label: "O computador do workspace",
@@ -8634,7 +8638,7 @@ export const ptBR = {
     phone: {
       otherApp: "{{The}} {{name}} está usando outro app na própria tela",
       fromComputer: "Para ver a tela, abra o agentes.chat num notebook",
-      chooseOnWeb: "Escolha no agentes.chat, em Configurações › Computadores.",
+      chooseOnWeb: "Escolha no agentes.chat, em Configurações\u00a0›\u00a0Computadores.",
     },
   },
 };

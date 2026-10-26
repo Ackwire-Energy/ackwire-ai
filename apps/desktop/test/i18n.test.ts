@@ -41,6 +41,15 @@ describe("desktop strings", () => {
     expect(filesNamingMakers([join(app, "src")]).map((f) => relative(app, f))).toEqual([]);
   });
 
+  test("a path to a setting stays on one line: no-break spaces around its ›", () => {
+    for (const tree of [desktopPtBR, desktopEn]) {
+      const paths = values(tree).filter((s) => s.includes("›"));
+      expect(paths.length).toBeGreaterThanOrEqual(2);
+      for (const s of paths)
+        expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
+    }
+  });
+
   test("merged under desktop.* next to the shared strings", () => {
     const res = withDesktopKeys({ "pt-BR": { translation: { a: "1" } }, en: { translation: { a: "2" } } });
     expect(res.en?.translation?.desktop).toBe(desktopEn);

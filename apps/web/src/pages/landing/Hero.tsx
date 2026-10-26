@@ -296,7 +296,7 @@ function Giant({
   );
 }
 
-/* ---------- The app, live: a sample conversation that loops while the hero is on screen ---------- */
+/* ---------- The app, live: a sample conversation that loops while the hero is on screen (still with reduced motion) ---------- */
 
 type FeedItem =
   | { id: string; kind: "ask" }
@@ -308,17 +308,26 @@ type FeedItem =
 /** At most this many messages show; older ones leave through the fade at the top. */
 const SHOWN = 4;
 
+/** With reduced motion, the conversation as one loop ends, held still: nothing arrives, nobody hops. */
+const STILL: FeedItem[] = [
+  { id: "0-ask", kind: "ask" },
+  { id: "0-work", kind: "work", done: 3, summary: true },
+  { id: "0-found", kind: "found" },
+  { id: "0-approval", kind: "approval", decided: true },
+  { id: "0-done", kind: "done" },
+];
+
 function HeroApp({ onCelebrate }: { onCelebrate: () => void }) {
   const { t } = useTranslation();
   const fmt = useFormat();
-  const { aim } = useLanding();
+  const { aim, reduced } = useLanding();
   const runner = useRunner();
   const wrap = useRef<HTMLDivElement>(null);
   const feed = useRef<HTMLDivElement>(null);
   const visible = useVisible(wrap);
   const seen = useRef(false);
   seen.current = visible;
-  const [items, setItems] = useState<FeedItem[]>([]);
+  const [items, setItems] = useState<FeedItem[]>(() => (reduced ? STILL : []));
   const [states, setStates] = useState<Partial<Record<CastKey, AgentState>>>({});
   const decide = useRef<(() => void) | null>(null);
   const celebrate = useRef(onCelebrate);
@@ -336,7 +345,7 @@ function HeroApp({ onCelebrate }: { onCelebrate: () => void }) {
 
   const started = useRef(false);
   useEffect(() => {
-    if (!visible || started.current) return;
+    if (reduced || !visible || started.current) return;
     started.current = true;
     runner.start(async (r) => {
       const step = async (ms: number) => {
@@ -382,7 +391,7 @@ function HeroApp({ onCelebrate }: { onCelebrate: () => void }) {
         if (!(await step(4500))) return;
       }
     });
-  }, [visible, runner]);
+  }, [reduced, visible, runner]);
   useEffect(() => () => decide.current?.(), []);
 
   const shown = items.slice(-SHOWN);

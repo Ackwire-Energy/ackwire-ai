@@ -223,6 +223,35 @@ describe("no AI yet while the workspace's computer is on its way", () => {
 });
 
 describe("Configurações → Computadores: the workspace's own computer", () => {
+  test("on hold with none ready: paused, nothing on its way and no notice; active again, its wait shows", async () => {
+    const state = seedState();
+    const me = state.me;
+    if (!me) throw new Error("no me");
+    me.organizations = me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: null } }));
+    // The server says no state for a workspace on hold whose computer isn't ready.
+    const { machines, socket } = await open(`/org/${ORG_ID}/settings/computers`, { state: null }, state);
+    const card = () => screen().getByRole("region", { name: "Computador da Acme" }).textContent ?? "";
+    expect(card()).toContain("Pausado");
+    expect(card()).toContain("Não está sendo preparado enquanto o workspace estiver em espera.");
+    expect(card()).not.toContain("Sendo preparado");
+    expect(card()).not.toContain("Avisamos");
+    expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
+
+    // Active again: the app asks again, and the wait is back.
+    machines.setSetup({ state: "preparing", step: "reserving" });
+    await act(async () =>
+      socket?.push({
+        type: "event",
+        scope: "org",
+        event: { type: "org.standing", orgId: ORG_ID, state: "active", reason: null },
+      }),
+    );
+    await settle(8);
+    expect(card()).toContain("Sendo preparado");
+    expect(card()).toContain("Passo 1 de 4 · Reservando o computador");
+    expect(screen().getByRole("region", { name: NOTICE }).textContent).toContain("Preparando o computador da Acme");
+  });
+
   test("its card instead of the cloud's: steps, size, one user per agent; ready, online with its agents", async () => {
     const { push, machines } = await open(`/org/${ORG_ID}/settings/computers`, {
       state: "preparing",

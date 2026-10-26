@@ -141,6 +141,11 @@
     opacity: 0;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  .issues-now__step.is-live::after {
+    animation: none;
+  }
+}
 .issues-now__go {
   display: inline-flex;
   align-items: center;

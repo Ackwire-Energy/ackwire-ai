@@ -86,6 +86,7 @@ const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   waiting: "waiting",
   problem: "alert",
   ready: "check",
+  paused: "pause",
 };
 
 /** While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. */
@@ -206,7 +207,7 @@ export function SetupWait({
     <div className="setup-wait">
       <SetupProgress view={view} />
       <SetupWaitLines view={view} reader={reader} closeable={closeable} />
-      {agentName && view.phase !== "ready" && (
+      {agentName && setupPending(view) && (
         <p className="setup-line ac-iconline">
           <Icon name="clock" size={14} />
           <span>{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>

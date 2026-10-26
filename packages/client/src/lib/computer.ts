@@ -93,7 +93,8 @@ export const SETUP_STAGES = {
 } as const satisfies Record<string, ComputerSetupStep>;
 type SetupStage = keyof typeof SETUP_STAGES;
 
-export type SetupPhase = "preparing" | "waiting" | "problem" | "ready";
+/** `paused`: the workspace is on hold, and waits for no computer until it is active again. */
+export type SetupPhase = "preparing" | "waiting" | "problem" | "ready" | "paused";
 /** What a line or a chip says: the phase, or why it waits. */
 type SetupStatus = Exclude<SetupPhase, "waiting"> | "capacity";
 
@@ -133,7 +134,8 @@ export interface SetupView {
  */
 export function setupView(setup: ComputerSetup | null | undefined, receivedAt = Date.now()): SetupView | null {
   if (setup?.mode !== "external") return null;
-  const phase: SetupPhase = setup.state ?? "preparing";
+  // The server says no state only for a workspace that isn't active and has no ready computer.
+  const phase: SetupPhase = setup.state ?? "paused";
   const step = phase === "preparing" && setup.step && SETUP_STEPS.includes(setup.step) ? setup.step : null;
   const stage = setup.stage as SetupStage | null | undefined;
   // Every wait reads as capacity: an older server's `approval` too.
@@ -252,8 +254,9 @@ export function setupPortrait(view: SetupView, online: boolean): ComputerState {
   return view.phase === "problem" ? "offline" : "paused";
 }
 
-/** Not ready yet: the notice, the waiting agents and the onboarding's progress show. */
-export const setupPending = (view: SetupView | null): view is SetupView => view !== null && view.phase !== "ready";
+/** On its way: the notice, the waiting agents and the onboarding's progress show. */
+export const setupPending = (view: SetupView | null): view is SetupView =>
+  view !== null && view.phase !== "ready" && view.phase !== "paused";
 
 /**
  * The agents waiting for the workspace's computer: those no computer lists. Its first hello gives it to every

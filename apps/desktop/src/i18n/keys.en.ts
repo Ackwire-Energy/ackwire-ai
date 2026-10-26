@@ -237,7 +237,7 @@ export const desktopEn: DesktopTranslations = {
     notRunning: "agentes.chat is installed on this {{device}}, but it isn't running",
     notRunningText: "It was installed from the terminal, in {{path}}. Start it there, then try again.",
     running: "agentes.chat already runs on this {{device}}",
-    runningText: "This app runs it, at {{url}}. Its settings are in Preferences › Servers.",
+    runningText: "This app runs it, at {{url}}. Its settings are in Preferences\u00a0›\u00a0Servers.",
     openIt: "Open it",
     win: {
       title: "Run agentes.chat on this PC",
@@ -297,7 +297,7 @@ export const desktopEn: DesktopTranslations = {
     phoneOff: "Turn on reach first.",
     showQr: "Show QR code",
     usageRestart: "Changing it restarts agentes.chat for a moment.",
-    usageBoth: "Off here or in agentes.chat's Settings › General, nothing is sent.",
+    usageBoth: "Off here or in agentes.chat's Settings\u00a0›\u00a0General, nothing is sent.",
     reachFailed: "Access from your devices didn't turn on: {{reason}}.",
     backup: "Back up now",
     backedUp: "Backed up: {{file}}",

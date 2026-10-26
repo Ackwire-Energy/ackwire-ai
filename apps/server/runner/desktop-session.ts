@@ -31,7 +31,7 @@ import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
 import { hasBunTerminal, runtimeName, thisRunner } from "./launch";
-import { tailLines } from "./logfile";
+import { seconds, tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
 import { KeyedQueue } from "./queue";
 
@@ -50,7 +50,8 @@ import { KeyedQueue } from "./queue";
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
  * - Its look (`desktop-look.ts`) is XFCE's settings in its HOME, written there
- *   as the agent before a start when the HOME's marker names another look.
+ *   as the agent while its screen server starts, when the HOME's marker names
+ *   another look.
  *   Its Browser reaches the runner on a socket next to the password file
  *   (`desktop-browser.ts`), open while the desktop runs.
  * - One that runs on gets what changed since it started without a restart
@@ -80,13 +81,22 @@ const SWEEP_MS = 60_000;
 /** Xvnc listens within a few hundred ms. */
 const XVNC_START_MS = 5000;
 /**
- * The steps before X, run as the agent (the prepare, the look), take milliseconds: one still running after this
- * is held up (a pipe in its HOME, a hung disk), and is stopped rather than left to block the agent's desktop.
+ * The steps before its session, run as the agent (the prepare, the look), take milliseconds: one still running
+ * after this is held up (a pipe in its HOME, a hung disk), and is stopped rather than left to block the agent's
+ * desktop.
  */
 const STEP_MS = 10_000;
 const KILL_WAIT_MS = 3000;
 /** A running desktop takes a new look only after a minute without a request (its agent's steps come closer). */
 const REFRESH_IDLE_MS = 60_000;
+/**
+ * XFCE's session starts its programs one priority after another, each once the one before has registered (or
+ * after 8 s): the window manager, the settings daemon, the panel (and the dock's own process), Thunar's daemon,
+ * then xfdesktop and its wallpaper. When each started, from the session's own start, goes in the log at the first
+ * sweep this long after the desktop started: where its seconds before the picture went.
+ */
+const SESSION_PROGRAMS = ["xfwm4", "xfsettingsd", "xfce4-panel", "wrapper-2.0", "Thunar", "xfdesktop"];
+const SESSION_SETTLED_MS = 15_000;
 /**
  * The look written into a running session (`refresh`) also sets some 70 settings, an `xfconf-query` each through
  * the session's bus, and restarts its dock: seconds on a busy computer, so it gets this many steps' time.
@@ -174,12 +184,18 @@ const PREPARE = [
 
 /**
  * XFCE's session starts an ssh-agent that daemonizes on its own and outlives
- * the desktop (one more process left at every start): off.
+ * the desktop (one more process left at every start), and before any of its
+ * programs it waits for gpg-agent's restart (`gpgconf --kill`, then
+ * `gpg-agent --daemon`, each run to its end): both off. gpg starts its own
+ * agent when something uses it.
  */
 const XFCE_SESSION_SETTINGS = `<?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-session" version="1.0">
   <property name="startup" type="empty">
     <property name="ssh-agent" type="empty">
+      <property name="enabled" type="bool" value="false"/>
+    </property>
+    <property name="gpg-agent" type="empty">
       <property name="enabled" type="bool" value="false"/>
     </property>
   </property>
@@ -332,6 +348,33 @@ export interface DesktopSystem {
   /** A process's command line; null when it isn't running. */
   cmdline(pid: number): string[] | null;
   kill(pid: number, signal: NodeJS.Signals): void;
+  /** Every process on the computer (none where there is no `/proc`). */
+  processes(): ProcessStat[];
+}
+
+/** A process as `/proc/<pid>/stat` has it: `start` in seconds since the computer booted, `cpu` in seconds it ran. */
+export interface ProcessStat {
+  pid: number;
+  ppid: number;
+  name: string;
+  start: number;
+  cpu: number;
+}
+
+/** USER_HZ, what `/proc/<pid>/stat` counts a process's start and CPU time in: 100 on every Linux the runner runs on. */
+const TICKS_PER_SECOND = 100;
+
+/** One `/proc/<pid>/stat` line; null when it isn't one. Its name can hold spaces and parentheses: it ends at the last ")". */
+export function procStat(line: string): ProcessStat | null {
+  const open = line.indexOf("(");
+  const close = line.lastIndexOf(")");
+  if (open < 0 || close < open) return null;
+  // From the field after the name: state, ppid, … utime and stime (the stat's 14th and 15th), starttime (its 22nd).
+  const fields = line.slice(close + 2).split(" ");
+  const [pid, ppid, start] = [Number(line.slice(0, open)), Number(fields[1]), Number(fields[19])];
+  const cpu = Number(fields[11]) + Number(fields[12]);
+  if (!isPid(pid) || !Number.isInteger(ppid) || !Number.isFinite(start) || !Number.isFinite(cpu)) return null;
+  return { pid, ppid, name: line.slice(open + 1, close), start: start / TICKS_PER_SECOND, cpu: cpu / TICKS_PER_SECOND };
 }
 
 function spawnProcess(argv: string[], opts: DesktopSpawnOptions): DesktopProcess {
@@ -382,6 +425,21 @@ export const hostSystem = (): DesktopSystem => ({
     } catch {
       // gone
     }
+  },
+  processes() {
+    let pids: string[];
+    try {
+      pids = readdirSync("/proc").filter((name) => /^\d+$/.test(name));
+    } catch {
+      return [];
+    }
+    return pids.flatMap((pid) => {
+      try {
+        return procStat(readFileSync(`/proc/${pid}/stat`, "utf8")) ?? [];
+      } catch {
+        return [];
+      }
+    });
   },
 });
 
@@ -448,6 +506,8 @@ interface Desktop extends Saved {
    * runner has settled, its `LIVE_PARAMS` and its look (done, or failed and left to the next runner).
    */
   refresh: { current: boolean; queued: boolean; params: boolean; look: boolean };
+  /** Started by this runner, its session's start not in the log yet (`sessionStart`). */
+  untold?: boolean;
 }
 
 /** Browser's socket: in the password file's folder, root's for the agent in system mode. */
@@ -695,7 +755,8 @@ export class DesktopSessions {
   /**
    * Desktops that ended by themselves start again (one taken back from an earlier runner has no exit to wait
    * on). The agent's Chrome in use on one touches it, so it isn't parked as soon as that Chrome closes. A running
-   * one gets what changed since it started (`refresh`); the promise settles once those refreshes are over.
+   * one gets what changed since it started (`refresh`); the promise settles once those refreshes are over. One this
+   * runner started says how its session's start went (`sessionStart`), once that is over.
    */
   sweep(): Promise<void> {
     for (const d of [...this.desktops.values()]) {
@@ -704,6 +765,7 @@ export class DesktopSessions {
         continue;
       }
       if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
+      if (d.untold && this.now() - d.startedAt >= SESSION_SETTLED_MS) this.sessionStart(d);
       if (d.refresh.current && !d.refresh.queued && !(d.refresh.params && d.refresh.look)) {
         d.refresh.queued = true;
         // One that throws (its agent's user isn't known while the runner isn't connected) is tried again at the next
@@ -712,6 +774,29 @@ export class DesktopSessions {
       }
     }
     return this.refreshes;
+  }
+
+  /**
+   * When each of XFCE's programs (`SESSION_PROGRAMS`) started, from its session's own start, and the CPU time its
+   * processes used so far (a program building a cache shows seconds; one waiting on another, none): the processes
+   * under the one this runner started, as `/proc` has them. Once per desktop it started.
+   */
+  private sessionStart(d: Desktop) {
+    d.untold = false;
+    const procs = this.sys.processes();
+    const tree = procs.filter((p) => p.pid === d.sessionPid);
+    for (let i = 0; i < tree.length; i++) tree.push(...procs.filter((p) => p.ppid === tree[i]?.pid));
+    const base = tree.find((p) => p.name === "xfce4-session")?.start;
+    if (base === undefined) return;
+    const parts = SESSION_PROGRAMS.map((name) => {
+      const own = tree.filter((p) => p.name === name);
+      const at = Math.min(...own.map((p) => p.start));
+      const cpu = own.reduce((sum, p) => sum + p.cpu, 0);
+      return Number.isFinite(at)
+        ? `${name} at ${seconds((at - base) * 1000)} (${seconds(cpu * 1000)} of CPU)`
+        : `${name} not yet`;
+    });
+    this.opts.log(`the desktop of ${d.agent.handle}: its session started ${parts.join(", ")}`);
   }
 
   /** The runner stops: desktops go on running (the next runner takes them back). */
@@ -735,6 +820,7 @@ export class DesktopSessions {
   }
 
   private async start(agent: AgentScope): Promise<Desktop> {
+    const began = this.now();
     if (!(await this.makeRoom(agent.id, true))) {
       throw new RunnerError(
         "desktop_busy",
@@ -744,6 +830,7 @@ export class DesktopSessions {
     let display: number | null = null;
     try {
       const user = await this.opts.user(agent);
+      const userAt = this.now();
       if (this.asRoot(user)) throw new RunnerError("desktop_unavailable", NOT_AS_ROOT);
       const xvnc = this.sys.which("Xtigervnc", user.env.PATH);
       const dbus = this.sys.which("dbus-launch", user.env.PATH);
@@ -797,25 +884,38 @@ export class DesktopSessions {
             `The agent's desktop couldn't be prepared: ${prepared === "late" ? `still running after ${this.stepMs / 1000} s` : tailLines(logFile, 3).join(" ")}`,
           );
         }
-        // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
+        const preparedAt = this.now();
+        // The agentes.chat look (desktop-look.ts), as the agent, while the screen server starts: it writes only
+        // into HOME, which XFCE reads and Xtigervnc doesn't. Without it the desktop starts as its HOME has it.
         const look = lookCommand(user.home, this.lookOptions(agent, user, files.passwd));
-        const looked = await this.step(
+        const looking = this.step(
           this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
-        );
+        ).then((code) => ({ code, ms: this.now() - preparedAt }));
+        const env = { ...user.env, HOME: user.home };
+        let x: DesktopProcess;
+        let pid: number;
+        try {
+          this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
+          x = this.sys.spawn([...user.prefix, xvnc, `:${display}`, ...xvncArgs(files, desktopName(agent))], {
+            cwd: user.home,
+            env,
+            detached: true,
+            log,
+          });
+          pid = await this.waitForXvnc(x, display, files.socket, logFile);
+        } catch (err) {
+          // Its next start's prepare renames files the look still writes (xfwm4's settings among them).
+          await looking;
+          throw err;
+        }
+        const screenAt = this.now();
+        const { code: looked, ms: lookMs } = await looking;
         if (looked !== 0) {
           this.opts.log(
             `the desktop of ${agent.handle} keeps the look its home has: writing the agentes.chat look ${looked === "late" ? `was stopped after ${this.stepMs / 1000} s` : `failed (exit ${looked})`}`,
           );
         }
-        this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
-        const env = { ...user.env, HOME: user.home };
-        const x = this.sys.spawn([...user.prefix, xvnc, `:${display}`, ...xvncArgs(files, desktopName(agent))], {
-          cwd: user.home,
-          env,
-          detached: true,
-          log,
-        });
-        const pid = await this.waitForXvnc(x, display, files.socket, logFile);
+        const sessionAt = this.now();
         const session = this.sys.spawn([...user.prefix, dbus, "--exit-with-session", "xfce4-session"], {
           cwd: user.home,
           env: {
@@ -851,13 +951,17 @@ export class DesktopSessions {
           lastUsed: saved.startedAt,
           streams: 0,
           refresh: { current: true, queued: false, params: true, look: looked === 0 },
+          untold: true,
         };
         writeJson(d.file, saved);
         this.add(d);
         void x.exited.then(() => this.ended(d));
         void session.exited.then(() => this.ended(d));
         await this.listenBrowser(d);
-        this.opts.log(`the desktop of ${agent.handle} started on :${display}`);
+        const now = this.now();
+        this.opts.log(
+          `the desktop of ${agent.handle} started on :${display} in ${seconds(now - began)}: room and its user ${seconds(userAt - began)}, prepared in ${seconds(preparedAt - userAt)}, its screen in ${seconds(screenAt - preparedAt)} (the look in ${seconds(lookMs)} meanwhile), its session in ${seconds(now - sessionAt)}`,
+        );
         return d;
       } finally {
         closeSync(log);
@@ -893,7 +997,7 @@ export class DesktopSessions {
     }
   }
 
-  /** A step before X: its exit code, or "late" once it has run `ms` (`STEP_MS`; then it is stopped). */
+  /** A step run as the agent: its exit code, or "late" once it has run `ms` (`STEP_MS`; then it is stopped). */
   private async step(p: DesktopProcess, ms = this.stepMs): Promise<number | null | "late"> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<"late">((resolve) => {

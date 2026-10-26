@@ -166,7 +166,10 @@ const ComputerSetup = z
       description:
         "`pair`: people connect their own computers (the other fields are null). `external`: the workspace gets its own computer, being prepared until `state` is `ready`.",
     }),
-    state: z.enum(PROVISIONING_STATES).nullable(),
+    state: z.enum(PROVISIONING_STATES).nullable().openapi({
+      description:
+        "With `external`, null while the workspace is on hold and its computer isn't ready: it waits for none, so nothing of a wait is said either.",
+    }),
     step: z
       .enum(PROVISIONING_STEPS)
       .nullable()

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError } from "./errors";
@@ -8,7 +8,7 @@ import type { Judge } from "./judge";
 import type { MachineHub } from "./machine-hub";
 import { notifyOrgStanding } from "./notification-producers";
 
-const { organizations, agents, users, sessions, pushDevices, organizationMembers } = schema;
+const { organizations, agents, users, sessions, pushDevices, organizationMembers, machineProvisioning } = schema;
 
 /**
  * A workspace's standing (ADR 0056 §8), set by the people who run this server through the operator API and
@@ -182,7 +182,8 @@ export interface StandingDeps {
  * Sets a workspace's standing (the operator API): at once in this process, within 5 s in the others. When
  * what the workspace sees changes (the state, or the reason it is told), its members hear `org.standing`;
  * with the notice `shown` the change goes into its audit log, and a new state notifies its owners and
- * admins. Suspending it also stops its runs and tasks now. Null when there is no such workspace.
+ * admins. Suspending it also stops its runs and tasks now. A workspace held or suspended waits for no computer:
+ * what its provisioner last said goes, and the apps ask again on `org.standing`. Null when there is no such workspace.
  */
 export async function setOrgStanding(
   deps: StandingDeps,
@@ -210,6 +211,13 @@ export async function setOrgStanding(
       .where(eq(organizations.id, orgId))
       .returning(OPERATOR_STANDING_COLUMNS);
     if (!after) return null;
+    // Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), each
+    // time it is set. Under this row's lock, which a report and a removal share, so neither brings the wait back.
+    if (after.state !== "active") {
+      await tx
+        .delete(machineProvisioning)
+        .where(and(eq(machineProvisioning.orgId, orgId), ne(machineProvisioning.state, "ready")));
+    }
     const seen = moved || (after.state !== "active" && toldReason(before) !== toldReason(after));
     if (seen && after.notice === "shown") {
       await recordAudit(tx, {

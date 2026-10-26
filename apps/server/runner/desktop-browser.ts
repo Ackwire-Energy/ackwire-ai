@@ -35,8 +35,9 @@ const CONNECTIONS_MAX = 4;
 /** Chrome for Testing's download and install, then Chrome's start: a click is given up after this. */
 export const SHOW_MS = 16 * 60_000;
 /**
- * A click answered sooner (Chrome already open, brought to the front) shows no window of its own: Chrome's is the
- * answer. A Chrome that starts takes seconds, and the note itself most of a second to show on a small computer.
+ * A click answered sooner (Chrome already open, brought to the front: from the apps menu, say, since docklike handles
+ * a plain click on Browser while Chrome has a window itself) shows no window of its own: Chrome's is the answer. A
+ * Chrome that starts takes seconds, and the note itself most of a second to show on a small computer.
  */
 const QUIET_MS = 300;
 
