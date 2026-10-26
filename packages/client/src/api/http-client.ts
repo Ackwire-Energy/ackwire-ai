@@ -30,6 +30,7 @@ import type {
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
+  AskToJoinResult,
   AuthConfig,
   BatchInviteResult,
   BrowserHandoff,
@@ -64,9 +65,12 @@ import type {
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
+  InviteLink,
   Issue,
   IssueActivity,
   IssueColumn,
+  JoinApproval,
+  JoinRequest,
   Machine,
   MachineAccess,
   MachineAccount,
@@ -655,8 +659,19 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`, { method: "PUT", json: input }),
     },
     invites: {
-      createLink: (orgId) => request<{ url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
+      createLink: (orgId) =>
+        request<{ id: string; url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
+      links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
+      turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
+      ask: (token, input) => request<AskToJoinResult>(`/api/app/invitations/${enc(token)}/requests`, { json: input }),
       requestNew: (token) => request<void>(`/api/app/invitations/${enc(token)}/request-new`, { json: {} }),
+    },
+    joinRequests: {
+      list: async (orgId) => (await request<{ requests: JoinRequest[] }>(`${org(orgId)}/join-requests`)).requests,
+      approve: (orgId, id, role) =>
+        request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { role } }),
+      deny: (orgId, id, reason) =>
+        request<void>(`${org(orgId)}/join-requests/${enc(id)}/deny`, { json: reason ? { reason } : {} }),
     },
     storage: {
       get: (orgId) => request<StorageConfig>(`${org(orgId)}/storage`),

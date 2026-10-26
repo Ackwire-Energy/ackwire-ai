@@ -46,6 +46,9 @@ export const keys = {
   overview: (orgId: string) => ["org", orgId, "overview"] as const,
   people: (orgId: string) => ["org", orgId, "people"] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
+  /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
+  joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
+  inviteLinks: (orgId: string) => ["org", orgId, "invitations", "links"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
   /** The usage views; an agent's sits under it, so one invalidation refreshes both. */
   planUsage: (orgId: string) => ["org", orgId, "plan-usage"] as const,
