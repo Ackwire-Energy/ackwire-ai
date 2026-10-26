@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ImportInput, SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
@@ -82,6 +82,21 @@ describe("Entrar (e-mail primeiro)", () => {
       { email: "marina@acme.com.br", password: "correct horse" },
     ]);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
+  });
+
+  test("signed in from an email's deep link: back on that page, its query and all", async () => {
+    const state = seedState({ me: null });
+    const signedIn = seedState().me;
+    const { auth } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
+    const { api } = authApi(ACCOUNT, { state });
+    const target = `/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=budget`;
+    const { router } = await renderApp(`/login?redirect=${encodeURIComponent(target)}`, { api, auth });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Senha", "correct horse");
+    await press(/^Entrar/);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
   });
 
   test("an account without a password: only the provider it signs in with", async () => {

@@ -18,7 +18,7 @@ import {
   viewDays,
   viewRange,
 } from "@agenteschat/client/lib/calendar";
-import { formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { dateOnly, formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
 import { runPixelStatus, runPixels } from "@agenteschat/client/lib/routine-view";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
@@ -35,7 +35,7 @@ import {
   Toolbar,
   useDelayed,
 } from "@agenteschat/ui";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
@@ -49,12 +49,15 @@ import { TimeGrid } from "@/components/calendar/TimeGrid";
 import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./calendar.css";
 
 export { mondayOf } from "@agenteschat/client/lib/calendar";
 
 const VIEWS: CalendarView[] = ["day", "week", "month", "agenda"];
+/** A linked event's day goes with it when its details close. */
+const WITH_OPEN = ["day"];
 const SOURCES: { source: ItemSource; icon: IconName }[] = [
   { source: "person", icon: "person" },
   { source: "agent", icon: "agent" },
@@ -93,7 +96,10 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
   const [today] = useState(() => todayProp ?? new Date());
   const [now, setNow] = useState(() => new Date());
   const [view, setView] = useState<CalendarView>("week");
-  const [focus, setFocus] = useState(() => startOfDay(today));
+  // A link to an event (an invitation's email) says its day, so the view starts on its week.
+  const [linked, setLinked] = useOpenParam("open", WITH_OPEN);
+  const [linkedDay] = useOpenParam("day");
+  const [focus, setFocus] = useState(() => startOfDay(linkedDay ? dateOnly(linkedDay) : today));
   const [businessOnly, setBusinessOnly] = useState(false);
   const [panel, setPanel] = useState(() => typeof window === "undefined" || window.innerWidth >= 1180);
   const [filters, setFilters] = useState<Filters>({ person: true, agent: true, routine: true, deadline: true });
@@ -150,6 +156,19 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
     shiftItems(toItems(soon.data)).filter((it) => filters[it.source]),
     now,
   );
+  // Once the linked event has loaded, its details open; closing them drops the link.
+  const shownLink = useRef<string | null>(null);
+  useEffect(() => {
+    const item = linked && shownLink.current !== linked ? items.find((it) => it.eventId === linked) : undefined;
+    if (!item || !linked) return;
+    shownLink.current = linked;
+    setFocus(startOfDay(item.start));
+    setOpenKey(item.key);
+  });
+  const onOpenKey = (key: string | null) => {
+    setOpenKey(key);
+    if (!key && linked) setLinked(null);
+  };
   const placeholders = useDelayed(range.isLoading);
   const busy = useMemo(() => new Set(all.map((it) => toYmd(it.start))), [all]);
   const proposal = range.data?.proposals[0];
@@ -351,7 +370,7 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
               loading={placeholders}
               focusDay={focus}
               openKey={openKey}
-              onOpenKey={setOpenKey}
+              onOpenKey={onOpenKey}
               details={details}
               onCreate={(r) => setDialog({ draft: { start: fromView(r.start), end: fromView(r.end) }, event: null })}
               onMove={move}
@@ -367,7 +386,7 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
               today={today}
               focusDay={focus}
               openKey={openKey}
-              onOpenKey={setOpenKey}
+              onOpenKey={onOpenKey}
               details={details}
               onFocusDay={setFocus}
             />
@@ -378,7 +397,7 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
               items={items}
               today={today}
               openKey={openKey}
-              onOpenKey={setOpenKey}
+              onOpenKey={onOpenKey}
               details={details}
             />
           )}
