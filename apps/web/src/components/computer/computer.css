@@ -174,10 +174,9 @@
 .cmp-dialog.is-screen-only .dsk-line {
   grid-row: 4;
 }
-/* Hidden after a while (useBar), the line under the screen also while only the head came back. */
+/* Hidden after a while (useBar); what floats under the head also while the head alone came back. */
 .cmp-dialog.is-bar-hidden > .ac-dialog__head,
-.cmp-dialog.is-bar-hidden .cmp-asked,
-.cmp-dialog.is-line-hidden .dsk-line {
+.cmp-dialog.is-line-hidden :is(.cmp-asked, .dsk-line) {
   opacity: 0;
   translate: 0 var(--bar-slide, -8px);
   pointer-events: none;

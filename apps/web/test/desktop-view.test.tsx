@@ -943,10 +943,10 @@ describe("the dialog's size (computer.css)", () => {
 
   test("the bar over the full screen: what hides with it, what keeps it, and over any cover", async () => {
     const text = await css();
-    // The head and the request hide with it; the line under them also while only the head came back.
+    // The head hides with it; the request and the line under it also while the head alone came back.
     const hide = rule(
       text,
-      ".cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-bar-hidden .cmp-asked,\n.cmp-dialog.is-line-hidden .dsk-line",
+      ".cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-line-hidden :is(.cmp-asked, .dsk-line)",
     );
     expect(hide).toContain("opacity: 0");
     expect(hide).toContain("pointer-events: none");
