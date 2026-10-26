@@ -69,7 +69,7 @@ export const termsEn: LegalDocument = {
       id: "third-parties",
       heading: "7. Model providers, connectors and your own accounts",
       blocks: [
-        "Agents run on AI models from third parties (such as Anthropic and OpenAI), either through the platform's key, through a key your organization adds, or through a Claude or ChatGPT plan connected on someone's computer. When you use your own key or plan, your use is also governed by your agreement with that provider, and you are responsible for following its terms and for its charges.",
+        "Agents run on AI models from third parties (such as Anthropic, which makes Claude, and OpenAI), either through the platform's key, through a key your organization adds, or through a Claude or ChatGPT plan connected on someone's computer. When you use your own key or plan, your use is also governed by your agreement with that provider, and you are responsible for following its terms and for its charges.",
         "Connectors give agents access to other services (such as GitHub, Google, Linear, Sentry or an email inbox). Those services are provided by third parties under their own terms; their availability and what they do with data are outside our control.",
       ],
     },

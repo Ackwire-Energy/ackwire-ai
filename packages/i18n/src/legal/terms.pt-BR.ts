@@ -70,7 +70,7 @@ export const termsPtBR: LegalDocument = {
       id: "third-parties",
       heading: "7. Provedores de modelo, conectores e as suas próprias contas",
       blocks: [
-        "Os agentes rodam em modelos de IA de terceiros (como Anthropic e OpenAI), pela chave da plataforma, por uma chave que a sua organização adiciona ou por um plano do Claude ou do ChatGPT conectado no computador de alguém. Quando você usa a sua própria chave ou plano, o uso também segue o seu contrato com esse provedor, e você responde por seguir os termos dele e pelas cobranças dele.",
+        "Os agentes rodam em modelos de IA de terceiros (como a Anthropic, que faz o Claude, e a OpenAI), pela chave da plataforma, por uma chave que a sua organização adiciona ou por um plano do Claude ou do ChatGPT conectado no computador de alguém. Quando você usa a sua própria chave ou plano, o uso também segue o seu contrato com esse provedor, e você responde por seguir os termos dele e pelas cobranças dele.",
         "Os conectores dão aos agentes acesso a outros serviços (como GitHub, Google, Linear, Sentry ou uma caixa de e-mail). Esses serviços são prestados por terceiros sob os próprios termos; a disponibilidade deles e o que fazem com os dados estão fora do nosso controle.",
       ],
     },
