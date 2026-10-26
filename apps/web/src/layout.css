@@ -6276,11 +6276,6 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
-/* A card's title and its ⓘ: the line takes the title's type, so the ⓘ sits on the title's first line. */
-.ac-hintline:has(> .ac-card__title) {
-  font-size: 18px;
-  line-height: 24px;
-}
 /* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size. */
 .setup-progress {
   margin: 0;
