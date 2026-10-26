@@ -1,24 +1,43 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { afterEach, expect, test } from "bun:test";
+import { eq, schema } from "@agenteschat/db";
+import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
-beforeEach(async () => {
-  t = await createTestServer();
-});
 afterEach(() => t.close());
 
-test("invite link: anyone signed in joins as a member; members can't create links", async () => {
+type Link = { id: string; url: string; expiresAt: string };
+type Request = { id: string; name: string; email: string; note: string | null; confirmed: boolean };
+const DAY = 86_400_000;
+
+async function start(env: Record<string, string> = {}) {
+  t = await createTestServer({ env });
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
-  const { orgId, agentId } = await seedOrg(owner);
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  expect(res.status).toBe(201);
-  const { url, expiresAt } = (await res.json()) as { url: string; expiresAt: string };
-  expect(new Date(expiresAt).getTime() - Date.now()).toBeGreaterThan(6.9 * 86_400_000);
-  const token = url.split("/invite/")[1] ?? "";
-  // Before signing in: who invited and a few of the org's agents, by name and look only.
-  expect(await (await browser(t)(`/api/app/invitations/${token}`)).json()).toEqual({
+  const seeded = await seedOrg(owner);
+  const res = await owner(`/api/app/organizations/${seeded.orgId}/invite-links`, { json: {} });
+  const link = (await res.json()) as Link;
+  return { owner, ...seeded, status: res.status, link, token: link.url.split("/invite/")[1] ?? "" };
+}
+
+const ask = (b: Browser, token: string, json: Record<string, string>, headers?: Record<string, string>) =>
+  b(`/api/app/invitations/${token}/requests`, { json, headers });
+const requests = async (b: Browser, orgId: string) =>
+  ((await (await b(`/api/app/organizations/${orgId}/join-requests`)).json()) as { requests: Request[] }).requests;
+const mailTo = (to: string) => t.email.sent.filter((m) => m.to.includes(to));
+
+test("a link only asks: the same link every time, no sign-up from it, and an approval invites the address", async () => {
+  const { owner, orgId, agentId, status, link, token } = await start();
+  expect(status).toBe(201);
+  expect(new Date(link.expiresAt).getTime() - Date.now()).toBeGreaterThan(29.9 * DAY);
+  const again = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
+  expect(again.status).toBe(200);
+  expect(await again.json()).toEqual(link);
+  const [stored] = await t.db.select().from(schema.organizationInviteLinks);
+  expect(JSON.stringify(stored)).not.toContain(token);
+
+  // Signed out: who shared it and a few of the workspace's agents, by name and look only.
+  const anon = browser(t);
+  expect(await (await anon(`/api/app/invitations/${token}`)).json()).toEqual({
     orgName: "Acme",
     email: "",
     role: "member",
@@ -26,26 +45,178 @@ test("invite link: anyone signed in joins as a member; members can't create link
     invitedBy: "owner",
     agents: [{ id: agentId, name: "Dev", appearance: null }],
   });
-  // Sign-up is closed here: the link's token lets a new person register.
-  await expect(signUp(browser(t), "eve@example.com")).rejects.toThrow("403");
-  await expect(signUp(browser(t), "eve@example.com", { inviteToken: "bad" })).rejects.toThrow("403");
-  for (const email of ["ana@example.com", "bia@example.com"]) {
-    const b = browser(t);
-    await signUp(b, email, { inviteToken: token });
-    expect(await (await b(`/api/app/invitations/${token}/accept`, { json: {} })).json()).toEqual({ orgId });
-    const me = (await (await b("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
-    expect(me.organizations).toEqual([expect.objectContaining({ id: orgId, role: "member" })]);
-    expect((await b(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).status).toBe(403);
+  // The link's token never opens sign-up, nor joins anyone.
+  const header = await anon("/api/auth/sign-up/email", {
+    json: { email: "eve@example.com", password: "correct horse battery", name: "Eve" },
+    headers: { "x-invite-token": token },
+  });
+  expect(header.status).toBe(403);
+
+  // A typed request gets the same answer whatever happens behind it.
+  const typed = { name: "  Ana   Souza ", email: "Ana@Example.com", note: "Paula's new designer" };
+  for (let i = 0; i < 2; i++) {
+    const res = await ask(anon, token, typed);
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ status: "pending", email: "ana@example.com", emailed: true });
   }
-  const [link] = await t.db.select().from(schema.organizationInviteLinks);
-  expect(link?.uses).toBe(2);
-  expect(JSON.stringify(link)).not.toContain(token);
+  expect((await ask(anon, token, { email: "x@example.com" })).status).toBe(400);
+  const [request] = await requests(owner, orgId);
+  expect(request).toMatchObject({ name: "Ana Souza", email: "ana@example.com", note: "Paula's new designer" });
+  expect(request?.confirmed).toBe(false);
+
+  await t.drain();
+  const [toOwner] = mailTo("owner@example.com").filter((m) => m.subject.includes("Ana"));
+  expect(toOwner?.subject).toBe("Ana Souza pede para entrar na Acme");
+  expect(toOwner?.text).toContain(`/org/${orgId}/settings/members?request=${request?.id}&do=approve`);
+  expect(toOwner?.text).not.toContain("Paula");
+  const inbox = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as {
+    items: { kind: string; waiting: boolean; latest: { title?: string } }[];
+  };
+  expect(inbox.items).toEqual([
+    expect.objectContaining({ kind: "join_request", waiting: true, latest: { title: "Ana Souza" } }),
+  ]);
+
+  const approved = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, {
+    json: { role: "member" },
+  });
+  const answer = (await approved.json()) as { outcome: string; url: string; emailed: boolean };
+  expect(answer).toMatchObject({ outcome: "invited", emailed: true });
+  expect(await requests(owner, orgId)).toEqual([]);
+  await t.drain();
+  const [toAna] = mailTo("ana@example.com");
+  expect(toAna?.subject).toBe("Seu pedido para entrar na Acme foi aprovado");
+  expect(toAna?.text).toContain(answer.url);
+
+  // The invitation opens sign-up for that address only, and joins as the role picked.
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  const invitation = answer.url.split("/invite/")[1] ?? "";
+  expect(await (await ana(`/api/app/invitations/${invitation}/accept`, { json: {} })).json()).toEqual({ orgId });
+  const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
+  expect(me.organizations).toEqual([expect.objectContaining({ id: orgId, role: "member" })]);
+  const [used] = await t.db.select().from(schema.organizationInviteLinks);
+  expect(used?.uses).toBe(1);
+  const after = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as { items: unknown[] };
+  expect(after.items).toEqual([]);
+  // Joining with the link itself is refused: it only asks.
+  expect((await (await ana(`/api/app/invitations/${token}/accept`, { json: {} })).json()) as object).toMatchObject({
+    error: { code: "invitation.ask_to_join" },
+  });
+});
+
+test("asks are limited per IP (10 an hour) and per link (20 an hour)", async () => {
+  const { token } = await start();
+  const from = (ip: string, i: number) =>
+    ask(browser(t), token, { name: `P ${ip} ${i}`, email: `p${i}-${ip}@example.com` }, { "x-forwarded-for": ip });
+  for (let i = 0; i < 10; i++) expect((await from("203.0.113.1", i)).status).toBe(201);
+  const limited = await from("203.0.113.1", 10);
+  expect(limited.status).toBe(429);
+  expect(((await limited.json()) as { error: { code: string } }).error.code).toBe("join.rate_limited");
+  for (let i = 0; i < 10; i++) expect((await from("203.0.113.2", i)).status).toBe(201);
+  expect((await from("203.0.113.3", 0)).status).toBe(429);
+});
+
+test("signed in: a confirmed address joins at approval; an unconfirmed one gets an invitation", async () => {
+  const { owner, orgId, token } = await start({ ALLOW_SIGNUP: "true" });
+  const bia = browser(t);
+  await signUp(bia, "bia@example.com");
+  await t.db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.email, "bia@example.com"));
+  const preview = async (b: Browser) =>
+    ((await (await b(`/api/app/invitations/${token}`)).json()) as { you?: Record<string, unknown> }).you;
+  expect(await preview(bia)).toEqual({ member: false, email: "bia@example.com", request: null });
+
+  expect((await ask(bia, token, { note: "From the design team" })).status).toBe(201);
+  expect((await ask(bia, token, {})).status).toBe(200);
+  expect(await preview(bia)).toMatchObject({ request: { status: "pending", reason: null } });
+  const [request] = await requests(owner, orgId);
+  expect(request).toMatchObject({ email: "bia@example.com", confirmed: true });
+
+  const res = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, {
+    json: { role: "admin" },
+  });
+  expect(await res.json()).toEqual({ outcome: "joined" });
+  expect(await preview(bia)).toEqual({
+    member: true,
+    orgId,
+    email: "bia@example.com",
+    request: { status: "approved", reason: null },
+  });
+  const me = (await (await bia("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
+  expect(me.organizations).toEqual([expect.objectContaining({ id: orgId, role: "admin" })]);
+  expect((await ask(bia, token, {})).status).toBe(409);
+
+  const cris = browser(t);
+  await signUp(cris, "cris@example.com");
+  await ask(cris, token, {});
+  const [unconfirmed] = await requests(owner, orgId);
+  expect(unconfirmed?.confirmed).toBe(false);
+  const invited = await owner(`/api/app/organizations/${orgId}/join-requests/${unconfirmed?.id}/approve`, {
+    json: { role: "member" },
+  });
+  expect(await invited.json()).toMatchObject({ outcome: "invited" });
+});
+
+test("only admins see and answer requests; asks must come from our own pages", async () => {
+  const { owner, orgId, link, token } = await start();
+  await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
+  const [request] = await requests(owner, orgId);
+  const member = await joinByInvitation(t, owner, orgId, "member@example.com");
+  const calls = (b: Browser) => [
+    b(`/api/app/organizations/${orgId}/join-requests`),
+    b(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: { role: "member" } }),
+    b(`/api/app/organizations/${orgId}/join-requests/${request?.id}/deny`, { json: {} }),
+    b(`/api/app/organizations/${orgId}/invite-links`),
+    b(`/api/app/organizations/${orgId}/invite-links`, { json: {} }),
+    b(`/api/app/organizations/${orgId}/invite-links/${link.id}`, { method: "DELETE" }),
+  ];
+  for (const res of await Promise.all(calls(member))) expect(res.status).toBe(403);
+  for (const res of await Promise.all(calls(browser(t)))) expect(res.status).toBe(401);
+  const foreign = await browser(t)(`/api/app/invitations/${token}/requests`, {
+    json: { name: "Eve", email: "eve@example.com" },
+    origin: "https://evil.example",
+  });
+  expect(foreign.status).toBe(403);
+
+  // Denied with a reason: the person reads it in the email.
+  const denied = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/deny`, {
+    json: { reason: "We only take people from <the studio>" },
+  });
+  expect(denied.status).toBe(204);
+  const again = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/deny`, { json: {} });
+  expect(((await again.json()) as { error: { code: string } }).error.code).toBe("join.answered");
+  await t.drain();
+  const [toAna] = mailTo("ana@example.com");
+  expect(toAna?.subject).toBe("Seu pedido para entrar na Acme não foi aprovado");
+  expect(toAna?.html).toContain("We only take people from &lt;the studio&gt;");
+});
+
+test("a link turned off: its requests close quietly, its page says it no longer works", async () => {
+  const { owner, orgId, link, token } = await start();
+  await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
+  await t.drain();
+  t.email.sent.length = 0;
+  expect((await owner(`/api/app/organizations/${orgId}/invite-links`)).status).toBe(200);
+  expect((await owner(`/api/app/organizations/${orgId}/invite-links/${link.id}`, { method: "DELETE" })).status).toBe(
+    204,
+  );
+  expect(await requests(owner, orgId)).toEqual([]);
+  expect(await (await browser(t)(`/api/app/invitations/${token}`)).json()).toMatchObject({
+    kind: "link",
+    closed: true,
+  });
+  const refused = await ask(browser(t), token, { name: "Bia", email: "bia@example.com" });
+  expect(refused.status).toBe(404);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("join.link_closed");
+  expect((await browser(t)(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(404);
+  await t.drain();
+  expect(t.email.sent).toEqual([]);
+  // A new link is made the next time one is asked for.
+  const next = (await (await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).json()) as Link;
+  expect(next.url).not.toBe(link.url);
 });
 
 test("request a new invitation: the inviter is emailed once; valid or unknown tokens are refused", async () => {
-  const owner = browser(t);
-  await signUp(owner, "owner@example.com");
-  const { orgId } = await seedOrg(owner);
+  const { owner, orgId } = await start();
   const { url } = (await (
     await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
   ).json()) as { url: string };

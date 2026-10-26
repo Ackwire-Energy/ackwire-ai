@@ -1,8 +1,21 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  ne,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
 import { caches } from "./cache";
-import { randomToken, sha256 } from "./crypto";
+import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { followWorkspaceName } from "./machine-provisioning";
@@ -129,7 +142,7 @@ export async function requirePermission(db: Database, userId: string, orgId: str
 }
 
 /** Invitations go out only from an active workspace (`standing.ts`). */
-function assertInviting(membership: Membership) {
+export function assertInviting(membership: Membership) {
   if (membership.standing && membership.standing.state !== "active") throw new OrgPausedError(membership.standing);
 }
 
@@ -214,24 +227,14 @@ export interface SignupPolicy {
  * Self-hosted sign-up policy: the first account may always register (there is
  * no other way in), unless the installation waits for its owner's link or key,
  * which make it on their own path; after that, only with ALLOW_SIGNUP or a pending
- * invitation for that email (or from a valid org invite link). Open sign-up on a reachable server would let
- * anyone create organizations (and spend model credits) on it.
+ * invitation for that email. An invitation link never opens it (ADR 0068): whoever holds one asks to join
+ * without an account. Open sign-up on a reachable server would let anyone create organizations (and spend
+ * model credits) on it.
  */
-export async function isSignupAllowed(
-  db: Database,
-  email: string,
-  policy: SignupPolicy,
-  now = new Date(),
-  /** The token of an org invite link the person is signing up from. */
-  inviteToken?: string | null,
-) {
+export async function isSignupAllowed(db: Database, email: string, policy: SignupPolicy, now = new Date()) {
   if (policy.allowSignup && !policy.ownerByLink) return true;
   if ((await countUsers(db)) === 0) return !policy.ownerByLink;
   if (policy.allowSignup) return true;
-  if (inviteToken) {
-    const link = await findInviteLink(db, inviteToken);
-    if (link && !link.link.revokedAt && link.link.expiresAt > now) return true;
-  }
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
@@ -255,7 +258,7 @@ const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
  * allowed for that e-mail). This tells whether the e-mail has an account, so
  * the route that serves it is rate limited.
  */
-export async function signInOptions(db: Database, email: string, policy: SignupPolicy, inviteToken?: string | null) {
+export async function signInOptions(db: Database, email: string, policy: SignupPolicy) {
   const rows = await db
     .select({ providerId: accounts.providerId })
     .from(users)
@@ -266,7 +269,7 @@ export async function signInOptions(db: Database, email: string, policy: SignupP
       account: false,
       password: false,
       providers: [] as SignInProvider[],
-      canSignUp: await isSignupAllowed(db, email, policy, new Date(), inviteToken),
+      canSignUp: await isSignupAllowed(db, email, policy),
     };
   }
   const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
@@ -638,6 +641,73 @@ export async function appleSignInTokens(
 // ── Invitations ──────────────────────────────────────────────────────────────
 
 export const INVITATION_TTL_DAYS = 7;
+/** How long an invitation link works (ADR 0068): nobody gets in through it without an admin's approval. */
+export const INVITE_LINK_TTL_DAYS = 30;
+
+/**
+ * Sends an invitation to an address with a role: the one named (`invitationId`), else the newest one for that
+ * address not accepted yet, gets a new token and 7 more days (its old link stops working); with none, a new one
+ * is made. Records `invitation.created`. The caller checks who may invite.
+ */
+export async function sendInvitation(
+  db: Executor,
+  input: {
+    orgId: string;
+    email: string;
+    role: MemberRole;
+    invitedBy: string;
+    now?: Date;
+    invitationId?: string;
+    /** Resent from the pending list. */
+    resent?: boolean;
+    /** An admin approved a request to join (`invite-requests.ts`). */
+    fromRequest?: boolean;
+  },
+) {
+  const now = input.now ?? new Date();
+  const email = input.email.trim().toLowerCase();
+  const [existing] = await db
+    .select({ id: organizationInvitations.id })
+    .from(organizationInvitations)
+    .where(
+      and(
+        eq(organizationInvitations.orgId, input.orgId),
+        input.invitationId
+          ? eq(organizationInvitations.id, input.invitationId)
+          : eq(organizationInvitations.email, email),
+        isNull(organizationInvitations.acceptedAt),
+      ),
+    )
+    .orderBy(desc(organizationInvitations.createdAt))
+    .limit(1);
+  const token = randomToken(32);
+  const fresh = {
+    role: input.role,
+    tokenHash: sha256(token),
+    invitedByUserId: input.invitedBy,
+    expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
+  };
+  const [invitation] = existing
+    ? await db.update(organizationInvitations).set(fresh).where(eq(organizationInvitations.id, existing.id)).returning()
+    : await db
+        .insert(organizationInvitations)
+        .values({ orgId: input.orgId, email, ...fresh })
+        .returning();
+  if (!invitation) throw new ConflictError("This invitation can't be sent");
+  await recordOperatorEvent(db, {
+    type: "invitation.created",
+    orgId: input.orgId,
+    userId: input.invitedBy,
+    data: {
+      emailDomain: addressDomain(invitation.email),
+      role: invitation.role,
+      ...(input.resent ? { resent: true } : {}),
+      ...(input.fromRequest ? { fromRequest: true } : {}),
+    },
+  });
+  /** `token` goes in the link and is never stored. */
+  return { invitation, token };
+}
 
 export async function createInvitation(
   db: Database,
@@ -658,28 +728,7 @@ export async function createInvitation(
     .innerJoin(organizationMembers, eq(organizationMembers.userId, users.id))
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
-
-  const token = randomToken(32);
-  const [invitation] = await db
-    .insert(organizationInvitations)
-    .values({
-      orgId,
-      email,
-      role: input.role,
-      tokenHash: sha256(token),
-      invitedByUserId: actorId,
-      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
-    })
-    .returning();
-  if (!invitation) throw new Error("invitation insert returned nothing");
-  await recordOperatorEvent(db, {
-    type: "invitation.created",
-    orgId,
-    userId: actorId,
-    data: { emailDomain: addressDomain(email), role: input.role },
-  });
-  /** `token` goes in the link and is never stored. */
-  return { invitation, token };
+  return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, now });
 }
 
 export async function listInvitations(db: Database, orgId: string, now = new Date()) {
@@ -710,36 +759,64 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
 }
 
 /**
- * An organization-wide invite link (admins): whoever opens it signed in joins
- * as a member, for 7 days. Uses the same `/invite/{token}` page and accept
- * endpoint as email invitations.
+ * The workspace's invitation link (admins, ADR 0068): whoever opens it can only ask to join. One link per
+ * workspace, shown again whenever needed: the newest active link whose token is still derived from
+ * `secret` (`inviteLinkToken`), else a new one for 30 days (`made`). Uses the same `/invite/{token}` page as
+ * email invitations.
  */
-export async function createInviteLink(db: Database, actorId: string, orgId: string, now = new Date()) {
+export async function inviteLink(db: Database, secret: string, actorId: string, orgId: string, now = new Date()) {
   assertInviting(await requirePermission(db, actorId, orgId, "manage_members"));
-  const token = randomToken(32);
-  const [link] = await db
-    .insert(organizationInviteLinks)
-    .values({
-      orgId,
-      role: "member",
-      tokenHash: sha256(token),
-      createdByUserId: actorId,
-      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
-    })
-    .returning();
-  if (!link) throw new Error("invite link insert returned nothing");
-  await recordOperatorEvent(db, { type: "invitation.created", orgId, userId: actorId, data: { link: true } });
-  return { link, token };
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`invite-links:${orgId}`}))`);
+    const active = await tx
+      .select()
+      .from(organizationInviteLinks)
+      .where(
+        and(
+          eq(organizationInviteLinks.orgId, orgId),
+          isNull(organizationInviteLinks.revokedAt),
+          gt(organizationInviteLinks.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(organizationInviteLinks.createdAt));
+    for (const link of active) {
+      const token = inviteLinkToken(secret, link.id);
+      if (link.tokenHash === sha256(token)) return { link, token, made: false };
+    }
+    const id = crypto.randomUUID();
+    const token = inviteLinkToken(secret, id);
+    const [link] = await tx
+      .insert(organizationInviteLinks)
+      .values({
+        id,
+        orgId,
+        role: "member",
+        tokenHash: sha256(token),
+        createdByUserId: actorId,
+        expiresAt: new Date(now.getTime() + INVITE_LINK_TTL_DAYS * 86_400_000),
+      })
+      .returning();
+    if (!link) throw new Error("invite link insert returned nothing");
+    await recordOperatorEvent(tx, { type: "invitation.created", orgId, userId: actorId, data: { link: true } });
+    return { link, token, made: true };
+  });
 }
 
-async function findInviteLink(db: Database, token: string) {
+/** An invitation link by its token, with its workspace's name and standing; null when there is none. */
+export async function findInviteLink(db: Executor, token: string) {
   const [row] = await db
-    .select({ link: organizationInviteLinks, orgName: organizations.name })
+    .select({ link: organizationInviteLinks, orgName: organizations.name, standing: STANDING_COLUMNS })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
     .where(eq(organizationInviteLinks.tokenHash, sha256(token)));
   return row ?? null;
 }
+
+/** A link people can still ask with: not turned off, not expired, and its workspace active. */
+export const inviteLinkOpen = (
+  found: { link: { revokedAt: Date | null; expiresAt: Date }; standing: WorkspaceStanding },
+  now = new Date(),
+) => !found.link.revokedAt && found.link.expiresAt > now && found.standing.state === "active";
 
 /** How many of the organization's agents an invitation shows ("Ada, Theo e Lia já trabalham lá"). */
 const INVITE_AGENTS = 3;
@@ -757,6 +834,7 @@ async function inviteAgents(db: Database, orgId: string) {
 /**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
  * invited (their name), the role and a few of its agents. Only for a valid token, which reached the person.
+ * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
@@ -775,7 +853,18 @@ export async function previewInvitation(db: Database, token: string, now = new D
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
   if (!row) {
     const link = await findInviteLink(db, token);
-    if (!link || link.link.revokedAt || link.link.expiresAt <= now) return null;
+    if (!link) return null;
+    if (!inviteLinkOpen(link, now)) {
+      return {
+        orgName: link.orgName,
+        email: "",
+        role: "member" as const,
+        kind: "link" as const,
+        invitedBy: null,
+        agents: [],
+        closed: true as const,
+      };
+    }
     const [creator] = link.link.createdByUserId
       ? await db.select({ name: users.name }).from(users).where(eq(users.id, link.link.createdByUserId))
       : [];
@@ -801,7 +890,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
 
 /**
  * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
- * a blocked account, nor into a workspace on hold or suspended.
+ * a blocked account, nor into a workspace on hold or suspended. An invitation link only lets people ask
+ * (`invitation.ask_to_join`, ADR 0068).
  */
 export async function acceptInvitation(
   db: Database,
@@ -817,23 +907,9 @@ export async function acceptInvitation(
       .where(eq(organizationInvitations.tokenHash, sha256(token)))
       .for("update");
     if (!invitation) {
-      // An org-wide link: any signed-in person joins as its role.
-      const [link] = await tx
-        .select()
-        .from(organizationInviteLinks)
-        .where(eq(organizationInviteLinks.tokenHash, sha256(token)))
-        .for("update");
-      if (!link || link.revokedAt || link.expiresAt <= now) {
-        throw new ConflictError("This invitation is invalid or has expired");
-      }
-      // Nobody joins a workspace on hold or suspended.
-      await assertCanWork(tx, link.orgId);
-      await joinOrganization(tx, link.orgId, user.id, link.role);
-      await tx
-        .update(organizationInviteLinks)
-        .set({ uses: sql`${organizationInviteLinks.uses} + 1` })
-        .where(eq(organizationInviteLinks.id, link.id));
-      return { orgId: link.orgId };
+      if (await findInviteLink(tx, token))
+        throw new ConflictError("This link asks an admin first", "invitation.ask_to_join");
+      throw new ConflictError("This invitation is invalid or has expired");
     }
     if (invitation.acceptedAt || invitation.expiresAt <= now) {
       throw new ConflictError("This invitation is invalid or has expired");
@@ -854,7 +930,7 @@ export async function acceptInvitation(
 }
 
 /** Adds a person to an organization (keeping an existing role) and to `general`. */
-async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
+export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
   await assignHandle(tx, orgId, userId);
   const [general] = await tx
@@ -943,24 +1019,15 @@ export async function resendInvitation(
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
   if (existing.role === "owner" && !can(actor.role, "manage_owners"))
     throw new ForbiddenError("Only owners can invite owners");
-  const token = randomToken(32);
-  const [invitation] = await db
-    .update(organizationInvitations)
-    .set({
-      tokenHash: sha256(token),
-      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
-      invitedByUserId: actorId,
-    })
-    .where(eq(organizationInvitations.id, invitationId))
-    .returning();
-  if (!invitation) throw new ConflictError("This invitation can't be resent");
-  await recordOperatorEvent(db, {
-    type: "invitation.created",
+  return sendInvitation(db, {
     orgId,
-    userId: actorId,
-    data: { emailDomain: addressDomain(invitation.email), role: invitation.role, resent: true },
+    email: existing.email,
+    role: existing.role,
+    invitedBy: actorId,
+    now,
+    invitationId,
+    resent: true,
   });
-  return { invitation, token };
 }
 
 /** Invitations not yet accepted, expired ones included, with their status. */

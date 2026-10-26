@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { ConfigError, testConfig } from "@agenteschat/config";
 import { eq, schema } from "@agenteschat/db";
 import { authenticateMachine, retireHostTokens } from "@agenteschat/engine";
-import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 const TOKEN = "host-computer-token-".padEnd(48, "h");
 let t: TestServer;
@@ -37,18 +37,6 @@ async function synced(body: Record<string, unknown> = {}) {
 
 const userId = async (email: string) =>
   (await t.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)))[0]?.id ?? "";
-
-/** Someone who joins `orgId` through an invite link made by `admin`. */
-async function joinByLink(admin: Browser, orgId: string, who: Browser | string) {
-  const { url } = (await (await admin(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).json()) as {
-    url: string;
-  };
-  const token = url.split("/invite/")[1] ?? "";
-  const b = typeof who === "string" ? browser(t) : who;
-  if (typeof who === "string") await signUp(b, who, { inviteToken: token });
-  expect((await b(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
-  return b;
-}
 
 async function start() {
   t = await createTestServer({ env: { HOST_COMPUTER_TOKEN: TOKEN } });
@@ -86,7 +74,7 @@ test("one computer per organization of the first account, its own token each; no
   expect(await (await api("/machines/host")).json()).toEqual({ machineId: before.machines[0]?.id, on: true });
 
   // Someone invited makes an organization of their own: it isn't served.
-  const bia = await joinByLink(owner, orgId, "bia@example.com");
+  const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
   const created = (await (await bia("/api/app/organizations", { json: { name: "Beta" } })).json()) as {
     organization: { id: string };
   };
@@ -115,7 +103,7 @@ test("one computer per organization of the first account, its own token each; no
   expect(await authenticateMachine(t.db, rotated?.token ?? "")).toBeNull();
 
   // Bia can make the first account an admin, even an owner, of Beta on her own: Beta still isn't served.
-  await joinByLink(bia, betaId, owner);
+  await joinByInvitation(t, bia, betaId, "owner@example.com", { as: owner });
   const ownerId = await userId("owner@example.com");
   const biaId = await userId("bia@example.com");
   const setRole = async (by: Browser, org: string, who: string, role: string) =>
@@ -145,7 +133,7 @@ test("an admin stops it in an organization (skipped from then on) and turns it b
   expect(agent?.machineId).toBeNull();
 
   // Members can't turn it back on.
-  const bia = await joinByLink(owner, orgId, "bia@example.com");
+  const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
   expect((await bia(`/api/app/organizations/${orgId}/machines/host`, { json: {} })).status).toBe(403);
 
   expect(await (await api("/machines/host", { json: {} })).json()).toEqual({ machineId, on: true });

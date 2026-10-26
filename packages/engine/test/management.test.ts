@@ -6,6 +6,7 @@ import {
   agentDetail,
   budgetPercent,
   ConflictError,
+  createInvitation,
   createModelGateway,
   DEFAULT_AGENT_BUDGET_NANO_USD,
   deleteCredential,
@@ -89,6 +90,20 @@ describe("invitations", () => {
     const later = new Date(Date.now() + 8 * 86_400_000);
     const statuses = await listInvitationsWithStatus(f.db, f.owner.id, f.org.id, later);
     expect(statuses.map((s) => [s.email, s.status])).toEqual([["rita@example.com", "expired"]]);
+    // Inviting an address that has an invitation sends that one again (a new link, the role asked), never a second.
+    const rita = results[3];
+    if (rita?.status !== "invited") throw new Error("expected invite");
+    const renewed = await createInvitation(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { email: "Rita@Example.com", role: "admin" },
+      later,
+    );
+    expect(renewed.invitation).toMatchObject({ id: rita.invitationId, role: "admin" });
+    expect(renewed.token).not.toBe(rita.token);
+    const after = await listInvitationsWithStatus(f.db, f.owner.id, f.org.id, later);
+    expect(after.map((s) => [s.email, s.status])).toEqual([["rita@example.com", "pending"]]);
     const member = await addMember(f.db, f.org.id, "member");
     await expect(
       inviteMany(f.db, member.id, f.org.id, { emails: ["x@example.com"], role: "member" }),

@@ -44,17 +44,10 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
   const { db, config, log } = deps;
   const emailEnabled = deps.emailDelivers === true;
 
-  /**
-   * Emails cleared by an org invite link in the sign-up request (header
-   * `x-invite-token`), for the user-create hook of the same request.
-   */
-  const clearedByLink = new Map<string, number>();
   const policy = signupPolicy(config);
-  const assertSignupAllowed = async (email: string, inviteToken?: string | null) => {
-    const key = email.toLowerCase();
-    const cleared = clearedByLink.get(key);
-    if (cleared !== undefined && cleared > Date.now()) return;
-    if (!(await isSignupAllowed(db, email, policy, new Date(), inviteToken))) {
+  // An invitation link never opens sign-up (ADR 0068): only an email invitation to that address does.
+  const assertSignupAllowed = async (email: string) => {
+    if (!(await isSignupAllowed(db, email, policy))) {
       if (policy.ownerByLink && (await countUsers(db)) === 0) {
         throw new APIError("FORBIDDEN", {
           code: OWNER_CLAIM_REQUIRED,
@@ -62,7 +55,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
         });
       }
       throw new APIError("FORBIDDEN", {
-        message: "Sign-up is closed on this agentes.chat instance. Ask an organization owner for an invitation.",
+        message: "Sign-up is closed on this server. If you were invited, open the link in the invitation email.",
       });
     }
   };
@@ -205,21 +198,15 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
         if (ctx.path !== "/sign-up/email") return;
         const email = (ctx.body as { email?: unknown } | undefined)?.email;
         if (typeof email !== "string") return;
-        const inviteToken = ctx.headers?.get("x-invite-token")?.trim() || null;
-        await assertSignupAllowed(email, inviteToken);
-        if (inviteToken) {
-          for (const [k, until] of clearedByLink) if (until <= Date.now()) clearedByLink.delete(k);
-          clearedByLink.set(email.toLowerCase(), Date.now() + 60_000);
-        }
+        await assertSignupAllowed(email);
       }),
     },
     databaseHooks: {
       user: {
         create: {
-          // Social sign-up too (the phone's Apple sign-in from an invitation): an org invite link's token in
-          // the request (`x-invite-token`) opens sign-up for it, as it does for e-mail sign-up.
+          // Social sign-up too (the phone's Apple sign-in from an invitation).
           before: async (user, context) => {
-            await assertSignupAllowed(user.email, context?.headers?.get("x-invite-token")?.trim() || null);
+            await assertSignupAllowed(user.email);
             // The sign-up's own language from the start: the confirmation email goes out before any other choice.
             const locale = requestLocale(context?.headers?.get("accept-language"));
             return { data: { ...user, email: user.email.toLowerCase(), ...(locale ? { locale } : {}) } };

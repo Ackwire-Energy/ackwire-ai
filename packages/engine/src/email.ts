@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, inArray, isNull, lt, schema } fr
 import { appLocale } from "@agenteschat/i18n/locale";
 import { approverIds } from "./approvals";
 import { adminIds } from "./gateway";
+import { oneLine } from "./mail/text";
 import { enqueue, PermanentJobError } from "./outbox";
 import { budgetPercent } from "./usage";
 
@@ -43,8 +44,37 @@ export type EmailTemplate =
       when: string;
       url: string;
     }
-  /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
+  /** Someone opened an expired email invitation and asked for a new one. */
   | { kind: "invite_request"; locale?: EmailLocale; orgName: string; email: string; url: string }
+  /**
+   * Someone asks to join through the workspace's invitation link (ADR 0068), to its owners and admins at most once
+   * an hour. Approve and Deny open the request in the app: a link in an email never acts by itself, because mail
+   * scanners open every link. `name` is what the person typed (cut and escaped here); their note never goes out.
+   */
+  | {
+      kind: "join_request";
+      locale?: EmailLocale;
+      orgName: string;
+      name: string;
+      email: string;
+      url: string;
+      denyUrl: string;
+    }
+  /**
+   * The answer to a request to join (ADR 0068), to the address that asked: in (`url` the workspace), approved with
+   * an invitation to accept (`url` the invitation), or not approved with the admin's `reason`.
+   */
+  | {
+      kind: "join_answer";
+      locale?: EmailLocale;
+      outcome: "joined" | "invited" | "denied";
+      orgName: string;
+      /** Empty: "someone" in the email's language. */
+      approverName: string;
+      role?: string;
+      url?: string;
+      reason?: string | null;
+    }
   | { kind: "verify_email"; locale?: EmailLocale; url: string }
   /**
    * Double opt-in for the landing page's waiting list, in the language they
@@ -86,6 +116,8 @@ export type EmailTemplate =
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+/** A name someone typed, as an admin's email shows it (ADR 0068). */
+export const JOIN_EMAIL_NAME_MAX = 60;
 const percent = (n: number) => `${Math.round(n)}%`;
 
 const LAYOUT = {
@@ -106,7 +138,8 @@ function layout(
   title: string,
   paragraphs: Block[],
   action?: { label: string; url: string },
-  options: { lang?: EmailLocale; footer?: string } = {},
+  /** `secondary`: a second action after the button, as a plain link. */
+  options: { lang?: EmailLocale; footer?: string; secondary?: { label: string; url: string } } = {},
 ) {
   const lang = options.lang ?? "pt-BR";
   const words = LAYOUT[lang];
@@ -125,7 +158,7 @@ ${paragraphs
   .join("\n")}
 ${
   action
-    ? `<p style="margin:24px 0"><a href="${esc(action.url)}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px">${esc(action.label)}</a></p>
+    ? `<p style="margin:24px 0"><a href="${esc(action.url)}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px">${esc(action.label)}</a>${options.secondary ? `<a href="${esc(options.secondary.url)}" style="display:inline-block;margin-left:12px;padding:12px 8px;color:#111111">${esc(options.secondary.label)}</a>` : ""}</p>
 <p style="margin:0 0 16px;font-size:14px;color:#444444">${words.fallback} <a href="${esc(action.url)}" style="color:#111111">${esc(action.url)}</a></p>`
     : ""
 }
@@ -142,7 +175,8 @@ ${
   const lines = paragraphs.flatMap((p) =>
     typeof p === "string" ? [strip(p)] : p.steps.map((step, i) => `${i + 1}. ${strip(step)}`),
   );
-  const text = [title, "", ...lines, ...(action ? ["", `${action.label}: ${action.url}`] : [])].join("\n");
+  const actions = [action, options.secondary].flatMap((a) => (a ? [`${a.label}: ${a.url}`] : []));
+  const text = [title, "", ...lines, ...(actions.length ? ["", ...actions] : [])].join("\n");
   return { html, text };
 }
 
@@ -277,11 +311,35 @@ const WORDS = {
     },
     inviteRequest: {
       title: (org: string) => `Pedido de novo convite para ${org}`,
-      someoneWithLink: "Alguém com o link de convite",
       body: (who: string, org: string) =>
         `${who} tentou entrar em <strong>${org}</strong>, mas o convite expirou e pediu um novo.`,
       note: "Se fizer sentido, envie um convite novo na página de membros.",
       button: "Abrir membros",
+    },
+    joinRequest: {
+      subject: (name: string, org: string) => `${name} pede para entrar na ${org}`,
+      body: (name: string, email: string, org: string) =>
+        `<strong>${name}</strong> (${email}) abriu o link de convite da ${org} e pede para entrar.`,
+      note: "Aprove só quem você espera. A pessoa entra como membro, ou escolha outro papel na página.",
+      more: "Todos os pedidos esperando estão em Membros.",
+      approve: "Aprovar",
+      deny: "Recusar",
+    },
+    joinAnswer: {
+      joinedSubject: (org: string) => `Você entrou na ${org}`,
+      joinedBody: (approver: string, org: string, role: string) =>
+        `${approver} aprovou seu pedido. Você entrou na <strong>${org}</strong> como ${role}.`,
+      open: (org: string) => `Abrir ${org}`,
+      invitedSubject: (org: string) => `Seu pedido para entrar na ${org} foi aprovado`,
+      invitedBody: (approver: string) =>
+        `${approver} aprovou. Falta um passo: aceite o convite com este e-mail em até 7 dias.`,
+      join: (org: string) => `Entrar na ${org}`,
+      deniedSubject: (org: string) => `Seu pedido para entrar na ${org} não foi aprovado`,
+      deniedBody: (org: string) => `Alguém da <strong>${org}</strong> viu e não aprovou.`,
+      reason: (reason: string) => `Recado: «${reason}»`,
+      notYou: "Se você não pediu para entrar, ignore este e-mail.",
+      footer: (org: string) =>
+        `Você recebeu este e-mail porque este endereço pediu para entrar na ${org} no agentes.chat.`,
     },
     calendar: {
       subject: (inviter: string, title: string) => `${inviter} convidou você: ${title}`,
@@ -349,11 +407,34 @@ const WORDS = {
     },
     inviteRequest: {
       title: (org: string) => `Request for a new invitation to ${org}`,
-      someoneWithLink: "Someone with the invite link",
       body: (who: string, org: string) =>
         `${who} tried to join <strong>${org}</strong>, but the invitation had expired, and asked for a new one.`,
       note: "If it makes sense, send a new invitation from the members page.",
       button: "Open members",
+    },
+    joinRequest: {
+      subject: (name: string, org: string) => `${name} asks to join ${org}`,
+      body: (name: string, email: string, org: string) =>
+        `<strong>${name}</strong> (${email}) opened ${org}'s invitation link and asks to join.`,
+      note: "Approve only people you expect. They join as a member, or pick another role on the page.",
+      more: "Every request waiting is in Members.",
+      approve: "Approve",
+      deny: "Deny",
+    },
+    joinAnswer: {
+      joinedSubject: (org: string) => `You're in ${org}`,
+      joinedBody: (approver: string, org: string, role: string) =>
+        `${approver} approved your request. You joined <strong>${org}</strong> as ${role}.`,
+      open: (org: string) => `Open ${org}`,
+      invitedSubject: (org: string) => `Your request to join ${org} was approved`,
+      invitedBody: (approver: string) =>
+        `${approver} approved it. One step left: accept the invitation with this email address within 7 days.`,
+      join: (org: string) => `Join ${org}`,
+      deniedSubject: (org: string) => `Your request to join ${org} wasn't approved`,
+      deniedBody: (org: string) => `Someone at <strong>${org}</strong> looked at it and didn't approve it.`,
+      reason: (reason: string) => `Their note: «${reason}»`,
+      notYou: "If you didn't ask to join, ignore this email.",
+      footer: (org: string) => `You got this email because this address asked to join ${org} on agentes.chat.`,
     },
     calendar: {
       subject: (inviter: string, title: string) => `${inviter} invited you: ${title}`,
@@ -429,13 +510,59 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
       };
     }
     case "invite_request": {
-      const who = t.email ? esc(t.email) : w.inviteRequest.someoneWithLink;
+      const who = esc(t.email);
       return {
         subject: w.inviteRequest.title(t.orgName),
         ...page(w.inviteRequest.title(t.orgName), [w.inviteRequest.body(who, esc(t.orgName)), w.inviteRequest.note], {
           label: w.inviteRequest.button,
           url: t.url,
         }),
+      };
+    }
+    case "join_request": {
+      const name = oneLine(t.name, JOIN_EMAIL_NAME_MAX);
+      const r = w.joinRequest;
+      return {
+        subject: r.subject(name, t.orgName),
+        ...layout(
+          r.subject(name, t.orgName),
+          [r.body(esc(name), esc(t.email), esc(t.orgName)), r.note, r.more],
+          { label: r.approve, url: t.url },
+          { lang, secondary: { label: r.deny, url: t.denyUrl } },
+        ),
+      };
+    }
+    case "join_answer": {
+      const a = w.joinAnswer;
+      const options = { lang, footer: a.footer(t.orgName) };
+      const approver = esc(t.approverName || w.someone);
+      if (t.outcome === "denied") {
+        const reason = t.reason?.trim();
+        return {
+          subject: a.deniedSubject(t.orgName),
+          ...layout(
+            a.deniedSubject(t.orgName),
+            [a.deniedBody(esc(t.orgName)), ...(reason ? [esc(a.reason(reason))] : []), a.notYou],
+            undefined,
+            options,
+          ),
+        };
+      }
+      const url = t.url ?? "";
+      if (t.outcome === "joined") {
+        return {
+          subject: a.joinedSubject(t.orgName),
+          ...layout(
+            a.joinedSubject(t.orgName),
+            [a.joinedBody(approver, esc(t.orgName), esc(w.role[t.role ?? "member"] ?? t.role ?? ""))],
+            { label: a.open(t.orgName), url },
+            options,
+          ),
+        };
+      }
+      return {
+        subject: a.invitedSubject(t.orgName),
+        ...layout(a.invitedSubject(t.orgName), [a.invitedBody(approver)], { label: a.join(t.orgName), url }, options),
       };
     }
     case "calendar_invite": {

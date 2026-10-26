@@ -12,6 +12,7 @@ import {
   hasPassword,
   isEmailVerified,
   isValidTimeZone,
+  joinStatus,
   listInvitations,
   listMembers,
   listMemberships,
@@ -33,7 +34,7 @@ import {
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn, signupPolicy } from "../../auth";
+import { authUiConfig, mintPhoneSignIn, sessionUser, signupPolicy } from "../../auth";
 import { clientIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import {
@@ -141,12 +142,7 @@ export function accountRoutes(deps: AppDeps) {
       summary: "How an e-mail signs in (the login screen asks for the e-mail first)",
       description: "Tells whether the e-mail has an account, so it is rate limited per IP.",
       request: {
-        body: body(
-          z.object({
-            email: z.email().max(254),
-            inviteToken: z.string().min(1).max(200).optional().openapi({ description: "From an org invite link." }),
-          }),
-        ),
+        body: body(z.object({ email: z.email().max(254) })),
       },
       responses: {
         200: json(
@@ -167,8 +163,7 @@ export function accountRoutes(deps: AppDeps) {
       const ip = clientIp(c.req.header("x-forwarded-for"), c.req.header("x-real-ip"));
       const limit = await deps.adapters.rateLimiter.consume(`sign-in-options:${ip}`, SIGN_IN_OPTIONS_PER_IP);
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
-      const { email, inviteToken } = c.req.valid("json");
-      return c.json(await signInOptions(db, email, signupPolicy(config), inviteToken), 200);
+      return c.json(await signInOptions(db, c.req.valid("json").email, signupPolicy(config)), 200);
     },
   );
 
@@ -178,6 +173,8 @@ export function accountRoutes(deps: AppDeps) {
       path: "/invitations/{token}",
       tags,
       summary: "Preview an invitation",
+      description:
+        "Public. For an invitation link (ADR 0068), also what the signed-in person's request stands at (`you`).",
       request: { params: z.object({ token: z.string() }) },
       responses: {
         200: json(
@@ -196,14 +193,37 @@ export function accountRoutes(deps: AppDeps) {
                 }),
               )
               .openapi({ description: "A few of the organization's agents (name and look)." }),
+            closed: z
+              .literal(true)
+              .optional()
+              .openapi({ description: "A link turned off, expired, or whose workspace is paused: nobody can ask." }),
+            you: z
+              .object({
+                member: z.boolean(),
+                orgId: z.uuid().optional().openapi({ description: "Only when a member." }),
+                email: z.string(),
+                request: z
+                  .object({ status: z.enum(["pending", "approved", "denied"]), reason: z.string().nullable() })
+                  .nullable()
+                  .openapi({ description: "Their latest request through a link, with its answer." }),
+              })
+              .optional()
+              .openapi({ description: "A link opened signed in: where they stand." }),
           }),
         ),
         404: errors[404],
       },
     }),
     async (c) => {
-      const invitation = await previewInvitation(db, c.req.valid("param").token);
-      return invitation ? c.json(invitation, 200) : apiError(c, 404, "not_found", "Invitation not found or expired");
+      const token = c.req.valid("param").token;
+      const invitation = await previewInvitation(db, token);
+      if (!invitation) return apiError(c, 404, "not_found", "Invitation not found or expired");
+      const user =
+        invitation.kind === "link" && !("closed" in invitation)
+          ? await sessionUser(deps.auth, c.req.raw.headers)
+          : null;
+      const you = user ? await joinStatus(db, user, token) : null;
+      return c.json({ ...invitation, ...(you ? { you } : {}) }, 200);
     },
   );
 

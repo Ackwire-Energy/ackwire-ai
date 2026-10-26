@@ -5,12 +5,12 @@ import {
   adoptRestoredOperatorEvents,
   applyTaskDone,
   createInvitation,
-  createInviteLink,
   createOrganization,
   deleteAccount,
   drainOutbox,
   enableOperatorEvents,
   grantScopes,
+  inviteLink,
   listOperatorEvents,
   type OperatorEvent,
   postPersonMessage,
@@ -22,7 +22,7 @@ import {
   type ToolSource,
   ValidationError,
 } from "../src";
-import { addUser, type Fixture, setup } from "./fixtures";
+import { addUser, type Fixture, SECRET, setup } from "./fixtures";
 import { giveMail, imapAccount, mailSetup, runContext } from "./mail-fixtures";
 
 let close: (() => Promise<void>) | undefined;
@@ -69,7 +69,7 @@ const allEvents = (db: Database) =>
 async function everyEmitter(f: Fixture) {
   const invited = await createInvitation(f.db, f.owner.id, f.org.id, { email: "Bea@Partner.Example", role: "member" });
   const resent = await resendInvitation(f.db, f.owner.id, f.org.id, invited.invitation.id);
-  const link = await createInviteLink(f.db, f.owner.id, f.org.id);
+  const link = await inviteLink(f.db, SECRET, f.owner.id, f.org.id);
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev when is the launch?",
   });
