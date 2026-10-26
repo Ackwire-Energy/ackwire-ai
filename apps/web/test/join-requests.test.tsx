@@ -148,6 +148,15 @@ describe("an invitation link asks to join", () => {
     expect(text()).toContain("Peça um novo a quem mandou.");
     expect(screen().queryByRole("button", { name: "Pedir um novo convite" })).toBeNull();
     expect(screen().queryByLabelText("Seu nome")).toBeNull();
+    cleanup();
+
+    // A member opening a link that no longer works: they're in, with the way there.
+    await openLink(
+      { ...LINK, invitedBy: null, agents: [], closed: true, you: you({ member: true, orgId: ORG_ID }) },
+      { signedIn: true },
+    );
+    expect(heading()).toBe("Você já está na Acme");
+    expect(button("Abrir Acme")).toBeTruthy();
   });
 
   test("whoever works there is counted: the first four by name, then how many more", async () => {

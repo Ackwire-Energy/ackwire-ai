@@ -219,7 +219,10 @@ export function accountRoutes(deps: AppDeps) {
                   }),
               })
               .optional()
-              .openapi({ description: "A link opened signed in: where they stand." }),
+              .openapi({
+                description:
+                  "A link opened signed in: where they stand. On a link that no longer works, only a member's.",
+              }),
           }),
         ),
         404: errors[404],
@@ -229,11 +232,10 @@ export function accountRoutes(deps: AppDeps) {
       const token = c.req.valid("param").token;
       const invitation = await previewInvitation(db, token);
       if (!invitation) return apiError(c, 404, "not_found", "Invitation not found or expired");
-      const user =
-        invitation.kind === "link" && !("closed" in invitation)
-          ? await sessionUser(deps.auth, c.req.raw.headers)
-          : null;
-      const you = user ? await joinStatus(db, user, token) : null;
+      const user = invitation.kind === "link" ? await sessionUser(deps.auth, c.req.raw.headers) : null;
+      const status = user ? await joinStatus(db, user, token) : null;
+      // A link that no longer works still tells a member they're in; anyone else hears only that it doesn't work.
+      const you = "closed" in invitation && !status?.member ? null : status;
       return c.json({ ...invitation, ...(you ? { you } : {}) }, 200);
     },
   );

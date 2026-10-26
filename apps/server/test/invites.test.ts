@@ -232,7 +232,7 @@ test("joining by an email invitation closes the person's request and the admins'
 });
 
 test("a link turned off: its requests close quietly, its page says it no longer works", async () => {
-  const { owner, orgId, link, token } = await start();
+  const { owner, orgId, link, token } = await start({ ALLOW_SIGNUP: "true" });
   await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
   await t.drain();
   t.email.sent.length = 0;
@@ -251,6 +251,14 @@ test("a link turned off: its requests close quietly, its page says it no longer 
   expect((await browser(t)(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(404);
   await t.drain();
   expect(t.email.sent).toEqual([]);
+  // A member opening it is told they're in; anyone else signed in hears only that it no longer works.
+  expect(await (await owner(`/api/app/invitations/${token}`)).json()).toMatchObject({
+    closed: true,
+    you: { member: true, orgId },
+  });
+  const eve = browser(t);
+  await signUp(eve, "eve@example.com");
+  expect(await (await eve(`/api/app/invitations/${token}`)).json()).not.toHaveProperty("you");
   // A new link is made the next time one is asked for.
   const next = (await (await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).json()) as Link;
   expect(next.url).not.toBe(link.url);

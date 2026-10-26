@@ -151,7 +151,7 @@ export interface InvitationPreview {
   moreAgents?: number;
   /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
   closed?: true;
-  /** A link opened signed in: where that person stands. */
+  /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
   you?: JoinStatus;
 }
 
