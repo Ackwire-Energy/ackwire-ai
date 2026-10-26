@@ -33,22 +33,26 @@ export function DialogHead({ sub, actions }: { sub?: ReactNode; actions?: ReactN
   );
 }
 
-/** Full screen: the agent's screen alone, or the whole dialog over its page or a cover. */
-export function FullButton() {
+/** Full screen and back: two corners pulled apart to go in, pushed together to come out. */
+export function FullScreenButton({ full, onToggle }: { full: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
-  const head = useDialogHead();
-  if (!head) return null;
-  const label = head.full ? t("browser.inCard.fullExit") : t("browser.inCard.full");
+  const label = full ? t("browser.inCard.fullExit") : t("browser.inCard.full");
   return (
     <Button
       size="sm"
       variant="ghost"
       iconOnly
-      icon="external"
-      aria-pressed={head.full}
+      icon={full ? "shrink" : "expand"}
       aria-label={label}
       title={label}
-      onClick={() => head.setFull(!head.full)}
+      onClick={onToggle}
     />
   );
+}
+
+/** Full screen: the agent's screen alone, or the whole dialog over its page or a cover. */
+export function FullButton() {
+  const head = useDialogHead();
+  if (!head) return null;
+  return <FullScreenButton full={head.full} onToggle={() => head.setFull(!head.full)} />;
 }

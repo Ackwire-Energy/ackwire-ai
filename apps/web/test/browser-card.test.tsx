@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { BrowserHandoff } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
@@ -147,6 +148,11 @@ describe("the card in the message", () => {
     expect(card.textContent).toContain("Clique para expandir");
     await act(async () => fireEvent.click(card.querySelector(".brw-ac__tt") as HTMLElement));
     expect(card.classList.contains("is-open")).toBe(true);
+    // Full screen and back, as in the computer's window: corners pulled apart, then pushed together.
+    const glyph = (name: string) => within(card).getByRole("button", { name }).querySelector("path")?.getAttribute("d");
+    expect(glyph("Tela cheia")).toBe(icons.expand[0]?.[1].d);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tela cheia" })));
+    expect(glyph("Sair da tela cheia")).toBe(icons.shrink[0]?.[1].d);
   });
 
   test("the wheel scrolls the conversation until the page is clicked; Esc gives it back", async () => {

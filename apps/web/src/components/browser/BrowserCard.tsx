@@ -54,7 +54,7 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useStreams } from "@/realtime/context";
-import { DialogHead, FullButton, useDialogHead } from "../computer/head";
+import { DialogHead, FullButton, FullScreenButton, useDialogHead } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
@@ -752,7 +752,6 @@ export function BrowserCard({
             ? t("browser.watch.live")
             : (head?.watching ?? sub);
   const toggleLabel = open ? t("browser.inCard.collapse") : t("browser.inCard.expand");
-  const fullLabel = full ? t("browser.inCard.fullExit") : t("browser.inCard.full");
   const thumbSrc = pic ? `data:image/jpeg;base64,${pic.data}` : null;
 
   // Watching: Assumir (a labelled, tactile button) and Parar (quiet, with a confirmation), never a lone red square.
@@ -948,17 +947,7 @@ export function BrowserCard({
                 {t("desktop.seeWhole")}
               </Button>
             )}
-            {!blocker && (
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon={full ? "close" : "external"}
-                aria-label={fullLabel}
-                title={fullLabel}
-                onClick={() => setFull((v) => !v)}
-              />
-            )}
+            {!blocker && <FullScreenButton full={full} onToggle={() => setFull((v) => !v)} />}
             {!full && (
               <Button
                 size="sm"

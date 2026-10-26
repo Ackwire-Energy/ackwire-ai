@@ -212,6 +212,8 @@ export const extraIcons = {
   ],
   /** "Tela cheia": two corners pulled apart. */
   expand: [["path", { d: "M12 3.5h4.5V8M8 16.5H3.5V12M16.5 3.5 11.25 8.75M3.5 16.5l5.25-5.25" }]],
+  /** "Sair da tela cheia": the same two corners pushed together. */
+  shrink: [["path", { d: "M11.5 4v4.5H16M8.5 16v-4.5H4M16.5 3.5l-5 5M3.5 16.5l5-5" }]],
   /** "Apagar". */
   trash: [
     [

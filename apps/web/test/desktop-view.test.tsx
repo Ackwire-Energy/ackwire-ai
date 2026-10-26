@@ -5,6 +5,7 @@ setupDom();
 
 import type { Agent, BrowserHandoff, DesktopStatus, SocketFactory } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
@@ -762,7 +763,13 @@ describe("the agent's screen in the computer dialog", () => {
   test("full screen is the page's and shows the computer alone; Esc leaves it, and Devolver works on its first click", async () => {
     const page = fullScreen();
     const t = await controlled();
+    /** The glyph the full-screen button draws. */
+    const glyph = (name: string) => view().getByRole("button", { name }).querySelector("path")?.getAttribute("d");
+    // Corners pulled apart to go in, pushed together to come out: never an external link's arrow.
+    expect(glyph("Tela cheia")).toBe(icons.expand[0]?.[1].d);
     await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(glyph("Sair da tela cheia")).toBe(icons.shrink[0]?.[1].d);
+    expect(view().getByRole("button", { name: "Sair da tela cheia" }).hasAttribute("aria-pressed")).toBe(false);
     // The page goes full screen, not the dialog: noVNC's capture layer on the page stays inside it.
     expect(page.requested).toEqual([document.documentElement]);
     expect(classes()).toEqual(expect.arrayContaining(["is-full", "is-screen-only"]));
