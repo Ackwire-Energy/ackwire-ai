@@ -339,6 +339,7 @@ export function OnboardingFlow() {
             label={t("mobile.onb.share")}
             onPress={() => void shareLink()}
           />
+          <Note icon="shield" text={t("mobile.onb.shareNote")} />
           <View style={styles.emails}>
             {emails.map((e) => (
               <Pressable

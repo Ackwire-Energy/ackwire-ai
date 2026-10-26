@@ -1,15 +1,22 @@
-import { keys, useMe } from "@agenteschat/client";
-import { passwordState } from "@agenteschat/client/lib/text";
-import { Alert, Button, Card, Field, Input } from "@agenteschat/ui";
+import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
+import { keys, useAuthConfig, useMe } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { ANSWER_POLL_MS, askView, JOIN_NAME_MAX, JOIN_NOTE_MAX } from "@agenteschat/client/lib/join-requests";
+import { emailTypoFix, isEmail, passwordState } from "@agenteschat/client/lib/text";
+import { Alert, AvatarStack, Button, Card, Field, Input, Textarea } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { CenteredLayout } from "@/components/AuthLayout";
+import { lookOf } from "@/lib/look";
+import "./invite.css";
 
-/** An invitation, valid or expired. */
+/** An invitation, valid or expired; an invitation link only lets people ask to join (`AskToJoin`). */
 export function InvitePage({ token }: { token: string }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -61,6 +68,7 @@ export function InvitePage({ token }: { token: string }) {
   }
 
   const invitation = preview.data;
+  if (invitation?.kind === "link") return <AskToJoin token={token} preview={invitation} />;
   const orgName = invitation?.orgName ?? "";
   const user = me.data?.user;
   const passwordOk = passwordState(password) === "ok";
@@ -68,17 +76,7 @@ export function InvitePage({ token }: { token: string }) {
   return (
     <CenteredLayout narrow>
       <Card padded as="div">
-        {invitation && (
-          <div className="row" style={{ gap: 12 }}>
-            <span className="org-badge" aria-hidden="true">
-              {orgName.trim()[0]?.toUpperCase()}
-            </span>
-            <div className="stack-4" style={{ gap: 0 }}>
-              <span className="small muted">{window.location.host}</span>
-              <span style={{ fontWeight: 700, fontSize: 18, lineHeight: "24px" }}>{orgName}</span>
-            </div>
-          </div>
-        )}
+        {invitation && <OrgHead orgName={orgName} />}
 
         {invitation ? (
           <>
@@ -186,6 +184,262 @@ export function InvitePage({ token }: { token: string }) {
             </Button>
           </>
         )}
+      </Card>
+    </CenteredLayout>
+  );
+}
+
+/** The workspace an invitation is for: its initial, this server's address and its name. */
+function OrgHead({ orgName }: { orgName: string }) {
+  return (
+    <div className="row" style={{ gap: 12 }}>
+      <span className="org-badge" aria-hidden="true">
+        {orgName.trim()[0]?.toUpperCase()}
+      </span>
+      <div className="stack-4" style={{ gap: 0 }}>
+        <span className="small muted">{window.location.host}</span>
+        <span style={{ fontWeight: 700, fontSize: 18, lineHeight: "24px" }}>{orgName}</span>
+      </div>
+    </div>
+  );
+}
+
+/** One of the page's answers: the guide's face, what happened, and what to do next. */
+function Outcome({
+  expression,
+  title,
+  children,
+  action,
+}: {
+  expression?: "happy" | "closed";
+  title: string;
+  children?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="invite-ask__outcome" aria-live="polite">
+      <AgentAvatar name="agentes.chat" size="lg" expression={expression} />
+      <div className="invite-ask__outcome-text">
+        <h1 className="page-title page-title--sm">{title}</h1>
+        {children}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/**
+ * An invitation link (ADR 0068): whoever opens it asks, and an admin of the workspace approves each person.
+ * Signed out they type a name and an email, and no account is made: the answer comes by email. Signed in their
+ * account asks, and the page checks for the answer while it is open.
+ */
+function AskToJoin({ token, preview }: { token: string; preview: InvitationPreview }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const auth = useAuth();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const me = useMe();
+  const config = useAuthConfig();
+  const user = me.data?.user ?? null;
+  const [sent, setSent] = useState<AskToJoinResult | null>(null);
+  const view = askView(preview, sent !== null);
+  useQuery({
+    queryKey: keys.invitation(token),
+    queryFn: () => api.orgs.previewInvitation(token),
+    retry: false,
+    refetchInterval: user && (view.state === "sent" || view.state === "approvedEmail") ? ANSWER_POLL_MS : false,
+  });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const ask = useMutation({
+    mutationFn: () =>
+      api.invites.ask(token, {
+        ...(user ? {} : { name: name.trim(), email: email.trim() }),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      }),
+    meta: { silent: true },
+    onSuccess: async (result) => {
+      setSent(result);
+      if (user) await qc.invalidateQueries({ queryKey: keys.invitation(token) });
+    },
+    onError: (e) => setError(errorText(t, e)),
+  });
+
+  const org = preview.orgName;
+  const address = sent?.email ?? preview.you?.email ?? user?.email ?? "";
+  const emailsGoOut = sent?.emailed ?? config.data?.passwordReset ?? true;
+  const agents = preview.agents ?? [];
+  const fix = user ? null : emailTypoFix(email);
+  const ready = user !== null || (name.trim() !== "" && isEmail(email));
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ready || ask.isPending) return;
+    setError(null);
+    ask.mutate();
+  };
+
+  let body: ReactNode;
+  switch (view.state) {
+    case "closed":
+      body = (
+        <Outcome expression="closed" title={t("invite.ask.closedTitle")}>
+          <p className="page-sub">{t("invite.ask.closedText")}</p>
+        </Outcome>
+      );
+      break;
+    case "in":
+      body = (
+        <Outcome
+          expression="happy"
+          title={view.already ? t("invite.ask.memberTitle", { org }) : t("invite.ask.inTitle", { org })}
+          action={
+            view.orgId && (
+              <Button
+                variant="primary"
+                block
+                onClick={async () => {
+                  await qc.invalidateQueries({ queryKey: keys.me });
+                  await navigate({ to: "/org/$orgId", params: { orgId: view.orgId ?? "" } });
+                }}
+              >
+                {t("invite.ask.open", { org })}
+              </Button>
+            )
+          }
+        />
+      );
+      break;
+    case "approvedEmail":
+      body = (
+        <Outcome expression="happy" title={t("invite.ask.approvedTitle")}>
+          <p className="page-sub">
+            {emailsGoOut ? t("invite.ask.approvedEmail", { email: address }) : t("invite.ask.approvedNoEmail")}
+          </p>
+        </Outcome>
+      );
+      break;
+    case "denied":
+      body = (
+        <Outcome expression="closed" title={t("invite.ask.deniedTitle")}>
+          {view.reason && <p className="invite-ask__reason">{t("invite.ask.reason", { reason: view.reason })}</p>}
+          <p className="page-sub">{t("invite.ask.deniedText", { org })}</p>
+        </Outcome>
+      );
+      break;
+    case "sent":
+      body = (
+        <Outcome expression="happy" title={t("invite.ask.sentTitle")}>
+          <p className="page-sub">
+            {user?.emailVerified
+              ? t("invite.ask.sentAccount", { org })
+              : emailsGoOut
+                ? t("invite.ask.sentEmail", { org, email: address })
+                : t("invite.ask.sentNoEmail", { org })}
+          </p>
+          <p className="small muted">{t("invite.ask.sentClose")}</p>
+        </Outcome>
+      );
+      break;
+    case "form":
+      body = (
+        <>
+          <div className="stack-4" style={{ gap: 8 }}>
+            <h1 className="page-title page-title--sm">{t("invite.ask.title", { org })}</h1>
+            <p className="page-sub">
+              {preview.invitedBy
+                ? t("invite.ask.lead", { name: preview.invitedBy.split(/\s+/)[0], org })
+                : t("invite.ask.leadNoName", { org })}
+            </p>
+          </div>
+          {agents.length > 0 && (
+            <div className="invite-ask__agents ac-iconline">
+              <AvatarStack aria-hidden="true">
+                {agents.map((a) => (
+                  <AgentAvatar key={a.id} name={a.name} appearance={lookOf(a)} size="sm" />
+                ))}
+              </AvatarStack>
+              <span>
+                {t("invite.ask.agents", {
+                  count: agents.length,
+                  names: joinNames(
+                    agents.map((a) => a.name),
+                    t("newAgent.and"),
+                  ),
+                })}
+              </span>
+            </div>
+          )}
+          <form className="invite-ask__form" onSubmit={submit} noValidate>
+            {user ? (
+              <p className="page-sub">
+                {t("invite.ask.as", { email: user.email })}{" "}
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={async () => {
+                    await auth.signOut();
+                    qc.clear();
+                  }}
+                >
+                  {t("invite.ask.notYou")}
+                </button>
+              </p>
+            ) : (
+              <>
+                <Field label={t("invite.ask.name")} id="ask-name">
+                  <Input
+                    autoComplete="name"
+                    maxLength={JOIN_NAME_MAX}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </Field>
+                <Field label={t("invite.ask.email")} id="ask-email" help={t("invite.ask.emailHelp")}>
+                  <Input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    spellCheck={false}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </Field>
+                {fix && (
+                  <button type="button" className="auth__fix" onClick={() => setEmail(fix)}>
+                    {t("auth.flow.didYouMean", { email: fix })}
+                  </button>
+                )}
+              </>
+            )}
+            <Field label={t("invite.ask.note")} id="ask-note" help={t("invite.ask.noteHelp")}>
+              <Textarea rows={2} maxLength={JOIN_NOTE_MAX} value={note} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+            {error && <Alert>{error}</Alert>}
+            <Button type="submit" variant="primary" block disabled={!ready} loading={ask.isPending}>
+              {t("invite.ask.send")}
+            </Button>
+            {!user && (
+              <p className="auth__foot" style={{ margin: 0, fontSize: 14 }}>
+                {t("invite.ask.haveAccount")}{" "}
+                <a className="ac-link" href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}>
+                  {t("auth.signIn")}
+                </a>
+              </p>
+            )}
+          </form>
+        </>
+      );
+      break;
+  }
+
+  return (
+    <CenteredLayout narrow>
+      <Card padded as="div">
+        <OrgHead orgName={org} />
+        {body}
       </Card>
     </CenteredLayout>
   );

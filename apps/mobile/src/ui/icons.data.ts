@@ -144,6 +144,11 @@ export const ICONS = {
   eye: [p("M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"), c(12, 12, 2.6)],
   down: [p("M12 5v14M6 13l6 6 6-6")],
   wifi: [p("M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"), p("M12 19h.01")],
+  // The web's Membros icon on this grid: someone asking to join.
+  members: [
+    c(9.6, 8.4, 3.4),
+    p("M3.6 19.2c.7-3.1 3-4.8 6-4.8s5.3 1.7 6 4.8M16.2 5.4a3.1 3.1 0 0 1 0 6M18 14.8c1.3.7 2.2 2.3 2.4 4.4"),
+  ],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

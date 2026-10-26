@@ -11,6 +11,13 @@ export const locales = [
 export type LocaleCode = (typeof locales)[number]["code"];
 export const DEFAULT_LOCALE: LocaleCode = "pt-BR";
 
+/**
+ * `<Trans>` props for values people typed (a name): interpolated escaped, then shown as the same text. The app's
+ * `escapeValue: false` leaves escaping to React, but `<Trans>` parses the interpolated string first, so a typed
+ * `<strong>` would become an element.
+ */
+export const TYPED_VALUES = { tOptions: { interpolation: { escapeValue: true } }, shouldUnescape: true };
+
 const STORAGE_KEY = "agentes.locale";
 
 function browserLanguages(): readonly string[] {

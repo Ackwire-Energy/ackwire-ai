@@ -14,6 +14,7 @@ import { type EmailArt, sendQueuedEmail } from "./email";
 import { publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
+import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import { mentionHandoffs } from "./judge";
 import { wakeForAccessDecision } from "./machine-access";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
@@ -467,6 +468,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {
       await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
+    },
+    // A request to join through an invitation link, filed apart from the ask's reply (ADR 0068).
+    [FILE_JOIN_REQUEST_JOB]: async (job) => {
+      await fileJoinRequest({ db: deps.db, pubsub: deps.pubsub }, job.payload);
     },
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {

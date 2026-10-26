@@ -22,6 +22,7 @@ import {
   LIST_INSET,
   LineIcon,
   ListRow,
+  PersonAvatar,
   SectionHeader,
   Sky,
   Text,
@@ -137,7 +138,12 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const card = waitingCardOf(n);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
   const request = useWaitingApprovals().find((a) => a.id === n.source.approvalId);
-  const title = card.kind === "approval" && request ? approvalTitle(t, request) : card.title;
+  const title =
+    card.kind === "approval" && request
+      ? approvalTitle(t, request)
+      : card.kind === "join"
+        ? t("notifications.wait.joinRequest", { count: n.count, name: card.title })
+        : card.title;
   // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
   const dms = useDms(orgId);
   const href = notificationHref(n, agentDmOf(dms.data));
@@ -165,6 +171,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     >
       <View style={styles.hd}>
         {who ? <Face who={who} size={22} live={false} /> : null}
+        {card.kind === "join" ? <PersonAvatar name={card.title} size={22} /> : null}
         {name ? (
           <Text variant="footnote" tone="ink" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
             {name}
@@ -207,7 +214,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   );
 }
 
-const KIND_ICON = { approval: "wait", question: "help", forum: "chat", browser: "globe" } as const;
+const KIND_ICON = { approval: "wait", question: "help", forum: "chat", browser: "globe", join: "members" } as const;
 
 /** Faces of the crew drawn over "Nada esperando você". */
 const CREW = 3;

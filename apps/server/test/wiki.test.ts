@@ -3,16 +3,14 @@ import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./h
 
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }), env: { ALLOW_SIGNUP: "true" } });
 });
 afterEach(() => t.close());
 
-/** A signed-up person outside the organization (the invite link lets them register; they never accept it). */
-async function outsider(owner: ReturnType<typeof browser>, orgId: string, email: string) {
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+/** A signed-up person outside the organization (sign-up is open on this server). */
+async function outsider(email: string) {
   const b = browser(t);
-  await signUp(b, email, { inviteToken: token });
+  await signUp(b, email);
   return b;
 }
 
@@ -87,7 +85,7 @@ test("wiki API: create, edit with version check, rename, history, graph, links i
   expect((await api("/wiki/pages/runbook")).status).toBe(404);
   expect((await api("/wiki/pages/runbook/restore", { json: {} })).status).toBe(200);
 
-  const stranger = await outsider(owner, orgId, "stranger@example.com");
+  const stranger = await outsider("stranger@example.com");
   expect((await stranger(`/api/app/organizations/${orgId}/wiki/pages`)).status).toBe(403);
 });
 

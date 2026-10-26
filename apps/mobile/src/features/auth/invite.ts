@@ -1,17 +1,16 @@
-import { readValue, readValueSync, STORED, writeValue } from "@/lib/storage";
+import { readValue, STORED, writeValue } from "@/lib/storage";
+import { afterSignIn, type InviteKind, storedInvite } from "./links";
 
 /**
- * An invitation opened in the app (its link) before the person is signed in: kept until they are in, then
- * accepted (`InviteAcceptor` in the root layout). While it waits, sign-up and the social sign-in send its token
- * (`x-invite-token`), so a closed server lets the invited person create their account.
+ * An invitation opened in the app before the person is signed in, kept until they are in (the root layout's
+ * `useAcceptPendingInvite`, through `afterSignIn`). Kept in memory too: signing out to switch accounts clears what
+ * the app stored.
  */
-let pending: string | null = readValueSync(STORED.invite);
+let pending: string | null = null;
 
-export const pendingInvite = () => pending;
-
-export function rememberInvite(token: string) {
-  pending = token;
-  void writeValue(STORED.invite, token);
+export function rememberInvite(token: string, kind: InviteKind) {
+  pending = storedInvite(token, kind);
+  void writeValue(STORED.invite, pending);
 }
 
 export function forgetInvite() {
@@ -20,12 +19,7 @@ export function forgetInvite() {
 }
 
 /** Read again from storage (the app may have been closed between the link and signing in). */
-export async function loadPendingInvite(): Promise<string | null> {
+export async function loadPendingInvite() {
   pending = (await readValue(STORED.invite)) ?? pending;
-  return pending;
+  return afterSignIn(pending);
 }
-
-/** The header sign-up requests carry while an invitation waits. */
-export const inviteHeaders = (): Record<string, string> => (pending ? { "x-invite-token": pending } : {});
-
-export { isInviteToken } from "./links";

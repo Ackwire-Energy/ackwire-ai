@@ -1,6 +1,6 @@
 # 0006. Better Auth for people; our own organizations, roles and agents
 
-- Status: Accepted
+- Status: Accepted. Revised by ADR 0068: a workspace's invitation link only lets people ask to join, an admin approves each person, and only an email invitation opens sign-up
 - Date: 2026-10-14
 
 ## Decision
@@ -13,7 +13,7 @@
   - owner: + `manage_owners`. An organization always keeps an owner.
 - **Channel access** is one function, `requireChannelAccess` (org member + channel in that org + channel member), used by the HTTP API and the WebSocket.
 - **Agents are not users.** They live in `agents`; messages have a polymorphic author (`person` | `agent`). Agent permissions will come from their scopes (Tool Gateway), never from roles or prompts.
-- **Sign-up policy (self-host):** the first account may always sign up and becomes owner of any existing organizations; afterwards sign-up needs `ALLOW_SIGNUP=true` or a pending invitation. Cloud runs with `ALLOW_SIGNUP=true`. An install that leaves an owner link or the desktop app's owner key (`OWNER_CLAIM_SHA256`, `OWNER_KEY_SHA256`) keeps the first account for them (ADR 0060 §6).
+- **Sign-up policy (self-host):** the first account may always sign up and becomes owner of any existing organizations; afterwards sign-up needs `ALLOW_SIGNUP=true` or a pending invitation (an email invitation: an invitation link never opens it, ADR 0068). The Cloud keeps public sign-up closed until billing ships (ADR 0068). An install that leaves an owner link or the desktop app's owner key (`OWNER_CLAIM_SHA256`, `OWNER_KEY_SHA256`) keeps the first account for them (ADR 0060 §6).
 - **App API** `/api/app/*` is private to our web app: cookie session, CSRF protection (writes need our `Origin` and a JSON body), described in the OpenAPI document so the web app can generate a typed client.
 
 ## Consequences
