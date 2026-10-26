@@ -604,7 +604,9 @@ jobs:
               echo '{"current":"https://agentes.chat","servers":["https://agentes.chat"]}' \
                 > "$home/.config/chat.agentes.desktop/servers.json"
             fi
-            HOME="$home" xvfb-run -a -s "-screen 0 1440x900x24" dbus-run-session -- bash -c '
+            # Its own folders, whatever the runner sets for XDG.
+            HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache" \
+              xvfb-run -a -s "-screen 0 1440x900x24" dbus-run-session -- bash -c '
               "$0" > "$1.log" 2>&1 & app=$!
               sleep 25
               import -window root "$1.png"
@@ -612,6 +614,7 @@ jobs:
               kill "$app" 2>/dev/null; wait "$app" 2>/dev/null
               [ "$alive" = 1 ]' "$APPIMAGE" "$PWD/look/$name" \
               || { echo "::error::The app ended on its own ($name)"; cat "look/$name.log"; return 1; }
+            echo "$name: $(find "$home" -name servers.json -exec cat {} \; | tr -d '\n ')"
           }
           look first
           look cloud
