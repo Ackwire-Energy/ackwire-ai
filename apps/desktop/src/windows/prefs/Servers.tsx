@@ -2,10 +2,10 @@ import { Button, Chip, Dialog, DialogFooter, Menu, MenuItem, Switch } from "@age
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
-import { isHereServer, type LocalServerStatus, type ServeProblem, type Tailnet } from "../../control/local-server";
+import { isHereServer, type LocalServerStatus, type ServeProblem } from "../../control/local-server";
 import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
 import { pairedHomes } from "../../control/store";
-import { useLocalServer, useOnShown } from "../../hooks";
+import { useLocalServer, useOnShown, useTailnet } from "../../hooks";
 import { ReachProblem, ReachRow, ServerTile } from "../../ui/here";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
@@ -196,7 +196,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
   const { t } = useTranslation();
   const host = useHost();
   const toast = useToast();
-  const [tailnet, setTailnet] = useState<Tailnet>({ state: "missing" });
+  const tailnet = useTailnet();
   const [reaching, setReaching] = useState(false);
   const [reachProblem, setReachProblem] = useState<ServeProblem | null>(null);
   const [busy, setBusy] = useState<"restart" | "stop" | "start" | "usage" | "backup" | null>(null);
@@ -204,17 +204,6 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
   const address = local.publicUrl ?? local.url ?? "";
   const running = local.phase === "running";
   const up = running || local.phase === "starting" || local.phase === "updating";
-
-  useEffect(() => {
-    const read = () =>
-      void host
-        .tailscale()
-        .then(setTailnet)
-        .catch(() => setTailnet({ state: "missing" }));
-    read();
-    window.addEventListener("focus", read);
-    return () => window.removeEventListener("focus", read);
-  }, [host]);
 
   const act = async (what: NonNullable<typeof busy>, run: () => Promise<unknown>) => {
     setBusy(what);

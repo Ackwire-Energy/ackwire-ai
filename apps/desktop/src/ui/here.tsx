@@ -46,7 +46,8 @@ export function ServerTile({ kind }: { kind: ServerKind }) {
 
 /**
  * "Reach it from your phone and teammates", what it does behind its ⓘ. While Tailscale is missing or not
- * connected the switch can't be used, and one line under the label says why, with what fixes it.
+ * connected the switch can't be used, and one line under the label says why, with what fixes it. `tailnet` null:
+ * not read yet, so no line, and the switch waits unless reach is on already (turning it off needs no Tailscale).
  */
 export function ReachRow({
   tailnet,
@@ -54,15 +55,15 @@ export function ReachRow({
   onChange,
   busy,
 }: {
-  tailnet: Tailnet;
+  tailnet: Tailnet | null;
   on: boolean;
   onChange: (on: boolean) => void;
   busy?: boolean;
 }) {
   const { t } = useTranslation();
   const host = useHost();
-  const usable = tailnet.state === "on" || on;
-  const missing = tailnet.state === "missing";
+  const usable = tailnet?.state === "on" || on;
+  const missing = tailnet?.state === "missing";
   // Not connected, and no Tailscale app to open: it connects from the terminal.
   const fromTerminal = !usable && !missing && host.platform !== "mac";
   return (
@@ -72,6 +73,7 @@ export function ReachRow({
       hint={hintFor(t, t("desktop.here.reach"), t("desktop.here.reachText"))}
       htmlFor="here-reach"
       desc={
+        tailnet &&
         !usable && (
           <span>
             {missing

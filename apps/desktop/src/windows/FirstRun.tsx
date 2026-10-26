@@ -55,10 +55,9 @@ import {
   type StepChange,
   setupSteps,
   stepStates,
-  type Tailnet,
 } from "../control/local-server";
 import { appServer, serverKind, serverName } from "../control/server";
-import { readPref, useOnShown, writePref } from "../hooks";
+import { readPref, useOnShown, useTailnet, writePref } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
 import { hintFor, PrefRow } from "../ui/settings";
@@ -514,7 +513,7 @@ function RunHere({
   const [status, setStatus] = useState<LocalServerStatus | null>(null);
   // A server (a Docker install) answering on this computer when the app doesn't run one: checked once.
   const [answering, setAnswering] = useState<string | null | undefined>(undefined);
-  const [tailnet, setTailnet] = useState<Tailnet>({ state: "missing" });
+  const tailnet = useTailnet();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [reach, setReach] = useState(false);
@@ -546,18 +545,6 @@ function RunHere({
   useEffect(read, [read]);
   // Left mid-setup (a link arrived): the setup goes on in the app, and Esc works again on what shows.
   useEffect(() => () => onBusy(false), [onBusy]);
-
-  // Tailscale, each time the window comes to the front (the person may have just connected it).
-  useEffect(() => {
-    const read = () =>
-      void host
-        .tailscale()
-        .then(setTailnet)
-        .catch(() => setTailnet({ state: "missing" }));
-    read();
-    window.addEventListener("focus", read);
-    return () => window.removeEventListener("focus", read);
-  }, [host]);
 
   useEffect(
     () =>

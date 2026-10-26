@@ -7,6 +7,7 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import { AppProvider } from "../src/app";
+import type { Tailnet } from "../src/control/local-server";
 import { DesktopStore } from "../src/control/store";
 import type { UpdateCheck } from "../src/hooks";
 import { createFakeHost, type FakeHost, type Scenario } from "../src/host/fake";
@@ -21,14 +22,19 @@ import { Updates } from "../src/windows/prefs/Updates";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** A Preferences tab on a fake host, once `ready` says it shows what the test looks at. */
+/**
+ * A Preferences tab on a fake host, once `ready` says it shows what the test looks at. `options.host` changes the
+ * host before the tab first reads it.
+ */
 async function pane(
   scenario: Scenario,
   view: ReactNode,
   ready: (el: HTMLElement) => unknown,
   check: (el: HTMLElement, host: FakeHost, opened: string[]) => Promise<void> | void,
+  options: { host?: (host: FakeHost) => void } = {},
 ) {
   const host = createFakeHost("prefs", scenario);
+  options.host?.(host);
   const opened: string[] = [];
   host.openExternal = async (url) => {
     opened.push(url);
@@ -147,6 +153,31 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         expect(el.querySelector(".dk-phead .dk-lead")?.textContent).toBe("Where this app opens agentes.chat.");
       },
     ));
+
+  test("Servers: until Tailscale answers, nothing shows under reach and its switch waits", async () => {
+    // Tailscale is connected, but its read takes a moment: no "Needs Tailscale" in the meantime.
+    const answers: ((tailnet: Tailnet) => void)[] = [];
+    await pane(
+      "here",
+      <Servers />,
+      (el) => row(el, "Reach it from your phone and teammates"),
+      async (el) => {
+        const reach = () => row(el, "Reach it from your phone and teammates");
+        expect(reach()?.line).toBeNull();
+        expect(el.querySelector("#here-reach")?.hasAttribute("disabled")).toBe(true);
+        await act(async () => {
+          for (const answer of answers) answer({ state: "on", device: "macbook" });
+        });
+        await until(() => !el.querySelector("#here-reach")?.hasAttribute("disabled"));
+        expect(reach()?.line).toBeNull();
+      },
+      {
+        host: (host) => {
+          host.tailscale = () => new Promise((resolve) => answers.push(resolve));
+        },
+      },
+    );
+  });
 
   test("Folders: the note under the list is a link to how folders work, opened in the browser", () =>
     pane(

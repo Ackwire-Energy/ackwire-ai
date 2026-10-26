@@ -7,8 +7,9 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import { AppProvider } from "../src/app";
+import type { Tailnet } from "../src/control/local-server";
 import { DesktopStore } from "../src/control/store";
-import { createFakeHost, type HereOptions, type Scenario } from "../src/host/fake";
+import { createFakeHost, type FakeHost, type HereOptions, type Scenario } from "../src/host/fake";
 import { type AppLocale, createDesktopI18n } from "../src/i18n";
 import { ToastProvider } from "../src/ui/Toast";
 import { FirstRun } from "../src/windows/FirstRun";
@@ -19,13 +20,14 @@ const REACH_TEXT =
   "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat.";
 const USAGE_TEXT = "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.";
 
-/** The first run on a fake host, with what it opened in the browser and in Tailscale. */
+/** The first run on a fake host, with what it opened in the browser and in Tailscale; `host` changes the host first. */
 async function firstRun(
   scenario: Scenario,
   check: (screen: ReturnType<typeof screenOf>) => Promise<void>,
-  options: { here?: HereOptions; lang?: AppLocale } = {},
+  options: { here?: HereOptions; lang?: AppLocale; host?: (host: FakeHost) => void } = {},
 ) {
   const host = createFakeHost("welcome", scenario, { here: options.here });
+  options.host?.(host);
   const opened: string[] = [];
   host.openExternal = async (url) => {
     opened.push(url);
@@ -206,6 +208,34 @@ describe("Run agentes.chat on this Mac", () => {
         expect(row?.querySelector("small button[aria-label='Copy']")).toBeTruthy();
       },
       { here: { tailscale: "off" } },
+    );
+  });
+});
+
+describe("Run here, while Tailscale is read", () => {
+  test("nothing shows under reach and its switch waits, so no wrong line flashes", async () => {
+    // Tailscale is connected, but its read takes a moment (up to 2 s on a Mac).
+    const answers: ((tailnet: Tailnet) => void)[] = [];
+    await firstRun(
+      "first",
+      async ({ el, press, until }) => {
+        await press("Use your own server");
+        await press("Run agentes.chat on this Mac");
+        await until(() => el.querySelector("form.dk-fr__here"));
+        expect(switchRows(el)[0]?.line).toBeNull();
+        expect(el.textContent).not.toContain("Needs Tailscale");
+        expect(el.querySelector("#here-reach")?.hasAttribute("disabled")).toBe(true);
+        await act(async () => {
+          for (const answer of answers) answer({ state: "on", device: "macbook" });
+        });
+        await until(() => !el.querySelector("#here-reach")?.hasAttribute("disabled"));
+        expect(switchRows(el)[0]?.line).toBeNull();
+      },
+      {
+        host: (host) => {
+          host.tailscale = () => new Promise((resolve) => answers.push(resolve));
+        },
+      },
     );
   });
 });
