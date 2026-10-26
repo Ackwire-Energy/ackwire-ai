@@ -432,6 +432,8 @@ test("external provisioning: requests, progress, the workspace's computer and it
     { state: "preparing", specs: { cpus: 0, memoryGb: 8, diskGb: 75 } },
     { state: "preparing", expectedReadyAt: "in ten minutes" },
     { state: "preparing", expectedReadyAt: new Date(Date.now() + 8 * 86_400_000).toISOString() },
+    { state: "preparing", step: "installing", stage: "Updating the system" },
+    { state: "preparing", step: "installing", stage: "a".repeat(33) },
   ]) {
     expect({ bad, status: (await put(`/orgs/${orgId}/provisioning`, bad)).status }).toEqual({ bad, status: 400 });
   }
@@ -444,6 +446,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
       await put(`/orgs/${orgId}/provisioning`, {
         state: "preparing",
         step: "connecting",
+        stage: "connecting",
         specs,
         expectedReadyAt: readyAt,
       })
@@ -455,6 +458,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
   expect(progress.requests.find((r) => r.orgId === orgId)?.provisioning).toEqual({
     state: "preparing",
     step: "connecting",
+    stage: "connecting",
     reason: null,
     since: expect.any(String),
     requestedAt: listed.requests.find((r) => r.orgId === orgId)?.createdAt,
@@ -471,6 +475,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
     mode: "pair",
     state: null,
     step: null,
+    stage: null,
     reason: null,
     since: null,
     requestedAt: null,

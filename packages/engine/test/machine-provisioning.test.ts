@@ -134,6 +134,7 @@ describe("external provisioning", () => {
         provisioning: {
           state: "waiting",
           step: null,
+          stage: null,
           reason: "capacity",
           since: expect.any(String),
           requestedAt: later.organization.createdAt.toISOString(),
@@ -157,6 +158,7 @@ describe("external provisioning", () => {
       mode: "external",
       state: "preparing",
       step: null,
+      stage: null,
       reason: null,
       since: null,
       requestedAt: f.org.createdAt.toISOString(),
@@ -222,6 +224,49 @@ describe("external provisioning", () => {
     expect(await setProvisioning(deps(), f.org.id, { state: "problem" })).toBe(true);
     // Every later report keeps when the wait began.
     expect((await status()).requestedAt).toBe(waiting.requestedAt);
+  });
+
+  test("the stage within a step: kept with preparing only, any word, heard when it changes, since kept", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id);
+    const at = new Date(Date.now() + 600_000);
+    const report = (stage?: string) =>
+      setProvisioning(deps(), f.org.id, { state: "preparing", step: "installing", stage, expectedReadyAt: at });
+
+    await report("updating");
+    const updating = await status();
+    expect(updating).toMatchObject({ step: "installing", stage: "updating" });
+    expect(events.at(-1)).toMatchObject({ step: "installing", stage: "updating" });
+    const listed = (await page()).requests.find((r) => r.orgId === f.org.id);
+    expect(listed?.provisioning).toMatchObject({ step: "installing", stage: "updating" });
+    // The same report again says nothing new.
+    await report("updating");
+    expect(events).toHaveLength(1);
+    // The restart the update needs: its people hear it, and the step it is in began when it did.
+    await Bun.sleep(5);
+    await report("restarting");
+    expect(events).toHaveLength(2);
+    expect(events.at(-1)).toMatchObject({ step: "installing", stage: "restarting" });
+    expect((await status()).since).toBe(updating.since);
+    // A word this server has no use for is kept as said: the apps read it as its step.
+    await report("defragmenting");
+    expect((await status()).stage).toBe("defragmenting");
+    // A report without one has none, and only `preparing` has one.
+    await report();
+    expect((await status()).stage).toBeNull();
+    expect(events.at(-1)).toMatchObject({ stage: null });
+    await report("apps");
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity", stage: "apps" });
+    expect(await status()).toMatchObject({ state: "waiting", stage: null });
+
+    // Ready, then taken away: no stage left over.
+    await report("finishing");
+    const { machineId, token } = await enrolled();
+    await hello(token);
+    expect(await status()).toMatchObject({ state: "ready", stage: null });
+    await revokeManagedMachine(deps(), f.org.id, machineId);
+    expect(await status()).toMatchObject({ state: "preparing", step: null, stage: null });
   });
 
   test("the ready time: past times keep the first, the seconds left come from the server, older words still read", async () => {
@@ -421,6 +466,7 @@ describe("external provisioning", () => {
           type: "machine.provisioning",
           state: "ready",
           step: null,
+          stage: null,
           reason: null,
           since: expect.any(String),
           requestedAt: f.org.createdAt.toISOString(),

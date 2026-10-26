@@ -171,6 +171,10 @@ const ComputerSetup = z
       .enum(PROVISIONING_STEPS)
       .nullable()
       .openapi({ description: "While `preparing`: reserving, starting, installing or connecting." }),
+    stage: z.string().nullable().openapi({
+      description:
+        "While `preparing`, when the provisioner says: what it is doing within its step (`updating`, `restarting`, `apps`…). One the app has no words for reads as its step.",
+    }),
     reason: z
       .enum(PROVISIONING_REASONS)
       .nullable()

@@ -1,0 +1,1 @@
+ALTER TABLE "machine_provisioning" ADD COLUMN "stage" text;

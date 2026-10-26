@@ -58,6 +58,8 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
   return {
     state: (row?.state ?? "preparing") as ProvisioningState,
     step: (row?.step ?? null) as ProvisioningStep | null,
+    /** With `preparing`: what the computer is doing within its step, as the provisioner said it. */
+    stage: row?.stage ?? null,
     reason: currentReason(row?.reason),
     /** When this state (and step or reason) began; null before anything was reported. */
     since: row?.since.toISOString() ?? null,
@@ -173,6 +175,11 @@ export interface ProvisioningInput {
   state: Exclude<ProvisioningState, "ready">;
   /** Kept with `preparing` only. */
   step?: ProvisioningStep | null;
+  /**
+   * Kept with `preparing` only: what the computer is doing within its step (`updating`, `apps`…). Any word is kept:
+   * the apps read one they don't know as its step.
+   */
+  stage?: string | null;
   /** Kept with `waiting` only; `approval` reads as `capacity`. */
   reason?: ProvisioningReason | "approval" | null;
   /** Kept with `preparing` only: when it should be ready. A time already past means any moment now. */
@@ -217,6 +224,7 @@ export async function setProvisioning(
   const [before] = await db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   const now = new Date();
   const step = input.state === "preparing" ? (input.step ?? null) : null;
+  const stage = input.state === "preparing" ? (input.stage ?? null) : null;
   const reason = input.state === "waiting" ? currentReason(input.reason) : null;
   const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
   const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
@@ -226,6 +234,7 @@ export async function setProvisioning(
   const next = {
     state: input.state,
     step,
+    stage,
     reason,
     expectedReadyAt,
     emailWhenReady: long || before?.emailWhenReady === true,
@@ -245,7 +254,8 @@ export async function setProvisioning(
     );
   }
   const moved = before?.expectedReadyAt?.getTime() !== row.expectedReadyAt?.getTime();
-  if (!same || moved || !Bun.deepEquals(before?.specs ?? null, row.specs)) {
+  // A new stage is told without restarting `since`: the step is still the same one.
+  if (!same || before?.stage !== row.stage || moved || !Bun.deepEquals(before?.specs ?? null, row.specs)) {
     const [managed] = await db
       .select({ id: machines.id })
       .from(machines)
@@ -402,6 +412,7 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   const waiting = {
     state: "preparing",
     step: null,
+    stage: null,
     reason: null,
     expectedReadyAt: null,
     requestedAt: now,
@@ -513,7 +524,15 @@ export async function onManagedMachineHello(
   const { orgId } = machine;
   const draft = deps.readyEmail ? await readyEmailDraft(deps.db, deps.readyEmail, orgId) : null;
   const now = new Date();
-  const ready = { state: "ready", step: null, reason: null, expectedReadyAt: null, since: now, updatedAt: now };
+  const ready = {
+    state: "ready",
+    step: null,
+    stage: null,
+    reason: null,
+    expectedReadyAt: null,
+    since: now,
+    updatedAt: now,
+  };
   const done = await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .insert(machineProvisioning)
@@ -575,6 +594,7 @@ export async function computerSetup(
       mode: "pair" as const,
       state: null,
       step: null,
+      stage: null,
       reason: null,
       since: null,
       requestedAt: null,

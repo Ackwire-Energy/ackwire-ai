@@ -192,6 +192,8 @@ export const machineProvisioning = pgTable("machine_provisioning", {
     .references(() => organizations.id, { onDelete: "cascade" }),
   state: text().notNull(),
   step: text(),
+  /** With `preparing`: what the computer is doing within its step, in the provisioner's word (`updating`, `apps`…). */
+  stage: text(),
   reason: text(),
   /** With `preparing`: when the provisioner expects it ready (already past: any moment now). */
   expectedReadyAt: timestamp({ withTimezone: true }),
