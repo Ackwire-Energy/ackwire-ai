@@ -583,6 +583,8 @@ textarea.ac-input {
   }
 }
 
+/* Its own line height: a taller one inherited (a chip's 22px around an 18px tile) grows the grid's row past the
+   tile from its top, and the initials sit low. */
 .ac-avatar {
   display: inline-grid;
   place-items: center;
@@ -590,6 +592,7 @@ textarea.ac-input {
   width: 36px;
   height: 36px;
   font-size: 14px;
+  line-height: 1;
   font-weight: 700;
   background: var(--surface-sunken);
   color: var(--ink);

@@ -258,6 +258,13 @@ describe("Card", () => {
   });
 });
 
+test("an avatar's initials sit in the middle of its tile at any size: it brings its own line height", async () => {
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  expect(rule(".ac-avatar")).toContain("place-items: center;");
+  expect(rule(".ac-avatar")).toContain("line-height: 1;");
+});
+
 describe("single-line controls", () => {
   test("buttons, inputs and selects centre their text in the box: the line is the text's own", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
