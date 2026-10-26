@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -8,7 +8,13 @@ import { cleanup, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  setSystemTime();
+  cleanup();
+});
+
+/** Mid-day: an hour away is still today, and a time today shows without its date. */
+const MIDDAY = new Date(2026, 9, 21, 12);
 
 interface Options {
   setup?: Partial<ComputerSetup>;
@@ -86,6 +92,7 @@ describe("the agent page's one entry: its status line", () => {
   });
 
   test("its computer not answering (Cloud) or offline since a time (self-host)", async () => {
+    setSystemTime(MIDDAY);
     const down = { desktop: { available: false, reason: "offline" } };
     const cloud = await entryOf({
       ...down,
@@ -100,6 +107,7 @@ describe("the agent page's one entry: its status line", () => {
   });
 
   test("self-host: paused on the computer itself, until when", async () => {
+    setSystemTime(MIDDAY);
     const until = new Date(Date.now() + 3_600_000).toISOString();
     expect(line(await entryOf({ machine: { paused: { until } } }))).toMatch(/^Pausado no Mac mini até \d\d:\d\d$/);
   });
