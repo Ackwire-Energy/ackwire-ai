@@ -118,6 +118,8 @@ export interface SetupView {
   machineId: string | null;
   /** The server's seconds left when its answer came (`receivedAt`, this device's clock); null: no time said. */
   secondsLeft: number | null;
+  /** How many seconds from `receivedAt` they stay as they are before counting down (a part running long). */
+  steady: number;
   receivedAt: number;
   /** Seconds people had waited when the server answered, on the server's clock; null when it doesn't say. */
   waited: number | null;
@@ -152,6 +154,7 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     specs: setup.specs,
     machineId: setup.machineId,
     secondsLeft,
+    steady: typeof setup.secondsSteady === "number" ? Math.max(0, setup.secondsSteady) : 0,
     receivedAt,
     waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,
     notifyByEmail: setup.notifyByEmail === true,
@@ -166,13 +169,13 @@ export type EtaView =
   | { kind: "late" };
 
 /**
- * The time left now: the server's `secondsLeft` less the seconds since its answer came. A minute or more:
- * whole minutes, rounded up; under 15 s, or up to a minute past the time: almost; past that: a little longer
- * than expected. Null without a time.
+ * The time left now: the server's `secondsLeft` less the seconds since its answer came, once its first `steady`
+ * seconds have gone. A minute or more: whole minutes, rounded up; under 15 s, or up to a minute past the time:
+ * almost; past that: a little longer than expected. Null without a time.
  */
-export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number): EtaView | null {
+export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number, steady = 0): EtaView | null {
   if (secondsLeft === null) return null;
-  const left = secondsLeft - Math.max(0, nowMs - receivedAtMs) / 1000;
+  const left = secondsLeft - Math.max(0, (nowMs - receivedAtMs) / 1000 - steady);
   if (left >= 60) return { kind: "minutes", count: Math.ceil(left / 60) };
   if (left >= 15) return { kind: "underMinute" };
   if (left >= -60) return { kind: "almost" };
@@ -185,7 +188,7 @@ export const etaLine = (t: TFunction, eta: EtaView) =>
 
 /** Only while it is being prepared: a wait and a problem have no time. */
 export const setupEta = (view: SetupView, nowMs: number) =>
-  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs) : null;
+  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs, view.steady) : null;
 
 /** How often every time line repaints, all together. No ticking seconds. */
 const ETA_TICK_MS = 5_000;

@@ -2195,6 +2195,11 @@ export interface ComputerSetup {
   expectedReadyAt: string | null;
   /** `expectedReadyAt` less the server's clock when it answered (negative once past), so a device's clock doesn't matter. */
   secondsLeft: number | null;
+  /**
+   * How many seconds from this answer `secondsLeft` stays as it is before counting down: a part running long moves
+   * the ready time later with the clock. 0 or absent (an older server): it counts down at once.
+   */
+  secondsSteady?: number | null;
   /** The server's clock when it answered less `requestedAt`, for the same reason. */
   secondsWaited: number | null;
   /** The server sends email: the workspace's owners get one when it's ready after a wait. */

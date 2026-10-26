@@ -257,6 +257,7 @@ describe("live: machine.provisioning and org.standing", () => {
       requestedAt: "2026-10-24T18:49:00.000Z",
       expectedReadyAt: null,
       secondsLeft: null,
+      secondsSteady: null,
       secondsWaited: 660,
       // The event doesn't say whether the server sends email: what the answer said stays.
       notifyByEmail: false,
@@ -264,14 +265,20 @@ describe("live: machine.provisioning and org.standing", () => {
       machineId: null,
     });
     expect(refetched).toBe(0);
-    // What it is doing within its step comes with it.
+    // What it is doing within its step comes with it, and how long its time left holds still.
     applyWorkspaceEvent(qc, "o1", {
       type: "machine.provisioning",
       state: "preparing",
       step: "installing",
       stage: "restarting",
+      secondsLeft: 257,
+      secondsSteady: 60,
     } as { type: string });
-    expect(qc.getQueryData<ComputerSetup>(keys.computerSetup("o1"))).toMatchObject({ stage: "restarting" });
+    expect(qc.getQueryData<ComputerSetup>(keys.computerSetup("o1"))).toMatchObject({
+      stage: "restarting",
+      secondsLeft: 257,
+      secondsSteady: 60,
+    });
     applyWorkspaceEvent(qc, "o1", { type: "machine.provisioning", state: "ready", machineId: "m1" } as {
       type: string;
     });
