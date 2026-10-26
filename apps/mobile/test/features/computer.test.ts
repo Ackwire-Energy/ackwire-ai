@@ -18,6 +18,7 @@ import {
   phoneEntryButton,
   phoneStage,
   screenRequest,
+  setupCardText,
   setupNoticeLine,
 } from "../../src/features/computer/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
@@ -295,5 +296,18 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(t(wait.chipKey)).toBe("Na fila");
     // On hold no time is said: where it is instead.
     expect(setupNoticeLine(t, view, null, false)).toBe("Instalando os programas");
+  });
+
+  test("the first run's AI step: where it is and when they sign in, a line each", async () => {
+    const t = await translator("pt-BR");
+    const later = t("connectAi.wait.signIn");
+    const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
+    expect(setupCardText(t, wait, later)).toBe(
+      "Esperando um computador disponível\nVocê entra aqui assim que ele ficar pronto.",
+    );
+    expect(setupCardText(t, viewOf(), later)).toBe(
+      "Instalando os programas\nVocê entra aqui assim que ele ficar pronto.",
+    );
+    expect(setupCardText(t, null, later)).toBe(later);
   });
 });

@@ -81,3 +81,10 @@ export function setupNoticeLine(t: TFunction, view: SetupView, eta: EtaView | nu
     ? `${t(view.textKey)} · ${t("computerSetup.email.short")}`
     : t(view.textKey);
 }
+
+/**
+ * The AI step's wait in one card where the whole wait doesn't show (the first run, before a workspace is chosen):
+ * where the computer is, then what happens once it's ready, each on its line, since a step or a wait has no period.
+ */
+export const setupCardText = (t: TFunction, view: SetupView | null, later: string): string =>
+  view ? `${t(view.textKey)}\n${later}` : later;

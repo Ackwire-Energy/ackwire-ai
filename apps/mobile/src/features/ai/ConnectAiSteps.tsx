@@ -45,6 +45,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { setupCardText } from "../computer/logic";
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
@@ -448,8 +449,7 @@ function PlanSteps({
       <View style={styles.gap}>
         {setup && inWorkspace ? <SetupWait view={setup} agentName={agentName} /> : null}
         <InfoCard icon="clock">
-          {setup && !inWorkspace ? `${t(setup.textKey)} ` : ""}
-          {t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}
+          {setupCardText(t, inWorkspace ? null : setup, t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn"))}
         </InfoCard>
         {setup?.phase === "waiting" || setup?.phase === "problem" ? useKey : null}
       </View>
