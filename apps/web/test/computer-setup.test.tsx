@@ -573,6 +573,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const plate = screen().getByRole("img", { name: "Computador da Acme Saúde · Pronto" });
     expect(plate.getAttribute("data-state")).toBe("online");
     expect(plate.closest(".onb__crew-computer")?.getAttribute("title")).toBe("Computador da Acme Saúde · Pronto");
+    // Spaced by the row's gap alone: wrapped onto a line of its own (more faces, a phone), it starts under the first.
+    const css = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
+    expect(css.match(/\.onb__crew-computer \{[^}]*\}/)?.[0]).not.toContain("margin");
     expect(
       (screen().getByRole("textbox", { name: "Sua primeira mensagem no #general" }) as HTMLTextAreaElement).value,
     ).toBe("@lia Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?");

@@ -605,6 +605,7 @@ export const ptBR = {
       first: {
         read: "Li o que você escreveu sobre a {{org}}. Posso começar por isto?",
         unread: "Posso começar por isto? Pergunto o que precisar saber.",
+        empty: "Por onde eu começo?",
         label: "Sua primeira mensagem no #general",
         placeholder: "Escreva a sua primeira mensagem",
         asks: {

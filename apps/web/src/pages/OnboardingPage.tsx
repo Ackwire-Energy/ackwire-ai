@@ -2,6 +2,7 @@ import type { AiStatus, Machine, Role } from "@agenteschat/client";
 import {
   keys,
   meQuery,
+  newClientId,
   useAiStatus,
   useAuthConfig,
   useComputerSetup,
@@ -64,6 +65,7 @@ import {
   Logo,
   normalizeAppearance,
   OptionCard,
+  onScreenKeyboard,
   Select,
   Spinner,
   Textarea,
@@ -241,7 +243,6 @@ export function OnboardingPage() {
   const contextBox = useRef<HTMLTextAreaElement>(null);
   // An Obsidian vault for the wiki: read in step 2, imported when it continues.
   const vault = useVaultReader([]);
-  const [vaultPages, setVaultPages] = useState<number | null>(null);
   // Import: read and planned in its step, applied when the team is kept (a key saved later gives back their models).
   const flow = useImportFlow(created?.orgId ?? null);
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
@@ -269,7 +270,10 @@ export function OnboardingPage() {
   const [invites, setInvites] = useState<InviteDraft[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
   // Done: the first message, written for whoever asks it when the step opens (`team`: the crew it was written for).
-  const [firstAsk, setFirstAsk] = useState<{ team: string; asker: string; text: string } | null>(null);
+  // Its `clientId` changes with its text: sent again after an answer that never came back, it's posted once.
+  const [firstAsk, setFirstAsk] = useState<{ team: string; asker: string; text: string; clientId: string } | null>(
+    null,
+  );
 
   const step = ONBOARDING_STEPS[index] ?? ONBOARDING_STEPS[0];
   const total = ONBOARDING_STEPS.length;
@@ -387,7 +391,7 @@ export function OnboardingPage() {
         into: "",
         onConflict: "keep_both",
       });
-      setVaultPages(result.created.length);
+      return result.created.length;
     },
     onError: (e) => toast.show(errorText(t, e), "error"),
   });
@@ -671,6 +675,7 @@ export function OnboardingPage() {
             team,
             asker: asker.key,
             text: preset ? t(`onboarding.done.first.asks.${preset}`, { handle: asker.handle }) : "",
+            clientId: newClientId(),
           }
         : null,
     );
@@ -703,10 +708,10 @@ export function OnboardingPage() {
     : null;
 
   const finish = useMutation({
-    mutationFn: async (body: string | null) => {
+    mutationFn: async (message: { body: string; clientId: string } | null) => {
       if (!created) return;
       // A failed post stays on Done with its text: the app's toast says why.
-      if (body) await api.chat.post(created.orgId, created.generalChannelId, { body });
+      if (message) await api.chat.post(created.orgId, created.generalChannelId, message);
       sessionStore.remove(STORAGE_KEYS.confirmationSent);
       await qc.invalidateQueries({ queryKey: keys.me });
       await navigate({
@@ -740,7 +745,9 @@ export function OnboardingPage() {
   const advance = async (how?: "skip" | "keyLater") => {
     const skip = how === "skip";
     if (step.id === "done") {
-      await finish.mutateAsync(skip || !asking ? null : askText.trim());
+      await finish.mutateAsync(
+        !skip && asking && firstAsk ? { body: askText.trim(), clientId: firstAsk.clientId } : null,
+      );
       return;
     }
     if (!skip) {
@@ -748,7 +755,7 @@ export function OnboardingPage() {
       if (step.id === "context") {
         await saveContext.mutateAsync();
         // The vault goes in the background: the next steps don't wait for the attachments.
-        if (vault.report && vaultPages === null && !importWiki.isPending) importWiki.mutate();
+        if (vault.report && (importWiki.isIdle || importWiki.isError)) importWiki.mutate();
       }
       if (step.id === "agents") {
         // The team first, then what it thinks with, on its own screen.
@@ -786,6 +793,8 @@ export function OnboardingPage() {
     finish.isPending;
   const blocked =
     (step.id === "workspace" && !org.trim()) ||
+    // Continue is what brings a vault into the wiki: it waits for the vault to be read.
+    (step.id === "context" && vault.state.step === "reading") ||
     (aiOpen &&
       ((keyPending ? draft.provider === "platform" || !keyLooksValid(draft.provider, draft.apiKey) : !aiDone) ||
         (choice === "key" && !budgetOk))) ||
@@ -1231,7 +1240,7 @@ export function OnboardingPage() {
               agents={crew}
               computer={plate}
               invites={sent.size}
-              wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
+              wiki={importWiki.isPending ? null : importWiki.data}
             />
           )}
           {step.id === "done" && created && flow.report && (
@@ -1251,7 +1260,7 @@ export function OnboardingPage() {
               read={savedContext.trim() !== ""}
               orgName={orgName}
               value={askText}
-              onChange={(text) => setFirstAsk((a) => a && { ...a, text })}
+              onChange={(text) => setFirstAsk((a) => a && { ...a, text, clientId: newClientId() })}
               onSend={() => {
                 if (!busy) void advance().catch(() => {});
               }}
@@ -1840,7 +1849,7 @@ function DoneStep({
   agents: CrewMember[];
   computer: ComputerPlate | null;
   invites: number;
-  /** Pages imported from Obsidian; null while importing, undefined when none was brought. */
+  /** Pages imported from Obsidian; null while they're arriving, undefined when none are (none brought, or it failed). */
   wiki?: number | null;
 }) {
   const { t } = useTranslation();
@@ -1937,7 +1946,11 @@ function FirstAsk({
         </span>
         <div className="onb__bubble">
           <p id={said} className="onb__say">
-            {read ? t("onboarding.done.first.read", { org: orgName }) : t("onboarding.done.first.unread")}
+            {value.trim() === ""
+              ? t("onboarding.done.first.empty")
+              : read
+                ? t("onboarding.done.first.read", { org: orgName })
+                : t("onboarding.done.first.unread")}
           </p>
         </div>
       </div>
@@ -1950,8 +1963,9 @@ function FirstAsk({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          // Enter sends and Shift+Enter starts a line; the page's own Enter handler is kept out.
-          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+          // Enter sends and Shift+Enter starts a line; the page's own Enter handler is kept out. On an on-screen
+          // keyboard Enter is a new line, as in the chat: the big button sends.
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
           e.preventDefault();
           onSend();
         }}

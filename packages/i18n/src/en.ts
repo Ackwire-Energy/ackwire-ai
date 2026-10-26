@@ -594,6 +594,7 @@ export const en: Translations = {
       first: {
         read: "I read what you wrote about {{org}}. Want me to start with this?",
         unread: "Want me to start with this? I'll ask what I need to know.",
+        empty: "What should I start with?",
         label: "Your first message in #general",
         placeholder: "Write your first message",
         asks: {

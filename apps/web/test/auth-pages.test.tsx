@@ -5,7 +5,7 @@ setupDom();
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { ImportInput, SignInOptions } from "@agenteschat/client";
+import { ApiError, type ImportInput, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -460,6 +460,25 @@ describe("Onboarding", () => {
   const askLine = () => document.querySelector(".onb__first-line")?.textContent ?? null;
   const agentId = (state: ReturnType<typeof seedState>, name: string) =>
     state.agents.find((a) => a.name === name)?.id ?? "";
+  /** What each post of the first message sent: its text, and the `clientId` that tells a resend from a new one. */
+  const posted = (state: ReturnType<typeof seedState>) =>
+    calls(state, "chat.post").map((c) => c.args[2] as { body: string; clientId: string });
+  const THEO_ASKS = "@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?";
+  /** The workspace named, then an Obsidian vault of two notes picked in Contexto; `read`: and read. */
+  const pickVault = async ({ read = true } = {}) => {
+    await type("Nome", "Acme Saúde");
+    await next();
+    const vault = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
+    await act(async () => {
+      fireEvent.change(within(vault).getByLabelText("Escolher .zip ou .md"), {
+        target: { files: [new File(["Veja [[Clientes]]."], "Início.md"), new File(["Lista."], "Clientes.md")] },
+      });
+    });
+    await settle(8);
+    if (!read) return;
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+  };
 
   test("context: an Obsidian vault is read in the step and imported into the wiki on continue", async () => {
     const { state } = await start();
@@ -856,9 +875,7 @@ describe("Onboarding", () => {
     expect(asker()).toBe("Theo");
     await click(button("Enviar para Theo"), 8);
     const posts = calls(state, "chat.post");
-    expect(posts.map((c) => c.args[2])).toEqual([
-      { body: "@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?" },
-    ]);
+    expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
     expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
   });
 
@@ -909,7 +926,7 @@ describe("Onboarding", () => {
     expect(
       screen().getByRole("region", { name: "Li o que você escreveu sobre a Acme Saúde. Posso começar por isto?" }),
     ).toBeTruthy();
-    expect(askBox().value).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
+    expect(askBox().value).toBe(THEO_ASKS);
     // Not focused: Enter anywhere does what the big button's ↵ says.
     expect(document.activeElement).not.toBe(askBox());
     expect(askLine()).toBe("Theo começa na hora, no #general.");
@@ -917,9 +934,7 @@ describe("Onboarding", () => {
     expect(button("Abrir o #general sem enviar")).toBeTruthy();
     await click(button("Enviar para Theo"), 8);
     const posts = calls(state, "chat.post");
-    expect(posts.map((c) => c.args[2])).toEqual([
-      { body: "@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?" },
-    ]);
+    expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
     expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
   });
 
@@ -954,7 +969,7 @@ describe("Onboarding", () => {
     expect(button("Enviar para Ada")).toBeTruthy();
   });
 
-  test("the first message as it's edited: whoever it names speaks and gets it; naming nobody, #general; emptied, nothing goes", async () => {
+  test("the first message as it's edited: whoever it names speaks and gets it; naming nobody, #general; emptied, the agent asks for one and nothing goes", async () => {
     const { state, router } = await start();
     await toDone(state, "Theo · PM", "Lia · Pesquisa");
     await type(ASK, "@Lia e os preços deles?");
@@ -966,8 +981,10 @@ describe("Onboarding", () => {
     expect(asker()).toBe("Theo");
     expect(button("Enviar no #general")).toBeTruthy();
     expect(askLine()).toBeNull();
-    // Emptied: only the way into #general, and nothing to open it "without sending".
+    // Emptied: no offer of "this" over an empty box, only the way into #general, and nothing to open it "without
+    // sending".
     await type(ASK, "  ");
+    expect(screen().getByRole("region", { name: "Por onde eu começo?" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Abrir o #general sem enviar" })).toBeNull();
     expect(askLine()).toBeNull();
     await click(button("Abrir o #general"), 8);
@@ -975,7 +992,7 @@ describe("Onboarding", () => {
     expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
   });
 
-  test("the first message's box: Enter sends and Shift+Enter doesn't; going Back keeps what was written", async () => {
+  test("the first message's box: Enter sends; Shift+Enter, Enter ending an input method's word and a phone's return key don't; going Back keeps what was written", async () => {
     const { state } = await start();
     await toDone(state, "Theo · PM");
     await type(ASK, "@theo o que fazemos hoje?");
@@ -983,12 +1000,83 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
     await skip();
     expect(askBox().value).toBe("@theo o que fazemos hoje?");
-    await act(async () => fireEvent.keyDown(askBox(), { key: "Enter", shiftKey: true }));
-    await settle(4);
+    const enter = async (init: KeyboardEventInit = {}) => {
+      await act(async () => fireEvent.keyDown(askBox(), { key: "Enter", ...init }));
+      await settle(4);
+    };
+    await enter({ shiftKey: true });
+    await enter({ isComposing: true });
+    // A phone, touch first: its return key is a new line, as in the chat, and the big button sends.
+    const touches = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    const matchMedia = window.matchMedia;
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+    window.matchMedia = ((query: string) =>
+      query === "(pointer: coarse)"
+        ? ({ matches: true, media: query } as MediaQueryList)
+        : matchMedia.call(window, query)) as typeof window.matchMedia;
+    try {
+      await enter();
+    } finally {
+      window.matchMedia = matchMedia;
+      if (touches) Object.defineProperty(navigator, "maxTouchPoints", touches);
+      else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
+    }
     expect(calls(state, "chat.post")).toHaveLength(0);
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    await enter();
+    await settle(4);
+    expect(posted(state)).toEqual([{ body: "@theo o que fazemos hoje?", clientId: expect.any(String) }]);
+  });
+
+  test("the first message goes once: two presses at once are one message; while it's on its way, Enter and the button send nothing more", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM");
+    let land = () => {};
+    state.holdPosts = new Promise<void>((done) => {
+      land = done;
+    });
+    const send = button("Enviar para Theo");
+    // Two presses before the page shows it's sending: the same message twice, which the server writes once.
+    await act(async () => {
+      fireEvent.click(send);
+      fireEvent.click(send);
+    });
+    await settle(2);
     await act(async () => fireEvent.keyDown(askBox(), { key: "Enter" }));
+    await act(async () => fireEvent.keyDown(document.querySelector(".onb__main") as HTMLElement, { key: "Enter" }));
+    await click(send, 2);
+    const [one, two, ...more] = posted(state);
+    expect(two).toEqual(one);
+    expect(more).toEqual([]);
+    state.holdPosts = undefined;
+    await act(async () => land());
     await settle(8);
-    expect(calls(state, "chat.post").map((c) => c.args[2])).toEqual([{ body: "@theo o que fazemos hoje?" }]);
+    expect(state.messages.filter((m) => m.body === THEO_ASKS)).toHaveLength(1);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("sent again after its answer was lost on the way back, the first message is written once; changed, it's a new one", async () => {
+    const { state, api, router } = await start();
+    await toDone(state, "Theo · PM");
+    // Each post is written, but the first two answers never come back (a proxy's 502).
+    const post = api.chat.post;
+    let lost = 2;
+    api.chat.post = async (...args: Parameters<typeof post>) => {
+      const message = await post(...args);
+      if (lost-- > 0) throw new ApiError(502, "bad_gateway", "Bad gateway");
+      return message;
+    };
+    await click(button("Enviar para Theo"), 8);
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    await type(ASK, "@theo o que fazemos hoje?");
+    await click(button("Enviar para Theo"), 8);
+    await click(button("Enviar para Theo"), 8);
+    const [first, changed, again] = posted(state);
+    expect(changed?.clientId).not.toBe(first?.clientId);
+    expect(again).toEqual(changed);
+    const bodies = [THEO_ASKS, "@theo o que fazemos hoje?"];
+    expect(state.messages.filter((m) => bodies.includes(m.body)).map((m) => m.body)).toEqual(bodies);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
   });
 
   test("a first message that can't be posted stays on Done with its text, and says why", async () => {
@@ -1016,17 +1104,7 @@ describe("Onboarding", () => {
       });
       return wikiImport(...args);
     };
-    await type("Nome", "Acme Saúde");
-    await next();
-    const vault = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
-    await act(async () => {
-      fireEvent.change(within(vault).getByLabelText("Escolher .zip ou .md"), {
-        target: { files: [new File(["Veja [[Clientes]]."], "Início.md"), new File(["Lista."], "Clientes.md")] },
-      });
-    });
-    await settle(8);
-    await act(() => new Promise((r) => setTimeout(r, 700)));
-    await settle(4);
+    await pickVault();
     await next();
     await skip();
     await skip();
@@ -1049,6 +1127,30 @@ describe("Onboarding", () => {
     expect(welcome()).toBe(
       "Theo e Ada já estão no #general. Mandamos 2 convites por e-mail. A wiki tem 2 páginas do Obsidian.",
     );
+  });
+
+  test("notes that aren't coming aren't said to be arriving: Continue waits for the vault to be read, and a failed import says nothing on Done", async () => {
+    const { api } = await start();
+    let imports = 0;
+    api.wiki.import = async () => {
+      imports++;
+      throw new ApiError(500, "internal", "Internal error");
+    };
+    await pickVault({ read: false });
+    // Continue is what brings the vault in: it waits until the vault is read.
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+    await next();
+    await settle(4);
+    expect(imports).toBe(1);
+    await skip();
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    await click(button("Conectar depois"), 8);
+    await skip();
+    expect(welcome()).toBe("Theo e Ada já estão no #general.");
   });
 
   test("with no AI yet, the line says to send anyway, for the agent named or every agent; one connected on a way back counts", async () => {
