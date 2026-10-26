@@ -27,9 +27,6 @@
   padding: 12px;
   gap: 4px;
 }
-.imp-source .ac-option__desc {
-  font-size: 12.5px;
-}
 .imp-mark {
   flex: none;
   width: 34px;
@@ -53,6 +50,12 @@
 .imp-note {
   margin: 0;
   color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+/* A help page's link, on a line of its own under what it explains. */
+.imp-help {
+  margin: 0;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -95,30 +98,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-}
-.imp-other__apps-title {
-  margin: 4px 0 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-.imp-other__apps {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  font-size: 13px;
-}
-.imp-other__apps > div {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 8px;
-}
-.imp-other__apps dt {
-  font-weight: 600;
-}
-.imp-other__apps dd {
-  margin: 0;
-  color: var(--muted);
 }
 .imp-other p {
   margin: 0;
@@ -356,11 +335,6 @@ label.imp-row__text {
   font-size: 13.5px;
   font-weight: 650;
 }
-.imp-block__help {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12.5px;
-}
 .imp-todo,
 .imp-left,
 .imp-missed,
@@ -480,26 +454,6 @@ label.imp-row__text {
   box-shadow: var(--focus-ring);
 }
 
-/* ── Export ─────────────────────────────────────────────────────────────── */
-.imp-export {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 16px;
-}
-.imp-export ul {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13.5px;
-}
-/* `.ac-iconline` rows. */
-.imp-export li > .ac-icon {
-  color: var(--ink2);
-}
-
 @media (max-width: 640px) {
   .imp-row {
     flex-wrap: wrap;
@@ -508,10 +462,6 @@ label.imp-row__text {
   .imp-row__chip {
     margin-left: 56px;
     max-width: none;
-  }
-  .imp-other__apps > div {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
   }
   .imp-paste {
     flex-direction: column;

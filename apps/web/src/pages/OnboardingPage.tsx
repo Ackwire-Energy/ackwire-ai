@@ -82,7 +82,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -853,27 +853,17 @@ export function OnboardingPage() {
                 ? t("onboarding.agents.importedTitle")
                 : t(`onboarding.${step.id}.title`),
             lead:
-              step.id === "agents" && metNames.length ? (
-                t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
-              ) : step.id === "computer" && workspaceComputer ? (
-                t(
-                  workspaceComputer.phase === "ready"
-                    ? "onboarding.computer.leadCloudReady"
-                    : workspaceComputer.phase === "paused"
-                      ? "onboarding.computer.leadCloudPaused"
-                      : "onboarding.computer.leadCloud",
-                )
-              ) : step.id === "import" ? (
-                // Its answer is long: the "skip" Theo says is the way out, right where it's said.
-                <Trans
-                  i18nKey="onboarding.import.leadWithSkip"
-                  components={{
-                    skip: <button type="button" className="ac-link onb__link" onClick={skip} disabled={busy} />,
-                  }}
-                />
-              ) : (
-                t(`onboarding.${step.id}.lead`)
-              ),
+              step.id === "agents" && metNames.length
+                ? t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
+                : step.id === "computer" && workspaceComputer
+                  ? t(
+                      workspaceComputer.phase === "ready"
+                        ? "onboarding.computer.leadCloudReady"
+                        : workspaceComputer.phase === "paused"
+                          ? "onboarding.computer.leadCloudPaused"
+                          : "onboarding.computer.leadCloud",
+                    )
+                  : t(`onboarding.${step.id}.lead`),
           };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 

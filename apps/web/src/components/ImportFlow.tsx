@@ -12,7 +12,6 @@ import {
   Alert,
   Button,
   Card,
-  CardFooter,
   CardHeader,
   Checkbox,
   Chip,
@@ -21,6 +20,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   normalizeAppearance,
   OptionCard,
@@ -37,6 +37,7 @@ import { useApi } from "@/api/context";
 import { failedOffline } from "@/chat/outbox";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { fileSaver } from "@/components/artifacts/fileSaver";
+import { HelpLink } from "@/components/HelpLink";
 import { useOrg } from "@/components/org-context";
 import {
   EXPORT_PROMPT,
@@ -58,7 +59,6 @@ import {
   bundleOrigin,
   choosable,
   droppedFiles,
-  EXPORT_PROMPT_APPS,
   githubRoot,
   IMPORT_CARDS,
   type ImportCard,
@@ -414,7 +414,6 @@ function Picker({ flow }: { flow: ImportFlowState }) {
           >
             <SourceMark card={c} />
             <span className="ac-option__title">{cardName(c)}</span>
-            <span className="ac-option__desc">{t(`onboarding.import.${c}Desc`)}</span>
           </OptionCard>
         ))}
       </div>
@@ -517,15 +516,21 @@ function Picker({ flow }: { flow: ImportFlowState }) {
           )}
         </div>
       )}
+      {/* What a person needs before dropping a folder that holds keys: said on the line, the rest in its ⓘ. */}
       <p className="imp-note ac-iconline">
         <Icon name="lock" size={16} />
-        <span>{t("onboarding.import.privacy")}</span>
+        <span className="ac-hintline">
+          <span>{t("onboarding.import.privacy")}</span>
+          <InfoHint name={t("common.about", { label: t("onboarding.import.privacy") })}>
+            {t("onboarding.import.privacyMore")}
+          </InfoHint>
+        </span>
       </p>
     </div>
   );
 }
 
-/** "Outro app": the request to paste there, and where each app gives the file back. */
+/** "Outro app": the request to paste there; where each app gives the file back is on the help page. */
 function OtherApp() {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
@@ -567,16 +572,11 @@ function OtherApp() {
               : ""}
         </span>
       </div>
-      <p className="imp-other__apps-title">{t("onboarding.import.other.appsTitle")}</p>
-      <dl className="imp-other__apps">
-        {EXPORT_PROMPT_APPS.map((a) => (
-          <div key={a.step}>
-            <dt>{a.name}</dt>
-            <dd>{t(`onboarding.import.other.apps.${a.step}`)}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="small muted">{t("onboarding.import.other.noFile")}</p>
+      <p className="imp-help">
+        <HelpLink slug="import" section="other-apps">
+          {t("onboarding.import.other.where")}
+        </HelpLink>
+      </p>
     </section>
   );
 }
@@ -682,7 +682,6 @@ function Preview({
           <Heading level={sub} id="imp-left-title" className="imp-block__title">
             {t("onboarding.import.leftOutTitle")}
           </Heading>
-          <p className="imp-block__help">{t("onboarding.import.leftOutHelp")}</p>
           <ul className="imp-left">
             {left.map((g) => (
               <li key={g.kind}>
@@ -791,7 +790,10 @@ function Group({
           {title}
         </Heading>
         <CountChip size="sm">{rows.length}</CountChip>
-        <span className="imp-group__help">{t(`onboarding.import.groupHelp.${kind}`)}</span>
+        {/* Only what changes what happens after the import: skills arrive off, routines paused. */}
+        {(kind === "skill" || kind === "routine") && (
+          <span className="imp-group__help">{t(`onboarding.import.groupHelp.${kind}`)}</span>
+        )}
       </div>
       <ul className="imp-rows">
         {(open ? rows : rows.slice(0, SHOWN)).map((item, i) => (
@@ -1040,7 +1042,6 @@ function Todos({
       <Heading level={level} id="imp-todo-title" className="imp-block__title">
         {t("onboarding.import.todoTitle")}
       </Heading>
-      <p className="imp-block__help">{t("onboarding.import.todoHelp")}</p>
       <ul className="imp-todo">
         {todo.map((x) => (
           <li key={`${x.kind}:${x.label}`} className="ac-iconline">
@@ -1235,8 +1236,8 @@ export function ImportReport({
 }
 
 /**
- * Configurações → Importar e exportar (admins): the import flow, and this
- * workspace as a file, with what it carries and what it never does.
+ * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never
+ * carries (whoever shares the file needs that); the full list is on the help page.
  */
 export function ImportExportSection() {
   const { t } = useTranslation();
@@ -1249,12 +1250,7 @@ export function ImportExportSection() {
   return (
     <>
       <Card aria-labelledby="imp-import-title">
-        <CardHeader
-          icon="upload"
-          id="imp-import-title"
-          title={t("settings.import.title")}
-          subtitle={t("settings.import.sub")}
-        />
+        <CardHeader icon="upload" id="imp-import-title" title={t("settings.import.title")} />
         <ImportFlow flow={flow} orgId={org.id} standalone level={3} />
       </Card>
       <Card aria-labelledby="imp-export-title">
@@ -1262,42 +1258,21 @@ export function ImportExportSection() {
           icon="download"
           id="imp-export-title"
           title={t("settings.import.exportTitle")}
-          subtitle={t("settings.import.exportSub")}
           action={
             <Button icon="download" onClick={download}>
               {t("settings.import.download")}
             </Button>
           }
         />
-        <div className="imp-export">
-          <section aria-labelledby="imp-carries">
-            <h3 id="imp-carries" className="imp-block__title">
-              {t("settings.import.carries")}
-            </h3>
-            <ul>
-              {(["agents", "skills", "channels", "routines", "memory"] as const).map((k) => (
-                <li key={k} className="ac-iconline">
-                  <Icon name="check" size={14} />
-                  {t(`settings.import.carry.${k}`)}
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section aria-labelledby="imp-never">
-            <h3 id="imp-never" className="imp-block__title">
-              {t("settings.import.never")}
-            </h3>
-            <ul>
-              {(["keys", "connections", "computers", "messages", "usage"] as const).map((k) => (
-                <li key={k} className="ac-iconline">
-                  <Icon name="lock" size={14} />
-                  {t(`settings.import.neverList.${k}`)}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-        <CardFooter>{t("settings.import.back")}</CardFooter>
+        <p className="imp-note ac-iconline">
+          <Icon name="lock" size={16} />
+          <span>{t("settings.import.neverLine")}</span>
+        </p>
+        <p className="imp-help">
+          <HelpLink slug="import" section="export">
+            {t("settings.import.whatsIn")}
+          </HelpLink>
+        </p>
       </Card>
     </>
   );

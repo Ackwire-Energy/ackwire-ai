@@ -1254,11 +1254,17 @@ describe("Onboarding", () => {
     expect(interval()).toBe(false);
   });
 
-  test('import: Theo\'s "pular" is the way out, and each app is shown by its official logo', async () => {
+  test("import: one line on what comes along, no way out inside it (Pular esta etapa is); each app by its official logo and name", async () => {
     const { state } = await start();
     await throughContext(state);
-    expect(document.body.textContent).toContain("Se não usa, é só pular.");
-    // Each app's own logo, never letters or a generic icon; only "Outro app", which names many, keeps one.
+    const bubble = document.querySelector(".onb__bubble") as HTMLElement;
+    expect(bubble.querySelector(".onb__lead")?.textContent).toBe(
+      "Eles chegam com instruções, skills, rotinas e memória.",
+    );
+    expect(within(bubble).queryByRole("button")).toBeNull();
+    // Each app's own logo, never letters or a generic icon; only "Outro app", which names many, keeps one. No line
+    // under the name: where each app keeps its file is the tip under the cards, once one is picked.
+    expect(document.querySelector(".imp-source .ac-option__desc")).toBeNull();
     const tiles = [...document.querySelectorAll(".imp-source")].map((card) => [
       card.querySelector(".ac-option__title")?.textContent,
       card.querySelector(".imp-mark img")?.getAttribute("src") ?? card.querySelector(".imp-mark svg")?.tagName,
@@ -1273,7 +1279,7 @@ describe("Onboarding", () => {
       ["Exportação do agentes.chat", "/favicon.svg"],
       ["Outro app", "svg"],
     ]);
-    await click(button("pular"), 6);
+    await skip();
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");
   });
@@ -1368,8 +1374,13 @@ describe("Onboarding", () => {
     expect(text).toContain("Conectar CRM (mcp.example.com)");
     expect(text).toContain("O que não vem junto");
     expect(text).toContain("Chaves, senhas e histórico de conversa nunca vêm.");
-    expect(text).toContain("Os agentes usam o modelo e a chave do workspace.");
-    expect(text).toContain("Isso chega junto com o time, quando você criar os agentes.");
+    expect(text).toContain("Chega quando você criar o time.");
+    // Only the groups whose items arrive changed say so: skills off, routines paused.
+    expect([...document.querySelectorAll(".imp-group__help")].map((h) => h.textContent)).toEqual([
+      "Chegam desligadas.",
+      "Chegam pausadas.",
+    ]);
+    expect(document.querySelector(".imp-block__help")).toBeNull();
     // Nothing is saved while reading: the server only planned it.
     expect(calls(state, "agents.create")).toHaveLength(0);
     expect(calls(state, "imports.apply").map((c) => (c.args[1] as ImportInput).dryRun)).toEqual([true]);
@@ -1436,7 +1447,7 @@ describe("Onboarding", () => {
       ],
     };
     await throughContext(state);
-    await click(button(/^OpenBot O pacote/), 1);
+    await click(button(/^OpenBot$/), 1);
 
     const field = "Ou cole um link do GitHub ou a resposta do outro app";
     await type(field, "https://github.com/acme/nada/blob/main/agents.yaml");
