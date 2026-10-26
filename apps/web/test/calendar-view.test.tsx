@@ -97,6 +97,15 @@ describe("Calendário: views, moves and series", () => {
     expect(screen().getByRole("button", { name: "Revisão trimestral, 15:00–16:00" })).toBeTruthy();
   });
 
+  test("a link whose day doesn't exist opens on today's week", async () => {
+    for (const day of ["2026-13-45", "2026-02-30", "garbage", "20261028"]) {
+      await renderApp(`/org/${ORG_ID}/calendar?open=x&day=${day}`, { api: createFakeApi(seedState()) });
+      await settle(8);
+      expect(document.querySelector(`[data-day="${toYmd(today)}"]`), day).not.toBeNull();
+      cleanup();
+    }
+  });
+
   test("views: Mês and Agenda; T goes back to today; arrows move the day", async () => {
     await go();
     const range = () => document.querySelector(".cal-page__range")?.textContent ?? "";

@@ -88,7 +88,7 @@ const shortcutsFree = (e: KeyboardEvent) => {
  * and to move, recurring events with "Só este / Este e os próximos / Todos".
  * Keys: ←/→ move the day, N creates, T goes to today.
  */
-export function CalendarPage({ today: todayProp }: { today?: Date }) {
+export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: string }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -98,8 +98,7 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
   const [view, setView] = useState<CalendarView>("week");
   // A link to an event (an invitation's email) says its day, so the view starts on its week.
   const [linked, setLinked] = useOpenParam("open", WITH_OPEN);
-  const [linkedDay] = useOpenParam("day");
-  const [focus, setFocus] = useState(() => startOfDay(linkedDay ? dateOnly(linkedDay) : today));
+  const [focus, setFocus] = useState(() => startOfDay(day ? dateOnly(day) : today));
   const [businessOnly, setBusinessOnly] = useState(false);
   const [panel, setPanel] = useState(() => typeof window === "undefined" || window.innerWidth >= 1180);
   const [filters, setFilters] = useState<Filters>({ person: true, agent: true, routine: true, deadline: true });
