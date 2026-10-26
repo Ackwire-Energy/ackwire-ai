@@ -163,7 +163,18 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   }
   const webDir = resolve(config.WEB_DIR);
   const emailArt = await emailArtFor(config.PUBLIC_URL, existsSync(webDir) ? webDir : undefined, config.EMAIL_ART);
-  log.info("email pictures", { from: emailArt.base ?? "attached to each message" });
+  const because = {
+    attach: "EMAIL_ART=attach",
+    blocked: "PUBLIC_URL's host is private",
+    unreachable: "PUBLIC_URL's host didn't resolve, until a restart",
+  };
+  const pictures = {
+    from: emailArt.base ?? "attached to each message",
+    ...(emailArt.attached && { because: because[emailArt.attached] }),
+  };
+  // A failed lookup attaches them for the whole run, though the host may well be public.
+  if (emailArt.attached === "unreachable") log.warn("email pictures", pictures);
+  else log.info("email pictures", pictures);
   if (!existsSync(join(webDir, "email", "logo-ink.png"))) {
     log.warn("emails' pictures not found: their logo and art won't show", { dir: join(webDir, "email") });
   }

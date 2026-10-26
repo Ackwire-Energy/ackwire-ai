@@ -261,6 +261,18 @@ describe("where the pictures come from", () => {
       "http://localhost:3000/email/",
     );
   });
+
+  test("says why they're attached: asked, a private host, or a host that didn't resolve", async () => {
+    const why = (url: string, mode: "auto" | "attach", resolveTo: () => Promise<string[]>) =>
+      emailArtFor(url, WEB_DIR, mode, resolveTo).then((a) => a.attached);
+    const publicDns = async () => ["93.184.216.34"];
+    expect(await why("https://chat.acme.com", "auto", publicDns)).toBeUndefined();
+    expect(await why("https://chat.acme.com", "attach", publicDns)).toBe("attach");
+    expect(await why("http://localhost:3000", "auto", publicDns)).toBe("blocked");
+    expect(await why("https://chat.acme.com", "auto", () => Promise.reject(new Error("ENOTFOUND")))).toBe(
+      "unreachable",
+    );
+  });
 });
 
 describe("jobs queued before this look", () => {

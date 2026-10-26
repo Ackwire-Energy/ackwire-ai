@@ -114,17 +114,20 @@ export function emailArtAt(publicUrl: string): EmailArt {
  * can't reach a private, loopback or CGNAT address (a Tailscale name), or a name that resolves to one.
  * `attach`: always attached, for a public address outsiders still can't open (an access proxy, a VPN, an
  * IP allowlist). With no pictures in `webDir` (a server without the web app) they stay linked.
+ * `attached` says why they are attached: `attach` asked, or the host is private (`blocked`) or didn't
+ * resolve (`unreachable`); the choice holds until a restart.
  */
 export async function emailArtFor(
   publicUrl: string,
   webDir: string | undefined,
   mode: "auto" | "attach",
   resolve: ResolveHost = resolveHostDns,
-): Promise<EmailArt> {
+): Promise<EmailArt & { attached?: "attach" | "blocked" | "unreachable" }> {
   const art = emailArtAt(publicUrl);
-  if (mode === "auto" && (await publicHostAddress(new URL(publicUrl).hostname, resolve)).ok) return art;
+  const host = mode === "auto" ? await publicHostAddress(new URL(publicUrl).hostname, resolve) : null;
+  if (host?.ok) return art;
   const files = webDir ? await readPictures(join(webDir, "email")) : null;
-  return files ? { ...art, base: null, files } : art;
+  return files ? { ...art, base: null, files, attached: host?.reason ?? "attach" } : art;
 }
 
 async function readPictures(dir: string) {
