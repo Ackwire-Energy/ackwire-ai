@@ -20,6 +20,7 @@ import {
   createFakeScheduleReader,
   createLocalKeyWrapper,
   drainOutbox,
+  type EmailArt,
   type FakeScheduleAnswers,
   type McpConnect,
   type ResolveHost,
@@ -80,6 +81,8 @@ export async function createTestServer(
     mail?: MailAdapters;
     /** Fake database driver (ADR 0039); absent = no database connector. */
     databases?: DatabaseDriver;
+    /** Where emails get their pictures; absent = linked from `PUBLIC_URL`. */
+    emailArt?: EmailArt;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -125,6 +128,7 @@ export async function createTestServer(
     judge: createFakeJudge(options.judge),
     schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
     toolsOnDemand: false,
+    emailArt: options.emailArt,
   });
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });

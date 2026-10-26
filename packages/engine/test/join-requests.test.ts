@@ -22,6 +22,7 @@ import {
   sha256,
   turnOffInviteLink,
 } from "../src";
+import { BREAK } from "../src/email/inert";
 import { addMember, type Fixture, SECRET, setup } from "./fixtures";
 
 let f: Fixture;
@@ -348,8 +349,8 @@ describe("answering", () => {
     const [answer] = await joinEmails("join_answer");
     expect(answer?.template).toMatchObject({ outcome: "denied", reason: "Only <b>studio</b> people", locale: "en" });
     const rendered = renderEmail(answer?.template as EmailTemplate);
-    expect(rendered.subject).toBe("Your request to join Acme wasn't approved");
-    expect(rendered.html).toContain("Their note: «Only &lt;b&gt;studio&lt;/b&gt; people»");
+    expect(rendered.subject).toBe("Your request to join wasn't approved");
+    expect(rendered.html).toContain("“Only &lt;b&gt;studio&lt;/b&gt; people”");
     expect(rendered.html).not.toContain("<b>studio</b>");
     expect((await notices()).every((n) => n.doneAt !== null)).toBe(true);
     const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "join_request.denied"));
@@ -459,11 +460,11 @@ describe("links", () => {
 });
 
 describe("words", () => {
-  test("the admins' email: the typed name escaped and cut, both actions, never the note", () => {
-    const name = `<script>${"x".repeat(80)}`;
+  test("the admins' email: our words up top; the typed name inert and cut in the body, with both actions", () => {
+    const name = `<script> ${"Souza ".repeat(20)}`.trim();
     for (const [locale, subject, deny] of [
-      ["en", `${name.slice(0, 59)}… asks to join Acme`, "Deny"],
-      ["pt-BR", `${name.slice(0, 59)}… pede para entrar na Acme`, "Recusar"],
+      ["en", "Someone asks to join your workspace", "Deny"],
+      ["pt-BR", "Alguém pede para entrar no seu workspace", "Recusar"],
     ] as const) {
       const e = renderEmail({
         kind: "join_request",
@@ -476,14 +477,21 @@ describe("words", () => {
       });
       expect(e.subject).toBe(subject);
       expect(e.html).not.toContain("<script>");
-      expect(e.html).toContain("&lt;script&gt;");
+      expect(e.html).toContain("&lt;script&gt; Souza");
       expect(e.html).toContain('href="https://a.test/deny"');
       expect(e.text).toContain(`${deny}: https://a.test/deny`);
-      expect(e.text).toContain("ana@example.com");
+      const [shown = "", address] =
+        e.text
+          .split("\n")
+          .find((l) => l.startsWith("<script>"))
+          ?.split(" · ") ?? [];
+      expect(shown).toEndWith("…");
+      expect(shown.length).toBeLessThanOrEqual(60);
+      expect(address).toBe(`ana@${BREAK}example.${BREAK}com`);
     }
   });
 
-  test("the three answers in both languages, each with its own footer", () => {
+  test("the three answers in both languages; one that invites says what to do if you never asked", () => {
     const answer = (locale: "en" | "pt-BR", outcome: "joined" | "invited" | "denied") =>
       renderEmail({
         kind: "join_answer",
@@ -492,22 +500,26 @@ describe("words", () => {
         orgName: "Acme",
         approverName: "Marina",
         role: "admin",
-        url: "https://a.test/x",
-        reason: outcome === "denied" ? "Full team" : undefined,
+        url: outcome === "denied" ? undefined : "https://a.test/x",
+        reason: outcome === "denied" ? "Full <b>team</b>" : undefined,
       });
-    expect(["joined", "invited", "denied"].map((o) => answer("en", o as "joined").subject)).toEqual([
-      "You're in Acme",
-      "Your request to join Acme was approved",
-      "Your request to join Acme wasn't approved",
+    const outcomes = ["joined", "invited", "denied"] as const;
+    expect(outcomes.map((o) => answer("en", o).subject)).toEqual([
+      "Your request to join was approved",
+      "Your request to join was approved",
+      "Your request to join wasn't approved",
     ]);
-    expect(["joined", "invited", "denied"].map((o) => answer("pt-BR", o as "joined").subject)).toEqual([
-      "Você entrou na Acme",
-      "Seu pedido para entrar na Acme foi aprovado",
-      "Seu pedido para entrar na Acme não foi aprovado",
+    expect(outcomes.map((o) => answer("pt-BR", o).subject)).toEqual([
+      "Seu pedido para entrar foi aprovado",
+      "Seu pedido para entrar foi aprovado",
+      "Seu pedido para entrar não foi aprovado",
     ]);
-    expect(answer("en", "joined").text).toContain("Marina approved your request. You joined Acme as admin.");
-    expect(answer("pt-BR", "invited").text).toContain("Entrar na Acme: https://a.test/x");
-    expect(answer("en", "denied").text).toContain("Their note: «Full team»");
+    expect(answer("en", "joined").text).toContain("Marina approved your request. You joined Acme as an admin.");
+    expect(answer("pt-BR", "invited").text).toContain("Aceitar convite: https://a.test/x");
+    expect(answer("en", "invited").text).toContain("If you didn't ask to join, ignore this email.");
+    expect(answer("pt-BR", "invited").text).toContain("Se você não pediu para entrar, ignore este e-mail.");
+    expect(answer("en", "denied").text).toContain("Their note: “Full <b>team</b>”");
+    expect(answer("en", "denied").html).toContain("“Full &lt;b&gt;team&lt;/b&gt;”");
     expect(answer("en", "denied").html).not.toContain("https://a.test/x");
     expect(answer("en", "denied").html).toContain("this address asked to join Acme on agentes.chat");
     expect(answer("pt-BR", "joined").html).toContain("este endereço pediu para entrar na Acme");

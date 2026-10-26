@@ -174,7 +174,7 @@ export function GalleryPage() {
             id="g-r2"
             checked={radio === "own"}
             title="Chave da Acme"
-            description="Use sua conta da Anthropic."
+            description="Use a sua chave do Claude."
           />
         </RadioGroup>
         <div className="grid-options grid-options--sm">

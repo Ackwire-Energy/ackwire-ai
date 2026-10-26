@@ -576,7 +576,7 @@ export const ptBR = {
     keyNotPlan:
       "Use uma chave de pagamento por uso: a de um plano de assinatura só funciona em ferramentas de programação.",
     keyInvalid: {
-      anthropic: "As chaves da Anthropic começam com sk-ant-. Confira e cole de novo.",
+      anthropic: "As chaves de API do Claude começam com sk-ant-. Confira e cole de novo.",
       openai: "As chaves da OpenAI começam com sk-. Confira e cole de novo.",
       deepseek: "As chaves da DeepSeek começam com sk-. Confira e cole de novo.",
       moonshot: "As chaves da Kimi começam com sk-. Confira e cole de novo.",
@@ -586,8 +586,8 @@ export const ptBR = {
     },
     keyFromOther: "É de outro provedor?",
     advanced: "Avançado",
-    anthropicWorkspace: "ID do workspace da Anthropic",
-    anthropicWorkspaceHelp: "Opcional. Só para chaves que não são de um workspace.",
+    anthropicWorkspace: "ID do workspace no Claude Console",
+    anthropicWorkspaceHelp: "Só para uma chave que vale em mais de um workspace. O ID começa com wrkspc_.",
     openaiOrg: "ID da organização na OpenAI",
     openaiProject: "ID do projeto na OpenAI",
     optional: "Opcional.",
@@ -1018,7 +1018,7 @@ export const ptBR = {
       chatgpt: "Plano do ChatGPT",
       chatgptDesc: "Plus, Pro ou Team, pelo Codex",
       api_key: "Chave de API",
-      api_keyDesc: "Anthropic, OpenAI e outros; paga pelo uso",
+      api_keyDesc: "Claude, OpenAI e outros; paga pelo uso",
     },
     waitComputer: "Disponível quando o computador ficar pronto. Dá para usar uma chave de API agora.",
     agent: "Para qual agente",
@@ -1776,7 +1776,7 @@ export const ptBR = {
         planModel: "Modelo",
         preview: "Pensa com <b>{{brain}}</b>.",
         previewMoved: "Pensa com <b>{{brain}}</b> no <b>{{computer}}</b>.",
-        account: { claude_code: "Conta do Claude", codex: "Conta do Codex" },
+        account: { claude_code: "Conta do Claude", codex: "Conta do ChatGPT" },
         accountLocked: "Só {{name}} troca",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
@@ -1799,7 +1799,7 @@ export const ptBR = {
           max: "Pensa o máximo que puder. Bem mais lento e caro.",
         },
         add: {
-          title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do Codex" },
+          title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: { claude_code: "Entre no Claude com a outra conta", codex: "Entre no ChatGPT com a outra conta" },
           stepOneText: {
             claude_code: "Abre a página do próprio Claude. Se ela entrar na conta errada, saia de lá e tente de novo.",
@@ -2084,9 +2084,9 @@ export const ptBR = {
         provider_unavailable: "O provedor do modelo não respondeu: {{detail}}",
         canceled: "Alguém parou a tarefa.",
         interrupted: "Interrompida por uma atualização do servidor.",
-        missing_credential: "Falta uma chave da {{provider}} no workspace.",
+        missing_credential: "Falta uma chave {{of}} {{provider}} no workspace.",
         credential_revoked: "A chave deste agente foi revogada.",
-        credential_wrong_provider: "O modelo é da {{modelProvider}}, mas a chave é da {{keyProvider}}.",
+        credential_wrong_provider: "O modelo é {{modelOf}} {{modelProvider}}, mas a chave é {{keyOf}} {{keyProvider}}.",
         no_ai: "O agente não tem uma IA conectada.",
         org_paused: "Os agentes do workspace estão pausados.",
         org_suspended: "O workspace está indisponível.",
@@ -2462,12 +2462,12 @@ export const ptBR = {
     },
     price: "US$ {{input}} / {{output}} por milhão de tokens",
     autoCost: "O custo acompanha cada tarefa",
-    noKeyFor: "Sem chave da {{provider}}",
+    noKeyFor: "Sem chave {{of}} {{provider}}",
     key: "Chave",
     defaultKey: "Chave padrão do workspace",
     defaultKeyDesc: "{{provider}} · termina em {{hint}}",
     otherKeyDesc: "{{provider}} · termina em {{hint}}",
-    modelNeedsKey: "Adicione uma chave da {{provider}} para usar",
+    modelNeedsKey: "Precisa de uma chave {{of}} {{provider}}",
     noKeys: "Nenhuma chave cadastrada",
     budgetTitle: "Orçamento mensal",
     budget: "Orçamento mensal (US$)",
@@ -4428,10 +4428,15 @@ export const ptBR = {
       titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
       body: {
         claude_code:
-          "A Anthropic diz que as assinaturas pessoais do Claude são para uso pessoal. Usar a sua para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+          "Os termos do Claude dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
         codex:
           "A OpenAI diz que o plano do ChatGPT é para uso pessoal. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
-        seat: "A {{maker}} diz que cada assento do plano é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra os termos dela. Se continuar, o risco é seu.",
+        seat: {
+          claude_code:
+            "Os termos do Claude dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
+          codex:
+            "Os termos da OpenAI dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles. Se continuar, o risco é seu.",
+        },
         other:
           "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos. Se continuar, o risco é seu.",
       },
@@ -7109,7 +7114,7 @@ export const ptBR = {
       tool: { claude: "Claude Code", codex: "Codex", commands: "Comandos", browser: "Navegador" },
       toolText: {
         claude: "Escreve e muda arquivos, só nas pastas liberadas.",
-        codex: "Como o Claude Code, com a conta da OpenAI. Também só nas pastas liberadas.",
+        codex: "Como o Claude Code, com a conta do ChatGPT. Também só nas pastas liberadas.",
         commands: "Roda comandos do Terminal, como testes e builds.",
       },
       commandsWarn: "Comandos podem chegar a outras partes do computador, não só às pastas liberadas.",
@@ -7411,7 +7416,7 @@ export const ptBR = {
     addKey: "Adicionar chave",
     addKeyTitle: "Adicionar chave de API",
     keyLabel: "Nome da chave",
-    keyLabelPlaceholder: "Ex.: Anthropic da Acme",
+    keyLabelPlaceholder: "Ex.: Claude da Acme",
     keyValue: "Chave da API",
     keyInvalid: "Cole a chave da API (pelo menos 8 caracteres).",
     saveKey: "Salvar chave",

@@ -585,7 +585,7 @@ export async function requestNewInvitation(db: Database, publicUrl: string, toke
         locale,
         orgName: org.name,
         email: invitation.email,
-        url: `${base(publicUrl)}/org/${invitation.orgId}/members`,
+        url: `${base(publicUrl)}/org/${invitation.orgId}/settings/members`,
       },
     });
   }

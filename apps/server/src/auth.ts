@@ -103,6 +103,8 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       minPasswordLength: 8,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
+      // The reset email says the link works for an hour.
+      resetPasswordTokenExpiresIn: 60 * 60,
       // Only when a real email sender is configured (MillionSend or SMTP); sent through the outbox.
       ...(emailEnabled
         ? {

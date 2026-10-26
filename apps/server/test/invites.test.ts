@@ -65,8 +65,8 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   expect(request?.confirmed).toBe(false);
 
   await t.drain();
-  const [toOwner] = mailTo("owner@example.com").filter((m) => m.subject.includes("Ana"));
-  expect(toOwner?.subject).toBe("Ana Souza pede para entrar na Acme");
+  const [toOwner] = mailTo("owner@example.com").filter((m) => m.subject === "Alguém pede para entrar no seu workspace");
+  expect(toOwner?.text).toContain("Ana Souza · ana@\u200aexample.\u200acom");
   expect(toOwner?.text).toContain(`/org/${orgId}/settings/members?request=${request?.id}&do=approve`);
   expect(toOwner?.text).not.toContain("Paula");
   const inbox = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as {
@@ -84,7 +84,7 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   expect(await requests(owner, orgId)).toEqual([]);
   await t.drain();
   const [toAna] = mailTo("ana@example.com");
-  expect(toAna?.subject).toBe("Seu pedido para entrar na Acme foi aprovado");
+  expect(toAna?.subject).toBe("Seu pedido para entrar foi aprovado");
   expect(toAna?.text).toContain(answer.url);
 
   // The invitation opens sign-up for that address only, and joins as the role picked.
@@ -186,7 +186,7 @@ test("only admins see and answer requests; asks must come from our own pages", a
   expect(((await again.json()) as { error: { code: string } }).error.code).toBe("join.answered");
   await t.drain();
   const [toAna] = mailTo("ana@example.com");
-  expect(toAna?.subject).toBe("Seu pedido para entrar na Acme não foi aprovado");
+  expect(toAna?.subject).toBe("Seu pedido para entrar não foi aprovado");
   expect(toAna?.html).toContain("We only take people from &lt;the studio&gt;");
 });
 
@@ -231,9 +231,8 @@ test("request a new invitation: the inviter is emailed once; valid or unknown to
   expect((await anon(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(204);
   expect((await anon(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(204);
   await t.drain();
-  expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([
-    [["owner@example.com"], "Pedido de novo convite para Acme"],
-  ]);
-  expect(t.email.sent[0]?.text).toContain("ana@example.com");
-  expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/members`);
+  expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([[["owner@example.com"], "Pediram um novo convite"]]);
+  // The address as typed, with the hair spaces that keep mail clients from linking it.
+  expect(t.email.sent[0]?.text).toContain("ana@\u200aexample.\u200acom abriu um convite vencido da Acme");
+  expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/settings/members`);
 });
