@@ -264,7 +264,7 @@ export const ptBR = {
     yourCompany: "sua empresa",
     workspace: {
       title: "Como se chama o seu workspace?",
-      lead: "É onde o time e os agentes conversam. Dá para mudar tudo depois em Configurações.",
+      lead: "É onde o time e os agentes conversam.",
       zone: "Fuso horário: {{zone}}",
       zoneChange: "trocar",
       logoHelp: "PNG com fundo transparente fica melhor. Aparece na barra lateral para todo mundo.",
@@ -277,14 +277,14 @@ export const ptBR = {
     },
     vault: {
       title: "Já tem documentação no Obsidian?",
-      text: "A vault vira a wiki do workspace, com pastas, tags e [[links]]. Os agentes leem a wiki quando respondem.",
+      text: "Ela vira a wiki do workspace.",
       ready: "Pronta",
       optional: "opcional",
-      when: "Entra na wiki quando você continuar. Os anexos vão para o Drive em segundo plano.",
+      when: "Entra na wiki quando você continuar.",
     },
     context: {
       title: "O que a empresa faz?",
-      lead: "Escreva do seu jeito. Eu e os outros agentes lemos isso antes de responder.",
+      lead: "Eu e os outros agentes lemos isso antes de responder.",
       starters: {
         sell: { label: "O que vendem", text: "O que vendemos: " },
         who: { label: "Pra quem", text: "Nossos clientes: " },
@@ -659,8 +659,7 @@ export const ptBR = {
     },
     skip: "Pular esta etapa",
     confirmation: {
-      sent: "Mandamos um link de confirmação para {{email}}. Ele vale por uma hora.",
-      confirmed: "E-mail confirmado: {{email}}.",
+      sent: "Mandamos um link de confirmação para {{email}}.",
     },
   },
   /** The desktop app's right click (lib/context-menu.ts). */
@@ -5434,7 +5433,6 @@ export const ptBR = {
       pickZip: "Escolher .zip ou .md",
       pickFolder: "Escolher pasta",
       pickFolderShort: "escolha a pasta",
-      howToZip: "Para gerar o .zip: botão direito na pasta da vault → Comprimir.",
       howTo:
         "Para gerar o .zip: no Finder, clique com o botão direito na pasta da vault → Comprimir. No Windows, Enviar para → Pasta compactada. A pasta .obsidian (plugins e temas) fica de fora.",
       nothingYet: "Nada entra antes de você revisar.",

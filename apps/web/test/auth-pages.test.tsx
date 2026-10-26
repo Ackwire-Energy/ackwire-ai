@@ -1278,7 +1278,7 @@ describe("Onboarding", () => {
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");
   });
 
-  test("the confirmation email: where it went and for how long, a new link, then that it's confirmed", async () => {
+  test("the confirmation email: where it went, a new link, and once it's confirmed no line", async () => {
     const state = seedState();
     if (!state.me) throw new Error("no me");
     state.me.organizations = [];
@@ -1290,9 +1290,7 @@ describe("Onboarding", () => {
       await renderApp("/onboarding", { api: createFakeApi(state), auth });
       await settle(4);
       const note = () => document.querySelector(".onb__note")?.textContent;
-      expect(note()).toBe(
-        "Mandamos um link de confirmação para walter@acme.com.br. Ele vale por uma hora.Mandar outro link",
-      );
+      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br.Mandar outro link");
       // Nothing waits for it.
       expect(button("Continuar").hasAttribute("disabled")).toBe(true);
       await type("Nome", "Acme");
@@ -1302,13 +1300,13 @@ describe("Onboarding", () => {
       await click(button("Mandar outro link"), 4);
       expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["walter@acme.com.br"] }]);
       expect(document.body.textContent).toContain("Mandamos outro link para walter@acme.com.br.");
-      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br. Ele vale por uma hora.");
+      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br.");
 
-      // The link opened in another tab: back here, the line says so, and this tab forgets it was sent.
+      // The link opened in another tab, which said so: back here the line is gone, and this tab forgets it was sent.
       state.me = { ...state.me, user: { ...state.me.user, emailVerified: true } };
       await act(async () => window.dispatchEvent(new Event("visibilitychange")));
       await settle(6);
-      expect(note()).toBe("E-mail confirmado: walter@acme.com.br.");
+      expect(document.querySelector(".onb__note")).toBeNull();
       expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
     } finally {
       sessionStorage.clear();
@@ -1324,6 +1322,16 @@ describe("Onboarding", () => {
     await settle(4);
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     expect(document.querySelector(".onb__note")).toBeNull();
+  });
+
+  test("workspace: the time zone's reason is behind its ⓘ, with no line under the field", async () => {
+    await start();
+    await click(button("trocar"), 2);
+    const about = button("Sobre Fuso horário");
+    const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+    expect(why?.textContent).toBe("Para rotinas e lembretes. Detectado pelo seu navegador.");
+    expect(why?.hidden).toBe(true);
+    expect(document.querySelector(".ac-field__help")).toBeNull();
   });
 
   const fixture = (name: string) => readFileSync(join(import.meta.dir, "fixtures", "agent-import", name), "utf8");

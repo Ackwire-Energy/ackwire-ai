@@ -132,8 +132,6 @@ export function VaultDropZone({
           <button type="button" className="ac-link vault-drop__link" onClick={() => dir.current?.click()}>
             {t("wiki.import.pickFolderShort")}
           </button>
-          {" · "}
-          {t("wiki.import.howToZip")}
         </p>
       )}
       {children}

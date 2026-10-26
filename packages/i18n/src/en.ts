@@ -256,7 +256,7 @@ export const en: Translations = {
     yourCompany: "your company",
     workspace: {
       title: "What's your workspace called?",
-      lead: "It's where the team and the agents talk. You can change everything later in Settings.",
+      lead: "It's where the team and the agents talk.",
       zone: "Time zone: {{zone}}",
       zoneChange: "change",
       logoHelp: "A PNG with a transparent background looks best. It shows in the sidebar for everyone.",
@@ -269,14 +269,14 @@ export const en: Translations = {
     },
     vault: {
       title: "Already documented in Obsidian?",
-      text: "The vault becomes the workspace's wiki, with folders, tags and [[links]]. Agents read the wiki when they answer.",
+      text: "It becomes the workspace's wiki.",
       ready: "Ready",
       optional: "optional",
-      when: "It goes into the wiki when you continue. Attachments go to the Drive in the background.",
+      when: "It goes into the wiki when you continue.",
     },
     context: {
       title: "What does the company do?",
-      lead: "Write it your way. The other agents and I read it before answering.",
+      lead: "The other agents and I read it before answering.",
       starters: {
         sell: { label: "What you sell", text: "What we sell: " },
         who: { label: "For whom", text: "Our customers: " },
@@ -647,8 +647,7 @@ export const en: Translations = {
     },
     skip: "Skip this step",
     confirmation: {
-      sent: "We sent a confirmation link to {{email}}. It works for an hour.",
-      confirmed: "Email confirmed: {{email}}.",
+      sent: "We sent a confirmation link to {{email}}.",
     },
   },
   // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).
@@ -5410,7 +5409,6 @@ export const en: Translations = {
       pickZip: "Choose .zip or .md",
       pickFolder: "Choose folder",
       pickFolderShort: "choose the folder",
-      howToZip: "To make the .zip: right-click the vault folder → Compress.",
       howTo:
         "To make the .zip: in Finder, right-click the vault folder → Compress. On Windows, Send to → Compressed folder. The .obsidian folder (plugins and themes) is left out.",
       nothingYet: "Nothing goes in before you review it.",

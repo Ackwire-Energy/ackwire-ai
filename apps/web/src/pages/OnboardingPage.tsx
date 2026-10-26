@@ -553,7 +553,8 @@ export function OnboardingPage() {
   // forgotten once confirmed or set up, so a later onboarding (another workspace) says nothing of it.
   const [sentTo] = useState(() => sessionStore.get(STORAGE_KEYS.confirmationSent));
   const verified = me.data?.user.emailVerified === true;
-  const confirmation = email !== "" && sentTo === email ? (verified ? "confirmed" : "sent") : null;
+  // Confirmed, the line goes: the tab the link opened in says so.
+  const confirmationSent = email !== "" && sentTo === email && !verified;
   useEffect(() => {
     if (verified) sessionStore.remove(STORAGE_KEYS.confirmationSent);
   }, [verified]);
@@ -1003,7 +1004,10 @@ export function OnboardingPage() {
                 <Field
                   label={t("onboarding.workspace.timezone")}
                   id="org-zone"
-                  help={t("onboarding.workspace.timezoneHelp")}
+                  hint={{
+                    name: t("common.about", { label: t("onboarding.workspace.timezone") }),
+                    text: t("onboarding.workspace.timezoneHelp"),
+                  }}
                 >
                   <ZonePicker
                     id="org-zone"
@@ -1303,12 +1307,12 @@ export function OnboardingPage() {
                 <p className="onb__help">{t("connectAi.laterNote")}</p>
               </>
             )}
-            {step.id === "workspace" && confirmation && (
+            {step.id === "workspace" && confirmationSent && (
               <p className="onb__help onb__note ac-iconline" role="status">
-                <Icon name={confirmation === "confirmed" ? "check" : "mail"} size={14} />
+                <Icon name="mail" size={14} />
                 <span>
-                  {t(`onboarding.confirmation.${confirmation}`, { email })}
-                  {confirmation === "sent" && !resend.data && (
+                  {t("onboarding.confirmation.sent", { email })}
+                  {!resend.data && (
                     <>
                       <br />
                       <button
