@@ -54,7 +54,7 @@ describe("Configurações → Skills", () => {
     const sheet = screen().getByRole("dialog", { name: "Revisão de PR" });
     // The sheet title and the body's own heading.
     expect(within(sheet).getAllByRole("heading", { name: "Revisão de PR" }).length).toBeGreaterThanOrEqual(2);
-    expect(sheet.querySelector("pre.md__code code")?.textContent).toBe("bun test");
+    expect(sheet.querySelector("pre.code-card__code code")?.textContent).toBe("bun test");
     const files = within(sheet).getByRole("navigation", { name: "Arquivos" });
     // Scripts run on the agent's PC; old imports kept them as ignored.
     const script = within(files).getByText("scripts/lint.sh").closest(".skill-file") as HTMLElement;

@@ -1472,20 +1472,467 @@ p {
   padding: 0;
   background: none;
 }
+/* Tables: a quiet box with a hairline, the header on a soft band, rows split by hairlines, numbers aligned
+   (right, tabular figures; the parser decides the side). A wide table scrolls inside its box. */
 .md__table {
   overflow: auto;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .md__table table {
   border-collapse: collapse;
+  min-width: 100%;
+  font-variant-numeric: tabular-nums;
 }
 .md__table th,
 .md__table td {
   /* Whole words in cells: a wide table scrolls inside its box instead of breaking "coluna" into "colu/na". */
   overflow-wrap: normal;
   min-width: 8ch;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  vertical-align: top;
+}
+.md__table th {
+  background: var(--plate);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.md__table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Fenced code: the language, copy and full screen on top; colors from
+   the shared highlighter. The full screen viewer grows out of the card (CodeBlock.tsx). */
+.code-card {
+  margin: 2px 0;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.code-card__top {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  padding: 0 5px 0 14px;
+}
+.code-card__lang {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+.code-card__code,
+.code-viewer__code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--ink2);
+  tab-size: 2;
+}
+.code-card__code {
+  padding: 0 16px 14px;
+  overflow-x: auto;
+  max-height: 420px;
+}
+.md .code-card code,
+.md .code-viewer code {
+  padding: 0;
+  font-size: inherit;
+  background: none;
+  border-radius: 0;
+  color: inherit;
+}
+/* Copy: the icon turns into a check and "Copiado" slides out beside it. */
+.code-card__copy.ac-btn {
+  gap: 0;
+  padding: 0 8px;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+.code-card__copied {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    max-width 0.28s var(--out),
+    opacity 0.2s,
+    margin 0.28s var(--out);
+}
+.code-card__copy[data-done="true"] {
+  color: var(--ok);
+}
+.code-card__copy[data-done="true"] .code-card__copied {
+  max-width: 80px;
+  margin-left: 6px;
+  opacity: 1;
+}
+.code-viewer {
+  height: min(720px, calc(100dvh - 48px));
+}
+.code-viewer .ac-dialog__head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.code-viewer .ac-btn[aria-pressed="true"] {
+  background: var(--plate);
+  color: var(--ink);
+}
+.code-viewer__body.ac-dialog__body {
+  flex: 1 1 auto;
+  padding: 12px 0 20px;
+}
+.code-viewer__code {
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre;
+  counter-reset: code-line;
+}
+.code-viewer__code[data-wrap="true"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-line--numbered {
+  display: block;
+  padding: 0 20px 0 56px;
+  text-indent: -40px;
+}
+.code-line--numbered::before {
+  counter-increment: code-line;
+  content: counter(code-line);
+  display: inline-block;
+  width: 28px;
+  margin-right: 12px;
+  text-align: right;
+  text-indent: 0;
+  color: var(--faint);
+  opacity: 0.6;
+  user-select: none;
+}
+.code-tok--keyword {
+  color: var(--code-keyword);
+}
+.code-tok--string {
+  color: var(--code-string);
+}
+.code-tok--number {
+  color: var(--code-number);
+}
+.code-tok--function {
+  color: var(--code-function);
+}
+.code-tok--comment {
+  color: var(--faint);
+  font-style: italic;
+}
+.code-tok--inserted {
+  color: var(--ok);
+}
+.code-tok--deleted {
+  color: var(--danger);
+}
+/* Charts in messages: the code card's box; clean shapes with a
+   fine dither inside (ChartBlock.tsx paints the cells). */
+.chart-card {
+  position: relative;
+  margin: 2px 0;
+  max-width: 560px;
+  border-radius: 16px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.chart-card--pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  color: var(--faint);
+  font-size: 13.5px;
+}
+.chart-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 6px 4px 16px;
+}
+.chart-card__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chart-card__titles b {
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 650;
+}
+.chart-card__titles small {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--faint);
+}
+.chart-card__top .ac-btn[aria-pressed="true"] {
+  background: var(--plate);
+  color: var(--ink);
+}
+.chart-card__body {
+  padding: 8px 16px 16px;
+}
+.chart-viewer__body.ac-dialog__body {
+  gap: 20px;
+  padding: 16px 24px 24px;
+}
+.chart-cells {
+  display: block;
+  image-rendering: pixelated;
+}
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: var(--ink);
+  color: var(--surface-raised);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.chart-tip[data-on="true"] {
+  opacity: 1;
+}
+.chart-tip[data-below="true"] {
+  transform: translate(-50%, 24px);
+}
+/* Bars: label · rounded bar on a light rail · value. */
+.chart-bars {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.chart-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 36%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  transition: opacity 0.15s;
+}
+.chart-bars[data-big="true"] .chart-bar {
+  gap: 14px;
+  font-size: 14px;
+}
+.chart-bar[data-dim="true"] {
+  opacity: 0.55;
+}
+.chart-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+}
+.chart-bar__rail {
+  position: relative;
+  border-radius: 5px;
+  background: var(--plate);
+}
+.chart-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  border-radius: 5px;
+  transition: width 0.6s var(--out);
+}
+.chart-bar__value {
+  min-width: 44px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Line: a smooth vector line over a dithered area. */
+.chart-line__plot {
+  position: relative;
+}
+.chart-line__plot svg {
+  position: relative;
+  display: block;
+}
+.chart-line__area {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s 0.2s;
+}
+.chart-line__area[data-shown="true"] {
+  opacity: 1;
+}
+.chart-line__grid {
+  stroke: var(--line);
+  stroke-dasharray: 2 4;
+}
+.chart-line__cursor {
+  stroke: var(--line-strong);
+  stroke-dasharray: 2 3;
+}
+.chart-line__stroke {
+  transition: stroke-dashoffset 0.7s var(--out);
+}
+.chart-line__point {
+  opacity: 0;
+  transition: opacity 0.2s 0.5s;
+}
+.chart-line__point[data-shown="true"] {
+  opacity: 1;
+}
+.chart-line__x {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 2px 0;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend i,
+.chart-pie__legend i {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 2px;
+}
+/* Pie: a round ring (the mask keeps the edges clean), the total inside, the legend beside. */
+.chart-pie {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.chart-pie__ring {
+  position: relative;
+  flex: none;
+}
+.chart-pie__ring canvas {
+  width: 100%;
+  height: 100%;
+  -webkit-mask: radial-gradient(circle closest-side, transparent 57%, #000 57.6%, #000 99%, transparent 100%);
+  mask: radial-gradient(circle closest-side, transparent 57%, #000 57.6%, #000 99%, transparent 100%);
+}
+.chart-pie__total {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.chart-pie__total small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.chart-pie__legend {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.chart-pie__legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-pie__legend span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+}
+.chart-pie__legend b {
+  font-variant-numeric: tabular-nums;
+}
+/* A big number with its line beside it. */
+.chart-number {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.chart-number__value {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.chart-number[data-big="true"] .chart-number__value {
+  font-size: 72px;
+}
+.chart-number__delta {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ok);
+}
+.chart-number__spark {
+  flex: 1;
+  min-width: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-bar__fill,
+  .chart-line__stroke,
+  .chart-line__area,
+  .chart-line__point {
+    transition: none;
+  }
+}
+:root {
+  --code-keyword: #7a3fd1;
+  --code-string: #1f7a45;
+  --code-number: #b05a00;
+  --code-function: #0b62c9;
+}
+[data-theme="dark"] {
+  --code-keyword: #c29bff;
+  --code-string: #7fd4a0;
+  --code-number: #f0b35a;
+  --code-function: #79b8ff;
 }
 
 /* ── Drive: pages/drive.css. The previews (the agent's Arquivos tab), the kind tag and the selection bar
@@ -3974,7 +4421,7 @@ p {
 }
 
 /* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
-   white with a hairline (one indicator slides between items); counts are plain numbers. */
+   white with a hairline, painted on the item itself (no sliding); counts are plain numbers. */
 .sidebar {
   position: relative;
   background: var(--side);
@@ -3991,27 +4438,9 @@ p {
   }
 }
 .sidebar > *,
-.sidebar__scroll > *:not(.sidebar__indicator) {
+.sidebar__scroll > * {
   position: relative;
   z-index: 1;
-}
-.sidebar__indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  border-radius: var(--control-r-md);
-  background: var(--side-active);
-  box-shadow: inset 0 0 0 1px var(--line);
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .sidebar__indicator {
-    transition:
-      transform 0.32s var(--spring),
-      width 0.2s var(--out),
-      height 0.2s var(--out);
-  }
 }
 /* Nav items are default controls of the ruler (40, r12). */
 .sidebar__item {
@@ -4026,12 +4455,25 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
-.sidebar__item[data-status="active"] {
-  background: transparent;
-  font-weight: 600;
-}
+/* The chosen item: its own white with a hairline, and a small dithered sky rising from the right
+   (an agent's row in its color). Rounded like any item. */
+.sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
-  background: transparent;
+  background-color: var(--side-active);
+  background-image: var(--sel-sky, none);
+  background-position: right center;
+  background-size: auto 100%;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 600;
+  transition: none;
+}
+[data-theme="dark"] .sidebar__item[data-status="active"] {
+  background-image: var(--sel-sky-dark, none);
+}
+/* The icon rail is too narrow for a horizon. */
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
+  background-image: none;
 }
 .sidebar__label {
   font-size: 11.5px;
