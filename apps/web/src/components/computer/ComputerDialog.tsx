@@ -19,12 +19,13 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AGENT_GRADIENTS, Button, ComputerPortrait, Dialog, SkyStrip } from "@agenteschat/ui";
+import { AGENT_GRADIENTS, Button, ComputerPortrait, cx, Dialog, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useKeyboardLock } from "@/hooks/useKeyboardLock";
 import { useNow } from "@/hooks/useNow";
 import { useToast } from "@/lib/toast";
 import { BrowserCard, Cover, stepText } from "../browser/BrowserCard";
@@ -49,6 +50,14 @@ import "./computer.css";
 const POLL_MS = 5_000;
 /** While the page shows: it has a stream of its own; the screen may come on meanwhile. */
 const PAGE_POLL_MS = 30_000;
+/** How long the full-screen bar stays once nothing asks for it. */
+const BAR_MS = 2_500;
+/**
+ * In control the pointer is the computer's: the bar comes back only once it rests this long at the display's top
+ * edge, where it also stops on its way to the computer's own top bar.
+ */
+const BAR_EDGE_PX = 8;
+const BAR_EDGE_MS = 500;
 
 /**
  * Full screen fills the screen with the dialog. The page itself goes full screen, not the dialog: noVNC's
@@ -73,6 +82,69 @@ function useFullScreen(full: boolean, setFull: (full: boolean) => void) {
   }, [full, setFull]);
 }
 
+/** What of the full-screen bar shows: all of it, the head alone, or nothing. */
+type BarShown = "all" | "head" | "none";
+
+/**
+ * Full screen on the agent's screen: what shows of the dialog's head, a bar over the screen, and what floats under
+ * it. All of it as full screen starts, on any pointer move or tap while watching, and on a tap in control (a phone
+ * has no pointer to bring to the edge); in control, the head alone once the pointer rests at the top edge, which
+ * leaves the computer's own top bar as clear as it can. It stays while the pointer is on it and hides 2.5 s after
+ * the last ask. A banner, or keyboard focus in it, keeps it (computer.css).
+ */
+function useBar(on: boolean, control: boolean): BarShown {
+  const [shown, setShown] = useState<BarShown>("all");
+  useEffect(() => {
+    setShown("all");
+    if (!on) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let edge: ReturnType<typeof setTimeout> | undefined;
+    let now: BarShown = "all";
+    const show = (next: BarShown) => {
+      now = next;
+      setShown(next);
+    };
+    const hideLater = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        show("none");
+      }, BAR_MS);
+    };
+    const moved = (e: PointerEvent) => {
+      if ((e.target as Element | null)?.closest?.(".ac-dialog__head")) {
+        clearTimeout(timer);
+        timer = undefined;
+        if (now === "none") show("head");
+      } else if (!control || e.pointerType === "touch") {
+        show("all");
+        hideLater();
+      } else if (e.clientY > BAR_EDGE_PX) {
+        clearTimeout(edge);
+        edge = undefined;
+        if (now !== "none" && timer === undefined) hideLater();
+      } else if (edge === undefined) {
+        edge = setTimeout(() => {
+          edge = undefined;
+          if (now === "none") show("head");
+          hideLater();
+        }, BAR_EDGE_MS);
+      }
+    };
+    hideLater();
+    const opts = { capture: true, passive: true };
+    document.addEventListener("pointermove", moved, opts);
+    document.addEventListener("pointerdown", moved, opts);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(edge);
+      document.removeEventListener("pointermove", moved, opts);
+      document.removeEventListener("pointerdown", moved, opts);
+    };
+  }, [on, control]);
+  return on ? shown : "all";
+}
+
 /**
  * "Pronto" for a moment when the computer it was waiting for gets ready, then it opens by itself. A hold also
  * ends the wait's stage, and the computer isn't ready then.
@@ -94,8 +166,9 @@ function useReadyFlash(surface: ComputerSurface | null) {
 
 /**
  * The dialog. Closing it in control of a take over hands it back at once; the agent's own request keeps its
- * 2 minutes of grace, and says so. Esc: in control it goes to the computer, in full screen it only leaves full
- * screen, otherwise it closes.
+ * 2 minutes of grace, and says so. Full screen on the agent's screen shows that screen alone, the head a bar over
+ * it. Esc: in control it goes to the computer; in full screen it leaves full screen, except in control on Chromium,
+ * where holding it does; otherwise it closes.
  */
 export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -113,6 +186,9 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const g = agentGrammar(t, agent.name);
   const handoff = view.facts?.handoff ?? null;
   const mine = controlledBy(handoff, me.user.id);
+  const screenOnly = full && surface === "screen";
+  const bar = useBar(screenOnly, mine);
+  const locked = useKeyboardLock(screenOnly && mine);
   const color = colorOf(agent);
   const close = () => {
     setFull(false);
@@ -136,9 +212,17 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
       actions={<span ref={setActs} className="cmp-acts" />}
       closeLabel={t("common.close")}
       width={1280}
-      className={full ? "cmp-dialog is-full" : "cmp-dialog"}
+      className={cx(
+        "cmp-dialog",
+        full && "is-full",
+        screenOnly && "is-screen-only",
+        bar === "none" && "is-bar-hidden",
+        bar !== "all" && "is-line-hidden",
+      )}
       onEscapeKeyDown={(e) => {
-        if (full) {
+        // Keyboard Lock in control: Esc is the computer's; holding it leaves full screen, as the browser says.
+        if (locked.current && document.fullscreenElement) e.preventDefault();
+        else if (full) {
           e.preventDefault();
           setFull(false);
         } else if (mine) e.preventDefault();

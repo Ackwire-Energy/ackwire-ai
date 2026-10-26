@@ -12,6 +12,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { lastLine } from "@agenteschat/setup/src/lib";
+import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION, shQuote } from "../../runner/install-script";
 import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
 import { removeDirs, tempDir } from "./helpers";
@@ -67,6 +69,8 @@ mkdir -p "$dir/bun-linux-aarch64" && cp "$FAKE_BUN" "$dir/bun-linux-aarch64/bun"
   return {
     home,
     fake,
+    sys,
+    env: { PATH: `${fake}:${sys}`, HOME: home, LOG: log, FAKE_BUN: fetched },
     pinned: path.join(home, ".agentes-runner/runtime/bun"),
     install(script: string, args: string[] = []) {
       const r = spawnSync("/bin/sh", ["-s", "--", ...args], {
@@ -78,6 +82,7 @@ mkdir -p "$dir/bun-linux-aarch64" && cp "$FAKE_BUN" "$dir/bun-linux-aarch64/bun"
       return {
         status: r.status,
         out: `${r.stdout}${r.stderr}`,
+        err: r.stderr,
         runtime: existsSync(launcher) ? /^exec '([^']+)'/m.exec(readFileSync(launcher, "utf8"))?.[1] : undefined,
         log: existsSync(log) ? readFileSync(log, "utf8") : "",
       };
@@ -105,6 +110,8 @@ test("the install script quotes the server URL and is valid sh", () => {
   expect(script).toContain("grep -q '\"token\"'");
   expect(script).toContain("managedBy");
   expect(installScript("https://x.test/it's")).toContain("SERVER='https://x.test/it'\\''s'\n");
+  // The look of every agentes.chat command line, in sh (packages/setup/src/term-sh.ts).
+  expect(script).toContain(`\n${TERM_SH}`);
   if (process.platform !== "win32") {
     const check = spawnSync("sh", ["-n"], { input: script, encoding: "utf8" });
     expect(check.stderr).toBe("");
@@ -161,11 +168,167 @@ test.skipIf(process.platform === "win32")(
     r = fakeComputer({ node: fakeNode("20.18.0") }).install(script);
     expect(r.status).toBe(1);
     expect(r.out).toContain("The runner needs Bun 1.3.5 or newer, or Node.js 22 or newer.");
+    expect(r.out).toContain("     Bun:    curl -fsSL https://bun.sh/install | bash\n");
     expect(r.runtime).toBeUndefined();
   },
   // Six whole installs, each a shell running real tools: seconds on a busy computer.
   30_000,
 );
+
+test.skipIf(process.platform === "win32")(
+  "without a terminal: the marks and whole lines, no line down the left, no color; a refusal in its words",
+  () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    const r = pc.install(installScript("https://x.test"));
+    expect(r.status).toBe(0);
+    expect(r.out).toStartWith("agentes.chat connect this computer\n◇  Bun 1.4.4 (");
+    expect(r.out).toContain("◒  Downloading the runner from https://x.test\n◇  The runner, from https://x.test\n");
+    expect(r.out).toContain(
+      `●  To use the agentes-runner command, add it to your PATH:\n     export PATH="${pc.home}/.agentes-runner/bin:$PATH"\n`,
+    );
+    expect(r.out).toEndWith("\nDone\n");
+    expect(r.out).not.toContain("\x1b");
+    expect(r.out).not.toContain("│");
+
+    const refused = pc.install(installScript("https://x.test"), ["--bogus"]);
+    expect(refused.status).toBe(1);
+    expect(refused.out).toBe("■  unknown option: --bogus\n");
+  },
+);
+
+/** A curl that can't download anything: the server answers 404. */
+const CURL_404 = '#!/bin/sh\necho "curl: (22) The requested URL returned error: 404" >&2\nexit 22\n';
+
+test.skipIf(process.platform === "win32")(
+  "a failure without a terminal ends on why: the last line of stderr, and what the setup shows of it",
+  () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    const pinned = pc.install(installScript("https://x.test"), ["--runner-sha256", "0".repeat(64)]);
+    expect(pinned.status).toBe(1);
+    expect(pinned.err.trimEnd().split("\n").pop()).toBe(
+      "■  the runner download didn't match --runner-sha256; it was not installed",
+    );
+
+    writeFileSync(path.join(pc.fake, "curl"), CURL_404, { mode: 0o755 });
+    const missing = pc.install(installScript("https://x.test"));
+    expect(missing.status).toBe(1);
+    expect(missing.out).toContain("curl: (22) The requested URL returned error: 404\n");
+    // The setup's "Setting up the agents' computer failed: …" (packages/setup/src/cli.ts).
+    expect(lastLine(missing.out)).toBe("download failed");
+  },
+);
+
+test.skipIf(process.platform === "win32")(
+  "on a terminal, a failed download's output is kept for its last lines, then removed with the installer",
+  async () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    writeFileSync(path.join(pc.fake, "curl"), CURL_404, { mode: 0o755 });
+    for (const tool of ["date", "sleep", "stty", "fold", "tail", "tr"]) {
+      const real = Bun.which(tool);
+      if (real) symlinkSync(real, path.join(pc.sys, tool));
+    }
+    const tmp = tempDir("tmp-");
+    dirs.push(tmp);
+    const script = path.join(tmp, "..", `${path.basename(tmp)}-install.sh`);
+    writeFileSync(script, installScript("https://x.test"));
+    dirs.push(script);
+    let out = "";
+    const decoder = new TextDecoder();
+    let eof = () => {};
+    const drained = new Promise<void>((resolve) => {
+      eof = resolve;
+    });
+    const proc = Bun.spawn(["/bin/sh", script], {
+      env: { ...pc.env, TMPDIR: tmp, TERM: "xterm-256color" },
+      terminal: {
+        cols: 80,
+        rows: 40,
+        data: (_t, bytes) => {
+          out += decoder.decode(bytes);
+        },
+        exit: () => eof(),
+      },
+    });
+    const [code] = await Promise.all([proc.exited, drained]);
+    expect(code).toBe(1);
+    expect(out).toContain("curl: (22) The requested URL returned error: 404");
+    expect(out).toContain("download failed");
+    expect(readdirSync(tmp)).toEqual([]);
+  },
+  20_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "Ctrl-C at the code stops the installer too, on 130, not as a failure",
+  () => {
+    const dir = tempDir("install-");
+    dirs.push(dir);
+    const site = path.join(dir, "site");
+    mkdirSync(path.join(site, "runner"), { recursive: true });
+    // Stands in for the runner: `pair` ends as Ctrl-C ends it.
+    writeFileSync(path.join(site, "runner", "agentes-runner.mjs"), "process.exit(130);\n");
+    const r = spawnSync("sh", ["-s", "--", "--no-service"], {
+      input: installScript(`file://${site}`),
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        AGENTES_RUNNER_HOME: path.join(dir, "home"),
+      },
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(130);
+    expect(r.stderr).not.toContain("connecting this computer failed");
+  },
+);
+
+test.skipIf(process.platform === "win32")(
+  "Ctrl-C at the code interrupts the installer's whole group: it waits for pair's last lines, then ends on 130",
+  async () => {
+    const dir = tempDir("install-");
+    dirs.push(dir);
+    const site = path.join(dir, "site");
+    mkdirSync(path.join(site, "runner"), { recursive: true });
+    // Stands in for pair at its code: Ctrl-C there interrupts every process of the terminal's group, the
+    // installer's shell too, and pair says Canceled a moment later.
+    writeFileSync(
+      path.join(site, "runner", "agentes-runner.mjs"),
+      'process.on("SIGINT", () => {});\nprocess.kill(0, "SIGINT");\nsetTimeout(() => { console.log("■  Canceled"); process.exit(130); }, 300);\n',
+    );
+    // dash, Debian's and Ubuntu's sh, stops at once on an interrupt it doesn't catch.
+    const proc = Bun.spawn([Bun.which("dash") ?? "sh", "-s", "--", "--no-service"], {
+      stdin: new Blob([installScript(`file://${site}`)]),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        AGENTES_RUNNER_HOME: path.join(dir, "home"),
+      },
+      // A process group of its own, which the interrupt stays in.
+      detached: true,
+    });
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    await proc.exited;
+    expect(proc.signalCode).toBeNull();
+    expect(proc.exitCode).toBe(130);
+    expect(stdout).toEndWith("■  Canceled\n");
+    expect(stderr).not.toContain("connecting this computer failed");
+  },
+  20_000,
+);
+
+test.skipIf(process.platform === "win32")("a download cut short runs nothing: everything is inside main", () => {
+  const script = installScript("https://x.test");
+  const empty = tempDir("cut-");
+  dirs.push(empty);
+  const lastLine = script.trimEnd().lastIndexOf("\n");
+  for (const cut of [script.slice(0, lastLine), script.slice(0, Math.floor(script.length / 2))]) {
+    // No command on the PATH: running one would say it isn't found.
+    const r = spawnSync("/bin/sh", ["-s"], { input: cut, encoding: "utf8", env: { PATH: empty } });
+    expect(r.stdout).toBe("");
+    expect(r.stderr).not.toContain("not found");
+  }
+});
 
 test("every Bun build the installer picks has its SHA-256", () => {
   const picked = new Set([...installScript("https://x.test").matchAll(/BUN_TARGET=([\w-]+)/g)].map((m) => m[1]));
@@ -265,6 +428,9 @@ test.skipIf(process.platform === "win32")(
       const r = pc.install(`umask ${umask}\n${pc.script}`, ["--system", "--desktop", "--no-pair", "--no-start"]);
       expect(r.status).toBe(0);
       expect(r.log).toContain("service install --system --no-start");
+      expect(r.out).toEndWith(
+        `●  The agentes-runner command is ${pc.at("bin/agentes-runner")}. To check this computer's connection:\n     agentes-runner status\n\nDone\n`,
+      );
       return Object.fromEntries(
         readdirSync(pc.at(""), { recursive: true })
           .map(String)

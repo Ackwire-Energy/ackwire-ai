@@ -67,18 +67,19 @@ tailnet can open it: no domain, no open port, nothing on the public internet.
    more. Done when it prints:
 
    ```
-   ✓ On your tailnet as agentes.tail1234.ts.net
-   ✓ .env: PUBLIC_URL=https://agentes.tail1234.ts.net
-   ✓ HTTPS certificate ready
-   ✓ agentes.chat <version> is up
-   ✓ Agents' computer: this machine
-
-     https://agentes.tail1234.ts.net
-
-       App:  agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net
+   ◇  On your tailnet as agentes.tail1234.ts.net
+   ◇  .env: PUBLIC_URL=https://agentes.tail1234.ts.net
+   ◇  HTTPS certificate ready
+   ◇  agentes.chat <version> is up
+   ◇  Agents' computer: this machine
+   │
+   ●  agentes.chat is up
+   │    https://agentes.tail1234.ts.net
+   │
+   │    App:  agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net
    ```
 
-   then that link's QR code for your phone, and what to do next.
+   then that link's QR code for your phone, what to do next, and `└  Done`.
 5. **Your account.** On a computer in your tailnet, open that address and sign up. The first account
    is always allowed and becomes the owner; after it, sign-up is closed and people join by
    invitation. Onboarding then creates your organization and asks for its model key.

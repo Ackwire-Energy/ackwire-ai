@@ -114,35 +114,9 @@ export function desktopMode(status: Pick<DesktopStatus, "handoff">, userId: stri
 const RETRY_MS = [1000, 2000, 5000, 10_000];
 export const desktopRetryMs = (attempt: number) => RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)] ?? 10_000;
 
-/** The keyboard layouts the person in control may give the desktop; mirrors `DESKTOP_KEYBOARDS` in machine-protocol.ts. */
-export const DESKTOP_KEYBOARDS = ["br", "us", "us-intl", "gb", "pt", "es", "fr", "de", "it"] as const;
-export type DesktopKeyboard = (typeof DESKTOP_KEYBOARDS)[number];
-export const isDesktopKeyboard = (v: unknown): v is DesktopKeyboard =>
-  (DESKTOP_KEYBOARDS as readonly unknown[]).includes(v);
-
-const BY_LANGUAGE: Record<string, DesktopKeyboard> = { pt: "pt", es: "es", fr: "fr", de: "de", it: "it" };
-
-/**
- * The layout the person most likely types with: from the browser's language and, when the browser tells
- * (Chromium), the character on the key right of L: "ç" is a Brazilian ABNT2 keyboard.
- */
-export function keyboardFor(language: string, semicolonKey?: string | null): DesktopKeyboard {
-  if (semicolonKey === "ç") return "br";
-  const lang = language.toLowerCase();
-  // ponytail: a guess the panel lets the person change; a US keyboard in Brazil is mostly set to US-International.
-  if (lang === "pt-br") return semicolonKey ? "us-intl" : "br";
-  if (lang === "en-gb") return "gb";
-  return BY_LANGUAGE[lang.split("-")[0] ?? ""] ?? "us";
-}
-
-/** A person's socket to the agent's desktop (raw RFB); `keyboard` only counts in control. */
-export function desktopSocketUrl(
-  base: SocketBase,
-  v: { orgId: string; agentId: string; mode: "watch" | "control"; keyboard?: DesktopKeyboard },
-) {
-  const params: Record<string, string> = { orgId: v.orgId, agentId: v.agentId, mode: v.mode };
-  if (v.mode === "control" && v.keyboard) params.keyboard = v.keyboard;
-  return socketUrl(base, "/api/desktop", params);
+/** A person's socket to the agent's desktop (raw RFB). */
+export function desktopSocketUrl(base: SocketBase, v: { orgId: string; agentId: string; mode: "watch" | "control" }) {
+  return socketUrl(base, "/api/desktop", { orgId: v.orgId, agentId: v.agentId, mode: v.mode });
 }
 
 /** The agent's screen as this person sees it; `poll`: ask again this often (nothing else says when it is handed back). */
