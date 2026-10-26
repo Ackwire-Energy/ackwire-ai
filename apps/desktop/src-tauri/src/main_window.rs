@@ -53,11 +53,11 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
 };
 
 /// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
-/// computer of its own), a server on this computer itself, the server here included at its Tailscale address
-/// (`server_here`: its own computer is set up with it), or on Windows (no program for agents ships there yet).
+/// computer of its own) or a server on this computer itself, the server here included at its Tailscale address
+/// (`server_here`: its own computer is set up with it).
 /// Another server on this computer at its address for people is `discover::served_here`, which asks it.
 pub fn agents_here(origin: &str, server_here: bool) -> bool {
-    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here && PLATFORM != "windows"
+    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here
 }
 
 /// What a navigation in the window does.
@@ -764,7 +764,7 @@ mod tests {
         assert!(!agents_here("https://agentes.chat", false));
         assert!(!agents_here("http://127.0.0.1:4310", false));
         assert!(!agents_here("http://localhost:3000", false));
-        assert_eq!(agents_here("https://agentes.tail1234.ts.net", false), PLATFORM != "windows");
+        assert!(agents_here("https://agentes.tail1234.ts.net", false));
         assert!(!agents_here("https://ana-mac.tail1234.ts.net", true), "the server here, at its Tailscale address");
     }
 

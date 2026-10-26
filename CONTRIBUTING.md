@@ -28,7 +28,7 @@ per organization in the app (**Settings → API keys**), not in `.env`.
 Give development a database of its own, never a production one. To run the production image
 instead, build it and start it with the compose file ([SELF_HOSTING.md](SELF_HOSTING.md), "From
 source"). The phone app builds on EAS ([apps/mobile/README.md](apps/mobile/README.md)) and the
-macOS app in the Desktop workflow (`.github/workflows/desktop.yml`).
+desktop app (macOS, Windows and Linux) in the Desktop workflow (`.github/workflows/desktop.yml`).
 
 ## Checks
 

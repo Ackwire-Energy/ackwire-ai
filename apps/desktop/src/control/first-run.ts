@@ -10,10 +10,9 @@ import {
   type ServerProblem,
   serverHost,
 } from "@agenteschat/client/lib/server";
-import type { Platform } from "./platform";
 import { appServer, serverName } from "./server";
 
-export type FirstScreen = "choose" | "own" | "connect" | "here" | "windows" | "link";
+export type FirstScreen = "choose" | "own" | "connect" | "here" | "link";
 
 /**
  * Esc in the first run: back a screen, or the window closes (when a server is open already); never while
@@ -24,21 +23,16 @@ export const escapeAction = (screensBack: number, busy: boolean): "stay" | "back
 
 /**
  * Where "Use your own server ›" goes: the two ways where both exist (`canRunHere`: this build carries the
- * server, on a Mac or Linux; Windows explains its own two ways for now), else straight to Connect.
+ * server), else straight to Connect.
  */
-export const ownServerScreen = (platform: Platform, canRunHere: boolean): FirstScreen =>
-  platform === "windows" || canRunHere ? "own" : "connect";
+export const ownServerScreen = (canRunHere: boolean): FirstScreen => (canRunHere ? "own" : "connect");
 
-/** Where the run-here card on "Your own server" goes. */
-export const runHereScreen = (platform: Platform): FirstScreen => (platform === "windows" ? "windows" : "here");
-
-/** The one-command setup, for a server without a screen; on Windows, inside WSL 2 with no network question. */
+/** The one-command setup, for a server without a screen. */
 export const INSTALL_COMMAND = "curl -fsSL https://agentes.chat/install | sh";
-export const WSL_INSTALL_COMMAND = `${INSTALL_COMMAND} -s -- --network local`;
 
 /**
  * Whether the one-command setup works from a clean machine: it needs the repository, the setup package and the
- * image to be public. Until then Connect's "Run this on it" and Windows' WSL way stay hidden, since the command
+ * image to be public. Until then Connect's "Run this on it" stays hidden, since the command
  * would fail for anyone outside.
  */
 export const INSTALL_COMMAND_LIVE = false;

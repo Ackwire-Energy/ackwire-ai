@@ -261,10 +261,10 @@ describe("Your own server", () => {
     );
   });
 
-  test("on Windows, where it can't run here yet, there is nothing to choose between", () =>
+  test("on Windows it runs here too: the same card and its help", () =>
     firstRun("windows", async ({ el, press, button }) => {
       await press("Use your own server");
-      expect(el.textContent).toContain("On Mac and Linux for now.");
-      expect(button("Which one to choose?")).toBeUndefined();
+      expect(el.textContent).toContain("This PC becomes the server, while it's on.");
+      expect(button("Which one to choose?")).toBeDefined();
     }));
 });

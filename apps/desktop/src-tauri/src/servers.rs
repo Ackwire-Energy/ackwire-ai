@@ -221,9 +221,10 @@ pub fn servers_get(app: AppHandle) -> ServerFile {
 }
 
 /// The welcome window, the popover or Preferences chose a server (the person confirmed it there): the main
-/// window opens on it, on `page` when given.
+/// window opens on it, on `page` when given. Async: a sync command runs on the main thread, and making a
+/// window from there never finishes on Windows (WebView2 needs that thread: a black window, the call hangs).
 #[tauri::command]
-pub fn server_choose(app: AppHandle, server: String, page: Option<String>) -> Result<(), String> {
+pub async fn server_choose(app: AppHandle, server: String, page: Option<String>) -> Result<(), String> {
     let origin = origin_of(&server).filter(|o| *o == server).ok_or("not a server address")?;
     if page.as_deref().is_some_and(|p| !page_path(p)) {
         return Err("not a page to open".into());

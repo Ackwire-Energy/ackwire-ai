@@ -347,9 +347,17 @@ fn copy_dir(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// The version `app/current` points at.
+/// The version `app/current` points at (on Windows, where a link needs more rights, the file names it).
 pub fn current_version(folder: &Folder) -> Option<String> {
-    fs::read_link(folder.current()).ok()?.file_name()?.to_str().map(str::to_string)
+    #[cfg(unix)]
+    {
+        fs::read_link(folder.current()).ok()?.file_name()?.to_str().map(str::to_string)
+    }
+    #[cfg(not(unix))]
+    {
+        let version = fs::read_to_string(folder.current()).ok()?.trim().to_string();
+        (!version.is_empty() && !version.contains(['/', '\\']) && version != "..").then_some(version)
+    }
 }
 
 fn set_current(folder: &Folder, version: &str) -> io::Result<()> {
@@ -536,7 +544,7 @@ pub struct Launch {
 impl Launch {
     fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new(&self.bun);
-        command
+        crate::no_console(&mut command)
             .arg(self.folder.entry(&self.version))
             .args(args)
             .arg("--data")
@@ -548,7 +556,7 @@ impl Launch {
             // over the folder's own settings.
             .env_clear()
             .env("BUN_BE_BUN", "1");
-        for key in ["HOME", "PATH", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "TZ"] {
+        for key in ["HOME", "PATH", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "TZ"].iter().chain(WINDOWS_ENV) {
             if let Ok(value) = std::env::var(key) {
                 command.env(key, value);
             }
@@ -563,11 +571,58 @@ impl Launch {
     }
 
     pub fn spawn(&self) -> io::Result<Child> {
-        self.command(&[]).spawn()
+        #[cfg(unix)]
+        {
+            self.command(&[]).spawn()
+        }
+        #[cfg(not(unix))]
+        {
+            let mut child = self.command(&["--until-stdin-ends"]).stdin(Stdio::piped()).spawn()?;
+            if let Some(pipe) = child.stdin.take() {
+                stop_pipes().push((child.id(), pipe));
+            }
+            Ok(child)
+        }
     }
 }
 
-/// Asks a process to stop (SIGTERM), then kills it after `grace`.
+/// What Windows itself needs in a program's environment (Bun finds the system, the person's folders and a
+/// temporary folder through these); a Mac and Linux have none of them.
+const WINDOWS_ENV: &[&str] = &[
+    "SystemRoot",
+    "SystemDrive",
+    "windir",
+    "ComSpec",
+    "PATHEXT",
+    "USERPROFILE",
+    "USERNAME",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "ProgramData",
+    "TEMP",
+    "TMP",
+];
+
+/// Windows has no SIGTERM: the app holds each server's stdin open, and closing it asks the server to drain and
+/// stop (`--until-stdin-ends`, apps/server native.ts). When the app ends any other way the pipe closes too, so
+/// no server is left running without it.
+#[cfg(not(unix))]
+fn stop_pipes() -> std::sync::MutexGuard<'static, Vec<(u32, std::process::ChildStdin)>> {
+    static PIPES: Mutex<Vec<(u32, std::process::ChildStdin)>> = Mutex::new(Vec::new());
+    PIPES.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The child `pid` ended: its pipe goes (Windows; a later process may get the same pid).
+fn forget_pipe(pid: u32) {
+    #[cfg(not(unix))]
+    stop_pipes().retain(|(p, _)| *p != pid);
+    #[cfg(unix)]
+    let _ = pid;
+}
+
+/// Asks a process to stop (SIGTERM; on Windows its stdin closes), then kills it after `grace`.
 fn stop_pid(pid: u32, grace: Duration, gone: impl Fn() -> bool) {
     #[cfg(unix)]
     {
@@ -588,7 +643,26 @@ fn stop_pid(pid: u32, grace: Duration, gone: impl Fn() -> bool) {
         }
     }
     #[cfg(not(unix))]
-    let _ = (pid, grace, gone);
+    {
+        // Dropping the pipe closes it.
+        forget_pipe(pid);
+        let deadline = Instant::now() + grace;
+        while Instant::now() < deadline && !gone() {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if !gone() {
+            let _ = crate::no_console(&mut Command::new("taskkill"))
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            let killed = Instant::now();
+            while killed.elapsed() < Duration::from_secs(2) && !gone() {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -780,7 +854,7 @@ fn bundle(app: &AppHandle) -> Option<PathBuf> {
 
 /// The runner binary the app ships, which runs the server as Bun (next to the app's own program).
 pub fn runner_binary() -> Option<PathBuf> {
-    let path = std::env::current_exe().ok()?.parent()?.join("agentes-runner");
+    let path = std::env::current_exe().ok()?.parent()?.join(format!("agentes-runner{}", std::env::consts::EXE_SUFFIX));
     path.is_file().then_some(path)
 }
 
@@ -918,15 +992,23 @@ pub struct Status {
 fn system_name() -> Option<String> {
     #[cfg(target_os = "macos")]
     let out = Command::new("id").arg("-F").output().ok()?;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     let out = {
         let user = std::env::var("USER").ok()?;
         Command::new("getent").args(["passwd", &user]).output().ok()?
     };
-    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    #[cfg(not(target_os = "macos"))]
-    let text = text.split(':').nth(4).unwrap_or("").split(',').next().unwrap_or("").trim().to_string();
-    (!text.is_empty() && text.chars().count() <= 100).then_some(text)
+    #[cfg(unix)]
+    {
+        let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        #[cfg(not(target_os = "macos"))]
+        let text = text.split(':').nth(4).unwrap_or("").split(',').next().unwrap_or("").trim().to_string();
+        (!text.is_empty() && text.chars().count() <= 100).then_some(text)
+    }
+    // Windows hands out no full name without a slow query: the person types it.
+    #[cfg(not(unix))]
+    {
+        None
+    }
 }
 
 pub fn status(app: &AppHandle, welcome: bool) -> Status {
@@ -1121,6 +1203,7 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: 
         std::thread::sleep(Duration::from_millis(if state(app).answered { 1000 } else { 300 }));
     };
     let _ = child.wait();
+    forget_pipe(pid);
     if !current(app) {
         return;
     }
@@ -1576,7 +1659,11 @@ fn backup(app: &AppHandle) -> Result<String, String> {
     let folder = folder(app).ok_or("no folder")?;
     let was_running = state(app).pid.is_some();
     make_private_dir(&folder.backups()).map_err(|e| e.to_string())?;
+    // Windows has no `date` program: the stamp then.
+    #[cfg(unix)]
     let date = Command::new("date").arg("+%Y-%m-%d-%H%M%S").output().ok();
+    #[cfg(not(unix))]
+    let date: Option<std::process::Output> = None;
     let date = date.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).filter(|d| !d.is_empty());
     let name = format!("agentes-{}.tar.gz", date.unwrap_or_else(stamp));
     let out = folder.backups().join(&name);
@@ -1584,7 +1671,8 @@ fn backup(app: &AppHandle) -> Result<String, String> {
         stop(app, false);
     }
     let parts: Vec<&str> = ["db", "files", ".env"].into_iter().filter(|p| folder.0.join(p).exists()).collect();
-    let tar = Command::new("tar").arg("-czf").arg(&out).arg("-C").arg(&folder.0).args(&parts).status();
+    // Windows 10 and later carry `tar` too.
+    let tar = crate::no_console(&mut Command::new("tar")).arg("-czf").arg(&out).arg("-C").arg(&folder.0).args(&parts).status();
     if was_running {
         fresh_start(app);
         let _ = spawn(app, Phase::Starting);
