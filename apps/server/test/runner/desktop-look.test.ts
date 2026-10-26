@@ -101,10 +101,8 @@ test("the dock without docklike: the mark's apps menu, Browser, Files and Termin
   // The panel's own launchers carry the names an agent reads on the dock's buttons (ADR 0062).
   const launcher = (dir: string) => textOf(home, look(), `.config/xfce4/panel/${dir}`);
   expect(launcher("launcher-6/browser.desktop")).toContain("Name=Browser\n");
-  expect(launcher("launcher-3/files.desktop")).toContain("Name=Files\nName[pt_BR]=Arquivos\nExec=thunar\n");
-  expect(launcher("launcher-4/terminal.desktop")).toContain(
-    "Name=Terminal\nName[pt_BR]=Terminal\nExec=xfce4-terminal\n",
-  );
+  expect(launcher("launcher-3/files.desktop")).toContain("Name=Files\nExec=thunar\n");
+  expect(launcher("launcher-4/terminal.desktop")).toContain("Name=Terminal\nExec=xfce4-terminal\n");
   for (const app of ["browser", "files", "terminal"]) {
     expect(launcher(`launcher-${{ browser: 6, files: 3, terminal: 4 }[app]}/${app}.desktop`)).toBe(
       textOf(home, look(), `.local/share/applications/agentes-${app}.desktop`),
@@ -200,12 +198,26 @@ test("Browser: the runner's own command with the desktop's socket, nothing else;
       "[Desktop Entry]",
       "Type=Application",
       "Name=Browser",
-      "Name[pt_BR]=Navegador",
       `Exec=${RUNNER.join(" ")} desktop-browser ${SOCKET}`,
       "Icon=org.xfce.webbrowser",
       "StartupWMClass=agentes-browser",
       "StartupNotify=false",
       "Categories=X-Xfce-Toplevel;",
+      "",
+    ].join("\n"),
+  );
+  // The window that says why it didn't open has a class of its own: its entry, out of the menu, gives the dock its
+  // icon, and opened it is Browser's command.
+  expect(textOf("/home/ag-01a142cb", look(), ".local/share/applications/agentes-note.desktop")).toBe(
+    [
+      "[Desktop Entry]",
+      "Type=Application",
+      "Name=Browser",
+      `Exec=${RUNNER.join(" ")} desktop-browser ${SOCKET}`,
+      "Icon=dialog-warning",
+      "StartupWMClass=agentes-note",
+      "StartupNotify=false",
+      "NoDisplay=true",
       "",
     ].join("\n"),
   );
@@ -313,7 +325,6 @@ test("the terminal: the agent's name in the prompt and the title, from the look'
   expect(textOf(home, look(), `${LOOK_DIR}/bashrc`)).toBe(
     [
       "# The desktop's Terminal: the shell's own setup, then the agent's name in the prompt and the window's title.",
-      "[ -r /etc/bash.bashrc ] && . /etc/bash.bashrc",
       "[ -r ~/.bashrc ] && . ~/.bashrc",
       "AGENTES_NAME='Ada'",
       "shopt -s promptvars",
@@ -393,7 +404,7 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
     version: 3,
-    files: "820847f74a81c053",
+    files: "902329cc10bc3e55",
   });
 });
 

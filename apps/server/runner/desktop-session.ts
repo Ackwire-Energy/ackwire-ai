@@ -797,13 +797,23 @@ export class DesktopSessions {
     }
   }
 
-  /** Browser on the desktop reaches the runner on its socket (`desktop-browser.ts`), for as long as the desktop runs. */
+  /**
+   * Browser on the desktop reaches the runner on its socket (`desktop-browser.ts`), for as long as the desktop runs.
+   * Why a click failed goes in the log: the desktop's note says it in a person's words.
+   */
   private async listenBrowser(d: Desktop) {
     const open = this.opts.openBrowser;
     if (!open) return;
     const socket = browserSocket(d.passwd);
     try {
-      const server = await serveBrowser(socket, (installing) => open(d.agent, installing));
+      const server = await serveBrowser(socket, (installing) =>
+        open(d.agent, installing).catch((err: unknown) => {
+          this.opts.log(
+            `Browser on the desktop of ${d.agent.handle} didn't open: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw err;
+        }),
+      );
       if (d.ending) closeBrowser(server, socket);
       else d.browser = server;
     } catch (err) {

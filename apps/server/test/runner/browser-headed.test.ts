@@ -461,7 +461,7 @@ test.if(posix)(
 );
 
 test.if(posix)(
-  "Browser on its desktop: a desktop that failed a moment ago is tried again; none there says so",
+  "Browser on its desktop: a desktop that failed a moment ago is tried again; one that can't take Chrome says why",
   async () => {
     const t = setup();
     const folder = await agentWorkspace(t.ws, dev);
@@ -473,20 +473,37 @@ test.if(posix)(
     await t.manager.show(dev, folder, () => {});
     expect(t.log).toEqual(["desktop dev", "chrome", "desktop dev", "chrome"]);
     expect(headed(last(t))).toBe(true);
-    // No desktop for it at all: the click says so; the agent's Chrome goes on headless.
-    const other = setup();
-    other.desk.fails = "This computer has no room for another desktop";
-    const failed = await other.manager
-      .show(dev, await agentWorkspace(other.ws, dev), () => {})
-      .then(
+
+    const failure = (p: Promise<void>) =>
+      p.then(
         () => null,
-        (err: unknown) => err as RunnerError,
+        (err: unknown) => [(err as RunnerError).code, (err as RunnerError).message],
       );
-    expect([failed?.code, failed?.message]).toEqual([
-      "desktop_unavailable",
-      "The browser couldn't open on this screen; try again in a minute",
+    // No room for Chrome on its desktop: the click fails with the desktop's own reason, and starts no Chrome
+    // headless instead, nor stops the one the agent runs.
+    const other = setup();
+    const otherFolder = await agentWorkspace(other.ws, dev);
+    other.desk.fails = "This computer is short of memory for the agent's browser on its desktop";
+    expect(await failure(other.manager.show(dev, otherFolder, () => {}))).toEqual([
+      "desktop_busy",
+      "This computer is short of memory for the agent's browser on its desktop",
     ]);
-    expect(headed(last(other))).toBe(false);
+    expect(other.chromes).toHaveLength(0);
+    await other.act("open", ["https://shop.example/"], false);
+    expect(await failure(other.manager.show(dev, otherFolder, () => {}))).toEqual([
+      "desktop_busy",
+      "This computer is short of memory for the agent's browser on its desktop",
+    ]);
+    expect(other.chromes).toHaveLength(1);
+    expect(other.chromes[0]?.killed).toBe(false);
+    // Chrome itself fails to start there: that is the answer, not a headless one.
+    const third = setup();
+    third.fails.headed = 1;
+    expect(await failure(third.manager.show(dev, await agentWorkspace(third.ws, dev), () => {}))).toEqual([
+      "internal",
+      "Couldn't start the agent's browser: Chrome closed while starting",
+    ]);
+    expect(third.chromes).toHaveLength(0);
   },
 );
 

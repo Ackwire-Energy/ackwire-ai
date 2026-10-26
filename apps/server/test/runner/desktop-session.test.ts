@@ -17,6 +17,7 @@ import {
   systemDesktopUser,
   vncPasswordFile,
 } from "../../runner/desktop-session";
+import { RunnerError } from "../../runner/errors";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -437,15 +438,25 @@ test.if(posix)(
   "Browser on the desktop: a socket while the desktop runs, and a click on it asks the runner for that agent's browser",
   async () => {
     const asked: string[] = [];
+    let refusal: string | null = null;
     const t = setup({
       openBrowser: async (agent, installing) => {
         asked.push(agent.handle);
+        if (refusal) throw new RunnerError("not_allowed", refusal);
         if (agent.handle === "ops") installing();
       },
     });
     await t.desktops.ensure(dev);
     const socket = path.join(t.home, "desktop", "01a142cb", "browser.sock");
     expect(statSync(socket).isSocket()).toBe(true);
+    expect(await click(socket)).toBe("ok\n");
+    expect(asked).toEqual(["dev"]);
+    // Refused: the launcher hears the code, the runner's log the reason.
+    refusal = "The browser is turned off on this computer";
+    expect(await click(socket)).toBe("error not_allowed\n");
+    expect(t.logs).toContain("Browser on the desktop of dev didn't open: The browser is turned off on this computer");
+    refusal = null;
+    asked.length = 0;
     expect(await click(socket)).toBe("ok\n");
     expect(asked).toEqual(["dev"]);
     // Each desktop its own: ops's click is ops's.

@@ -875,9 +875,9 @@ only Orchis-Light):
 sudo apt install --no-install-recommends orchis-gtk-theme librsvg2-common
 ```
 
-On Debian 13, also install the dock's plugin, so an app's open windows show on its own icon in the dock
-(`--system --desktop` installs it where apt has it; Debian 12 and Ubuntu don't have it, and there each
-open window gets a button of its own after the icons):
+On Debian 13 and Ubuntu 25.04 or newer, also install the dock's plugin, so an app's open windows show on
+its own icon in the dock (`--system --desktop` installs it where apt has it; Debian 12 and Ubuntu 22.04
+and 24.04 don't have it, and there each open window gets a button of its own after the icons):
 
 ```sh
 sudo apt install --no-install-recommends xfce4-docklike-plugin
@@ -886,7 +886,9 @@ sudo apt install --no-install-recommends xfce4-docklike-plugin
 What a person changes on a desktop (its theme, its panel) stays until the runner writes the look again:
 for a new version of the look, once Orchis, the SVG loader or the dock's plugin is installed or removed
 (running the installer again with `--desktop` installs them), when the agent is renamed, or when the
-agent's folder moves (without `--system`, it is renamed with the agent's handle).
+agent's folder moves (without `--system`, it is renamed with the agent's handle). The runner writes it
+as a desktop starts, so a desktop that is running keeps its look until its next start (after a reboot,
+say): desktops stay on, and a new look doesn't close what is open on them.
 
 Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
 terminal are for the person who connected the computer, since they act as its user: by default every

@@ -3,7 +3,8 @@ import type { EventEmitter } from "node:events";
 import { chmodSync, chownSync, rmSync, statSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
-import { BROWSER_ICON, BROWSER_WM_CLASS } from "./desktop-look";
+import type { MachineErrorCode } from "@agenteschat/adapters/machine-protocol";
+import { BROWSER_ICON, BROWSER_WM_CLASS, NOTE_ICON, NOTE_WM_CLASS } from "./desktop-look";
 import { toMachineError } from "./errors";
 
 /**
@@ -16,9 +17,10 @@ import { toMachineError } from "./errors";
  *   signs the agent in.
  * - The socket sits next to the desktop's password file: in system mode in root's folder for that agent, which
  *   only the agent's group may enter, so only the agent's own user reaches it (and it may already run anything as
- *   itself). It takes one word, `open`: no address, no flag, nothing that widens what the browser reaches.
- * - While Chrome for Testing installs (the agent's first browser), a small window on the desktop says so; when
- *   the browser can't open, one says why.
+ *   itself). It takes one word, `open`: no address, no flag, nothing that widens what the browser reaches. The
+ *   agent's own code can connect too: it answers one click at a time and holds a few connections at most.
+ * - When the answer takes more than a moment, a small window on the desktop says the browser is opening (or, before
+ *   the agent's first browser, that Chrome for Testing installs); when the browser can't open, one says why.
  */
 
 /** The socket's name, in the folder of the desktop's password file. */
@@ -27,20 +29,21 @@ export const BROWSER_SOCKET = "browser.sock";
 const OPEN = "open";
 /** A connection that hasn't said it by then is dropped. */
 const ASK_MS = 5000;
-/** Chrome for Testing's download and install, then Chrome's start: the launcher gives up after this. */
-const SHOW_MS = 16 * 60_000;
-/** A reason the launcher shows, at most. */
-const WHY_MAX = 300;
-
-const why = (err: unknown) => toMachineError(err).message.replace(/\s+/g, " ").trim().slice(0, WHY_MAX);
+/** Connections held at once: each is one of the runner's open files (root's, in system mode). */
+const CONNECTIONS_MAX = 4;
+/** Chrome for Testing's download and install, then Chrome's start: a click is given up after this. */
+export const SHOW_MS = 16 * 60_000;
+/** A click answered sooner shows no window of its own: Chrome's is the answer. */
+const QUIET_MS = 1000;
 
 /**
  * Answers the Browser of one agent's desktop on `socket`: `open` in; `installing` while Chrome for Testing
- * installs first, then `ok` or `error <why>`. One click at a time: one while another runs gets that one's answer.
- * The socket takes its folder's group (the agent's, in system mode), and only that group may write to it.
+ * installs first, then `ok` or `error <code>`. One click at a time: one that comes meanwhile is told `busy`, and
+ * the first one's launcher shows what happens. The socket takes its folder's group (the agent's, in system mode),
+ * and only that group may write to it.
  */
 export async function serveBrowser(socket: string, open: (installing: () => void) => Promise<void>): Promise<Server> {
-  let current: { done: Promise<void>; installing: boolean; waiting: Set<Socket> } | null = null;
+  let busy = false;
   const say = (conn: Socket, line: string) => {
     if (!conn.destroyed) conn.write(`${line}\n`);
   };
@@ -48,27 +51,16 @@ export async function serveBrowser(socket: string, open: (installing: () => void
     if (!conn.destroyed) conn.end(`${line}\n`);
   };
   const show = (conn: Socket) => {
-    let c = current;
-    if (!c) {
-      const next: NonNullable<typeof current> = { installing: false, waiting: new Set(), done: Promise.resolve() };
-      next.done = (async () =>
-        open(() => {
-          next.installing = true;
-          for (const waiting of next.waiting) say(waiting, "installing");
-        }))();
-      const over = () => {
-        if (current === next) current = null;
-      };
-      next.done.then(over, over);
-      current = next;
-      c = next;
-    }
-    c.waiting.add(conn);
-    if (c.installing) say(conn, "installing");
-    c.done.then(
-      () => end(conn, "ok"),
-      (err: unknown) => end(conn, `error ${why(err)}`),
-    );
+    if (busy) return end(conn, "busy");
+    busy = true;
+    (async () => open(() => say(conn, "installing")))()
+      .finally(() => {
+        busy = false;
+      })
+      .then(
+        () => end(conn, "ok"),
+        (err: unknown) => end(conn, `error ${toMachineError(err).code}`),
+      );
   };
   rmSync(socket, { force: true });
   const server = createServer((conn) => {
@@ -91,6 +83,7 @@ export async function serveBrowser(socket: string, open: (installing: () => void
     };
     conn.on("data", listen);
   });
+  server.maxConnections = CONNECTIONS_MAX;
   const events = server as unknown as EventEmitter;
   await new Promise<void>((resolve, reject) => {
     events.once("error", reject);
@@ -117,32 +110,46 @@ export function closeBrowser(server: Server, socket: string) {
   rmSync(socket, { force: true });
 }
 
-/** A small window on the desktop: the wait while the browser gets ready, or why it didn't open. */
+/** A small window on the desktop: the wait while the browser opens, or why it didn't. */
 export type DesktopNote = (kind: "wait" | "error", text: string) => { close(): void };
 
-const WAIT = "Getting the browser ready…\nThe first time takes about a minute. It opens by itself.";
+const OPENING = "Opening the browser…";
+const INSTALLING = "Getting the browser ready…\nThe first time takes about a minute. It opens by itself.";
 const FAILED = "The browser didn't open.";
+/** Why, by the runner's error code, in the words of the person who clicked; the runner's log keeps its own. */
+const REASONS = new Map<string, string>([
+  ["not_allowed", "The browser is turned off on this computer."],
+  ["paused", "This computer is paused. Open the browser again once it resumes."],
+  ["desktop_busy", "This computer is short of memory right now. Try again in a few minutes."],
+  ["browser_unavailable", "The browser can't run on this computer right now. Try again in a few minutes."],
+] satisfies [MachineErrorCode, string][]);
+const AGAIN = "Something went wrong. Try again in a minute.";
+/** A note's text columns; its window has two more on each side. */
+const NOTE_COLUMNS = 56;
 
 /**
  * The note as an xfce4-terminal of its own (every desktop has one), small, with no menu or bars: the text
- * wrapped and indented, the cursor hidden; the wait stays until closed, the reason until Enter. Its window class
- * is Browser's, so the dock shows it there.
+ * wrapped and indented, the cursor hidden, a row free above and below. The wait stays until closed, with Browser's
+ * window class, so the dock shows it on Browser; the reason stays until Enter, with a class of its own, so a click
+ * on Browser tries again rather than bringing that window up.
  */
 export function noteArgs(kind: "wait" | "error", text: string): string[] {
-  const end = kind === "wait" ? `exec sleep ${SHOW_MS / 1000}` : "printf '\\n  %s' 'Press Enter to close.'; read -r _";
+  const error = kind === "error";
+  const rows = text.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / NOTE_COLUMNS)), 0);
+  const end = error ? "printf '\\n  %s' 'Press Enter to close.'; read -r _" : `exec sleep ${SHOW_MS / 1000}`;
   return [
     "--disable-server",
-    `--class=${BROWSER_WM_CLASS}`,
+    `--class=${error ? NOTE_WM_CLASS : BROWSER_WM_CLASS}`,
     "--title=Browser",
-    `--icon=${BROWSER_ICON}`,
+    `--icon=${error ? NOTE_ICON : BROWSER_ICON}`,
     "--hide-menubar",
     "--hide-toolbar",
     "--hide-scrollbar",
-    `--geometry=${kind === "wait" ? "60x6" : "60x10"}`,
+    `--geometry=${NOTE_COLUMNS + 4}x${rows + (error ? 4 : 2)}`,
     "-x",
     "/bin/sh",
     "-c",
-    `printf '\\033[?25l\\n'; printf '%s\\n' "$1" | fold -s -w 56 | sed 's/^/  /'; ${end}`,
+    `printf '\\033[?25l\\n'; printf '%s\\n' "$1" | fold -s -w ${NOTE_COLUMNS} | sed 's/^/  /'; ${end}`,
     "sh",
     text,
   ];
@@ -155,7 +162,7 @@ const terminalNote: DesktopNote = (kind, text) => {
   return { close: () => child.kill() };
 };
 
-/** The runner's answer: null once the browser is open, else why it isn't. */
+/** The runner's answer: null once the browser is open (or another click's launcher shows it), else why not. */
 function ask(socket: string, installing: () => void, timeoutMs: number): Promise<string | null> {
   return new Promise((resolve) => {
     let buffer = "";
@@ -177,8 +184,8 @@ function ask(socket: string, installing: () => void, timeoutMs: number): Promise
         const line = buffer.slice(0, end);
         buffer = buffer.slice(end + 1);
         if (line === "installing") installing();
-        else if (line === "ok") return finish(null);
-        else if (line.startsWith("error ")) return finish(line.slice("error ".length));
+        else if (line === "ok" || line === "busy") return finish(null);
+        else if (line.startsWith("error ")) return finish(REASONS.get(line.slice("error ".length)) ?? AGAIN);
       }
     });
     conn.on("error", () => finish("agentes.chat isn't running on this computer right now. Try again in a minute."));
@@ -188,21 +195,30 @@ function ask(socket: string, installing: () => void, timeoutMs: number): Promise
 
 /**
  * `agentes-runner desktop-browser <socket>`, from the desktop (its session's environment): asks for the agent's
- * browser on it, with the wait shown while Chrome for Testing installs and the reason when it doesn't open.
+ * browser on it. A note says it is opening once that takes more than a moment, and that Chrome for Testing
+ * installs first as soon as the runner says so; another one says why when it doesn't open.
  */
 export async function runDesktopBrowser(
   socket: string,
-  o: { note?: DesktopNote; timeoutMs?: number } = {},
+  o: { note?: DesktopNote; timeoutMs?: number; quietMs?: number } = {},
 ): Promise<number> {
   const note = o.note ?? terminalNote;
   let wait: ReturnType<DesktopNote> | null = null;
+  let installing = false;
+  const quiet = setTimeout(() => {
+    wait ??= note("wait", OPENING);
+  }, o.quietMs ?? QUIET_MS);
   const reason = await ask(
     socket,
     () => {
-      wait ??= note("wait", WAIT);
+      if (installing) return;
+      installing = true;
+      wait?.close();
+      wait = note("wait", INSTALLING);
     },
     o.timeoutMs ?? SHOW_MS,
   );
+  clearTimeout(quiet);
   (wait as ReturnType<DesktopNote> | null)?.close();
   if (reason === null) return 0;
   note("error", `${FAILED}\n${reason}`);

@@ -21,7 +21,8 @@ import { xmlEscape } from "./xml";
  *   the panel's own launchers, then a button for each window. Desktop use (ADR 0062) reads the panel's own
  *   plugins only: docklike runs in a process of its own, outside what the agent reads of the screen.
  * - Browser, Files and Terminal are desktop entries of the look's own (`agentes-*.desktop`), on the dock and at
- *   the top of the apps menu, in place of XFCE's generic Terminal Emulator and File Manager.
+ *   the top of the apps menu, in place of XFCE's generic Terminal Emulator and File Manager. Their names are only
+ *   English: the desktop session runs in `C.UTF-8` (`desktop-session.ts`), where a translated name never shows.
  * - The terminal's prompt and title show the agent's name, where bash's own show its system user and the
  *   computer's hostname.
  */
@@ -79,6 +80,12 @@ export const LOOK_MARKER = `${LOOK_DIR}/look`;
 export const BROWSER_WM_CLASS = "agentes-browser";
 /** The icon theme's web browser (a globe), with the theme's Files and Terminal icons. */
 export const BROWSER_ICON = "org.xfce.webbrowser";
+/**
+ * The window that says why Browser didn't open (`desktop-browser.ts`) has a class of its own: with Browser's, a
+ * click on Browser would only bring that window up, where it should try again.
+ */
+export const NOTE_WM_CLASS = "agentes-note";
+export const NOTE_ICON = "dialog-warning";
 
 /**
  * 1280×900, the exact desktop size: shown 1:1, its logo centered on the dock's line below maximized windows. The
@@ -97,8 +104,6 @@ interface DockApp {
   /** Its desktop id, without `.desktop`. */
   id: string;
   name: string;
-  /** Its name for a desktop in pt-BR. */
-  ptBR: string;
   exec: string;
   icon: string;
   /** Its windows' WM_CLASS: the dock shows them on its launcher. */
@@ -121,7 +126,6 @@ const dockApps = (browser: string[]): DockApp[] => [
   {
     id: "agentes-browser",
     name: "Browser",
-    ptBR: "Navegador",
     exec: browser.map(execArg).join(" "),
     icon: BROWSER_ICON,
     wmClass: BROWSER_WM_CLASS,
@@ -130,7 +134,6 @@ const dockApps = (browser: string[]): DockApp[] => [
   {
     id: "agentes-files",
     name: "Files",
-    ptBR: "Arquivos",
     exec: "thunar",
     icon: "org.xfce.thunar",
     wmClass: "Thunar",
@@ -139,7 +142,6 @@ const dockApps = (browser: string[]): DockApp[] => [
   {
     id: "agentes-terminal",
     name: "Terminal",
-    ptBR: "Terminal",
     exec: "xfce4-terminal",
     icon: "org.xfce.terminalemulator",
     wmClass: "Xfce4-terminal",
@@ -153,12 +155,25 @@ const desktopEntry = (app: DockApp) =>
     "[Desktop Entry]",
     "Type=Application",
     `Name=${app.name}`,
-    `Name[pt_BR]=${app.ptBR}`,
     `Exec=${app.exec}`,
     `Icon=${app.icon}`,
     `StartupWMClass=${app.wmClass}`,
     `StartupNotify=${app.notify}`,
     "Categories=X-Xfce-Toplevel;",
+    "",
+  ].join("\n");
+
+/** The note's entry, out of the menu: docklike shows the note's window with its icon. Opened, it is Browser's command. */
+const noteEntry = (browser: DockApp) =>
+  [
+    "[Desktop Entry]",
+    "Type=Application",
+    `Name=${browser.name}`,
+    `Exec=${browser.exec}`,
+    `Icon=${NOTE_ICON}`,
+    `StartupWMClass=${NOTE_WM_CLASS}`,
+    "StartupNotify=false",
+    "NoDisplay=true",
     "",
   ].join("\n");
 
@@ -364,14 +379,14 @@ ${
 `;
 
 /**
- * The shell's own startup files first (bash reads neither with `--rcfile`), then the agent's name, green, in the
- * prompt and in the window's title. The prompt names it through a variable it expands, never in its own text,
- * so no character of the name runs anything or takes a prompt escape.
+ * `~/.bashrc` first (`--rcfile` reads this file in its place; Debian's and Ubuntu's bash still read
+ * `/etc/bash.bashrc` before it), then the agent's name, green, in the prompt and in the window's title. The prompt
+ * names it through a variable it expands, never in its own text, so no character of the name runs anything or
+ * takes a prompt escape.
  */
 const bashrc = (name: string) =>
   [
     "# The desktop's Terminal: the shell's own setup, then the agent's name in the prompt and the window's title.",
-    "[ -r /etc/bash.bashrc ] && . /etc/bash.bashrc",
     "[ -r ~/.bashrc ] && . ~/.bashrc",
     `AGENTES_NAME=${shQuote(name)}`,
     "shopt -s promptvars",
@@ -515,6 +530,7 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
     [".config/gtk-3.0/gtk.css", GTK_CSS],
     [".config/menus/xfce-applications.menu", menu(apps)],
     ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),
+    [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp)],
     ...Object.entries(HIDDEN).map(([id, name]): [string, string] => [
       `.local/share/applications/${id}.desktop`,
       hidden(name),

@@ -21,6 +21,7 @@ import {
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
+import { SHOW_MS } from "./desktop-browser";
 import { RunnerError, toMachineError } from "./errors";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
@@ -161,6 +162,8 @@ export interface SupervisorOptions {
   desktopViewers?: (agentId: string) => number;
   /** Tests: the clock of the browser's lease. */
   now?: () => number;
+  /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
+  showMs?: number;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -363,11 +366,18 @@ export class Supervisor {
     if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now; try again");
     const showId = String(++this.seq);
     await new Promise<void>((resolve, reject) => {
+      // The agent's own code can stop its worker (same user): past the launcher's own wait the click is over, and
+      // root lends it the desktop no longer.
+      const late = setTimeout(
+        () => w.shows.get(showId)?.settle(new RunnerError("internal", "The agent's worker didn't answer in time")),
+        this.opts.showMs ?? SHOW_MS,
+      );
       w.shows.set(showId, {
         agent,
         installing,
         settle: (error) => {
           if (!w.shows.delete(showId)) return;
+          clearTimeout(late);
           if (error) reject(error);
           else resolve();
         },
@@ -536,7 +546,12 @@ export class Supervisor {
   }
 
   private send(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
-    if (!w.ready || !w.proc) return;
+    if (w.ready) this.write(w, frame);
+  }
+
+  /** To the worker's process, also between two of its sessions. */
+  private write(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
+    if (!w.proc) return;
     if (w.proc.stdin.writableLength > WORKER_BACKLOG_MAX) {
       this.opts.log(`[${w.user.user}] isn't reading what it is sent; stopping it`);
       w.proc.kill();
@@ -702,11 +717,13 @@ export class Supervisor {
           : undefined,
       );
     }
-    if (!w.ready) return;
+    // So may the desktop its Chrome asks for: unanswered, the click would hang, and the agent's browser commands
+    // behind it.
     if (f?.type === "desktop.ensure") {
       const use = f.use === "browser" ? "browser" : "desktop";
       return this.ensureDesktop(w, typeof f.ensureId === "string" ? f.ensureId : "", use);
     }
+    if (!w.ready) return;
     if (f?.type === "browser.desktop") {
       w.browserLeaseAt = (this.opts.now ?? Date.now)();
       return;
@@ -750,10 +767,11 @@ export class Supervisor {
    * The worker's agent's desktop, only while it serves a request the server sent it that uses the desktop that
    * way (desktop use, or a browser command the server put on the desktop), or, for its Chrome, a click on Browser
    * on that desktop (`showBrowser`): the agent's own code runs as the worker's user and could ask at any other time.
+   * Between two of the worker's sessions only a click is answered: what the last session ran is over.
    */
   private ensureDesktop(w: Worker, ensureId: string, use: WorkerDesktopUse) {
     const reply = (r: { desktop: WorkerDesktop } | { error: { code: MachineErrorCode; message: string } }) =>
-      this.send(w, { type: "desktop.ensured", ensureId, ...r });
+      this.write(w, { type: "desktop.ensured", ensureId, ...r });
     const agent =
       [...w.inflight.values()].find((e) => desktopUseOf(e.req) === use)?.req.agent ??
       (use === "browser" ? [...w.shows.values()][0]?.agent : undefined);

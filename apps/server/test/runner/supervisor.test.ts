@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -6,6 +6,7 @@ import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser } from "../../runner/agent-users";
+import { BrowserManager } from "../../runner/browser";
 import { writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { RunnerDaemon } from "../../runner/daemon";
@@ -24,7 +25,7 @@ import {
   workerCommand,
   workerHome,
 } from "../../runner/supervisor";
-import { runWorker } from "../../runner/worker";
+import { runWorker, WorkerLink } from "../../runner/worker";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -1139,8 +1140,9 @@ test.if(posix)(
     expect(headed(chromes[3])).toBe(true);
     expect(chromes[3]?.env).toMatchObject({ DISPLAY: ":21", XAUTHORITY: xauthority });
     expect(chromes[3]?.args).toContain("--class=agentes-browser");
-    // Root can't lend it the desktop: the click says so, in the worker's words.
+    // Root can't lend it the desktop: the click says so, in root's words, and the agent's Chrome stays as it was.
     await act("click", false);
+    expect(chromes).toHaveLength(5);
     refusal = "The browser on the agent's desktop needs this computer's desktop and browser switches on";
     const failed = await t.sup
       .showBrowser(ANA, () => {})
@@ -1148,10 +1150,9 @@ test.if(posix)(
         () => null,
         (err: unknown) => err as RunnerError,
       );
-    expect([failed?.code, failed?.message]).toEqual([
-      "desktop_unavailable",
-      "The browser couldn't open on this screen; try again in a minute",
-    ]);
+    expect([failed?.code, failed?.message]).toEqual(["not_allowed", refusal]);
+    expect(chromes).toHaveLength(5);
+    expect(chromes[4]?.killed).toBe(false);
   },
 );
 
@@ -1199,11 +1200,18 @@ test("Browser clicked on an agent's desktop: its worker, started for it, answers
   await waitFor(() => ana.of("desktop.ensured").length === 3);
   expect(ana.of("desktop.ensured")[2]).toMatchObject({ error: { code: "not_allowed", message: BROWSER_REFUSED } });
 
-  // The server's connection drops meanwhile: the worker's session ends with it, the click it answers goes on.
+  // The server's connection drops meanwhile: the worker's session ends with it, the click it answers goes on, and
+  // root lends it the desktop before its next session too (desktop use, the last session's, it doesn't).
   t.sup.attach();
   const across = t.sup.showBrowser(ANA, () => {});
   await waitFor(() => ana.of("browser.show").length === 2);
   t.sup.detach();
+  ana.send({ type: "desktop.ensure", ensureId: "4", use: "browser" });
+  ana.send({ type: "desktop.ensure", ensureId: "5", use: "desktop" });
+  await waitFor(() => ana.of("desktop.ensured").length === 5);
+  const ensured = (ensureId: string) => ana.of("desktop.ensured").find((f) => f.ensureId === ensureId);
+  expect(ensured("4")).toEqual({ type: "desktop.ensured", ensureId: "4", desktop });
+  expect(ensured("5")).toMatchObject({ error: { code: "not_allowed" } });
   ana.send({ type: "browser.shown", showId: (ana.of("browser.show")[1] as { showId: string }).showId });
   await across;
   ana.hello();
@@ -1227,6 +1235,52 @@ test("Browser clicked on an agent's desktop: its worker, started for it, answers
   await waitFor(() => ana.of("browser.show").length === 4);
   ana.crash();
   expect(await errorCode(() => lost)).toBe("internal");
+});
+
+test("a click its worker never answers (the agent's own code stopped it) fails in time, and root lends nothing more", async () => {
+  const desktop: WorkerDesktop = {
+    display: 21,
+    width: 1280,
+    height: 900,
+    startedAt: new Date(1000).toISOString(),
+    started: false,
+    xauthority: "/home/ag-a1b2c3d4/.agentes/desktop/Xauthority",
+    home: "/home/ag-a1b2c3d4",
+  };
+  const t = setup({ desktop: async () => desktop, showMs: 50 });
+  t.sup.boot();
+  const shown = t.sup.showBrowser(ANA, () => {});
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const failed = await shown.then(
+    () => null,
+    (err: unknown) => err as RunnerError,
+  );
+  expect([failed?.code, failed?.message]).toEqual(["internal", "The agent's worker didn't answer in time"]);
+  ana.send({ type: "desktop.ensure", ensureId: "1", use: "browser" });
+  await waitFor(() => ana.of("desktop.ensured").length === 1);
+  expect(ana.of("desktop.ensured")[0]).toMatchObject({ error: { code: "not_allowed", message: BROWSER_REFUSED } });
+  // Its answer, late, settles nothing.
+  ana.send({ type: "browser.shown", showId: (ana.of("browser.show")[0] as { showId: string }).showId });
+});
+
+test("a worker's ask for its desktop that root never answers gives up, and frees what waits behind it", async () => {
+  const toRoot = new PassThrough();
+  const link = new WorkerLink(new PassThrough(), toRoot, 50);
+  const asked: string[] = [];
+  readLines(
+    toRoot,
+    1 << 20,
+    (line) => asked.push(line),
+    () => {},
+  );
+  const failed = await link.desktop("browser").then(
+    () => null,
+    (err: unknown) => err as RunnerError,
+  );
+  expect([failed?.code, failed?.message]).toEqual(["internal", "The agent's desktop didn't start in time"]);
+  expect(asked.map((l) => JSON.parse(l))).toEqual([{ type: "desktop.ensure", ensureId: "1", use: "browser" }]);
 });
 
 test.if(posix)(
@@ -1495,6 +1549,62 @@ test.if(posix)(
       expect(await errorCode(() => daemon.openBrowser(ANA, () => {}))).toBe("paused");
       expect(ana.of("browser.show")).toHaveLength(1);
     } finally {
+      await daemon.stop();
+    }
+  },
+);
+
+test.if(posix)(
+  "a single-user runner: Browser clicked on an agent's desktop opens that agent's own browser here, unless paused",
+  async () => {
+    const home = newHome();
+    const ws = tempDir("single-ws-");
+    dirs.push(ws);
+    writeConfig(
+      {
+        server: "https://agentes.test",
+        machineId: "m1",
+        name: "box",
+        token: "agm_machine_token_never_shown_123456",
+        workspace: ws,
+        exec: true,
+        access: { folders: [], tools: { claude: false, codex: false, commands: true, browser: true, desktop: true } },
+      },
+      home,
+    );
+    const shown: [AgentScope, string][] = [];
+    const show = spyOn(BrowserManager.prototype, "show").mockImplementation(async (agent, folder, installing) => {
+      shown.push([agent, folder]);
+      installing();
+    });
+    const sockets: FakeSocket[] = [];
+    const daemon = new RunnerDaemon({
+      home,
+      mode: "start",
+      log: () => {},
+      watch: false,
+      executors: () => ({}),
+      self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+      caffeinate: false,
+      dial: (_url, handlers) => {
+        const s = new FakeSocket(handlers);
+        sockets.push(s);
+        return s;
+      },
+    });
+    daemon.start();
+    try {
+      await waitFor(() => sockets.length === 1);
+      let installing = 0;
+      await daemon.openBrowser(ANA, () => void installing++);
+      // This runner's own BrowserManager, on the agent's folder in the workspace: no worker in between.
+      expect(shown).toEqual([[ANA, path.join(realpathSync(ws), "ana-a1b2c3d4")]]);
+      expect(installing).toBe(1);
+      daemon.pause(null);
+      expect(await errorCode(() => daemon.openBrowser(ANA, () => {}))).toBe("paused");
+      expect(shown).toHaveLength(1);
+    } finally {
+      show.mockRestore();
       await daemon.stop();
     }
   },

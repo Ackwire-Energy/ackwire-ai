@@ -64,6 +64,12 @@ export interface WorkerOptions {
   browser?: Pick<BrowserManagerOptions, "command" | "chrome" | "startChrome" | "isOurChrome">;
 }
 
+/**
+ * Root answers for the agent's desktop within that desktop's start, whose steps each have a limit; an ask it never
+ * answers would hold the agent's browser commands behind it.
+ */
+const DESKTOP_MS = 2 * 60_000;
+
 /** Until the supervisor says otherwise, nothing is allowed. */
 const NOTHING_ALLOWED: WorkerState = {
   access: { folders: [], tools: { claude: false, codex: false, commands: false } },
@@ -99,6 +105,7 @@ export class WorkerLink {
   constructor(
     input: Readable,
     private readonly output: Writable,
+    private readonly desktopMs = DESKTOP_MS,
   ) {
     readLines(
       input,
@@ -115,7 +122,7 @@ export class WorkerLink {
     this.onEnd();
   }
 
-  /** Desktops asked for get no answer once the session or the link is gone (the supervisor drops them). */
+  /** Desktops still asked for fail when the session or the link ends, as the work that asked for them does. */
   private unanswered(message: string) {
     for (const answer of [...this.desktops.values()]) {
       answer({ type: "desktop.ensured", ensureId: "", error: { code: "internal", message } });
@@ -195,7 +202,12 @@ export class WorkerLink {
   desktop(use: WorkerDesktopUse): Promise<WorkerDesktop> {
     const ensureId = String(++this.nextEnsure);
     return new Promise((resolve, reject) => {
+      const late = setTimeout(() => {
+        const error = { code: "internal" as const, message: "The agent's desktop didn't start in time" };
+        this.desktops.get(ensureId)?.({ type: "desktop.ensured", ensureId, error });
+      }, this.desktopMs);
       this.desktops.set(ensureId, (reply) => {
+        clearTimeout(late);
         this.desktops.delete(ensureId);
         if (reply.desktop) resolve(reply.desktop);
         else reject(new RunnerError(reply.error?.code ?? "internal", reply.error?.message ?? "No desktop"));

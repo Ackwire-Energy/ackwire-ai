@@ -1432,7 +1432,8 @@ export class BrowserManager {
    * belongs there and the desktop runs (started first), else headless; its pid
    * and display go in `chromes.json`. One running in the other mode starts
    * again in this one on the page it showed, unless someone may be looking
-   * (`asked`: a person's own click, `show`, moves it anyway).
+   * (`asked`: a person's own click, `show`, moves it anyway, and never runs it
+   * headless: the desktop's own refusal, or Chrome's, is the answer).
    */
   private async ensureOwnChrome(
     agent: AgentScope,
@@ -1445,6 +1446,7 @@ export class BrowserManager {
     if (!running && session.chromeStarting) return session.chromeStarting;
     if (running && ((running.display !== undefined) === desktop || (!asked && this.inView(session)))) return running;
     const where = desktop ? await this.desktopFor(agent, session, asked) : null;
+    if (asked && !where) throw new RunnerError("desktop_unavailable", "The agent's desktop isn't running");
     let page: string | undefined;
     if (running) {
       if ((running.display !== undefined) === (where !== null)) return running;
@@ -1477,7 +1479,7 @@ export class BrowserManager {
       try {
         chrome = await launch(where).catch((err: unknown) => {
           // Libraries Chrome can't load fail a headless start just the same, and aren't the desktop's doing.
-          if (!where || (err instanceof ChromeStartError && err.missing.length > 0)) throw err;
+          if (!where || asked || (err instanceof ChromeStartError && err.missing.length > 0)) throw err;
           // A headed start failed (its desktop went away or hung under it): headless for now, like a desktop that
           // can't start.
           session.desktopFailedAt = this.now();
@@ -1528,7 +1530,8 @@ export class BrowserManager {
    * The agent's desktop for a headed Chrome, started when it isn't running.
    * Null when it can't be there now: Chrome runs headless meanwhile, and a
    * desktop that failed to start isn't tried again for a while (each try can
-   * take seconds), unless a person `asked` from that desktop.
+   * take seconds). A person who `asked` from that desktop gets it tried at once,
+   * and its refusal.
    */
   private async desktopFor(agent: AgentScope, session: Session, asked = false): Promise<ChromeDisplay | null> {
     const desktops = this.opts.desktops;
@@ -1539,6 +1542,7 @@ export class BrowserManager {
       await desktops.ensure(agent, { chrome: true });
     } catch (err) {
       session.desktopFailedAt = this.now();
+      if (asked) throw err;
       this.opts.log(
         `the browser of ${agent.handle} runs headless: ${err instanceof Error ? err.message : String(err)}`,
       );
@@ -1862,7 +1866,8 @@ export class BrowserManager {
    * Browser on the agent's desktop (`desktop-browser.ts`): its own Chrome there, in front, for the person who
    * clicked it. Chrome for Testing is installed first when it isn't here yet (`installing` says so). A Chrome
    * running headless moves there even while someone watches it or a person's turn is open: a person asked, from
-   * that desktop. The click carries no address and no flag, so the browser reaches nothing new.
+   * that desktop. A desktop that can't take it fails the click with its own reason: a click never starts one
+   * headless. The click carries no address and no flag, so the browser reaches nothing new.
    */
   async show(agent: AgentScope, folder: string, installing: () => void): Promise<void> {
     const chrome = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
@@ -1871,9 +1876,6 @@ export class BrowserManager {
     await this.enqueue(session, async () => {
       const before = session.chrome;
       const shown = await this.ensureOwnChrome(agent, session, true, [], true);
-      if (shown.display === undefined) {
-        throw new RunnerError("desktop_unavailable", "The browser couldn't open on this screen; try again in a minute");
-      }
       session.lastUsed = this.now();
       if (shown === before) await this.activate(shown);
     });
