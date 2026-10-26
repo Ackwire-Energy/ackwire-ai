@@ -1629,6 +1629,8 @@ export function NotificationsPage() {
 
   const select = (n: AppNotification) => {
     setCur(n.id);
+    // Its computer being ready has nothing more to show in place: a click goes where Open does.
+    if (n.kind === "computer_ready") return openItem(n);
     markRead(n);
     // A grouped item opens its replies on the first tap.
     if (isExpandable(n) && !open.has(n.id) && !n.waiting) toggle(n);

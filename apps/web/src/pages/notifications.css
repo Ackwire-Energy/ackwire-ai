@@ -375,11 +375,14 @@
 .nt-c {
   min-width: 0;
 }
+/* The headline's 22px line (its chips') sits in the middle of the 28px face beside it: the face's 1px, then
+   (28 - 22) / 2. */
 .nt-l1 {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);
 }
