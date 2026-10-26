@@ -278,7 +278,8 @@ test("Browser: the runner's own command with the desktop's socket, nothing else;
       "Type=Application",
       "Name=Browser",
       `Exec=${RUNNER.join(" ")} desktop-browser ${SOCKET}`,
-      "Icon=org.xfce.webbrowser",
+      // The theme's globe: its web browser's (org.xfce.webbrowser) has a mouse pointer drawn into it.
+      "Icon=applications-internet",
       "StartupWMClass=agentes-browser",
       "StartupNotify=false",
       "Categories=X-Xfce-Toplevel;",
@@ -293,7 +294,7 @@ test("Browser: the runner's own command with the desktop's socket, nothing else;
       "Type=Application",
       "Name=Browser",
       `Exec=${RUNNER.join(" ")} desktop-browser ${SOCKET}`,
-      "Icon=org.xfce.webbrowser",
+      "Icon=applications-internet",
       "StartupWMClass=agentes-wait",
       "StartupNotify=false",
       "NoDisplay=true",
@@ -503,8 +504,8 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   }
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
-    version: 4,
-    files: "385de5380da648ca",
+    version: 5,
+    files: "97c2df90e400a9b7",
   });
 });
 

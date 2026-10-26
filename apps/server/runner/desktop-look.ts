@@ -29,7 +29,7 @@ import { xmlEscape, xmlUnescape } from "./xml";
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 4;
+export const LOOK_VERSION = 5;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -81,8 +81,13 @@ const XFCONF = ".config/xfce4/xfconf/xfce-perchannel-xml";
 
 /** The agent's Chrome on its desktop has this window class (`browser.ts`), so the dock shows it on Browser. */
 export const BROWSER_WM_CLASS = "agentes-browser";
-/** The icon theme's web browser (a globe), with the theme's Files and Terminal icons. */
-export const BROWSER_ICON = "org.xfce.webbrowser";
+/**
+ * The icon theme's globe, next to its Files and Terminal icons. Not its web browser's (`org.xfce.webbrowser`, a link
+ * to `web-browser`): that globe has a mouse pointer drawn into it, which reads as a stray pointer on the dock.
+ * elementary-xfce has this one at every size, 16 to 128 px, in 0.16 to 0.21 (Ubuntu 22.04 and 24.04, Debian 12
+ * and 13).
+ */
+export const BROWSER_ICON = "applications-internet";
 /**
  * Browser's notes (`desktop-browser.ts`) have window classes of their own: with Browser's, docklike would show them
  * on Browser, and a click there would only raise or hide the note, never reach the runner, where it is told `busy`
