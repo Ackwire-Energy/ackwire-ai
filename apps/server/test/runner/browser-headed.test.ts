@@ -155,7 +155,8 @@ test("headed: maximized on the agent's display, no automation bars, the debuggin
   }
   expect(args).toContain("--disable-blink-features=AutomationControlled");
   // Pages hold still (an animated one would keep the computer's cores busy whether anyone watches or not), and the
-  // chip asking to sign in to Chrome itself stays off (Chrome 150 to 155; later ones read the profile's switch).
+  // chip asking to sign in to Chrome itself stays off (Chrome 147 at least to 155; later ones read the profile's
+  // switch).
   expect(args).toContain("--force-prefers-reduced-motion");
   expect(args).toContain("--disable-features=SigninPromoOnAvatarPill");
   expect(args).not.toContain("--headless=new");
@@ -418,7 +419,7 @@ test.if(posix)("the request's desktop counts only while the machine's desktop sw
   expect(headed(last(t))).toBe(false);
 });
 
-/** Chrome's own debugging endpoint, as `show` asks it to bring a window to the front. */
+/** Chrome's own debugging endpoint, as `show` asks it to bring a window to the front; `stalled`, it never answers. */
 function fakeDevTools() {
   const d = {
     urls: [] as string[],
@@ -427,10 +428,12 @@ function fakeDevTools() {
       { id: "P7", type: "page", url: "https://shop.example/cart" },
       { id: "P2", type: "page", url: "https://shop.example/" },
     ],
+    stalled: false,
   };
   const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     d.urls.push(`${init?.method ?? "GET"} ${url}`);
+    if (d.stalled) throw new DOMException("The operation timed out.", "TimeoutError");
     if (url.endsWith("/json/list")) return new Response(JSON.stringify(d.targets));
     if (url.includes("/json/new?")) d.targets = [...d.targets, { id: "N1", type: "page", url: "about:blank" }];
     return new Response("Target activated");
@@ -596,6 +599,11 @@ test.if(posix)(
       "Browser on the desktop of dev: opened in 0.0 s",
       "Browser on the desktop of dev: brought to the front",
     ]);
+    // Chrome's endpoint doesn't answer: Chrome stays behind, and the log doesn't say it came to the front.
+    devtools.stalled = true;
+    await t.manager.show(dev, folder, () => {});
+    expect(outcomes().at(-1)).toBe("Browser on the desktop of dev: already open; it didn't come to the front");
+    devtools.stalled = false;
     // Closed by the person: the next click starts it again, and waits for its window again.
     last(t).quit();
     await waitFor(() => t.manager.chromePid(dev.id) === null);

@@ -357,9 +357,9 @@ export function findChrome(home: string = os.homedir(), platform: string = proce
  * launched-for-automation Chrome carries (no `--enable-automation`). Pages
  * see `prefers-reduced-motion: reduce`, so an animated page holds still: one
  * kept two of a 4-core computer's cores busy whether anyone watched or not,
- * and sent its desktop's viewers a stream of changes. Chrome 150 to 155's chip
- * asking to sign in to the browser stays off; later versions read the
- * profile's own switch (`prepareProfile`).
+ * and sent its desktop's viewers a stream of changes. The chip asking to sign
+ * in to the browser, a feature of Chrome 147 (at least) to 155, stays off;
+ * later versions read the profile's own switch (`prepareProfile`).
  */
 export const CHROME_ARGS = [
   "--no-first-run",
@@ -1904,21 +1904,17 @@ export class BrowserManager {
     const chrome = this.chromePath ?? (this.opts.chrome ?? (() => findChrome(this.userHome)))();
     if (!this.recentFailure() && (!this.presentCommand() || !chrome)) installing();
     const session = await this.session(agent, folder);
-    const started = await this.enqueue(session, async () => {
+    const outcome = await this.enqueue(session, async () => {
       const before = session.chrome;
       const shown = await this.ensureOwnChrome(agent, session, true, [], true);
       session.lastUsed = this.now();
       if (shown === before) {
-        await this.activate(shown);
-        return false;
+        return (await this.activate(shown)) ? "brought to the front" : "already open; it didn't come to the front";
       }
       await this.windowShown(session, shown);
-      return true;
+      return `opened in ${((this.now() - clickedAt) / 1000).toFixed(1)} s`;
     });
-    const seconds = ((this.now() - clickedAt) / 1000).toFixed(1);
-    this.opts.log(
-      `Browser on the desktop of ${agent.handle}: ${started ? `opened in ${seconds} s` : "brought to the front"}`,
-    );
+    this.opts.log(`Browser on the desktop of ${agent.handle}: ${outcome}`);
     this.changed();
   }
 
@@ -1954,9 +1950,9 @@ export class BrowserManager {
 
   /**
    * Chrome's window in front, on its most recent tab, through Chrome's own debugging endpoint; a Chrome with no
-   * tab left gets a blank one, in a window of its own.
+   * tab left gets a blank one, in a window of its own. False when Chrome didn't take it.
    */
-  private async activate(chrome: OwnChrome) {
+  private async activate(chrome: OwnChrome): Promise<boolean> {
     const at = `http://127.0.0.1:${chrome.port}/json`;
     const call = (p: string, method = "GET") =>
       (this.opts.fetch ?? fetch)(`${at}/${p}`, {
@@ -1970,9 +1966,10 @@ export class BrowserManager {
         ? targets.find((t): t is { id: string } => isRecord(t) && t.type === "page" && typeof t.id === "string")
         : undefined;
       // Chrome takes a new tab only by PUT.
-      await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call("new?about:blank", "PUT"));
+      return (await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call("new?about:blank", "PUT"))).ok;
     } catch {
       // It stays where it is: on the desktop, behind whatever is in front.
+      return false;
     }
   }
 
