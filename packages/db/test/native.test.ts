@@ -13,9 +13,9 @@ import {
   openPglite,
   PG_MAJOR,
   PGLITE_VERSION,
+  PgMajorMismatchError,
   pgliteFolder,
   pgliteUrl,
-  PgMajorMismatchError,
   restorePglite,
 } from "../src/pglite";
 import { users } from "../src/schema";

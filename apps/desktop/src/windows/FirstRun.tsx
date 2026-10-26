@@ -209,14 +209,9 @@ export function FirstRun() {
     <div className="dk-fr" data-screen={screen}>
       <div className="dk-fr__body" key={screen}>
         {screen === "choose" && (
-          <Choose
-            onCloud={(page) => void finish(CLOUD_SERVER, page)}
-            onOwn={() => go(ownServerScreen(canRunHere))}
-          />
+          <Choose onCloud={(page) => void finish(CLOUD_SERVER, page)} onOwn={() => go(ownServerScreen(canRunHere))} />
         )}
-        {screen === "own" && (
-          <Own onBack={back} onConnect={() => go("connect")} onHere={() => go("here")} />
-        )}
+        {screen === "own" && <Own onBack={back} onConnect={() => go("connect")} onHere={() => go("here")} />}
         {screen === "connect" && (
           <Connect
             onBack={back}

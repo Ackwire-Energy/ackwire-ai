@@ -30,8 +30,8 @@ import {
   openPglite,
   PG_MAJOR,
   PGLITE_VERSION,
-  pgliteUrl,
   PgMajorMismatchError,
+  pgliteUrl,
   restorePglite,
 } from "@agenteschat/db";
 import { envEntries, upsertEnv } from "@agenteschat/setup/src/lib";
