@@ -781,7 +781,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ap-card,
-  .ap-row.is-fresh {
+  .ap-row.is-fresh,
+  .ap-card__running::after {
     animation: none;
   }
   .ap-hold.is-holding::before {

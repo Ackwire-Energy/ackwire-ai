@@ -1153,7 +1153,9 @@
 @media (prefers-reduced-motion: reduce) {
   .brw-step__shot,
   .brw-mwin__row i[data-flip],
-  .brw-mwin__row i[data-flip]::after {
+  .brw-mwin__row i[data-flip]::after,
+  .brw-ac__thumb-blank,
+  .brw-skel i {
     animation: none;
   }
 }

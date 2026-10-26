@@ -16,13 +16,14 @@ export function readReducedMotion(): boolean {
 export interface Run {
   /** False once a newer run started or the component unmounted. */
   alive(): boolean;
-  /** Waits (at most 60 ms with reduced motion). */
+  /** Waits; with reduced motion only until the browser's next task, so a script shows how it ends at once. */
   sleep(ms: number): Promise<void>;
 }
 
 /**
  * Cancellable async scripts (typing, work steps, the demo scenarios): `start`
- * cancels the previous one; `join` continues the current one.
+ * cancels the previous one; `join` continues the current one. A script that
+ * loops checks `reduced` itself: with reduced motion it holds still.
  */
 export function useRunner() {
   const { reduced } = useLanding();
@@ -34,7 +35,7 @@ export function useRunner() {
     };
   }, []);
   return useMemo(() => {
-    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, reduced ? Math.min(ms, 60) : ms));
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, reduced ? 0 : ms));
     const bind = (id: number): Run => ({ alive: () => gen.current === id, sleep });
     return {
       start(fn: (run: Run) => Promise<void> | void) {
