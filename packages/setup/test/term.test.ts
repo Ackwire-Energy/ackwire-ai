@@ -222,6 +222,14 @@ describe("what each terminal gets", () => {
     );
   });
 
+  test("a log keeps each line whole, for grep", () => {
+    const { term, text } = capture({ tty: false });
+    const long = `Agents' computer: set up, but it hasn't answered agentes.chat yet; it keeps trying. Its log: ${"x".repeat(60)}`;
+    term.warn(long);
+    term.info("Next", [long], "numbered");
+    expect(text()).toBe(`▲  ${long}\n●  Next\n   1. ${long}\n`);
+  });
+
   test("inside another program's frame (AGENTES_FRAME=1): no logo and no ┌, straight onto its line", () => {
     const { term, text } = capture({ depth: 24, env: { AGENTES_FRAME: "1" } });
     expect(term.inherited).toBe(true);

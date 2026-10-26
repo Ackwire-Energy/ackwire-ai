@@ -77,6 +77,7 @@ const MARKS = {
     info: "●",
     on: "●",
     off: "○",
+    skip: "○",
     warn: "▲",
     fail: "■",
     spin: ["◒", "◐", "◓", "◑"],
@@ -93,6 +94,7 @@ const MARKS = {
     info: "*",
     on: ">",
     off: " ",
+    skip: "-",
     warn: "!",
     fail: "x",
     spin: ["-", "\\", "|", "/"],
@@ -267,7 +269,8 @@ export function createTerm(o: TermOptions = {}) {
   const depth: Depth = o.depth ?? (tty ? ((out.getColorDepth?.() ?? 1) as Depth) : 1);
   const unicode = o.unicode ?? unicodeTerminal(env, o.platform ?? process.platform);
   const S = unicode ? MARKS.unicode : MARKS.ascii;
-  const width = Math.max(20, Math.min(o.columns ?? (out.columns || 80), 80));
+  // A log keeps each line whole, for grep; a terminal gets them wrapped at its width, 80 at most.
+  const width = tty ? Math.max(20, Math.min(o.columns ?? (out.columns || 80), 80)) : Number.POSITIVE_INFINITY;
   const now = o.now ?? Date.now;
   const every =
     o.every ??
@@ -472,6 +475,10 @@ export function createTerm(o: TermOptions = {}) {
     },
     /** ▲ Not what was hoped, but it goes on. */
     warn: (text: string, ...rest: string[]) => say(block(yellow(S.warn), text, rest)),
+    /** ○ Left out (a check that couldn't run here), quiet. */
+    skipped: (text: string) => say(wrap(text, width - 3).map((l, i) => lineOf(i === 0 ? dim(S.skip) : bar(), dim(l)))),
+    /** Lines kept as they are (a log, JSON), quiet, under the line. */
+    quiet: (lines: string[]) => say(lines.map((l) => lineOf(bar(), dim(l)))),
     /** ■ It failed: what, then how to fix it. */
     fail: (error: string, fix?: string) =>
       say([

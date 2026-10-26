@@ -475,8 +475,9 @@ t_init() {
   T_URL='https?://[^ <>"]*[^ <>".,:;)]'
   E=$(printf '\033')
   if [ "${TERM:-}" = linux ]; then T_UNI=0; fi
-  if command -v fold >/dev/null 2>&1; then T_FOLD=1; fi
   if [ -t "$T_FD" ] && [ "${TERM:-dumb}" != dumb ]; then
+    # A log keeps each line whole, for grep; a terminal gets them wrapped at its width.
+    if command -v fold >/dev/null 2>&1; then T_FOLD=1; fi
     T_FRAME=1
     if [ -z "${NO_COLOR+x}" ]; then
       case ${COLORTERM:-} in
