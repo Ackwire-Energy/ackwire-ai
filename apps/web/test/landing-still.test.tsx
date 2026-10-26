@@ -7,6 +7,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { createRef, type ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
 import { createI18n } from "@/i18n";
+import { Computer } from "@/pages/landing/Computer";
 import { LandingContext, type LandingContextValue } from "@/pages/landing/context";
 import { Hero } from "@/pages/landing/Hero";
 import { Onboarding } from "@/pages/landing/Onboarding";
@@ -107,6 +108,24 @@ describe("the landing with reduced motion holds still", () => {
     const moving = renderSection(<Team />, false);
     await run(1500);
     expect(moving.container.querySelector(".lp-team-say")).not.toBeNull();
+  });
+
+  test("the computer's sample shows how it ends, at once, and nothing more happens", async () => {
+    const still = renderSection(<Computer />, true);
+    await run(200);
+    expect(still.container.querySelector(".lp-computer-title")?.textContent).toBe("Nina is done");
+    expect(still.container.querySelectorAll(".lp-computer-steps li")).toHaveLength(5);
+    const at = still.container.innerHTML;
+    await run(30_000);
+    expect(still.container.innerHTML).toBe(at);
+    cleanup();
+
+    // With motion, it plays.
+    const moving = renderSection(<Computer />, false);
+    await run(200);
+    const first = moving.container.innerHTML;
+    await run(3000);
+    expect(moving.container.innerHTML).not.toBe(first);
   });
 
   test("the onboarding stays on its step until the visitor moves it", async () => {
