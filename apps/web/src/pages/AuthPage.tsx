@@ -13,6 +13,7 @@ import { AuthShell } from "@/components/AuthLayout";
 import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
 import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH, thisMac } from "@/lib/desktop";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 
 /**
  * Sign in and sign up in one flow: the e-mail
@@ -198,6 +199,8 @@ export function AuthPage({
       return;
     }
     rememberSignIn("email");
+    // A server that sends email sent this address a link to confirm it: the onboarding says where it went.
+    if (canReset) sessionStore.set(STORAGE_KEYS.confirmationSent, email.trim().toLowerCase());
     await enter(redirect ?? "/onboarding");
   };
 
@@ -450,6 +453,7 @@ export function AuthPage({
                 className="auth__big"
                 aria-label={t("auth.yourName")}
                 autoComplete="name"
+                spellCheck={false}
                 placeholder={t("auth.flow.namePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}

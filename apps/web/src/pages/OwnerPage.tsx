@@ -77,6 +77,7 @@ export function OwnerPage({ claim }: { claim: string | null }) {
                 className="auth__big"
                 aria-label={t("auth.yourName")}
                 autoComplete="name"
+                spellCheck={false}
                 placeholder={t("auth.flow.namePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}

@@ -633,6 +633,7 @@ function NewAgentFlow() {
                 value={name}
                 maxLength={32}
                 autoComplete="off"
+                spellCheck={false}
                 placeholder={t("newAgent.namePlaceholder")}
                 onChange={(e) => changeName(e.target.value)}
               />
@@ -649,6 +650,7 @@ function NewAgentFlow() {
                 value={handle}
                 maxLength={32}
                 autoComplete="off"
+                spellCheck={false}
                 placeholder={t("newAgent.handlePlaceholder")}
                 onChange={(e) => {
                   setHandleTouched(true);

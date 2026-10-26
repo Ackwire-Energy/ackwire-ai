@@ -69,6 +69,10 @@ export const en: Translations = {
     passwordMissing_one: "{{count}} more character needed (minimum 8).",
     passwordMissing_other: "{{count}} more characters needed (minimum 8).",
     passwordTooLong: "Use at most 128 characters.",
+    emailConfirmed: "Email confirmed.",
+    emailLinkExpired: "This confirmation link is no longer valid. Your account works as usual.",
+    sendNewLink: "Send a new link",
+    newLinkSent: "We sent a new link to {{email}}.",
     termsBefore: "By continuing you accept the ",
     terms: "Terms",
     termsMiddle: " and the ",
@@ -183,16 +187,15 @@ export const en: Translations = {
       done: "Done",
     },
     hosts: {
-      ada: "Hi, I'm Ada, I'll set everything up with you.",
-      lia: "Hi, I'm Lia, I do research.",
+      ada: "Hi, I'm Ada. I'll set everything up with you.",
+      lia: "Hi, I'm Lia. I do research.",
       theo: "Nice to meet you, I'm Theo. I organize the team's tasks.",
-      atlas: "Hey, Atlas here, I look after the computers.",
+      atlas: "Hey, Atlas here. I look after the computers.",
     },
     progress: {
       left_one: "{{count}} step left",
       left_other: "{{count}} steps left",
       done: "All set",
-      count: "{{n}} of {{total}}",
     },
     railValue: {
       context: "Written",
@@ -247,6 +250,8 @@ export const en: Translations = {
     import: {
       title: "Already using agents in another app?",
       lead: "Bring them from OpenClaw, Hermes, OpenBot and others: they arrive with their instructions, skills, routines and memory. If you don't, just skip.",
+      leadWithSkip:
+        "Bring them from OpenClaw, Hermes, OpenBot and others: they arrive with their instructions, skills, routines and memory. If you don't, just <skip>skip</skip>.",
       sourcesLabel: "Where the agents come from",
       otherName: "Another app",
       openclawDesc: "The ~/.openclaw folder, a workspace or a CLAW.md.",
@@ -502,10 +507,11 @@ export const en: Translations = {
       atlas: { name: "Atlas", role: "Ops", desc: "Watches errors, queues and deploys." },
     },
     keyStep: {
-      title: "One thing left: an API key.",
+      title: "Which AI will they use?",
       lead: "Your agents need an AI to think with: an API key, or your Claude or ChatGPT plan signed in on the computer.",
       useComputer: "Or sign in with your Claude or ChatGPT plan on {{computer}}: no key needed.",
-      useComputerCloud: "Or sign in with your plan once {{computer}} is ready: no key needed.",
+      planLater: "No key? Connect later, then sign in with your plan once {{computer}} is ready.",
+      planLaterReady: "No key? Connect later, then sign in with your plan on {{computer}}.",
     },
     budget: {
       title: "Spending limit per agent",
@@ -558,6 +564,7 @@ export const en: Translations = {
       hostReady: "The chosen agents will work on this server's computer.",
       hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
       leadCloud: "On a computer just for this workspace, being set up now.",
+      leadCloudReady: "On a computer just for this workspace. It's ready.",
     },
     team: {
       title: "Who else works with you?",
@@ -593,6 +600,10 @@ export const en: Translations = {
       open: "Open #general",
     },
     skip: "Skip this step",
+    confirmation: {
+      sent: "We sent a confirmation link to {{email}}. It works for an hour.",
+      confirmed: "Email confirmed: {{email}}.",
+    },
   },
   // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).
   desktopNotice: {
@@ -956,7 +967,7 @@ export const en: Translations = {
       api_key: "API key",
       api_keyDesc: "Anthropic, OpenAI and others; pay as you go",
     },
-    waitComputer: "Available once the computer is ready (a few minutes). You can use an API key now.",
+    waitComputer: "Available once the computer is ready. You can use an API key now.",
     agent: "For which agent",
     keyLocked: "Only an admin adds an API key.",
     accountsLocked: "Only {{name}} connects a plan on {{computer}}.",
@@ -8270,7 +8281,7 @@ export const en: Translations = {
     },
     stepOf: "Step {{n}} of {{total}} · {{step}}",
     status: {
-      preparing: "Getting the computer ready. It takes a few minutes.",
+      preparing: "Getting the computer ready.",
       capacity: "This is taking longer than usual. Nothing is lost.",
       problem: "Something went wrong while preparing it. We're on it: nothing to do on your side.",
       ready: "Ready. Your agents work on it.",
@@ -8287,7 +8298,7 @@ export const en: Translations = {
     managedHint: "The workspace's own computer: always on, with a user of its own for each agent.",
     continue: "You can go on: your agents start using it as soon as it's ready.",
     plans:
-      "Claude Code and Codex come ready on it. Once it's ready, each agent signs in with your Claude or ChatGPT plan, or another AI's coding plan.",
+      "Claude Code and Codex come ready on it. Each agent signs in with your Claude or ChatGPT plan, or another AI's coding plan.",
     eta: {
       minutes_one: "About 1 min left",
       minutes_other: "About {{count}} min left",

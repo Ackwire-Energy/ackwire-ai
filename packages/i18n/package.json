@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./pt-BR": "./src/pt-BR.ts",
     "./en": "./src/en.ts",
+    "./locale": "./src/locale.ts",
     "./legal": "./src/legal/index.ts"
   },
   "sideEffects": false,

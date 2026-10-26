@@ -1992,13 +1992,36 @@ a.ac-list__row:focus-visible {
   gap: var(--space-1);
 }
 .ac-steps__bar {
+  position: relative;
   flex: 1;
   height: 4px;
+  overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--line);
 }
 .ac-steps__bar[data-done="true"] {
   background: var(--ink);
+}
+/* The step under way: ink travels along its bar, like the top progress bar (half-lit, still, without motion). */
+.ac-steps__bar[data-current]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--ink);
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-steps__bar[data-current]::before {
+    animation: ac-top-progress 1.4s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-steps__bar[data-current]::before {
+    width: 100%;
+    opacity: 0.35;
+  }
 }
 .ac-eyebrow {
   font-size: 12px;

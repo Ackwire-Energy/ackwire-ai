@@ -150,7 +150,7 @@ export function SetupFacts({ view }: { view: SetupView }) {
   );
 }
 
-/** Claude Code and Codex come ready on it: each agent signs in with a plan once it's ready. */
+/** Claude Code and Codex come ready on it: each agent signs in there with a plan. */
 export function SetupPlans() {
   const { t } = useTranslation();
   return (

@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { appLocale } from "@agenteschat/i18n/locale";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
@@ -442,6 +443,29 @@ export type UserLocale = (typeof USER_LOCALES)[number];
 export async function setMyLocale(db: Database, userId: string, locale: UserLocale) {
   if (!USER_LOCALES.includes(locale)) throw new ValidationError("locale must be pt-BR or en");
   await db.update(users).set({ locale }).where(eq(users.id, userId));
+}
+
+/**
+ * The app language a request's `Accept-Language` asks for: its most preferred English or Portuguese tag
+ * ("en-GB,en;q=0.9" → en, "pt-PT" → pt-BR), else null. The web app sends its own language in it.
+ */
+export function requestLocale(acceptLanguage: string | null | undefined): UserLocale | null {
+  const tags = (acceptLanguage ?? "")
+    .split(",")
+    .map((part) => {
+      const [tag = "", ...params] = part.split(";").map((s) => s.trim().toLowerCase());
+      const q = params.find((p) => p.startsWith("q="));
+      return { tag, q: q ? Number(q.slice(2)) : 1 };
+    })
+    .filter((l) => l.q > 0)
+    .sort((a, b) => b.q - a.q);
+  return appLocale(tags.map((l) => l.tag));
+}
+
+/** Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. */
+export async function isEmailVerified(db: Database, userId: string) {
+  const [row] = await db.select({ verified: users.emailVerified }).from(users).where(eq(users.id, userId));
+  return row?.verified === true;
 }
 
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {

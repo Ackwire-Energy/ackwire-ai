@@ -195,6 +195,23 @@ describe("the agent's no-AI card", () => {
     expect(dialog("Conectar o seu plano do Claude")).toBeNull();
   });
 
+  test("a plan while the workspace's computer is on its way: it waits, for the time left; a key meanwhile", async () => {
+    const state = walters(withCard({ intent: "claude" }), ADA_ID);
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "preparing", step: "installing", secondsLeft: 330 });
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await brain(orgId, agentId)), computer: null });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
+    const plan = dialog("Conectar o seu plano do Claude") as HTMLElement;
+    expect(plan.textContent).toContain(
+      "Disponível quando o computador ficar pronto. Dá para usar uma chave de API agora.",
+    );
+    expect(plan.textContent).toContain("Faltam uns 6 min");
+    expect(within(plan).getByRole("button", { name: "Chave de API" })).toBeTruthy();
+  });
+
   test("connected elsewhere: 'Responder agora'; still no AI: it says so and keeps Connect", async () => {
     const state = withCard({}, aiStatus(true));
     await open(state);

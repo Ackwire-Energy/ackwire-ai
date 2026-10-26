@@ -97,6 +97,10 @@ describe("the edition: which words the computers get", () => {
     // Loading: no edition's words yet.
     expect(computerEdition(undefined)).toBeNull();
     expect(computerEdition(null)).toBeNull();
+    // Before a workspace exists, the server says whether each gets its own; a workspace's setup says for it.
+    expect(computerEdition(undefined, true)).toBe("cloud");
+    expect(computerEdition(null, false)).toBe("selfhost");
+    expect(computerEdition({ ...external(), mode: "pair" }, true)).toBe("selfhost");
   });
 });
 
