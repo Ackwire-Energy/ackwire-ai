@@ -180,6 +180,17 @@ function isOneOf<T extends string>(value: string, list: readonly T[]): value is 
   return (list as readonly string[]).includes(value);
 }
 
+/** A problem said as a sentence of its own: the options' messages start lowercase, after `--flag: `. */
+export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** A command's output line as the line under a wait shows it: no colors, and no mark of the agentes.chat look. */
+export const outputLine = (line: string) =>
+  line
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: a terminal's escapes are what it leaves out
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+    .replace(/^\s*(?:[◇◆●○▲■◒◐◓◑│]\s+)?/u, "")
+    .trim();
+
 /** A typed answer to a numbered list: its number, or the value itself (`2` or `domain`). */
 export function resolveChoice<T extends string>(answer: string, values: readonly T[]): T | null {
   const typed = answer.trim().toLowerCase();
@@ -996,17 +1007,12 @@ export const sshTunnel = (port: string, to: SshTarget) =>
 /**
  * A public domain's first start: private (PUBLIC_URL http://localhost:<port>) until the owner's account
  * exists, created through an SSH tunnel to the domain so nobody else can claim the instance; then the domain
- * goes live.
+ * goes live. The tunnel's command is a line of its own (`$ `), to copy whole.
  */
-export function privateStart(p: { domain: string; port: string; ssh: SshTarget; interactive: boolean }) {
+export function privateStart(p: { domain: string; port: string; ssh: SshTarget }) {
   return {
-    // Without a terminal the setup doesn't wait for the account: the domain goes live in this run if the account
-    // exists already, else in a later one, as the lines after this say.
-    note: p.interactive
-      ? `Starting agentes.chat privately first (docker compose up -d): ${p.domain} goes live once your account exists. The first time downloads about 2 GB…`
-      : "Starting agentes.chat privately first (docker compose up -d). The first time downloads about 2 GB…",
     steps: [
-      `From your computer, open a tunnel to this server: ${sshTunnel(p.port, { ...p.ssh, host: p.domain })}`,
+      `From your computer, open a tunnel to this server:\n$ ${sshTunnel(p.port, { ...p.ssh, host: p.domain })}`,
       `Open http://localhost:${p.port} and create your account: the first one owns the instance. It has to be port ${p.port} on your computer too: until ${p.domain} goes live, sign-up works only at that address.`,
     ],
   };
@@ -1222,7 +1228,7 @@ export function nextSteps(p: {
   } else {
     const port = new URL(p.url).port || "80";
     steps.push(`Open ${p.url} and ${account}.`);
-    steps.push(`On a server, open it from your computer through an SSH tunnel: ${sshTunnel(port, p.ssh)}`);
+    steps.push(`On a server, open it from your computer through an SSH tunnel:\n$ ${sshTunnel(port, p.ssh)}`);
   }
   return steps;
 }

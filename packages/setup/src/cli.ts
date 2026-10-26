@@ -62,6 +62,7 @@ import {
   normalizeDomain,
   type OnOff,
   type Options,
+  outputLine,
   PROBLEMS,
   type Problem,
   parseOptions,
@@ -72,6 +73,7 @@ import {
   resolveChoice,
   SYSTEM_RUNNER_HOME,
   secretEntries,
+  sentence,
   smtpUrlProblem,
   sshTarget,
   stopCommand,
@@ -86,6 +88,7 @@ import {
   wayIn,
   withNetworkProfile,
 } from "./lib";
+import { createTerm, type ListStyle, type Spinner } from "./term";
 
 const HELP = `agentes.chat setup: a self-hosted agentes.chat with Docker, in the current directory.
 
@@ -171,6 +174,9 @@ export async function main(argv: string[], context: { image?: boolean } = {}): P
   } finally {
     ui.close();
   }
+  // The setup speaks last, inside the installer's frame too: it closes the frame.
+  if (result.ok) ui.gap();
+  ui.end(result.ok ? ui.ending : "Stopped");
   if (opts.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result.ok ? 0 : 1;
 }
@@ -180,30 +186,32 @@ export async function main(argv: string[], context: { image?: boolean } = {}): P
 type Ui = ReturnType<typeof createUi>;
 
 interface AskOptions {
+  /** Shown before what's typed, and before the answer once answered. */
+  label?: string;
+  description?: string[];
   initial?: string;
-  /** Echoed cut short when stdin is piped. */
+  placeholder?: string;
+  /** Typed unseen, and shown cut short once answered. */
   secret?: boolean;
   /** Without an answer: asked again on a terminal, this problem when piped. */
   missing?: Problem;
   validate?: (value: string) => string | null;
-  /** What the terminal shows instead of `question: `. */
-  prompt?: string;
 }
 
 function createUi(opts: Options) {
   // With --json, stdout is for the result alone.
   const stream = opts.json ? process.stderr : process.stdout;
-  const tty = stream.isTTY === true;
-  const color = tty && !process.env.NO_COLOR;
-  const paint = (code: string) => (text: string) => (color ? `\x1b[${code}m${text}\x1b[0m` : text);
-  const bold = paint("1");
-  const dim = paint("2");
-  const interactive = !opts.json && tty && process.stdin.isTTY === true;
-  const write = (text = "") => stream.write(`${text}\n`);
+  const term = createTerm({ out: stream });
+  /** A person at a terminal, who can be asked again and waited for. */
+  const interactive = !opts.json && stream.isTTY === true && process.stdin.isTTY === true;
+  /** Arrow-key questions where the terminal can draw them; typed lines otherwise. */
+  const keys = !opts.json && term.interactive;
 
   let reader: ReturnType<typeof createInterface> | undefined;
   let lines: AsyncIterator<string> | undefined;
-  const readLine = async (): Promise<string | null> => {
+  /** The next line of stdin; someone typing at a terminal that can't draw the questions sees `prompt` first. */
+  const readLine = async (prompt: string): Promise<string | null> => {
+    if (process.stdin.isTTY) stream.write(prompt);
     if (!lines) {
       reader = createInterface({ input: process.stdin, terminal: false });
       lines = reader[Symbol.asyncIterator]();
@@ -211,71 +219,172 @@ function createUi(opts: Options) {
     const next = await lines.next();
     return next.done ? null : next.value;
   };
+  /** Before a typed answer at a terminal that can't draw the question: the question itself. */
+  const question = (title: string, lines: string[], style: ListStyle = "plain") => {
+    if (process.stdin.isTTY) term.info(title, lines, style);
+  };
+
+  let wait: Spinner | null = null;
+  let waiting = "";
+  /** The spinner that is turning, taken: its last line is the caller's. */
+  const ending = () => {
+    const spinner = wait;
+    wait = null;
+    return spinner;
+  };
 
   const ui = {
-    stream,
-    dim,
     interactive,
     /** Answers come from a terminal or from piped lines; never with --json, and not from a piped `tailscale status`. */
     canAsk: !opts.json && !opts.dryRun && opts.tailscaleStatus !== "-",
-    write,
-    title: (text: string) => write(`\n${bold(text)}`),
-    note: (text: string) => write(dim(text)),
-    ok: (text: string) => write(`${paint("32")("✓")} ${text}`),
-    warn: (text: string) => write(`${paint("33")("!")} ${text}`),
+    /** The installer's frame is around this run: it showed the folder and Docker just before. */
+    inherited: term.inherited,
+    /** How a run that went well ends: "Done", or nothing when what's left is for the person to run. */
+    ending: "Done",
+    intro: () => term.intro("setup"),
+    gap: () => term.gap(),
+    end: (text: string) => term.end(text),
+    note: (text: string) => term.text(text, true),
+    /** A wait's spinner, or a new label on the one turning (a new label clears its detail). */
+    wait(label: string, detail: string | null = null) {
+      if (!wait) wait = term.spin(label, detail);
+      else if (label !== waiting) wait.update(label, detail);
+      else if (detail !== null) wait.update(null, detail);
+      waiting = label;
+    },
+    /** The latest line of what the wait runs, under its spinner. */
+    detail(line: string) {
+      wait?.update(null, line);
+    },
+    ok(text: string, ...detail: string[]) {
+      const spinner = ending();
+      if (spinner) spinner.done(text, ...detail);
+      else term.step(text, ...detail);
+    },
+    warn(text: string) {
+      const spinner = ending();
+      if (spinner) spinner.warn(text);
+      else term.warn(text);
+    },
     fail(problem: Problem) {
-      write(`${paint("31")("✗")} ${problem.error}`);
-      write(`  ${problem.fix}`);
+      const spinner = ending();
+      if (spinner) spinner.fail(problem.error, problem.fix);
+      else term.fail(problem.error, problem.fix);
     },
-    list(title: string, items: string[], numbered = false) {
-      write(`\n${bold(title)}`);
-      for (const [i, item] of items.entries()) write(`  ${numbered ? `${i + 1}.` : "·"} ${item}`);
+    /** Something to read or do, apart from what's around it (above a wait that is turning). */
+    list(title: string, items: string[], style: ListStyle = "bullets") {
+      term.gap();
+      term.info(title, items, style);
+      term.gap();
     },
+    /** A title for the lines under it (commands, a QR code). */
+    heading(title: string) {
+      term.gap();
+      term.info(title);
+    },
+    command: (text: string, label?: string) => term.command(text, label),
     qr(text: string) {
       // Light modules drawn on a forced dark background: right on dark and light terminals alike.
-      for (const line of qrCode(text).split("\n")) write(color ? `  \x1b[97;40m${line}\x1b[0m` : `  ${line}`);
+      term.qr(qrCode(text).split("\n"));
     },
     /** An answer; empty takes `initial`. Piped, a bad answer stops the setup: nobody is there to ask again. */
-    async ask(question: string, o: AskOptions = {}): Promise<string> {
-      for (;;) {
-        stream.write(o.prompt ?? `${question}${o.initial ? dim(` [${o.initial}]`) : ""}: `);
-        const line = await readLine();
-        if (!interactive) write(line && o.secret ? `${line.slice(0, 12)}…` : (line ?? ""));
-        const answer = (line ?? "").trim() || o.initial || "";
-        const problem = answer ? (o.validate?.(answer) ?? null) : o.missing ? "an answer is needed." : null;
-        if (!problem) return answer;
-        if (!interactive || line === null) {
-          throw new SetupError(
-            !answer && o.missing
-              ? o.missing
-              : { check: "answer", error: `${question}: ${problem}`, fix: "Run with --help for the options." },
-          );
+    async ask(title: string, o: AskOptions = {}): Promise<string> {
+      term.gap();
+      const validate = (v: string) => {
+        const problem = o.validate?.(v);
+        return problem ? sentence(problem) : null;
+      };
+      const answer = keys ? await term.ask(title, { ...o, validate }) : await typed();
+      term.gap();
+      return answer;
+
+      async function typed() {
+        question(title, o.description ?? []);
+        for (;;) {
+          const line = await readLine(`${o.label ?? title}${o.initial ? ` [${o.initial}]` : ""}: `);
+          const answer = (line ?? "").trim() || o.initial || "";
+          const problem = answer ? (o.validate?.(answer) ?? null) : o.missing ? "an answer is needed." : null;
+          if (!problem) {
+            term.answered(title, o.secret ? `${answer.slice(0, 12)}…` : answer, o.label ? `${o.label}: ` : "");
+            return answer;
+          }
+          if (!interactive || line === null) {
+            throw new SetupError(
+              !answer && o.missing
+                ? o.missing
+                : { check: "answer", error: `${title}: ${problem}`, fix: "Run with --help for the options." },
+            );
+          }
+          term.warn(sentence(problem));
         }
-        ui.warn(problem.charAt(0).toUpperCase() + problem.slice(1));
       }
     },
     async choose<T extends string>(title: string, items: { value: T; label: string }[], initial: T): Promise<T> {
-      ui.list(
-        title,
-        items.map((item) => item.label),
-        true,
-      );
+      term.gap();
       const values = items.map((item) => item.value);
-      const answer = await ui.ask("Choose", {
-        initial: String(values.indexOf(initial) + 1),
-        validate: (v) => (resolveChoice(v, values) ? null : `type a number from 1 to ${items.length}.`),
-      });
-      return resolveChoice(answer, values) ?? initial;
+      let value: T;
+      if (keys) value = await term.choose(title, items, initial);
+      else {
+        question(
+          title,
+          items.map((item) => item.label),
+          "numbered",
+        );
+        const first = String(values.indexOf(initial) + 1);
+        for (;;) {
+          const line = await readLine(`Choose [${first}]: `);
+          const chosen = resolveChoice((line ?? "").trim() || first, values);
+          if (chosen) {
+            value = chosen;
+            break;
+          }
+          const problem = `type a number from 1 to ${items.length}.`;
+          if (!interactive || line === null) {
+            throw new SetupError({
+              check: "answer",
+              error: `Choose: ${problem}`,
+              fix: "Run with --help for the options.",
+            });
+          }
+          term.warn(sentence(problem));
+        }
+        term.answered(title, items[values.indexOf(value)]?.label ?? value);
+      }
+      term.gap();
+      return value;
     },
-    /** A yes/no question under a title's text; Enter takes `yes`. */
-    async confirm(question: string, yes: boolean): Promise<boolean> {
-      const answer = await ui.ask(question, {
-        prompt: `  ${question} ${yes ? "[Y/n]" : "[y/N]"} `,
-        validate: (v) => (/^(y|yes|n|no)$/i.test(v) ? null : "answer y or n."),
-      });
-      return answer ? /^y/i.test(answer) : yes;
+    /** Yes or no: `question` on the line of the answer, Enter takes `yes`. */
+    async confirm(title: string, prompt: string, yes: boolean, description: string[] = []): Promise<boolean> {
+      term.gap();
+      let value: boolean;
+      if (keys) value = await term.confirm(title, prompt, yes, description);
+      else {
+        question(title, description);
+        for (;;) {
+          const line = await readLine(`${prompt} ${yes ? "[Y/n]" : "[y/N]"} `);
+          const answer = (line ?? "").trim();
+          if (!answer || /^(y|yes|n|no)$/i.test(answer)) {
+            value = answer ? /^y/i.test(answer) : yes;
+            break;
+          }
+          if (!interactive || line === null) {
+            throw new SetupError({
+              check: "answer",
+              error: `${prompt}: answer y or n.`,
+              fix: "Run with --help for the options.",
+            });
+          }
+          term.warn("Answer y or n.");
+        }
+        term.answered(title, value ? "Yes" : "No", `${prompt} `);
+      }
+      term.gap();
+      return value;
     },
-    close: () => reader?.close(),
+    close() {
+      term.close();
+      reader?.close();
+    },
   };
   return ui;
 }
@@ -294,6 +403,33 @@ function docker(args: string[], timeoutMs?: number) {
   return { code: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
+/** `docker`'s way, without blocking: a wait's spinner keeps turning while a probe takes its seconds. */
+function exec(
+  command: string,
+  args: string[],
+  timeoutMs?: number,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    const timer = timeoutMs ? setTimeout(() => child.kill(), timeoutMs) : null;
+    const done = (code: number) => {
+      if (timer) clearTimeout(timer);
+      resolve({ code, stdout, stderr });
+    };
+    const events = child as unknown as EventEmitter;
+    events.on("error", (error: NodeJS.ErrnoException) => done(error.code === "ENOENT" ? -1 : 1));
+    events.on("close", (code: number | null) => done(code ?? 1));
+  });
+}
+
 function checkDocker(): { label: string } | { problem: Problem } {
   const problems = dockerProblems(process.platform);
   const server = docker(["version", "--format", "{{.Server.Version}}"]);
@@ -306,20 +442,23 @@ function checkDocker(): { label: string } | { problem: Problem } {
   return { label: `Docker ${server.stdout.trim()} with Compose ${version}` };
 }
 
-/** A command whose output is kept for a diagnosis and shown as it comes (unless `show` is false); `input` goes to its stdin. */
+/** A command whose output is kept for a diagnosis, its latest line shown under the wait; `input` goes to its stdin. */
 function streamed(
   ui: Ui,
   command: string,
   args: string[],
   input?: string,
-  show = true,
 ): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"] });
     let output = "";
+    let partial = "";
     const forward = (chunk: Buffer) => {
       output += chunk.toString();
-      if (show) ui.stream.write(ui.dim(chunk.toString()));
+      const lines = `${partial}${chunk.toString()}`.split(/\r\n|\r|\n/);
+      partial = lines.pop() ?? "";
+      const latest = lines.map(outputLine).filter(Boolean).pop();
+      if (latest) ui.detail(latest);
     };
     child.stdout?.on("data", forward);
     child.stderr?.on("data", forward);
@@ -334,10 +473,16 @@ function streamed(
 
 const lastLine = (output: string) => output.trim().split("\n").pop() ?? "";
 
+/** A failed command's last lines, quiet, above what failed. */
+function showTail(ui: Ui, output: string) {
+  for (const line of output.trim().split("\n").slice(-12).map(outputLine).filter(Boolean)) ui.note(line);
+}
+
 /** `docker compose up -d`, its output kept for `diagnoseCompose`. */
 async function composeUp(ui: Ui, services: string[] = []): Promise<void> {
   const { code, output } = await streamed(ui, "docker", ["compose", "up", "-d", "--quiet-pull", ...services]);
   if (code === 0) return;
+  showTail(ui, output);
   throw new SetupError(
     diagnoseCompose(output, process.platform) ?? {
       check: "compose",
@@ -347,11 +492,11 @@ async function composeUp(ui: Ui, services: string[] = []): Promise<void> {
   );
 }
 
-const logsOf = (service: string) =>
-  docker(["compose", "logs", "--no-color", "--no-log-prefix", "--tail", "80", service]).stdout;
+const logsOf = async (service: string) =>
+  (await exec("docker", ["compose", "logs", "--no-color", "--no-log-prefix", "--tail", "80", service])).stdout;
 
 const inTailscale = (args: string[], timeoutMs = 20_000) =>
-  docker(["compose", "exec", "-T", "tailscale", "tailscale", ...args], timeoutMs);
+  exec("docker", ["compose", "exec", "-T", "tailscale", "tailscale", ...args], timeoutMs);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -368,7 +513,7 @@ async function waitForApp(timeoutS: number, until: (app: App) => boolean = () =>
   const deadline = Date.now() + timeoutS * 1000;
   for (;;) {
     let healthy = false;
-    const probe = docker(["compose", "exec", "-T", "agentes", "bun", "-e", APP_PROBE], 20_000);
+    const probe = await exec("docker", ["compose", "exec", "-T", "agentes", "bun", "-e", APP_PROBE], 20_000);
     if (probe.code === 0) {
       try {
         const app = JSON.parse(probe.stdout) as App;
@@ -378,7 +523,7 @@ async function waitForApp(timeoutS: number, until: (app: App) => boolean = () =>
         // Not answering JSON yet.
       }
     } else {
-      const problem = diagnoseAppLogs(logsOf("agentes"));
+      const problem = diagnoseAppLogs(await logsOf("agentes"));
       if (problem) throw new SetupError(problem);
     }
     if (Date.now() > deadline) {
@@ -399,6 +544,12 @@ async function waitForApp(timeoutS: number, until: (app: App) => boolean = () =>
 // ── The setup ───────────────────────────────────────────────────────────────
 
 type Env = { read(): string | null; save(content: string): void };
+
+/** The wait for `docker compose up -d`: the first time it pulls the images. */
+const STARTING = {
+  label: "Starting agentes.chat (docker compose up -d)",
+  detail: "The first time downloads about 2 GB.",
+};
 
 async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   const dir = process.cwd();
@@ -421,17 +572,19 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     },
   };
 
+  ui.intro();
   if (opts.tailscaleStatus) return finishFromStatus(opts, ui, env);
 
-  ui.title("agentes.chat setup");
   const composeFile: string | null = COMPOSE_FILES.find((name) => existsSync(join(dir, name))) ?? null;
   const found = [content !== null ? ".env" : null, composeFile].filter(Boolean).join(" and ");
-  ui.note(found ? `Found ${found} in ${dir}: only what's missing is filled in.` : `Setting up in ${dir}.`);
+  // Inside the installer's frame, the folder and Docker were its last lines.
+  if (found) ui.note(`Found ${found} in ${dir}: only what's missing is filled in.`);
+  else if (!ui.inherited) ui.note(`Setting up in ${dir}.`);
 
   // Docker first: without it nothing below can run.
   const dockerCheck = image ? null : checkDocker();
   if (dockerCheck && "problem" in dockerCheck && !opts.dryRun) throw new SetupError(dockerCheck.problem);
-  if (dockerCheck && "label" in dockerCheck) ui.ok(dockerCheck.label);
+  if (dockerCheck && "label" in dockerCheck && !ui.inherited) ui.ok(dockerCheck.label);
 
   // A dry run asks nothing: it lists what the real run would ask.
   const ask = ui.canAsk;
@@ -490,6 +643,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
       tailscaleSteps(ui, hostname, opts.tailscaleTag);
       key = await ui.ask("Paste the auth key", {
         secret: true,
+        placeholder: "tskey-auth-…",
         missing: PROBLEMS.keyMissing,
         validate: tailscaleKeyProblem,
       });
@@ -500,11 +654,16 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     const missing = { check: "domain", error: "A public domain is needed.", fix: "Pass --domain chat.example.com." };
     domain = opts.domain ?? (envValue(content, "DOMAIN") || null);
     if (!domain && ask) {
-      ui.list("A public domain", [
-        "Point a DNS A record for it (and AAAA if this server has IPv6) at this server's public IP.",
-        "Open ports 80 and 443 in the server's firewall: Caddy gets a Let's Encrypt certificate on them.",
-      ]);
-      const answer = await ui.ask("Domain", { missing, validate: (v) => domainProblem(normalizeDomain(v)) });
+      const answer = await ui.ask("A public domain", {
+        label: "Domain",
+        placeholder: "chat.example.com",
+        description: [
+          "Point a DNS A record for it (and AAAA if this server has IPv6) at this server's public IP.",
+          "Open ports 80 and 443 in the server's firewall: Caddy gets a Let's Encrypt certificate on them.",
+        ],
+        missing,
+        validate: (v) => domainProblem(normalizeDomain(v)),
+      });
       domain = normalizeDomain(answer);
     }
     if (!domain && listQuestions) questions.push("the domain");
@@ -561,6 +720,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   });
   if (opts.dryRun) {
     ui.list("The plan (--dry-run: nothing is written or started)", plan);
+    ui.ending = "";
     return { ok: true, dryRun: true, network, ...results(choices), plan };
   }
 
@@ -573,17 +733,18 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     saveSecret(tokenFile, envValue(env.read(), "HOST_COMPUTER_TOKEN") ?? "");
   } else if (computer.state === "off" && computer.wasOn) {
     rmSync(tokenFile, { force: true });
-    ui.note(
-      `This machine stops being your agents' computer once agentes.chat restarts. To remove what ran them here: ${files.command} service uninstall --host`,
-    );
+    ui.note("This machine stops being your agents' computer once agentes.chat restarts. To remove what ran them here:");
+    ui.command(`${files.command} service uninstall --host`);
   }
 
   await ensureComposeFile(ui, dir, composeFile, network);
 
   if (image || !opts.start) return printCommands(ui, image, network, domain, content, stop, choices);
+  ui.gap();
   if (stop) {
-    ui.note(`Removing the way in .env no longer uses (docker ${stop.join(" ")})…`);
-    const removed = docker(stop, 120_000);
+    const what = `the way in .env no longer uses (docker ${stop.join(" ")})`;
+    ui.wait(`Removing ${what}`);
+    const removed = await exec("docker", stop, 120_000);
     if (removed.code !== 0) {
       throw new SetupError({
         check: "compose",
@@ -591,10 +752,11 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
         fix: `Fix that, run docker ${stop.join(" ")} yourself, then run the setup again.`,
       });
     }
+    ui.ok(`Removed ${what}`);
   }
   if (network === "tailscale") return startTailscale(opts, ui, env, choices);
   if (network === "domain") return startDomain(opts, ui, domain as string, env, choices);
-  ui.note("Starting agentes.chat (docker compose up -d). The first time downloads about 2 GB…");
+  ui.wait(STARTING.label, STARTING.detail);
   await composeUp(ui);
   const app = await waitForApp(opts.timeout);
   ui.ok(`agentes.chat ${app.health.version ?? ""} is up`);
@@ -653,32 +815,32 @@ async function chooseComputer(
     }
     const mac = !("problem" in c.offer) && c.offer.mac;
     if (next.ask === "computer") {
+      const why = !mac && !("problem" in c.offer) && c.offer.why ? [c.offer.why] : [];
       answers.on = await yesOrNo(
         ui,
         c.questions,
         `${mac ? "this Mac" : "this machine"} as your agents' computer`,
         next.yes,
-        () => {
-          ui.title("Agents' computer");
-          if (mac) {
-            ui.write("  Agents need a computer to work on: a browser and a folder each. This Mac can be it.");
-          } else {
-            ui.write("  Agents need a computer to work on: their own screen, a browser and a folder each.");
-            ui.write("  This machine can be it. Each agent gets a user of its own here, with about 0.2 GB");
-            ui.write("  of memory for its screen (0.6 GB more while its browser is open).");
-            if (!("problem" in c.offer) && c.offer.why) ui.write(`  ${c.offer.why}`);
-          }
-          return ui.confirm(
+        () =>
+          ui.confirm(
+            "Agents' computer",
             mac
               ? "Use this Mac as your agents' computer? They work as you, in folders of their own."
               : "Use this machine as your agents' computer?",
             next.yes,
-          );
-        },
+            mac
+              ? ["Agents need a computer to work on: a browser and a folder each. This Mac can be it."]
+              : [
+                  "Agents need a computer to work on: their own screen, a browser and a folder each. This machine can be it. Each agent gets a user of its own here, with about 0.2 GB of memory for its screen (0.6 GB more while its browser is open).",
+                  ...why,
+                ],
+          ),
       );
     } else {
       answers.commands = await yesOrNo(ui, c.questions, "whether agents may run commands on this Mac", next.yes, () =>
-        ui.confirm("Can they run commands here too? Commands run as you and can reach your files.", next.yes),
+        ui.confirm("Commands on this Mac", "Can they run commands here too?", next.yes, [
+          "Commands run as you and can reach your files.",
+        ]),
       );
     }
   }
@@ -696,11 +858,9 @@ async function chooseTelemetry(
   const decision = first.ask
     ? decideTelemetry({
         content,
-        answer: await yesOrNo(ui, questions, "usage statistics", true, () => {
-          ui.title("Usage statistics");
-          for (const line of TELEMETRY_TEXT) ui.write(`  ${line}`);
-          return ui.confirm("Send them?", true);
-        }),
+        answer: await yesOrNo(ui, questions, "usage statistics", true, () =>
+          ui.confirm("Usage statistics", "Send them?", true, [TELEMETRY_TEXT.join(" ")]),
+        ),
       })
     : first;
   Object.assign(entries, decision.entries);
@@ -708,16 +868,20 @@ async function chooseTelemetry(
 }
 
 function tailscaleSteps(ui: Ui, hostname: string, tag: string) {
-  ui.title("Tailscale");
-  ui.write(`This server joins your tailnet as "${hostname}", at https://${hostname}.<your tailnet>.ts.net with a real`);
-  ui.write(`certificate. Only devices in your tailnet reach it. No tailnet yet? Sign up free: ${TS.signup}`);
+  ui.list(
+    "Tailscale",
+    [
+      `This server joins your tailnet as "${hostname}", at https://${hostname}.<your tailnet>.ts.net with a real certificate. Only devices in your tailnet reach it. No tailnet yet? Sign up free: ${TS.signup}`,
+    ],
+    "plain",
+  );
   ui.list(
     "In the Tailscale admin console",
     [
       `DNS page, ${TS.dns}: if you see "Enable MagicDNS", click it. Under "HTTPS Certificates", click "Enable HTTPS" and confirm (device names go in a public certificate log).`,
       `Keys page, ${TS.keys}: click "Generate auth key". Leave Reusable and Ephemeral off, turn "Pre-approved" on if you see it, and click "Generate key". Copy the key (tskey-auth-…): it's shown once and works once.`,
     ],
-    true,
+    "numbered",
   );
   ui.list("Unattended, or an AI agent installing? An OAuth client secret instead of step 2", [
     `Access controls, ${TS.policy}: under "tagOwners" add "${tag}": ["autogroup:admin"], and save.`,
@@ -779,6 +943,7 @@ async function emailEntries(
     // Without one, mail goes out as ola@ the server's own host, which no provider verifies for a ts.net name or localhost.
     const fallback = network === "domain" && domain ? `agentes <ola@${domain}>` : undefined;
     entries.EMAIL_FROM = await value(opts.emailFrom ?? (ui.canAsk ? undefined : fallback), "--email-from", "Sender", {
+      placeholder: "agentes <ola@example.com>",
       validate: emailFromProblem,
       ...(fallback ? { initial: fallback } : {}),
     });
@@ -797,11 +962,10 @@ async function ensureComposeFile(ui: Ui, dir: string, file: string | null, netwo
       fix: `Download the current one (your settings live in .env): curl -fsSLO ${COMPOSE_URL}, then run the setup again.`,
     };
     if (!ui.interactive) throw new SetupError(outdated);
-    const answer = await ui.ask(`${outdated.error} Download the current one over it? Settings stay in .env (y/n)`, {
-      initial: "y",
-    });
-    if (!answer.toLowerCase().startsWith("y")) throw new SetupError(outdated);
+    const yes = await ui.confirm(outdated.error, "Download the current one over it? Settings stay in .env.", true);
+    if (!yes) throw new SetupError(outdated);
   }
+  ui.wait(`Downloading ${file ?? "docker-compose.yml"}`);
   try {
     const response = await fetch(COMPOSE_URL, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -835,18 +999,13 @@ function printCommands(
     image && network === "tailscale"
       ? [
           "docker compose up -d tailscale",
-          `Once Tailscale is on your tailnet (about a minute), write its address into .env: docker compose exec -T tailscale tailscale status --json | ${setup} --tailscale-status -`,
+          `Once Tailscale is on your tailnet (about a minute), write its address into .env:\n$ docker compose exec -T tailscale tailscale status --json | ${setup} --tailscale-status -`,
           "docker compose up -d (starts the app with that address)",
         ]
       : image && network === "domain"
         ? [
             "docker compose up -d",
-            ...privateStart({
-              domain: domain as string,
-              port,
-              ssh: sshTarget(process.env),
-              interactive: ui.interactive,
-            }).steps,
+            ...privateStart({ domain: domain as string, port, ssh: sshTarget(process.env) }).steps,
             `Then in .env set PUBLIC_URL=https://${domain} and add https to COMPOSE_PROFILES, and run docker compose up -d.`,
           ]
         : [
@@ -860,30 +1019,33 @@ function printCommands(
                 ]),
           ];
   const commands = [...(stop ? [`docker ${stop.join(" ")} (the way in .env no longer uses)`] : []), ...start];
-  ui.list("Next, in this directory", commands, true);
+  ui.list("Next, in this directory", commands, "numbered");
+  ui.ending = "";
   return { ok: true, network, started: false, ...results(choices), nextSteps: commands };
 }
 
 async function startTailscale(opts: Options, ui: Ui, env: Env, choices: Choices): Promise<Result> {
-  ui.note("Starting Tailscale (docker compose up -d tailscale)…");
+  ui.wait("Starting Tailscale (docker compose up -d tailscale)");
   await composeUp(ui, ["tailscale"]);
   const joined = await joinTailnet(opts, ui, env);
   ui.ok(`On your tailnet as ${new URL(joined.url).host}`);
   savePublicUrl(ui, env, joined.url);
 
-  ui.note("Starting agentes.chat (docker compose up -d). The first time downloads about 2 GB…");
+  ui.wait(STARTING.label, STARTING.detail);
   await composeUp(ui);
   const tailnet = await joinTailnet(opts, ui, env);
   // A new TS_HOSTNAME is set only once the node is back on the tailnet under its old name.
   if (tailnet.url !== joined.url) {
     ui.ok(`Renamed on your tailnet: ${new URL(tailnet.url).host}`);
     savePublicUrl(ui, env, tailnet.url);
+    ui.wait(STARTING.label);
     await composeUp(ui);
   }
   const host = new URL(tailnet.url).host;
   await ensureServe(opts, ui, env, host);
   await waitForCertificate(opts, ui, host);
   ui.ok("HTTPS certificate ready");
+  ui.wait("Waiting for agentes.chat to answer");
   const app = await waitForApp(opts.timeout);
   ui.ok(`agentes.chat ${app.health.version ?? ""} is up`);
   return finish(ui, "tailscale", tailnet.url, app, tailnet.keyExpiry, choices);
@@ -906,9 +1068,15 @@ async function joinTailnet(opts: Options, ui: Ui, env: Env): Promise<{ url: stri
         throw error;
       }
       ui.fail(error.problem);
-      const key = await ui.ask("Paste a new auth key", { missing: PROBLEMS.keyMissing, validate: tailscaleKeyProblem });
+      const key = await ui.ask("Paste a new auth key", {
+        secret: true,
+        placeholder: "tskey-auth-…",
+        missing: PROBLEMS.keyMissing,
+        validate: tailscaleKeyProblem,
+      });
       const current = env.read() ?? "";
       env.save(upsertEnv(current, tailscaleKeyEntries(key, opts.tailscaleTag, envValue(current, "TS_EXTRA_ARGS"))));
+      ui.wait("Starting Tailscale (docker compose up -d tailscale)");
       await composeUp(ui, ["tailscale"]);
     }
   }
@@ -922,24 +1090,34 @@ async function waitForTailnet(
   const deadline = Date.now() + opts.timeout * 1000;
   let said = "";
   for (;;) {
-    const status = inTailscale(["status", "--json"]);
+    const status = await inTailscale(["status", "--json"]);
     const state = status.code === 0 ? readTailscaleStatus(status.stdout) : null;
     if (state?.kind === "ready") return state;
     // A tailnet setting someone can switch on while this waits; without a terminal, say it at once.
     const setting = state?.kind === "problem" ? state.problem : null;
     if (setting && !ui.interactive) throw new SetupError(setting);
-    const logged = setting ? null : diagnoseTailscaleLogs(logsOf("tailscale"), opts.tailscaleTag);
+    const logged = setting ? null : diagnoseTailscaleLogs(await logsOf("tailscale"), opts.tailscaleTag);
     if (logged && logged !== "approval") throw new SetupError(logged);
     if (state?.kind === "waiting" && state.reason === "login" && !hasKey) throw new SetupError(PROBLEMS.keyMissing);
     const approval = (state?.kind === "waiting" && state.reason === "approval") || logged === "approval";
-    const message = setting
-      ? `${setting.error} ${setting.fix} The setup goes on once it's on…`
+    // What a person has to do goes above the spinner, once; the spinner says what it waits for.
+    const note = setting
+      ? {
+          title: setting.error,
+          lines: [setting.fix, "The setup goes on once it's on."],
+          label: "Waiting for that setting",
+        }
       : approval
-        ? `Waiting for approval: open ${TS.machines}, find the server marked "Needs approval", and choose Approve in its … menu.`
-        : "Waiting for Tailscale to join your tailnet…";
-    if (message !== said) {
-      ui.note(message);
-      said = message;
+        ? {
+            title: "Waiting for approval",
+            lines: [`Open ${TS.machines}, find the server marked "Needs approval", and choose Approve in its … menu.`],
+            label: "Waiting for approval",
+          }
+        : null;
+    ui.wait(note?.label ?? "Waiting for Tailscale to join your tailnet");
+    if (note && note.title !== said) {
+      ui.list(note.title, note.lines, "plain");
+      said = note.title;
     }
     if (Date.now() > deadline) {
       throw new SetupError(
@@ -962,13 +1140,13 @@ async function waitForTailnet(
  * that joined while HTTPS was still off in the tailnet may hold an empty one: a restart applies it again.
  */
 async function ensureServe(opts: Options, ui: Ui, env: Env, host: string) {
-  const served = () => inTailscale(["serve", "status", "--json"]).stdout.includes(`"${host}:443"`);
-  if (served()) return;
-  ui.note("Applying the HTTPS proxy (docker compose restart tailscale)…");
-  docker(["compose", "restart", "tailscale"], 60_000);
+  const served = async () => (await inTailscale(["serve", "status", "--json"])).stdout.includes(`"${host}:443"`);
+  if (await served()) return;
+  ui.wait("Applying the HTTPS proxy (docker compose restart tailscale)");
+  await exec("docker", ["compose", "restart", "tailscale"], 60_000);
   await joinTailnet(opts, ui, env);
-  for (let i = 0; i < 10 && !served(); i++) await sleep(2000);
-  if (!served()) {
+  for (let i = 0; i < 10 && !(await served()); i++) await sleep(2000);
+  if (!(await served())) {
     throw new SetupError({
       check: "tailscale.serve",
       error: "Tailscale didn't turn on the HTTPS proxy for this server.",
@@ -979,11 +1157,11 @@ async function ensureServe(opts: Options, ui: Ui, env: Env, host: string) {
 
 /** Asks Tailscale for the certificate the HTTPS proxy serves, so the first visit doesn't wait for it. */
 async function waitForCertificate(opts: Options, ui: Ui, host: string) {
-  ui.note(`Getting the HTTPS certificate for ${host}…`);
+  ui.wait(`Getting the HTTPS certificate for ${host}`);
   const deadline = Date.now() + opts.timeout * 1000;
   for (;;) {
     // The certificate alone, to stdout: the private key is never written anywhere.
-    const cert = inTailscale(["cert", "--cert-file", "-", host], Math.max(5_000, deadline - Date.now()));
+    const cert = await inTailscale(["cert", "--cert-file", "-", host], Math.max(5_000, deadline - Date.now()));
     if (cert.code === 0 && cert.stdout.includes("BEGIN CERTIFICATE")) return;
     if (Date.now() > deadline) {
       throw new SetupError({
@@ -1000,10 +1178,11 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choi
   const url = `https://${domain}`;
   if (envValue(env.read(), "PUBLIC_URL") !== url) {
     const port = envValue(env.read(), "HOST_PORT") || "3000";
-    const { note, steps } = privateStart({ domain, port, ssh: sshTarget(process.env), interactive: ui.interactive });
-    ui.note(note);
+    const { steps } = privateStart({ domain, port, ssh: sshTarget(process.env) });
+    ui.wait("Starting agentes.chat privately first (docker compose up -d)", STARTING.detail);
     await composeUp(ui);
     const app = await waitForApp(opts.timeout);
+    ui.ok(`agentes.chat ${app.health.version ?? ""} is up, on this server only`);
     if (app.firstRun) {
       if (!ui.interactive) {
         const again =
@@ -1011,7 +1190,8 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choi
             ? `Run the setup again: it turns on HTTPS for ${domain} and makes this machine the agents' computer.`
             : `Run the setup again: it turns on HTTPS for ${domain}.`;
         const next = [...steps, again];
-        ui.list("Next", next, true);
+        ui.list("Next", next, "numbered");
+        ui.ending = "";
         return {
           ok: true,
           network: "domain",
@@ -1021,10 +1201,10 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choi
           nextSteps: next,
         };
       }
-      ui.list(`Create your account before ${domain} goes live`, steps, true);
+      ui.list(`Create your account before ${domain} goes live`, steps, "numbered");
       // A person has to open the tunnel and sign up: longer than any service gets to start.
       const minutes = Math.max(30, Math.ceil(opts.timeout / 60));
-      ui.note(`Waiting for the account (up to ${minutes} minutes)…`);
+      ui.wait(`Waiting for the account (up to ${minutes} minutes)`);
       await waitForApp(minutes * 60, (a) => !a.firstRun, {
         check: "domain.owner",
         error: `No account was created within ${minutes} minutes.`,
@@ -1035,9 +1215,9 @@ async function startDomain(opts: Options, ui: Ui, domain: string, env: Env, choi
     env.save(upsertEnv(withNetworkProfile(env.read() ?? "", "https"), { PUBLIC_URL: url }));
     ui.ok(`.env: PUBLIC_URL=${url}, https in COMPOSE_PROFILES`);
   }
+  ui.wait(`Waiting for ${url} (Caddy gets its certificate)`);
   await composeUp(ui);
   const app = await waitForApp(opts.timeout);
-  ui.note(`Waiting for ${url} (Caddy gets its certificate)…`);
   const deadline = Date.now() + opts.timeout * 1000;
   for (;;) {
     let failure: unknown = null;
@@ -1095,6 +1275,7 @@ async function finishFromStatus(opts: Options, ui: Ui, env: Env): Promise<Result
   if (opts.dryRun) {
     const plan = [`.env: PUBLIC_URL=${state.url}${envValue(env.read(), "TS_AUTHKEY") ? ", TS_AUTHKEY emptied" : ""}`];
     ui.list("The plan (--dry-run: nothing is written or started)", plan);
+    ui.ending = "";
     return { ok: true, dryRun: true, network: "tailscale", plan };
   }
   savePublicUrl(ui, env, state.url);
@@ -1142,15 +1323,18 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
   const what = computer.mac ? "this Mac" : "this machine";
   const files = computerFiles(computer.mac, homedir(), RUNNER_HOME);
   // Its unit's journal on Linux, its log file on a Mac: since a time or an offset, or the latest lines.
-  const log = (since: { at: number; offset: number } | null) =>
+  const log = async (since: { at: number; offset: number } | null) =>
     files.log
       ? readFrom(files.log, since ? since.offset : null)
-      : (spawnSync(
-          "journalctl",
-          ["-u", HOST_SERVICE, "-o", "cat", "--no-pager", ...(since ? ["--since", `@${since.at}`] : ["-n", "1000"])],
-          { encoding: "utf8", timeout: 10_000, maxBuffer: 16 * 1024 * 1024 },
-        ).stdout ?? "");
+      : (
+          await exec(
+            "journalctl",
+            ["-u", HOST_SERVICE, "-o", "cat", "--no-pager", ...(since ? ["--since", `@${since.at}`] : ["-n", "1000"])],
+            10_000,
+          )
+        ).stdout;
   if (computer.kept) {
+    ui.wait(`Checking ${what} as your agents' computer`);
     const served = await fetch(`${computer.install.server}/runner/agentes-runner.mjs`, {
       signal: AbortSignal.timeout(30_000),
     })
@@ -1159,16 +1343,15 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
     const running = computer.mac
       ? succeeds("launchctl", ["print", `gui/${process.getuid?.() ?? 0}/${HOST_LAUNCHD_LABEL}`])
       : succeeds("systemctl", ["is-active", "--quiet", HOST_SERVICE]);
-    const state = hostState(log(null));
+    const state = hostState(await log(null));
     if (computerUpToDate({ kept: true, running, state, installed: readOrNull(files.bundle), served })) {
       ui.ok(`Agents' computer: ${what}`);
       return;
     }
   }
-  ui.note(
-    computer.mac
-      ? "Setting up this Mac for your agents…"
-      : "Setting up this machine for your agents: a user and a screen for each, and the packages they need. The first time takes a few minutes…",
+  ui.wait(
+    `Setting up ${what} for your agents`,
+    computer.mac ? null : "A user and a screen for each, and the packages they need: a few minutes the first time.",
   );
   const since = {
     at: Math.floor(Date.now() / 1000),
@@ -1186,18 +1369,19 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
       fix: "Run the setup again: agentes.chat itself is up.",
     });
   }
-  const run = await streamed(ui, "sh", ["-s", "--", ...computer.install.args], script, false);
+  const run = await streamed(ui, "sh", ["-s", "--", ...computer.install.args], script);
   if (run.code !== 0) {
-    for (const line of run.output.trim().split("\n").slice(-12)) ui.note(`  ${line}`);
+    showTail(ui, run.output);
     throw new SetupError({
       check: "computer.install",
       error: `Setting up the agents' computer failed: ${lastLine(run.output)}`,
       fix: "Fix what the output above says, then run the setup again: agentes.chat itself is up.",
     });
   }
+  ui.wait(`Waiting for ${what} to answer agentes.chat`);
   const deadline = Date.now() + COMPUTER_WAIT_S * 1000;
   for (;;) {
-    const state = hostState(log(since));
+    const state = hostState(await log(since));
     if (state === "on") {
       ui.ok(`Agents' computer: ${what}`);
       return;
@@ -1241,15 +1425,16 @@ async function finish(
     failed,
     ssh: sshTarget(process.env),
   });
-  ui.write("");
-  ui.write(`  ${url}`);
+  // Inside the image the app isn't started yet: this is the address it will have.
+  ui.heading(app ? "agentes.chat is up" : "agentes.chat's address");
+  ui.command(url);
   if (end.link) {
-    ui.write("");
-    ui.write(`    App:  ${end.link}`);
-    ui.write("");
+    ui.gap();
+    ui.command(end.link, "App:");
+    ui.gap();
     ui.qr(end.link);
-    ui.note("  Open the App link where the agentes.chat app is installed, or point your phone's camera here.");
+    ui.note("Open the App link where the agentes.chat app is installed, or point your phone's camera here.");
   }
-  ui.list("Next", end.steps, true);
+  ui.list("Next", end.steps, "numbered");
   return end.result;
 }
