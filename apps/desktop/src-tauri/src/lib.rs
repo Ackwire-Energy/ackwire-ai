@@ -232,9 +232,10 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
 }
 
 /// A page of a server this app opens goes to the main window, on that server; a provider's sign-in page and
-/// the app's own downloads open in the person's browser. Nothing else.
+/// the app's own downloads open in the person's browser. Nothing else. Async, as every command that may make
+/// a window (`server_choose`).
 #[tauri::command]
-fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+async fn open_external(app: AppHandle, url: String) -> Result<(), String> {
     if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return Err("not a link the app opens".into());
     }
@@ -265,8 +266,9 @@ fn set_tray_state(app: AppHandle, state: String) -> Result<(), String> {
     tray::set_state(&app, &state)
 }
 
+/// Async: Welcome and Preferences are made here (`server_choose`).
 #[tauri::command]
-fn show_window(app: AppHandle, name: String) -> Result<(), String> {
+async fn show_window(app: AppHandle, name: String) -> Result<(), String> {
     present(&app, &name)
 }
 
