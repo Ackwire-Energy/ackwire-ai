@@ -595,7 +595,11 @@ describe("Onboarding", () => {
     await throughImport(state);
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
-    expect(card.textContent).toContain("com um usuário para cada agente");
+    expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
+    expect(button(/^Outro computador/).textContent).toContain("Um Mac ou outro servidor, conectado com um código.");
+    expect(document.body.textContent).toContain(
+      "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
+    );
     expect(document.body.textContent).toContain("Os agentes escolhidos vão trabalhar no computador deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();

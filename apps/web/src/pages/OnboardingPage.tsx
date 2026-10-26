@@ -102,7 +102,7 @@ import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton, useAgentsHere, useOrgName } from "@/components/ThisMac";
-import { SetupWait, useSetupWait, type WaitReader } from "@/components/WorkspaceComputer";
+import { ComputerTitle, SetupWait, useSetupWait, type WaitReader } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
@@ -1664,13 +1664,15 @@ function WorkspaceComputerStep({
   hold: string | null;
 }) {
   const { t } = useTranslation();
+  const title = t("computerSetup.title", { org: orgName });
   return (
     <Card as="div" className="onb__workspace-computer">
       <div className="row" style={{ gap: 16, alignItems: "center" }}>
         <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state={setupPortrait(view, true)} size={96} />
-        <span className="stack-4" style={{ gap: 4, flex: "1 1 220px", minWidth: 0 }}>
-          <b>{t("computerSetup.title", { org: orgName })}</b>
-          <span className="small muted">{t("computerSetup.lead")}</span>
+        <span style={{ flex: "1 1 220px", minWidth: 0 }}>
+          <ComputerTitle name={title}>
+            <b>{title}</b>
+          </ComputerTitle>
         </span>
       </div>
       {hold && (
@@ -1679,8 +1681,7 @@ function WorkspaceComputerStep({
           <span>{hold}</span>
         </p>
       )}
-      {/* The team is made after this step: closing the page here would lose it. */}
-      <SetupWait view={view} reader={reader} closeable={false} />
+      <SetupWait view={view} reader={reader} />
       {setupPending(view) && (
         <p className="onb__status ac-iconline">
           <Icon name="check" />

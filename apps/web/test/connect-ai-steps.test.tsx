@@ -343,10 +343,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Passo 3 de 4 · Instalando os programas");
     expect(panel.textContent).toContain("Faltam uns 6 min");
-    expect(panel.textContent).toContain(
-      "Avisamos você em walter@acme.com.br quando ele ficar pronto. Pode fechar esta página.",
-    );
+    // The panel's own line says what happens once it's ready: no email line too.
     expect(panel.textContent).toContain("Você entra aqui assim que ele ficar pronto.");
+    expect(panel.textContent).not.toContain("Avisamos");
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
     expect(within(dialog).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
     expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado|seu computador/);

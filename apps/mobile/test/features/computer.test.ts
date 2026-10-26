@@ -287,7 +287,7 @@ describe("the workspace's computer on its way, on Conversas", () => {
     const view = viewOf();
     expect(setupNoticeLine(t, view, setupEta(view, NOW))).toBe("Faltam uns 6 min");
     const slow = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
-    expect(setupNoticeLine(t, slow, setupEta(slow, NOW))).toBe("Está demorando mais que o normal. Nada se perde.");
+    expect(setupNoticeLine(t, slow, setupEta(slow, NOW))).toBe("Está demorando mais que o normal.");
     // On hold no time is said: where it is instead.
     expect(setupNoticeLine(t, view, null)).toBe("Instalando os programas");
   });

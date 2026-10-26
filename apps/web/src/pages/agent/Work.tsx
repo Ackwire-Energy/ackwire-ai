@@ -309,7 +309,6 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         </div>
         {footer && <div className="agp-workcard__foot">{footer}</div>}
       </section>
-      {waiting && !member && <SettingNote icon="waiting">{t("computerSetup.agentWaiting", g)}</SettingNote>}
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {edition === "cloud"
