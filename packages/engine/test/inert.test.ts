@@ -18,8 +18,8 @@ const LURES = [
   "acme-support.com",
   "acme-support。com",
   "ａｃｍｅ-support．com",
-  "acme-sup​port.com",
-  "‮moc.troppus-emca‬",
+  "acme-sup\u200bport.com",
+  "\u202emoc.troppus-emca\u202c",
   "Security notice\nVisit acme-support.com\n\nThe team",
   `${"Urgent: verify your account now. ".repeat(3)}acme-support.com`,
   "Account locked? Call +1 (888) 555-0199",
@@ -36,10 +36,10 @@ const REAL_NAMES = [
   "株式会社テスト",
   "市场部：华东区",
   "شركة النور",
-  "محمد‌رضا",
-  "Ana ❤️",
-  "\u{1f469}\u{1f3fd}‍\u{1f4bb} Dev Team",
-  "\u{1f3f3}️‍\u{1f308} Pride",
+  "محمد\u200cرضا",
+  "Ana ❤\ufe0f",
+  "\u{1f469}\u{1f3fd}\u200d\u{1f4bb} Dev Team",
+  "\u{1f3f3}\ufe0f\u200d\u{1f308} Pride",
 ];
 
 describe("inertText", () => {
@@ -72,7 +72,7 @@ describe("inertText", () => {
       expect(linkable(inertText(name)), name).toBe(false);
     }
     // A joiner or a presentation selector anywhere else is no part of writing.
-    expect(inertText("pay‍pal 1️ ‌中")).toBe("paypal 1 中");
+    expect(inertText("pay\u200dpal 1\ufe0f \u200c中")).toBe("paypal 1 中");
   });
 
   test("prints no phone number a mail app would dial, and keeps shorter numbers", () => {
@@ -111,12 +111,12 @@ describe("inertText", () => {
     expect(inertText("word ".repeat(24), 120)).toBe("word ".repeat(24).trimEnd());
     expect(inertText("word ".repeat(30), 120)).toBe(`${"word ".repeat(23)}word…`);
     // One letter under hundreds of combining marks is a single character.
-    expect(inertText(`Z${"̶".repeat(500)}algo`)).toBe(`Z${"̶".repeat(4)}algo`);
+    expect(inertText(`Z${"\u0336".repeat(500)}algo`)).toBe(`Z${"\u0336".repeat(4)}algo`);
     // So is a chain of emoji joiners or of Indic viramas, which the code point cap cuts.
-    for (const chain of [`${"\u{1f469}‍".repeat(300)}x`, `${"क्".repeat(300)}x`]) {
+    for (const chain of [`${"\u{1f469}\u200d".repeat(300)}x`, `${"क्".repeat(300)}x`]) {
       const inert = inertText(chain);
       expect(Array.from(readable(inert)).length).toBeLessThanOrEqual(4 * 64);
-      expect(inert).toMatch(/[^‍]…$/u);
+      expect(inert).toMatch(/[^\u200d]…$/u);
     }
   });
 
@@ -127,7 +127,7 @@ describe("inertText", () => {
     expect(inert).not.toMatch(/\S{31}/u);
     // The breaks after separators count: "a.b.c…" needs no more.
     expect(inertText("a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r")).not.toContain(`${BREAK}${BREAK}`);
-    const emoji = "\u{1f469}\u{1f3fd}‍\u{1f4bb}".repeat(31);
+    const emoji = "\u{1f469}\u{1f3fd}\u200d\u{1f4bb}".repeat(31);
     expect(readable(inertText(emoji))).toBe(emoji);
     expect([...new Intl.Segmenter().segment(inertText(emoji))].map((s) => s.segment)).toContain(BREAK);
   });

@@ -16,21 +16,24 @@
  * IDNA's mapping deletes it. Whitespace ends every scheme, host and address grammar, and NFKC turns a hair
  * space into a space, which still ends them. It is about 1/24 em wide, so "acme.dev" reads as acme.dev.
  */
-export const BREAK = " ";
+export const BREAK = "\u200a";
 const SEPARATORS = new Set([".", ":", "@", "\\"]);
 
-/** The longest run of characters with no break: a table cell grows to its longest word, past a phone's screen. */
+/**
+ * The longest run of characters with no break, for the plain-text part and a client that ignores the layout's
+ * `word-break`: a table cell grows to its longest word, past a phone's screen.
+ */
 const RUN_MAX = 30;
 
 /** Zero-width, bidi and the other format and default-ignorable characters, except those writing uses. */
-const INVISIBLE = /(?!‌|‍|︎|️)[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
+const INVISIBLE = /(?!\u200c|\u200d|\ufe0e|\ufe0f)[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
 /**
  * Those stay only where writing puts them: a presentation selector right after an emoji, a joiner inside
  * an emoji sequence or between letters of a script that shapes with it (Persian ZWNJ, Indic ZWJ).
  */
-const STRAY_SELECTOR = /(?<!\p{Extended_Pictographic})(?:︎|️)/gu;
+const STRAY_SELECTOR = /(?<!\p{Extended_Pictographic})(?:\ufe0e|\ufe0f)/gu;
 const STRAY_JOINER =
-  /(?<![\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Lo}\p{M}])(?:‌|‍)|(?:‌|‍)(?![\p{Extended_Pictographic}\p{Lo}])/gu;
+  /(?<![\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Lo}\p{M}])(?:\u200c|\u200d)|(?:\u200c|\u200d)(?![\p{Extended_Pictographic}\p{Lo}])/gu;
 /** Controls (newlines, tabs) and line or paragraph separators. */
 const LINE_BREAKING = /[\p{Cc}\p{Zl}\p{Zp}]/gu;
 /** Combining marks past the fourth in a row: a flood of them is one character the length cap would never cut. */
