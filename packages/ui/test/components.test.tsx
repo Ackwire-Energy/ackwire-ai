@@ -250,6 +250,32 @@ describe("Card", () => {
   });
 });
 
+describe("single-line controls", () => {
+  test("buttons, inputs and selects centre their text in the box: the line is the text's own", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    for (const selector of [
+      ".ac-btn",
+      ".ac-input",
+      ".ac-input-affix",
+      ".ac-select__trigger",
+      ".ac-palette__q input",
+      ".ac-seg__item",
+      ".ac-filtertoggle",
+      ".ac-composer__pill,\n.ac-composer__agent",
+      ".ac-recur__day",
+      ".ac-react",
+    ]) {
+      const body = rule(selector);
+      expect(body).toContain("line-height: normal");
+      // After `font: inherit`, which would reset it.
+      if (body.includes("font: inherit")) expect(body.indexOf("line-height")).toBeGreaterThan(body.indexOf("font:"));
+    }
+    // Text that wraps keeps its line.
+    expect(rule("textarea.ac-input")).toContain("line-height: 22px");
+  });
+});
+
 describe("Composer", () => {
   function Harness({ onSend }: { onSend: (t: string) => void }) {
     const [v, setV] = useState("");

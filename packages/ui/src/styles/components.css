@@ -109,7 +109,10 @@ samp {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  line-height: 20px;
+  /* The box sets the height and the line is the text's own. A 20 or 22px line around 14px Source Sans 3 (a 21px
+     text box) leaves one pixel that Chrome and Safari put under the text, so the capitals would sit 1px high. Every
+     single-line control takes `normal` for the same reason. */
+  line-height: normal;
   white-space: nowrap;
   text-decoration: none;
   border-radius: var(--radius-sm);
@@ -250,6 +253,7 @@ samp {
   padding: 0 var(--control-px-md);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
@@ -294,6 +298,7 @@ textarea.ac-input {
   height: var(--control-h-md);
   box-sizing: border-box;
   font-size: var(--control-fs-md);
+  line-height: normal;
   border: 1px solid var(--field-line);
   border-radius: var(--control-r-md);
   background: var(--field-bg);
@@ -1095,6 +1100,7 @@ textarea.ac-input {
   padding: 0 var(--space-3) 0 var(--control-px-md);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
@@ -3476,6 +3482,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: var(--control-fs-sm);
   font-weight: 600;
+  line-height: normal;
   height: calc(var(--seg-h) - 2 * var(--seg-in));
   padding: 0 12px;
   border: 0;
@@ -4163,6 +4170,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 13px;
   font-weight: 550;
+  line-height: normal;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -4259,6 +4267,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   background: var(--sunken);
   color: var(--ink2);
   border: 0;
@@ -4824,6 +4833,7 @@ a.ac-list__row:focus-visible {
   background: transparent;
   font: inherit;
   font-size: 16px;
+  line-height: normal;
   color: var(--ink);
 }
 .ac-palette__q input::placeholder {
@@ -4971,6 +4981,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     background-color 0.15s var(--out),
@@ -5403,6 +5414,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition:

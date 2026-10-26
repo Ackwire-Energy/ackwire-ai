@@ -599,6 +599,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .issues-dest[aria-checked="true"] {
@@ -864,6 +865,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .issue-ask__other:hover {

@@ -2184,6 +2184,7 @@ p {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
@@ -3633,6 +3634,7 @@ p {
   border-radius: var(--control-r-sm);
   font-weight: 600;
   font-size: var(--control-fs-sm);
+  line-height: normal;
   background: var(--raised);
   color: var(--ink);
   box-shadow: var(--e1), var(--top);
@@ -4065,6 +4067,7 @@ p {
   box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--faint);
   cursor: pointer;
   text-align: left;
@@ -4186,6 +4189,7 @@ p {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .live-code-toggle__btn:hover {
@@ -4727,6 +4731,7 @@ button.live-call__head:hover {
   font: inherit;
   font-size: 12.5px;
   font-weight: 650;
+  line-height: normal;
   color: var(--ink);
   cursor: pointer;
   transition: transform 0.18s var(--spring);
@@ -6953,6 +6958,7 @@ a.machine-row__name:hover {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     transform 0.18s var(--spring),
@@ -9124,6 +9130,7 @@ html[data-menu-overlay] .shell {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   color: var(--muted);
   cursor: pointer;
 }
@@ -9223,6 +9230,7 @@ html[data-menu-overlay] .shell {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink);
   white-space: nowrap;
   cursor: pointer;

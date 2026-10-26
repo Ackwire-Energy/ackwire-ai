@@ -572,6 +572,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   cursor: pointer;
   transition:

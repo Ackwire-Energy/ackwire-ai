@@ -1239,6 +1239,7 @@ body[data-window="popover"] {
   color: var(--muted);
   font-weight: 500;
   font-size: 13.5px;
+  line-height: normal;
   white-space: nowrap;
 }
 .dk-pnav button:hover,

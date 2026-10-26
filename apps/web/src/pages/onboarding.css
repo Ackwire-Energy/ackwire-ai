@@ -73,6 +73,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .onb__back:hover:not(:disabled) {
@@ -225,6 +226,7 @@ textarea.onb__big.ac-input {
   font: inherit;
   font-size: 16px;
   font-weight: 650;
+  line-height: normal;
   text-align: right;
   outline: none;
 }
