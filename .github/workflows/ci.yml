@@ -7,9 +7,10 @@ name: CI
 # packages, the lockfile and this file run everything); docs and READMEs alone run only the secret
 # scan and the boundaries check. A manual run or a release tag checks everything.
 #
-# Runners are sized by price: the tests and the image boot run on ARM (a third cheaper per minute
-# than x64 on the same vCPUs), jobs that last seconds on 2 vCPUs (billing rounds each job up to a
-# whole minute), and lint/typecheck/build stays on x64 with the tools the x64 image ships.
+# Runners are sized by price: jobs that last seconds run on 2 vCPU ARM (billing rounds each job up
+# to a whole minute, and ARM costs a third less per minute). The tests stay on 4 vCPU x64: on 4 vCPU
+# ARM the backend shards took 2.5x as long (603 and 667 s against 229 and 275 s, 2026-10-26), which
+# cost more than the cheaper minute saves.
 on:
   push:
     branches: [main]
@@ -181,7 +182,7 @@ jobs:
     name: Test (backend ${{ matrix.shard }}/2)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -227,7 +228,7 @@ jobs:
     if: >-
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
@@ -296,7 +297,7 @@ jobs:
   # (sign-up is closed by default), the web app, the runner download and install.sh at /install,
   # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
   # and the backup profile: a dump and its restore.
-  # arm64 only (the cheaper runner), nothing pushed.
+  # amd64 only, nothing pushed.
   # A pull request runs it only when the image's own files changed (Dockerfile, compose files, the
   # backup image): code changes are the tests' job, and every push to main still runs it.
   # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
@@ -307,7 +308,7 @@ jobs:
     if: >-
       needs.changes.outputs.image == 'true' &&
       (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     env:
       AGENTES_IMAGE: agentes:ci
@@ -321,15 +322,15 @@ jobs:
           context: .
           load: true
           tags: ${{ env.AGENTES_IMAGE }}
-          cache-from: type=gha,scope=app-arm64
-          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=app-arm64,mode=max' || '' }}
+          cache-from: type=gha,scope=app-amd64
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=app-amd64,mode=max' || '' }}
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: deploy/backup
           load: true
           tags: ${{ env.AGENTES_BACKUP_IMAGE }}
-          cache-from: type=gha,scope=backup-arm64
-          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=backup-arm64,mode=max' || '' }}
+          cache-from: type=gha,scope=backup-amd64
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=backup-amd64,mode=max' || '' }}
       - name: Boot and use it
         run: |
           docker image ls "$AGENTES_IMAGE"
