@@ -1,6 +1,6 @@
 # 0068. An invitation link asks to join; an admin approves
 
-- Status: Accepted (built: server, web and the shared client; the phone app follows)
+- Status: Accepted (built: server, web, the shared client and the phone app)
 - Date: 2026-10-26
 - Revises: ADR 0006 (the organization-wide invitation link, and the sign-up policy's link path)
 
@@ -19,8 +19,8 @@ by an account with it.
 2. **Asking needs no account.** Signed out, a person gives a name (1 to 80 characters), an email and an optional
    note (up to 200, shown in the app only, never in an email or a push); signed in, their account asks. Requests
    live in `organization_join_requests` (`invite-requests.ts`).
-3. **Owners and admins answer** in Settings › Members: approve with a role (member or admin, member by default) or
-   deny with an optional reason the person is told by email.
+3. **Owners and admins answer** in Settings › Members, or in the phone app's Requests sheet: approve with a role
+   (member or admin, member by default) or deny with an optional reason the person is told by email.
 4. **An approval lets in only whoever controls the address.** A signed-in account with that address confirmed
    (`users.email_verified`, not blocked) joins at once. Every other request gets an email invitation to the address
    with that role (`sendInvitation`, 7 days), worded as the answer; an address that already has an invitation gets
@@ -33,13 +33,16 @@ by an account with it.
    burst while unread, no actor, the newest name in `latest.title`), a push for the row's first event only, and an
    email at most once an hour per workspace (key `join-request:{orgId}:{hour}` per language). The email's Approve
    and Deny open the request in Members (`?request={id}&do=approve|deny`); a link in an email never acts by itself,
-   because mail scanners open every link. A request closes when its address joins another way, and the notices
-   close when nothing is left waiting.
+   because mail scanners open every link. On the phone, the push, the Activity card and `agenteschat://join-requests`
+   open the Requests sheet. A request closes when its address joins another way, and the notices close when nothing
+   is left waiting.
 7. **The person is told by email** whatever the answer ("You're in", an approval with the invitation to accept, or
    not approved with the admin's note), in the account's language or the one of the page they asked from. A
    signed-in person whose address is confirmed also sees it on the link's page, which checks every 15 s while open;
-   an approval shows there only while it means something (they're in, or its invitation still waits). An account
-   whose address isn't confirmed hears the answer by email only, like a typed request.
+   an approval shows there only while it means something (they're in, or its invitation still waits). A request
+   typed for their address shows there as waiting only once they ask, which makes it theirs: approved before that,
+   it sends an invitation. An account whose address isn't confirmed hears the answer by email only, like a typed
+   request.
 8. **Limits.** 10 asks an hour per IP and 20 per link (per server process, like every rate limit here); at most 50
    waiting per workspace (counted under an advisory lock, so it holds across replicas); one waiting request per
    address (a partial unique index); a denied address can't ask again through a link while the denial is kept;

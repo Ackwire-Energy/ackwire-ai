@@ -13,9 +13,10 @@ export type ActivityFilter = "all" | "waiting";
 
 /**
  * Waiting ones in this order: an agent stuck in its browser (it expires in minutes), an agent's question, my
- * turn at the table, an approval; newest first within a kind.
+ * turn at the table, an approval, then someone asking to join (nobody's work waits on it); newest first within a
+ * kind.
  */
-const WAITING_ORDER: string[] = ["browser_handoff", "agent_question", "forum_turn", "approval"];
+const WAITING_ORDER: string[] = ["browser_handoff", "agent_question", "forum_turn", "approval", "join_request"];
 
 export const isVisible = (n: Pick<AppNotification, "doneAt" | "snoozedUntil">, now = Date.now()) =>
   !n.doneAt && !(n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now);
@@ -99,12 +100,15 @@ export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.late
 
 // ── Esperando você as cards, and what comes next ─────────────────────────────────────────────────
 
-/** What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser. */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser";
+/**
+ * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, or let
+ * someone in.
+ */
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "join";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
-  /** The exact request: the action to approve, the question, the topic, what to do in the browser. */
+  /** The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join. */
   title: string;
   /** Only requests expire. */
   expiresAt: string | null;
@@ -121,6 +125,8 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): Wait
     return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
   if (n.kind === "forum_turn")
     return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
+  // No actor (they aren't a member yet): the newest name of the burst is the title.
+  if (n.kind === "join_request") return { kind: "join", title: l.title ?? "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
 }
 

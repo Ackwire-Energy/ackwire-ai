@@ -14,7 +14,13 @@ import {
   useTurnOffInviteLink,
 } from "@agenteschat/client";
 import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
-import { JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requests";
+import {
+  APPROVE_ROLES,
+  type ApproveRole,
+  approvalNews,
+  askedLabel,
+  JOIN_REASON_MAX,
+} from "@agenteschat/client/lib/join-requests";
 import { can } from "@agenteschat/client/lib/permissions";
 import { parseEmails } from "@agenteschat/client/lib/text";
 import {
@@ -352,9 +358,6 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   );
 }
 
-const APPROVE_ROLES = ["member", "admin"] as const;
-type ApproveRole = (typeof APPROVE_ROLES)[number];
-
 /**
  * Members › Requests (ADR 0068): who asked to join through the invitation link, oldest first, each answered with
  * a role or denied with a reason. `focus` (from the admins' email): that request in view with Approve focused,
@@ -401,12 +404,12 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
       { id: r.id, role: roles[r.id] ?? "member" },
       {
         onSuccess: (result) => {
-          if (result.outcome === "joined") toast.show(t("members.requests.joined", { name: r.name }));
-          else if (result.emailed) toast.show(t("members.requests.invited", { email: r.email }));
-          else {
+          const news = approvalNews(result);
+          if ("send" in news) {
             setCopied(false);
-            setHandOff({ name: r.name, url: result.url });
-          }
+            setHandOff({ name: r.name, url: news.send });
+          } else if (news.said === "joined") toast.show(t("members.requests.joined", { name: r.name }));
+          else toast.show(t("members.requests.invited", { email: r.email }));
         },
       },
     );
@@ -450,7 +453,7 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
                       {...TYPED_VALUES}
                     />
                   }
-                  statusLabel={t("members.requests.asked", { ago: relativeTime(t, i18n.language, r.createdAt) })}
+                  statusLabel={askedLabel(t, i18n.language, r.createdAt)}
                   title={r.email}
                   detail={
                     <>

@@ -175,7 +175,7 @@ const REQUESTS: JoinRequest[] = [
     email: "bruno@lima.dev",
     note: null,
     confirmed: false,
-    createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+    createdAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
     expiresAt: new Date(Date.now() + 13 * 86_400_000).toISOString(),
   },
 ];
@@ -202,6 +202,7 @@ describe("Members › Requests to join", () => {
     expect(ana.textContent).toMatch(/Pelo link de convite · fecha em /);
     expect(ana.querySelector(".ac-chip")?.textContent).toBe("Pediu há 2 h");
     expect(card("Bruno Lima").textContent).toContain("E-mail não confirmado: aprovar manda um convite para ele.");
+    expect(card("Bruno Lima").querySelector(".ac-chip")?.textContent).toMatch(/^Pediu em \d/);
 
     const role = within(ana).getByRole("combobox", { name: "Papel de Ana Souza" });
     role.focus();
