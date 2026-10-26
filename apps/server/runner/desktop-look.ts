@@ -28,7 +28,7 @@ import { xmlEscape } from "./xml";
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 3;
+export const LOOK_VERSION = 4;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -98,6 +98,8 @@ const MARK = Buffer.from(MARK_BASE64, "base64");
 
 /** The ink of the sky's agents (the wallpaper's logo): the dock's lines and its window bars. */
 const INK = "4, 32, 63";
+/** The dock's rounded ends; its frame is 1 px. */
+const DOCK_RADIUS = 16;
 
 /** Browser, Files and Terminal, in the dock's and the menu's order. */
 interface DockApp {
@@ -255,9 +257,9 @@ ${own}  </property>
 
 /**
  * docklike's own settings: Browser, Files and Terminal pinned; a click on one with windows brings them up (or
- * down), a middle click opens another (1; 0 would close them all); icons at the mark's 32 px; under an app with
- * windows a short bar (style 2) at the bottom (orientation 1: the automatic one finds no edge on a floating panel
- * and draws none), in the sky's ink, solid under the active window's app.
+ * down), a middle click opens another (1; 0 would close them all); icons at the mark's 32 px. Its own marks off
+ * (style 5): it draws them at the very bottom of its buttons, inside the margin the look gives them, which GTK
+ * leaves out of what a button draws. The look's CSS marks the apps with windows instead (`GTK_CSS`).
  */
 const dockSettings = (apps: DockApp[]) => `[user]
 pinned=${apps.map((app) => `${app.id};`).join("")}
@@ -266,12 +268,8 @@ iconSize=32
 noWindowsListIfSingle=true
 showPreviews=false
 middleButtonBehavior=1
-indicatorOrientation=1
-indicatorStyle=2
-inactiveIndicatorStyle=2
-indicatorColorFromTheme=false
-indicatorColor=rgb(${INK})
-inactiveColor=rgba(${INK}, 0.65)
+indicatorStyle=5
+inactiveIndicatorStyle=5
 `;
 
 /** One workspace, the wallpaper zoomed (an image of the screen's size: 1:1) over the bottom band's tone, no icons. */
@@ -399,15 +397,20 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
   background-color: rgba(255, 255, 255, 0.88);
   background-image: none;
   border: 1px solid rgba(${INK}, 0.18);
-  border-radius: 16px;
+  border-radius: ${DOCK_RADIUS}px;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.9);
 }
 
-/* docklike draws in a window of its own process, inside the dock: the dock's glass there, not a second frame. */
+/*
+ * docklike draws in a window of its own process that fills the dock's right end inside the frame's 1 px, and the
+ * dock's own drawing never shows under it: there that window is the dock. The glass and its light, no frame of its
+ * own; its right corners rounded like the dock's, and the hairline around them a 1 px ring outside it (only the
+ * corners fall inside the window; the dock draws the straight edges itself).
+ */
 #XfcePanelWindowWrapper.xfce4-panel.background {
   border: none;
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: 0 ${DOCK_RADIUS - 1}px ${DOCK_RADIUS - 1}px 0;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(${INK}, 0.18);
 }
 
 .xfce4-panel.background button {
@@ -439,15 +442,20 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
   -XfceTasklist-minimized-icon-lucency: 100;
 }
 
-/* A short bar under each window's icon; a longer, darker one under the active window's. */
-.xfce4-panel.background .tasklist button {
+/*
+ * A short bar under the icon of each app with windows, a longer, darker one under the active window's: docklike's
+ * launchers say which by their classes, the panel's own dock has a button for each window.
+ */
+.xfce4-panel.background .tasklist button,
+.xfce4-panel.background button.open_group {
   background-image: linear-gradient(rgba(${INK}, 0.65), rgba(${INK}, 0.65));
   background-size: 8px 3px;
   background-repeat: no-repeat;
   background-position: 50% 100%;
 }
 
-.xfce4-panel.background .tasklist button:checked {
+.xfce4-panel.background .tasklist button:checked,
+.xfce4-panel.background button.active_group {
   background-image: linear-gradient(rgb(${INK}), rgb(${INK}));
   background-size: 16px 3px;
 }
