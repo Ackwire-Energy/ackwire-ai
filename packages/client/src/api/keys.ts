@@ -21,6 +21,8 @@ export const keys = {
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
+  /** A channel's older pages loaded on scroll-up: outside the channel's key, which holds only message lists. */
+  olderPages: (orgId: string, channelId: string) => ["org", orgId, "older-pages", channelId] as const,
   thread: (orgId: string, channelId: string, rootId: string) =>
     ["org", orgId, "channel", channelId, "thread", rootId] as const,
   approvals: (orgId: string) => ["org", orgId, "approvals"] as const,
