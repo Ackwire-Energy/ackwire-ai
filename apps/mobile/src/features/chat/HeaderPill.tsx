@@ -78,10 +78,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     // Room on both sides: the name ran up to the pill's edge, under the agent's dither.
-    gap: 10,
+    gap: 12,
     height: 44,
-    paddingLeft: 12,
-    paddingRight: 24,
+    paddingLeft: 16,
+    paddingRight: 32,
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
