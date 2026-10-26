@@ -983,6 +983,7 @@ export const en: Translations = {
     banner: {
       org: "Your agents don't have an AI to think with yet.",
       orgHint: "Connect yours, or just type what you want, like “use my Claude plan”.",
+      orgHintPreparing: "Your plan signs in on {{computer}} once it's ready. An API key works now.",
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because it has no AI connected.",
@@ -8396,6 +8397,16 @@ export const en: Translations = {
       starting: "Starting it up",
       installing: "Installing the apps",
       connecting: "Connecting it to your workspace",
+    },
+    stage: {
+      ordering: "Getting a new computer",
+      wiping: "Clearing it for a fresh start",
+      booting: "Loading the system",
+      updating: "Updating the system",
+      restarting: "Restarting after the update",
+      network: "Setting up its network",
+      firewall: "Setting up its protection",
+      finishing: "Running the last checks",
     },
     stepOf: "Step {{n}} of {{total}} · {{step}}",
     status: {

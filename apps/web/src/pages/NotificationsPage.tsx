@@ -1,6 +1,7 @@
 import type { Agent, AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
 import {
   dropNotification,
+  useAiStatus,
   useApproval,
   useChannels,
   useForumAction,
@@ -60,6 +61,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
 import { requestBrowserCard } from "@/components/browser/open";
+import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
@@ -1479,8 +1481,14 @@ export function NotificationsPage() {
     );
   };
 
+  const connect = useConnectAi();
+  const aiStatus = useAiStatus(org.id);
   const openItem = (n: AppNotification) => {
     markRead(n);
+    // Its computer is ready and its agents have no AI yet: what comes next is connecting one.
+    const ai = aiStatus.data;
+    if (n.kind === "computer_ready" && connect && ai && !ai.any && ai.agents.length > 0)
+      return void connect.open({ ready: true });
     const target = openTarget(n);
     if (!target) return;
     // An agent asked for help in its browser: its card opens there, in control (no page of its own).

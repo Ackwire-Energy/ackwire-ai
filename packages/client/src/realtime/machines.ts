@@ -184,11 +184,13 @@ export function applyComputerEvent(qc: QueryClient, orgId: string, event: { type
 const SETUP_FIELDS = [
   "state",
   "step",
+  "stage",
   "reason",
   "since",
   "requestedAt",
   "expectedReadyAt",
   "secondsLeft",
+  "secondsSteady",
   "secondsWaited",
   "specs",
   "machineId",

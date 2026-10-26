@@ -21,9 +21,15 @@ const NAMESPACES = [
   "support.",
 ];
 
-/** What the workspace computer's screens say in each state (`setupView`, `etaView` in packages/client/src/lib/computer.ts). */
+/**
+ * What the workspace computer's screens say in each state (`setupView`, `SETUP_STAGES`, `etaView` in
+ * packages/client/src/lib/computer.ts).
+ */
 const SETUP_KEYS = [
   ...["reserving", "starting", "installing", "connecting"].map((s) => `computerSetup.step.${s}`),
+  ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall", "finishing"].map(
+    (s) => `computerSetup.stage.${s}`,
+  ),
   ...["preparing", "capacity", "problem", "ready"].flatMap((s) => [
     `computerSetup.status.${s}`,
     `computerSetup.chip.${s}`,
@@ -104,6 +110,7 @@ const CLOUD_EXTRA = [
   ...["ready", "waiting", "noAi", "noAiAny"].map((k) => `onboarding.done.first.${k}`),
   ...["signIn", "key", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),
   "connectAi.titleFor",
+  "noAi.banner.orgHintPreparing",
   "agentPage.work.brain.add.startFailed",
   "outage.titleCloud",
   "outage.cloudSub",
@@ -209,6 +216,14 @@ describe("computer copy", () => {
       const { cloud } = editionKeys(strings);
       expect(cloud.filter((k) => !values.has(k))).toEqual([]);
       expect(hitsOf(values, cloud, () => CLOUD_BANNED[locale])).toEqual([]);
+    });
+
+    test(`${locale}: no stage opens with a step's word, so the computer never reads as starting twice`, () => {
+      const values = valuesOf(strings);
+      const first = (k: string) => values.get(k)?.split(" ")[0];
+      const of = (prefix: string) => [...values.keys()].filter((k) => k.startsWith(prefix));
+      const steps = of("computerSetup.step.").map(first);
+      expect(of("computerSetup.stage.").filter((k) => steps.includes(first(k)))).toEqual([]);
     });
 
     test(`${locale}: self-host never says the cloud, and its computer's dialog never says terminal`, () => {

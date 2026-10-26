@@ -120,6 +120,32 @@ describe("no AI connected: above the composer", () => {
     expect(panel.textContent).toContain("A conta do Claude com login no MacBook");
   });
 
+  test("the ready email's Connect your AI: the picker on Claude, with the computer said ready first; not from the banner", async () => {
+    const state = walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID);
+    const api = createFakeApi(state);
+    noOwnSignIn(api);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    const { router } = await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
+    await settle(8);
+    expect(router.state.location.search).toEqual({});
+    const first = dialog("Conectar uma IA") as HTMLElement;
+    expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    // Opened from the banner, nothing just got ready: no word about it.
+    await act(async () => fireEvent.keyDown(first, { key: "Escape" }));
+    await act(async () =>
+      router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId: ENG_ID } }),
+    );
+    await settle(6);
+    await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 8);
+    const again = within(dialog("Conectar uma IA") as HTMLElement).getByRole("region", { name: "Seu plano do Claude" });
+    expect(again.textContent).not.toContain("está pronto");
+  });
+
   test("an admin with no agent of their own: the API key first; a plan thinks only for its owner's agents", async () => {
     await open(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }));
     await click(within(banner() as HTMLElement).getByRole("button", { name: "Conectar uma IA" }));

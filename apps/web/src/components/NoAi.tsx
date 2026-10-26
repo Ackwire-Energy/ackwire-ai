@@ -1,6 +1,7 @@
 import type { Message } from "@agenteschat/client";
 import { useAiStatus } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
+import { setupPending } from "@agenteschat/client/lib/computer";
 import { aiStateOf, NO_AI, noAiCardOf, opensByItself } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon } from "@agenteschat/ui";
@@ -8,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
+import { useSetupView, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useChannelEvents } from "@/realtime/context";
@@ -20,7 +22,9 @@ import "./no-ai.css";
 
 /**
  * Above the composer: this DM's agent has no AI, or (anywhere with agents) the organization has none.
- * Everyone sees it; the dialog says what each person may connect.
+ * Everyone sees it; the dialog says what each person may connect. While the workspace's computer is on its way,
+ * the organization's says a plan signs in there once it's ready, and a key works now; not on hold, when nothing works
+ * now and the hold banner says so.
  */
 export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgentId?: string }) {
   const { t } = useTranslation();
@@ -28,6 +32,8 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
+  const { held } = useWaitReader();
+  const preparing = setupPending(useSetupView(org.id)) && !held;
   if (!status.data || !connect) return null;
   if (dmAgentId) {
     if (aiStateOf(status.data, dmAgentId) !== "no_ai") return null;
@@ -50,7 +56,10 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
       <span className="noai-banner__text ac-iconline">
         <Icon name="plug" size={16} />
         <span>
-          <b>{t("noAi.banner.org")}</b> {t("noAi.banner.orgHint")}
+          <b>{t("noAi.banner.org")}</b>{" "}
+          {preparing
+            ? t("noAi.banner.orgHintPreparing", { computer: t("computerSetup.title", { org: org.name }) })
+            : t("noAi.banner.orgHint")}
         </span>
       </span>
       <Button size="sm" onClick={() => connect.open({ agentId: agentIds.length === 1 ? agentIds[0] : undefined })}>

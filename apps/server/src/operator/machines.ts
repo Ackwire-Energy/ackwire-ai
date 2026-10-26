@@ -33,6 +33,7 @@ const Provisioning = z
   .object({
     state: z.enum(PROVISIONING_STATES),
     step: z.enum(PROVISIONING_STEPS).nullable(),
+    stage: z.string().nullable().openapi({ description: "With `preparing`: the stage you gave." }),
     reason: z.enum(PROVISIONING_REASONS).nullable(),
     since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
     requestedAt: z.string().openapi({
@@ -71,6 +72,10 @@ const ProvisioningInput = z.object({
     .enum(PROVISIONING_STEPS)
     .optional()
     .openapi({ description: "With `preparing`: reserving, starting, installing or connecting; ignored otherwise." }),
+  stage: z.string().max(64).optional().openapi({
+    description:
+      "With `preparing`: what the computer is doing within `step` (ordering, wiping, starting, booting, updating, restarting, network, firewall, apps, finishing, connecting); ignored otherwise. Any word is kept: the apps say one they have no words for as its step.",
+  }),
   reason: z
     .enum([...PROVISIONING_REASONS, "approval"])
     .optional()
@@ -156,7 +161,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Say how far the workspace's computer is",
       description:
-        "Its people see it live, with the time left. The time `since` restarts only when the state, step or reason change. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. A ready time moved later within the same step and stage (a part running long) holds still on their screens for a minute: while it keeps moving, send it again within that minute. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
       request: { params: OrgParams, body: body(ProvisioningInput) },
       responses: { 204: noContent[204], ...errors, 409: errorResponse("The computer is ready") },
     }),

@@ -144,6 +144,11 @@ const TYPING_MS = 900;
 const HAPPY_MS = 1600;
 /** How often the workspace's computer is asked about while it's on its way (no socket is open here). */
 const COMPUTER_POLL_MS = 5000;
+/**
+ * In the wait's first minute, until the provisioner says when it will be ready (it does from its first pass): asked
+ * this often, so the time and the email line show as soon as it has.
+ */
+const FIRST_TIME_POLL_MS = 2000;
 
 /** `host`: the server's own computer. */
 type Computer = "cloud" | "machine" | "host" | null;
@@ -530,11 +535,11 @@ export function OnboardingPage() {
   // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
   const computerPoll = step.id === "computer" ? COMPUTER_POLL_MS : false;
-  const setup = useComputerSetup(
-    created?.orgId ?? "",
-    Boolean(created),
-    (data) => computerPoll || (setupPending(setupView(data)) ? COMPUTER_POLL_MS : false),
-  );
+  const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), (data) => {
+    const view = setupView(data);
+    if (view?.phase === "preparing" && view.secondsLeft === null && (view.waited ?? 0) < 60) return FIRST_TIME_POLL_MS;
+    return computerPoll || (setupPending(view) ? COMPUTER_POLL_MS : false);
+  });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   const aiOpen = step.id === "agents" && agentsPhase === "ai";
   // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.

@@ -40,6 +40,8 @@ export interface ConnectAiRequest {
   apiKey?: string;
   /** Opened by itself (Jev), not by a click: never over a dialog already open. */
   auto?: boolean;
+  /** Opened because the workspace's computer just got ready (its email, its notification): a plan's panel says so. */
+  ready?: boolean;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -73,7 +75,7 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per link
   useEffect(() => {
     if (asked !== "ai") return;
-    open({});
+    open({ ready: true });
     clearAsked(null);
   }, [asked]);
   const answer = useCallback(
@@ -224,6 +226,7 @@ function ConnectAiDialog({
                 key={choice}
                 choice={choice}
                 gates={gates}
+                justReady={request.ready}
                 agents={agents}
                 agentId={agentId}
                 onAgent={setPickedAgent}

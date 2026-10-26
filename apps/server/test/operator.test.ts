@@ -432,9 +432,18 @@ test("external provisioning: requests, progress, the workspace's computer and it
     { state: "preparing", specs: { cpus: 0, memoryGb: 8, diskGb: 75 } },
     { state: "preparing", expectedReadyAt: "in ten minutes" },
     { state: "preparing", expectedReadyAt: new Date(Date.now() + 8 * 86_400_000).toISOString() },
+    { state: "preparing", step: "installing", stage: "a".repeat(65) },
   ]) {
     expect({ bad, status: (await put(`/orgs/${orgId}/provisioning`, bad)).status }).toEqual({ bad, status: 400 });
   }
+  // A stage of any shape is kept as said rather than the whole report refused: the apps read one they don't know as
+  // its step.
+  const odd = { state: "preparing", step: "installing", stage: "Re-wiping" };
+  expect((await put(`/orgs/${orgId}/provisioning`, odd)).status).toBe(204);
+  const oddly = await body<Requests>(
+    await external.request("/api/operator/v1/machine-requests?limit=200", { headers: { authorization: BEARER } }),
+  );
+  expect(oddly.requests.find((r) => r.orgId === orgId)?.provisioning).toMatchObject({ stage: "Re-wiping" });
   expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/provisioning", { state: "problem" })).status).toBe(404);
   const specs = { cpus: 4, memoryGb: 8, diskGb: 75 };
   // A time already past is normal: any moment now.
@@ -444,6 +453,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
       await put(`/orgs/${orgId}/provisioning`, {
         state: "preparing",
         step: "connecting",
+        stage: "connecting",
         specs,
         expectedReadyAt: readyAt,
       })
@@ -455,6 +465,7 @@ test("external provisioning: requests, progress, the workspace's computer and it
   expect(progress.requests.find((r) => r.orgId === orgId)?.provisioning).toEqual({
     state: "preparing",
     step: "connecting",
+    stage: "connecting",
     reason: null,
     since: expect.any(String),
     requestedAt: listed.requests.find((r) => r.orgId === orgId)?.createdAt,
@@ -471,12 +482,14 @@ test("external provisioning: requests, progress, the workspace's computer and it
     mode: "pair",
     state: null,
     step: null,
+    stage: null,
     reason: null,
     since: null,
     requestedAt: null,
     expectedReadyAt: null,
     specs: null,
     secondsLeft: null,
+    secondsSteady: null,
     secondsWaited: null,
     notifyByEmail: false,
     machineId: null,

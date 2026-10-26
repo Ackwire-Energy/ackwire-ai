@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { useSyncExternalStore } from "react";
 import type { AgentComputer, ComputerSetup, ComputerSetupStep, Edition, Machine } from "../api/types";
 import { type ComputerState, computerKind, machineTitle } from "./machines";
 
@@ -75,6 +76,23 @@ export function computerEdition(setup: ComputerSetup | null | undefined, workspa
 /** The provisioner's steps, in order (`computerSetup.step.*`). */
 export const SETUP_STEPS: readonly ComputerSetupStep[] = ["reserving", "starting", "installing", "connecting"];
 
+/**
+ * What the computer is doing within a step, where that has words of its own (`computerSetup.stage.*`), by the step
+ * it belongs to. A stage its step already says (`starting`, `apps`, `connecting`), one under another step, or one
+ * this app doesn't know yet reads as its step.
+ */
+export const SETUP_STAGES = {
+  ordering: "reserving",
+  wiping: "starting",
+  booting: "installing",
+  updating: "installing",
+  restarting: "installing",
+  network: "installing",
+  firewall: "installing",
+  finishing: "installing",
+} as const satisfies Record<string, ComputerSetupStep>;
+type SetupStage = keyof typeof SETUP_STAGES;
+
 export type SetupPhase = "preparing" | "waiting" | "problem" | "ready";
 /** What a line or a chip says: the phase, or why it waits. */
 type SetupStatus = Exclude<SetupPhase, "waiting"> | "capacity";
@@ -87,8 +105,11 @@ export interface SetupView {
   stepNumber: number;
   /** While waiting: `capacity` (longer than usual). */
   reason: "capacity" | null;
-  /** The status line. */
-  textKey: `computerSetup.step.${ComputerSetupStep}` | `computerSetup.status.${SetupStatus}`;
+  /** The status line: the stage within the step when it has words, else the step, else the phase. */
+  textKey:
+    | `computerSetup.stage.${SetupStage}`
+    | `computerSetup.step.${ComputerSetupStep}`
+    | `computerSetup.status.${SetupStatus}`;
   /** The short word for a chip. */
   chipKey: `computerSetup.chip.${SetupStatus}`;
   /** `computerSetup.specs`'s values ("4 CPUs · 8 GB…"), once the provisioner said. */
@@ -97,6 +118,8 @@ export interface SetupView {
   machineId: string | null;
   /** The server's seconds left when its answer came (`receivedAt`, this device's clock); null: no time said. */
   secondsLeft: number | null;
+  /** How many seconds from `receivedAt` they stay as they are before counting down (a part running long). */
+  steady: number;
   receivedAt: number;
   /** Seconds people had waited when the server answered, on the server's clock; null when it doesn't say. */
   waited: number | null;
@@ -112,6 +135,7 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
   if (setup?.mode !== "external") return null;
   const phase: SetupPhase = setup.state ?? "preparing";
   const step = phase === "preparing" && setup.step && SETUP_STEPS.includes(setup.step) ? setup.step : null;
+  const stage = setup.stage as SetupStage | null | undefined;
   // Every wait reads as capacity: an older server's `approval` too.
   const status: SetupStatus = phase === "waiting" ? "capacity" : phase;
   const secondsLeft = typeof setup.secondsLeft === "number" ? setup.secondsLeft : null;
@@ -120,11 +144,17 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     step,
     stepNumber: step ? SETUP_STEPS.indexOf(step) + 1 : 0,
     reason: phase === "waiting" ? "capacity" : null,
-    textKey: step ? `computerSetup.step.${step}` : `computerSetup.status.${status}`,
+    textKey:
+      step && stage && SETUP_STAGES[stage] === step
+        ? `computerSetup.stage.${stage}`
+        : step
+          ? `computerSetup.step.${step}`
+          : `computerSetup.status.${status}`,
     chipKey: `computerSetup.chip.${status}`,
     specs: setup.specs,
     machineId: setup.machineId,
     secondsLeft,
+    steady: typeof setup.secondsSteady === "number" ? Math.max(0, setup.secondsSteady) : 0,
     receivedAt,
     waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,
     notifyByEmail: setup.notifyByEmail === true,
@@ -139,13 +169,13 @@ export type EtaView =
   | { kind: "late" };
 
 /**
- * The time left now: the server's `secondsLeft` less the seconds since its answer came. A minute or more:
- * whole minutes, rounded up; under 15 s, or up to a minute past the time: almost; past that: a little longer
- * than expected. Null without a time.
+ * The time left now: the server's `secondsLeft` less the seconds since its answer came, once its first `steady`
+ * seconds have gone. A minute or more: whole minutes, rounded up; under 15 s, or up to a minute past the time:
+ * almost; past that: a little longer than expected. Null without a time.
  */
-export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number): EtaView | null {
+export function etaView(secondsLeft: number | null, receivedAtMs: number, nowMs: number, steady = 0): EtaView | null {
   if (secondsLeft === null) return null;
-  const left = secondsLeft - Math.max(0, nowMs - receivedAtMs) / 1000;
+  const left = secondsLeft - Math.max(0, (nowMs - receivedAtMs) / 1000 - steady);
   if (left >= 60) return { kind: "minutes", count: Math.ceil(left / 60) };
   if (left >= 15) return { kind: "underMinute" };
   if (left >= -60) return { kind: "almost" };
@@ -158,10 +188,41 @@ export const etaLine = (t: TFunction, eta: EtaView) =>
 
 /** Only while it is being prepared: a wait and a problem have no time. */
 export const setupEta = (view: SetupView, nowMs: number) =>
-  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs) : null;
+  view.phase === "preparing" ? etaView(view.secondsLeft, view.receivedAt, nowMs, view.steady) : null;
 
-/** How often the time line repaints: every 15 s, every 5 s under a minute. No ticking seconds. */
-export const etaTickMs = (eta: EtaView | null) => (eta?.kind === "minutes" ? 15_000 : 5_000);
+/** How often every time line repaints, all together. No ticking seconds. */
+const ETA_TICK_MS = 5_000;
+
+/**
+ * One clock for every time line on screen (the notice, the setup, the computer's window, the agent's page): one
+ * that shows up later reads the time the others read, and they all move on together, so two of them never say two
+ * different times. It runs only while one is shown.
+ */
+const etaClock = {
+  now: Date.now(),
+  shown: new Set<() => void>(),
+  timer: undefined as ReturnType<typeof setInterval> | undefined,
+};
+
+function showEta(repaint: () => void) {
+  if (etaClock.shown.size === 0) {
+    etaClock.now = Date.now();
+    etaClock.timer = setInterval(() => {
+      etaClock.now = Date.now();
+      for (const shown of etaClock.shown) shown();
+    }, ETA_TICK_MS);
+  }
+  etaClock.shown.add(repaint);
+  return () => {
+    etaClock.shown.delete(repaint);
+    if (etaClock.shown.size === 0) clearInterval(etaClock.timer);
+  };
+}
+
+const hidden = () => () => {};
+
+/** The time every time line reads now (`shown`: one is on screen, so the clock moves). */
+export const useEtaNow = (shown: boolean) => useSyncExternalStore(shown ? showEta : hidden, () => etaClock.now);
 
 /**
  * Whether "we'll email you" holds: the server sends email, and the wait is or will be over a minute, which
