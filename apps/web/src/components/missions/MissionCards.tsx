@@ -1139,7 +1139,11 @@ export function TaskNoticeLine({ message }: { message: Message }) {
       {blocked.length > 0 && task?.missionId && (
         <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
       )}
-      {notice.code === "machine_access_requested" && here && <ShowRequestsButton />}
+      {notice.code === "machine_access_requested" && here && (
+        <span className="mi-evt__act">
+          <ShowRequestsButton />
+        </span>
+      )}
       {notice.code === "machine_access_requested" && p.command && !here && (
         <span className="mi-evt__command">
           <span className="small muted">{t("missions.notice.access_command")}</span>

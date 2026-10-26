@@ -3090,7 +3090,11 @@ p {
   gap: 8px;
   align-items: center;
 }
+/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
 .computer-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   color: var(--ink);
 }
