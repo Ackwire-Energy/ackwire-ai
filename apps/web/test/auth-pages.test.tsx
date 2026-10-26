@@ -305,6 +305,13 @@ describe("Aceitar convite", () => {
     const email = screen().getByLabelText("E-mail") as HTMLInputElement;
     expect(email.value).toBe("marina@acme.com.br");
     expect(email.readOnly).toBe(true);
+    // Why it can't change is behind its ⓘ; the password keeps what it needs under the field.
+    expect(email.getAttribute("aria-describedby")).toBe("inv-email-hint");
+    expect(document.getElementById("inv-email-hint")?.textContent).toBe("O convite vale só para este e-mail.");
+    expect(screen().getByRole("button", { name: "Sobre E-mail" })).toBeTruthy();
+    expect([...document.querySelectorAll(".ac-field__help")].map((h) => h.textContent)).toEqual([
+      "Pelo menos 8 caracteres.",
+    ]);
     const accept = screen().getByRole("button", { name: "Aceitar e entrar na Acme" });
     expect(accept.hasAttribute("disabled")).toBe(true);
     await type("Seu nome", "Marina");
@@ -318,6 +325,7 @@ describe("Aceitar convite", () => {
   test("expired invitation offers to ask for a new one", async () => {
     await renderApp("/invite/expired", { api: createFakeApi(seedState({ me: null })) });
     expect(screen().getByRole("heading", { name: "Este convite expirou" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe("Convites valem por 7 dias.");
     const ask = screen().getByRole("button", { name: "Pedir um novo convite" });
     await act(async () => fireEvent.click(ask));
     await settle();

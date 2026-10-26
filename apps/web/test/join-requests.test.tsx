@@ -57,7 +57,7 @@ describe("an invitation link asks to join", () => {
   test("signed out: who shared it and who works there, the form, then sent (the answer comes by email)", async () => {
     const { state } = await openLink(LINK);
     expect(heading()).toBe("Pedir para entrar na Acme");
-    expect(text()).toContain("Marina compartilhou este link. Um admin da Acme aprova cada pessoa nova.");
+    expect(text()).toContain("Marina compartilhou este link. Um admin aprova cada pessoa nova.");
     expect(text()).toContain("Ada e Atlas já trabalham lá.");
     // Their faces lead the line, on its first line when the names wrap.
     const agents = screen().getByText("Ada e Atlas já trabalham lá.").parentElement;
@@ -68,10 +68,14 @@ describe("an invitation link asks to join", () => {
 
     await type(screen().getByLabelText("Seu nome"), "  Ana Souza ");
     await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
-    expect(screen().getByText("A resposta chega neste e-mail.")).toBeTruthy();
+    // No line under it: the sent screen names the address.
+    expect(screen().getByLabelText("Seu e-mail").hasAttribute("aria-describedby")).toBe(false);
     // The answer goes to that address: a likely typo is offered first.
     await click(button("Você quis dizer ana@gmail.com?"));
-    await type(screen().getByLabelText("Algo que eles devam saber?"), "Designer nova da Paula");
+    const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
+    expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
+    expect(note.hasAttribute("aria-describedby")).toBe(false);
+    await type(note, "Designer nova da Paula");
     expect(send.hasAttribute("disabled")).toBe(false);
     await click(send);
     await settle(4);
@@ -80,8 +84,10 @@ describe("an invitation link asks to join", () => {
       { name: "Ana Souza", email: "ana@gmail.com", note: "Designer nova da Paula" },
     ]);
     expect(heading()).toBe("Pedido enviado");
-    expect(text()).toContain("Os admins da Acme já podem ver. Quando um deles responder, avisamos em ana@gmail.com.");
-    expect(text()).toContain("Pode fechar esta página. Pedido sem resposta fecha em 14 dias.");
+    // One line: where the answer goes. Nothing about closing the page.
+    expect([...document.querySelectorAll(".invite-ask__outcome-text p")].map((p) => p.textContent)).toEqual([
+      "Avisamos em ana@gmail.com quando um admin responder.",
+    ]);
   });
 
   test("signed in: one tap as the account; the page follows the answer", async () => {
@@ -93,7 +99,7 @@ describe("an invitation link asks to join", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual(["lnk", {}]);
     expect(heading()).toBe("Pedido enviado");
-    expect(text()).toContain("Você entra assim que um deles aprovar.");
+    expect(text()).toContain("Você entra assim que um admin aprovar.");
 
     // Approved: the next check finds them in.
     state.previews = {
