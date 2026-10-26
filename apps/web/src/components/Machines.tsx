@@ -327,7 +327,9 @@ function MachineRow({
   ].filter(Boolean);
   return (
     <div className="ac-list__row machine-row">
-      <ComputerPortrait className="machine-row__icon" kind={computerKind(m.os)} state={computerState(m)} />
+      <span className="machine-row__pic">
+        <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
+      </span>
       <span className="list-col machine-row__main">
         <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Link
@@ -380,7 +382,9 @@ function HostOffRow() {
   const turnOn = useHostComputerOn(org.id);
   return (
     <div className="ac-list__row machine-row">
-      <ComputerPortrait className="machine-row__icon" kind="linux" state="offline" />
+      <span className="machine-row__pic">
+        <ComputerPortrait kind="linux" state="offline" />
+      </span>
       <span className="list-col machine-row__main">
         <span className="machine-row__name">{t("machines.host.label")}</span>
         <span className="small muted">{t("machines.host.offText")}</span>

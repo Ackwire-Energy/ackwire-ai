@@ -4,7 +4,7 @@
  * visible portraits are drawn; with reduced motion each one is drawn once,
  * still (and again when its kind or state changes).
  */
-import { type ComputerKind, type ComputerState, drawComputer } from "./portrait.js";
+import { COMPUTER_ART, type ComputerKind, type ComputerState, drawComputer } from "./portrait.js";
 
 export interface LiveComputer {
   canvas: HTMLCanvasElement;
@@ -37,6 +37,8 @@ export function drawLiveComputer(c: LiveComputer, t = now()) {
   }
   if (!ctx) return;
   const { kind, state } = c.look();
+  // The canvas is as wide as the kind's art: the grid's first drawn column lands on its left edge.
+  ctx.setTransform(1, 0, 0, 1, -COMPUTER_ART[kind][0], 0);
   drawComputer(ctx, kind, state, { dark: isDark(c.canvas), t: reduced() ? 0 : t });
 }
 

@@ -5615,6 +5615,13 @@ button.live-call__head:hover {
 .machine-row__icon {
   flex: none;
 }
+/* The portrait's column is as wide as the grid, so a list's names line up whatever each computer is. */
+.machine-row__pic {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  width: 48px;
+}
 .machine-row__name {
   font-weight: 600;
   color: inherit;
