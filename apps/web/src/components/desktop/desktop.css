@@ -53,3 +53,20 @@
   min-height: 22px;
   font-size: 13px;
 }
+/* What the computer copied when the browser kept it out of the person's clipboard, with Copy: one line, cut to fit. */
+.dsk-got {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.dsk-got > * {
+  flex: none;
+}
+.dsk-got > q {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

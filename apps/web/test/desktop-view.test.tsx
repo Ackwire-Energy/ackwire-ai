@@ -145,6 +145,11 @@ const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(4);
 };
+/** A click as Chrome, Edge and Firefox off a Mac make it: the button takes the browser's focus first. */
+const clickFocusing = async (el: HTMLElement) => {
+  await act(async () => el.focus());
+  await click(el);
+};
 const connected = async () => {
   await act(async () => rfb().emit("connect"));
   await settle(2);
@@ -169,6 +174,8 @@ function fullScreen() {
 const classes = () => [...(document.querySelector(".cmp-dialog")?.classList ?? [])];
 /** Past the time the full-screen bar stays once nothing asks for it (2.5 s). */
 const barTime = () => act(() => new Promise((r) => setTimeout(r, 2_600)));
+/** Past the time the pointer rests at the display's top edge before the bar comes back in control (0.5 s). */
+const edgeTime = () => act(() => new Promise((r) => setTimeout(r, 600)));
 /** The pointer moves over the page at this height. */
 const pointerAt = (clientY: number) => act(async () => void fireEvent.pointerMove(document.body, { clientY }));
 
@@ -538,17 +545,20 @@ describe("the agent's screen in the computer dialog", () => {
     ]);
   });
 
-  test("a paste over 256 KB, or with no text, sends nothing and says why", async () => {
+  test("a paste over 256 KB as it is sent, or with no text, sends nothing and says why", async () => {
     const t = await controlled();
-    await pasteOn(t.field(), "x".repeat(262_145));
-    expect(screen().getByText("Grande demais para colar no computador da Ada. No máximo 256 KB.")).toBeTruthy();
     await pasteOn(t.field(), "");
     expect(screen().getByText("No computador da Ada só dá para colar texto.")).toBeTruthy();
+    // The limit is the computer's, in what noVNC sends: UTF-8, each line break as CRLF, and a NUL at the end.
+    for (const text of ["x".repeat(262_144), "ã".repeat(131_072), "linha\n".repeat(40_000)]) {
+      await pasteOn(t.field(), text);
+    }
+    expect(screen().getByText("Grande demais para colar no computador da Ada. No máximo 256 KB.")).toBeTruthy();
     expect(rfb().pasted).toEqual([]);
     expect(rfb().log).toEqual([]);
-    // The limit is the computer's, in bytes: 256 KB of two-byte letters goes.
-    await pasteOn(t.field(), "ã".repeat(131_072));
-    expect(rfb().pasted).toHaveLength(1);
+    // Up to the limit goes, a CRLF counted as the two bytes it is.
+    await pasteOn(t.field(), `${"x".repeat(262_141)}\r\n`);
+    expect(rfb().pasted.map((text) => text.length)).toEqual([262_142]);
   });
 
   test("a dead key composes in the field: é goes as one key, an emoji as a paste", async () => {
@@ -594,6 +604,17 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(2);
     expect(board.written).toEqual(["ls -la /tmp"]);
     expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
+    // The toast's × is the toast's own, though the dialog is modal: the dialog stays, and control with it.
+    const dismiss = document.querySelector(".ac-toast button[aria-label='Fechar']") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(dismiss);
+      fireEvent.click(dismiss);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await settle(2);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(t.closed()).toBe(0);
+    expect(calls(t, "browser.done")).toEqual([]);
 
     rfb().log = [];
     expect(fireEvent.keyDown(field, { key: "v", code: "KeyV", metaKey: true })).toBe(true);
@@ -625,20 +646,26 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(2);
     expect(board.writes).toBe(0);
     expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(document.querySelector(".dsk-got")).toBeNull();
   });
 
-  test("a browser that won't let the copy in: a toast with the text and Copiar", async () => {
+  test("a browser that won't let the copy in: the line under the screen offers the text, with Copiar", async () => {
     const board = clipboard({ refuses: true });
     const t = await controlled();
     fireEvent.keyDown(t.field(), { key: "c", code: "KeyC", ctrlKey: true });
     await act(async () => rfb().emit("clipboard", { text: "ls -la /tmp" }));
     await settle(2);
-    expect(screen().getByText("Copiado no computador da Ada:")).toBeTruthy();
-    expect(screen().getByText("ls -la /tmp")).toBeTruthy();
-    // The toasts sit outside the dialog, which hides the rest of the page from assistive tech while open.
-    await click(screen().getByRole("button", { name: "Copiar", hidden: true }));
+    // In the dialog, not a toast: nothing reached the person's clipboard, and their click must reach the button.
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(view().getByText("Copiado no computador da Ada:")).toBeTruthy();
+    expect(view().getByText("ls -la /tmp")).toBeTruthy();
+    expect(line()).toBeUndefined();
+    await click(view().getByRole("button", { name: "Copiar" }));
     expect(board.texts).toEqual(["ls -la /tmp"]);
     expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
+    expect(document.querySelector(".dsk-got")).toBeNull();
+    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+    expect(t.closed()).toBe(0);
   });
 
   test("watching: no field, nothing pasted, nothing copied", async () => {
@@ -707,6 +734,18 @@ describe("the agent's screen in the computer dialog", () => {
     expect(page.requested).toEqual([document.documentElement]);
     expect(classes()).toEqual(expect.arrayContaining(["is-full", "is-screen-only"]));
     expect(classes()).not.toContain("is-bar-hidden");
+    // The screen and what floats over it alone: anything else in the dialog (its sky strip) is hidden by the class
+    // it really has, or it would take a row of the display.
+    const css = await Bun.file(new URL("../src/components/computer/computer.css", import.meta.url).pathname).text();
+    const others = [...(document.querySelector(".cmp-dialog")?.children ?? [])].filter(
+      (el) => !el.matches(".ac-dialog__head, .cmp-body"),
+    );
+    expect(others.length).toBeGreaterThan(0);
+    for (const el of others) {
+      expect(css).toMatch(
+        new RegExp(`\\.cmp-dialog\\.is-screen-only > \\.${el.classList[0]}[,\\s][^{]*\\{\\s*display: none;`),
+      );
+    }
     // Without Keyboard Lock, Esc leaves full screen, even in control.
     await act(async () => fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" }));
     await settle(2);
@@ -731,29 +770,40 @@ describe("the agent's screen in the computer dialog", () => {
   });
 
   // Real time past the bar's 2.5 s: these tests say how long they may take, as the run's later files get 5 s.
-  test("the full-screen bar hides itself; in control only the display's top edge, or a tap, brings it back", async () => {
+  test("the full-screen bar hides itself; in control only a rest at the display's top edge, or a tap, brings it back", async () => {
     fullScreen();
     await controlled();
     await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(classes()).not.toContain("is-line-hidden");
     await barTime();
-    expect(classes()).toContain("is-bar-hidden");
+    expect(classes()).toEqual(expect.arrayContaining(["is-bar-hidden", "is-line-hidden"]));
     // The pointer is the computer's: a move over the screen leaves it hidden.
     await pointerAt(400);
     expect(classes()).toContain("is-bar-hidden");
+    // On its way to the computer's own top bar the pointer stops at the edge a moment: that brings nothing.
     await pointerAt(4);
+    await pointerAt(30);
+    await edgeTime();
+    expect(classes()).toContain("is-bar-hidden");
+    // Resting there brings the head back, alone: the line under it would cover more of the computer's top bar.
+    await pointerAt(4);
+    expect(classes()).toContain("is-bar-hidden");
+    await edgeTime();
     expect(classes()).not.toContain("is-bar-hidden");
+    expect(classes()).toContain("is-line-hidden");
     // On the bar it stays.
     await act(
       async () => void fireEvent.pointerMove(document.querySelector(".ac-dialog__head") as Element, { clientY: 30 }),
     );
     await barTime();
     expect(classes()).not.toContain("is-bar-hidden");
-    // A phone has no pointer to bring to the edge: a tap anywhere brings it back.
+    // A phone has no pointer to bring to the edge: a tap anywhere brings all of it back, its Keyboard button too.
     await pointerAt(400);
     await barTime();
     expect(classes()).toContain("is-bar-hidden");
     await act(async () => void fireEvent.pointerDown(document.body, { clientY: 400, pointerType: "touch" }));
     expect(classes()).not.toContain("is-bar-hidden");
+    expect(classes()).not.toContain("is-line-hidden");
   }, 20_000);
 
   test("watching in full screen, any move brings the bar back", async () => {
@@ -777,15 +827,21 @@ describe("the agent's screen in the computer dialog", () => {
     const t = await controlled();
     // Only full screen locks it.
     expect(lock.locked).toBe(0);
-    await click(view().getByRole("button", { name: "Tela cheia" }));
+    // The keys still go to the computer after a click on the button, which takes the browser's focus.
+    await clickFocusing(view().getByRole("button", { name: "Tela cheia" }));
     expect(lock.locked).toBe(1);
-    t.field().focus();
-    await act(async () => fireEvent.keyDown(t.field(), { key: "Escape", code: "Escape" }));
+    expect(document.activeElement).toBe(t.field());
+    await act(async () =>
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape", code: "Escape" }),
+    );
     await settle(2);
     expect(classes()).toContain("is-full");
     expect(t.closed()).toBe(0);
     expect(rfb().log).toContain("keydown Escape Escape");
-    await click(view().getByRole("button", { name: "Devolver" }));
+    // Leaving it from the bar's button gives the keys back to the computer too, and lets go of the lock.
+    await clickFocusing(view().getByRole("button", { name: "Sair da tela cheia" }));
+    expect(classes()).not.toContain("is-full");
+    expect(document.activeElement).toBe(t.field());
     expect(lock.unlocked).toBe(1);
   });
 
@@ -881,10 +937,35 @@ describe("the dialog's size (computer.css)", () => {
     expect(stage).toContain("grid-area: 1 / 1 / -1 / -1");
     expect(stage).toContain("container-type: size");
     expect(rule(text, ".cmp-dialog.is-screen-only .dsk-screen")).toContain("width: min(100cqw, 100cqh * 1280 / 900)");
-    // A banner waiting for the person keeps the bar.
-    expect(text).toContain(".is-bar-hidden:not(:has(.cmp-banner");
     // The ground is the screen's own in both themes, so the dialog has it, not only the screen.
     expect(rule(text, ".ac-dialog.cmp-dialog")).toContain("--screen-bg: #1f2128");
+  });
+
+  test("the bar over the full screen: what hides with it, what keeps it, and over any cover", async () => {
+    const text = await css();
+    // The head and the request hide with it; the line under them also while only the head came back.
+    const hide = rule(
+      text,
+      ".cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-bar-hidden .cmp-asked,\n.cmp-dialog.is-line-hidden .dsk-line",
+    );
+    expect(hide).toContain("opacity: 0");
+    expect(hide).toContain("pointer-events: none");
+    // Sliding up as it fades, which reduced motion keeps to the fade.
+    expect(hide).toContain("translate: 0 var(--bar-slide, -8px)");
+    expect(text).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.cmp-dialog\.is-screen-only \{\s*--bar-slide: 0px;/,
+    );
+    // A banner or the computer's copy waiting for the person keeps it, and so does focus a key put there; not the
+    // focus a click leaves on the button it pressed.
+    const keeps =
+      ".cmp-dialog:has(.cmp-banner, .dsk-got, .ac-dialog__head :focus-visible) :is(.ac-dialog__head, .cmp-asked, .dsk-line)";
+    const keep = rule(text, keeps);
+    expect(keep).toContain("opacity: 1");
+    expect(keep).toContain("translate: none");
+    expect(keep).toContain("pointer-events: auto");
+    expect(text).not.toContain(":focus-within");
+    // A cover over the screen (z-index 5) stays in the screen's own layer, under the bar.
+    expect(rule(text, ".cmp-dialog.is-screen-only .dsk-stage")).toContain("isolation: isolate");
   });
 });
 

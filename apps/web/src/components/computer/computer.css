@@ -109,13 +109,15 @@
 .cmp-dialog.is-screen-only .cmp-body > .dsk {
   display: contents;
 }
-.cmp-dialog.is-screen-only > .ac-run-strip,
+.cmp-dialog.is-screen-only > .ac-sky-strip,
 .cmp-dialog.is-screen-only .cmp-steps-row {
   display: none;
 }
+/* Isolated: a cover over the screen (z-index 5) stays under the bar. */
 .cmp-dialog.is-screen-only .dsk-stage {
   grid-area: 1 / 1 / -1 / -1;
   container-type: size;
+  isolation: isolate;
   border-radius: 0;
 }
 .cmp-dialog.is-screen-only .dsk-stage > .brw-dim {
@@ -172,19 +174,27 @@
 .cmp-dialog.is-screen-only .dsk-line {
   grid-row: 4;
 }
-/* Hidden after a while (useBarHidden); a banner waiting for the person, or keyboard focus in the bar, keeps them. */
-.cmp-dialog.is-screen-only.is-bar-hidden:not(:has(.cmp-banner, .ac-dialog__head:focus-within)) > .ac-dialog__head,
-.cmp-dialog.is-screen-only.is-bar-hidden:not(:has(.cmp-banner, .ac-dialog__head:focus-within))
-  :is(.cmp-asked, .dsk-line) {
+/* Hidden after a while (useBar), the line under the screen also while only the head came back. */
+.cmp-dialog.is-bar-hidden > .ac-dialog__head,
+.cmp-dialog.is-bar-hidden .cmp-asked,
+.cmp-dialog.is-line-hidden .dsk-line {
   opacity: 0;
-  translate: 0 -8px;
+  translate: 0 var(--bar-slide, -8px);
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cmp-dialog.is-screen-only.is-bar-hidden > .ac-dialog__head,
-  .cmp-dialog.is-screen-only.is-bar-hidden :is(.cmp-asked, .dsk-line) {
-    translate: none;
+  .cmp-dialog.is-screen-only {
+    --bar-slide: 0px;
   }
+}
+/*
+ * What waits for the person (a banner, the computer's copy) keeps them, and so does focus a key put in the bar: a
+ * click leaves the browser's focus on the button it pressed.
+ */
+.cmp-dialog:has(.cmp-banner, .dsk-got, .ac-dialog__head :focus-visible) :is(.ac-dialog__head, .cmp-asked, .dsk-line) {
+  opacity: 1;
+  translate: none;
+  pointer-events: auto;
 }
 .cmp-dialog .ac-dialog__head {
   padding-bottom: 8px;

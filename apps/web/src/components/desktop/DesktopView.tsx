@@ -111,11 +111,16 @@ export function DesktopView({
   const inControl = mode === "control";
   const connect = blocked === null && !gaveUp;
   const { refetch } = status;
-  const copy = (value: string) =>
-    navigator.clipboard?.writeText(value).then(
-      () => toast.show(t("desktop.clipboard.copied", g)),
-      () => toast.show(t("browser.live.actionFailed"), "error"),
-    ) ?? toast.show(t("browser.live.actionFailed"), "error");
+  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
+  const copiedToast = () => toast.show(t("desktop.clipboard.copied", g));
+  // What the computer copied when the browser kept it out of the person's clipboard: the line under the screen
+  // offers it until they copy it, copy again or hand back.
+  const [got, setGot] = useState<string | null>(null);
+  const copyGot = (text: string) =>
+    navigator.clipboard?.writeText(text).then(() => {
+      setGot(null);
+      copiedToast();
+    }, failedToast) ?? failedToast();
   const copiedThere = useScreenKeys({
     field: keysRef,
     screen: screenRef,
@@ -123,15 +128,10 @@ export function DesktopView({
     active: inControl,
     onRefused: (why) =>
       toast.show(why === "tooLong" ? t("desktop.clipboard.tooLong", g) : t("desktop.clipboard.textOnly", g), "error"),
-    onCopied: (text, written) =>
-      written
-        ? toast.show(t("desktop.clipboard.copied", g))
-        : toast.show(
-            t("desktop.clipboard.got", g),
-            "info",
-            { label: t("desktop.clipboard.copy"), run: () => void copy(text) },
-            quoteExcerpt(text, 120),
-          ),
+    onCopied: (text, written) => {
+      setGot(written ? null : text);
+      if (written) copiedToast();
+    },
   });
   // Leaving the page in control asks first: outside full screen Ctrl+W closes the tab, which in a terminal there
   // means "delete a word", and the agent would wait for control to come back.
@@ -249,9 +249,16 @@ export function DesktopView({
   useEffect(() => {
     if (inControl) return;
     setHandingBack(false);
+    setGot(null);
     // Its field goes with control, and a field removed while focused may get no blur.
     setTyping(false);
   }, [inControl]);
+  // In control, full screen starting or ending gives the keys back to the computer: a click on the full-screen
+  // button leaves the browser's focus on it, where Space would toggle it and Esc would reach nothing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: full screen's changes move the keys too
+  useEffect(() => {
+    if (inControl && !touch && !handingBack) keysRef.current?.focus({ preventScroll: true });
+  }, [head?.full, inControl, touch, handingBack]);
 
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
@@ -264,7 +271,6 @@ export function DesktopView({
   // Until the screen's state says who (right after a 4409), someone.
   const controllerName =
     (s?.controllerUserId ? dir.memberById.get(s.controllerUserId)?.name : undefined) ?? t("channel.unknownPerson");
-  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
 
   // One new socket: no longer given up opens it; otherwise a new round does.
   const retry = () => {
@@ -492,10 +498,26 @@ export function DesktopView({
                 {t("desktop.keyboard.label")}
               </Button>
             )}
-            <span className="muted">
-              {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
-              {t("desktop.control.notice", g)}
-            </span>
+            {got === null ? (
+              <span className="muted">
+                {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
+                {t("desktop.control.notice", g)}
+              </span>
+            ) : (
+              <span className="dsk-got" role="status">
+                <span className="muted">{t("desktop.clipboard.got", g)}</span>
+                <q>{quoteExcerpt(got, 120)}</q>
+                <button
+                  type="button"
+                  className="ac-link"
+                  // The keys stay on the screen's field.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void copyGot(got)}
+                >
+                  {t("desktop.clipboard.copy")}
+                </button>
+              </span>
+            )}
           </div>
         ))}
     </div>

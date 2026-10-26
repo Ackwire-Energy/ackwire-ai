@@ -3,8 +3,11 @@ import type RFB from "@novnc/novnc";
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { composes, copies, isModifier, keyInit, locksOf, macCopy, pastes } from "@/lib/keys";
 
-/** Xvnc's MaxCutText (its default): a larger clipboard from a viewer is dropped without a word. */
-export const PASTE_MAX_BYTES = 262_144;
+/**
+ * Xvnc's MaxCutText (its default): a larger clipboard from a viewer is dropped without a word. It counts what noVNC
+ * sends: UTF-8 with every line break as CRLF, and a NUL at the end.
+ */
+const PASTE_MAX_BYTES = 262_144;
 /** What the computer copies this soon after the person's copy keys goes to their clipboard. */
 const COPY_WAIT_MS = 2_000;
 /** Shift+Insert pastes and Ctrl+Insert copies in every window there, a terminal too. Inline: noVNC exports only RFB. */
@@ -130,7 +133,8 @@ export function useScreenKeys({
       e.preventDefault();
       const text = e.clipboardData?.getData("text/plain") ?? "";
       if (!text) return on.current.onRefused("textOnly");
-      if (new TextEncoder().encode(text).byteLength > PASTE_MAX_BYTES) return on.current.onRefused("tooLong");
+      const sent = new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;
+      if (sent > PASTE_MAX_BYTES) return on.current.onRefused("tooLong");
       paste(text.replaceAll("\r\n", "\n"));
     };
     const input = (e: Event) => {

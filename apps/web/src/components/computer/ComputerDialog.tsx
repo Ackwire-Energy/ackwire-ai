@@ -52,8 +52,12 @@ const POLL_MS = 5_000;
 const PAGE_POLL_MS = 30_000;
 /** How long the full-screen bar stays once nothing asks for it. */
 const BAR_MS = 2_500;
-/** In control the pointer is the computer's: the bar comes back only from the display's top edge. */
+/**
+ * In control the pointer is the computer's: the bar comes back only once it rests this long at the display's top
+ * edge, where it also stops on its way to the computer's own top bar.
+ */
 const BAR_EDGE_PX = 8;
+const BAR_EDGE_MS = 500;
 
 /**
  * Full screen fills the screen with the dialog. The page itself goes full screen, not the dialog: noVNC's
@@ -78,40 +82,54 @@ function useFullScreen(full: boolean, setFull: (full: boolean) => void) {
   }, [full, setFull]);
 }
 
+/** What of the full-screen bar shows: all of it, the head alone, or nothing. */
+type BarShown = "all" | "head" | "none";
+
 /**
- * Full screen on the agent's screen: whether the dialog's head, a bar over the screen, is hidden. It shows as full
- * screen starts, on any pointer move or tap while watching (in control only at the top edge, or on a touch: a phone
- * has no pointer to bring there) and while the pointer is on it; 2.5 s later it hides. A banner, or keyboard focus
- * in it, keeps it (computer.css).
+ * Full screen on the agent's screen: what shows of the dialog's head, a bar over the screen, and what floats under
+ * it. All of it as full screen starts, on any pointer move or tap while watching, and on a tap in control (a phone
+ * has no pointer to bring to the edge); in control, the head alone once the pointer rests at the top edge, which
+ * leaves the computer's own top bar as clear as it can. It stays while the pointer is on it and hides 2.5 s after
+ * the last ask. A banner, or keyboard focus in it, keeps it (computer.css).
  */
-function useBarHidden(on: boolean, control: boolean) {
-  const [hidden, setHidden] = useState(false);
+function useBar(on: boolean, control: boolean): BarShown {
+  const [shown, setShown] = useState<BarShown>("all");
   useEffect(() => {
-    setHidden(false);
+    setShown("all");
     if (!on) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let shown = true;
-    const show = (yes: boolean) => {
-      shown = yes;
-      setHidden(!yes);
+    let edge: ReturnType<typeof setTimeout> | undefined;
+    let now: BarShown = "all";
+    const show = (next: BarShown) => {
+      now = next;
+      setShown(next);
     };
     const hideLater = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
         timer = undefined;
-        show(false);
+        show("none");
       }, BAR_MS);
     };
     const moved = (e: PointerEvent) => {
       if ((e.target as Element | null)?.closest?.(".ac-dialog__head")) {
         clearTimeout(timer);
         timer = undefined;
-        return show(true);
-      }
-      if (!control || e.clientY <= BAR_EDGE_PX || e.pointerType === "touch") {
-        show(true);
+        if (now === "none") show("head");
+      } else if (!control || e.pointerType === "touch") {
+        show("all");
         hideLater();
-      } else if (shown && timer === undefined) hideLater();
+      } else if (e.clientY > BAR_EDGE_PX) {
+        clearTimeout(edge);
+        edge = undefined;
+        if (now !== "none" && timer === undefined) hideLater();
+      } else if (edge === undefined) {
+        edge = setTimeout(() => {
+          edge = undefined;
+          if (now === "none") show("head");
+          hideLater();
+        }, BAR_EDGE_MS);
+      }
     };
     hideLater();
     const opts = { capture: true, passive: true };
@@ -119,11 +137,12 @@ function useBarHidden(on: boolean, control: boolean) {
     document.addEventListener("pointerdown", moved, opts);
     return () => {
       clearTimeout(timer);
+      clearTimeout(edge);
       document.removeEventListener("pointermove", moved, opts);
       document.removeEventListener("pointerdown", moved, opts);
     };
   }, [on, control]);
-  return on && hidden;
+  return on ? shown : "all";
 }
 
 /**
@@ -168,7 +187,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const handoff = view.facts?.handoff ?? null;
   const mine = controlledBy(handoff, me.user.id);
   const screenOnly = full && surface === "screen";
-  const barHidden = useBarHidden(screenOnly, mine);
+  const bar = useBar(screenOnly, mine);
   const locked = useKeyboardLock(screenOnly && mine);
   const color = colorOf(agent);
   const close = () => {
@@ -193,7 +212,13 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
       actions={<span ref={setActs} className="cmp-acts" />}
       closeLabel={t("common.close")}
       width={1280}
-      className={cx("cmp-dialog", full && "is-full", screenOnly && "is-screen-only", barHidden && "is-bar-hidden")}
+      className={cx(
+        "cmp-dialog",
+        full && "is-full",
+        screenOnly && "is-screen-only",
+        bar === "none" && "is-bar-hidden",
+        bar !== "all" && "is-line-hidden",
+      )}
       onEscapeKeyDown={(e) => {
         // Keyboard Lock in control: Esc is the computer's; holding it leaves full screen, as the browser says.
         if (locked.current && document.fullscreenElement) e.preventDefault();
