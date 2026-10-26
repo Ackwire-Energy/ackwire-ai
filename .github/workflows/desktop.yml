@@ -535,6 +535,11 @@ jobs:
           test -s apps/desktop/src-tauri/native/web/index.html
           test -d apps/desktop/src-tauri/native/licenses/npm
 
+      # The server here as the app runs it on Linux: it answers, and it stops when its stdin closes.
+      - name: Run the server here once
+        shell: bash
+        run: bun apps/desktop/scripts/server-smoke.ts "$BIN_DIR/agentes-runner-x86_64-unknown-linux-gnu" apps/desktop/src-tauri/native
+
       - name: Icons
         working-directory: apps/desktop
         run: |
@@ -568,11 +573,56 @@ jobs:
           (cd out && for f in "agentes_${VERSION}_amd64.deb" "agentes_${VERSION}_amd64.AppImage"; do sha256sum "$f" > "$f.sha256"; done)
           ls -l out
 
+      # What the deb puts on the computer: the two sidecars and the server's files (the AppImage has the same).
+      - name: Check the app's files
+        shell: bash
+        run: |
+          dpkg-deb -c "out/agentes_${VERSION}_amd64.deb" > deb.txt
+          for f in /agentes-runner /agent-browser /server/native.js /web/index.html /licenses/bun/LICENSE.md /licenses/agent-browser/LICENSE; do
+            grep -q -- "$f\$" deb.txt || { echo "::error::$f is not in the deb"; exit 1; }
+          done
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: desktop-linux
           path: out/*
           retention-days: 14
+
+      # The AppImage opens on a virtual screen, as a first run and on agentes.chat (the site under the cover): it
+      # must still run after 25 s. The screenshots and the app's output go up as `desktop-linux-look`.
+      - name: Open the app once
+        shell: bash
+        run: |
+          sudo apt-get install -y -qq xvfb imagemagick dbus
+          APPIMAGE="$PWD/out/agentes_${VERSION}_amd64.AppImage"
+          mkdir -p look
+          look() {
+            local name=$1 home
+            home=$(mktemp -d)
+            if [ "$name" = cloud ]; then
+              mkdir -p "$home/.config/chat.agentes.desktop"
+              echo '{"current":"https://agentes.chat","servers":["https://agentes.chat"]}' \
+                > "$home/.config/chat.agentes.desktop/servers.json"
+            fi
+            HOME="$home" xvfb-run -a -s "-screen 0 1440x900x24" dbus-run-session -- bash -c '
+              "$0" > "$1.log" 2>&1 & app=$!
+              sleep 25
+              import -window root "$1.png"
+              alive=0; kill -0 "$app" 2>/dev/null && alive=1
+              kill "$app" 2>/dev/null; wait "$app" 2>/dev/null
+              [ "$alive" = 1 ]' "$APPIMAGE" "$PWD/look/$name" \
+              || { echo "::error::The app ended on its own ($name)"; cat "look/$name.log"; return 1; }
+          }
+          look first
+          look cloud
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: desktop-linux-look
+          path: look/*
+          retention-days: 14
+          if-no-files-found: ignore
 
   # Release notes = the annotated tag's message (`git tag -a desktop-v0.2.0 -m "- Folders…"`).
   publish:
@@ -587,9 +637,11 @@ jobs:
         with:
           ref: ${{ needs.version.outputs.ref }}
 
+      # Only the three builds' files: the server's files and the Linux screenshots are artifacts too.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: out
+          pattern: desktop-{macos,windows,linux}
           merge-multiple: true
 
       - name: Publish the release

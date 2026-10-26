@@ -6,7 +6,7 @@
  *
  *   bun apps/desktop/scripts/server-smoke.ts <runner binary> <native folder>
  *
- * Run by the Desktop workflow on Windows.
+ * Run by the Desktop workflow on Windows and Linux.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
