@@ -30,5 +30,11 @@ export function markShapes(id: string, scheme: Scheme, ink: string) {
   };
 }
 
-/** A stack's chips, left to right as given, each after the first drawn 6 pt over the one before. */
-export const stackChips = (ids: readonly string[]) => ids.map((id, i) => ({ id, marginLeft: i === 0 ? 0 : -6 }));
+/** The ring in the surface's color around each chip of a stack, in points. */
+export const STACK_RING = 2;
+
+/**
+ * A stack's chips, left to right as given, each after the first drawn 2 pt over the one before: with its ring, it
+ * covers only the 4 pt around the mark before it, never the mark (the makers ask for clear space around theirs).
+ */
+export const stackChips = (ids: readonly string[]) => ids.map((id, i) => ({ id, marginLeft: i === 0 ? 0 : -2 }));

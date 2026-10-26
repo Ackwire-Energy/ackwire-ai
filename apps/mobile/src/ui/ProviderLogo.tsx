@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
-import { LOGO_SIZES, type LogoSize, MARK_GRADIENT, markShapes, stackChips } from "./provider-marks";
+import { LOGO_SIZES, type LogoSize, MARK_GRADIENT, markShapes, STACK_RING, stackChips } from "./provider-marks";
 import { useTheme } from "./theme";
 
 const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18 } as const;
@@ -79,7 +79,7 @@ export function ProviderStack({ ids, label }: { ids: readonly string[]; label?: 
           style={{
             marginLeft: chip.marginLeft,
             borderRadius: Math.round(box / 3),
-            boxShadow: `0px 0px 0px 2px ${colors.surface}`,
+            boxShadow: `0px 0px 0px ${STACK_RING}px ${colors.surface}`,
           }}
         >
           <ProviderLogo id={chip.id} size="chip" />

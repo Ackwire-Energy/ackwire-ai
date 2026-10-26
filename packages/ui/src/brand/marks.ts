@@ -6,7 +6,7 @@
  * each entry names its source. A mark is drawn as provided: never recoloured, and dimmed only with opacity.
  */
 export interface ProviderMark {
-  /** The brand's color; absent for a one-color mark, drawn in the text's color so it follows the theme. */
+  /** The brand's color; absent for a one-color mark, drawn in the theme's ink, never a muted text's grey. */
   color?: string;
   /** One path on a 24×24 grid, nonzero fill. */
   path: string;
@@ -52,7 +52,7 @@ const MARKS = {
     gradient: ["#E21680", "#FF633A"],
     path: "M11.431 3.92A.859.859 0 1 0 9.712 3.92L9.712 18.156A1.999 1.999 0 0 1 5.715 18.156L5.715 9.021A.859.859 0 1 0 3.997 9.021L3.997 12.892A1.999 1.999 0 0 1 0 12.892L0 11.49A.569.569 0 0 1 1.139 11.49L1.139 12.893A.859.859 0 0 0 2.858 12.893L2.858 9.021A1.999 1.999 0 0 1 6.855 9.021L6.855 18.156A.859.859 0 0 0 8.574 18.156L8.574 12.571L8.574 12.571L8.574 3.92A1.998 1.998 0 1 1 12.57 3.92L12.57 15.708A.569.569 0 1 1 11.431 15.708ZM22.002 7.024A2.001 2.001 0 0 0 20.003 9.021L20.003 16.652A.859.859 0 0 1 18.285 16.652L18.285 3.922A1.999 1.999 0 0 0 14.288 3.922L14.288 20.082A.859.859 0 0 1 12.569 20.082L12.569 18.08A.569.569 0 1 0 11.431 18.08L11.431 20.08A1.998 1.998 0 0 0 15.427 20.08L15.427 3.92A.859.859 0 0 1 17.146 3.92L17.146 16.65A1.999 1.999 0 0 0 21.142 16.65L21.142 9.021A.859.859 0 1 1 22.861 9.021L22.861 15.708A.569.569 0 0 0 24 15.708L24 9.021A2 2 0 0 0 22.002 7.024Z",
   },
-  // https://opencode.ai/brand: the frame, and its grey block (lighter on a dark theme)
+  // https://opencode.ai/brand: the frame, and its grey block (darker on a dark theme)
   opencode: {
     path: "M16.8 4.8L7.2 4.8L7.2 19.2L16.8 19.2L16.8 4.8ZM21.6 24L2.4 24L2.4 0L21.6 0L21.6 24Z",
     parts: [{ path: "M16.8 19.2L7.2 19.2L7.2 9.6L16.8 9.6L16.8 19.2Z", color: "#CFCECD", dark: "#4B4646" }],

@@ -126,8 +126,30 @@ describe("provider marks", () => {
     expect(named.hasAttribute("aria-hidden")).toBe(false);
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
-    expect(rule(".ac-brand-stack > .ac-brand + .ac-brand")).toContain("margin-left: -6px");
-    expect(rule(".ac-brand-stack > .ac-brand")).toContain("0 0 0 2px var(--stack-ring, var(--surface))");
+    const px = (selector: string, property: RegExp) => Number(property.exec(rule(selector))?.[1]);
+    const overlap = -px(".ac-brand-stack > .ac-brand + .ac-brand", /margin-left: (-?\d+)px/);
+    const ring = px(".ac-brand-stack > .ac-brand", /0 0 0 (\d+)px var\(--stack-ring, var\(--surface\)\)/);
+    const chip = px(".ac-brand--chip", /width: (\d+)px/);
+    const mark = px(".ac-brand--chip svg", /width: (\d+)px/);
+    expect([overlap, ring]).toEqual([2, 2]);
+    // The next tile and its ring cover only the space around a mark, never the mark itself.
+    expect(overlap + ring).toBeLessThanOrEqual((chip - mark) / 2);
+  });
+
+  test("a one-color mark is drawn in ink at every size, even beside muted text", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    // Every rule that sets a mark's color: the brand's, or the ink for a one-color mark (an initial isn't a mark).
+    const colors = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, selector]) => selector?.includes(".ac-brand") && !selector.includes("__initial"))
+      .flatMap(([, selector, body]) =>
+        [...(body ?? "").matchAll(/(?:^|[\s;])color: ([^;]+);/g)].map((m) => [selector?.trim(), m[1]]),
+      );
+    expect(colors).toEqual([
+      [".ac-brand", "var(--brand)"],
+      [".ac-brand--mono", "var(--ink)"],
+    ]);
+    const xs = logo(render(<ProviderLogo id="codex" size="xs" />).container);
+    expect(xs.className).toBe("ac-brand ac-brand--xs ac-brand--mono");
   });
 
   test("decorative unless labeled", () => {

@@ -468,15 +468,13 @@ textarea.ac-input {
   width: 12px;
   height: 12px;
 }
-/* Beside text: the bare mark; a one-color one takes the text's color. */
+/* Beside text: the bare mark. A one-color one stays in ink beside muted text too: OpenAI's, for one, may only be
+   black or white. */
 .ac-brand--xs {
   width: 14px;
   height: 14px;
   background: none;
   box-shadow: none;
-}
-.ac-brand--xs.ac-brand--mono {
-  color: inherit;
 }
 .ac-brand--xs svg {
   width: 14px;
@@ -506,7 +504,8 @@ textarea.ac-input {
   opacity: 0.5;
 }
 /* ProviderStack: several makers' 20 px tiles overlapping, each ringed in the surface under it (`--stack-ring`
-   where that isn't the page's), like `.ac-avatar-stack`. */
+   where that isn't the page's), like `.ac-avatar-stack`. The 2 px overlap and the 2 px ring stay inside the 4 px
+   around each 12 px mark, so no tile covers another's mark: the makers ask for clear space around theirs. */
 .ac-brand-stack {
   display: inline-flex;
   flex: none;
@@ -518,7 +517,7 @@ textarea.ac-input {
     0 0 0 2px var(--stack-ring, var(--surface));
 }
 .ac-brand-stack > .ac-brand + .ac-brand {
-  margin-left: -6px;
+  margin-left: -2px;
 }
 /* Engine line icons (BrainIcon, executor marks): each engine's accent; working writes / looks around. */
 .ac-icon .ac-brain-cc {

@@ -7,7 +7,7 @@ import i18next, { type TFunction } from "i18next";
 import { featureKeysEn } from "../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../src/features/i18n/keys.pt-BR";
 import { withMobileKeys } from "../src/i18n/merge";
-import { LOGO_SIZES, MARK_GRADIENT, markShapes, stackChips } from "../src/ui/provider-marks";
+import { LOGO_SIZES, MARK_GRADIENT, markShapes, STACK_RING, stackChips } from "../src/ui/provider-marks";
 
 async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
   const i18n = i18next.createInstance();
@@ -75,15 +75,18 @@ describe("the marks as the phone draws them", () => {
     const minimax = markShapes("minimax", "light", INK);
     expect(minimax?.gradient).toEqual(["#E21680", "#FF633A"]);
     expect(minimax?.shapes[0]?.fill).toBe(`url(#${MARK_GRADIENT})`);
-    // One color, any size: the ink, never the muted text color (an unavailable mark only fades).
+    // A one-color mark takes the ink it is given, with no color of its own.
     expect(markShapes("codex", "light", INK)?.shapes).toEqual([{ d: PROVIDER_MARKS.openai.path, fill: INK }]);
     expect(markShapes("newplan", "light", INK)).toBeNull();
   });
 
   test("a stack: 20 pt chips with a 12 pt mark, in the order given, each over the one before", () => {
-    expect(LOGO_SIZES.chip).toEqual([20, 12]);
+    const [chip, mark] = LOGO_SIZES.chip;
+    expect([chip, mark]).toEqual([20, 12]);
     const chips = stackChips(["claude_code", "codex", "zai", "kimi"]);
     expect(chips.map((c) => markOf(c.id))).toEqual(["claude", "openai", "zai", "kimi"]);
-    expect(chips.map((c) => c.marginLeft)).toEqual([0, -6, -6, -6]);
+    expect(chips.map((c) => c.marginLeft)).toEqual([0, -2, -2, -2]);
+    // The next chip and its ring cover only the space around a mark, never the mark itself.
+    for (const c of chips.slice(1)) expect(-c.marginLeft + STACK_RING).toBeLessThanOrEqual((chip - mark) / 2);
   });
 });
