@@ -361,7 +361,14 @@ export function BrowserCard({
 
       {open ? (
         <>
-          <View style={[styles.page, { backgroundColor: c.sunken }]}>
+          <View
+            style={[
+              styles.page,
+              // Nothing under the page (no controls, note or steps): it keeps the card's margin at the bottom too.
+              !mine && !(helper && !live.hidden) && steps.length === 0 && styles.pageLast,
+              { backgroundColor: c.sunken },
+            ]}
+          >
             {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
             {!live.frame || live.unavailable ? (
               <View style={[styles.center, live.frame ? styles.overlay : null]}>
@@ -476,6 +483,7 @@ const styles = StyleSheet.create({
   hint: { marginTop: 2 },
   flip: { transform: [{ rotate: "180deg" }] },
   page: { aspectRatio: 16 / 10, marginHorizontal: 8, borderRadius: 12, overflow: "hidden" },
+  pageLast: { marginBottom: 8 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 16 },
   centerText: { textAlign: "center" },
   overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" },
