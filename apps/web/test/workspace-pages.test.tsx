@@ -417,7 +417,8 @@ describe("Equipe", () => {
     expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
     expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
     expect(mark("Google Drive")).toEqual(['url("/connectors/googledrive.svg")', "#4285F4"]);
-    expect(mark("Erros em produção")).toEqual(['url("/connectors/sentry.svg")', ""]);
+    // A service's mark sits beside the service's own name.
+    expect(mark("Sentry")).toEqual(['url("/connectors/sentry.svg")', ""]);
     // Our own abilities keep their icons.
     expect(mark("Navegador")).toBeNull();
     const browser = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Navegador");

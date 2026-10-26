@@ -800,7 +800,7 @@ export const ptBR = {
       browser: "Navegador",
       database: "Bancos de dados",
       github: "GitHub",
-      sentry: "Erros em produção",
+      sentry: "Sentry",
       linear: "Linear",
       gdrive: "Google Drive",
       mail: "Email",
