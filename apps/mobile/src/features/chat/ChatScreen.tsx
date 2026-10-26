@@ -82,9 +82,9 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { ChannelMembersSheet } from "./ChannelMembers";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
-import { ChannelMembersSheet } from "./ChannelMembers";
 import { HeaderPill } from "./HeaderPill";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
