@@ -701,8 +701,8 @@ export class DesktopSessions {
       if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
       if (d.refresh.current && !d.refresh.queued && !(d.refresh.params && d.refresh.look)) {
         d.refresh.queued = true;
-        // One that throws (its agent's user isn't known before the runner reaches the server) is tried again at the
-        // next sweep.
+        // One that throws (its agent's user isn't known while the runner isn't connected) is tried again at the next
+        // sweep.
         this.refreshes = this.refreshes.then(() => this.serial(d.agent.id, () => this.refresh(d)).catch(() => {}));
       }
     }
