@@ -13,13 +13,17 @@ export const signInPath = (redirect: string, email?: string) =>
 
 /**
  * Where a sign-in leads, read from its `redirect` alone so the page can say it: an invitation (by its token, which
- * that address already holds) or connecting an AI (the ready email's button). Null for anywhere else.
+ * that address already holds), connecting an AI or creating an agent (the ready email's buttons). Null for anywhere
+ * else.
  */
-export function signInFor(redirect: string | undefined): { invite: string } | { connect: "ai" } | null {
+export function signInFor(
+  redirect: string | undefined,
+): { invite: string } | { connect: "ai" } | { create: "agent" } | null {
   if (!redirect) return null;
   const url = new URL(redirect, "http://localhost");
   const invite = /^\/invite\/([^/]+)$/.exec(url.pathname)?.[1];
   if (invite) return { invite };
+  if (/^\/org\/[^/]+\/agents\/new$/.test(url.pathname)) return { create: "agent" };
   return url.searchParams.get("connect") === "ai" ? { connect: "ai" } : null;
 }
 

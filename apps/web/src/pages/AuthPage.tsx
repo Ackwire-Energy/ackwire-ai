@@ -120,7 +120,7 @@ export function AuthPage({
   const privacyUrl = config.data?.privacyUrl;
   const desktop = inDesktopApp();
   // Where this sign-in leads, in place of the general line, read from the address alone: only what the page before
-  // already showed (an invitation's workspace, by its token; the ready email's Connect your AI).
+  // already showed (an invitation's workspace, by its token; the ready email's Connect your AI or Create an agent).
   const goal = signInFor(redirect);
   const invite = goal && "invite" in goal ? goal.invite : "";
   const invitation = useQuery({ ...invitationQuery(api, invite), enabled: invite !== "" });
@@ -128,9 +128,11 @@ export function AuthPage({
   const purpose =
     goal && "connect" in goal
       ? t("auth.flow.toConnectAi")
-      : joining
-        ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
-        : null;
+      : goal && "create" in goal
+        ? t("auth.flow.toCreateAgent")
+        : joining
+          ? t(joining.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", { org: joining.orgName })
+          : null;
   const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
     null,
   );

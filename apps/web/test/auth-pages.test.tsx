@@ -220,7 +220,7 @@ describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
     expect(screen().getByText("marina@acme.com.br")).toBeTruthy();
   });
 
-  test("an email invitation's: to join; the ready email's Connect your AI: to connect it", async () => {
+  test("an email invitation's: to join; the ready email's Connect your AI and Create an agent: to do that", async () => {
     const { api } = authApi(ACCOUNT, { state: seedState({ me: null }) });
     await renderApp(at("/invite/valid"), { api, auth: createFakeAuth().auth });
     expect(lead()).toBe("Para entrar na Acme.");
@@ -229,13 +229,19 @@ describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
     await renderApp(at(`/org/${ORG_ID}?connect=ai`), { api, auth: createFakeAuth().auth });
     expect(heading()).toBe("Oi. Qual é o seu e-mail?");
     expect(lead()).toBe("Para conectar sua IA.");
+    cleanup();
+
+    await renderApp(at(`/org/${ORG_ID}/agents/new`), { api, auth: createFakeAuth().auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    expect(lead()).toBe("Para criar um agente.");
   });
 
   test("a link that no longer works, an unknown one, or anywhere else: the general line", async () => {
     const { api } = authApi(ACCOUNT, {
       state: seedState({ me: null, previews: { off: { ...LINK, closed: true } } }),
     });
-    for (const redirect of ["/invite/off", "/invite/nope", `/org/${ORG_ID}/drive`]) {
+    // The ready email's button to the workspace itself included: it leads nowhere in particular.
+    for (const redirect of ["/invite/off", "/invite/nope", `/org/${ORG_ID}/drive`, `/org/${ORG_ID}`]) {
       await renderApp(at(redirect), { api, auth: createFakeAuth().auth });
       expect(lead()).toBe("Vale para entrar ou para criar uma conta.");
       cleanup();

@@ -93,6 +93,7 @@ export const en: Translations = {
       toAsk: "To ask to join {{org}}.",
       toJoin: "To join {{org}}.",
       toConnectAi: "To connect your AI.",
+      toCreateAgent: "To create an agent.",
       emailUp: "Let's create your account. What's your work email?",
       emailUpLead: "With your work email, your team finds you more easily.",
       emailPlaceholder: "you@company.com",
