@@ -35,11 +35,18 @@ class DesktopSocket {
   }
 }
 
-/** noVNC's RFB as the screen drives it: how it was set, what it pasted and pressed; `emit` plays its events. */
+/** A key event as the log reads it: `keydown a KeyA ctrl`. */
+const keyText = (e: KeyboardEvent) =>
+  [e.type, e.key, e.code, ...(["ctrl", "shift", "alt", "meta"] as const).filter((m) => e[`${m}Key`])]
+    .filter(Boolean)
+    .join(" ");
+
+/**
+ * noVNC's RFB as the screen drives it: how it was set and what it pasted; `log` holds, in order, the key events
+ * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events.
+ */
 class FakeRfb {
   static all: FakeRfb[] = [];
-  /** Like noVNC, it draws into a canvas of its own inside the screen. */
-  static drawsCanvas = false;
   viewOnly = false;
   qualityLevel = 6;
   compressionLevel = 2;
@@ -47,11 +54,12 @@ class FakeRfb {
   resizeSession = false;
   focusOnClick = true;
   background = "";
-  focused = 0;
   pasted: string[] = [];
-  keys: [number, string | null, boolean | undefined][] = [];
+  log: string[] = [];
   /** It took its socket in the tick the socket was made, before anything could arrive on it. */
   readonly onTime: boolean;
+  /** Like noVNC, it draws into a canvas of its own inside the screen, and takes its keys there. */
+  readonly canvas = document.createElement("canvas");
   private listeners = new Map<string, ((e: Event) => void)[]>();
   constructor(
     readonly el: HTMLElement,
@@ -60,12 +68,12 @@ class FakeRfb {
   ) {
     this.onTime = !ws.late;
     FakeRfb.all.push(this);
-    if (FakeRfb.drawsCanvas) {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1280;
-      canvas.height = 900;
-      el.appendChild(canvas);
+    this.canvas.width = 1280;
+    this.canvas.height = 900;
+    for (const type of ["keydown", "keyup"]) {
+      this.canvas.addEventListener(type, (e) => this.log.push(keyText(e as KeyboardEvent)));
     }
+    el.appendChild(this.canvas);
   }
   addEventListener(type: string, fn: (e: Event) => void) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
@@ -76,13 +84,12 @@ class FakeRfb {
   clipboardPasteFrom(text: string) {
     this.pasted.push(text);
   }
-  sendKey(keysym: number, code: string | null, down?: boolean) {
-    this.keys.push([keysym, code, down]);
+  sendKey(_keysym: number, code: string | null, down?: boolean) {
+    this.log.push(`send ${code} ${down ? "down" : "up"}`);
   }
-  focus() {
-    this.focused++;
-  }
+  focus() {}
   disconnect() {
+    this.canvas.remove();
     this.ws.close();
   }
 }
@@ -138,10 +145,96 @@ const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(4);
 };
+/** A click as Chrome, Edge and Firefox off a Mac make it: the button takes the browser's focus first. */
+const clickFocusing = async (el: HTMLElement) => {
+  await act(async () => el.focus());
+  await click(el);
+};
 const connected = async () => {
   await act(async () => rfb().emit("connect"));
   await settle(2);
 };
+/** The browser's full screen: which element asked for it; `document.fullscreenElement` follows. */
+function fullScreen() {
+  const page = { requested: [] as Element[] };
+  const doc = document as { fullscreenElement: Element | null };
+  replaceOn(document, "fullscreenElement", null);
+  replaceOn(document.documentElement, "requestFullscreen", function (this: Element) {
+    page.requested.push(this);
+    doc.fullscreenElement = this;
+    return Promise.resolve();
+  });
+  replaceOn(document, "exitFullscreen", () => {
+    doc.fullscreenElement = null;
+    return Promise.resolve();
+  });
+  return page;
+}
+/** The dialog's classes. */
+const classes = () => [...(document.querySelector(".cmp-dialog")?.classList ?? [])];
+/** Past the time the full-screen bar stays once nothing asks for it (2.5 s). */
+const barTime = () => act(() => new Promise((r) => setTimeout(r, 2_600)));
+/** Past the time the pointer rests at the display's top edge before the bar comes back in control (0.5 s). */
+const edgeTime = () => act(() => new Promise((r) => setTimeout(r, 600)));
+/** The pointer moves over the page at this height. */
+const pointerAt = (clientY: number) => act(async () => void fireEvent.pointerMove(document.body, { clientY }));
+
+/** Ada's screen in this person's control, live: the field over it has the person's keys. */
+async function controlled() {
+  const t = await dialog();
+  await connected();
+  await click(view().getByRole("button", { name: "Assumir o controle" }));
+  await settle(4);
+  await connected();
+  return {
+    ...t,
+    field: () => view().getByRole("textbox", { name: "Digitar no computador da Ada" }) as HTMLTextAreaElement,
+  };
+}
+/** The line under the screen in control: its words. */
+const line = () => document.querySelector(".dsk-line > .muted")?.textContent;
+const pasteOn = (el: Element, text: string) =>
+  act(
+    async () =>
+      void fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : "") } }),
+  );
+const SHIFT_INSERT = ["send ShiftLeft down", "send Insert down", "send Insert up", "send ShiftLeft up"];
+
+/** Globals a test replaced (the person's clipboard, the platform), put back after it. */
+const restores: (() => void)[] = [];
+function replaceOn(target: object, key: string, value: unknown) {
+  const own = Object.getOwnPropertyDescriptor(target, key);
+  Object.defineProperty(target, key, { configurable: true, writable: true, value });
+  restores.push(() => {
+    if (own) Object.defineProperty(target, key, own);
+    else delete (target as Record<string, unknown>)[key];
+  });
+}
+
+/** The person's clipboard as the browser keeps it: what was written there, and whether a write is let in. */
+function clipboard({ refuses = false } = {}) {
+  const board = { writes: 0, failed: 0, written: [] as string[], texts: [] as string[] };
+  class Item {
+    constructor(readonly data: Record<string, Promise<Blob>>) {}
+  }
+  replaceOn(globalThis, "ClipboardItem", Item);
+  replaceOn(navigator, "clipboard", {
+    write: async ([item]: Item[]) => {
+      board.writes++;
+      if (refuses) throw new Error("NotAllowedError");
+      try {
+        const blob = await item?.data["text/plain"];
+        board.written.push((await blob?.text()) ?? "");
+      } catch (err) {
+        board.failed++;
+        throw err;
+      }
+    },
+    writeText: async (text: string) => void board.texts.push(text),
+  });
+  return board;
+}
+
 const controlOf = (agentId: string, controllerUserId: string): BrowserHandoff => ({
   id: "h-joao",
   agentId,
@@ -163,7 +256,10 @@ beforeEach(() => {
   FakeRfb.all = [];
   localStorage.clear();
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  for (const put of restores.splice(0).reverse()) put();
+});
 
 /**
  * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
@@ -187,14 +283,12 @@ function screenPixels() {
   proto.getContext = function (this: HTMLCanvasElement, ...args: Parameters<HTMLCanvasElement["getContext"]>) {
     return this.isConnected ? getContext.apply(this, args) : copy;
   } as unknown as typeof proto.getContext;
-  FakeRfb.drawsCanvas = true;
   return {
     picture: () => {
       shows = true;
     },
     restore: () => {
       proto.getContext = getContext;
-      FakeRfb.drawsCanvas = false;
     },
   };
 }
@@ -230,7 +324,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(view().queryByRole("button", { name: "Desligar" })).toBeNull();
     expect(view().queryByRole("button", { name: "Recolher" })).toBeNull();
     // Watching gives no way to type into it.
-    expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
+    expect(view().queryByRole("textbox", { name: "Digitar no computador da Ada" })).toBeNull();
   });
 
   test("Live once a picture is there: a screen that just started stays black a moment, and says Opening meanwhile", async () => {
@@ -368,30 +462,36 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops).toHaveLength(3);
   });
 
-  test("Assumir takes the screen's own handoff, control opens at quality 6 with the person's keyboard; Devolver hands it back", async () => {
+  test("Assumir takes the screen's own handoff, control opens at quality 6 with no keyboard to pick; Devolver hands it back", async () => {
+    // A layout an older version kept is never sent: what a key types is the person's own layout's.
     localStorage.setItem("agentes.screen.keyboard", "br");
     const t = await dialog();
     await connected();
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     expect(calls(t, "browser.takeover")).toEqual([[ORG_ID, ADA_ID, "desktop"]]);
     await settle(4);
-    expect(t.sockets.desktops.at(-1)?.url).toContain("&mode=control&keyboard=br");
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
     expect(t.sockets.desktops[0]?.closed).toBe(true);
-    expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, focusOnClick: true });
+    expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, focusOnClick: false });
     await connected();
-    // The person's keys go to the screen at once.
-    expect(rfb().focused).toBeGreaterThan(0);
+    // The person's keys go to the screen at once, through a field over it.
+    expect(document.activeElement).toBe(view().getByRole("textbox", { name: "Digitar no computador da Ada" }));
     expect(sub()).toBe("Você no controle · a Ada espera");
-    expect(
-      screen().getByText(
-        "Enquanto você está no controle, os programas do computador da Ada podem ver a tela e o que você digita.",
-      ),
-    ).toBeTruthy();
+    expect(line()).toBe(
+      "Copiar e colar como sempre: Ctrl C, Ctrl V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
+    );
+    // No box to paste into and no keyboard to pick: the person's own keys paste, and type in their own layout.
+    expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
+    expect(view().queryByRole("combobox")).toBeNull();
+    expect(document.querySelector(".dsk-line")?.textContent).toBe(line());
 
     // Esc in control goes to the computer: the dialog stays.
-    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await act(async () =>
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape", code: "Escape" }),
+    );
     await settle(2);
     expect(t.closed()).toBe(0);
+    expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
     const note = view().getByRole("textbox", { name: "Recado para a Ada" });
@@ -402,67 +502,347 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
   });
 
-  test("full screen is the page's, so leaving it with Esc lets the first click on Devolver work", async () => {
-    let requested = null as Element | null;
-    Object.defineProperty(document.documentElement, "requestFullscreen", {
-      configurable: true,
-      value: function (this: Element) {
-        requested = this;
-        return Promise.resolve();
-      },
-    });
-    const t = await dialog();
-    await connected();
-    await click(view().getByRole("button", { name: "Assumir o controle" }));
-    await settle(4);
-    await connected();
-    await click(view().getByRole("button", { name: "Tela cheia" }));
-    // The page goes full screen, not the dialog: noVNC's capture layer on the page stays inside it.
-    expect(requested).toBe(document.documentElement);
-    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(true);
-    // In full screen Esc only leaves full screen, even in control.
-    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
-    await settle(2);
-    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(false);
-    expect(t.closed()).toBe(0);
-    await click(view().getByRole("button", { name: "Devolver" }));
-    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
-    delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
+  test("in control each key is replayed on noVNC's canvas, never seen by the page; a blur lets go of what is held", async () => {
+    const t = await controlled();
+    const field = t.field();
+    const page: string[] = [];
+    const seen = (e: KeyboardEvent) => page.push(e.key);
+    window.addEventListener("keydown", seen);
+    try {
+      // Taken from the browser (prevented) and replayed.
+      expect(fireEvent.keyDown(field, { key: "a", code: "KeyA" })).toBe(false);
+      fireEvent.keyUp(field, { key: "a", code: "KeyA" });
+      fireEvent.keyDown(field, { key: "Shift", code: "ShiftLeft", shiftKey: true });
+      await act(async () => field.blur());
+      expect(rfb().log).toEqual([
+        "keydown a KeyA",
+        "keyup a KeyA",
+        "keydown Shift ShiftLeft shift",
+        "keyup Shift ShiftLeft shift",
+      ]);
+      expect(page).toEqual([]);
+    } finally {
+      window.removeEventListener("keydown", seen);
+    }
   });
 
-  test("Colar texto: the screen's clipboard, then Shift+Insert; what the screen copies waits behind Copiar", async () => {
-    const copied: string[] = [];
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (v: string) => void copied.push(v) },
-    });
-    const t = await dialog();
-    await connected();
-    await click(view().getByRole("button", { name: "Assumir o controle" }));
-    await settle(4);
-    await connected();
-    expect(t.sockets.desktops.at(-1)?.url).toContain("mode=control");
+  test("Ctrl+V pastes the person's clipboard: the computer's clipboard, then Shift+Insert with Ctrl let go and held again", async () => {
+    const t = await controlled();
     // The watching socket's close can arrive after the control one opened: the paste still goes.
     await act(async () => t.sockets.desktops[0]?.serverClose(1000));
     await settle(2);
-
-    const field = view().getByRole("textbox", { name: "Texto para colar no computador da Ada" });
-    await act(async () => fireEvent.change(field, { target: { value: "Olá, ação: êõú ç — 日本" } }));
-    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
-    expect(rfb().pasted).toEqual(["Olá, ação: êõú ç — 日本"]);
-    expect(rfb().keys).toEqual([
-      [0xffe1, "ShiftLeft", true],
-      [0xff63, "Insert", undefined],
-      [0xffe1, "ShiftLeft", false],
+    const field = t.field();
+    fireEvent.keyDown(field, { key: "Control", code: "ControlLeft", ctrlKey: true });
+    // V is the browser's own paste: neither replayed nor stopped.
+    expect(fireEvent.keyDown(field, { key: "v", code: "KeyV", ctrlKey: true })).toBe(true);
+    await pasteOn(field, "Olá, ação: êõú ç — 日本\r\nfim");
+    expect(rfb().pasted).toEqual(["Olá, ação: êõú ç — 日本\nfim"]);
+    expect(rfb().log).toEqual([
+      "keydown Control ControlLeft ctrl",
+      "keyup Control ControlLeft ctrl",
+      ...SHIFT_INSERT,
+      "keydown Control ControlLeft ctrl",
     ]);
+  });
 
+  test("a paste over 256 KB as it is sent, or with no text, sends nothing and says why", async () => {
+    const t = await controlled();
+    await pasteOn(t.field(), "");
+    expect(screen().getByText("No computador da Ada só dá para colar texto.")).toBeTruthy();
+    // The limit is the computer's, in what noVNC sends: UTF-8, each line break as CRLF, and a NUL at the end.
+    for (const text of ["x".repeat(262_144), "ã".repeat(131_072), "linha\n".repeat(40_000)]) {
+      await pasteOn(t.field(), text);
+    }
+    expect(screen().getByText("Grande demais para colar no computador da Ada. No máximo 256 KB.")).toBeTruthy();
+    expect(rfb().pasted).toEqual([]);
+    expect(rfb().log).toEqual([]);
+    // Up to the limit goes, a CRLF counted as the two bytes it is.
+    await pasteOn(t.field(), `${"x".repeat(262_141)}\r\n`);
+    expect(rfb().pasted.map((text) => text.length)).toEqual([262_142]);
+  });
+
+  test("a dead key composes in the field: é goes as one key, an emoji as a paste", async () => {
+    const t = await controlled();
+    const field = t.field();
+    // Left to the browser, which composes it.
+    expect(fireEvent.keyDown(field, { key: "Dead", code: "Quote" })).toBe(true);
+    expect(rfb().log).toEqual([]);
+    const compose = async (text: string) => {
+      field.value = text;
+      await act(async () => {
+        field.dispatchEvent(new Event("compositionend"));
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    };
+    await compose("é");
+    expect(rfb().log).toEqual(["keydown é"]);
+    expect(field.value).toBe("");
+    await compose("👍");
+    expect(rfb().pasted).toEqual(["👍"]);
+    expect(rfb().log.slice(1)).toEqual(SHIFT_INSERT);
+  });
+
+  test("⌘C on a Mac: Ctrl+Insert there, and what it copies within 2 s lands in the person's clipboard; ⌘V pastes", async () => {
+    replaceOn(navigator, "platform", "MacIntel");
+    const board = clipboard();
+    const t = await controlled();
+    expect(line()).toStartWith("Copiar e colar como sempre: ⌘ C, ⌘ V. ");
+    const field = t.field();
+    fireEvent.keyDown(field, { key: "Meta", code: "MetaLeft", metaKey: true });
+    fireEvent.keyDown(field, { key: "c", code: "KeyC", metaKey: true });
+    // ⌘ is Alt there: let go of it around the copy keys, then held again.
+    expect(rfb().log).toEqual([
+      "keydown Meta MetaLeft meta",
+      "keyup Meta MetaLeft meta",
+      "send ControlLeft down",
+      "send Insert down",
+      "send Insert up",
+      "send ControlLeft up",
+      "keydown Meta MetaLeft meta",
+    ]);
     await act(async () => rfb().emit("clipboard", { text: "ls -la /tmp" }));
     await settle(2);
-    expect(copied).toEqual([]);
-    expect(screen().getByText("ls -la /tmp")).toBeTruthy();
-    expect(screen().getByText("Copiado no computador da Ada:")).toBeTruthy();
+    expect(board.written).toEqual(["ls -la /tmp"]);
+    expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
+    // The toast's × is the toast's own, though the dialog is modal: the dialog stays, and control with it.
+    const dismiss = document.querySelector(".ac-toast button[aria-label='Fechar']") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(dismiss);
+      fireEvent.click(dismiss);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await settle(2);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(t.closed()).toBe(0);
+    expect(calls(t, "browser.done")).toEqual([]);
+
+    rfb().log = [];
+    expect(fireEvent.keyDown(field, { key: "v", code: "KeyV", metaKey: true })).toBe(true);
+    await pasteOn(field, "oi");
+    expect(rfb().pasted).toEqual(["oi"]);
+    expect(rfb().log).toEqual(["keyup Meta MetaLeft meta", ...SHIFT_INSERT, "keydown Meta MetaLeft meta"]);
+  });
+
+  test("Ctrl+C elsewhere stays an interrupt there; nothing is written when nothing is copied", async () => {
+    const board = clipboard();
+    const t = await controlled();
+    const field = t.field();
+    fireEvent.keyDown(field, { key: "Control", code: "ControlLeft", ctrlKey: true });
+    fireEvent.keyDown(field, { key: "c", code: "KeyC", ctrlKey: true });
+    expect(rfb().log).toEqual(["keydown Control ControlLeft ctrl", "keydown c KeyC ctrl"]);
+    await act(() => new Promise((r) => setTimeout(r, 2_100)));
+    expect(board).toMatchObject({ writes: 1, failed: 1, written: [] });
+    // Too late to be that copy's.
+    await act(async () => rfb().emit("clipboard", { text: "^C" }));
+    await settle(2);
+    expect(board.writes).toBe(1);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+  }, 10_000);
+
+  test("what the computer copies by itself never reaches the person's clipboard", async () => {
+    const board = clipboard();
+    await controlled();
+    await act(async () => rfb().emit("clipboard", { text: "a selection" }));
+    await settle(2);
+    expect(board.writes).toBe(0);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(document.querySelector(".dsk-got")).toBeNull();
+  });
+
+  test("a browser that won't let the copy in: the line under the screen offers the text, with Copiar", async () => {
+    const board = clipboard({ refuses: true });
+    const t = await controlled();
+    fireEvent.keyDown(t.field(), { key: "c", code: "KeyC", ctrlKey: true });
+    await act(async () => rfb().emit("clipboard", { text: "ls -la /tmp" }));
+    await settle(2);
+    // In the dialog, not a toast: nothing reached the person's clipboard, and their click must reach the button.
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(view().getByText("Copiado no computador da Ada:")).toBeTruthy();
+    expect(view().getByText("ls -la /tmp")).toBeTruthy();
+    expect(line()).toBeUndefined();
     await click(view().getByRole("button", { name: "Copiar" }));
-    expect(copied).toEqual(["ls -la /tmp"]);
+    expect(board.texts).toEqual(["ls -la /tmp"]);
+    expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
+    expect(document.querySelector(".dsk-got")).toBeNull();
+    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+    expect(t.closed()).toBe(0);
+  });
+
+  test("watching: no field, nothing pasted, nothing copied", async () => {
+    const board = clipboard();
+    await dialog();
+    await connected();
+    expect(view().queryByRole("textbox", { name: "Digitar no computador da Ada" })).toBeNull();
+    await pasteOn(document.body, "oi");
+    fireEvent.keyDown(document.body, { key: "c", code: "KeyC", ctrlKey: true });
+    await act(async () => rfb().emit("clipboard", { text: "ls" }));
+    await settle(2);
+    expect(rfb().pasted).toEqual([]);
+    expect(rfb().log).toEqual([]);
+    expect(board.writes).toBe(0);
+  });
+
+  test("a phone: a Keyboard button raises its keyboard, no keys hint; what it types goes to the computer", async () => {
+    replaceOn(navigator, "maxTouchPoints", 5);
+    const t = await controlled();
+    const field = t.field();
+    // Its keyboard comes up only when asked.
+    expect(document.activeElement).not.toBe(field);
+    const keyboard = view().getByRole("button", { name: "Teclado" });
+    expect(keyboard.getAttribute("aria-pressed")).toBe("false");
+    expect(line()).toBe("Os programas do computador da Ada podem ver a tela e o que você digita ou cola.");
+    await click(keyboard);
+    expect(document.activeElement).toBe(field);
+    expect(keyboard.getAttribute("aria-pressed")).toBe("true");
+    field.value = "oi";
+    await act(async () => void field.dispatchEvent(new InputEvent("input", { inputType: "insertText" })));
+    expect(rfb().log).toEqual(["keydown o", "keydown i"]);
+    expect(field.value).toBe("");
+    await act(async () => void field.dispatchEvent(new InputEvent("input", { inputType: "deleteContentBackward" })));
+    expect(rfb().log.at(-1)).toBe("keydown Backspace");
+
+    // Handed back with its keyboard up, then taken again: the button starts unpressed.
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getAllByRole("button", { name: "Devolver" }).at(-1) as HTMLElement);
+    await settle(4);
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    expect(view().getByRole("button", { name: "Teclado" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  test("leaving the page asks first, only in control", async () => {
+    await dialog();
+    await connected();
+    const leaving = () => {
+      const e = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(e);
+      return e.defaultPrevented;
+    };
+    expect(leaving()).toBe(false);
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    expect(leaving()).toBe(true);
+  });
+
+  test("full screen is the page's and shows the computer alone; Esc leaves it, and Devolver works on its first click", async () => {
+    const page = fullScreen();
+    const t = await controlled();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    // The page goes full screen, not the dialog: noVNC's capture layer on the page stays inside it.
+    expect(page.requested).toEqual([document.documentElement]);
+    expect(classes()).toEqual(expect.arrayContaining(["is-full", "is-screen-only"]));
+    expect(classes()).not.toContain("is-bar-hidden");
+    // The screen and what floats over it alone: anything else in the dialog (its sky strip) is hidden by the class
+    // it really has, or it would take a row of the display.
+    const css = await Bun.file(new URL("../src/components/computer/computer.css", import.meta.url).pathname).text();
+    const others = [...(document.querySelector(".cmp-dialog")?.children ?? [])].filter(
+      (el) => !el.matches(".ac-dialog__head, .cmp-body"),
+    );
+    expect(others.length).toBeGreaterThan(0);
+    for (const el of others) {
+      expect(css).toMatch(
+        new RegExp(`\\.cmp-dialog\\.is-screen-only > \\.${el.classList[0]}[,\\s][^{]*\\{\\s*display: none;`),
+      );
+    }
+    // Without Keyboard Lock, Esc leaves full screen, even in control.
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" }));
+    await settle(2);
+    expect(classes()).not.toContain("is-full");
+    expect(document.fullscreenElement).toBeNull();
+    expect(t.closed()).toBe(0);
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+  });
+
+  test("Devolver from full screen leaves it first: the note is the dialog's, never over the screen", async () => {
+    fullScreen();
+    await controlled();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(classes()).toContain("is-screen-only");
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(classes()).not.toContain("is-full");
+    expect(document.fullscreenElement).toBeNull();
+    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    // No full screen while the note is open.
+    expect(view().queryByRole("button", { name: "Tela cheia" })).toBeNull();
+  });
+
+  // Real time past the bar's 2.5 s: these tests say how long they may take, as the run's later files get 5 s.
+  test("the full-screen bar hides itself; in control only a rest at the display's top edge, or a tap, brings it back", async () => {
+    fullScreen();
+    await controlled();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(classes()).not.toContain("is-line-hidden");
+    await barTime();
+    expect(classes()).toEqual(expect.arrayContaining(["is-bar-hidden", "is-line-hidden"]));
+    // The pointer is the computer's: a move over the screen leaves it hidden.
+    await pointerAt(400);
+    expect(classes()).toContain("is-bar-hidden");
+    // On its way to the computer's own top bar the pointer stops at the edge a moment: that brings nothing.
+    await pointerAt(4);
+    await pointerAt(30);
+    await edgeTime();
+    expect(classes()).toContain("is-bar-hidden");
+    // Resting there brings the head back, alone: the line under it would cover more of the computer's top bar.
+    await pointerAt(4);
+    expect(classes()).toContain("is-bar-hidden");
+    await edgeTime();
+    expect(classes()).not.toContain("is-bar-hidden");
+    expect(classes()).toContain("is-line-hidden");
+    // On the bar it stays.
+    await act(
+      async () => void fireEvent.pointerMove(document.querySelector(".ac-dialog__head") as Element, { clientY: 30 }),
+    );
+    await barTime();
+    expect(classes()).not.toContain("is-bar-hidden");
+    // A phone has no pointer to bring to the edge: a tap anywhere brings all of it back, its Keyboard button too.
+    await pointerAt(400);
+    await barTime();
+    expect(classes()).toContain("is-bar-hidden");
+    await act(async () => void fireEvent.pointerDown(document.body, { clientY: 400, pointerType: "touch" }));
+    expect(classes()).not.toContain("is-bar-hidden");
+    expect(classes()).not.toContain("is-line-hidden");
+  }, 20_000);
+
+  test("watching in full screen, any move brings the bar back", async () => {
+    fullScreen();
+    await dialog();
+    await connected();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    await barTime();
+    expect(classes()).toContain("is-bar-hidden");
+    await pointerAt(400);
+    expect(classes()).not.toContain("is-bar-hidden");
+  }, 10_000);
+
+  test("Keyboard Lock in control: Esc goes to the computer, and the lock goes with full screen", async () => {
+    fullScreen();
+    const lock = { locked: 0, unlocked: 0 };
+    replaceOn(navigator, "keyboard", {
+      lock: async () => void lock.locked++,
+      unlock: () => void lock.unlocked++,
+    });
+    const t = await controlled();
+    // Only full screen locks it.
+    expect(lock.locked).toBe(0);
+    // The keys still go to the computer after a click on the button, which takes the browser's focus.
+    await clickFocusing(view().getByRole("button", { name: "Tela cheia" }));
+    expect(lock.locked).toBe(1);
+    expect(document.activeElement).toBe(t.field());
+    await act(async () =>
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape", code: "Escape" }),
+    );
+    await settle(2);
+    expect(classes()).toContain("is-full");
+    expect(t.closed()).toBe(0);
+    expect(rfb().log).toContain("keydown Escape Escape");
+    // Leaving it from the bar's button gives the keys back to the computer too, and lets go of the lock.
+    await clickFocusing(view().getByRole("button", { name: "Sair da tela cheia" }));
+    expect(classes()).not.toContain("is-full");
+    expect(document.activeElement).toBe(t.field());
+    expect(lock.unlocked).toBe(1);
   });
 
   test("a page kept for the Back button lets its screen go, and opens it again when the person comes back", async () => {
@@ -527,7 +907,7 @@ describe("the dialog's size (computer.css)", () => {
     const text = await css();
     // The wait for the workspace's computer is as wide, so its screen opens in place.
     expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
-      "width: calc(var(--cmp-screen) + 32px + var(--cmp-side))",
+      "width: calc(var(--cmp-screen) + 32px)",
     );
     expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
       "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
@@ -538,18 +918,66 @@ describe("the dialog's size (computer.css)", () => {
     expect(text).not.toContain("--cmp-page-room");
   });
 
-  test("in control the tools take a column beside the screen only where it leaves the screen larger", async () => {
+  test("one size watching or in control: the line under the screen takes the steps' line's place", async () => {
     const text = await css();
-    const query = "(min-width: 1080px) and (min-aspect-ratio: 139 / 100)";
-    const wide = text.split(`@media ${query} {`)[1] ?? "";
-    expect(rule(wide, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain("--cmp-side: 252px");
-    expect(wide).toMatch(/grid-template-columns: minmax\(0, 1fr\) 240px/);
-    expect(wide).toMatch(/\.dsk\.is-control > \.brw-ac__foot \{[^}]*grid-area: tools/);
-    // Elsewhere under it, where the steps' line was, and the dialog grows by them while there is room.
-    const narrow = text.split(`@media not all and ${query} {`)[1] ?? "";
-    expect(rule(narrow, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain(
-      "height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px))",
+    // No column of tools beside the screen any more, on any window.
+    expect(text).not.toContain("--cmp-side");
+    expect(text).not.toContain("min-aspect-ratio");
+    expect(rule(text, ".cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
+    const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
+    expect(rule(desk, ".dsk-line")).toContain("min-height: 22px");
+  });
+
+  test("full screen on the agent's screen: the screen alone on its ground, what floats over it hidden after a while", async () => {
+    const text = await css();
+    const dialog = rule(text, ".ac-dialog.cmp-dialog.is-screen-only");
+    expect(dialog).toContain("display: grid");
+    expect(dialog).toContain("background: var(--screen-bg)");
+    const stage = rule(text, ".cmp-dialog.is-screen-only .dsk-stage");
+    expect(stage).toContain("grid-area: 1 / 1 / -1 / -1");
+    expect(stage).toContain("container-type: size");
+    expect(rule(text, ".cmp-dialog.is-screen-only .dsk-screen")).toContain("width: min(100cqw, 100cqh * 1280 / 900)");
+    // The ground is the screen's own in both themes, so the dialog has it, not only the screen.
+    expect(rule(text, ".ac-dialog.cmp-dialog")).toContain("--screen-bg: #1f2128");
+  });
+
+  test("the bar over the full screen: what hides with it, what keeps it, and over any cover", async () => {
+    const text = await css();
+    // The head hides with it; the request and the line under it also while the head alone came back.
+    const hide = rule(
+      text,
+      ".cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-line-hidden :is(.cmp-asked, .dsk-line)",
     );
-    expect(rule(narrow, "  .cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
+    expect(hide).toContain("opacity: 0");
+    expect(hide).toContain("pointer-events: none");
+    // Sliding up as it fades, which reduced motion keeps to the fade.
+    expect(hide).toContain("translate: 0 var(--bar-slide, -8px)");
+    expect(text).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.cmp-dialog\.is-screen-only \{\s*--bar-slide: 0px;/,
+    );
+    // A banner or the computer's copy waiting for the person keeps it, and so does focus a key put there; not the
+    // focus a click leaves on the button it pressed.
+    const keeps =
+      ".cmp-dialog:has(.cmp-banner, .dsk-got, .ac-dialog__head :focus-visible) :is(.ac-dialog__head, .cmp-asked, .dsk-line)";
+    const keep = rule(text, keeps);
+    expect(keep).toContain("opacity: 1");
+    expect(keep).toContain("translate: none");
+    expect(keep).toContain("pointer-events: auto");
+    expect(text).not.toContain(":focus-within");
+    // A cover over the screen (z-index 5) stays in the screen's own layer, under the bar.
+    expect(rule(text, ".cmp-dialog.is-screen-only .dsk-stage")).toContain("isolation: isolate");
+  });
+});
+
+describe("the person's clipboard", () => {
+  test("is never read in the computer dialog: only a paste they make gives it", async () => {
+    const dir = new URL("../src/components/", import.meta.url).pathname;
+    const files = [...new Bun.Glob("{desktop,computer}/**/*.{ts,tsx}").scanSync({ cwd: dir })];
+    expect(files.length).toBeGreaterThan(5);
+    const reads: string[] = [];
+    for (const file of files) {
+      if (/clipboard\s*\??\.\s*read/.test(await Bun.file(dir + file).text())) reads.push(file);
+    }
+    expect(reads).toEqual([]);
   });
 });

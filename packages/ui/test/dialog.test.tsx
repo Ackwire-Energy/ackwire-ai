@@ -55,6 +55,45 @@ describe("Dialog", () => {
     expect(body().queryByRole("dialog")).toBeNull();
   });
 
+  test("a toast over it takes its own clicks, even one that removes it; a press on the scrim still closes it", async () => {
+    let closes = 0;
+    render(
+      <>
+        <div className="ac-toasts">
+          <div className="ac-toast">
+            Salvo <button type="button">Dispensar</button>
+          </div>
+        </div>
+        <Dialog open onOpenChange={() => closes++} title="Orçamento mensal" closeLabel="Fechar">
+          <Input aria-label="Limite mensal (US$)" defaultValue="40" />
+        </Dialog>
+      </>,
+    );
+    // Radix listens for presses outside a tick after it opens.
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    const toast = document.querySelector(".ac-toast") as HTMLElement;
+    const dismiss = toast.querySelector("button") as HTMLButtonElement;
+    // As in a browser once the toast's own click handler ran: the toast is gone before the click reaches the page.
+    toast.parentElement?.addEventListener("click", () => toast.remove());
+    await act(async () => {
+      fireEvent.pointerDown(dismiss);
+      fireEvent.click(dismiss);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(toast.isConnected).toBe(false);
+    expect(closes).toBe(0);
+    const scrim = document.querySelector(".ac-dialog__scrim") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(scrim);
+      fireEvent.click(scrim);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(closes).toBe(1);
+    // A modal dialog turns the page's pointer events off; a toast turns its own back on.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css.split("\n.ac-toast {")[1]?.split("}")[0]).toContain("pointer-events: auto");
+  });
+
   test("searchable list variant filters and shows the empty message", async () => {
     const items = ["Ler código e issues", "Abrir e comentar PRs", "Fazer merge"];
     function Search() {

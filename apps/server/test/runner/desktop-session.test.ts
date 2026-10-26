@@ -276,7 +276,13 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
   expect(flagValue(xvnc.argv, "-nolisten")).toBe("tcp");
   expect(flagValue(xvnc.argv, "-geometry")).toBe("1280x900");
   expect(flagValue(xvnc.argv, "-desktop")).toBe("Dev");
-  for (const flag of ["-AcceptSetDesktopSize=0", "-FrameRate=30", "-UseBlacklist=0", "-AlwaysShared"]) {
+  for (const flag of [
+    "-AcceptSetDesktopSize=0",
+    "-SendPrimary=0",
+    "-FrameRate=30",
+    "-UseBlacklist=0",
+    "-AlwaysShared",
+  ]) {
     expect(xvnc.argv).toContain(flag);
   }
   for (const flag of ["-ac", "-nopw", "-localhost", "-interface", "-rfbauth"]) expect(xvnc.argv).not.toContain(flag);
@@ -577,24 +583,6 @@ test("system mode: every process as the agent, and the password file root's (rea
   expect(await t.desktops.stop(dev)).toEqual({ stopped: true });
   expect(existsSync(passwd)).toBe(false);
   expect(existsSync(socket)).toBe(false);
-});
-
-test("the controller's keyboard: setxkbmap as the agent on its display; a variant only when the layout has one", async () => {
-  const t = setup();
-  await t.desktops.setKeyboard(dev, "br");
-  expect(t.fake.procs).toHaveLength(0);
-  await t.desktops.ensure(dev);
-  await t.desktops.setKeyboard(dev, "us-intl");
-  await t.desktops.setKeyboard(dev, "br");
-  const runs = t.fake.procs.filter((p) => p.argv[0] === "/usr/bin/setxkbmap");
-  expect(runs.map((p) => p.argv.slice(1))).toEqual([
-    ["-layout", "us", "-variant", "intl"],
-    ["-layout", "br"],
-  ]);
-  expect(runs[0]?.opts.env).toMatchObject({
-    DISPLAY: ":20",
-    XAUTHORITY: path.join(t.home, "desktop", "01a142cb", "Xauthority"),
-  });
 });
 
 test("system mode's desktop user: the agent's launcher and home; the cookie and the socket in ~/.agentes/desktop", () => {

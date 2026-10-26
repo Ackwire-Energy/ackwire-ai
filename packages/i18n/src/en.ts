@@ -8335,29 +8335,16 @@ export const en: Translations = {
     },
     retry: "Try again",
     takeover: "Take control",
-    paste: {
-      placeholder: "Paste text on the computer",
-      label: "Text to paste on {{name}}'s computer",
-      send: "Paste",
-    },
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",
-      copied: "Copied.",
+      copied: "Copied from {{name}}'s computer.",
+      tooLong: "That's too long to paste on {{name}}'s computer. 256 KB at most.",
+      textOnly: "Only text can be pasted on {{name}}'s computer.",
     },
     keyboard: {
       label: "Keyboard",
-      layouts: {
-        br: "Portuguese (Brazil, ABNT2)",
-        us: "English (US)",
-        "us-intl": "English (US, international)",
-        gb: "English (UK)",
-        pt: "Portuguese (Portugal)",
-        es: "Spanish",
-        fr: "French",
-        de: "German",
-        it: "Italian",
-      },
+      field: "Type on {{name}}'s computer",
     },
     seeWhole: "See the whole screen",
     card: {
@@ -8367,7 +8354,8 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      notice: "While you're in control, programs on {{name}}'s computer can see the screen and what you type.",
+      keys: "Copy and paste as usual: {{key}} C, {{key}} V.",
+      notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** What the agent did on its desktop, on its message after the run (ADR 0062); the rest is the browser card's. */
     after: {

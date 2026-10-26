@@ -449,20 +449,11 @@ test("the desktop's REST: its state for who may watch it, nothing to turn on or 
     controllerUserId: taken.controllerUserId,
     handoff: { id: taken.id, screen: "desktop" },
   });
-  // In control, the stream carries the person's keyboard layout; one that isn't on the list never reaches the computer.
-  const control = (keyboard: string) =>
-    openViewer(
-      `${base()}/api/desktop?orgId=${org.orgId}&agentId=${org.agentId}&mode=control&keyboard=${keyboard}`,
-      owner,
-    );
-  const mine = control("br");
+  // An older app's keyboard layout never reaches the computer: Xvnc types what the person's own layout made.
+  openViewer(`${base()}/api/desktop?orgId=${org.orgId}&agentId=${org.agentId}&mode=control&keyboard=br`, owner);
   await until(() => runner.opened.length === 1, "the control stream");
-  expect(runner.opened[0]).toMatchObject({ kind: "desktop", mode: "control", keyboard: "br" });
-  mine.socket.close();
-  control("dvorak");
-  await until(() => runner.opened.length === 2, "another control stream");
-  expect(runner.opened[1]).toMatchObject({ kind: "desktop", mode: "control" });
-  expect(runner.opened[1]).not.toHaveProperty("keyboard");
+  expect(runner.opened[0]).toMatchObject({ kind: "desktop", mode: "control" });
+  expect(runner.opened[0]).not.toHaveProperty("keyboard");
   expect(runner.requests).toContain("desktop.session.status");
   expect(runner.requests).not.toContain("desktop.session.stop");
 

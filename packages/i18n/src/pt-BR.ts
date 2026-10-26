@@ -8365,29 +8365,16 @@ export const ptBR = {
     },
     retry: "Tentar de novo",
     takeover: "Assumir o controle",
-    paste: {
-      placeholder: "Colar texto no computador",
-      label: "Texto para colar no computador {{of}} {{name}}",
-      send: "Colar",
-    },
     clipboard: {
       got: "Copiado no computador {{of}} {{name}}:",
       copy: "Copiar",
-      copied: "Copiado.",
+      copied: "Copiado do computador {{of}} {{name}}.",
+      tooLong: "Grande demais para colar no computador {{of}} {{name}}. No máximo 256 KB.",
+      textOnly: "No computador {{of}} {{name}} só dá para colar texto.",
     },
     keyboard: {
       label: "Teclado",
-      layouts: {
-        br: "Português (ABNT2)",
-        us: "Inglês (EUA)",
-        "us-intl": "Inglês (EUA, internacional)",
-        gb: "Inglês (Reino Unido)",
-        pt: "Português (Portugal)",
-        es: "Espanhol",
-        fr: "Francês",
-        de: "Alemão",
-        it: "Italiano",
-      },
+      field: "Digitar no computador {{of}} {{name}}",
     },
     seeWhole: "Ver a tela inteira",
     card: {
@@ -8397,8 +8384,8 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      notice:
-        "Enquanto você está no controle, os programas do computador {{of}} {{name}} podem ver a tela e o que você digita.",
+      keys: "Copiar e colar como sempre: {{key}} C, {{key}} V.",
+      notice: "Os programas do computador {{of}} {{name}} podem ver a tela e o que você digita ou cola.",
     },
     /** What the agent did on its desktop, on its message after the run (ADR 0062); the rest is the browser card's. */
     after: {
