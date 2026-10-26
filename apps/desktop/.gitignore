@@ -9,3 +9,4 @@ src-tauri/icons/*
 !src-tauri/icons/.gitkeep
 src-tauri/Cargo.lock
 src-tauri/native/
+src-tauri/installer/*.bmp

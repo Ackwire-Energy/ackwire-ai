@@ -181,7 +181,13 @@ export const thisMac = {
    * this window trades at `/desktop/handover`; the key never reaches the page). The window moves there.
    */
   signIn: () => invoke<unknown>({ kind: "signIn" }),
+  /** The app's own window to pick another server (its first run), from the sign-in page. */
+  otherServer: () => invoke<unknown>({ kind: "servers" }),
 };
+
+/** The app takes `otherServer` (`servers` in `window.__agentesDesktop`); older apps refuse it. */
+export const desktopPicksServer = () =>
+  inDesktopApp() && (window as { __agentesDesktop?: { servers?: unknown } }).__agentesDesktop?.servers === true;
 
 /**
  * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"

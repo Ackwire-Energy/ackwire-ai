@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, type PressableProps, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { useTheme } from "./theme";
@@ -11,6 +11,12 @@ export interface PressScaleProps extends Omit<PressableProps, "style" | "childre
   sink?: boolean;
   /** A light haptic on press in (default true). */
   haptic?: boolean;
+  /**
+   * The press area fills the view (default true: a sized circle or tile centers its content). Off for
+   * content-sized controls: a growing press area takes whatever height Yoga offers when it measures a row
+   * to fit, so a button stood as tall as the screen.
+   */
+  fill?: boolean;
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }
@@ -23,6 +29,7 @@ export function PressScale({
   to = 0.97,
   sink = false,
   haptic = true,
+  fill = true,
   style,
   children,
   onPressIn,
@@ -40,7 +47,7 @@ export function PressScale({
       <Pressable
         {...rest}
         disabled={disabled}
-        style={{ flexGrow: 1 }}
+        style={fill ? styles.fill : undefined}
         onPressIn={(e) => {
           k.value = reducedMotion ? withTiming(1, { duration: 0 }) : withSpring(1, motion.press);
           if (haptic && !disabled) haptics.light();
@@ -56,3 +63,5 @@ export function PressScale({
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({ fill: { flexGrow: 1 } });

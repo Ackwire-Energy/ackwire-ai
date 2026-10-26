@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Message } from "../src/index";
 import {
   answeredNotices,
+  consultationOfNotice,
   isTalkerReply,
   noticeAgentHandle,
   noticeOf,
@@ -105,5 +106,47 @@ describe("notices in a conversation", () => {
     // A person's message never answers a report (only the agent's, with `meta.routine`).
     const byPerson = msg("p", 3, walter, { routine: { id: "rt", name: "x", noticeId: "notice" } });
     expect(answeredNotices([byPerson]).size).toBe(0);
+  });
+});
+
+describe("consultationOfNotice", () => {
+  const notice = (refs: Record<string, string>) => ({
+    notice: { kind: "consult_reply", text: "written for the asking agent", from: "@infra", refs },
+  });
+
+  test("another agent's answer with its consultation: who asked whom, the question and the answer", () => {
+    const meta = notice({
+      consultationId: "c1",
+      runId: "r1",
+      askerAgentId: "dev",
+      agentId: "infra",
+      status: "answered",
+      question: "Onde fica o deploy?",
+      answer: "No deploy.sh",
+    });
+    expect(consultationOfNotice(meta)).toEqual({
+      askerId: "dev",
+      consultation: {
+        agentId: "infra",
+        consultationId: "c1",
+        status: "answered",
+        question: "Onde fica o deploy?",
+        answer: "No deploy.sh",
+      },
+    });
+  });
+
+  test("an older notice without them, another kind or an unknown status stays a line", () => {
+    expect(consultationOfNotice(notice({ consultationId: "c1", runId: "r1" }))).toBeNull();
+    expect(
+      consultationOfNotice(notice({ askerAgentId: "dev", agentId: "infra", status: "pending", question: "Onde?" })),
+    ).toBeNull();
+    expect(consultationOfNotice({ notice: { kind: "agent_note", text: "x", refs: { question: "q" } } })).toBeNull();
+    expect(consultationOfNotice(undefined)).toBeNull();
+  });
+
+  test("no answer yet (expired): the answer is null", () => {
+    const meta = notice({ askerAgentId: "dev", agentId: "infra", status: "expired", question: "Onde?" });
+    expect(consultationOfNotice(meta)?.consultation.answer).toBeNull();
   });
 });

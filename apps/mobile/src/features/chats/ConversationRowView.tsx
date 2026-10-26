@@ -143,7 +143,9 @@ export const ConversationRowView = memo(function ConversationRowView({
   } else {
     const last = lastText(r.last);
     const text = r.kind === "channel" ? last.text || r.topic : last.text;
-    const lead = last.who;
+    // In a DM the other side's own words need no "Ada:" before them (the row is already Ada's).
+    const theirs = r.kind === "dm" && r.last?.author?.type === r.with.type && r.last.author.id === r.with.id;
+    const lead = theirs ? "" : last.who;
     label = lead ? `${lead}: ${text}` : text;
     line = (
       <Text variant="small" tone={r.unread > 0 ? "ink2" : "muted"} numberOfLines={lines ? 1 : 2} style={LIST_PREVIEW}>

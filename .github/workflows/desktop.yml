@@ -9,10 +9,11 @@ name: Desktop
 #   macOS    agentes_<v>_universal.dmg (+ .sha256), agentes_<v>_universal.app.tar.gz (+ .sig)
 #   Windows  agentes_<v>_x64-setup.exe (+ .sha256, + .sig: the installer is its own updater bundle)
 #   Linux    agentes_<v>_amd64.deb (+ .sha256), agentes_<v>_amd64.AppImage (+ .sha256, + .sig)
-# The macOS and Linux apps carry the runner and agent-browser (ADR 0040), and the server's own files, built
-# from the same commit, for "Run agentes.chat on this computer" (ADR 0066; tauri.native.conf.json adds them to
-# the resources); Windows carries none of them (no agents or server on a Windows computer yet). `none` only builds the current version as artifacts. macOS runners cost
-# about 10x Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
+# Every app carries the runner and agent-browser (ADR 0040), and the server's own files, built once from the
+# same commit (the `server` job: JavaScript and WebAssembly, the same on every system), for "Run agentes.chat
+# on this computer" (ADR 0066; tauri.native.conf.json adds them to the resources). `none` only builds the
+# current version as artifacts, and `platforms` can build just one system then. macOS runners cost about 10x
+# Linux minutes: this runs only by hand, never per PR; pushing a tag starts nothing.
 on:
   workflow_dispatch:
     inputs:
@@ -25,6 +26,11 @@ on:
         description: "Release notes (optional; default = commit subjects since the last release)"
         type: string
         required: false
+      platforms:
+        description: "Which builds (a release needs all)"
+        type: choice
+        options: [all, macos, windows, linux]
+        default: all
 
 concurrency:
   group: desktop-${{ github.ref }}
@@ -56,9 +62,14 @@ jobs:
         env:
           RELEASE: ${{ inputs.release }}
           NOTES: ${{ inputs.notes }}
+          PLATFORMS: ${{ inputs.platforms || 'all' }}
         run: |
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::Releases are cut from main (this run is on $GITHUB_REF); pick release = none for a test build"
+            exit 1
+          fi
+          if [ "$PLATFORMS" != "all" ]; then
+            echo "::error::A release builds every system; pick platforms = all, or release = none for a test build"
             exit 1
           fi
           CURRENT=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
@@ -116,8 +127,47 @@ jobs:
           echo "tag=${RELEASE_TAG:-}" >> "$GITHUB_OUTPUT"
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  macos:
+  # "Run agentes.chat on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit, built
+  # once on Linux (the same files on every system; on Windows the build's own paths would lose the bundled
+  # packages' licenses) and shipped among each app's resources (tauri.native.conf.json), signed with the app.
+  server:
     needs: version
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20
+    steps:
+      - uses: useblacksmith/checkout@v1 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the server's files
+        shell: bash
+        run: |
+          bun scripts/native-package.ts folders --out "$RUNNER_TEMP/native"
+          rm -rf native
+          mv "$RUNNER_TEMP"/native/agentes/* native
+          test -s native/server/native.js
+          test -s native/web/index.html
+          du -sh native/server native/web native/licenses/npm
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-server
+          path: |
+            native/server
+            native/web
+            native/licenses/npm
+          if-no-files-found: error
+          retention-days: 1
+
+  macos:
+    needs: [version, server]
+    if: ${{ contains(fromJSON('["all", "macos"]'), inputs.platforms || 'all') }}
     # Intel: the Apple silicon runners often sit in the queue (capacity); the build is universal either way.
     runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 60
@@ -203,16 +253,18 @@ jobs:
           chmod +x "$BIN_DIR"/agent-browser-*
           lipo -info "$BIN_DIR/agent-browser-universal-apple-darwin"
 
-      # "Run agentes.chat on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit,
-      # ship among the app's resources (tauri.native.conf.json), signed with the app.
-      - name: Build the server's files
+      # The server's files (the `server` job), among the app's resources (tauri.native.conf.json).
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-server
+          path: apps/desktop/src-tauri/native
+
+      - name: Check the server's files
         shell: bash
         run: |
-          bun scripts/native-package.ts folders --out "$RUNNER_TEMP/native"
-          rm -rf apps/desktop/src-tauri/native
-          mv "$RUNNER_TEMP"/native/agentes/* apps/desktop/src-tauri/native
           test -s apps/desktop/src-tauri/native/server/native.js
-          du -sh apps/desktop/src-tauri/native/server apps/desktop/src-tauri/native/web
+          test -s apps/desktop/src-tauri/native/web/index.html
+          test -d apps/desktop/src-tauri/native/licenses/npm
 
       - name: Icons
         working-directory: apps/desktop
@@ -294,10 +346,12 @@ jobs:
           retention-days: 14
 
   windows:
-    needs: version
+    needs: [version, server]
+    if: ${{ contains(fromJSON('["all", "windows"]'), inputs.platforms || 'all') }}
     runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 60
     env:
+      BIN_DIR: apps/desktop/src-tauri/binaries
       VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -316,14 +370,59 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: Icons
+      # The baseline build: some x64 CPUs lack AVX2. Tauri's sidecar name: `<name>-<target triple>.exe`.
+      - name: Compile the runner
+        shell: bash
+        run: |
+          mkdir -p "$BIN_DIR"
+          bun build --compile --target=bun-windows-x64-baseline apps/server/runner/main.ts \
+            --outfile "$BIN_DIR/agentes-runner-x86_64-pc-windows-msvc.exe"
+          "$BIN_DIR/agentes-runner-x86_64-pc-windows-msvc.exe" --version
+
+      - name: Fetch agent-browser
+        shell: bash
+        run: |
+          read -r AB_VERSION ASSET SHA < <(bun -e '
+            import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserAsset } from "./packages/adapters/src/machine-protocol.ts";
+            console.log([AGENT_BROWSER_VERSION, agentBrowserAsset("win32-x64"), AGENT_BROWSER_SHA256["win32-x64"]].join(" "));
+          ')
+          OUT="$BIN_DIR/agent-browser-x86_64-pc-windows-msvc.exe"
+          curl -fsSL --retry 3 -o "$OUT" \
+            "https://github.com/vercel-labs/agent-browser/releases/download/v$AB_VERSION/$ASSET"
+          echo "$SHA  $OUT" | sha256sum -c -
+          "$OUT" --version
+
+      # The server's files (the `server` job), among the app's resources (tauri.native.conf.json).
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-server
+          path: apps/desktop/src-tauri/native
+
+      - name: Check the server's files
+        shell: bash
+        run: |
+          test -s apps/desktop/src-tauri/native/server/native.js
+          test -s apps/desktop/src-tauri/native/web/index.html
+          test -d apps/desktop/src-tauri/native/licenses/npm
+
+      # The server here as the app runs it on Windows: it answers, and it stops when its stdin closes.
+      - name: Run the server here once
+        shell: bash
+        run: bun apps/desktop/scripts/server-smoke.ts "$BIN_DIR/agentes-runner-x86_64-pc-windows-msvc.exe" apps/desktop/src-tauri/native
+
+      - name: Icons and the installer's pictures
         working-directory: apps/desktop
         run: |
           bun scripts/icons.ts
           bun run tauri icon app-icon.png
+          bun scripts/installer-art.ts
 
-      # No runner and no agent-browser on Windows (tauri.windows.conf.json): the Cloud and your own server
-      # only. Unsigned for now: SmartScreen asks once ("More info › Run anyway") until a code-signing certificate.
+      # The cached target may keep an older build's installer (another version): only this build's may be there.
+      - name: Clear older bundles
+        shell: bash
+        run: rm -rf apps/desktop/src-tauri/target/release/bundle
+
+      # Unsigned for now: SmartScreen asks once ("More info › Run anyway") until a code-signing certificate.
       - name: Build the app (NSIS)
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
@@ -332,6 +431,19 @@ jobs:
         with:
           projectPath: apps/desktop
           tauriScript: bun run tauri
+          args: --config src-tauri/tauri.native.conf.json
+
+      # What the installer puts next to the app: the two sidecars and the server's files.
+      - name: Check the app's files
+        shell: bash
+        run: |
+          RELEASE=apps/desktop/src-tauri/target/release
+          test -s "$RELEASE/agentes-runner.exe"
+          test -s "$RELEASE/agent-browser.exe"
+          test -s "$RELEASE/server/native.js"
+          test -s "$RELEASE/web/index.html"
+          test -s "$RELEASE/licenses/bun/LICENSE.md"
+          test -s "$RELEASE/licenses/agent-browser/LICENSE"
 
       - name: Name the build files and the checksum
         shell: bash
@@ -356,7 +468,8 @@ jobs:
           retention-days: 14
 
   linux:
-    needs: version
+    needs: [version, server]
+    if: ${{ contains(fromJSON('["all", "linux"]'), inputs.platforms || 'all') }}
     # 22.04: an older glibc, so the app runs on more distributions.
     runs-on: blacksmith-4vcpu-ubuntu-2204
     timeout-minutes: 60
@@ -409,16 +522,18 @@ jobs:
           echo "$SHA  $OUT" | sha256sum -c -
           chmod +x "$OUT"
 
-      # "Run agentes.chat on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit,
-      # ship among the app's resources (tauri.native.conf.json), signed with the app.
-      - name: Build the server's files
+      # The server's files (the `server` job), among the app's resources (tauri.native.conf.json).
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-server
+          path: apps/desktop/src-tauri/native
+
+      - name: Check the server's files
         shell: bash
         run: |
-          bun scripts/native-package.ts folders --out "$RUNNER_TEMP/native"
-          rm -rf apps/desktop/src-tauri/native
-          mv "$RUNNER_TEMP"/native/agentes/* apps/desktop/src-tauri/native
           test -s apps/desktop/src-tauri/native/server/native.js
-          du -sh apps/desktop/src-tauri/native/server apps/desktop/src-tauri/native/web
+          test -s apps/desktop/src-tauri/native/web/index.html
+          test -d apps/desktop/src-tauri/native/licenses/npm
 
       - name: Icons
         working-directory: apps/desktop

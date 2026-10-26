@@ -3,12 +3,12 @@ import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { LOGO_SIZES, type LogoSize, MARK_GRADIENT, markShapes, STACK_RING, stackChips } from "./provider-marks";
 import { useTheme } from "./theme";
 
-const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18 } as const;
+const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18, hero: 24 } as const;
 
 export interface ProviderLogoProps {
   /** A provider, plan, brain or mission executor id (`anthropic`, `zai`, `claude_code`…). */
   id: string;
-  /** `xs`: the bare mark beside text; `chip`: a 20 pt tile, for `ProviderStack`; `sm`: 30 pt; `tile`: 48 pt. */
+  /** `xs`: the bare mark beside text; `chip`: a 20 pt tile, for `ProviderStack`; `sm`: 30 pt; `tile`: 48 pt; `hero`: 64 pt raised. */
   size?: LogoSize;
   /** Can't be used now (not installed, signed out, computer offline): dimmed, in its own colors. */
   off?: boolean;
@@ -21,7 +21,7 @@ export interface ProviderLogoProps {
  * neutral tile, one-color marks in ink; an id without a mark shows its initial.
  */
 export function ProviderLogo({ id, size = "tile", off = false, label }: ProviderLogoProps) {
-  const { colors, scheme } = useTheme();
+  const { colors, scheme, shadows } = useTheme();
   const drawn = markShapes(id, scheme, colors.ink2);
   const [box, drawing] = LOGO_SIZES[size];
   const tile = size !== "xs" || !drawn;
@@ -33,6 +33,8 @@ export function ProviderLogo({ id, size = "tile", off = false, label }: Provider
       style={[
         { width: box, height: box, alignItems: "center", justifyContent: "center", opacity: off ? 0.5 : 1 },
         tile ? { borderRadius: Math.round(box / 3), backgroundColor: colors.sunken } : null,
+        // A page's head: raised off the grouped gray (sunken would sink into it).
+        size === "hero" ? { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` } : null,
       ]}
     >
       {drawn ? (
@@ -85,6 +87,65 @@ export function ProviderStack({ ids, label }: { ids: readonly string[]; label?: 
           <ProviderLogo id={chip.id} size="chip" />
         </View>
       ))}
+    </View>
+  );
+}
+
+/**
+ * A group of makers in one tile the size of the others (`sm`): four marks 2 × 2 (the plans of code, the API key's
+ * makers). Hidden from screen readers unless given `label`: the row's words name the group.
+ */
+export function ProviderQuad({ ids, label }: { ids: readonly string[]; label?: string }) {
+  const { colors, scheme } = useTheme();
+  const [box] = LOGO_SIZES.sm;
+  const cell = 10;
+  return (
+    <View
+      {...(label
+        ? { accessible: true, accessibilityRole: "image" as const, accessibilityLabel: label }
+        : { accessible: false, importantForAccessibility: "no-hide-descendants" as const })}
+      style={{
+        width: box,
+        height: box,
+        borderRadius: Math.round(box / 3),
+        backgroundColor: colors.sunken,
+        flexDirection: "row",
+        flexWrap: "wrap",
+        alignContent: "center",
+        justifyContent: "center",
+        gap: 2,
+        paddingHorizontal: (box - cell * 2 - 2) / 2,
+      }}
+    >
+      {ids.slice(0, 4).map((id) => {
+        const drawn = markShapes(id, scheme, colors.ink2);
+        return (
+          <Svg key={id} width={cell} height={cell} viewBox="0 0 24 24">
+            {drawn?.gradient ? (
+              <Defs>
+                <LinearGradient
+                  id={`${MARK_GRADIENT}-${id}`}
+                  x1="0"
+                  y1="12"
+                  x2="24"
+                  y2="12"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <Stop offset="0" stopColor={drawn.gradient[0]} />
+                  <Stop offset="1" stopColor={drawn.gradient[1]} />
+                </LinearGradient>
+              </Defs>
+            ) : null}
+            {drawn?.shapes.map((shape) => (
+              <Path
+                key={shape.d}
+                d={shape.d}
+                fill={shape.fill === `url(#${MARK_GRADIENT})` ? `url(#${MARK_GRADIENT}-${id})` : shape.fill}
+              />
+            ))}
+          </Svg>
+        );
+      })}
     </View>
   );
 }

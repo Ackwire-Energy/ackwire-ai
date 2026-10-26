@@ -49,6 +49,9 @@ function AppStack() {
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="account-delete" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="ai-accounts" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="usage" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-usage/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={formSheet} />
@@ -62,6 +65,7 @@ function AppStack() {
       <Stack.Screen name="join-requests" options={requestsSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
+      <Stack.Screen name="connect-ai" options={formSheet} />
       <Stack.Screen name="me" options={meSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />

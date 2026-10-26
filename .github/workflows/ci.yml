@@ -1,11 +1,10 @@
 name: CI
 
 # All verification runs here.
-# Every pull request that is not a draft and every push to main; a `v*` tag also publishes the image.
-# A draft runs nothing (each push to a pull request is a full run, paid by the minute): marking it
-# ready for review starts the run. Each job runs only when something it covers changed (shared
-# packages, the lockfile and this file run everything); docs and READMEs alone run only the secret
-# scan and the boundaries check. A manual run or a release tag checks everything.
+# Only on demand (every run is paid by the minute): `gh workflow run CI --ref <branch>` or "Run
+# workflow" in Actions. A `v*` tag still runs on its own and publishes the image, since pushing a tag
+# is already a deliberate release. Pull requests and pushes to main start nothing. A manual run or a
+# release tag checks everything.
 #
 # Runners are sized by price: jobs that last seconds run on 2 vCPU ARM (billing rounds each job up
 # to a whole minute, and ARM costs a third less per minute). The tests stay on 4 vCPU x64: on 4 vCPU
@@ -13,10 +12,7 @@ name: CI
 # cost more than the cheaper minute saves.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:

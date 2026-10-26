@@ -67,7 +67,7 @@ fn run(args: &[&str], wait: Duration) -> Option<(bool, String)> {
 /// while it runs: a pipe holds 64 KB, and `status --json` on a large tailnet prints more, so a reader after
 /// the exit would never see it end.
 fn run_program(program: &Path, args: &[&str], wait: Duration) -> Option<(bool, String)> {
-    let mut child = Command::new(program)
+    let mut child = crate::no_console(&mut Command::new(program))
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

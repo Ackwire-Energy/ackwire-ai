@@ -118,7 +118,7 @@ export function createFakeHost(
   const running = scenario === "here" && here.run !== false;
   let local: LocalServerStatus = {
     ...NO_SERVER,
-    bundled: platform !== "windows",
+    bundled: true,
     dir: "/Users/voce/.agentes",
     usage: here.usage !== false,
     ...(scenario === "here"

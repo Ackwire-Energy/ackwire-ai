@@ -148,7 +148,6 @@ export const desktopPtBR = {
     connect: "Conectar ao meu servidor",
     connectText: "Ele roda em outro computador: um Mac mini, um notebook sobrando ou um servidor na internet.",
     here: "Rodar o agentes.chat neste {{device}}",
-    hereLater: "Por enquanto, no Mac e no Linux.",
     hereText: "Este {{device}} vira o servidor, enquanto estiver ligado.",
     which: "Qual escolher?",
   },
@@ -237,13 +236,6 @@ export const desktopPtBR = {
     running: "O agentes.chat já roda neste {{device}}",
     runningText: "Este app roda ele, em {{url}}.",
     openIt: "Abrir",
-    win: {
-      title: "Rodar o agentes.chat neste PC",
-      lead: "No Windows, isso vem depois. Por enquanto, dois caminhos:",
-      later: "No Windows, isso vem depois: por enquanto, rode em outro computador e conecte a ele.",
-      other: "Em outro computador: rode lá a instalação de um comando.",
-      wsl: "Neste PC, com o WSL 2: rode isto no Ubuntu.",
-    },
   },
   /** A link to a server (`agenteschat://connect`): the server in large type, nothing changes before Connect. */
   link: {

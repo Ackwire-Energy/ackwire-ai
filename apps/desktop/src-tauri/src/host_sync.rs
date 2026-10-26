@@ -67,7 +67,7 @@ pub fn sync_now(app: &AppHandle, rotate: &[String]) {
     };
     let Some(server) = local_server::loopback(app) else { return };
     let mut command = Command::new(runner);
-    command
+    crate::no_console(&mut command)
         .args(["host", "--once", "--server", &server, "--token-file"])
         .arg(folder.host_token())
         .arg("--state")

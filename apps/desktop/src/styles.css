@@ -749,10 +749,6 @@ body[data-window="popover"] {
   /* No word alone on the last line ("…while it's / on."). */
   text-wrap: pretty;
 }
-.dk-fr__card[data-later] b,
-.dk-fr__card[data-later] .dk-fr__card-art {
-  opacity: 0.7;
-}
 .dk-fr__card-art {
   display: inline-flex;
   align-items: center;

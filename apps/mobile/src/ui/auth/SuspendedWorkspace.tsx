@@ -6,7 +6,7 @@ import type { OrgState } from "@/providers/org";
 import { Button } from "../Button";
 import { Text } from "../Text";
 import { useTheme } from "../theme";
-import { AuthScaffold } from "./AuthScaffold";
+import { AuthScaffold, CENTER } from "./AuthScaffold";
 
 /**
  * The chosen organization is suspended (ADR 0056 §8): say so plainly (why, when the workspace is told), where
@@ -46,9 +46,14 @@ export function SuspendedWorkspace({
 function SupportLine() {
   const { t } = useTranslation();
   const email = useAuthConfig().data?.supportEmail;
-  if (!email) return <Text tone="muted">{t("support.ask")}</Text>;
+  if (!email)
+    return (
+      <Text tone="muted" style={CENTER}>
+        {t("support.ask")}
+      </Text>
+    );
   return (
-    <Text tone="muted">
+    <Text tone="muted" style={CENTER}>
       {t("support.writeBefore")}
       <Text
         tone="muted"

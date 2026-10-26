@@ -1,5 +1,7 @@
 import {
   browserHandoffOf,
+  browserTrailOf,
+  desktopTrailOf,
   keys,
   type Message,
   type ThreadInfo,
@@ -36,7 +38,9 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
+import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
@@ -64,6 +68,9 @@ import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";
 import { recentTurn, stoppedOf } from "./turn";
+
+/** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
+const TRAIL_RECENT_MS = 12 * 60 * 60_000;
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
@@ -137,6 +144,15 @@ export const MessageRow = memo(function MessageRow({
   const question = isAgent ? questionOf(meta) : null;
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
+  // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
+  const trails =
+    isAgent && m.author.id && !m.local
+      ? {
+          browser: browserTrailOf(meta),
+          desktop: desktopTrailOf(meta),
+          recent: Date.now() - Date.parse(m.createdAt) < TRAIL_RECENT_MS,
+        }
+      : null;
   // "Esperando o MacBook Air voltar": its brain's computer is offline (the card, when it says which computer).
   const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
@@ -295,9 +311,28 @@ export const MessageRow = memo(function MessageRow({
         {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
+        {isAgent ? <NoAiCard message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
+        {trails && m.author.id && trails.browser.length > 0 ? (
+          <TrailCard
+            agentId={m.author.id}
+            runId={m.agentRunId ?? null}
+            steps={trails.browser}
+            stopped={stopped}
+            recent={trails.recent}
+          />
+        ) : null}
+        {trails && m.author.id && trails.desktop.length > 0 ? (
+          <TrailCard
+            agentId={m.author.id}
+            runId={m.agentRunId ?? null}
+            steps={trails.desktop}
+            stopped={stopped}
+            screen="desktop"
+          />
+        ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {cards}
       </View>

@@ -6,6 +6,7 @@ import {
   Stack,
 } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Platform } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
 import { useTheme } from "./theme";
@@ -171,11 +172,16 @@ export function CoverTabStack({ title }: { title: string }) {
  */
 export function usePushedOptions(): NativeStackNavigationOptions {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+  const backTitle = t("mobile.common.back");
   return useMemo<NativeStackNavigationOptions>(
     () => ({
       headerShown: true,
       title: "",
       headerBackButtonDisplayMode: "minimal",
+      // Hidden by the minimal button, but VoiceOver reads it: without it the back button was named after the
+      // route group under it, "(tabs)".
+      headerBackTitle: backTitle,
       headerTransparent: false,
       headerStyle: { backgroundColor: colors.bg },
       headerShadowVisible: false,
@@ -184,7 +190,7 @@ export function usePushedOptions(): NativeStackNavigationOptions {
       gestureEnabled: true,
       contentStyle: { backgroundColor: colors.bg },
     }),
-    [colors],
+    [colors, backTitle],
   );
 }
 
