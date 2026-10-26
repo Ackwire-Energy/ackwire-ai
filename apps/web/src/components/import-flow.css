@@ -466,6 +466,10 @@ label.imp-row__text {
   .imp-paste {
     flex-direction: column;
   }
+  /* In a column, `flex: 1` would size its height from nothing: the field keeps its own, Read's under it. */
+  .imp-paste .ac-input {
+    flex: none;
+  }
   .imp-apply {
     align-items: stretch;
   }
