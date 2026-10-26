@@ -15,10 +15,15 @@ const RUNNER = {
   workspace: "/Users/w/agentes",
 };
 
-/** A connected runner on the test server's hub that starts and cancels tasks. */
-function fakeRunner(extra: Record<string, unknown> = {}) {
+type Request = Extract<ServerFrame, { type: "request" }>;
+
+/**
+ * A connected runner on the test server's hub that starts and cancels tasks and ends brain turns; `answer` replies
+ * to the other requests (undefined: an empty reply).
+ */
+function fakeRunner(extra: Record<string, unknown> = {}, answer: (frame: Request) => unknown = () => undefined) {
   const hub = t.engine.machineHub;
-  const started: Extract<ServerFrame, { type: "request"; op: "task.start" }>[] = [];
+  const started: Extract<Request, { op: "task.start" }>[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const conn = hub.open({
     send(text: string) {
@@ -38,16 +43,23 @@ function fakeRunner(extra: Record<string, unknown> = {}) {
         }
         if (frame.op === "task.cancel") return ok({ canceled: true });
         if (frame.op === "task.output") return ok({ lines: ["Reading app/package.json"], truncated: false });
+        if (frame.op === "brain.turn") {
+          // A turn of a brain on this computer (a mission's main session) ends as a runner ends it: `brain.done`,
+          // then the reply with its final event. A reply without them leaves the turn waiting out the brain's
+          // grace for the stream's end, 1.5 s of real time.
+          const final = { type: "done", text: "ok", session: { id: frame.session.id } };
+          return void reply({ type: "brain.done", runId: frame.runId }).then(() => ok({ runId: frame.runId, final }));
+        }
         if (frame.op === "read") return ok({ base64: null, size: 0 });
-        return ok({ size: 0 });
+        return ok(answer(frame) ?? { size: 0 });
       }, 1);
     },
     close() {},
   });
   return {
     started,
-    hello: (token: string) =>
-      hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true, ...extra })),
+    reply,
+    hello: (token: string) => reply({ type: "hello", token, ...RUNNER, exec: true, ...extra }),
   };
 }
 
@@ -326,54 +338,24 @@ test("missions API: the copy of the project (ADR 0044) — DTO fields, setup fai
   const paired = await pairComputer(t, api, { ...RUNNER, exec: true }, { name: "MacBook" });
   await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
   // A runner whose setup fails once; it keeps its worktree requests.
-  const hub = t.engine.machineHub;
-  const started: Extract<ServerFrame, { type: "request"; op: "task.start" }>[] = [];
-  const worktree: Extract<ServerFrame, { type: "request"; op: "mission.worktree" }>[] = [];
-  const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
-  const conn = hub.open({
-    send(text: string) {
-      const frame = JSON.parse(text) as ServerFrame;
-      if (frame.type !== "request") return;
-      setTimeout(() => {
-        const ok = (data: unknown) => void reply({ type: "result", id: frame.id, ok: true, data });
-        if (frame.op === "mission.worktree") {
-          worktree.push(frame);
-          if (frame.action === "remove") return ok({ removed: true });
-          return ok({
-            path: frame.path,
-            branch: frame.branch,
-            baseBranch: "main",
-            baseSha: "0123456789abcdef0123456789abcdef01234567",
-            created: !frame.baseSha,
-            dirty: false,
-            setupCommand: "bun install",
-            copied: [],
-          });
-        }
-        if (frame.op === "task.start") {
-          started.push(frame);
-          return ok({
-            taskId: frame.taskId,
-            pid: 7,
-            startedAt: new Date().toISOString(),
-            cwd: frame.cwd ?? "",
-            command: "x",
-          });
-        }
-        if (frame.op === "brain.turn") {
-          // The mission's main session (Claude Code on this computer) ends each turn as a runner does: `brain.done`,
-          // then the reply with its final event. A reply without them leaves the turn waiting out the brain's grace
-          // for the stream's end, 1.5 s of real time.
-          const final = { type: "done", text: "ok", session: { id: frame.session.id } };
-          return void reply({ type: "brain.done", runId: frame.runId }).then(() => ok({ runId: frame.runId, final }));
-        }
-        if (frame.op === "read") return ok({ base64: null, size: 0 });
-        return ok({ size: 0 });
-      }, 1);
-    },
-    close() {},
+  const worktree: Extract<Request, { op: "mission.worktree" }>[] = [];
+  const runner = fakeRunner({}, (frame) => {
+    if (frame.op !== "mission.worktree") return undefined;
+    worktree.push(frame);
+    if (frame.action === "remove") return { removed: true };
+    return {
+      path: frame.path,
+      branch: frame.branch,
+      baseBranch: "main",
+      baseSha: "0123456789abcdef0123456789abcdef01234567",
+      created: !frame.baseSha,
+      dirty: false,
+      setupCommand: "bun install",
+      copied: [],
+    };
   });
-  await hub.message(conn, JSON.stringify({ type: "hello", token: paired.token, ...RUNNER, exec: true }));
+  await runner.hello(paired.token);
+  const { started, reply } = runner;
 
   const created = (await (
     await api("/missions", { json: { agentId, channelId, goal: "Build our mobile app", title: "Mobile app" } })
