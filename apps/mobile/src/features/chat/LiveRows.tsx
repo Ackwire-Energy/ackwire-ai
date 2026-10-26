@@ -2,6 +2,7 @@ import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agen
 import { activitySentence, activityVerb, barPhrase, isWriting, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { formatDuration, toolLabel } from "@agenteschat/client/lib/work";
+import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, type LayoutChangeEvent, Pressable, Text as RNText, StyleSheet, View } from "react-native";
@@ -130,7 +131,7 @@ export const TurnRow = memo(function TurnRow({
           </View>
         ) : null}
         <TurnLines items={lines} quoteOf={bodyOf} color={color} />
-        {run.text ? <RevealText text={run.text} live={phase === "writing"} /> : null}
+        {run.text ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
       </View>
     </View>
   );
@@ -266,7 +267,7 @@ function ReadWell({ now, quote, settled }: { now: boolean; quote: string; settle
  * in one chunk), each new word fading in (~280 ms), the caret after them. Mounted with a long text already
  * (back to the conversation mid-reply), it shows it at once.
  */
-function RevealText({ text, live }: { text: string; live: boolean }) {
+function RevealText({ text, live, accent }: { text: string; live: boolean; accent: AgentColorName }) {
   const c = useTheme().colors;
   const reduced = useReducedMotion();
   const shown = useRef(initialReveal(text));
@@ -314,7 +315,9 @@ function RevealText({ text, live }: { text: string; live: boolean }) {
           </RNText>
         ))
       : undefined;
-  return <MessageText body={text.slice(0, solid)} tail={tailNode} streaming={live} selectable={false} />;
+  return (
+    <MessageText body={text.slice(0, solid)} tail={tailNode} streaming={live} selectable={false} accent={accent} />
+  );
 }
 
 /** The runs at work in their browser (not writing yet), one per agent: each gets its browser card. */

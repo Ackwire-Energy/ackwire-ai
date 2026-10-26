@@ -6,6 +6,12 @@ export const featureKeysEn: FeatureTranslations = {
     failed: "That didn't work. Try again.",
     send: "Send",
   },
+  chart: {
+    table: "Table",
+    item: "Item",
+    share: "Share",
+    gone: "This chart is no longer open.",
+  },
   code: {
     label: "Code",
     copy: "Copy the code",

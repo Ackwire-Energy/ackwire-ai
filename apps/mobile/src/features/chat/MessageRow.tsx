@@ -42,6 +42,7 @@ import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ApprovalInline, ConsultationCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
@@ -96,6 +97,7 @@ export const MessageRow = memo(function MessageRow({
   const when = useWhen();
   const isAgent = m.author.type === "agent";
   const agent = isAgent && m.author.id ? dir.agentById.get(m.author.id) : undefined;
+  const accent = agent ? agentLook(agent).color : undefined;
   const name = dir.nameOf(m.author) || t("mobile.chat.someone");
   const meta = m.meta;
   // What a routine found, told by its agent (as on the web): a small tag, and the report it answers on demand
@@ -201,7 +203,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {body ? (
           <View style={[styles.bubble, { backgroundColor: c.bubble }]}>
-            <MessageText body={body} muted={m.local === "pending"} selectable={false} />
+            <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
           </View>
         ) : null}
         {files.length > 0 ? (
@@ -283,10 +285,10 @@ export const MessageRow = memo(function MessageRow({
         {brainWait ? (
           <BrainWait
             message={m}
-            fallback={body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} /> : null}
+            fallback={body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} /> : null}
           />
         ) : body ? (
-          <MessageText body={body} muted={m.local === "pending"} selectable={false} />
+          <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
         ) : null}
         {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}

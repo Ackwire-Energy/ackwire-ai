@@ -10,6 +10,12 @@ export const featureKeysPtBR = {
     failed: "Não deu certo. Tente de novo.",
     send: "Enviar",
   },
+  chart: {
+    table: "Tabela",
+    item: "Item",
+    share: "Parte",
+    gone: "Esse gráfico não está mais aberto.",
+  },
   code: {
     label: "Código",
     copy: "Copiar o código",
