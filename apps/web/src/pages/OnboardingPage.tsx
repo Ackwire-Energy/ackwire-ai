@@ -701,6 +701,9 @@ export function OnboardingPage() {
 
   const go = (i: number) => {
     const next = Math.max(0, Math.min(total - 1, i));
+    // Done asks again whether the agents have an AI: one connected on a way back there counts.
+    if (created && ONBOARDING_STEPS[next]?.id === "done")
+      void qc.invalidateQueries({ queryKey: keys.aiStatus(created.orgId), refetchType: "none" });
     setIndex(next);
     setReached((r) => Math.max(r, next));
     setAgentsPhase("pick");

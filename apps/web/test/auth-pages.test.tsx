@@ -980,7 +980,7 @@ describe("Onboarding", () => {
     );
   });
 
-  test("with no AI yet, the line says to send anyway: for the agent named, or, naming nobody, for every agent", async () => {
+  test("with no AI yet, the line says to send anyway, for the agent named or every agent; one connected on a way back counts", async () => {
     const { state } = await start();
     await throughImport(state);
     await skip();
@@ -997,6 +997,12 @@ describe("Onboarding", () => {
     expect(button("Enviar para Theo")).toBeTruthy();
     await type(ASK, "Bom dia, time");
     expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: os agentes respondem quando você conectar uma.");
+    // An AI connected after going back: Done says so as soon as it's open again.
+    await type(ASK, "@theo bom dia");
+    state.aiStatus = { any: true, agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })) };
+    await click(button("Voltar"), 4);
+    await skip();
+    expect(askLine()).toBe("Theo começa na hora, no #general.");
   });
 
   test("an agent whose computer is away: the line waits for it, asked about again every 5 s, until it can start", async () => {
