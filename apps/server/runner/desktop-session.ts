@@ -88,6 +88,11 @@ const KILL_WAIT_MS = 3000;
 /** A running desktop takes a new look only after a minute without a request (its agent's steps come closer). */
 const REFRESH_IDLE_MS = 60_000;
 /**
+ * The look written into a running session (`refresh`) also sets some 70 settings, an `xfconf-query` each through
+ * the session's bus, and restarts its dock: seconds on a busy computer, so it gets this many steps' time.
+ */
+const LIVE_LOOK_STEPS = 6;
+/**
  * Xtigervnc's flags that a running server takes from `tigervncconfig -set` (through its VNC extension), as
  * `<param>=<value>`: TigerVNC 1.12 to 1.15 let it set only desktop, AcceptPointerEvents, SendCutText,
  * AcceptCutText, SendPrimary and SetPrimary (`AllowOverride`'s default, which the runner keeps). A desktop
@@ -739,7 +744,7 @@ export class DesktopSessions {
     let display: number | null = null;
     try {
       const user = await this.opts.user(agent);
-      if (this.sys.uid === 0 && user.prefix.length === 0) throw new RunnerError("desktop_unavailable", NOT_AS_ROOT);
+      if (this.asRoot(user)) throw new RunnerError("desktop_unavailable", NOT_AS_ROOT);
       const xvnc = this.sys.which("Xtigervnc", user.env.PATH);
       const dbus = this.sys.which("dbus-launch", user.env.PATH);
       if (!xvnc || !dbus) {
@@ -888,11 +893,11 @@ export class DesktopSessions {
     }
   }
 
-  /** A step before X: its exit code, or "late" once it has run `STEP_MS` (then it is stopped). */
-  private async step(p: DesktopProcess): Promise<number | null | "late"> {
+  /** A step before X: its exit code, or "late" once it has run `ms` (`STEP_MS`; then it is stopped). */
+  private async step(p: DesktopProcess, ms = this.stepMs): Promise<number | null | "late"> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<"late">((resolve) => {
-      timer = setTimeout(() => resolve("late"), this.stepMs);
+      timer = setTimeout(() => resolve("late"), ms);
     });
     const code = await Promise.race([p.exited, late]);
     clearTimeout(timer);
@@ -935,17 +940,23 @@ export class DesktopSessions {
       const has = d.params ?? this.sys.cmdline(d.pid)?.map((arg) => arg.slice(1)) ?? [];
       const missing = d.refresh.params ? [] : LIVE_PARAMS.filter((p) => !has.includes(p));
       if (missing.length === 0) d.refresh.params = true;
-      const idle = d.streams === 0 && !this.opts.inUse?.(d.agent.id) && this.now() - d.lastUsed >= REFRESH_IDLE_MS;
-      if (missing.length === 0 && (d.refresh.look || !idle)) return;
+      const idle = () =>
+        d.streams === 0 && !this.opts.inUse?.(d.agent.id) && this.now() - d.lastUsed >= REFRESH_IDLE_MS;
+      if (missing.length === 0 && (d.refresh.look || !idle())) return;
       const user = await this.opts.user(d.agent);
       const who = `the desktop of ${d.agent.handle}`;
+      if (this.asRoot(user)) {
+        d.refresh.params = d.refresh.look = true;
+        this.opts.log(`${who} stays as it is: the runner runs as root, and nothing on a desktop does`);
+        return;
+      }
       const log = openSync(path.join(this.dir, `${id8(d.agent)}.log`), "a", 0o600);
       try {
         const env = { ...user.env, HOME: d.home, DISPLAY: `:${d.display}`, XAUTHORITY: d.xauthority };
-        const run = (argv: string[], input?: string) =>
-          this.step(this.sys.spawn([...user.prefix, ...argv], { cwd: "/", env, log, ...(input ? { input } : {}) }));
-        const why = (code: number | null | "late") =>
-          code === "late" ? `was stopped after ${this.stepMs / 1000} s` : `failed (exit ${code})`;
+        const run = (argv: string[], input?: string, ms = this.stepMs) =>
+          this.step(this.sys.spawn([...user.prefix, ...argv], { cwd: "/", env, log, ...(input ? { input } : {}) }), ms);
+        const why = (code: number | null | "late", ms = this.stepMs) =>
+          code === "late" ? `was stopped after ${ms / 1000} s` : `failed (exit ${code})`;
         if (missing.length > 0) {
           const set = await run(["/bin/sh", "-c", PARAMS_SCRIPT, "agentes-xvnc", ...missing]);
           if (set === 0) {
@@ -958,20 +969,22 @@ export class DesktopSessions {
           }
           d.refresh.params = true;
         }
-        if (d.refresh.look || !idle) return;
+        // Asked again: a viewer who came while the flags were set would see the dock start over.
+        if (d.refresh.look || !idle()) return;
         const look = lookCommand(d.home, this.lookOptions(d.agent, user, d.passwd), true);
         if (d.look !== look.id) {
+          const ms = this.stepMs * LIVE_LOOK_STEPS;
           // Single-user mode moves an agent's folder with its handle: its session still has the old HOME.
-          const looked = user.home === d.home ? await run(look.argv, look.input) : "moved";
+          const looked = user.home === d.home ? await run(look.argv, look.input, ms) : "moved";
           if (looked === 0) {
             d.look = look.id;
             this.persist(d);
-            this.opts.log(`${who} took this runner's look while running`);
+            this.opts.log(`${who} has this runner's look`);
           } else {
             const reason =
               looked === "moved"
                 ? "its home moved while it ran"
-                : (typeof looked === "number" && LOOK_FAILED[looked]) || `writing it ${why(looked)}`;
+                : (typeof looked === "number" && LOOK_FAILED[looked]) || `writing it ${why(looked, ms)}`;
             this.opts.log(`${who} keeps its earlier look until it starts again: ${reason}`);
           }
         }
@@ -986,6 +999,11 @@ export class DesktopSessions {
 
   private persist(d: Desktop) {
     writeJson(d.file, savedOf(d));
+  }
+
+  /** What runs as `user` would run as root: the runner is root, with no launcher for the agent (`NOT_AS_ROOT`). */
+  private asRoot(user: DesktopUser) {
+    return this.sys.uid === 0 && user.prefix.length === 0;
   }
 
   /** Xvnc's own pid once it holds the display and its socket is there; its output says why when it doesn't. */

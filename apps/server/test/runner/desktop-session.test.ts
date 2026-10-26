@@ -725,7 +725,7 @@ test("a desktop an earlier runner left running gets this runner's flags at once 
   expect(look?.opts.input).toBe(want.input);
   expect(look?.opts.env).toMatchObject({ DISPLAY: ":20", HOME: home });
   expect(JSON.parse(readFileSync(state, "utf8")).look).toBe(want.id);
-  expect(t.logs).toContain("the desktop of dev took this runner's look while running");
+  expect(t.logs).toContain("the desktop of dev has this runner's look");
 
   // Once: neither again, in this runner or the next; and nothing of it stopped or started the desktop.
   t.clock.now += 60_000;
@@ -796,7 +796,7 @@ test("a running desktop that can't take the flags or the look keeps what it has,
   expect(t.fake.of("agentes-look").filter(live)).toHaveLength(1);
   next.close();
 
-  // The next one tries again; one held up is stopped, and says so.
+  // The next one tries again; one held up is stopped, and says so. It has six steps' time: its settings take seconds.
   t.fake.exits.clear();
   t.fake.hangs.add("agentes-look");
   const after = new DesktopSessions({ ...t.opts, stepMs: 30 });
@@ -808,10 +808,65 @@ test("a running desktop that can't take the flags or the look keeps what it has,
   const [, held] = t.fake.of("agentes-look").filter(live);
   expect(t.fake.kills).toContainEqual([held?.pid ?? 0, "SIGTERM"]);
   expect(t.logs).toContain(
-    "the desktop of dev keeps its earlier look until it starts again: writing it was stopped after 0.03 s",
+    "the desktop of dev keeps its earlier look until it starts again: writing it was stopped after 0.18 s",
   );
   expect(after.status(dev).running).toBe(true);
   after.close();
+});
+
+test("a viewer who comes while a running desktop's flags are set holds its new look back: its dock would start over", async () => {
+  const t = setup();
+  await leftByEarlierRunner(t, dev);
+  t.fake.hangs.add("agentes-xvnc");
+  const next = new DesktopSessions(t.opts);
+  next.restore();
+  await next.serve([dev]);
+  t.clock.now += 60_000;
+  const swept = next.sweep();
+  await waitFor(() => t.fake.of("agentes-xvnc").length === 1);
+  const release = next.hold(dev.id);
+  t.fake.of("agentes-xvnc")[0]?.exit(0);
+  await swept;
+  const looks = () => t.fake.of("agentes-look").filter(live).length;
+  expect(looks()).toBe(0);
+  release?.();
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(looks()).toBe(1);
+  next.close();
+});
+
+test("a runner running as root refreshes a running desktop only through the agent's launcher; with none, it sets nothing and says why", async () => {
+  const t = setup();
+  await leftByEarlierRunner(t, dev);
+  const root = { ...t.fake.system, uid: 0 };
+  // Desktops taken back from a home that isn't system mode's (`sudo -E`, say): the agent's user is the runner's own.
+  const unlaunched = new DesktopSessions({ ...t.opts, system: root });
+  unlaunched.restore();
+  await unlaunched.serve([dev]);
+  t.clock.now += 60_000;
+  await unlaunched.sweep();
+  t.clock.now += 60_000;
+  await unlaunched.sweep();
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(0);
+  expect(t.fake.of("agentes-look").filter(live)).toHaveLength(0);
+  expect(t.logs.filter((l) => l.includes("runs as root"))).toEqual([
+    "the desktop of dev stays as it is: the runner runs as root, and nothing on a desktop does",
+  ]);
+  unlaunched.close();
+
+  // System mode: as the agent, through its launcher.
+  const prefix = ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"];
+  const user = async (agent: AgentScope) => ({ ...(await t.opts.user(agent)), prefix });
+  const launched = new DesktopSessions({ ...t.opts, system: root, agentUsers: true, user });
+  launched.restore();
+  await launched.serve([dev]);
+  t.clock.now += 60_000;
+  await launched.sweep();
+  const refreshed = [...t.fake.of("agentes-xvnc"), ...t.fake.of("agentes-look").filter(live)];
+  expect(refreshed).toHaveLength(2);
+  for (const p of refreshed) expect(p.argv.slice(0, prefix.length)).toEqual(prefix);
+  launched.close();
 });
 
 test.if(posix)(
@@ -881,7 +936,7 @@ test("running desktops take a new look one after another; one renamed takes it a
   await waitFor(() => looks().length === 2);
   looks()[1]?.exit(0);
   await swept;
-  expect(t.logs.filter((l) => l.endsWith("took this runner's look while running"))).toHaveLength(2);
+  expect(t.logs.filter((l) => l.endsWith("has this runner's look"))).toHaveLength(2);
   t.fake.hangs.clear();
 
   // Renamed (the server's list says so), dev's terminal prompt names it anew.

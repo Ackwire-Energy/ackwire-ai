@@ -604,10 +604,14 @@ function channelSettings(xml: string): string[][] {
 /** The wallpaper's setting (`backdrop`): the screen's one monitor and workspace. */
 const WALLPAPER_SETTING = "/backdrop/screen0/monitorVNC-0/workspace0/last-image";
 
-const settingsOf = (files: LookFile[]) => [
-  ["-c", "xfce4-desktop", "-p", WALLPAPER_SETTING, "-r"],
-  ...files.flatMap((f) => (f.path.startsWith(`${XFCONF}/`) ? channelSettings(f.data.toString()) : [])),
-];
+const settingsOf = (files: LookFile[]) =>
+  files
+    .flatMap((f) => (f.path.startsWith(`${XFCONF}/`) ? channelSettings(f.data.toString()) : []))
+    .flatMap((args) =>
+      args[1] === "xfce4-desktop" && args[3] === WALLPAPER_SETTING
+        ? [["-c", "xfce4-desktop", "-p", WALLPAPER_SETTING, "-r"], args]
+        : [args],
+    );
 
 /**
  * The look's xfconf settings for a running session, each as the arguments of the `xfconf-query` call that sets it
@@ -616,46 +620,51 @@ const settingsOf = (files: LookFile[]) => [
  * session's programs (xfwm4, xfsettingsd, xfdesktop, the terminal) follow what it says changed: set through it,
  * they show at once. xfconfd says nothing of a value set again as it was, and xfdesktop loads the wallpaper's
  * image again only when it hears its setting change, where a new look's image keeps its path: that setting is
- * unset first.
+ * unset right before it is set, so a run stopped part-way doesn't leave the screen without its wallpaper.
  */
 export const lookSettings = (home: string, o: LookOptions) => settingsOf(lookFiles(home, o));
 
 /**
  * Run as the agent (`lookCommand`), the files on its stdin, a `<path under HOME> <base64>` line each: unless the
- * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, then the
- * marker once all of them are. As the agent's own process it writes nothing the agent couldn't itself: a link the
- * agent made in its home leads only to the agent's own files. What sits at a temporary name goes first and only a
- * plain file is read as the marker, so a pipe left in the home can't hold the desktop's start.
+ * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, and the
+ * marker last. As the agent's own process it writes nothing the agent couldn't itself: a link the agent made in its
+ * home leads only to the agent's own files. What sits at a temporary name goes first and only a plain file is read
+ * as the marker, so a pipe left in the home can't hold the desktop's start.
  *
- * Live (`$5`, where the processes are listed: `/proc`), on a desktop that runs, with its `DISPLAY`: the files as
- * above, then the settings (`lookSettings`, a line each after the files: the arguments, each ended by a NUL, in
- * base64) through the session's own xfconfd, on the bus its session or panel on that display has (the agent's own
- * processes: no other's environment can be read), then the panel starts over (SIGUSR1, its own restart) to read
- * its new settings, gtk.css and docklike's file, which a panel reads only as it starts. The agent's apps and their
- * windows stay as they are. Exits 1: a file wasn't written; 2: no session on that display; 3: a setting wasn't
- * taken; 4: the panel didn't take the signal.
+ * Live (`$5`, where the processes are listed: `/proc`), on a desktop that runs, with its `DISPLAY`: between the
+ * files and the marker, the settings (`lookSettings`, a line each after the files: the arguments, each ended by a
+ * NUL, in base64) go through the session's own xfconfd, on the bus of its session or panel on exactly that display
+ * (in single-user mode one user runs every agent's desktop: the display tells them apart), then the panel starts
+ * over to read its new settings, gtk.css and docklike's file, which a panel reads only as it starts. That is the
+ * panel's D-Bus Terminate, the call `xfce4-panel --restart` makes, which runs the restart from the panel's main
+ * loop: its SIGUSR1 runs it inside a plain signal handler (XFCE 4.16 to 4.20), and `--restart` itself opens a
+ * dialog on the agent's screen when it fails. The agent's apps and their windows stay as they are. A marker that
+ * names this look already means the session shows it (it started with it, or took it here), and nothing is set
+ * again. A run stopped part-way leaves the marker as it was, so the desktop's next start writes every file again,
+ * over what xfconfd wrote back. Exits 1: a file wasn't written; 2: no session on that display; 3: a setting wasn't
+ * taken; 4: the panel didn't start over.
  */
 export const LOOK_SCRIPT = [
   'h=$1 v=$2 m="$1/$3" n=$4 && umask 077',
-  'w=1 && [ -f "$m" ] && [ "$(cat "$m")" = "$v" ] && w=0',
-  '[ "$w$5" = 0 ] && exit 0',
-  'while [ "$n" -gt 0 ] && read -r p b; do [ "$w" = 0 ] || { f="$h/$p" && mkdir -p "$(dirname "$f")" && rm -f "$f.new" && printf %s "$b" | base64 -d > "$f.new" && mv -f "$f.new" "$f"; } || exit 1; n=$((n - 1)); done',
-  '[ "$n" -eq 0 ] && { [ "$w" = 0 ] || { mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"; }; } || exit 1',
-  '[ -n "$5" ] || exit 0',
-  "s= q=",
-  'for d in "$5"/[0-9]*; do',
-  '  read -r c 2>/dev/null < "$d/comm" || continue',
-  "  case $c in xfce4-session|xfce4-panel) ;; *) continue ;; esac",
-  String.raw`  e=$(tr '\0' '\n' 2>/dev/null < "$d/environ") || continue`,
-  String.raw`  printf '%s\n' "$e" | grep -qxF "DISPLAY=$DISPLAY" || continue`,
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: a shell parameter, not a template literal
-  '  [ "$c" = xfce4-panel ] && q=${d##*/}',
-  String.raw`  [ -n "$s" ] || s=$(printf '%s\n' "$e" | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p')`,
-  "done",
-  '[ -n "$DISPLAY" ] && [ -n "$s" ] || exit 2',
-  'export DBUS_SESSION_BUS_ADDRESS="$s"',
-  'while read -r l; do printf %s "$l" | base64 -d | xargs -0 xfconf-query || exit 3; done',
-  '[ -z "$q" ] || kill -USR1 "$q" || exit 4',
+  '[ -f "$m" ] && [ "$(cat "$m")" = "$v" ] && exit 0',
+  'while [ "$n" -gt 0 ] && read -r p b; do f="$h/$p" && mkdir -p "$(dirname "$f")" && rm -f "$f.new" && printf %s "$b" | base64 -d > "$f.new" && mv -f "$f.new" "$f" || exit 1; n=$((n - 1)); done',
+  '[ "$n" -eq 0 ] || exit 1',
+  'if [ -n "$5" ]; then',
+  "  s= q=",
+  '  for d in "$5"/[0-9]*; do',
+  '    read -r c 2>/dev/null < "$d/comm" || continue',
+  "    case $c in xfce4-session|xfce4-panel) ;; *) continue ;; esac",
+  String.raw`    e=$(tr '\0' '\n' 2>/dev/null < "$d/environ") || continue`,
+  String.raw`    printf '%s\n' "$e" | grep -qxF "DISPLAY=$DISPLAY" || continue`,
+  '    [ "$c" = xfce4-panel ] && q=1',
+  String.raw`    [ -n "$s" ] || s=$(printf '%s\n' "$e" | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p')`,
+  "  done",
+  '  [ -n "$DISPLAY" ] && [ -n "$s" ] || exit 2',
+  '  export DBUS_SESSION_BUS_ADDRESS="$s"',
+  '  while read -r l; do printf %s "$l" | base64 -d | xargs -0 xfconf-query || exit 3; done',
+  '  [ -z "$q" ] || dbus-send --session --print-reply --dest=org.xfce.Panel /org/xfce/Panel org.xfce.Panel.Terminate boolean:true > /dev/null || exit 4',
+  "fi",
+  'mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
 ].join("\n");
 
 /**
