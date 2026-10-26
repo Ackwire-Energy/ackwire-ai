@@ -813,7 +813,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Hold, suspend or restore a workspace",
-        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
+        "description": "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), and it is a request again once active. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
         "parameters": [
           {
             "schema": {
@@ -1291,7 +1291,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Say how far the workspace's computer is",
-        "description": "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. A ready time moved later within the same step and stage (a part running long) holds still on their screens for a minute: while it keeps moving, send it again within that minute. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "description": "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. A ready time moved later within the same step and stage (a part running long) holds still on their screens for a minute: while it keeps moving, send it again within that minute. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
         "parameters": [
           {
             "schema": {
@@ -1373,6 +1373,16 @@
           },
           "401": {
             "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The workspace isn't active",
             "content": {
               "application/json": {
                 "schema": {
@@ -1560,7 +1570,7 @@
       "delete": {
         "tags": ["Operator"],
         "summary": "Take the workspace's computer away",
-        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "description": "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now (one held or suspended waits for none). 404 when the workspace has no such managed computer (also when it was already removed).",
         "parameters": [
           {
             "schema": {

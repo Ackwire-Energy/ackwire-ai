@@ -51,6 +51,9 @@ test("a server's tile: Tailscale's own icon for one on the Tailscale network, a 
   // The smallest size Tailscale's brand rules allow, and its own black and white files' colors by the app's theme.
   expect(rule(".dk-logo--lg")).toContain("width: 48px");
   expect(rule(".dk-logo--lg")).toContain("height: 48px");
+  // The mark in the tile as in Tailscale's own squircle: its dots (20.45 of the 24-unit drawing) 4/7 of the tile.
+  expect(rule(".dk-tailscale")).toContain("width: 32px");
+  expect(rule(".dk-tailscale")).toContain("height: 32px");
   expect(rule(".dk-tailscale")).toContain("fill: #1e1e1f");
   expect(rule('[data-theme="dark"] .dk-tailscale')).toContain("fill: #fff");
 });

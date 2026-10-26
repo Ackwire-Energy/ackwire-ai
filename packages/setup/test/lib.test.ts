@@ -21,6 +21,7 @@ import {
   diagnoseCompose,
   diagnoseTailscaleLogs,
   domainProblem,
+  emailFromProblem,
   envFlag,
   envName,
   envValue,
@@ -44,6 +45,7 @@ import {
   readTailscaleStatus,
   resolveChoice,
   secretEntries,
+  senderFor,
   sentence,
   sshTarget,
   sshTunnel,
@@ -93,7 +95,7 @@ describe("options", () => {
       "--smtp-url",
       "smtps://u:p@smtp.example.com:465",
       "--email-from",
-      "agentes <ola@example.com>",
+      "agentes.chat <ola@example.com>",
       "--computer",
       "no",
       "--computer-commands",
@@ -113,7 +115,7 @@ describe("options", () => {
         hostname: "chat",
         email: "smtp",
         smtpUrl: "smtps://u:p@smtp.example.com:465",
-        emailFrom: "agentes <ola@example.com>",
+        emailFrom: "agentes.chat <ola@example.com>",
         computer: "no",
         computerCommands: "yes",
         telemetry: "off",
@@ -180,6 +182,18 @@ describe("answers", () => {
     expect(domainProblem("localhost")).not.toBeNull();
     expect(domainProblem("10.0.0.1")).not.toBeNull();
     expect(domainProblem("box.tail1234.ts.net")).toContain("Tailscale");
+  });
+
+  test("the sender offered is the server's own default: agentes.chat, at a public domain only", () => {
+    // The same name every email signs with (packages/engine's defaultEmailFrom).
+    expect(senderFor("domain", "chat.acme.com")).toBe("agentes.chat <ola@chat.acme.com>");
+    expect(senderFor("domain", null)).toBeUndefined();
+    expect(senderFor("tailscale", null)).toBeUndefined();
+    expect(senderFor("local", null)).toBeUndefined();
+    expect(emailFromProblem("agentes.chat <ola@chat.acme.com>")).toBeNull();
+    // The old name is still a sender: a .env that has it keeps it.
+    expect(emailFromProblem("agentes <ola@chat.acme.com>")).toBeNull();
+    expect(emailFromProblem("ola")).toBe('that isn\'t a sender like "agentes.chat <ola@example.com>".');
   });
 
   test("a problem shown on its own starts as a sentence", () => {

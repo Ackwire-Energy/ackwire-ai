@@ -448,9 +448,7 @@ export function Popover() {
                     {t("desktop.tray.updateSee")}
                   </Button>
                 }
-              >
-                {t("desktop.tray.updateBody")}
-              </Banner>
+              />
             )}
             <span className="dk-pop__end" ref={bodyEnd} />
           </div>
@@ -567,9 +565,7 @@ export function Popover() {
                   {t("desktop.tray.updateSee")}
                 </Button>
               }
-            >
-              {t("desktop.tray.updateBody")}
-            </Banner>
+            />
           )}
 
           {requests.length > 0 && (
@@ -745,9 +741,7 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
               </Button>
             </>
           }
-        >
-          {t("desktop.server.failingBody")}
-        </Banner>
+        />
       )}
       {banner === "back" && (
         <Banner

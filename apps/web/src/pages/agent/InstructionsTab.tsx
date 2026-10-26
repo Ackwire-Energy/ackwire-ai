@@ -34,6 +34,10 @@ export function InstructionsTab() {
               id="in-title"
               icon="document"
               title={t("agent.howWorks", g)}
+              hint={{
+                name: t("common.about", { label: t("agent.howWorks", g) }),
+                text: t("agent.instructionsHelp", { ...g, org: org.name }),
+              }}
               changeKeys={["instructions"]}
               lock="instructions"
             />
@@ -48,8 +52,7 @@ export function InstructionsTab() {
                   value={draft.instructions}
                   onChange={(e) => set("instructions", e.target.value)}
                 />
-                <div className="newag__ta-meta">
-                  <span className="small muted">{t("agent.instructionsHelp", { org: org.name })}</span>
+                <div className="newag__ta-meta" style={{ justifyContent: "flex-end" }}>
                   <span className="newag__count ac-num">
                     <span aria-hidden="true">{draft.instructions.length}</span>
                     <span className="ac-visually-hidden">
@@ -103,10 +106,6 @@ export function InstructionsTab() {
               />
             </Card>
           )}
-          <p className="newag__note ac-iconline">
-            <Icon name="info" size={16} />
-            <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
-          </p>
           {pending.length > 0 && (
             <div className="agp-attn">
               <span className="agp-ib agp-ib--warn">

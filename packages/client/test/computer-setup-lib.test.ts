@@ -59,15 +59,20 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
       chipKey: "computerSetup.chip.preparing",
       specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
     });
-    // Nothing reported yet reads as preparing, with no step.
-    expect(setupView(external({ state: null }))).toMatchObject({
-      phase: "preparing",
-      step: null,
-      stepNumber: 0,
-      textKey: "computerSetup.status.preparing",
-    });
     // A step the app doesn't know (a newer provisioner) is no step.
     expect(setupView(external({ step: "polishing" as never }))?.step).toBeNull();
+  });
+
+  test("no state: the workspace is on hold and waits for no computer, so nothing says one is on its way", () => {
+    const paused = setupView(external({ state: null, since: null, requestedAt: null, secondsWaited: null }));
+    expect(paused).toMatchObject({
+      phase: "paused",
+      step: null,
+      stepNumber: 0,
+      textKey: "computerSetup.status.paused",
+      chipKey: "computerSetup.chip.paused",
+    });
+    expect(setupPending(paused)).toBe(false);
   });
 
   test("what it is doing within its step: the stage's own words, still that step's number; else the step's", () => {
@@ -110,7 +115,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
 
   test("every state names one of the keys packages/i18n words (plain-computer-copy.test.ts)", () => {
     const lines = new Set<string>();
-    for (const state of ["preparing", "waiting", "problem", "ready"] as const)
+    for (const state of ["preparing", "waiting", "problem", "ready", null] as const)
       for (const step of [null, ...SETUP_STEPS])
         for (const reason of [null, "approval" as never, "capacity"] as const)
           for (const stage of [null, ...Object.keys(SETUP_STAGES)]) {
@@ -119,6 +124,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
           }
     expect([...lines].sort()).toEqual([
       "computerSetup.chip.capacity",
+      "computerSetup.chip.paused",
       "computerSetup.chip.preparing",
       "computerSetup.chip.problem",
       "computerSetup.chip.ready",
@@ -131,6 +137,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
       "computerSetup.stage.updating",
       "computerSetup.stage.wiping",
       "computerSetup.status.capacity",
+      "computerSetup.status.paused",
       "computerSetup.status.preparing",
       "computerSetup.status.problem",
       "computerSetup.status.ready",
@@ -149,6 +156,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupPortrait(at("problem"), false)).toBe("offline");
     expect(setupPortrait(at("ready"), true)).toBe("online");
     expect(setupPortrait(at("ready"), false)).toBe("offline");
+    expect(setupPortrait(at(null), false)).toBe("paused");
     expect(setupPending(at("waiting"))).toBe(true);
     expect(setupPending(at("ready"))).toBe(false);
     expect(setupPending(null)).toBe(false);
@@ -201,10 +209,13 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     for (const state of ["preparing", "waiting", "problem"] as const) {
       expect(noComputerChoice(at(state), false, false)).toBe("workspace");
     }
-    // Ready, on a server with no cloud computer: never offered, only shown for an agent that has none.
-    expect(noComputerChoice(at("ready"), false, false)).toBeNull();
-    expect(noComputerChoice(at("ready"), false, true)).toBe("none");
-    expect(noComputerChoice(at("ready"), true, false)).toBe("cloud");
+    // Ready, or on hold with none on its way, on a server with no cloud computer: never offered, only shown for an
+    // agent that has none.
+    for (const state of ["ready", null] as const) {
+      expect(noComputerChoice(at(state), false, false)).toBeNull();
+      expect(noComputerChoice(at(state), false, true)).toBe("none");
+      expect(noComputerChoice(at(state), true, false)).toBe("cloud");
+    }
   });
 
   test("nobody turns a tool off or takes a folder away on the workspace's own computer", () => {
@@ -290,8 +301,9 @@ describe("live: machine.provisioning and org.standing", () => {
     expect(applyWorkspaceEvent(qc, "o1", { type: "machine.status" })).toBe(false);
   });
 
-  test("a standing event sets that workspace's standing in /me (the reason only when told)", () => {
+  test("a standing event sets that workspace's standing in /me (the reason only when told) and asks for its setup", () => {
     const qc = new QueryClient();
+    qc.setQueryData(keys.computerSetup("o1"), external({ state: "waiting", reason: "capacity" }));
     const me: Me = {
       user: { id: "u1", name: "Walt", email: "w@x.co", image: null },
       organizations: [
@@ -306,6 +318,8 @@ describe("live: machine.provisioning and org.standing", () => {
     const after = qc.getQueryData<Me>(keys.me);
     expect(after?.organizations[0]?.standing).toEqual({ state: "hold", reason: null });
     expect(after?.organizations[1]?.standing).toBeUndefined();
+    // On hold it waits for no computer, active again it waits for one: the server's answer follows the standing.
+    expect(qc.getQueryState(keys.computerSetup("o1"))?.isInvalidated).toBe(true);
     applyWorkspaceEvent(qc, "o1", { type: "org.standing", orgId: "o1", state: "suspended", reason: "Pagamento" } as {
       type: string;
     });

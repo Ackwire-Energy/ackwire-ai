@@ -35,6 +35,8 @@ const press = async (name: string | RegExp, rounds = 6) => {
   await settle(rounds);
 };
 const heading = () => screen().getByRole("heading").textContent;
+/** The line under the question, or null where the step has none. */
+const lead = () => document.querySelector(".auth__lead")?.textContent ?? null;
 const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], canSignUp: false };
 const NEW: SignInOptions = { account: false, password: false, providers: [], canSignUp: true };
 
@@ -72,6 +74,8 @@ describe("Entrar (e-mail primeiro)", () => {
     await type("Senha", "senha-errada");
     await press(/^Entrar/);
     expect(heading()).toBe("Hmm, essa senha não bateu.");
+    // The field, Entrar and "Esqueci a senha" sit right under it: no line between.
+    expect(lead()).toBeNull();
     expect(screen().getByLabelText("Senha").getAttribute("aria-invalid")).toBe("true");
     expect(screen().getByRole("button", { name: "Esqueci a senha" })).toBeTruthy();
 
@@ -158,6 +162,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(calls[0]?.method).toBe("requestPasswordReset");
     expect((calls[0]?.args[0] as { email: string } | undefined)?.email).toBe("marina@gmail.com");
     expect(heading()).toBe("Pronto. Mandei o link para marina@gmail.com.");
+    expect(lead()).toBe("Não chegou em 1 minuto? Veja o spam.");
     expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
   });
 
@@ -195,12 +200,16 @@ describe("Criar conta (e-mail novo)", () => {
     const { auth, calls } = createFakeAuth();
     const { router } = await renderApp("/signup", { api, auth });
     expect(heading()).toBe("Vamos criar sua conta. Qual é o seu e-mail de trabalho?");
+    expect(lead()).toBeNull();
     await type("E-mail", "walter@acme.com.br");
     await press(/^Continuar(?! com)/);
     expect(heading()).toBe("Prazer. Esse e-mail é novo por aqui.");
     await type("Seu nome", "Walter Souza");
     await press(/^Continuar(?! com)/, 2);
     expect(heading()).toBe("Boa, Walter. Agora uma senha.");
+    // What a password needs is said once, under the field, and turns into the count as it's typed.
+    expect(lead()).toBeNull();
+    expect(screen().getByText("Pelo menos 8 caracteres.")).toBeTruthy();
     await type("Crie uma senha", "curta");
     expect(screen().getByText("Faltam 3 caracteres (mínimo de 8).")).toBeTruthy();
     expect(
@@ -265,10 +274,13 @@ describe("Senha nova (link do e-mail)", () => {
     const { auth, calls } = createFakeAuth();
     await renderApp("/reset-password?token=tok-1", { api: createFakeApi(seedState({ me: null })), auth });
     expect(heading()).toBe("Crie uma senha nova.");
+    expect(lead()).toBeNull();
+    expect(screen().getByText("Pelo menos 8 caracteres.")).toBeTruthy();
     await type("Crie uma senha nova.", "senha-nova-1");
     await press(/Salvar senha/);
     expect(calls[0]).toEqual({ method: "resetPassword", args: [{ token: "tok-1", newPassword: "senha-nova-1" }] });
     expect(heading()).toBe("Senha nova salva.");
+    expect(lead()).toBe("Saímos das suas outras sessões.");
   });
 
   test("an expired link (no token) asks for another", async () => {
@@ -277,6 +289,7 @@ describe("Senha nova (link do e-mail)", () => {
       auth: createFakeAuth().auth,
     });
     expect(heading()).toBe("Esse link expirou.");
+    expect(lead()).toBe("Os links valem por 1 hora.");
     expect(screen().getByRole("link", { name: "Pedir outro link" }).getAttribute("href")).toBe("/login");
   });
 });
@@ -292,6 +305,13 @@ describe("Aceitar convite", () => {
     const email = screen().getByLabelText("E-mail") as HTMLInputElement;
     expect(email.value).toBe("marina@acme.com.br");
     expect(email.readOnly).toBe(true);
+    // Why it can't change is behind its ⓘ; the password keeps what it needs under the field.
+    expect(email.getAttribute("aria-describedby")).toBe("inv-email-hint");
+    expect(document.getElementById("inv-email-hint")?.textContent).toBe("O convite vale só para este e-mail.");
+    expect(screen().getByRole("button", { name: "Sobre E-mail" })).toBeTruthy();
+    expect([...document.querySelectorAll(".ac-field__help")].map((h) => h.textContent)).toEqual([
+      "Pelo menos 8 caracteres.",
+    ]);
     const accept = screen().getByRole("button", { name: "Aceitar e entrar na Acme" });
     expect(accept.hasAttribute("disabled")).toBe(true);
     await type("Seu nome", "Marina");
@@ -305,6 +325,7 @@ describe("Aceitar convite", () => {
   test("expired invitation offers to ask for a new one", async () => {
     await renderApp("/invite/expired", { api: createFakeApi(seedState({ me: null })) });
     expect(screen().getByRole("heading", { name: "Este convite expirou" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe("Convites valem por 7 dias.");
     const ask = screen().getByRole("button", { name: "Pedir um novo convite" });
     await act(async () => fireEvent.click(ask));
     await settle();
@@ -412,8 +433,10 @@ describe("Onboarding", () => {
     await skip();
 
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-    // Ada is already on the team: no card to leave her out. The others start picked.
+    // Ada is already on the team (her lead says so): no card to leave her out. The others start picked.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Eu já estou no time: desmarque quem não quiser.");
     expect(screen().queryByRole("button", { name: /Ada · Dev/ })).toBeNull();
+    expect(button(/Theo · PM/).textContent).toContain("Organiza tarefas e cuida do fórum.");
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("true");
     await keepOnly("Theo · PM");
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("false");
@@ -446,8 +469,14 @@ describe("Onboarding", () => {
     expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
-    // New agents start on "Automático".
-    expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
+    // Who charges the API and what happens at the limit: behind the limit's ⓘ, with nothing under the card.
+    const budget = screen().getByRole("region", { name: "Limite de gasto por agente" });
+    expect(budget.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
+    const limit = within(budget).getByRole("button", { name: "Sobre Limite de gasto por agente" });
+    expect(document.getElementById(limit.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Vale só para o uso da API, cobrado pelo provedor da chave, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Planos não contam aqui.",
+    );
+    expect(document.body.textContent).not.toContain("Começa no Automático");
     await type("Cole aqui", "sk-errado");
     await act(async () => fireEvent.blur(screen().getByLabelText("Cole aqui")));
     expect(document.body.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
@@ -559,6 +588,32 @@ describe("Onboarding", () => {
     expect(screen().getByText("Falta 1 etapa")).toBeTruthy();
   });
 
+  test("team: each field's reason behind its ⓘ, the link's approval in view, a line only for emails to check", async () => {
+    const { state } = await start();
+    await throughAgents(state);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Convide por e-mail ou compartilhe o link.");
+    const hintOf = (name: string) =>
+      document.getElementById(button(name).getAttribute("aria-describedby") ?? "")?.textContent;
+    expect(hintOf("Sobre E-mails")).toBe("Cada pessoa recebe um convite por e-mail e entra direto.");
+    expect(hintOf("Sobre Link de convite")).toBe("Vale 30 dias. Dá para desativar em Membros.");
+    const emails = screen().getByLabelText("E-mails");
+    expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint");
+    // What makes sharing the link in a group safe stays in view, under it.
+    expect(screen().getByLabelText("Link de convite").getAttribute("aria-describedby")).toBe(
+      "invite-link-hint invite-link-help",
+    );
+    expect(document.getElementById("invite-link-help")?.textContent).toBe("Você aprova cada pessoa que pedir.");
+    // Nothing under the emails until one needs a look.
+    expect(document.getElementById("invite-emails-help")).toBeNull();
+    await act(async () => fireEvent.change(emails, { target: { value: "nao-e-email" } }));
+    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    expect(document.getElementById("invite-emails-help")?.textContent).toBe(
+      "Confira os e-mails marcados: eles não recebem convite.",
+    );
+    expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint invite-emails-help");
+  });
+
   test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
     const { state } = await start();
     await throughImport(state);
@@ -566,7 +621,8 @@ describe("Onboarding", () => {
     await keepOnly("Theo · PM");
     await click(button(/Criar 1 agente/), 8);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Os agentes começam a responder quando uma IA estiver conectada.");
+    // Nothing under "Conectar depois": Done says what it means for the first message.
+    expect(button("Conectar depois").nextElementSibling).toBeNull();
     // A key typed and then left for later isn't saved.
     await type("Cole aqui", "sk-ant-api03-abcdefghijklmnop");
     await click(button("Conectar depois"), 8);
@@ -595,7 +651,11 @@ describe("Onboarding", () => {
     await throughImport(state);
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
-    expect(card.textContent).toContain("com um usuário para cada agente");
+    expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
+    expect(button(/^Outro computador/).textContent).toContain("Um Mac ou outro servidor, conectado com um código.");
+    expect(document.body.textContent).toContain(
+      "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
+    );
     expect(document.body.textContent).toContain("Os agentes escolhidos vão trabalhar no computador deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
@@ -617,9 +677,7 @@ describe("Onboarding", () => {
     ])
       expect(option(name)).toBeTruthy();
     expect(option(/^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    expect(document.body.textContent).toContain(
-      "Entre com o seu plano de IA e eles pensam com ele: sem chave de API. Ou use uma chave de API, paga pelo uso.",
-    );
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Entre com o seu plano de IA: sem chave de API.");
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
@@ -778,14 +836,18 @@ describe("Onboarding", () => {
     await skip();
     await keepOnly("Theo · PM");
     await click(button(/Criar 1 agente/), 8);
-    const makers = within(screen().getByRole("region", { name: "Chave de API" })).getByRole("group", {
-      name: "Provedor",
-    });
+    const panel = screen().getByRole("region", { name: "Chave de API" });
+    const makers = within(panel).getByRole("group", { name: "Provedor" });
     const ours = within(makers).getByRole("button", { name: "agentes.chat" });
     // The makers' 30 px tile, so every tile is as tall.
     expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
+    const PAYS = "Você paga pelo uso, direto ao provedor.";
+    expect(panel.textContent).toContain(PAYS);
     await click(ours, 2);
     expect(screen().queryByLabelText("Cole aqui")).toBeNull();
+    // Our key isn't paid to a provider: its own line says what it is.
+    expect(panel.textContent).not.toContain(PAYS);
+    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do agentes.chat.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
@@ -920,7 +982,8 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.invite")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
     // No cards repeating the rail and the faces, and nothing said of what was skipped: no invitations, no computer.
-    expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card")).toBeNull();
+    // No line over the title either: the welcome says it, and so does the rail's "Tudo certo" where it shows.
+    expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card, .onb__eyebrow")).toBeNull();
     expect(welcome()).toBe("Theo e Ada já estão no #general.");
     expect(document.querySelector(".onb__crew-computer")).toBeNull();
     // The rail marks the steps done and lets you go back.
@@ -1192,11 +1255,11 @@ describe("Onboarding", () => {
       agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai" as const, reason: "no_key" as const })),
     };
     await skip();
-    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: Theo responde quando você conectar uma.");
+    expect(askLine()).toBe("Ainda sem IA conectada: Theo responde quando você conectar uma.");
     expect(document.querySelector(".onb__first-line")?.getAttribute("data-state")).toBe("no_ai");
     expect(button("Enviar para Theo")).toBeTruthy();
     await type(ASK, "Bom dia, time");
-    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: os agentes respondem quando você conectar uma.");
+    expect(askLine()).toBe("Ainda sem IA conectada: os agentes respondem quando você conectar uma.");
     // An AI connected after going back: Done says so as soon as it's open again.
     await type(ASK, "@theo bom dia");
     state.aiStatus = { any: true, agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })) };
@@ -1241,11 +1304,17 @@ describe("Onboarding", () => {
     expect(interval()).toBe(false);
   });
 
-  test('import: Theo\'s "pular" is the way out, and each app is shown by its official logo', async () => {
+  test("import: one line on what comes along, no way out inside it (Pular esta etapa is); each app by its official logo and name", async () => {
     const { state } = await start();
     await throughContext(state);
-    expect(document.body.textContent).toContain("Se não usa, é só pular.");
-    // Each app's own logo, never letters or a generic icon; only "Outro app", which names many, keeps one.
+    const bubble = document.querySelector(".onb__bubble") as HTMLElement;
+    expect(bubble.querySelector(".onb__lead")?.textContent).toBe(
+      "Eles chegam com instruções, skills, rotinas e memória.",
+    );
+    expect(within(bubble).queryByRole("button")).toBeNull();
+    // Each app's own logo, never letters or a generic icon; only "Outro app", which names many, keeps one. No line
+    // under the name: where each app keeps its file is the tip under the cards, once one is picked.
+    expect(document.querySelector(".imp-source .ac-option__desc")).toBeNull();
     const tiles = [...document.querySelectorAll(".imp-source")].map((card) => [
       card.querySelector(".ac-option__title")?.textContent,
       card.querySelector(".imp-mark img")?.getAttribute("src") ?? card.querySelector(".imp-mark svg")?.tagName,
@@ -1260,12 +1329,12 @@ describe("Onboarding", () => {
       ["Exportação do agentes.chat", "/favicon.svg"],
       ["Outro app", "svg"],
     ]);
-    await click(button("pular"), 6);
+    await skip();
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");
   });
 
-  test("the confirmation email: where it went and for how long, a new link, then that it's confirmed", async () => {
+  test("the confirmation email: where it went, a new link, and once it's confirmed no line", async () => {
     const state = seedState();
     if (!state.me) throw new Error("no me");
     state.me.organizations = [];
@@ -1277,9 +1346,7 @@ describe("Onboarding", () => {
       await renderApp("/onboarding", { api: createFakeApi(state), auth });
       await settle(4);
       const note = () => document.querySelector(".onb__note")?.textContent;
-      expect(note()).toBe(
-        "Mandamos um link de confirmação para walter@acme.com.br. Ele vale por uma hora.Mandar outro link",
-      );
+      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br.Mandar outro link");
       // Nothing waits for it.
       expect(button("Continuar").hasAttribute("disabled")).toBe(true);
       await type("Nome", "Acme");
@@ -1289,13 +1356,13 @@ describe("Onboarding", () => {
       await click(button("Mandar outro link"), 4);
       expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["walter@acme.com.br"] }]);
       expect(document.body.textContent).toContain("Mandamos outro link para walter@acme.com.br.");
-      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br. Ele vale por uma hora.");
+      expect(note()).toBe("Mandamos um link de confirmação para walter@acme.com.br.");
 
-      // The link opened in another tab: back here, the line says so, and this tab forgets it was sent.
+      // The link opened in another tab, which said so: back here the line is gone, and this tab forgets it was sent.
       state.me = { ...state.me, user: { ...state.me.user, emailVerified: true } };
       await act(async () => window.dispatchEvent(new Event("visibilitychange")));
       await settle(6);
-      expect(note()).toBe("E-mail confirmado: walter@acme.com.br.");
+      expect(document.querySelector(".onb__note")).toBeNull();
       expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
     } finally {
       sessionStorage.clear();
@@ -1311,6 +1378,16 @@ describe("Onboarding", () => {
     await settle(4);
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     expect(document.querySelector(".onb__note")).toBeNull();
+  });
+
+  test("workspace: the time zone's reason is behind its ⓘ, with no line under the field", async () => {
+    await start();
+    await click(button("trocar"), 2);
+    const about = button("Sobre Fuso horário");
+    const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+    expect(why?.textContent).toBe("Para rotinas e lembretes. Detectado pelo seu navegador.");
+    expect(why?.hidden).toBe(true);
+    expect(document.querySelector(".ac-field__help")).toBeNull();
   });
 
   const fixture = (name: string) => readFileSync(join(import.meta.dir, "fixtures", "agent-import", name), "utf8");
@@ -1347,8 +1424,13 @@ describe("Onboarding", () => {
     expect(text).toContain("Conectar CRM (mcp.example.com)");
     expect(text).toContain("O que não vem junto");
     expect(text).toContain("Chaves, senhas e histórico de conversa nunca vêm.");
-    expect(text).toContain("Os agentes usam o modelo e a chave do workspace.");
-    expect(text).toContain("Isso chega junto com o time, quando você criar os agentes.");
+    expect(text).toContain("Chega quando você criar o time.");
+    // Only the groups whose items arrive changed say so: skills off, routines paused.
+    expect([...document.querySelectorAll(".imp-group__help")].map((h) => h.textContent)).toEqual([
+      "Chegam desligadas.",
+      "Chegam pausadas.",
+    ]);
+    expect(document.querySelector(".imp-block__help")).toBeNull();
     // Nothing is saved while reading: the server only planned it.
     expect(calls(state, "agents.create")).toHaveLength(0);
     expect(calls(state, "imports.apply").map((c) => (c.args[1] as ImportInput).dryRun)).toEqual([true]);
@@ -1415,7 +1497,7 @@ describe("Onboarding", () => {
       ],
     };
     await throughContext(state);
-    await click(button(/^OpenBot O pacote/), 1);
+    await click(button(/^OpenBot$/), 1);
 
     const field = "Ou cole um link do GitHub ou a resposta do outro app";
     await type(field, "https://github.com/acme/nada/blob/main/agents.yaml");

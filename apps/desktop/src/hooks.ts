@@ -1,7 +1,7 @@
 import type { ControlAgent } from "@agenteschat/adapters/runner-control";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHost } from "./app";
-import { type LocalServerStatus, NO_SERVER } from "./control/local-server";
+import { type LocalServerStatus, NO_SERVER, type Tailnet } from "./control/local-server";
 import type { Home } from "./control/store";
 import {
   CHECK_EVERY_MS,
@@ -100,6 +100,27 @@ export function useLocalServer(): LocalServerStatus {
     };
   }, [host]);
   return local;
+}
+
+/**
+ * What Tailscale is doing on this computer, read again each time the window comes to the front (the person may
+ * have just connected it). Null until the first read answers, which can take a couple of seconds: guessing a state
+ * before that would show its line, then take it back.
+ */
+export function useTailnet(): Tailnet | null {
+  const host = useHost();
+  const [tailnet, setTailnet] = useState<Tailnet | null>(null);
+  useEffect(() => {
+    const read = () =>
+      void host
+        .tailscale()
+        .then(setTailnet)
+        .catch(() => setTailnet({ state: "missing" }));
+    read();
+    window.addEventListener("focus", read);
+    return () => window.removeEventListener("focus", read);
+  }, [host]);
+  return tailnet;
 }
 
 /** Runs `fn` whenever the shell brings this window up. */

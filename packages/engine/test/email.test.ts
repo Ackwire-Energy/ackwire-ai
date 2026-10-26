@@ -412,6 +412,9 @@ describe("outbox delivery", () => {
 
   test("invitation: the inviter's address goes in the body, so the invitee can judge who sent it", async () => {
     f = await setup();
+    // The fixture's addresses end in a random hex suffix, which typed-text masking hides whenever it has 7 digits in a row.
+    const inviterEmail = "ana.lima@example.com";
+    await f.db.update(schema.users).set({ email: inviterEmail }).where(eq(schema.users.id, f.owner.id));
     await queueInvitationEmail(f.db, {
       orgId: f.org.id,
       invitationId: "i1",
@@ -421,9 +424,9 @@ describe("outbox delivery", () => {
       inviterId: f.owner.id,
     });
     const [job] = (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
-    expect(job?.payload).toMatchObject({ template: { kind: "invitation", inviterEmail: f.owner.email } });
+    expect(job?.payload).toMatchObject({ template: { kind: "invitation", inviterEmail } });
     const payload = job?.payload as { template: EmailTemplate } | undefined;
     const text = payload ? renderEmail(payload.template, art).text : "";
-    expect(text).toContain(`(${f.owner.email.replace(/([.@])/g, `$1${BREAK}`)}) convidou você para entrar na`);
+    expect(text).toContain(`(${inviterEmail.replace(/([.@])/g, `$1${BREAK}`)}) convidou você para entrar na`);
   });
 });

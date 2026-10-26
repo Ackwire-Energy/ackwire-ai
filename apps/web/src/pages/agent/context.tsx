@@ -138,7 +138,7 @@ export function LockNote({ field }: { field: Field }) {
   );
 }
 
-/** A card's head: icon, title, and on the right the changed tag, a lock note or an action. */
+/** A card's head: icon, title (with an optional ⓘ hint), and on the right the changed tag, a lock note or an action. */
 export function CardHead({
   icon,
   title,
@@ -147,6 +147,7 @@ export function CardHead({
   lock,
   action,
   subtitle,
+  hint,
 }: {
   icon: IconName;
   title: ReactNode;
@@ -156,6 +157,7 @@ export function CardHead({
   lock?: Field;
   action?: ReactNode;
   subtitle?: ReactNode;
+  hint?: { name: string; text: ReactNode };
 }) {
   const { changeOf, can } = useAgentEdit();
   const changed = changeKeys.find((k) => changeOf(k));
@@ -165,6 +167,7 @@ export function CardHead({
       icon={icon}
       title={title}
       subtitle={subtitle}
+      hint={hint}
       action={changed ? <ChangedTag changeKey={changed} /> : lock && !can(lock) ? <LockNote field={lock} /> : action}
     />
   );

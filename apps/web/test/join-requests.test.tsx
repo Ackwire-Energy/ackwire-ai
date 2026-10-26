@@ -57,7 +57,7 @@ describe("an invitation link asks to join", () => {
   test("signed out: who shared it and who works there, the form, then sent (the answer comes by email)", async () => {
     const { state } = await openLink(LINK);
     expect(heading()).toBe("Pedir para entrar na Acme");
-    expect(text()).toContain("Marina compartilhou este link. Um admin da Acme aprova cada pessoa nova.");
+    expect(text()).toContain("Marina compartilhou este link. Um admin aprova cada pessoa nova.");
     expect(text()).toContain("Ada e Atlas já trabalham lá.");
     // Their faces lead the line, on its first line when the names wrap.
     const agents = screen().getByText("Ada e Atlas já trabalham lá.").parentElement;
@@ -68,10 +68,14 @@ describe("an invitation link asks to join", () => {
 
     await type(screen().getByLabelText("Seu nome"), "  Ana Souza ");
     await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
-    expect(screen().getByText("A resposta chega neste e-mail.")).toBeTruthy();
+    // No line under it: the sent screen names the address.
+    expect(screen().getByLabelText("Seu e-mail").hasAttribute("aria-describedby")).toBe(false);
     // The answer goes to that address: a likely typo is offered first.
     await click(button("Você quis dizer ana@gmail.com?"));
-    await type(screen().getByLabelText("Algo que eles devam saber?"), "Designer nova da Paula");
+    const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
+    expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
+    expect(note.hasAttribute("aria-describedby")).toBe(false);
+    await type(note, "Designer nova da Paula");
     expect(send.hasAttribute("disabled")).toBe(false);
     await click(send);
     await settle(4);
@@ -80,8 +84,10 @@ describe("an invitation link asks to join", () => {
       { name: "Ana Souza", email: "ana@gmail.com", note: "Designer nova da Paula" },
     ]);
     expect(heading()).toBe("Pedido enviado");
-    expect(text()).toContain("Os admins da Acme já podem ver. Quando um deles responder, avisamos em ana@gmail.com.");
-    expect(text()).toContain("Pode fechar esta página. Pedido sem resposta fecha em 14 dias.");
+    // One line: where the answer goes. Nothing about closing the page.
+    expect([...document.querySelectorAll(".invite-ask__outcome-text p")].map((p) => p.textContent)).toEqual([
+      "Avisamos em ana@gmail.com quando um admin responder.",
+    ]);
   });
 
   test("signed in: one tap as the account; the page follows the answer", async () => {
@@ -93,7 +99,7 @@ describe("an invitation link asks to join", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual(["lnk", {}]);
     expect(heading()).toBe("Pedido enviado");
-    expect(text()).toContain("Você entra assim que um deles aprovar.");
+    expect(text()).toContain("Você entra assim que um admin aprovar.");
 
     // Approved: the next check finds them in.
     state.previews = {
@@ -195,11 +201,11 @@ describe("Members › Requests to join", () => {
     const ana = within(section).getByRole("group", { name: "Ana Souza pede para entrar" });
     expect(ana.textContent).toContain("Ana Souza pede para entrar");
     expect(ana.textContent).toContain("ana@estudio.com");
-    expect(ana.textContent).toContain("E-mail confirmado: a pessoa entra quando você aprovar.");
-    const proof = within(ana).getByText("E-mail confirmado: a pessoa entra quando você aprovar.").parentElement;
+    expect(ana.textContent).toContain("E-mail confirmado");
+    const proof = within(ana).getByText("E-mail confirmado").parentElement;
     expect(proof?.classList.contains("ac-iconline")).toBe(true);
     expect(ana.textContent).toContain("“Designer nova da Paula”");
-    expect(ana.textContent).toMatch(/Pelo link de convite · fecha em /);
+    expect(within(ana).getByText(/^Fecha em \S+/)).toBeTruthy();
     expect(ana.querySelector(".ac-chip")?.textContent).toBe("Pediu há 2 h");
     expect(card("Bruno Lima").textContent).toContain("E-mail não confirmado: aprovar manda um convite para ele.");
     expect(card("Bruno Lima").querySelector(".ac-chip")?.textContent).toMatch(/^Pediu em \d/);
@@ -231,7 +237,7 @@ describe("Members › Requests to join", () => {
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Mande este link para Bruno Lima" });
-    expect(dialog.textContent).toContain("Este servidor não manda e-mail.");
+    expect(dialog.textContent).toContain("Este servidor não manda e-mail. O link vale por 7 dias.");
     expect((within(dialog).getByRole("textbox") as HTMLInputElement).value).toBe("http://localhost:3000/invite/tok-r2");
   });
 
@@ -325,13 +331,21 @@ describe("Members › Invitation link", () => {
       ],
     });
     const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(invite.textContent).toContain("Quem você convida por e-mail entra direto.");
+    // Inviting by email lets people straight in: the Emails field's ⓘ says so, and describes the field.
+    const about = within(invite).getByRole("button", { name: "Sobre E-mails, separados por vírgula" });
+    const joins = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+    expect(joins?.textContent).toBe("Quem você convida por e-mail entra direto.");
+    expect(within(invite).getByLabelText("E-mails, separados por vírgula").getAttribute("aria-describedby")).toBe(
+      joins?.id ?? null,
+    );
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(
       "http://localhost:3000/invite/k3J",
     );
-    expect(invite.textContent).toMatch(
-      /Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
+    // Who can get in through a shared link stays on screen, not behind an ⓘ.
+    const linkLine = within(invite).getByText(
+      /^Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
     );
+    expect(linkLine.closest("[hidden]")).toBeNull();
     expect(invite.textContent).toMatch(/Link anterior · criado .+ por João · vale até /);
 
     const [turnOff] = within(invite).getAllByRole("button", { name: "Desativar" });

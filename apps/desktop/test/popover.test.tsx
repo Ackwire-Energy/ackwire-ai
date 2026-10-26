@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -8,7 +8,7 @@ import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import { AppProvider } from "../src/app";
 import { DesktopStore } from "../src/control/store";
-import { createFakeHost } from "../src/host/fake";
+import { createFakeHost, type FakeHost } from "../src/host/fake";
 import { createDesktopI18n } from "../src/i18n";
 import { ToastProvider } from "../src/ui/Toast";
 import { Popover } from "../src/windows/Popover";
@@ -36,9 +36,15 @@ afterAll(() => {
   globalThis.IntersectionObserver = realObserver;
 });
 
-/** The menu with agentes.chat on this Mac, a folder request and two jobs: taller than the menu gets. */
-async function withMenu(check: (el: HTMLElement) => unknown) {
-  const host = createFakeHost("popover", "here");
+/**
+ * The menu, by default with agentes.chat on this Mac, a folder request and two jobs (taller than the menu gets),
+ * once `ready` says it shows what the test looks at.
+ */
+async function withMenu(
+  check: (el: HTMLElement, store: DesktopStore) => unknown,
+  host: FakeHost = createFakeHost("popover", "here"),
+  ready: (el: HTMLElement) => unknown = (el) => el.querySelector(".dk-req"),
+) {
   const store = new DesktopStore(host, {});
   const stop = store.start();
   const el = document.body.appendChild(document.createElement("div"));
@@ -55,10 +61,8 @@ async function withMenu(check: (el: HTMLElement) => unknown) {
         </I18nextProvider>,
       );
     });
-    for (let i = 0; i < 100 && !el.querySelector(".dk-req"); i++) {
-      await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
-    }
-    await check(el);
+    await until(() => ready(el));
+    await check(el, store);
   } finally {
     await act(async () => root.unmount());
     el.remove();
@@ -66,6 +70,19 @@ async function withMenu(check: (el: HTMLElement) => unknown) {
     for (const runner of host.runners.values()) runner.stop();
   }
 }
+
+async function until(ready: () => unknown) {
+  for (let i = 0; i < 100 && !ready(); i++) await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+  expect(Boolean(ready())).toBe(true);
+}
+
+/** Each banner on the menu: its title, the line under it (null without one) and its buttons. */
+const banners = (el: HTMLElement) =>
+  [...el.querySelectorAll(".dk-banner")].map((banner) => ({
+    title: banner.querySelector(".dk-banner__text b")?.textContent,
+    line: banner.querySelector(".dk-banner__text small")?.textContent ?? null,
+    actions: [...banner.querySelectorAll(".dk-banner__acts button")].map((b) => b.textContent),
+  }));
 
 test("the menu bar menu: what goes on here scrolls, and Open, Preferences and Quit stay below it", () =>
   withMenu((el) => {
@@ -107,3 +124,96 @@ test("the middle fades out at the bottom while its end is out of sight, by the l
     await cross(false, true);
     expect(body?.hasAttribute("data-more")).toBe(false);
   }));
+
+describe("the menu's banners say only what matters there", () => {
+  /** A newer version of the app, from the release the menu checks. */
+  async function withUpdate(run: () => Promise<void>) {
+    const before = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      Response.json({
+        version: "9.9.9",
+        url: "https://agentes.chat/api/desktop/download/9.9.9/agentes_9.9.9_universal.dmg",
+      })) as unknown as typeof fetch;
+    try {
+      await run();
+    } finally {
+      globalThis.fetch = before;
+    }
+  }
+  const update = { title: "Version 9.9.9 is available", line: null, actions: ["See what's new"] };
+
+  test("a new version: its title and See what's new, with or without agents working here", () =>
+    withUpdate(async () => {
+      await withMenu(
+        (el) => expect(banners(el)).toContainEqual(update),
+        createFakeHost("popover", "here"),
+        (el) => el.querySelector(".dk-req") && banners(el).length > 0,
+      );
+      await withMenu(
+        (el) => expect(banners(el)).toEqual([update]),
+        createFakeHost("popover", "cloud"),
+        (el) => banners(el).length > 0,
+      );
+    }));
+
+  test("agentes.chat not starting here: its title, Copy diagnostics and Try again", () =>
+    withMenu(
+      (el) =>
+        expect(banners(el)).toContainEqual({
+          title: "agentes.chat isn't starting on this Mac",
+          line: null,
+          actions: ["Copy diagnostics", "Try again"],
+        }),
+      createFakeHost("popover", "here", { here: { phase: "failing" } }),
+      (el) => banners(el).length > 0,
+    ));
+
+  test("no internet: what already started keeps going", async () => {
+    const host = createFakeHost("popover", "here");
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+    try {
+      await withMenu(async (el) => {
+        await act(async () => {
+          for (const runner of host.runners.values()) runner.setOnline(false);
+        });
+        await until(() => banners(el).some((b) => b.title === "No internet. Trying again…"));
+        expect(banners(el).find((b) => b.title === "No internet. Trying again…")?.line).toBe(
+          "What already started keeps running here and sends the result when the connection is back.",
+        );
+      }, host);
+    } finally {
+      delete (navigator as { onLine?: boolean }).onLine;
+    }
+  });
+
+  test("paused: no agent starts anything new here", () =>
+    withMenu(async (el, store) => {
+      await act(async () => {
+        await store.requestAll({ type: "pause", until: null });
+      });
+      await until(() => banners(el).some((b) => b.title === "Paused until you resume"));
+      expect(banners(el).find((b) => b.title === "Paused until you resume")?.line).toBe(
+        "No agent, from any organization, starts anything new on this Mac.",
+      );
+    }));
+
+  test("Quit: what happens to the work running here, and to everyone when agentes.chat runs here", async () => {
+    const quit = async (el: HTMLElement) => {
+      const button = [...el.querySelectorAll("button.dk-mi")].find((b) => b.textContent?.includes("Quit agentes.chat"));
+      await act(async () => (button as HTMLButtonElement | undefined)?.click());
+      return el.querySelector(".dk-confirm p")?.textContent;
+    };
+    await withMenu(
+      async (el) =>
+        expect(await quit(el)).toBe(
+          "Agents can't use this Mac while the app is closed. What is already running finishes and sends the result when you open it again.",
+        ),
+      createFakeHost("popover", "selfhost"),
+    );
+    await withMenu(async (el) =>
+      expect(await quit(el)).toBe(
+        "agentes.chat stops on this Mac: nobody can use it, here, on your phone or your teammates', until you open the app again.",
+      ),
+    );
+  });
+});

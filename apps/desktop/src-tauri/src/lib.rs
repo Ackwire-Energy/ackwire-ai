@@ -66,6 +66,11 @@ fn is_app_download(url: &str) -> bool {
     url.starts_with("https://agentes.chat/api/desktop/download/")
 }
 
+/// The help pages on agentes.chat ("Which one to choose?", "How folders work"), whichever server it opens.
+fn is_help_page(url: &str) -> bool {
+    url.starts_with("https://agentes.chat/help/")
+}
+
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
 /// (with the open-window dot, clickable), even when the person took it out of the Dock.
 const APP_WINDOWS: &[&str] = &["welcome", "prefs", main_window::LABEL];
@@ -231,15 +236,15 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
-/// A page of a server this app opens goes to the main window, on that server; a provider's sign-in page and
-/// the app's own downloads open in the person's browser. Nothing else. Async, as every command that may make
-/// a window (`server_choose`).
+/// A page of a server this app opens goes to the main window, on that server; a provider's sign-in page, the
+/// app's own downloads and the help pages open in the person's browser. Nothing else. Async, as every command
+/// that may make a window (`server_choose`).
 #[tauri::command]
 async fn open_external(app: AppHandle, url: String) -> Result<(), String> {
     if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return Err("not a link the app opens".into());
     }
-    if is_sign_in_url(&url) || is_app_download(&url) {
+    if is_sign_in_url(&url) || is_app_download(&url) || is_help_page(&url) {
         return app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string());
     }
     let page: Url = url.parse().map_err(|_| "not a URL")?;
@@ -604,5 +609,8 @@ mod tests {
         assert!(is_app_download("https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
         assert!(!is_app_download("https://agentes.chat.evil.com/api/desktop/download/x"));
         assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
+        assert!(is_help_page("https://agentes.chat/help/run-on-your-computer?lang=en#who"));
+        assert!(!is_help_page("https://agentes.chat.evil.com/help/x"));
+        assert!(!is_help_page("https://agentes.chat/helpdesk"));
     }
 }

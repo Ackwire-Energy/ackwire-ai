@@ -459,7 +459,6 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               <h2 className="cal-side__title">{t("calendar.viewZone")}</h2>
               <ZoneSelect value={viewZone} onChange={setViewZone} aria-label={t("calendar.viewZone")} />
             </section>
-            <p className="cal-side__note">{t("calendar.note")}</p>
           </aside>
         )}
       </div>

@@ -24,6 +24,7 @@ import { Route as DesktopHandoverRouteImport } from './routes/desktop.handover'
 import { Route as DesktopSignInRouteImport } from './routes/desktop.sign-in'
 import { Route as DesktopSignedInRouteImport } from './routes/desktop.signed-in'
 import { Route as DevGalleryRouteImport } from './routes/dev.gallery'
+import { Route as HelpSlugRouteImport } from './routes/help.$slug'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as OrgOrgIdRouteImport } from './routes/org.$orgId'
 import { Route as OrgOrgIdIndexRouteImport } from './routes/org.$orgId.index'
@@ -127,6 +128,11 @@ const DesktopSignedInRoute = DesktopSignedInRouteImport.update({
 const DevGalleryRoute = DevGalleryRouteImport.update({
   id: '/dev/gallery',
   path: '/dev/gallery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpSlugRoute = HelpSlugRouteImport.update({
+  id: '/help/$slug',
+  path: '/help/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
@@ -294,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId': typeof OrgOrgIdRouteWithChildren
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
@@ -340,6 +347,7 @@ export interface FileRoutesByTo {
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
@@ -386,6 +394,7 @@ export interface FileRoutesById {
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
+  '/help/$slug': typeof HelpSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/org/$orgId': typeof OrgOrgIdRouteWithChildren
   '/org/$orgId/approvals': typeof OrgOrgIdApprovalsRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/desktop/sign-in'
     | '/desktop/signed-in'
     | '/dev/gallery'
+    | '/help/$slug'
     | '/invite/$token'
     | '/org/$orgId'
     | '/org/$orgId/approvals'
@@ -480,6 +490,7 @@ export interface FileRouteTypes {
     | '/desktop/sign-in'
     | '/desktop/signed-in'
     | '/dev/gallery'
+    | '/help/$slug'
     | '/invite/$token'
     | '/org/$orgId/approvals'
     | '/org/$orgId/calendar'
@@ -525,6 +536,7 @@ export interface FileRouteTypes {
     | '/desktop/sign-in'
     | '/desktop/signed-in'
     | '/dev/gallery'
+    | '/help/$slug'
     | '/invite/$token'
     | '/org/$orgId'
     | '/org/$orgId/approvals'
@@ -572,6 +584,7 @@ export interface RootRouteChildren {
   DesktopSignInRoute: typeof DesktopSignInRoute
   DesktopSignedInRoute: typeof DesktopSignedInRoute
   DevGalleryRoute: typeof DevGalleryRoute
+  HelpSlugRoute: typeof HelpSlugRoute
   InviteTokenRoute: typeof InviteTokenRoute
   OrgOrgIdRoute: typeof OrgOrgIdRouteWithChildren
 }
@@ -681,6 +694,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/gallery'
       fullPath: '/dev/gallery'
       preLoaderRoute: typeof DevGalleryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help/$slug': {
+      id: '/help/$slug'
+      path: '/help/$slug'
+      fullPath: '/help/$slug'
+      preLoaderRoute: typeof HelpSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/invite/$token': {
@@ -970,6 +990,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesktopSignInRoute: DesktopSignInRoute,
   DesktopSignedInRoute: DesktopSignedInRoute,
   DevGalleryRoute: DevGalleryRoute,
+  HelpSlugRoute: HelpSlugRoute,
   InviteTokenRoute: InviteTokenRoute,
   OrgOrgIdRoute: OrgOrgIdRouteWithChildren,
 }

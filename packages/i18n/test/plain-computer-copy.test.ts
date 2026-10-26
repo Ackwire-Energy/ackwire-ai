@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
-import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED } from "./edition-words";
+import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED, TECHNICAL } from "./edition-words";
 import { leaves } from "./leaves";
 
 /**
@@ -30,7 +30,7 @@ const SETUP_KEYS = [
   ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall", "finishing"].map(
     (s) => `computerSetup.stage.${s}`,
   ),
-  ...["preparing", "capacity", "problem", "ready"].flatMap((s) => [
+  ...["preparing", "capacity", "problem", "ready", "paused"].flatMap((s) => [
     `computerSetup.status.${s}`,
     `computerSetup.chip.${s}`,
   ]),
@@ -39,7 +39,6 @@ const SETUP_KEYS = [
   "computerSetup.email.here",
   "computerSetup.plans",
   "computerSetup.title",
-  "computerSetup.lead",
   "computerSetup.specs",
   "computerSetup.users",
   "computerSetup.notice.title",
@@ -96,21 +95,23 @@ const CLOUD_EXTRA = [
   "desktop.keyboard.label",
   ...["got", "copied", "tooLong", "textOnly"].map((k) => `desktop.clipboard.${k}`),
   "computers.leadCloud",
-  ...["title", "screens"].map((k) => `computers.onIt.${k}`),
+  "computers.about",
   "agentPage.work.cell.computer",
   "agentPage.work.offlineCloud",
   "agentPage.work.brain.fallbackTitle",
+  "agentPage.work.brain.fallbackHint",
+  "agentPage.work.brain.add.stepOneHint",
+  "aiAccounts.page.hint",
   "agentPage.work.brain.offCloud",
   "missions.settings.more.sub",
   "missions.settings.recovery.title",
   "onboarding.budget.noteKey",
   "onboarding.computer.leadCloud",
-  "onboarding.computer.leadCloudReady",
+  "onboarding.computer.leadCloudPaused",
   "onboarding.keyStep.lead",
   ...["ready", "waiting", "noAi", "noAiAny"].map((k) => `onboarding.done.first.${k}`),
   ...["signIn", "key", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),
   "connectAi.titleFor",
-  "noAi.banner.orgHintPreparing",
   "agentPage.work.brain.add.startFailed",
   "outage.titleCloud",
   "outage.cloudSub",
@@ -122,7 +123,6 @@ const CLOUD_EXTRA = [
   "scopes.browser_use.description",
   "access.areaText.browser.write",
   "missions.subtitle",
-  "missions.empty.text",
   "threads.empty.missions",
   "missions.share.lendText",
   "missions.waitingCloud",
@@ -134,11 +134,11 @@ const SELFHOST_EXTRA = [
   "browser.inCard.offline",
   "browser.inCard.noComputer",
   "computers.hostMissing",
-  ...["title", "text", "emptyTitle", "emptyText"].map((k) => `computers.other.${k}`),
+  ...["title", "text", "emptyTitle"].map((k) => `computers.other.${k}`),
+  "computers.how",
   "computers.daytona.cardTitle",
   "computers.cloud.note",
   "computers.agents.title",
-  "computers.agents.text",
   "machines.host.label",
   "machines.host.desc",
   "machines.host.descUsers",
@@ -169,15 +169,11 @@ const SELFHOST_EXTRA = [
   "onboarding.keyStep.leadNoComputer",
   "onboarding.brain.failed",
   "connectAi.wait.connecting",
-  ...["this", "thisText", "other", "otherText", "note"].map((k) => `connectAi.own.${k}`),
+  ...["this", "thisText", "other", "note"].map((k) => `connectAi.own.${k}`),
   "aiAccounts.connect.needs.keys",
   "aiAccounts.connect.noComputer",
   "aiAccounts.connect.addComputer",
 ];
-
-/** Case-insensitive, so the Go language is left out: it would match English "Go to…". */
-const TECHNICAL =
-  /\bLinux\b|\bIP(v[46])?\b|\bvCPU|Chrome|\bgit\b|\bNode\b|Python|\bRust\b|Debian|Ubuntu|Docker|kernel/i;
 
 const LOCALES = [
   ["pt-BR", ptBR],

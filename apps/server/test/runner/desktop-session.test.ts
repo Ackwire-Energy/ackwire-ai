@@ -13,6 +13,8 @@ import {
   type DesktopUser,
   memAvailableBytes,
   PARK_AFTER_MS,
+  type ProcessStat,
+  procStat,
   runnerUser,
   systemDesktopUser,
   vncPasswordFile,
@@ -57,6 +59,7 @@ function fakeComputer(lockDir: string) {
   const exits = new Map<string, number>();
   const files = new Set<string>();
   const hangs = new Set<string>();
+  const stats: ProcessStat[] = [];
   const system: DesktopSystem = {
     platform: "linux",
     pty: true,
@@ -108,6 +111,7 @@ function fakeComputer(lockDir: string) {
       kills.push([pid, signal]);
       procs.find((x) => x.pid === pid)?.exit(null);
     },
+    processes: () => stats,
   };
   const of = (command: string) => procs.filter((p) => commandOf(p) === command);
   return {
@@ -128,6 +132,8 @@ function fakeComputer(lockDir: string) {
     files,
     /** Commands that never end by themselves ("sh": the prepare, "agentes-look"). */
     hangs,
+    /** What `/proc` lists. */
+    stats,
   };
 }
 
@@ -262,7 +268,12 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
   // The cookie goes to xauth on stdin; the folder and HOME are made by the agent's user.
   expect(prepare.opts.input).toMatch(/^add :20 \. [0-9a-f]{32}\n$/);
   expect(prepare.argv.slice(-4, -2)).toEqual([dir, path.join(t.folders, "dev", ".agentes", "home")]);
-  expect(prepare.argv.at(-2)).toContain('<property name="ssh-agent" type="empty">');
+  // The session starts neither agent: ssh-agent outlives the desktop, and gpg-agent's restart holds up its start.
+  for (const agent of ["ssh-agent", "gpg-agent"]) {
+    expect(prepare.argv.at(-2)).toContain(
+      `<property name="${agent}" type="empty">\n      <property name="enabled" type="bool" value="false"/>`,
+    );
+  }
   expect(prepare.argv.at(-1)).toContain('<property name="vblank_mode" type="string" value="off"/>');
   const cookie = prepare.opts.input?.split(" ")[3]?.trim() ?? "";
   expect(cookie).toMatch(/^[0-9a-f]{32}$/);
@@ -371,6 +382,7 @@ test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settin
   await desktops.ensure(dev);
   expect(readFileSync(settings, "utf8")).toContain('<property name="vblank_mode" type="string" value="off"/>');
   expect(readFileSync(path.join(xfconf, "xfce4-session.xml"), "utf8")).toContain('name="ssh-agent"');
+  expect(readFileSync(path.join(xfconf, "xfce4-session.xml"), "utf8")).toContain('name="gpg-agent"');
   // The look's own xfwm4 settings came after, the vblank still off.
   expect(readFileSync(settings, "utf8")).toContain('name="margin_bottom"');
   const home = path.join(t.folders, "dev", ".agentes", "home");
@@ -396,7 +408,7 @@ test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settin
   desktops.close();
 });
 
-test("the look: written as the agent into its desktop's HOME, after the prepare and before X starts", async () => {
+test("the look: written as the agent into its desktop's HOME, after the prepare, while X starts", async () => {
   const t = setup();
   await t.desktops.ensure(dev);
   const [prepare] = t.fake.of("sh");
@@ -535,6 +547,113 @@ test("a step before X that is held up (a pipe in the HOME, a hung disk) is stopp
   t.fake.hangs.clear();
   expect(await t.desktops.ensure(dev)).toMatchObject({ display: 20, started: true });
   t.desktops.close();
+});
+
+test("the screen server starts while the look is written; the session waits for both", async () => {
+  const t = setup();
+  t.fake.hangs.add("agentes-look");
+  const starting = t.desktops.ensure(dev);
+  await waitFor(() => t.fake.of("Xtigervnc").length === 1);
+  // X is up and the look still writes XFCE's files: XFCE doesn't start before they are all there.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(t.fake.of("dbus-launch")).toHaveLength(0);
+  t.fake.of("agentes-look")[0]?.exit(0);
+  expect(await starting).toMatchObject({ started: true });
+  expect(t.fake.of("dbus-launch")).toHaveLength(1);
+  await t.desktops.stop(dev);
+
+  // A screen server that doesn't start fails the start once the look is done, never under it.
+  t.fake.failXvnc("no display");
+  let failed = false;
+  const failing = t.desktops.ensure(dev).catch(() => {
+    failed = true;
+  });
+  await waitFor(() => t.fake.of("agentes-look").length === 2);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(failed).toBe(false);
+  t.fake.of("agentes-look")[1]?.exit(0);
+  await failing;
+  expect(failed).toBe(true);
+  t.desktops.close();
+});
+
+test("a start that fails before its screen server is up, its password file unwritable, ends after the look too", async () => {
+  const t = setup();
+  t.fake.hangs.add("agentes-look");
+  // A folder where the password file goes: writing it fails.
+  mkdirSync(path.join((await t.opts.user(dev)).dir, "passwd"), { recursive: true });
+  let failed = false;
+  const failing = t.desktops.ensure(dev).catch(() => {
+    failed = true;
+  });
+  await waitFor(() => t.fake.of("agentes-look").length === 1);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(failed).toBe(false);
+  expect(t.fake.of("Xtigervnc")).toHaveLength(0);
+  t.fake.of("agentes-look")[0]?.exit(0);
+  await failing;
+  expect(failed).toBe(true);
+  t.desktops.close();
+});
+
+test("each start's line says where its time went; its session's programs follow once it settled, from /proc", async () => {
+  const t = setup();
+  await t.desktops.ensure(dev);
+  expect(t.logs).toContain(
+    "the desktop of dev started on :20 in 0.00 s: room and its user 0.00 s, prepared in 0.00 s, its screen in 0.00 s (the look in 0.00 s meanwhile), its session in 0.00 s",
+  );
+  const [launched] = t.fake.of("dbus-launch");
+  if (!launched) throw new Error("not started");
+  // dbus-launch became the session (system mode: runuser's child); another desktop's programs aren't its own.
+  t.fake.stats.push(
+    { pid: launched.pid, ppid: 1, name: "xfce4-session", start: 5000, cpu: 0.2 },
+    { pid: 9001, ppid: launched.pid, name: "xfwm4", start: 5000.31, cpu: 0.4 },
+    { pid: 9002, ppid: launched.pid, name: "xfsettingsd", start: 5000.88, cpu: 3.1 },
+    { pid: 9003, ppid: launched.pid, name: "xfce4-panel", start: 5003.9, cpu: 0.5 },
+    // docklike's and another plugin's: one program, their CPU time together.
+    { pid: 9004, ppid: 9003, name: "wrapper-2.0", start: 5004.1, cpu: 0.3 },
+    { pid: 9006, ppid: 9003, name: "wrapper-2.0", start: 5004.2, cpu: 0.05 },
+    { pid: 9005, ppid: launched.pid, name: "Thunar", start: 5003.95, cpu: 0.1 },
+    { pid: 9100, ppid: 4242, name: "xfdesktop", start: 4000, cpu: 9 },
+  );
+  const told = () => t.logs.filter((l) => l.startsWith("the desktop of dev: its session started"));
+  t.clock.now += 14_000;
+  await t.desktops.sweep();
+  expect(told()).toEqual([]);
+  t.clock.now += 1000;
+  await t.desktops.sweep();
+  expect(told()).toEqual([
+    "the desktop of dev: its session started xfwm4 at 0.31 s (0.40 s of CPU), xfsettingsd at 0.88 s (3.10 s of CPU), xfce4-panel at 3.90 s (0.50 s of CPU), wrapper-2.0 at 4.10 s (0.35 s of CPU), Thunar at 3.95 s (0.10 s of CPU), xfdesktop not yet",
+  ]);
+  // Once.
+  t.clock.now += 60_000;
+  await t.desktops.sweep();
+  expect(told()).toHaveLength(1);
+
+  // A desktop the next runner takes back has no start of its own to tell.
+  const next = new DesktopSessions({ ...t.opts, system: gone(t.fake.system) });
+  next.restore();
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(told()).toHaveLength(1);
+  next.close();
+  t.desktops.close();
+});
+
+test("a process in /proc: its parent, its name with spaces and parentheses, its start since boot and its CPU time", () => {
+  // The 52 fields of /proc/<pid>/stat, in hundredths of a second: its time in user and kernel mode the 14th and 15th,
+  // its start the 22nd.
+  const rest = (start: number, user = 0, kernel = 0) =>
+    `S 4321 ${[...Array(9).fill(0), user, kernel, ...Array(6).fill(0)].join(" ")} ${start} ${Array(30).fill(0).join(" ")}`;
+  expect(procStat(`1234 (xfce4-panel) ${rest(503390, 250, 61)}`)).toEqual({
+    pid: 1234,
+    ppid: 4321,
+    name: "xfce4-panel",
+    start: 5033.9,
+    cpu: 3.11,
+  });
+  expect(procStat(`77 (Web Content (x) y) ${rest(10)}`)).toMatchObject({ name: "Web Content (x) y", start: 0.1 });
+  expect(procStat("not a stat line")).toBeNull();
 });
 
 test("system mode: every process as the agent, and the password file root's (readable by the agent's group only)", async () => {

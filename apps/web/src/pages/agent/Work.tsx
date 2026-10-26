@@ -53,6 +53,7 @@ import {
   EffortPixels,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   LogoMark,
   OptionList,
@@ -308,7 +309,6 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         </div>
         {footer && <div className="agp-workcard__foot">{footer}</div>}
       </section>
-      {waiting && !member && <SettingNote icon="waiting">{t("computerSetup.agentWaiting", g)}</SettingNote>}
       {machine && !machine.online && kind !== "model" && (
         <SettingNote icon="pause">
           {edition === "cloud"
@@ -553,6 +553,24 @@ function BrainDialog({ onClose }: { onClose: () => void }) {
   // The choices start from what is saved: the form mounts once it is loaded.
   if (!work.brain.data || !work.computer.data) return null;
   return <BrainForm view={work.brain.data} onClose={onClose} />;
+}
+
+/**
+ * A switch's label on one line, its ⓘ right after it: outside the label, so pressing the ⓘ never flips the switch,
+ * and the switch is described by it (`<id>-hint`). The hint reads the same whether the switch is on or off.
+ */
+function SwitchLabel({ htmlFor, label, hint }: { htmlFor: string; label: string; hint: string }) {
+  const { t } = useTranslation();
+  return (
+    <span className="agp-brainoff ac-hintline">
+      <label htmlFor={htmlFor}>
+        <b>{label}</b>
+      </label>
+      <InfoHint name={t("common.about", { label })} id={`${htmlFor}-hint`}>
+        {hint}
+      </InfoHint>
+    </span>
+  );
 }
 
 /** A setting of the opened brain: a small label above its control (the label is the control's name too). */
@@ -913,20 +931,22 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       {accountField}
       {agent.ownerUserId && (
         <div className="agp-brainshare">
-          <label className="agp-brainoff" htmlFor={shareId}>
-            <b>
-              {view.canUsePlans
+          <SwitchLabel
+            htmlFor={shareId}
+            label={
+              view.canUsePlans
                 ? t("aiAccounts.share.switch")
-                : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" })}
-            </b>
-            <span>
-              {view.canUsePlans
-                ? t(onlyOwner ? "aiAccounts.share.on" : "aiAccounts.share.off", g)
-                : t(onlyOwner ? "aiAccounts.share.onOther" : "aiAccounts.share.offOther", { owner: ownerFirst ?? "" })}
-            </span>
-          </label>
+                : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" })
+            }
+            hint={
+              view.canUsePlans
+                ? t("aiAccounts.share.hint", g)
+                : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
+            }
+          />
           <Switch
             id={shareId}
+            aria-describedby={`${shareId}-hint`}
             checked={onlyOwner}
             // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
             disabled={!view.canUsePlans && onlyOwner}
@@ -949,13 +969,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         />
       )}
       <div className="ac-optcard__foot">
-        <label className="agp-brainoff" htmlFor={offId}>
-          <b>{t("agentPage.work.brain.fallbackTitle", { computer: whereName })}</b>
-          <span>
-            {fallback ? t("agentPage.work.brain.fallbackOnNow", g) : t("agentPage.work.brain.fallbackOffNow", g)}
-          </span>
-        </label>
-        <Switch id={offId} checked={fallback} onCheckedChange={setFallback} />
+        <SwitchLabel
+          htmlFor={offId}
+          label={t("agentPage.work.brain.fallbackTitle", { computer: whereName })}
+          hint={t("agentPage.work.brain.fallbackHint", g)}
+        />
+        <Switch id={offId} aria-describedby={`${offId}-hint`} checked={fallback} onCheckedChange={setFallback} />
       </div>
     </>
   );

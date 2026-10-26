@@ -2228,6 +2228,7 @@ export type ComputerSetupStep = "reserving" | "starting" | "installing" | "conne
  */
 export interface ComputerSetup {
   mode: "external" | "pair";
+  /** With `external`, null while the workspace is on hold and its computer isn't ready: it waits for none. */
   state: "preparing" | "waiting" | "problem" | "ready" | null;
   /** While `preparing`. */
   step: ComputerSetupStep | null;

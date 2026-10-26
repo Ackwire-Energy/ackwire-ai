@@ -1898,6 +1898,11 @@ export class BrowserManager {
    * watches it or a person's turn is open: a person asked, from that desktop. A desktop that can't take it fails
    * the click with its own reason: a click never starts one headless. The click carries no address and no flag, so
    * the browser reaches nothing new. Each click's outcome goes in the log (a failure in the caller's).
+   *
+   * A Chrome already there comes to the front only for a click that reaches the runner: the apps menu's Browser, a
+   * middle or Shift click on docklike's, or the panel's own launcher where docklike isn't installed. A plain click
+   * on docklike's Browser while Chrome has a window there never comes here: docklike raises that window itself (or
+   * hides it, when it is the active one), and nothing is logged.
    */
   async show(agent: AgentScope, folder: string, installing: () => void): Promise<void> {
     const clickedAt = this.now();
@@ -1909,7 +1914,9 @@ export class BrowserManager {
       const shown = await this.ensureOwnChrome(agent, session, true, [], true);
       session.lastUsed = this.now();
       if (shown === before) {
-        return (await this.activate(shown)) ? "brought to the front" : "already open; it didn't come to the front";
+        return (await this.activate(shown))
+          ? "already open: brought to the front"
+          : "already open; it didn't come to the front";
       }
       await this.windowShown(session, shown);
       return `opened in ${((this.now() - clickedAt) / 1000).toFixed(1)} s`;

@@ -16,6 +16,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, 
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { CAST, type CastKey, PEOPLE, type PersonKey } from "./cast";
+import { useLanding } from "./context";
 import { type Run, useAimRef, useJoy, useRunner, useVisible } from "./hooks";
 import { LpAvatar } from "./LpAvatar";
 import { PixelSky } from "./PixelSky";
@@ -168,6 +169,7 @@ export function Team() {
   const narrow = useNarrow();
   const narrowRef = useRef(narrow);
   narrowRef.current = narrow;
+  const { reduced } = useLanding();
   const runner = useRunner();
 
   const panel = useRef<HTMLDivElement>(null);
@@ -255,8 +257,9 @@ export function Team() {
   const consultRef = useRef(consult);
   consultRef.current = consult;
 
+  // With reduced motion the agents stay as they are: no line, no bubbles, nobody hops.
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || reduced) return;
     const go = () => runner.start((run) => consultRef.current(run));
     const first = setTimeout(go, 900);
     const every = setInterval(go, 4600);
@@ -266,7 +269,7 @@ export function Team() {
       runner.stop();
       clear();
     };
-  }, [visible, runner, clear]);
+  }, [visible, reduced, runner, clear]);
 
   // The layout changed: the line and the bubbles point at old places.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the layout changes

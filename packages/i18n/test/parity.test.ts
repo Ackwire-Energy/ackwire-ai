@@ -22,6 +22,19 @@ describe("locales", () => {
   });
 });
 
+describe("menu paths", () => {
+  test("a path to a setting stays on one line: no-break spaces around its ›", () => {
+    for (const tree of [ptBR, en]) {
+      const paths = leaves(tree)
+        .map(([, v]) => String(v))
+        .filter((s) => s.includes("›"));
+      expect(paths.length).toBeGreaterThanOrEqual(4);
+      for (const s of paths)
+        expect({ s, alone: s.split("\u00a0›\u00a0").join("").includes("›") }).toEqual({ s, alone: false });
+    }
+  });
+});
+
 describe("resources", () => {
   test("one i18next namespace per locale", () => {
     expect(Object.keys(resources)).toEqual(["pt-BR", "en"]);

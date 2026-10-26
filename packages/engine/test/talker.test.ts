@@ -19,7 +19,7 @@ import {
   talkerPolicy,
 } from "../src";
 import { afterSteered } from "../src/steering";
-import { type Fixture, setup } from "./fixtures";
+import { answerSteering, type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
@@ -248,6 +248,7 @@ describe("talker: fast replies while the task waits", () => {
       .update(schema.agentRuns)
       .set({ status: "running", startedAt: new Date() })
       .where(eq(schema.agentRuns.id, run?.id ?? ""));
+    if (run) answerSteering(f, run);
     const { write, decisions } = talkerOn(trigger);
     await write("olha só os de ontem");
     expect(decisions).toEqual(["reads_soon"]);

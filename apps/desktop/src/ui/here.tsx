@@ -9,6 +9,7 @@ import { useHost } from "../app";
 import { REASON_TEXT, type ServeProblem, type Tailnet } from "../control/local-server";
 import type { ServerKind } from "../control/server";
 import { CommandCopy } from "./bits";
+import { hintFor, PrefRow } from "./settings";
 import { useToast } from "./Toast";
 
 /** Connecting Tailscale where it has no app of its own to open (Linux). */
@@ -20,9 +21,10 @@ const KIND_ICON: Record<Exclude<ServerKind, "tailnet">, IconName> = { cloud: "cl
 
 /**
  * A server's tile by where it runs. One on the person's Tailscale network shows Tailscale's own icon (its press
- * kit's black file, its white one on a dark theme) on a 48 px tile beside the server's name, never as a small icon
- * inside a line of text, which Tailscale's brand toolkit discourages. Lists that can show one draw every row's tile
- * at that size.
+ * kit's black file, its white one on a dark theme) on a tile beside the server's name, never as a small icon inside
+ * a line of text. Tailscale's brand toolkit asks for its logo at 48×48 px at least, with clear space around it; its
+ * press kit's tile (the squircle) is that logo's own edge, so the tile is 48 px and the mark sits in it as in the
+ * squircle (`.dk-tailscale`). Lists that can show one draw every row's tile at that size.
  */
 export function ServerTile({ kind }: { kind: ServerKind }) {
   return (
@@ -42,65 +44,67 @@ export function ServerTile({ kind }: { kind: ServerKind }) {
   );
 }
 
-/** "Reach it from your phone and teammates": by what Tailscale is doing on this computer. */
+/**
+ * "Reach it from your phone and teammates", what it does behind its ⓘ. While Tailscale is missing or not
+ * connected the switch can't be used, and one line under the label says why, with what fixes it. `tailnet` null:
+ * not read yet, so no line, and the switch waits unless reach is on already (turning it off needs no Tailscale).
+ */
 export function ReachRow({
   tailnet,
   on,
   onChange,
   busy,
 }: {
-  tailnet: Tailnet;
+  tailnet: Tailnet | null;
   on: boolean;
   onChange: (on: boolean) => void;
   busy?: boolean;
 }) {
   const { t } = useTranslation();
   const host = useHost();
-  const usable = tailnet.state === "on" || on;
+  const usable = tailnet?.state === "on" || on;
+  const missing = tailnet?.state === "missing";
   // Not connected, and no Tailscale app to open: it connects from the terminal.
-  const fromTerminal = !usable && tailnet.state === "off" && host.platform !== "mac";
+  const fromTerminal = !usable && !missing && host.platform !== "mac";
   return (
-    <div className="dk-crow" data-top>
-      <span className="dk-crow__text">
-        <label htmlFor="here-reach" className="dk-crow__title">
-          {t("desktop.here.reach")}
-        </label>
-        <small>
+    <PrefRow
+      top
+      title={t("desktop.here.reach")}
+      hint={hintFor(t, t("desktop.here.reach"), t("desktop.here.reachText"))}
+      htmlFor="here-reach"
+      desc={
+        tailnet &&
+        !usable && (
           <span>
-            {tailnet.state === "on" || on
-              ? t("desktop.here.reachText")
+            {missing
+              ? t("desktop.here.reachMissing")
               : fromTerminal
                 ? t("desktop.here.reachOffTerminal")
-                : tailnet.state === "off"
-                  ? t("desktop.here.reachOff")
-                  : t("desktop.here.reachMissing")}
-            {!usable && (tailnet.state === "missing" || host.platform === "mac") && (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  className="ac-link dk-link"
-                  onClick={() =>
-                    void host.openTailscale(tailnet.state === "missing" ? "download" : "app").catch(() => {})
-                  }
-                >
-                  {tailnet.state === "missing" ? t("desktop.here.getTailscale") : t("desktop.here.openTailscale")}
-                </button>
-              </>
-            )}
-            {fromTerminal && (
-              <>
-                {" "}
-                <CommandCopy command={TAILSCALE_UP} inline />
-              </>
+                : t("desktop.here.reachOff")}{" "}
+            {fromTerminal ? (
+              <CommandCopy command={TAILSCALE_UP} inline />
+            ) : (
+              <button
+                type="button"
+                className="ac-link dk-link"
+                onClick={() => void host.openTailscale(missing ? "download" : "app").catch(() => {})}
+              >
+                {missing ? t("desktop.here.getTailscale") : t("desktop.here.openTailscale")}
+              </button>
             )}
           </span>
-        </small>
-      </span>
-      <span className="dk-crow__end">
-        <Switch id="here-reach" checked={on} disabled={!usable || busy} onCheckedChange={onChange} />
-      </span>
-    </div>
+        )
+      }
+      end={
+        <Switch
+          id="here-reach"
+          aria-describedby="here-reach-hint"
+          checked={on}
+          disabled={!usable || busy}
+          onCheckedChange={onChange}
+        />
+      }
+    />
   );
 }
 

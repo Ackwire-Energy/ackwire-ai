@@ -1,7 +1,8 @@
 import { resources } from "@agenteschat/i18n";
 import { appLocale } from "@agenteschat/i18n/locale";
 import i18n, { type i18n as I18n } from "i18next";
-import { initReactI18next } from "react-i18next";
+import { useEffect, useState } from "react";
+import { initReactI18next, useTranslation } from "react-i18next";
 
 /** pt-BR is the primary locale and the default; English is the alternative. */
 export const locales = [
@@ -50,6 +51,18 @@ export function loadLocale(code: LocaleCode, instance: I18n = i18n): Promise<voi
   return bundles[code]().then((strings) => {
     instance.addResourceBundle(code, "translation", strings);
   });
+}
+
+/** `t` in `lang` for a page shown in another language than the app's: the app's until `lang` has downloaded. */
+export function usePageT(lang: LocaleCode) {
+  const { i18n: instance } = useTranslation();
+  const [loaded, setLoaded] = useState<LocaleCode | null>(null);
+  useEffect(() => {
+    loadLocale(lang, instance)
+      .then(() => setLoaded(lang))
+      .catch(() => {});
+  }, [lang, instance]);
+  return instance.getFixedT(loaded === lang ? lang : instance.language);
 }
 
 /** The language picked last (a slower download of an earlier pick must not win). */

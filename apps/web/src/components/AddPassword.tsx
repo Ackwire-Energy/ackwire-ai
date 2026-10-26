@@ -52,9 +52,6 @@ export function AddPasswordDialog({ open, onClose }: { open: boolean; onClose: (
         }}
       >
         <DialogBody>
-          <p className="muted" style={{ margin: 0 }}>
-            {t("shell.addPasswordText")}
-          </p>
           <Field label={t("shell.addPasswordLabel")} id="add-password">
             <Input
               type="password"

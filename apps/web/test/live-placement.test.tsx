@@ -271,7 +271,7 @@ describe("live row in the timeline", () => {
     expect(row()).toBeNull();
   });
 
-  test("after a reconnect, live rows the server no longer runs go away", async () => {
+  test("after a reconnect, once the server confirms the channel again, live rows it no longer runs go away", async () => {
     const { ev, sockets } = await open((s) => {
       s.activeRuns = { [ENG_ID]: [] };
     });
@@ -282,6 +282,7 @@ describe("live row in the timeline", () => {
     await act(async () => sockets.last().drop());
     await act(() => new Promise((r) => setTimeout(r, 650)));
     await act(async () => sockets.last().open());
+    await act(async () => sockets.last().push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
     expect(row()).toBeNull();
   });

@@ -20,6 +20,7 @@ import {
   Field,
   glowTones,
   Icon,
+  InfoHint,
   Input,
   PixelSky,
   PixelSpinner,
@@ -52,12 +53,12 @@ import {
   type StepChange,
   setupSteps,
   stepStates,
-  type Tailnet,
 } from "../control/local-server";
 import { appServer, serverKind, serverName } from "../control/server";
-import { readPref, useOnShown, writePref } from "../hooks";
-import { BrandFace, CommandCopy } from "../ui/bits";
+import { readPref, useOnShown, useTailnet, writePref } from "../hooks";
+import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
+import { hintFor, PrefRow } from "../ui/settings";
 import { shortPath } from "../ui/time";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
@@ -316,6 +317,11 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
           <Icon name="chevronRight" size={16} className="dk-fr__card-go" />
         </button>
       </div>
+      <p className="dk-help dk-fr__which">
+        <HelpLink slug="run-on-your-computer" section="who">
+          {t("desktop.own.which")}
+        </HelpLink>
+      </p>
     </>
   );
 }
@@ -392,6 +398,7 @@ function Connect({
     e.preventDefault();
     if (address.trim()) void submit(address);
   };
+  const none = hintFor(t, t("desktop.connect.none"), t("desktop.connect.noneText"));
 
   return (
     <>
@@ -458,9 +465,11 @@ function Connect({
       )}
       {INSTALL_COMMAND_LIVE && (
         <section className="dk-fr__none" aria-label={t("desktop.connect.none")}>
-          <h2>{t("desktop.connect.none")}</h2>
+          <span className="ac-hintline">
+            <h2>{t("desktop.connect.none")}</h2>
+            <InfoHint name={none.name}>{none.text}</InfoHint>
+          </span>
           <CommandCopy command={INSTALL_COMMAND} />
-          <p className="dk-help">{t("desktop.connect.noneText")}</p>
         </section>
       )}
     </>
@@ -493,7 +502,7 @@ function RunHere({
   const [status, setStatus] = useState<LocalServerStatus | null>(null);
   // A server (a Docker install) answering on this computer when the app doesn't run one: checked once.
   const [answering, setAnswering] = useState<string | null | undefined>(undefined);
-  const [tailnet, setTailnet] = useState<Tailnet>({ state: "missing" });
+  const tailnet = useTailnet();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [reach, setReach] = useState(false);
@@ -525,18 +534,6 @@ function RunHere({
   useEffect(read, [read]);
   // Left mid-setup (a link arrived): the setup goes on in the app, and Esc works again on what shows.
   useEffect(() => () => onBusy(false), [onBusy]);
-
-  // Tailscale, each time the window comes to the front (the person may have just connected it).
-  useEffect(() => {
-    const read = () =>
-      void host
-        .tailscale()
-        .then(setTailnet)
-        .catch(() => setTailnet({ state: "missing" }));
-    read();
-    window.addEventListener("focus", read);
-    return () => window.removeEventListener("focus", read);
-  }, [host]);
 
   useEffect(
     () =>
@@ -653,9 +650,7 @@ function RunHere({
       <BackLink label={t("desktop.own.title")} onClick={onBack} />
       <h1 className="dk-fr__h1sm">{t("desktop.here.title")}</h1>
       <p className="dk-lead dk-fr__wide">
-        {view.ask
-          ? t("desktop.here.how")
-          : `${t("desktop.here.how")} ${t("desktop.here.again", { path: shortPath(status.dir) })}`}
+        {view.ask ? t("desktop.here.how") : t("desktop.here.again", { path: shortPath(status.dir) })}
       </p>
       <form className="dk-fr__here" onSubmit={submit} noValidate>
         {view.ask && (
@@ -671,7 +666,6 @@ function RunHere({
             </Field>
             <Field
               label={t("desktop.here.email")}
-              labelAside={<span className="dk-help">{t("desktop.here.emailHint")}</span>}
               error={tried && !emailOk ? t("desktop.here.emailNeeded") : undefined}
             >
               <Input
@@ -688,21 +682,14 @@ function RunHere({
         )}
         <div className="dk-card">
           <ReachRow tailnet={tailnet} on={reach} onChange={setReach} />
-          <div className="dk-crow">
-            <span className="dk-crow__text">
-              <label htmlFor="here-usage" className="dk-crow__title">
-                {t("desktop.here.usage")}
-              </label>
-              <small>{t("desktop.here.usageText")}</small>
-            </span>
-            <span className="dk-crow__end">
-              <Switch id="here-usage" checked={usage} onCheckedChange={setUsage} />
-            </span>
-          </div>
-        </div>
-        <div className="dk-fr__notes">
-          <p className="dk-help">{t("desktop.here.agents")}</p>
-          <p className="dk-help">{t("desktop.here.limits")}</p>
+          <PrefRow
+            title={t("desktop.here.usage")}
+            hint={hintFor(t, t("desktop.here.usage"), t("desktop.here.usageText"))}
+            htmlFor="here-usage"
+            end={
+              <Switch id="here-usage" aria-describedby="here-usage-hint" checked={usage} onCheckedChange={setUsage} />
+            }
+          />
         </div>
         <div className="dk-fr__end">
           <Button type="submit" variant="primary" autoFocus={!view.ask}>

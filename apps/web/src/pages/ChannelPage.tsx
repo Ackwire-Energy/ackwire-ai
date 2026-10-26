@@ -1720,7 +1720,7 @@ function ChannelView({
                           ) : undefined
                         }
                       >
-                        {chrome?.emptyText ?? t("channel.empty")}
+                        {chrome?.emptyText}
                       </EmptyState>
                     </div>
                   )}

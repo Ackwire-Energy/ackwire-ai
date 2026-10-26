@@ -200,7 +200,8 @@ const SETUP_FIELDS = [
  * The workspace's own computer and standing (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
- * and the suspended screen follow without a reload. Returns whether the event was one of these.
+ * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
+ * computer, and one active again waits for one. Returns whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "machine.provisioning") {
@@ -231,6 +232,7 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     qc.setQueryData<Me>(keys.me, (me) =>
       me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, standing } : o)) } : me,
     );
+    void qc.invalidateQueries({ queryKey: keys.computerSetup(target) });
     return true;
   }
   return false;

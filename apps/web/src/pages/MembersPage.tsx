@@ -167,7 +167,13 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             {t("members.inviteTitle")}
           </h2>
           <div className="row row--end">
-            <Field label={t("members.emails")} id="m-email" style={{ flex: "1 1 280px" }} error={error}>
+            <Field
+              label={t("members.emails")}
+              id="m-email"
+              style={{ flex: "1 1 280px" }}
+              error={error}
+              hint={{ name: t("common.about", { label: t("members.emails") }), text: t("members.link.emailsJoin") }}
+            >
               <Input
                 value={draft}
                 onChange={(e) => {
@@ -195,9 +201,6 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
               {t("members.invite")}
             </Button>
           </div>
-          <span className="small muted">
-            {t("members.link.emailsJoin")} {t("members.roleNote")}
-          </span>
           <InviteLinkBlock />
         </Card>
       )}
@@ -534,7 +537,7 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
         open={handOff !== null}
         onOpenChange={(open) => !open && setHandOff(null)}
         title={t("members.requests.copyTitle", { name: handOff?.name ?? "" })}
-        description={t("members.requests.copyText", { name: handOff?.name ?? "" })}
+        description={t("members.requests.copyText")}
         closeLabel={t("common.close")}
         width={440}
       >

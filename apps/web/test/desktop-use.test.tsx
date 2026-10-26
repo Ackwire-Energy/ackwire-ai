@@ -6,6 +6,7 @@ setupDom();
 import type { Machine } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, NOW, ORG_ID, seedState } from "./fake-api";
+import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -90,6 +91,11 @@ describe("whether agents can use apps on their desktops", () => {
       await settle(8);
     };
     await page(linux);
+    // What the card is for is its title's ⓘ.
+    expect(card().querySelector(".ac-card__sub")).toBeNull();
+    expect(hintOf("Apps nas telas dos agentes", card()).text).toBe(
+      "Os agentes abrem e usam apps na própria tela aqui, como uma pessoa faria, e as pessoas assistem pela página de cada um.",
+    );
     expect(card().textContent).toContain("Indisponível");
     expect(card().textContent).toContain("missing: python3-gi");
     expect(card().querySelector(".machine-command code")?.textContent).toBe(

@@ -262,11 +262,21 @@ export function httpUrlProblem(url: string): string | null {
     : "that isn't an address like https://api.resend.com.";
 }
 
+/** The name every email is sent under: the server's own default sender's (`SENDER_NAME` in packages/engine/src/email.ts). */
+const SENDER_NAME = "agentes.chat";
+
+/** A sender at `domain`, as the server's default one reads. */
+export const senderAt = (domain: string) => `${SENDER_NAME} <ola@${domain}>`;
+
+/** The sender the setup offers: at a public domain only, which a provider can verify (a ts.net name or localhost no). */
+export const senderFor = (network: Network, domain: string | null) =>
+  network === "domain" && domain ? senderAt(domain) : undefined;
+
 /** The shapes `EMAIL_FROM` takes: a bare address, or `Name <address>`. */
 export const emailFromProblem = (from: string) =>
   /^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/.test(from)
     ? null
-    : 'that isn\'t a sender like "agentes <ola@example.com>".';
+    : `that isn't a sender like "${senderAt("example.com")}".`;
 
 function parseUrl(url: string): URL | null {
   try {

@@ -125,7 +125,11 @@ export function InvitePage({ token }: { token: string }) {
               )
             ) : (
               <form onSubmit={signUpAndAccept} style={{ display: "flex", flexDirection: "column", gap: 20 }} noValidate>
-                <Field label={t("auth.email")} id="inv-email" help={t("invite.emailHelp")}>
+                <Field
+                  label={t("auth.email")}
+                  id="inv-email"
+                  hint={{ name: t("common.about", { label: t("auth.email") }), text: t("invite.emailHelp") }}
+                >
                   <Input value={invitation.email} readOnly />
                 </Field>
                 <Field label={t("auth.yourName")} id="inv-name">
@@ -334,12 +338,11 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
         <Outcome expression="happy" title={t("invite.ask.sentTitle")}>
           <p className="page-sub">
             {user?.emailVerified
-              ? t("invite.ask.sentAccount", { org })
+              ? t("invite.ask.sentAccount")
               : emailsGoOut
-                ? t("invite.ask.sentEmail", { org, email: address })
-                : t("invite.ask.sentNoEmail", { org })}
+                ? t("invite.ask.sentEmail", { email: address })
+                : t("invite.ask.sentNoEmail")}
           </p>
-          <p className="small muted">{t("invite.ask.sentClose")}</p>
         </Outcome>
       );
       break;
@@ -350,8 +353,8 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
             <h1 className="page-title page-title--sm">{t("invite.ask.title", { org })}</h1>
             <p className="page-sub">
               {preview.invitedBy
-                ? t("invite.ask.lead", { name: preview.invitedBy.split(/\s+/)[0], org })
-                : t("invite.ask.leadNoName", { org })}
+                ? t("invite.ask.lead", { name: preview.invitedBy.split(/\s+/)[0] })
+                : t("invite.ask.leadNoName")}
             </p>
           </div>
           {agents.length > 0 && (
@@ -397,7 +400,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
                     onChange={(e) => setName(e.target.value)}
                   />
                 </Field>
-                <Field label={t("invite.ask.email")} id="ask-email" help={t("invite.ask.emailHelp")}>
+                <Field label={t("invite.ask.email")} id="ask-email">
                   <Input
                     type="email"
                     inputMode="email"
@@ -414,8 +417,14 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
                 )}
               </>
             )}
-            <Field label={t("invite.ask.note")} id="ask-note" help={t("invite.ask.noteHelp")}>
-              <Textarea rows={2} maxLength={JOIN_NOTE_MAX} value={note} onChange={(e) => setNote(e.target.value)} />
+            <Field label={t("invite.ask.note")} id="ask-note">
+              <Textarea
+                rows={2}
+                maxLength={JOIN_NOTE_MAX}
+                placeholder={t("invite.ask.noteHelp")}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
             </Field>
             {error && <Alert>{error}</Alert>}
             <Button type="submit" variant="primary" block disabled={!ready} loading={ask.isPending}>

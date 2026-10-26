@@ -84,7 +84,7 @@ export function registerOperatorStanding(api: OpenAPIHono, { db, pubsub, hub }: 
       tags,
       summary: "Hold, suspend or restore a workspace",
       description:
-        "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
+        "Enforced by this server where work starts: model calls, computer calls, routines, invitations and, when suspended, every permission check. Suspending also stops its runs and its tasks on computers now; cutting a computer's network is up to the operator's own controls on it. Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), and it is a request again once active. It takes effect at once in this process and within 5 seconds in the server's others. Setting what is already set tells nobody again.",
       request: { params: OrgParams, body: body(StandingInput) },
       responses: { 200: json(Standing), ...errors },
     }),
