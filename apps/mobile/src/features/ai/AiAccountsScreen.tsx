@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Chip, ProviderLogo, Row, Text, useToast } from "@/ui";
+import { Button, Card, Chip, InfoHint, ProviderLogo, Row, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
@@ -147,12 +147,15 @@ export function AiAccountsScreen() {
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
         <View style={styles.sectionHead}>
-          <Text variant="title" tone="ink">
-            {t("aiAccounts.page.title")}
-          </Text>
-          <Text variant="small" tone="muted">
-            {t("aiAccounts.page.text")}
-          </Text>
+          <InfoHint
+            name={t("common.about", { label: t("aiAccounts.page.title") })}
+            text={t("aiAccounts.page.hint")}
+            variant="title"
+          >
+            <Text variant="title" tone="ink">
+              {t("aiAccounts.page.title")}
+            </Text>
+          </InfoHint>
         </View>
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
@@ -236,11 +239,6 @@ export function AiAccountsScreen() {
             onPress={() => openConnectAi()}
           />
         </View>
-        {rows.length > 0 ? (
-          <Text variant="small" tone="faint">
-            {t("aiAccounts.page.where")}
-          </Text>
-        ) : null}
         {can(org?.role, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>

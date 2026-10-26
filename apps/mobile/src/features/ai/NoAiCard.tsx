@@ -72,11 +72,6 @@ export function NoAiCard({ message: m }: { message: Message }) {
           {title}
         </Text>
       </View>
-      {!ready && !answer && card.forUserId === meId ? (
-        <Text variant="small" tone="muted">
-          {t("noAi.card.line", { name })}
-        </Text>
-      ) : null}
       {answering ? null : ready || answer === "pending" ? (
         mayAnswer ? (
           <Button

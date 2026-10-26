@@ -41,6 +41,7 @@ export { haptics } from "./haptics";
 export { type HeaderAction, type SFSymbolName, useHeaderActionOptions } from "./headerActions";
 export { Icon, type IconName, type IconProps } from "./Icon";
 export { IconButton, type IconButtonProps } from "./IconButton";
+export { InfoHint, type InfoHintOptions } from "./InfoHint";
 export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
 export { LineIcon, type LineIconProps } from "./LineIcon";

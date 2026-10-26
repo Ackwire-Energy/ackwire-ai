@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { resources } from "@agenteschat/i18n";
 import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
+import { featureKeysEn } from "../src/features/i18n/keys.en";
+import { featureKeysPtBR } from "../src/features/i18n/keys.pt-BR";
 import { mobileEn } from "../src/i18n/keys.en";
 import { mobilePtBR } from "../src/i18n/keys.pt-BR";
 import { pickLocale, withMobileKeys } from "../src/i18n/merge";
@@ -21,6 +25,26 @@ test("placeholders match between locales", () => {
     path.split(".").reduce<unknown>((a, k) => (a as Record<string, unknown>)[k], o);
   for (const key of leaves(mobilePtBR))
     expect(vars(get(mobileEn, key) as string)).toEqual(vars(get(mobilePtBR, key) as string));
+});
+
+test("every key the phone reads by name exists in both languages, so a deleted line can't come back empty", () => {
+  const app = join(import.meta.dir, "..");
+  const read = ["src", "app"].flatMap((dir) =>
+    readdirSync(join(app, dir), { recursive: true, encoding: "utf8" })
+      .filter((f) => /\.tsx?$/.test(f))
+      .flatMap((f) =>
+        [...readFileSync(join(app, dir, f), "utf8").matchAll(/\bt\(\s*["'`]([A-Za-z][\w-]*(?:\.[\w-]+)+)["'`]/g)].map(
+          (m) => [`${dir}/${f}`, m[1] ?? ""] as const,
+        ),
+      ),
+  );
+  expect(read.length).toBeGreaterThan(500);
+  const merged = withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn });
+  for (const lng of ["pt-BR", "en"]) {
+    const have = new Set(leaves(merged[lng]?.translation ?? {}));
+    const exists = (key: string) => have.has(key) || have.has(`${key}_one`) || have.has(`${key}_other`);
+    expect(read.filter(([, key]) => !exists(key))).toEqual([]);
+  }
 });
 
 test("Claude and ChatGPT, not their makers, in what the phone shows", () => {
