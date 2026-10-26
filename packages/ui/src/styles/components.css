@@ -3932,9 +3932,13 @@ a.ac-list__row:focus-visible {
 .ac-hint[data-state="open"] {
   color: var(--ink);
 }
+/*
+ * The target reaches 1px into the label, so the ring is drawn well inside it (20px across, clear of the glyph), not
+ * around it, where it would cover the label's last letter.
+ */
 .ac-hint:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+  outline: 2px solid var(--ink);
+  outline-offset: -4px;
 }
 .ac-hint__bubble {
   z-index: var(--z-floating);
