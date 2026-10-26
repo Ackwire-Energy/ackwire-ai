@@ -29,7 +29,7 @@ import { xmlEscape, xmlUnescape } from "./xml";
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 4;
+export const LOOK_VERSION = 5;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -81,8 +81,13 @@ const XFCONF = ".config/xfce4/xfconf/xfce-perchannel-xml";
 
 /** The agent's Chrome on its desktop has this window class (`browser.ts`), so the dock shows it on Browser. */
 export const BROWSER_WM_CLASS = "agentes-browser";
-/** The icon theme's web browser (a globe), with the theme's Files and Terminal icons. */
-export const BROWSER_ICON = "org.xfce.webbrowser";
+/**
+ * The icon theme's globe, next to its Files and Terminal icons. Not its web browser's (`org.xfce.webbrowser`, a link
+ * to `web-browser`): that globe has a mouse pointer drawn into it, which reads as a stray pointer on the dock.
+ * elementary-xfce has this one at every size, 16 to 128 px, in 0.16 to 0.21 (Ubuntu 22.04 and 24.04, Debian 12
+ * and 13).
+ */
+export const BROWSER_ICON = "applications-internet";
 /**
  * Browser's notes (`desktop-browser.ts`) have window classes of their own: with Browser's, docklike would show them
  * on Browser, and a click there would only raise or hide the note, never reach the runner, where it is told `busy`
@@ -522,6 +527,14 @@ const HIDDEN: Record<string, string> = {
 };
 const hidden = (name: string) => `[Desktop Entry]\nType=Application\nName=${name}\nHidden=true\n`;
 
+/**
+ * XFCE's Internet menu (there once some other network app is installed) has Browser's globe for its icon: it gets
+ * the theme's network sphere instead, a purple one, at every size in elementary-xfce 0.16 to 0.21. The file takes
+ * the place of XFCE's own (`xfce-network.directory`), with its name and comment.
+ */
+const INTERNET_MENU =
+  "[Desktop Entry]\nVersion=1.0\nType=Directory\nName=Internet\nComment=Applications for Internet access\nIcon=preferences-system-network\n";
+
 interface LookFile {
   /** Under HOME. */
   path: string;
@@ -548,6 +561,7 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
     ...dock,
     [".config/gtk-3.0/gtk.css", GTK_CSS],
     [".config/menus/xfce-applications.menu", menu(apps)],
+    [".local/share/desktop-directories/xfce-network.directory", INTERNET_MENU],
     ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),
     [`.local/share/applications/${WAIT_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, WAIT_WM_CLASS, BROWSER_ICON)],
     [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, NOTE_WM_CLASS, NOTE_ICON)],

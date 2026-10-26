@@ -1407,15 +1407,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.channelMembers[channelId] = list;
         list.push("agentId" in member ? { type: "agent", id: member.agentId } : { type: "person", id: member.userId });
       },
+      // Copies, as over HTTP: each read is new objects, never the ones an earlier read returned.
       messages: async (_orgId, channelId, options = {}) => {
         const inChannel = state.messages.filter((m) => m.channelId === channelId);
         if (options.threadId) {
           const root = inChannel.find((m) => m.id === options.threadId);
-          return [...(root ? [root] : []), ...inChannel.filter((m) => m.threadId === options.threadId)];
+          return structuredClone([
+            ...(root ? [root] : []),
+            ...inChannel.filter((m) => m.threadId === options.threadId),
+          ]);
         }
         // Like the server: the latest `limit` before `before`, oldest first.
         const top = inChannel.filter((m) => m.threadId === null && (!options.before || m.createdAt < options.before));
-        return options.limit ? top.slice(-options.limit) : top;
+        return structuredClone(options.limit ? top.slice(-options.limit) : top);
       },
       post: async (orgId, channelId, input) => {
         log("chat.post", orgId, channelId, input);

@@ -287,12 +287,15 @@ export const useChannelMembers = (orgId: string, channelId: string, enabled = tr
 
 /** Messages per page: the latest page, then older pages on scroll-up. */
 export const MESSAGES_PAGE = 100;
+/** A thread's root and replies, in one read. */
+export const THREAD_PAGE = 200;
 
 /**
  * The latest page of a conversation. Cached per channel and fresh for 30 s
- * (real-time events keep it current), so switching back is instant; then it
- * revalidates in the background. Kept 30 min after leaving it, so going back
- * later still shows it at once.
+ * (real-time events keep it current, and what they missed before the
+ * channel's subscription was confirmed is added then), so switching back is
+ * instant; then it revalidates in the background. Kept 30 min after leaving
+ * it, so going back later still shows it at once.
  */
 export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
@@ -387,6 +390,62 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
+}
+
+const isMessageList = (key: readonly unknown[]) => key[4] === "messages" || key[4] === "thread";
+
+/**
+ * Reads a channel's open lists again once its events reach us (`subscribed`: what happened there before was
+ * never sent to us) and adds what they lack, taking nothing away: a message heard live while this read was on
+ * its way stays. A read already on its way lands first, so it can't put an older list back over what this one
+ * adds. Returns what it read.
+ */
+export async function catchUpChannel(
+  api: ApiClient,
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+): Promise<Message[]> {
+  const prefix = ["org", orgId, "channel", channelId];
+  await qc.refetchQueries({ queryKey: prefix, fetchStatus: "fetching" }, { cancelRefetch: false });
+  const reads = qc
+    .getQueryCache()
+    .findAll({ queryKey: prefix, type: "active" })
+    .flatMap(({ queryKey: [, , , , list, rootId] }) =>
+      list === "messages"
+        ? [api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE })]
+        : list === "thread" && typeof rootId === "string"
+          ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
+          : [],
+    );
+  const read = (await Promise.all(reads).catch(() => [])).flat();
+  const known = new Set(
+    qc
+      .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
+      .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
+  );
+  for (const m of read) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
+  return read;
+}
+
+/** A read's receipts on the copies of its messages the channel's lists hold (nothing else of them changes). */
+export function cacheReceipts(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  read: Message[],
+) {
+  const receipts = new Map(read.flatMap((m) => (m.receipts ? [[m.id, m.receipts] as const] : [])));
+  qc.setQueriesData<Message[]>(
+    { queryKey: ["org", orgId, "channel", channelId], predicate: (q) => isMessageList(q.queryKey) },
+    (list) =>
+      list?.some((m) => receipts.has(m.id) && m.receipts !== receipts.get(m.id))
+        ? list.map((m) => {
+            const r = receipts.get(m.id);
+            return r && m.receipts !== r ? { ...m, receipts: r } : m;
+          })
+        : list,
+  );
 }
 
 /**
@@ -2328,7 +2387,7 @@ export function useThreadMessages(orgId: string, channelId: string | undefined, 
   const api = useApi();
   return useQuery({
     queryKey: keys.thread(orgId, channelId ?? "", rootId),
-    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: 200 }),
+    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: THREAD_PAGE }),
     enabled: Boolean(channelId),
     staleTime: 30_000,
   });

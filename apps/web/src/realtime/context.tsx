@@ -37,7 +37,9 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheReceipts,
   cacheTask,
+  catchUpChannel,
   consultSeeds,
   createBrowserLiveConnection,
   dismissRun,
@@ -265,10 +267,14 @@ export function createStreamsStore(
         streaming,
       );
     },
-    /** Person messages loaded over HTTP: start their receipts. */
-    seed: (messages: Message[]) => {
+    /**
+     * Person messages loaded over HTTP: start their receipts. `before`: the receipts when the read was asked for;
+     * one that hasn't changed since takes the read as it is.
+     */
+    seed: (messages: Message[], before?: ReceiptsState) => {
       let receipts = state.receipts;
-      for (const m of messages) receipts = seedReceipt(receipts, m);
+      for (const m of messages)
+        receipts = seedReceipt(receipts, m, before !== undefined && receipts[m.id] === before[m.id]);
       set({ ...state, receipts });
     },
     /** Right after sending: provisional "pensando…" rows and receipts for the agents we mentioned. */
@@ -644,16 +650,26 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   const { connection, streams } = useRealtime();
   const qc = useQueryClient();
   const api = useApi();
-  // On load and after every reconnect: drop live rows the server no longer runs.
+  // On load: drop live rows the server no longer runs. The channel's events reach us only once the server confirms
+  // its subscription (the first, and again after every reconnect): then the live rows are checked again, and what
+  // happened before, after the page read the channel (an answer posted while the socket opened, right after a page
+  // change), is read and added.
   useEffect(() => {
     if (!connection || !enabled) return;
-    const check = () => {
-      void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
-        if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+    void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
+      if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+    });
+    return connection.onSubscribed((id) => {
+      if (id !== channelId) return;
+      void reconcileChannelRuns(api, streams, orgId, channelId);
+      // A receipt nothing changed while the read was on its way takes it as it is. The lists' copies get the same
+      // receipts, so the page seeding them again (on every change) changes nothing.
+      const before = streams.get().receipts;
+      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+        streams.seed(read, before);
+        cacheReceipts(qc, orgId, channelId, read);
       });
-    };
-    check();
-    return connection.onReconnect(check);
+    });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
