@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-const matchesNow = (query: string) =>
+/** Whether `query` (a CSS media query) matches at this moment. */
+export const matchesNow = (query: string) =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches;
 
 /** Whether `query` (a CSS media query) matches now, kept current as the window changes. */

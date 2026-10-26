@@ -13,11 +13,13 @@ import {
   useDesktopStatus,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, Input, Select } from "@agenteschat/ui";
+import { quoteExcerpt } from "@agenteschat/client/lib/reply";
+import { Button, Input, modKey, Select } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
+import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
 import { showsPicture } from "@/lib/canvas";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
@@ -27,16 +29,9 @@ import { CantShowCover } from "../computer/covers";
 import { DialogHead, FullButton, useDialogHead } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
+import { useScreenKeys } from "./screen-keys";
 import "../browser/browser.css";
 import "./desktop.css";
-
-/**
- * "Colar texto" presses Shift+Insert after setting the desktop's clipboard: it pastes in every window there,
- * a terminal too (where Ctrl+V doesn't; it reads PRIMARY, which Xvnc sets with the clipboard). Keysyms and
- * key codes are inline: the noVNC package exports only RFB.
- */
-const SHIFT = { keysym: 0xffe1, code: "ShiftLeft" };
-const INSERT = { keysym: 0xff63, code: "Insert" };
 
 type KeyboardNavigator = Navigator & {
   keyboard?: { getLayoutMap(): Promise<{ get(code: string): string | undefined }> };
@@ -65,13 +60,15 @@ const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdat
 const PICTURE_POLL_MS = 200;
 const PICTURE_WAIT_MS = 10_000;
 
+/** A phone or tablet: no keys hint, and a Keyboard button raises its keyboard. */
+const TOUCH = "(pointer: coarse)";
+
 /**
  * An agent's screen, live (ADR 0058), as the computer dialog's stage: noVNC on a socket of its own, which
  * starts a screen that isn't running. Watching is view-only at quality 3; in control (the screen's own
- * handoff is this person's) it takes the pointer and keys at quality 6, with the person's keyboard layout,
- * "Colar texto", and what the screen copies behind "Copiar" (never written to the person's clipboard by
- * itself). While someone else is in control the screen stays hidden; it opens again by itself after drops,
- * restarts and hand backs. Its sub-line and actions go in the dialog's head.
+ * handoff is this person's) it takes the pointer and the keys at quality 6, with the person's keyboard layout
+ * and their own copy and paste (`useScreenKeys`). While someone else is in control the screen stays hidden;
+ * it opens again by itself after drops, restarts and hand backs. Its sub-line and actions go in the dialog's head.
  */
 export function DesktopView({
   agentId,
@@ -113,12 +110,13 @@ export function DesktopView({
   const [round, setRound] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
   const [keyboard, setKeyboard] = useState<DesktopKeyboard | null>(null);
-  const [text, setText] = useState("");
-  const [copied, setCopied] = useState<string | null>(null);
   const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
   const screenRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
+  const keysRef = useRef<HTMLTextAreaElement>(null);
+  const touch = useMatchMedia(TOUCH);
+  const [typing, setTyping] = useState(false);
   const attempts = useRef(0);
   // Nothing says when a screen is handed back: asked often while it may change any moment.
   const [poll, setPoll] = useState(5_000);
@@ -136,6 +134,36 @@ export function DesktopView({
   const controlKeyboard = inControl ? keyboard : null;
   const connect = blocked === null && !gaveUp && keyboard !== null;
   const { refetch } = status;
+  const copy = (value: string) =>
+    navigator.clipboard?.writeText(value).then(
+      () => toast.show(t("desktop.clipboard.copied", g)),
+      () => toast.show(t("browser.live.actionFailed"), "error"),
+    ) ?? toast.show(t("browser.live.actionFailed"), "error");
+  const copiedThere = useScreenKeys({
+    field: keysRef,
+    screen: screenRef,
+    rfb: rfbRef,
+    active: inControl,
+    onRefused: (why) =>
+      toast.show(why === "tooLong" ? t("desktop.clipboard.tooLong", g) : t("desktop.clipboard.textOnly", g), "error"),
+    onCopied: (text, written) =>
+      written
+        ? toast.show(t("desktop.clipboard.copied", g))
+        : toast.show(
+            t("desktop.clipboard.got", g),
+            "info",
+            { label: t("desktop.clipboard.copy"), run: () => void copy(text) },
+            quoteExcerpt(text, 120),
+          ),
+  });
+  // Leaving the page in control asks first: outside full screen Ctrl+W closes the tab, which in a terminal there
+  // means "delete a word", and the agent would wait for control to come back.
+  useEffect(() => {
+    if (!inControl) return;
+    const ask = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [inControl]);
 
   useEffect(() => {
     void startingKeyboard().then(setKeyboard);
@@ -178,7 +206,6 @@ export function DesktopView({
           // A close that arrives after the next connection took over (watching turned control) leaves that one be.
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
-          setCopied(null);
           const next = desktopCloseState(e.code, e.reason);
           setView(next.state);
           // What changed shows at once (someone took control); a state that blocks it stops the retry.
@@ -195,12 +222,13 @@ export function DesktopView({
         rfb.compressionLevel = 2;
         rfb.scaleViewport = true;
         rfb.resizeSession = false;
-        rfb.focusOnClick = inControl;
+        // The person's keys go to the field over the screen (`useScreenKeys`), never to noVNC's canvas.
+        rfb.focusOnClick = false;
         rfb.background = "transparent";
         rfb.addEventListener("connect", () => {
           attempts.current = 0;
-          // Taking control puts the person's keys on the screen at once.
-          if (inControl) rfb?.focus({ preventScroll: true });
+          // Taking control puts the person's keys on the screen at once (a phone's keyboard waits for its button).
+          if (inControl && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
           const since = Date.now();
           const look = () => {
             const canvas = el.querySelector("canvas");
@@ -211,7 +239,7 @@ export function DesktopView({
           looking = setInterval(look, PICTURE_POLL_MS);
           look();
         });
-        rfb.addEventListener("clipboard", (e) => setCopied((e as CustomEvent<{ text: string }>).detail.text));
+        rfb.addEventListener("clipboard", (e) => copiedThere((e as CustomEvent<{ text: string }>).detail.text));
         rfbRef.current = rfb;
       },
       () => {
@@ -241,7 +269,7 @@ export function DesktopView({
       window.removeEventListener("pagehide", leave);
       end();
     };
-  }, [connect, mode, controlKeyboard, round, org.id, agentId, createSocket, refetch, inControl]);
+  }, [connect, mode, controlKeyboard, round, org.id, agentId, createSocket, refetch, inControl, copiedThere]);
   useEffect(() => {
     const back = (e: PageTransitionEvent) => {
       if (e.persisted) setRound((r) => r + 1);
@@ -250,7 +278,10 @@ export function DesktopView({
     return () => window.removeEventListener("pageshow", back);
   }, []);
   useEffect(() => {
-    if (!inControl) setHandingBack(false);
+    if (inControl) return;
+    setHandingBack(false);
+    // Its field goes with control, and a field removed while focused may get no blur.
+    setTyping(false);
   }, [inControl]);
 
   const shown: DesktopViewState = blocked ?? view;
@@ -301,21 +332,6 @@ export function DesktopView({
     if (!handoff) return;
     actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: failedToast });
   };
-  const paste = () => {
-    const rfb = rfbRef.current;
-    if (!rfb || !text) return;
-    rfb.clipboardPasteFrom(text);
-    rfb.sendKey(SHIFT.keysym, SHIFT.code, true);
-    rfb.sendKey(INSERT.keysym, INSERT.code);
-    rfb.sendKey(SHIFT.keysym, SHIFT.code, false);
-    setText("");
-    rfb.focus({ preventScroll: true });
-  };
-  const copy = (value: string) =>
-    navigator.clipboard.writeText(value).then(
-      () => toast.show(t("desktop.clipboard.copied")),
-      () => toast.show(t("browser.live.actionFailed"), "error"),
-    );
   const chooseKeyboard = (k: DesktopKeyboard) => {
     storage.set(STORAGE_KEYS.screenKeyboard, k);
     setKeyboard(k);
@@ -430,13 +446,33 @@ export function DesktopView({
         }
       />
       {ask && <p className="cmp-asked">“{ask}”</p>}
-      <div className="brw-ac__stage dsk-stage">
+      <div
+        className="brw-ac__stage dsk-stage"
+        onPointerDownCapture={(e) => {
+          // noVNC cancels its own mousedown, so the field keeps the focus a click on the screen gives it.
+          if (inControl && e.pointerType !== "touch") keysRef.current?.focus({ preventScroll: true });
+        }}
+      >
         <div
           ref={screenRef}
           className={inControl ? "dsk-screen is-control" : "dsk-screen"}
           role="img"
           aria-label={t("agentComputer.screen", g)}
         />
+        {inControl && (
+          <textarea
+            ref={keysRef}
+            className="dsk-keys"
+            aria-label={t("desktop.keyboard.field", g)}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-gramm="false"
+            onFocus={() => setTyping(true)}
+            onBlur={() => setTyping(false)}
+          />
+        )}
         {shown !== "live" && cover[shown]}
       </div>
       {inControl &&
@@ -469,53 +505,30 @@ export function DesktopView({
             </div>
           </div>
         ) : (
-          <div className="brw-ac__foot dsk-foot">
-            <label className="brw-tfield">
-              <input
-                placeholder={t("desktop.paste.placeholder")}
-                aria-label={t("desktop.paste.label", g)}
-                autoComplete="off"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    paste();
-                  }
-                }}
-              />
+          <div className="dsk-line">
+            {touch && (
               <Button
-                variant="primary"
                 size="sm"
-                iconOnly
-                icon="send"
-                className="brw-tfield__send"
-                aria-label={t("desktop.paste.send")}
-                title={t("desktop.paste.send")}
-                disabled={!text || !live}
-                onClick={paste}
-              />
-            </label>
-            {copied !== null && (
-              <div className="dsk-copied">
-                <span className="small">
-                  {t("desktop.clipboard.got", g)} <q>{copied.length > 120 ? `${copied.slice(0, 120)}…` : copied}</q>
-                </span>
-                <Button size="sm" icon="copy" onClick={() => void copy(copied)}>
-                  {t("desktop.clipboard.copy")}
-                </Button>
-              </div>
+                icon="keyboard"
+                aria-pressed={typing}
+                // The field keeps its focus, so the phone's keyboard stays up.
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => (typing ? keysRef.current?.blur() : keysRef.current?.focus({ preventScroll: true }))}
+              >
+                {t("desktop.keyboard.label")}
+              </Button>
             )}
-            <div className="brw-ac__row">
-              <Select<DesktopKeyboard>
-                size="sm"
-                aria-label={t("desktop.keyboard.label")}
-                value={keyboard ?? undefined}
-                onValueChange={chooseKeyboard}
-                options={DESKTOP_KEYBOARDS.map((k) => ({ value: k, label: t(`desktop.keyboard.layouts.${k}`) }))}
-              />
-              <span className="small muted dsk-notice">{t("desktop.control.notice", g)}</span>
-            </div>
+            <Select<DesktopKeyboard>
+              size="sm"
+              aria-label={t("desktop.keyboard.label")}
+              value={keyboard ?? undefined}
+              onValueChange={chooseKeyboard}
+              options={DESKTOP_KEYBOARDS.map((k) => ({ value: k, label: t(`desktop.keyboard.layouts.${k}`) }))}
+            />
+            <span className="muted">
+              {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
+              {t("desktop.control.notice", g)}
+            </span>
           </div>
         ))}
     </div>

@@ -151,7 +151,7 @@ export {
   type TrackSize,
   trackItemAt,
 } from "./components/ForumPixels";
-export { Kbd, modKey } from "./components/Kbd";
+export { isApple, Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";

@@ -24,30 +24,33 @@
 .dsk-screen.is-control canvas {
   cursor: auto;
 }
-.dsk-foot .brw-ac__row {
-  flex-wrap: nowrap;
-}
-.dsk-notice {
-  flex: 1;
-  min-width: 0;
-}
-.dsk-copied {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--control-r-md);
-  background: var(--sunken);
-}
-.dsk-copied .small {
-  flex: 1;
-  min-width: 0;
+/*
+ * In control the person's keys and pastes go here, a text field nobody sees, not to noVNC's canvas
+ * (`useScreenKeys`). 16px: iOS zooms into a smaller field when it takes focus.
+ */
+.dsk-keys {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  pointer-events: none;
+  font-size: 16px;
 }
-@media (max-width: 640px) {
-  .dsk-foot .brw-ac__row {
-    flex-wrap: wrap;
-  }
+/*
+ * In control, in the steps' line's place under the screen and as tall (13px text on the dialog's 22px line): the
+ * keys, and what programs there can see. A phone's Keyboard button sits on the text's first line.
+ */
+.dsk-line {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 13px;
 }

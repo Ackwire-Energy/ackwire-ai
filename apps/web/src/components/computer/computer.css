@@ -67,9 +67,8 @@
  * it opens in place.
  */
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
-  --cmp-side: 0px;
-  --cmp-screen: min(96vw - 32px - var(--cmp-side), 1280px, (94dvh - 130px) * 1280 / 900);
-  width: calc(var(--cmp-screen) + 32px + var(--cmp-side));
+  --cmp-screen: min(96vw - 32px, 1280px, (94dvh - 130px) * 1280 / 900);
+  width: calc(var(--cmp-screen) + 32px);
 }
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface)) {
   height: calc(var(--cmp-screen) * 900 / 1280 + 130px);
@@ -79,53 +78,9 @@
   flex: none;
   height: 22px;
 }
-/*
- * In control, where the window is wide enough for it to leave the screen larger than tools under it would, the
- * tools take a column beside the screen and the dialog grows by that column. The screen keeps its size wherever
- * the column fits beside it (from about 1.5 times as wide as tall, most laptop and desktop windows).
- */
-@media (min-width: 1080px) and (min-aspect-ratio: 139 / 100) {
-  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control)) {
-    --cmp-side: 252px;
-  }
-  .cmp-body > .dsk.is-control {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 240px;
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas:
-      "stage asked"
-      "stage tools";
-    gap: 0 12px;
-  }
-  .dsk.is-control > .dsk-stage {
-    grid-area: stage;
-  }
-  .dsk.is-control > .cmp-asked {
-    grid-area: asked;
-    margin-bottom: 12px;
-  }
-  .cmp-body .dsk.is-control > .brw-ac__foot {
-    grid-area: tools;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 0;
-  }
-  .dsk.is-control > .dsk-foot .brw-ac__row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-/*
- * Elsewhere they go under the screen (the paste field and the keyboard, 112 px) in place of the steps' line, as
- * nobody's steps show while a person is in control, and the dialog grows by them while there is room.
- */
-@media not all and (min-width: 1080px) and (min-aspect-ratio: 139 / 100) {
-  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control)) {
-    height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px));
-  }
-  .cmp-body:has(> .dsk.is-control) > .cmp-steps-row {
-    display: none;
-  }
+/* In control the line under the screen (`.dsk-line`, 22px) takes the steps' line's place: one size watching or in control. */
+.cmp-body:has(> .dsk.is-control) > .cmp-steps-row {
+  display: none;
 }
 .ac-dialog.cmp-dialog.is-full {
   inset: 0;
