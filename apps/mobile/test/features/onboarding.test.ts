@@ -4,6 +4,7 @@ import {
   emailsFrom,
   HOST,
   introducesAt,
+  inviteEach,
   nextStep,
   OPTIONAL,
   type Preset,
@@ -102,4 +103,15 @@ test("each step's question and its one line: the phone's own where it can't do w
     "O #general está pronto. Crie um agente quando quiser.",
   );
   expect(stepText(pt, "import", acme)[1]).toBe("Traga pela web, em Configurações\u00a0›\u00a0Importar e exportar.");
+});
+
+test("invitations: each is sent once, and the ones that failed are what is left to send again", async () => {
+  const sent: string[] = [];
+  const failed = await inviteEach(["ana@acme.com", "bia@acme", "caio@acme.com"], async (email) => {
+    sent.push(email);
+    if (!email.endsWith(".com")) throw new Error("invalid");
+  });
+  expect(sent).toEqual(["ana@acme.com", "bia@acme", "caio@acme.com"]);
+  expect(failed).toEqual(["bia@acme"]);
+  expect(await inviteEach(["ana@acme.com"], async () => undefined)).toEqual([]);
 });

@@ -27,6 +27,7 @@ import {
   GUIDE,
   HOST,
   introducesAt,
+  inviteEach,
   OPTIONAL,
   PRESET_LOOK,
   PRESET_ROLE,
@@ -67,7 +68,8 @@ export function OnboardingFlow() {
   const [typing, setTyping] = useState("");
   const [bad, setBad] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A failure belongs to the step it happened on: going on or back leaves it there.
+  const [error, setError] = useState<{ at: StepId; text: string } | null>(null);
   const zone = phoneTimezone();
   const orgName = name.trim();
   // The AI step's key, for the workspace just created (no workspace is chosen yet: it gets the id).
@@ -84,7 +86,7 @@ export function OnboardingFlow() {
       await work();
       setStep(typeof then === "function" ? then() : then);
     } catch {
-      setError(t("mobile.onb.failed"));
+      setError({ at: step, text: t("mobile.onb.failed") });
     } finally {
       setPending(false);
     }
@@ -156,12 +158,17 @@ export function OnboardingFlow() {
     }
   };
 
-  const sendInvites = () =>
-    run(async () => {
-      if (!created) return;
-      for (const email of emails)
-        await api.orgs.invite(created.orgId, { email, role: "member" }).catch(() => undefined);
-    }, "done");
+  // An invitation that fails keeps its address on the step, with the line that says so: only those go again.
+  const sendInvites = async () => {
+    if (!created) return;
+    setPending(true);
+    setError(null);
+    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email, role: "member" }));
+    setPending(false);
+    setEmails(failed);
+    if (failed.length) setError({ at: "team", text: t("mobile.onb.invitesFailed") });
+    else setStep("done");
+  };
 
   const shareLink = async () => {
     if (!created) return;
@@ -169,7 +176,7 @@ export function OnboardingFlow() {
       const { url } = await api.invites.createLink(created.orgId);
       await Share.share({ message: t("mobile.onb.shareMessage", { org: orgName, url }) });
     } catch {
-      setError(t("mobile.onb.failed"));
+      setError({ at: step, text: t("mobile.onb.failed") });
     }
   };
 
@@ -272,9 +279,9 @@ export function OnboardingFlow() {
       onBack={back && !pending ? () => setStep(back) : undefined}
       footer={
         <>
-          {error ? (
+          {error?.at === step ? (
             <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-              {error}
+              {error.text}
             </Text>
           ) : null}
           {action ? (
@@ -647,17 +654,8 @@ function Line({
   onPress?: (() => void) | undefined;
 }) {
   const { colors: c } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      accessibilityRole={onPress ? "button" : undefined}
-      style={({ pressed }) => [
-        styles.line,
-        { borderColor: c.line },
-        pressed && onPress ? { backgroundColor: c.sunken } : null,
-      ]}
-    >
+  const content = (
+    <>
       <View style={styles.lead}>{lead}</View>
       <View style={styles.grow}>
         <Text variant="body" style={styles.bold}>
@@ -674,6 +672,17 @@ function Line({
           {end}
         </Text>
       ) : null}
+    </>
+  );
+  // Without an action it's a plain row: a Pressable with nothing to do reads as a dimmed button to VoiceOver.
+  if (!onPress) return <View style={[styles.line, { borderColor: c.line }]}>{content}</View>;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.line, { borderColor: c.line }, pressed ? { backgroundColor: c.sunken } : null]}
+    >
+      {content}
     </Pressable>
   );
 }

@@ -82,6 +82,13 @@ export function stepText(
   }
 }
 
+/** Sends each invitation in turn; the addresses whose invitation failed, in order. */
+export async function inviteEach(emails: string[], invite: (email: string) => Promise<unknown>): Promise<string[]> {
+  const failed: string[] = [];
+  for (const email of emails) await invite(email).catch(() => failed.push(email));
+  return failed;
+}
+
 /** Where the strip of sky is at a step (0 at the first, 1 when done). */
 export function progressAt(step: StepId): number {
   const i = STEPS.indexOf(step);

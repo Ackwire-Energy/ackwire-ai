@@ -1373,6 +1373,7 @@ export const featureKeysPtBR = {
     emailsPlaceholder: "nome@empresa.com",
     membersNote: "Entram como membros.",
     invalidEmail: "Confira este e-mail.",
+    invitesFailed: "Não deu para enviar esses convites. Tente de novo.",
     removeEmail: "Remover {{email}}",
     later: "Agora não",
     talk: "Falar com a {{name}}",

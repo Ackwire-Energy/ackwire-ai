@@ -1368,6 +1368,7 @@ export const featureKeysEn: FeatureTranslations = {
     emailsPlaceholder: "name@company.com",
     membersNote: "They join as members.",
     invalidEmail: "Check this e-mail.",
+    invitesFailed: "Couldn't send these invitations. Try again.",
     removeEmail: "Remove {{email}}",
     later: "Not now",
     talk: "Talk to {{name}}",
