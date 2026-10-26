@@ -100,7 +100,11 @@ test("removing a channel member: self, creator or admin; publishes the revocatio
   ]);
 
   await removeMember(f.db, f.owner.id, f.org.id, a.id, opts);
-  expect(events.at(-1)).toEqual({ type: "membership.revoked", orgId: f.org.id, userId: a.id });
+  // Their sockets lose access; everyone else's apps read the people again.
+  expect(events.slice(-2)).toEqual([
+    { type: "membership.revoked", orgId: f.org.id, userId: a.id },
+    { type: "org.broadcast", orgId: f.org.id, event: { type: "org.members" } },
+  ]);
 });
 
 test("archiving a channel: creator or admin; access ends and subscribers are told", async () => {
