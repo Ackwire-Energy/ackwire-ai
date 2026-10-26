@@ -567,6 +567,10 @@ textarea.ac-input {
 .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
 }
+/* Initials fill their tile: the next one starts past it, only its ring overlapping, so no letter is cut. */
+.ac-avatar-stack > .ac-avatar[data-kind="person"]:not(:has(img)) + .ac-avatar {
+  margin-left: 0;
+}
 
 /* Message: a fixed avatar column at the top, the text column beside it. */
 .ac-msg {
@@ -1638,6 +1642,10 @@ textarea.ac-input {
 .ac-dialog__body > * {
   flex: none;
 }
+/* With no footer under it, the body keeps the dialog's own edge below its last item. */
+.ac-dialog__body:last-child {
+  padding-bottom: 20px;
+}
 .ac-dialog__list {
   flex: 1 1 auto;
   min-height: min(120px, 30vh);
@@ -1923,6 +1931,8 @@ a.ac-list__row:focus-visible {
 .ac-empty__text {
   margin: 0 auto;
   max-width: 52ch;
+  /* Centered lines of even length: a short last word never sits on a line of its own. */
+  text-wrap: balance;
 }
 .ac-empty__actions {
   display: flex;
@@ -1992,13 +2002,36 @@ a.ac-list__row:focus-visible {
   gap: var(--space-1);
 }
 .ac-steps__bar {
+  position: relative;
   flex: 1;
   height: 4px;
+  overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--line);
 }
 .ac-steps__bar[data-done="true"] {
   background: var(--ink);
+}
+/* The step under way: ink travels along its bar, like the top progress bar (half-lit, still, without motion). */
+.ac-steps__bar[data-current]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--ink);
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-steps__bar[data-current]::before {
+    animation: ac-top-progress 1.4s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-steps__bar[data-current]::before {
+    width: 100%;
+    opacity: 0.35;
+  }
 }
 .ac-eyebrow {
   font-size: 12px;
@@ -5713,6 +5746,9 @@ a.ac-list__row:focus-visible {
   }
   .ac-dialog__body {
     padding: 4px 16px;
+  }
+  .ac-dialog__body:last-child {
+    padding-bottom: 16px;
   }
   .ac-dialog__list {
     padding: 0 16px;

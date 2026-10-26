@@ -18,6 +18,7 @@ import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
+import { showsPicture } from "@/lib/canvas";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
@@ -56,6 +57,13 @@ async function startingKeyboard(): Promise<DesktopKeyboard> {
 
 /** Its state settles: live, or only a person's own step changes it. */
 const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdated", "ended", "noRoom"];
+
+/**
+ * "Live" waits for the screen's first picture: one that just started is black for a few seconds, until its desktop
+ * draws. How often it's looked at, and how long at most before it's shown as it is (a screen black for good).
+ */
+const PICTURE_POLL_MS = 200;
+const PICTURE_WAIT_MS = 10_000;
 
 /**
  * An agent's screen, live (ADR 0058), as the computer dialog's stage: noVNC on a socket of its own, which
@@ -145,6 +153,7 @@ export function DesktopView({
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let looking: ReturnType<typeof setInterval> | undefined;
     let ws: WebSocket | null = null;
     let rfb: RFB | null = null;
     void import("@novnc/novnc").then(
@@ -165,6 +174,7 @@ export function DesktopView({
         // noVNC takes the socket's `on*` handlers: the close code comes through a listener of our own.
         socket.addEventListener("close", (e: CloseEvent) => {
           closed = true;
+          clearInterval(looking);
           // A close that arrives after the next connection took over (watching turned control) leaves that one be.
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
@@ -189,9 +199,17 @@ export function DesktopView({
         rfb.background = "transparent";
         rfb.addEventListener("connect", () => {
           attempts.current = 0;
-          setView("live");
           // Taking control puts the person's keys on the screen at once.
           if (inControl) rfb?.focus({ preventScroll: true });
+          const since = Date.now();
+          const look = () => {
+            const canvas = el.querySelector("canvas");
+            if (canvas && !showsPicture(canvas) && Date.now() - since < PICTURE_WAIT_MS) return;
+            clearInterval(looking);
+            if (!cancelled) setView("live");
+          };
+          looking = setInterval(look, PICTURE_POLL_MS);
+          look();
         });
         rfb.addEventListener("clipboard", (e) => setCopied((e as CustomEvent<{ text: string }>).detail.text));
         rfbRef.current = rfb;
@@ -206,6 +224,7 @@ export function DesktopView({
     const end = () => {
       cancelled = true;
       clearTimeout(timer);
+      clearInterval(looking);
       if (rfbRef.current === rfb) rfbRef.current = null;
       if (closed) return;
       closed = true;

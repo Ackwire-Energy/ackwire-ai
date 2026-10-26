@@ -17,6 +17,7 @@ import {
   VERSION_CHECK_MS,
 } from "./lib/app-version";
 import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
+import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
@@ -105,7 +106,25 @@ if (connectorError) {
   window.history.replaceState(null, "", window.location.pathname);
 }
 
-const services: AppServices = { api, auth: createBetterAuthClient(), queryClient, i18n, toasts };
+const services: AppServices = {
+  api,
+  auth: createBetterAuthClient(window.location.origin, () => i18n.language),
+  queryClient,
+  i18n,
+  toasts,
+};
+
+// The confirmation email's link: wherever `/` then goes, the person hears how it went.
+const confirmation = emailConfirmedToast(window.location.search);
+if (confirmation) {
+  window.history.replaceState(null, "", window.location.pathname);
+  void announceConfirmation(confirmation, {
+    auth: services.auth,
+    t: i18n.t,
+    show: toasts.show,
+    me: () => queryClient.fetchQuery({ ...meQuery(api), staleTime: 0 }),
+  });
+}
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");

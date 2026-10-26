@@ -13,6 +13,7 @@ import {
   useThreadMessages,
 } from "@agenteschat/client";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
@@ -27,11 +28,13 @@ import {
   snoozeTimes,
   sortWaiting,
   stepCells,
+  workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import {
   Button,
   Chip,
+  ComputerIcon,
   cx,
   ExpiryFuse,
   Icon,
@@ -139,6 +142,23 @@ function Face({
   );
 }
 
+/** Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. */
+function SystemFace({ n }: { n: AppNotification }) {
+  if (n.kind === "computer_ready")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
+      </span>
+    );
+  if (n.kind !== "org_standing") return null;
+  const status = n.latest.statusTo;
+  return (
+    <span className="nt-sys" aria-hidden="true">
+      <Icon name={status === "active" ? "check" : status === "suspended" ? "block" : "pause"} size={16} />
+    </span>
+  );
+}
+
 /** A snippet with @mentions: mine highlighted, others in bold. */
 function Snippet({ text, mine }: { text: string; mine: string | null }) {
   const parts = text.split(MENTION_RE);
@@ -238,6 +258,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
   const k = (key: WhatKey, values: Record<string, unknown>) => (
     <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} />
   );
+  const own = workspaceHeadline(n);
+  if (own) return t(own);
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -280,11 +302,6 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
     case "reaction":
       return k("reaction", { names, count });
-    case "org_standing":
-      if (n.latest.statusTo === "suspended") return t("standing.notification.suspended");
-      return n.latest.statusTo === "active" ? t("standing.notification.active") : t("standing.notification.hold");
-    case "computer_ready":
-      return t("computerSetup.notification.ready");
   }
 }
 
@@ -572,6 +589,8 @@ function Row({
   const unread = n.readAt === null;
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
+  const own = workspaceHeadline(n);
+  const label = own ? t(own) : name;
   const reaction = n.kind === "reaction";
   const group = n.actors.length > 1;
   const other = n.actors.find((a, i) => i > 0 && (a.id !== first?.id || a.type !== first?.type));
@@ -586,8 +605,10 @@ function Row({
       <Face actor={first} dir={dir} size="sm" className="nt-av22" />
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
-  ) : (
+  ) : first ? (
     <Face actor={first} dir={dir} className="nt-av28" />
+  ) : (
+    <SystemFace n={n} />
   );
   const l = n.latest;
   // Asked while nobody watched (ADR 0053 §8): who asked leads an approval's line, its why follows.
@@ -637,7 +658,7 @@ function Row({
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a focusable item (J/K, E, R, Enter) with its own actions inside
       tabIndex={0}
       data-n={n.id}
-      aria-label={unread ? t("notifications.unreadItem", { name }) : name}
+      aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);

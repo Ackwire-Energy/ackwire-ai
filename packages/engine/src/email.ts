@@ -1,5 +1,6 @@
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
+import { appLocale } from "@agenteschat/i18n/locale";
 import { approverIds } from "./approvals";
 import { adminIds } from "./gateway";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -12,7 +13,7 @@ export type EmailLocale = "pt-BR" | "en";
 
 /** A stored or chosen language as an email locale: "en…" is English, anything else (or none) pt-BR. */
 export const emailLocale = (value: unknown): EmailLocale =>
-  typeof value === "string" && value.toLowerCase().startsWith("en") ? "en" : "pt-BR";
+  (typeof value === "string" ? appLocale([value]) : null) ?? "pt-BR";
 
 /**
  * Transactional emails in pt-BR or English (`locale`, the recipient's; jobs

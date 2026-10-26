@@ -48,7 +48,7 @@ import {
   type PickedFile,
   parseImport,
   readImportFiles,
-  SOURCE_ICON,
+  SOURCE_MARK,
   SOURCE_NAME,
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
@@ -336,14 +336,17 @@ function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">
 }
 
 function SourceMark({ card }: { card: ImportCard }) {
-  const icon = card === "other" ? "" : SOURCE_ICON[card];
+  if (card === "other") {
+    return (
+      <span className="imp-mark" aria-hidden="true">
+        <Icon name="message" />
+      </span>
+    );
+  }
+  const mark = SOURCE_MARK[card];
   return (
     <span className="imp-mark" aria-hidden="true">
-      {icon ? (
-        <img src={icon} alt="" className="imp-mark__img" />
-      ) : (
-        <Icon name={card === "other" ? "message" : "layers"} />
-      )}
+      {"icon" in mark ? <img src={mark.icon} alt="" className="imp-mark__img" /> : mark.letters}
     </span>
   );
 }

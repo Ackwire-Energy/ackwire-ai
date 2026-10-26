@@ -8,6 +8,7 @@ export function createFakeAuth(
     redeem?: boolean;
     oneTime?: AuthResult;
     claim?: AuthResult;
+    verification?: AuthResult;
     onSignIn?: () => void;
   } = {},
 ) {
@@ -22,6 +23,10 @@ export function createFakeAuth(
     signUp: async (input) => {
       calls.push({ method: "signUp", args: [input] });
       return options.signUp ?? { ok: true };
+    },
+    sendVerificationEmail: async (email) => {
+      calls.push({ method: "sendVerificationEmail", args: [email] });
+      return options.verification ?? { ok: true };
     },
     signInSocial: async (provider, callbackURL) => {
       calls.push({ method: "signInSocial", args: [provider, callbackURL] });

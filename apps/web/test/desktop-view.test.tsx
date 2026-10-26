@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -38,6 +38,8 @@ class DesktopSocket {
 /** noVNC's RFB as the screen drives it: how it was set, what it pasted and pressed; `emit` plays its events. */
 class FakeRfb {
   static all: FakeRfb[] = [];
+  /** Like noVNC, it draws into a canvas of its own inside the screen. */
+  static drawsCanvas = false;
   viewOnly = false;
   qualityLevel = 6;
   compressionLevel = 2;
@@ -58,6 +60,12 @@ class FakeRfb {
   ) {
     this.onTime = !ws.late;
     FakeRfb.all.push(this);
+    if (FakeRfb.drawsCanvas) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1280;
+      canvas.height = 900;
+      el.appendChild(canvas);
+    }
   }
   addEventListener(type: string, fn: (e: Event) => void) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
@@ -157,6 +165,41 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
+/**
+ * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
+ * `picture()`. The DOM here draws nothing, so that copy's context is this stand-in while it's on; the canvases
+ * on the page keep their own.
+ */
+function screenPixels() {
+  let shows = false;
+  const proto = Object.getPrototypeOf(document.createElement("canvas")) as HTMLCanvasElement;
+  const getContext = proto.getContext;
+  const copy = {
+    drawImage() {},
+    getImageData: (_x: number, _y: number, w: number, h: number) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let i = 3; i < data.length; i += 4) data[i] = 255;
+      // One spot of the desktop's sky is enough to tell a picture from a black screen.
+      if (shows) data.set([75, 147, 255, 255], 4 * (w + 1));
+      return { data };
+    },
+  };
+  proto.getContext = function (this: HTMLCanvasElement, ...args: Parameters<HTMLCanvasElement["getContext"]>) {
+    return this.isConnected ? getContext.apply(this, args) : copy;
+  } as unknown as typeof proto.getContext;
+  FakeRfb.drawsCanvas = true;
+  return {
+    picture: () => {
+      shows = true;
+    },
+    restore: () => {
+      proto.getContext = getContext;
+      FakeRfb.drawsCanvas = false;
+    },
+  };
+}
+const waitLooks = () => act(async () => new Promise((r) => setTimeout(r, 260)));
+
 describe("the agent's screen in the computer dialog", () => {
   test("watching: a socket of its own in binary, view-only at quality 3, scaled; live once noVNC connects", async () => {
     const t = await dialog();
@@ -188,6 +231,41 @@ describe("the agent's screen in the computer dialog", () => {
     expect(view().queryByRole("button", { name: "Recolher" })).toBeNull();
     // Watching gives no way to type into it.
     expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
+  });
+
+  test("Live once a picture is there: a screen that just started stays black a moment, and says Opening meanwhile", async () => {
+    const pixels = screenPixels();
+    try {
+      await dialog({ ...RUNNING, running: false });
+      await connected();
+      await waitLooks();
+      expect(sub()).toBe("Abrindo…");
+      expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+      expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+      pixels.picture();
+      await waitLooks();
+      expect(sub()).toBe("Ao vivo · você está assistindo");
+      expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+      expect(view().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    } finally {
+      pixels.restore();
+    }
+  });
+
+  test("a screen that stays one flat color for good is shown as it is after a while, not Opening forever", async () => {
+    const pixels = screenPixels();
+    try {
+      await dialog();
+      await connected();
+      await waitLooks();
+      expect(sub()).toBe("Abrindo…");
+      setSystemTime(new Date(Date.now() + 10_500));
+      await waitLooks();
+      expect(sub()).toBe("Ao vivo · você está assistindo");
+    } finally {
+      setSystemTime();
+      pixels.restore();
+    }
   });
 
   test("a screen that isn't running opens like any other: no Off and no Turn on; an older computer's refusal reads as opening", async () => {
@@ -422,5 +500,56 @@ describe("the agent's screen in the computer dialog", () => {
     const outdated = await dialog({ ...RUNNING, available: false, reason: "runner_outdated" });
     expect(outdated.sockets.desktops).toHaveLength(0);
     expect(screen().getByText("Atualize o agentes no Servidor de casa para ver a tela da Ada.")).toBeTruthy();
+  });
+});
+
+describe("the dialog's size (computer.css)", () => {
+  const css = () => Bun.file(new URL("../src/components/computer/computer.css", import.meta.url).pathname).text();
+  const rule = (text: string, selector: string) => text.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+
+  test("the screen fills what its stage gets, keeping its shape; no mode sizes it on its own", async () => {
+    const text = await css();
+    const stage = rule(text, ".cmp-body .dsk-stage,\n.cmp-body > .cmp-stage");
+    expect(stage).toContain("container-type: size");
+    expect(stage).toContain("flex: 1 1 0");
+    expect(rule(text, ".cmp-body .dsk-screen,\n.cmp-body .cmp-stage__box")).toContain(
+      "width: min(100cqw, 100cqh * 1280 / 900)",
+    );
+    // In control and in full screen alike: nothing outranks the stage's own measure.
+    expect(text).not.toMatch(/is-control \.dsk-screen\s*\{[^}]*width/);
+    expect(text).not.toMatch(/is-full \.(dsk-screen|cmp-stage__box)/);
+    const full = rule(text, ".ac-dialog.cmp-dialog.is-full");
+    expect(full).toContain("width: 100%");
+    expect(full).toContain("height: 100%");
+  });
+
+  test("one frame for the screen, its covers and the agent's page, its steps' line kept while there are none", async () => {
+    const text = await css();
+    // The wait for the workspace's computer is as wide, so its screen opens in place.
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
+      "width: calc(var(--cmp-screen) + 32px + var(--cmp-side))",
+    );
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
+      "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
+    );
+    expect(rule(text, ".cmp-steps-row")).toContain("height: 22px");
+    // The page at 16:10 takes the most of its stage in the same frame, never a size of its own.
+    expect(rule(text, ".cmp-body .brw-ac__page")).toContain("width: min(100cqw, 100cqh * 16 / 10)");
+    expect(text).not.toContain("--cmp-page-room");
+  });
+
+  test("in control the tools take a column beside the screen only where it leaves the screen larger", async () => {
+    const text = await css();
+    const query = "(min-width: 1080px) and (min-aspect-ratio: 139 / 100)";
+    const wide = text.split(`@media ${query} {`)[1] ?? "";
+    expect(rule(wide, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain("--cmp-side: 252px");
+    expect(wide).toMatch(/grid-template-columns: minmax\(0, 1fr\) 240px/);
+    expect(wide).toMatch(/\.dsk\.is-control > \.brw-ac__foot \{[^}]*grid-area: tools/);
+    // Elsewhere under it, where the steps' line was, and the dialog grows by them while there is room.
+    const narrow = text.split(`@media not all and ${query} {`)[1] ?? "";
+    expect(rule(narrow, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain(
+      "height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px))",
+    );
+    expect(rule(narrow, "  .cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
   });
 });

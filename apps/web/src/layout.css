@@ -598,6 +598,10 @@ p {
   align-items: center;
   gap: var(--space-2);
 }
+.sidebar__usage-label {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
 .sidebar__usage-track {
   flex: 1;
   height: 4px;
@@ -6383,10 +6387,11 @@ a.machine-row__name:hover {
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
 }
-/* Phone: the rail is a compact step bar (numbers only, no guide). */
+/* Phone: the rail is a compact step bar (numbers only, no guide); the page's height left goes to the step. */
 @media (max-width: 760px) {
   .onb {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
   }
   .onb__rail {
     position: relative;
@@ -7957,12 +7962,6 @@ a.machine-row__name:hover {
   font-size: 14.5px;
   line-height: 1.65;
   white-space: pre-line;
-}
-.agp-clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 .agp-instructions.ac-input {
   min-height: 300px;

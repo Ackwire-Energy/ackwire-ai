@@ -289,7 +289,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           </h2>
           {can(org.role, "manage_agents") && (
             <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} className="ac-link" style={{ fontSize: 14 }}>
-              {t("members.createAgent")}
+              {t("shell.createAgent")}
             </Link>
           )}
         </div>

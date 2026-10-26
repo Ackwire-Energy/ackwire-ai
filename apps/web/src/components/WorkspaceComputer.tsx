@@ -150,7 +150,7 @@ export function SetupFacts({ view }: { view: SetupView }) {
   );
 }
 
-/** Claude Code and Codex come ready on it: each agent signs in with a plan once it's ready. */
+/** Claude Code and Codex come ready on it: each agent signs in there with a plan. */
 export function SetupPlans() {
   const { t } = useTranslation();
   return (
@@ -234,7 +234,6 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
           <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <SetupChip view={view} machine={machine} />
           </span>
-          <span className="small muted">{t("computerSetup.lead")}</span>
         </span>
       </div>
       {view.phase !== "ready" && <SetupProgress view={view} />}

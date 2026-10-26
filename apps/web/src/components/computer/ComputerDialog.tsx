@@ -216,6 +216,9 @@ function ComputerStage({
   const choose = () => goTo({ tab: "settings", sec: "computer" });
 
   let body: ReactNode;
+  let steps: ReactNode = null;
+  // Everything but the wait for the workspace's computer takes the screen's frame, the steps' line included.
+  let framed = true;
   if (!f || !view.ready) {
     body = (
       <>
@@ -258,6 +261,7 @@ function ComputerStage({
       </>
     );
   } else if (surface === "preparing" && f.setup) {
+    framed = false;
     body = (
       <>
         <DialogHead sub={t("agentComputer.sub.preparing")} />
@@ -327,14 +331,14 @@ function ComputerStage({
         ) : (
           <BrowserCard agentId={agent.id} name={agent.name} handoff={f.handoff} surface canTakeOver={canTakeOver} />
         )}
-        {f.working && !mine && view.steps.length > 0 && (
-          <ol className="cmp-steps" aria-label={t("browser.watch.title")}>
-            {view.steps.slice(-3).map((s) => (
-              <li key={s.id}>{stepText(t, s, s.screen)}</li>
-            ))}
-          </ol>
-        )}
       </>
+    );
+    steps = f.working && !mine && view.steps.length > 0 && (
+      <ol className="cmp-steps" aria-label={t("browser.watch.title")}>
+        {view.steps.slice(-3).map((s) => (
+          <li key={s.id}>{stepText(t, s, s.screen)}</li>
+        ))}
+      </ol>
     );
   } else if (machine && !machine.online) {
     const since = machine.lastSeenAt ? clockAt(i18n.language, machine.lastSeenAt) : null;
@@ -472,7 +476,10 @@ function ComputerStage({
   }
   return (
     <DialogHeadContext.Provider value={head}>
-      <div className="cmp-body">{body}</div>
+      <div className="cmp-body">
+        {body}
+        {framed && <div className="cmp-steps-row">{steps}</div>}
+      </div>
     </DialogHeadContext.Provider>
   );
 }
