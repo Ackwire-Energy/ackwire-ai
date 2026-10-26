@@ -33,7 +33,7 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -61,6 +61,20 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const view = brain.data;
   const row = ai.data?.computers.find((c) => c.machineId === view?.computer?.machineId);
+  // Once ready, the workspace's computer is every agent's: a view from before that still has none is asked again
+  // now, not at its next poll, so the panel turns on as the rest of the page says ready.
+  const behind = edition === "cloud" && setup?.phase === "ready" && view !== undefined && !view.computer;
+  const { refetch: brainAgain } = brain;
+  const { refetch: accountsAgain } = ai;
+  useEffect(() => {
+    if (!behind) return;
+    void brainAgain();
+    void accountsAgain();
+  }, [behind, brainAgain, accountsAgain]);
+  // A panel here waited for that computer: once it's ready, it says so whenever it shows again (another plan, another
+  // step and back).
+  const [waited, setWaited] = useState(false);
+  const markWaited = useCallback(() => setWaited(true), []);
   const gateOf = (choice: PlanChoice): PlanGate =>
     planGate({
       choice,
@@ -71,7 +85,7 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
       computer: row,
     });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, failed: brain.isError && !view, edition };
+  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -227,11 +241,12 @@ function PlanSteps({
   const [assigned, setAssigned] = useState<"saving" | "failed" | "done">("saving");
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
-  // It turns ready while the person watches, or they came because it did: said once, in place.
-  const [waited, setWaited] = useState(gate.state === "preparing" || justReady === true);
+  // It turns ready while the person watches, or they came because it did: said in place, and again on a way back.
+  const waited = gates.waited || justReady === true;
+  const { markWaited } = gates;
   useEffect(() => {
-    if (gate.state === "preparing") setWaited(true);
-  }, [gate.state]);
+    if (gate.state === "preparing") markWaited();
+  }, [gate.state, markWaited]);
 
   const computer =
     edition === "cloud" ? computerName(t, org.name, managedOf(machines.data)) : (view?.computer?.name ?? "");

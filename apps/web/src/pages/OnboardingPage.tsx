@@ -292,7 +292,8 @@ export function OnboardingPage() {
     role: t(`onboarding.presets.${p}.role`),
     desc: t(`onboarding.presets.${p}.desc`),
   });
-  const createdPresets = PRESETS.filter((p) => agentIds[p]);
+  // In the order they were made (`agentIds` keeps it), the order the workspace lists its agents in.
+  const createdPresets = (Object.keys(agentIds) as Preset[]).filter((p) => agentIds[p]);
   /** The imported agents to choose in "Agentes e IA": the ones the plan creates or updates. */
   const importAgents = (flow.planned?.items ?? []).flatMap((i) => {
     const agent = i.kind === "agent" && choosable(i) ? flow.planned?.bundle.agents.find((a) => a.key === i.key) : null;
@@ -311,15 +312,11 @@ export function OnboardingPage() {
     })),
     ...importedCrew,
   ];
-  /** The agents created so far, the guide first: whom a plan thinks for, and Who thinks' rows. */
-  const crewAgents = [
-    ...[GUIDE, ...PRESETS.filter((p) => p !== GUIDE)].flatMap((p) => {
-      const id = agentIds[p];
-      const initials = p === "atlas" ? "At" : undefined;
-      return id ? [{ id, name: presetInfo(p).name, appearance: PRESET_LOOK[p], initials }] : [];
-    }),
-    ...importedCrew.map((c) => ({ id: c.id, name: c.name, appearance: c.appearance, initials: c.initials })),
-  ];
+  /**
+   * The agents created so far, in the team's order: whom a plan thinks for (the first with no AI unless one is
+   * picked, as Connect an AI picks in the app) and Who thinks' rows.
+   */
+  const crewAgents = crew.map(({ id, name, appearance, initials }) => ({ id, name, appearance, initials }));
   /** Still to create when the team is kept, besides the guide (it is "already here" in the copy). */
   const joiningLeft =
     PRESETS.filter((p) => p !== GUIDE && chosen.has(p) && !agentIds[p]).length +
