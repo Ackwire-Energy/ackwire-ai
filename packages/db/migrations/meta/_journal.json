@@ -750,6 +750,13 @@
       "when": 1792913278591,
       "tag": "0106_mail_account_aliases",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1792984793302,
+      "tag": "0107_claude_key_labels",
+      "breakpoints": true
     }
   ]
 }
