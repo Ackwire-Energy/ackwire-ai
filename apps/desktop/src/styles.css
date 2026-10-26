@@ -760,14 +760,12 @@ body[data-window="popover"] {
   margin-top: 24px;
   display: flex;
   gap: 8px;
-  max-width: 560px;
 }
 .dk-fr__form .ac-input {
   flex: 1;
 }
 .dk-fr__problem {
   margin-top: 12px;
-  max-width: 560px;
 }
 .dk-fr__looking {
   margin-top: 20px;
@@ -779,7 +777,6 @@ body[data-window="popover"] {
 }
 .dk-fr__found {
   margin-top: 20px;
-  max-width: 560px;
 }
 .dk-fr__foundrow {
   display: flex;
@@ -813,7 +810,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 560px;
 }
 .dk-fr__none h2 {
   font-size: 13.5px;
@@ -866,7 +862,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 600px;
 }
 .dk-fr__ways li {
   display: flex;
@@ -956,7 +951,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 600px;
 }
 .dk-fr__who {
   display: grid;
@@ -983,7 +977,6 @@ body[data-window="popover"] {
 /* After a short screen's text, not at the window's bottom. */
 .dk-fr__end[data-near] {
   margin-top: 24px;
-  max-width: 600px;
 }
 /* Run here's steps as they run. */
 .dk-fr__steps {
@@ -993,7 +986,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 600px;
 }
 .dk-fr__steps li {
   display: flex;
@@ -1061,7 +1053,6 @@ body[data-window="popover"] {
 .dk-fr__bar {
   margin-top: 28px;
   height: 6px;
-  max-width: 600px;
   border-radius: 3px;
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
