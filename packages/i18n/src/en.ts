@@ -8273,8 +8273,6 @@ export const en: Translations = {
     agentWaiting: "{{name}} starts using it as soon as it's ready.",
     managedHint: "The workspace's own computer: always on, with a user of its own for each agent.",
     continue: "You can go on meanwhile.",
-    plans: "Your agents can think with your own AI plan, signed in on this computer. No API key needed.",
-    plansMarks: "Claude, ChatGPT, GLM, Kimi and other AI plans",
     eta: {
       minutes_one: "About 1 min left",
       minutes_other: "About {{count}} min left",
@@ -8425,7 +8423,6 @@ export const en: Translations = {
       notAnswering: "{{computer}} isn't answering",
       notAnsweringHelp: "It usually comes back within a few minutes. We're on it.",
       offline: "{{computer}} is offline",
-      offlineHelp: "Since {{time}}. {{name}} waits for the computer to come back.",
       offlineHelpPlain: "{{name}} waits for the computer to come back.",
       noRoom: "{{computer}} is showing as many screens as it can. Try again in a moment.",
       unavailable: "{{name}}'s screen can't be shown right now",

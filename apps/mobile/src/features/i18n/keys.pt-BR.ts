@@ -194,7 +194,7 @@ export const featureKeysPtBR = {
     title: "Novo",
     chat: "Conversa com…",
     name: "Nome",
-    channelFine: "Para um time ou assunto. Você chama pessoas e agentes depois, pelo nome.",
+    channelFine: "Para um time ou assunto.",
     chatSearch: "Buscar pessoa ou agente",
     people: "Pessoas",
     nobody: "Ninguém por aqui ainda.",
@@ -211,7 +211,6 @@ export const featureKeysPtBR = {
     },
     agent: {
       question: "O que ele vai fazer?",
-      fine: "O resto a gente sugere. Você ajusta depois, no perfil.",
     },
   },
   chat: {
@@ -497,7 +496,7 @@ export const featureKeysPtBR = {
   },
   newMission: {
     title: "Nova missão",
-    intro: "Para trabalho longo. O agente monta um plano e só começa quando você disser.",
+    intro: "O agente monta um plano e só começa quando você disser.",
     placeholder: "O que precisa ficar pronto?",
     submit: "Pedir um plano",
     created: "{{name}} está montando o plano",
@@ -777,7 +776,6 @@ export const featureKeysPtBR = {
     version: "agentes.chat · versão {{version}}",
     workspaces: "Workspaces",
     workspacesIn: "Você está em",
-    workspacesFooter: "Cada workspace tem seus agentes, canais e conversas. Trocar não apaga nada.",
     account: {
       title: "Conta",
       save: "OK",
@@ -796,9 +794,8 @@ export const featureKeysPtBR = {
       inWorkspace: "Neste workspace · {{org}}",
       handle: "Seu @",
       timezone: "Fuso",
+      timezoneHint: "Aparece no seu cartão de perfil e vale para rotinas e lembretes.",
       orgZone: "O do workspace",
-      footer:
-        "O @ é como pessoas e agentes mencionam você. O fuso aparece no seu cartão de perfil e vale para rotinas e lembretes.",
       nameEmpty: "Escreva seu nome.",
       handleInvalid: "O @ tem de 2 a 32 letras minúsculas, números, - ou _.",
       handleTaken: "Esse @ já é de outra pessoa.",
@@ -816,15 +813,15 @@ export const featureKeysPtBR = {
   },
   delete: {
     title: "Apagar sua conta",
-    intro: "Isso não tem volta. Antes de seguir, veja o que acontece:",
+    intro: "Isso não tem volta.",
     goes: {
       account: "Sua conta, seus acessos e suas sessões somem.",
       orgs: "Organizações em que só você está são apagadas.",
       phones: "Este celular e os outros param de receber avisos.",
     },
     stays: "Mensagens que você escreveu ficam nas conversas, sem seu nome.",
-    which: "Organizações: {{names}}.",
-    how: "Abra a organização no site, em Pessoas, e torne outra pessoa dona. Depois volte aqui.",
+    blocked:
+      "Você é a única pessoa dona de {{names}}. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     hold: "Segure para apagar",
     holding: "Segure…",
     note: "Os planos são assinados e cancelados no site.",
@@ -882,7 +879,7 @@ export const featureKeysPtBR = {
     },
     until: "até {{date}}",
     empty: "Nenhuma tarefa aqui",
-    emptyOpen: "Crie uma ou peça no chat. Quem pegar, pessoa ou agente, aparece aqui.",
+    emptyOpen: "Também dá para pedir uma no chat.",
     loadFailed: "Não deu para carregar as tarefas.",
     createdBy: "criada por {{name}}",
     fromMessage: "a partir de uma mensagem",
@@ -921,7 +918,7 @@ export const featureKeysPtBR = {
       titlePlaceholder: "O que precisa ser feito",
       description: "Descrição (opcional)",
       who: "Quem faz",
-      agentStarts: "O agente começa assim que você cria a tarefa, e ela anda sozinha pelo quadro.",
+      agentStarts: "O agente começa assim que você criar a tarefa.",
       details: "Detalhes",
       due: "Prazo",
       dueChoice: { none: "Nenhum", today: "Hoje", tomorrow: "Amanhã", friday: "Sexta", nextWeek: "Em uma semana" },
@@ -960,7 +957,7 @@ export const featureKeysPtBR = {
     },
     doingLabel: "trabalhando: {{what}}",
     first: {
-      subtitle: "Diga o que ele vai fazer. Ele aparece aqui, como uma conversa.",
+      subtitle: "Ele aparece aqui, como uma conversa.",
       create: "Criar meu primeiro agente",
       examples: "Ou comece por um destes",
     },
@@ -978,7 +975,7 @@ export const featureKeysPtBR = {
     open: "Abrir",
     clear: {
       title: "Nada esperando você",
-      text: "Tudo em dia. Quando um agente precisar de você, aparece aqui primeiro.",
+      text: "Quando um agente precisar de você, aparece aqui primeiro.",
     },
     next: {
       title: "Próximo: {{name}}",
@@ -1006,8 +1003,8 @@ export const featureKeysPtBR = {
       month_other: "{{count}} este mês",
       seeAll: "Ver tudo",
       seeLess: "Ver menos",
-      emptyF: "Nada ainda. O que a {{name}} fizer a seu pedido aparece aqui.",
-      emptyM: "Nada ainda. O que o {{name}} fizer a seu pedido aparece aqui.",
+      emptyF: "Nada ainda.",
+      emptyM: "Nada ainda.",
       file: "{{title}}",
       approval: "{{title}}",
       fileKind: {
@@ -1035,8 +1032,8 @@ export const featureKeysPtBR = {
     },
     knows: {
       title: "O que sabe sobre você",
-      footF: "Toque para corrigir ou esquecer. Ela usa isso nas próximas conversas.",
-      footM: "Toque para corrigir ou esquecer. Ele usa isso nas próximas conversas.",
+      footF: "Toque para corrigir ou esquecer.",
+      footM: "Toque para corrigir ou esquecer.",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
       footAdmins: "Só quem administra pode corrigir.",
       emptyF: "A {{name}} ainda não guardou nada sobre você.",
@@ -1053,8 +1050,6 @@ export const featureKeysPtBR = {
       titleM: "O que o {{name}} sabe",
       from: "Da conversa com você · {{when}}",
       see: "Ver",
-      fineF: "A {{name}} passa a usar a versão nova. A antiga fica no histórico.",
-      fineM: "O {{name}} passa a usar a versão nova. A antiga fica no histórico.",
       save: "Salvar",
       forget: "Esquecer isso",
       saved: "Memória corrigida",
@@ -1103,12 +1098,11 @@ export const featureKeysPtBR = {
     },
     sheet: {
       title: "Trocar o computador",
-      descOne: "O {{computer}} está desconectado. Escolha onde {{names}} passa a trabalhar.",
-      descMany: "O {{computer}} está desconectado. Escolha onde {{names}} passam a trabalhar.",
+      descOne: "Escolha onde {{names}} passa a trabalhar.",
+      descMany: "Escolha onde {{names}} passam a trabalhar.",
       where: "Para onde",
       who: "Quem troca",
-      hint: "O que estava esperando continua no novo computador. Uma tarefa que já mexeu em arquivos no {{computer}} espera por ele.",
-      note: "Dá para voltar ao {{computer}} depois.",
+      hint: "Tarefas que já mexeram em arquivos no {{computer}} esperam por ele.",
       submit_one: "Trocar {{count}} agente",
       submit_other: "Trocar {{count}} agentes",
       later: "Agora não",
@@ -1164,7 +1158,7 @@ export const featureKeysPtBR = {
     },
     titleCloud: "O {{computer}} não está respondendo",
     a11yCloud: "Computador sem resposta",
-    cloudSub: "Já estamos cuidando: nada a fazer do seu lado.",
+    cloudSub: "Já estamos cuidando",
   },
   // The agent's browser (ADR 0040).
   browser: {
@@ -1277,9 +1271,8 @@ export const featureKeysPtBR = {
     signIn: "Entrar no {{name}}",
     useKey: "Usar uma chave",
     useSignIn: "Entrar pelo navegador",
-    signInHelp: "Abre o {{name}} no navegador. Depois de autorizar, você volta sozinho para o app.",
     keyLabel: "Chave do {{name}}",
-    keyHelp: "A chave fica guardada cifrada. Nem você nem os agentes a veem de novo.",
+    keyHelp: "Fica guardada cifrada. Nem você nem os agentes a veem de novo.",
     keyShort: "A chave parece curta demais.",
     paste: "Colar",
     addressTitle: "Conectar pelo endereço",
@@ -1298,7 +1291,7 @@ export const featureKeysPtBR = {
       write: "Pode mudar",
       custom: "Do seu jeito",
     },
-    safe: "O que é sensível (apagar, publicar, responder clientes) sempre pede sua aprovação no chat, em qualquer nível.",
+    safe: "Apagar, publicar e responder clientes sempre pedem sua aprovação.",
     reviewOnComputer: "As ferramentas desse servidor se revisam no computador antes de os agentes usarem.",
     done: "Pronto",
     step: "Passo {{n}} de 3",
@@ -1327,6 +1320,8 @@ export const featureKeysPtBR = {
   },
   joinRequests: {
     share: "Compartilhar o link",
+    rolesHint:
+      "Membros conversam, criam tarefas e aprovam os próprios agentes. Admins também gerenciam membros, agentes e chaves.",
   },
   reset: {
     title: "Escolha uma senha nova",

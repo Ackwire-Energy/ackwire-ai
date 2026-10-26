@@ -146,7 +146,6 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
               />
             ))}
           </GroupedList>
-          <GroupedFooter>{t("mobile.me.workspacesFooter")}</GroupedFooter>
         </Page>
       );
       break;

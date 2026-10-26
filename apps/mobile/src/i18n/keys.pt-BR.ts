@@ -69,7 +69,7 @@ export const mobilePtBR = {
   },
   account: {
     deleteSoleOwner:
-      "Você é a única pessoa dona de uma organização com outros membros. Passe a organização para alguém antes de apagar sua conta.",
+      "Você é a única pessoa dona de uma organização com outros membros. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     deleteFailed: "Não deu para apagar sua conta agora. Tente de novo.",
     deleted: "Sua conta foi apagada.",
     signedOut: "Você saiu.",

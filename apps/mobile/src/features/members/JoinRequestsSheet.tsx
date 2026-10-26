@@ -6,7 +6,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, PersonAvatar, Segmented, SheetScreen, Text, useToast } from "@/ui";
+import { Button, InfoHint, LineIcon, PersonAvatar, Segmented, SheetScreen, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
@@ -180,11 +180,13 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
         </>
       ) : (
         <>
-          <Segmented
-            items={APPROVE_ROLES.map((key) => ({ key, label: t(`roles.${key}`) }))}
-            value={role}
-            onChange={(key) => setRole(key === "admin" ? "admin" : "member")}
-          />
+          <InfoHint name={t("common.about", { label: t("members.role") })} text={t("mobile.joinRequests.rolesHint")}>
+            <Segmented
+              items={APPROVE_ROLES.map((key) => ({ key, label: t(`roles.${key}`) }))}
+              value={role}
+              onChange={(key) => setRole(key === "admin" ? "admin" : "member")}
+            />
+          </InfoHint>
           <View style={styles.acts}>
             <View style={styles.grow}>
               <Button

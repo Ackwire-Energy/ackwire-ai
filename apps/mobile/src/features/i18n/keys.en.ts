@@ -190,7 +190,7 @@ export const featureKeysEn: FeatureTranslations = {
     title: "New",
     chat: "Chat with…",
     name: "Name",
-    channelFine: "For a team or a topic. You bring in people and agents later, by name.",
+    channelFine: "For a team or a topic.",
     chatSearch: "Search for a person or an agent",
     people: "People",
     nobody: "Nobody here yet.",
@@ -207,7 +207,6 @@ export const featureKeysEn: FeatureTranslations = {
     },
     agent: {
       question: "What will it do?",
-      fine: "We suggest the rest. You can adjust it later, on its profile.",
     },
   },
   chat: {
@@ -493,7 +492,7 @@ export const featureKeysEn: FeatureTranslations = {
   },
   newMission: {
     title: "New mission",
-    intro: "For long work. The agent makes a plan and only starts when you say so.",
+    intro: "The agent makes a plan and only starts when you say so.",
     placeholder: "What needs to get done?",
     submit: "Ask for a plan",
     created: "{{name}} is making the plan",
@@ -773,7 +772,6 @@ export const featureKeysEn: FeatureTranslations = {
     version: "agentes.chat · version {{version}}",
     workspaces: "Workspaces",
     workspacesIn: "You're in",
-    workspacesFooter: "Each workspace has its own agents, channels and conversations. Switching deletes nothing.",
     account: {
       title: "Account",
       save: "OK",
@@ -792,9 +790,8 @@ export const featureKeysEn: FeatureTranslations = {
       inWorkspace: "In this workspace · {{org}}",
       handle: "Your @",
       timezone: "Time zone",
+      timezoneHint: "Shows on your profile card and sets when routines and reminders run.",
       orgZone: "The workspace's",
-      footer:
-        "Your @ is how people and agents mention you. The time zone shows on your profile card and is used for routines and reminders.",
       nameEmpty: "Write your name.",
       handleInvalid: "Your @ has 2 to 32 lowercase letters, numbers, - or _.",
       handleTaken: "That @ belongs to someone else.",
@@ -812,15 +809,15 @@ export const featureKeysEn: FeatureTranslations = {
   },
   delete: {
     title: "Delete your account",
-    intro: "There's no undo. Before you go on, see what happens:",
+    intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
       orgs: "Organizations where you are the only member are deleted.",
       phones: "This phone and the others stop getting alerts.",
     },
     stays: "Messages you wrote stay in the chats, without your name.",
-    which: "Organizations: {{names}}.",
-    how: "Open the organization on the website, in People, and make someone else an owner. Then come back here.",
+    blocked:
+      "You're the only owner of {{names}}. On the website, in People, make someone else an owner, then come back.",
     hold: "Hold to delete",
     holding: "Keep holding…",
     note: "Plans are bought and canceled on the website.",
@@ -878,7 +875,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     until: "due {{date}}",
     empty: "No tasks here",
-    emptyOpen: "Create one or ask in a chat. Whoever takes it, person or agent, shows up here.",
+    emptyOpen: "You can also ask for one in a chat.",
     loadFailed: "Couldn't load the tasks.",
     createdBy: "created by {{name}}",
     fromMessage: "from a message",
@@ -917,7 +914,7 @@ export const featureKeysEn: FeatureTranslations = {
       titlePlaceholder: "What needs to be done",
       description: "Description (optional)",
       who: "Who does it",
-      agentStarts: "The agent starts as soon as you create the task, and it moves along the board on its own.",
+      agentStarts: "The agent starts as soon as you create the task.",
       details: "Details",
       due: "Due",
       dueChoice: { none: "None", today: "Today", tomorrow: "Tomorrow", friday: "Friday", nextWeek: "In a week" },
@@ -956,7 +953,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     doingLabel: "working: {{what}}",
     first: {
-      subtitle: "Say what it will do. It shows up here, like a chat.",
+      subtitle: "It shows up here, as a chat.",
       create: "Create my first agent",
       examples: "Or start with one of these",
     },
@@ -974,7 +971,7 @@ export const featureKeysEn: FeatureTranslations = {
     open: "Open",
     clear: {
       title: "Nothing waiting on you",
-      text: "All caught up. When an agent needs you, it shows up here first.",
+      text: "When an agent needs you, it shows up here first.",
     },
     next: {
       title: "Next: {{name}}",
@@ -1002,8 +999,8 @@ export const featureKeysEn: FeatureTranslations = {
       month_other: "{{count}} this month",
       seeAll: "See all",
       seeLess: "See less",
-      emptyF: "Nothing yet. What {{name}} does at your request shows up here.",
-      emptyM: "Nothing yet. What {{name}} does at your request shows up here.",
+      emptyF: "Nothing yet.",
+      emptyM: "Nothing yet.",
       file: "{{title}}",
       approval: "{{title}}",
       fileKind: {
@@ -1031,8 +1028,8 @@ export const featureKeysEn: FeatureTranslations = {
     },
     knows: {
       title: "What it knows about you",
-      footF: "Tap to correct or forget. She uses this in the next conversations.",
-      footM: "Tap to correct or forget. He uses this in the next conversations.",
+      footF: "Tap to correct or forget.",
+      footM: "Tap to correct or forget.",
       footOwner: "Only {{name}} or an admin can correct these.",
       footAdmins: "Only an admin can correct these.",
       emptyF: "{{name}} hasn't saved anything about you yet.",
@@ -1049,8 +1046,6 @@ export const featureKeysEn: FeatureTranslations = {
       titleM: "What {{name}} knows",
       from: "From your conversation · {{when}}",
       see: "See",
-      fineF: "{{name}} uses the new version from now on. The old one stays in the history.",
-      fineM: "{{name}} uses the new version from now on. The old one stays in the history.",
       save: "Save",
       forget: "Forget this",
       saved: "Memory corrected",
@@ -1099,12 +1094,11 @@ export const featureKeysEn: FeatureTranslations = {
     },
     sheet: {
       title: "Switch the computer",
-      descOne: "{{computer}} is disconnected. Choose where {{names}} works from now on.",
-      descMany: "{{computer}} is disconnected. Choose where {{names}} work from now on.",
+      descOne: "Choose where {{names}} works from now on.",
+      descMany: "Choose where {{names}} work from now on.",
       where: "Where to",
       who: "Who switches",
-      hint: "What was waiting goes on on the new computer. A task that already changed files on {{computer}} waits for it.",
-      note: "You can go back to {{computer}} later.",
+      hint: "Tasks that already changed files on {{computer}} wait for it.",
       submit_one: "Switch {{count}} agent",
       submit_other: "Switch {{count}} agents",
       later: "Not now",
@@ -1160,7 +1154,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     titleCloud: "{{computer}} isn't answering",
     a11yCloud: "Computer not answering",
-    cloudSub: "We're on it: nothing to do on your side.",
+    cloudSub: "We're on it",
   },
   // The agent's browser (ADR 0040).
   browser: {
@@ -1273,9 +1267,8 @@ export const featureKeysEn: FeatureTranslations = {
     signIn: "Sign in to {{name}}",
     useKey: "Use a key",
     useSignIn: "Sign in in the browser",
-    signInHelp: "Opens {{name}} in the browser. Once you authorize, you come back to the app on your own.",
     keyLabel: "{{name}} key",
-    keyHelp: "The key is stored encrypted. Neither you nor the agents see it again.",
+    keyHelp: "Stored encrypted. Neither you nor the agents see it again.",
     keyShort: "The key looks too short.",
     paste: "Paste",
     addressTitle: "Connect by address",
@@ -1294,7 +1287,7 @@ export const featureKeysEn: FeatureTranslations = {
       write: "Can change",
       custom: "Your own way",
     },
-    safe: "Sensitive things (deleting, publishing, answering customers) always ask for your approval in the chat, at any level.",
+    safe: "Deleting, publishing and answering customers always ask for your approval.",
     reviewOnComputer: "This server's tools are reviewed on the computer before agents use them.",
     done: "Done",
     step: "Step {{n}} of 3",
@@ -1323,6 +1316,7 @@ export const featureKeysEn: FeatureTranslations = {
   },
   joinRequests: {
     share: "Share the link",
+    rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
   },
   reset: {
     title: "Pick a new password",

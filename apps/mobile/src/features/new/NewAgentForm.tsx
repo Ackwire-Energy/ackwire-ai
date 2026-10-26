@@ -95,9 +95,6 @@ export function NewAgentForm({ initialWhat = "" }: { initialWhat?: string }) {
           style={[styles.input, { color: c.ink }]}
         />
       </View>
-      <Text variant="footnote" tone="faint" style={styles.fine}>
-        {t("mobile.new.agent.fine")}
-      </Text>
       <Button
         variant="primary"
         wide
@@ -141,5 +138,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   input: { flex: 1, paddingVertical: 12, ...systemText("body") },
-  fine: { marginHorizontal: 6 },
 });

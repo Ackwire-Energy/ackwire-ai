@@ -24,7 +24,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, Segmented, systemText, Text, useToast } from "@/ui";
+import { Button, InfoHint, LineIcon, Segmented, systemText, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
@@ -225,6 +225,7 @@ function ConnectStep({
   const busy = start.isPending || complete.isPending || withKey.isPending || connect.isPending;
   const serverUrl = def?.kind === "remote_mcp" ? (def.serverUrl ?? "") : url.trim();
   const shownName = name || serverUrl.replace(/^https:\/\//, "").split("/")[0] || "";
+  const keyLabel = t("mobile.connectors.keyLabel", { name: shownName });
 
   const fail = () => setError(t("mobile.connectors.failed"));
   /** The browser round trip: open, wait for the answer, finish with the app's session. */
@@ -334,24 +335,25 @@ function ConnectStep({
         />
       ) : null}
       {mode === "signIn" ? (
-        <>
-          <Text variant="small" tone="muted">
-            {t("mobile.connectors.signInHelp", { name: shownName })}
-          </Text>
-          <Button
-            variant="primary"
-            wide
-            label={busy ? t("mobile.connectors.working") : t("mobile.connectors.signIn", { name: shownName })}
-            disabled={busy}
-            onPress={() => void signIn()}
-          />
-        </>
+        <Button
+          variant="primary"
+          wide
+          label={busy ? t("mobile.connectors.working") : t("mobile.connectors.signIn", { name: shownName })}
+          disabled={busy}
+          onPress={() => void signIn()}
+        />
       ) : (
         <>
           <View style={styles.fieldBox}>
-            <Text variant="footnote" tone="faint">
-              {t("mobile.connectors.keyLabel", { name: shownName })}
-            </Text>
+            <InfoHint
+              name={t("common.about", { label: keyLabel })}
+              text={t("mobile.connectors.keyHelp")}
+              variant="footnote"
+            >
+              <Text variant="footnote" tone="faint">
+                {keyLabel}
+              </Text>
+            </InfoHint>
             <View style={styles.keyRow}>
               <TextInput
                 value={key}
@@ -359,7 +361,7 @@ function ConnectStep({
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-                accessibilityLabel={t("mobile.connectors.keyLabel", { name: shownName })}
+                accessibilityLabel={keyLabel}
                 style={[field, styles.grow]}
               />
               <Pressable
@@ -372,12 +374,6 @@ function ConnectStep({
                   {t("mobile.connectors.paste")}
                 </Text>
               </Pressable>
-            </View>
-            <View style={styles.note}>
-              <LineIcon name="lock" size={14} color={c.faint} variant="small" />
-              <Text variant="small" tone="muted" style={styles.grow}>
-                {t("mobile.connectors.keyHelp")}
-              </Text>
             </View>
           </View>
           <Button

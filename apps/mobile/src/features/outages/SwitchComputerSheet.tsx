@@ -191,9 +191,6 @@ function SwitchForm({
         />
         <Button variant="ghost" wide label={t("mobile.outage.sheet.later")} onPress={onClose} />
       </View>
-      <Text variant="footnote" tone="faint" style={styles.note}>
-        {t("mobile.outage.sheet.note", { computer: o.name })}
-      </Text>
     </>
   );
 }
@@ -274,7 +271,6 @@ const styles = StyleSheet.create({
   off: { opacity: 0.5 },
   hint: { flexDirection: "row", gap: 8, padding: 12, borderRadius: 14 },
   acts: { gap: 8, marginTop: 4 },
-  note: { textAlign: "center", marginHorizontal: 6 },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
 });

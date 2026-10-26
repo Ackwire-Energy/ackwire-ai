@@ -8316,9 +8316,6 @@ export const ptBR = {
     agentWaiting: "{{The}} {{name}} começa a usar assim que ele ficar pronto.",
     managedHint: "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
     continue: "Pode seguir enquanto isso.",
-    plans:
-      "Os agentes podem pensar com o seu próprio plano de IA, com login neste computador. Não precisa de chave de API.",
-    plansMarks: "Claude, ChatGPT, GLM, Kimi e outros planos de IA",
     eta: {
       minutes_one: "Falta cerca de 1 min",
       minutes_other: "Faltam uns {{count}} min",
@@ -8469,7 +8466,6 @@ export const ptBR = {
       notAnswering: "O {{computer}} não está respondendo",
       notAnsweringHelp: "Costuma voltar em poucos minutos. Já estamos cuidando.",
       offline: "O {{computer}} está offline",
-      offlineHelp: "Desde {{time}}. {{The}} {{name}} espera o computador voltar.",
       offlineHelpPlain: "{{The}} {{name}} espera o computador voltar.",
       noRoom: "O {{computer}} já mostra o máximo de telas que consegue. Tente de novo daqui a pouco.",
       unavailable: "A tela {{of}} {{name}} não pode ser mostrada agora",
