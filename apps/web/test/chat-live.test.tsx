@@ -352,18 +352,17 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
 
 describe("empty conversations", () => {
   test("a channel: its greeting and the suggestions; a DM with a person: the greeting alone", async () => {
-    // A slow machine can take more than a few ticks to draw the empty state, so wait for it.
     await open(seedState(), `c/${GENERAL_ID}`);
-    const channel = await screen().findByText(
-      "Diga oi em #general",
-      { selector: ".ac-empty__title" },
-      { timeout: 3000 },
-    );
-    expect(channel.closest(".ac-empty")?.querySelector(".ac-empty__text")).toBeNull();
+    await settle(4);
+    const channel = document.querySelector(".ac-empty") as HTMLElement;
+    expect(channel.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi em #general");
+    expect(channel.querySelector(".ac-empty__text")).toBeNull();
     cleanup();
     await open(seedState(), "dm/person/u-joao");
-    const dm = await screen().findByText("Diga oi para João", { selector: ".ac-empty__title" }, { timeout: 3000 });
-    expect(dm.closest(".ac-empty")?.querySelector(".ac-empty__text")).toBeNull();
+    await settle(4);
+    const dm = document.querySelector(".ac-empty") as HTMLElement;
+    expect(dm.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi para João");
+    expect(dm.querySelector(".ac-empty__text")).toBeNull();
   });
 });
 

@@ -333,9 +333,8 @@ const GESTURE_MS = 1500;
 const IDLE_CATCH_UP_MS = 20_000;
 /** Older messages per scroll-up page. */
 const OLDER_PAGE = 50;
-/** Per channel, for this session: older pages already loaded, and channels with no more. */
-const olderPages = new Map<string, MessageType[]>();
-const olderDone = new Set<string>();
+/** Older pages a channel already loaded, and whether there are no more. */
+type OlderPages = { pages: MessageType[]; done: boolean };
 /** Same limit as the server (`MAX_MESSAGE_ATTACHMENTS`). */
 const MAX_ATTACHMENTS = 10;
 
@@ -727,10 +726,12 @@ function ChannelView({
     if (messages.data) live.seed(messages.data);
   }, [messages.data, live]);
 
-  // Older pages, loaded on scroll-up (kept for this session per channel).
-  const [older, setOlder] = useState<MessageType[]>(() => olderPages.get(channel.id) ?? []);
+  // Older pages, loaded on scroll-up. Kept in the query cache, so they belong to this session: signing
+  // out clears them, and they never show to whoever signs in next in the same tab.
+  const olderKey = keys.olderPages(org.id, channel.id);
+  const [older, setOlder] = useState<MessageType[]>(() => qc.getQueryData<OlderPages>(olderKey)?.pages ?? []);
   const [olderState, setOlderState] = useState<"idle" | "loading" | "done">(() =>
-    olderDone.has(channel.id) ? "done" : "idle",
+    qc.getQueryData<OlderPages>(olderKey)?.done ? "done" : "idle",
   );
   const anchor = useRef<{ height: number; top: number } | null>(null);
   const loadOlder = () => {
@@ -751,10 +752,9 @@ function ChannelView({
         setOlder((prev) => {
           const known = new Set(prev.map((m) => m.id));
           const next = [...page.filter((m) => !known.has(m.id)), ...prev];
-          olderPages.set(channel.id, next);
+          qc.setQueryData<OlderPages>(olderKey, { pages: next, done: page.length < OLDER_PAGE });
           return next;
         });
-        if (page.length < OLDER_PAGE) olderDone.add(channel.id);
         setOlderState(page.length < OLDER_PAGE ? "done" : "idle");
       })
       .catch(() => setOlderState("idle"));

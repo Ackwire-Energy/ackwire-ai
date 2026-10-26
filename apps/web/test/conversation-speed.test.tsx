@@ -68,6 +68,25 @@ describe("conversations load fast", () => {
     // 180 messages rendered twice: ~2 s on a runner, more when it's busy; past 5 s the timeout broke the next files.
   }, 15_000);
 
+  test("older pages stay with the session that loaded them: the next one opens the channel without them", async () => {
+    const state = seedState();
+    state.messages = [...history(130), ...state.messages];
+    await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const list = screen().getByRole("region", { name: "Mensagens" });
+    await act(async () => {
+      fireEvent.wheel(list);
+      fireEvent.scroll(list, { target: { scrollTop: 0 } });
+    });
+    await settle(6);
+    expect(document.body.textContent).toContain("Mensagem antiga 29");
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    expect(document.body.textContent).not.toContain("Mensagem antiga");
+    expect(document.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi em #general");
+  }, 15_000);
+
   test("opening lands at the latest message (also after the skeleton); layout scrolls never unpin", async () => {
     const state = seedState();
     const api = createFakeApi(state);
