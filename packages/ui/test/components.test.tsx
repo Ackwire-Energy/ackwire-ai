@@ -27,6 +27,7 @@ import {
   Meter,
   RunMark,
   Steps,
+  Textarea,
 } from "../src";
 
 const body = () => within(document.body);
@@ -343,6 +344,78 @@ describe("Composer", () => {
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Enviar" })));
     expect(sent).toEqual(["oi"]);
   });
+});
+
+describe("boxes as tall as their text", () => {
+  /** happy-dom lays nothing out: a box's text is 22 px a line under 20 px of padding, inside a 2 px border. */
+  const measured = async (run: () => Promise<void>) => {
+    const proto = HTMLTextAreaElement.prototype;
+    const lines = (el: HTMLTextAreaElement) => el.value.split("\n").length;
+    Object.defineProperty(proto, "scrollHeight", {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return 20 + 22 * lines(this);
+      },
+    });
+    Object.defineProperty(proto, "clientHeight", { configurable: true, get: () => 100 });
+    Object.defineProperty(proto, "offsetHeight", { configurable: true, get: () => 102 });
+    try {
+      await run();
+    } finally {
+      for (const key of ["scrollHeight", "clientHeight", "offsetHeight"]) Reflect.deleteProperty(proto, key);
+    }
+  };
+  const type = (box: HTMLElement, value: string) => act(async () => fireEvent.change(box, { target: { value } }));
+
+  test("Textarea autoGrow grows with its text, border included, and shrinks back; without it, its height is left alone", () =>
+    measured(async () => {
+      function Box({ grow }: { grow: boolean }) {
+        const [value, setValue] = useState("uma linha");
+        return (
+          <Textarea
+            autoGrow={grow}
+            aria-label={grow ? "Cresce" : "Fixa"}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        );
+      }
+      render(
+        <>
+          <Box grow />
+          <Box grow={false} />
+        </>,
+      );
+      const box = body().getByRole("textbox", { name: "Cresce" }) as HTMLTextAreaElement;
+      expect(box.style.height).toBe("44px");
+      await type(box, "um\ndois\ntrês");
+      expect(box.style.height).toBe("88px");
+      await type(box, "um");
+      expect(box.style.height).toBe("44px");
+      expect((body().getByRole("textbox", { name: "Fixa" }) as HTMLTextAreaElement).style.height).toBe("");
+    }));
+
+  test("the composer grows the same way", () =>
+    measured(async () => {
+      function Chat() {
+        const [value, setValue] = useState("");
+        return (
+          <Composer
+            value={value}
+            onChange={setValue}
+            onSend={() => {}}
+            label="Mensagem"
+            sendLabel="Enviar"
+            attachLabel="Anexar"
+          />
+        );
+      }
+      render(<Chat />);
+      const box = body().getByRole("textbox", { name: "Mensagem" });
+      expect(box.style.height).toBe("44px");
+      await type(box, "um\ndois");
+      expect(box.style.height).toBe("66px");
+    }));
 });
 
 describe("Message", () => {

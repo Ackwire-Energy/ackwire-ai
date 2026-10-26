@@ -107,6 +107,7 @@ const CLOUD_EXTRA = [
   "onboarding.computer.leadCloud",
   "onboarding.computer.leadCloudReady",
   "onboarding.keyStep.lead",
+  ...["ready", "waiting", "noAi", "noAiAny"].map((k) => `onboarding.done.first.${k}`),
   ...["signIn", "key", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),
   "connectAi.titleFor",
   "noAi.banner.orgHintPreparing",

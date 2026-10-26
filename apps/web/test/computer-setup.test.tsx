@@ -655,12 +655,32 @@ describe("the onboarding where the workspace gets its own computer", () => {
     await click(screen().getByRole("button", { name: "Conectar depois" }));
     await settle(6);
     await click(screen().getByRole("button", { name: "Pular esta etapa" }));
-    // Done: how far it is in the tile's big type, whose it is under it.
-    const tile = [...document.querySelectorAll(".onb__summary > *")].find((c) =>
-      c.textContent?.startsWith("Computador"),
-    );
-    expect(tile?.querySelector(".onb__stat")?.textContent).toBe("Pronto");
-    expect(tile?.querySelector(".onb__stat-of")?.textContent).toBe("Computador da Acme Saúde");
+    // Done: the computer lit at the end of the faces, saying whose it is and how far; Lia browses on it, so she asks.
+    const plate = screen().getByRole("img", { name: "Computador da Acme Saúde · Pronto" });
+    expect(plate.getAttribute("data-state")).toBe("online");
+    expect(plate.closest(".onb__crew-computer")?.getAttribute("title")).toBe("Computador da Acme Saúde · Pronto");
+    // Spaced by the row's gap alone: wrapped onto a line of its own (more faces, a phone), it starts under the first.
+    const css = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
+    expect(css.match(/\.onb__crew-computer \{[^}]*\}/)?.[0]).not.toContain("margin");
+    expect(
+      (screen().getByRole("textbox", { name: "Sua primeira mensagem no #general" }) as HTMLTextAreaElement).value,
+    ).toBe("@lia Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?");
+    expect(screen().getByRole("button", { name: "Enviar para Lia" })).toBeTruthy();
+  });
+
+  test("Done while it's prepared: the computer's portrait dimmed with the time left, and Theo asks, since Lia can't browse yet", async () => {
+    await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
+    await click(screen().getByRole("button", { name: "Conectar depois" }));
+    await settle(6);
+    await click(screen().getByRole("button", { name: "Pular esta etapa" }));
+    const plate = screen().getByRole("img", { name: "Computador da Acme Saúde · Sendo preparado · Faltam uns 10 min" });
+    expect(plate.getAttribute("data-state")).toBe("paused");
+    expect(
+      (screen().getByRole("textbox", { name: "Sua primeira mensagem no #general" }) as HTMLTextAreaElement).value,
+    ).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
+    expect(screen().getByRole("button", { name: "Enviar para Theo" })).toBeTruthy();
   });
 
   test("its first time shows at once: asked every 2 s until the provisioner says one, with the email line", async () => {

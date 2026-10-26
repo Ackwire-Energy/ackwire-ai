@@ -14,7 +14,13 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
-import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@agenteschat/client/lib/onboarding";
+import {
+  addInvites,
+  firstAskOrder,
+  ONBOARDING_STEPS,
+  splitEmails,
+  validInvites,
+} from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@agenteschat/client/lib/text";
 import { en, ptBR } from "@agenteschat/i18n";
@@ -116,6 +122,10 @@ describe("text", () => {
       "done",
     ]);
     expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["import", "computer", "team"]);
+  });
+  test("onboarding's first message: Lia offers it where the agents can browse, Theo where they can't, then Ada", () => {
+    expect(firstAskOrder(true)).toEqual(["lia", "theo", "ada"]);
+    expect(firstAskOrder(false)).toEqual(["theo", "lia", "ada"]);
   });
   test("password and amounts", () => {
     expect(passwordState("")).toBe("empty");

@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { cx } from "../cx";
+import { onScreenKeyboard } from "../device";
 import {
   applyFormat,
   FORMAT_KINDS,
@@ -23,6 +24,7 @@ import {
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
 import { type EmojiPickerLabels, EmojiPickerPopover } from "./EmojiPicker";
+import { useAutoGrow } from "./Field";
 import { modKey } from "./Kbd";
 import { PixelStop } from "./PixelMarks";
 import { Spinner } from "./Skeleton";
@@ -319,13 +321,6 @@ export function mentionQuery(text: string, caret: number): { start: number; quer
   return { start: caret - query.length - 1, query };
 }
 
-/** A phone or tablet typing on its on-screen keyboard (touch first, no mouse). */
-const onScreenKeyboard = () =>
-  typeof navigator !== "undefined" &&
-  navigator.maxTouchPoints > 0 &&
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(pointer: coarse)").matches;
-
 /** The chat message box: attach on the left, send (primary, icon only) on the right, focus on the whole box. */
 export function Composer({
   value,
@@ -372,13 +367,12 @@ export function Composer({
   // A selection to restore after the text changes (formatting, an emoji).
   const selectAfter = useRef<[number, number] | null>(null);
 
-  // Grow with the text, up to the CSS max-height; put the caret after an inserted mention.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure whenever the text changes
+  useAutoGrow(ref, value);
+  // Once the text is in: the caret after an inserted mention, or a selection put back.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: whenever the text changes
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
     if (caretAfter.current !== null) {
       el.setSelectionRange(caretAfter.current, caretAfter.current);
       caretAfter.current = null;
@@ -389,21 +383,6 @@ export function Composer({
       selectAfter.current = null;
     }
   }, [value]);
-
-  // A width change rewraps the text (window resize, sidebar opening): measure again so nothing hides.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   /** Replaces the text and selection (formatting, emoji), keeping the focus in the box. */
   const edit = (next: TextEdit) => {
