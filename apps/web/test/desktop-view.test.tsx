@@ -263,11 +263,11 @@ afterEach(() => {
 
 /**
  * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
- * `picture()`. The DOM here draws nothing, so that copy's context is this stand-in while it's on; the canvases
- * on the page keep their own.
+ * `dock()` (its dock on that black, two pixels of the copy) or `picture()` (the wallpaper drawn). The DOM here
+ * draws nothing, so that copy's context is this stand-in while it's on; the canvases on the page keep their own.
  */
 function screenPixels() {
-  let shows = false;
+  let shows: "black" | "dock" | "picture" = "black";
   const proto = Object.getPrototypeOf(document.createElement("canvas")) as HTMLCanvasElement;
   const getContext = proto.getContext;
   const copy = {
@@ -275,8 +275,12 @@ function screenPixels() {
     getImageData: (_x: number, _y: number, w: number, h: number) => {
       const data = new Uint8ClampedArray(w * h * 4);
       for (let i = 3; i < data.length; i += 4) data[i] = 255;
-      // One spot of the desktop's sky is enough to tell a picture from a black screen.
-      if (shows) data.set([75, 147, 255, 255], 4 * (w + 1));
+      const bottom = 4 * w * (h - 1);
+      if (shows === "dock") for (const x of [w / 2 - 1, w / 2]) data.set([240, 244, 250, 255], bottom + 4 * x);
+      // The wallpaper: the sky, its pale band at the bottom.
+      if (shows === "picture") {
+        for (let i = 0; i < data.length; i += 4) data.set(i < bottom ? [75, 147, 255, 255] : [207, 230, 255, 255], i);
+      }
       return { data };
     },
   };
@@ -284,8 +288,11 @@ function screenPixels() {
     return this.isConnected ? getContext.apply(this, args) : copy;
   } as unknown as typeof proto.getContext;
   return {
+    dock: () => {
+      shows = "dock";
+    },
     picture: () => {
-      shows = true;
+      shows = "picture";
     },
     restore: () => {
       proto.getContext = getContext;
@@ -336,6 +343,11 @@ describe("the agent's screen in the computer dialog", () => {
       expect(sub()).toBe("Abrindo…");
       expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
       expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+      // Its dock drawn on the black, the wallpaper not yet: still opening.
+      pixels.dock();
+      await waitLooks();
+      expect(sub()).toBe("Abrindo…");
+      expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
       pixels.picture();
       await waitLooks();
       expect(sub()).toBe("Ao vivo · você está assistindo");
