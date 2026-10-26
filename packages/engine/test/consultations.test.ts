@@ -110,6 +110,12 @@ describe("ask_agent", () => {
     );
     expect(told).toBeGreaterThanOrEqual(0);
     expect(notice).toBeGreaterThan(told);
+    // The people see it as the consultation it was: who asked whom, the question and the answer apart.
+    const meta = timeline[notice]?.meta as { notice?: { refs?: Record<string, string> } } | undefined;
+    const refs = meta?.notice?.refs;
+    expect(refs).toMatchObject({ askerAgentId: f.agent.id, agentId: infra.id, status: "answered" });
+    expect(refs?.question).toBeTruthy();
+    expect(refs?.answer).toBeTruthy();
     const reply = timeline.at(-1);
     expect(reply?.body).toBe("Relaying: Staging deploys with deploy.sh");
     await Bun.sleep(5);

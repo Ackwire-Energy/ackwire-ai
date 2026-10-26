@@ -382,7 +382,10 @@ export function consultationResult(c: Pick<AgentConsultationRow, "status" | "ans
  * it may have asked other things since.
  */
 export function consultationNotice(
-  c: Pick<AgentConsultationRow, "id" | "status" | "answer" | "question" | "askerRunId">,
+  c: Pick<
+    AgentConsultationRow,
+    "id" | "status" | "answer" | "question" | "askerRunId" | "askerAgentId" | "targetAgentId"
+  >,
   handle: string,
 ): Notice {
   const asked = `you asked: "${c.question.slice(0, 300)}${c.question.length > 300 ? "…" : ""}"`;
@@ -392,8 +395,27 @@ export function consultationNotice(
       : c.status === "expired"
         ? `No answer: it didn't answer within ${CONSULTATION_TTL_MS / 60_000} minutes (${asked}). Say what is still missing if it matters; ask again only if you still need it.`
         : `No answer: it couldn't (${c.answer ?? "its run failed"}; ${asked}). Go on with what you know.`;
-  return { kind: "consult_reply", text, from: `@${handle}`, refs: { consultationId: c.id, runId: c.askerRunId } };
+  return {
+    kind: "consult_reply",
+    text,
+    from: `@${handle}`,
+    refs: {
+      consultationId: c.id,
+      runId: c.askerRunId,
+      // For the people reading the conversation: who asked whom, the question and the answer apart, so the
+      // app shows them as the consultation they were (`text` is written for the asking agent).
+      askerAgentId: c.askerAgentId,
+      agentId: c.targetAgentId,
+      status: c.status,
+      question: c.question.slice(0, NOTICE_QUESTION_MAX),
+      ...(c.answer ? { answer: c.answer.slice(0, NOTICE_ANSWER_MAX) } : {}),
+    },
+  };
 }
+
+/** How much of the question and the answer the notice keeps for the people (the agent reads `text`). */
+const NOTICE_QUESTION_MAX = 2_000;
+const NOTICE_ANSWER_MAX = 8_000;
 
 async function handleOf(db: Database, orgId: string, agentId: string) {
   const [a] = await db

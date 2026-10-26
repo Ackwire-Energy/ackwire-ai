@@ -50,7 +50,8 @@ export function NewAgentForm({ initialWhat = "" }: { initialWhat?: string }) {
     <SheetScreen>
       <SheetHeader title={t("mobile.agents.new")} />
       <View style={styles.sky}>
-        <Sky color={NEWBORN.color} depth={0.9} style={StyleSheet.absoluteFill} />
+        {/* Blends into the sheet's grouped gray: on the default (white) it drew a box under the header. */}
+        <Sky color={NEWBORN.color} depth={0.9} surface="grouped" style={StyleSheet.absoluteFill} />
         <AgentAvatar agent={NEWBORN} size={72} />
       </View>
       <Text variant="display2" style={styles.question} accessibilityRole="header">
