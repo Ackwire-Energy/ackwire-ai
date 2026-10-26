@@ -11,7 +11,8 @@ const CLOSE_MS = 150;
 /**
  * Whether the last input was a key rather than a press. Focus that a key brings opens a hint; focus that a press
  * brings opens nothing, since the press's own click decides, so one click never opens and closes it at once. A key
- * held with ⌘, Ctrl or Alt is a shortcut, not a move.
+ * held with ⌘, Ctrl or Alt is a shortcut, not a move, except Tab: by default, Safari and the macOS app reach a button
+ * only with ⌥Tab.
  */
 let lastInputKey = false;
 let tracking = false;
@@ -21,7 +22,7 @@ function trackLastInput() {
   document.addEventListener(
     "keydown",
     (e) => {
-      if (!e.metaKey && !e.ctrlKey && !e.altKey) lastInputKey = true;
+      if (e.key === "Tab" || !(e.metaKey || e.ctrlKey || e.altKey)) lastInputKey = true;
     },
     true,
   );
@@ -127,7 +128,11 @@ export function InfoHint({ name, children, id, side = "top", align = "center" }:
           onCloseAutoFocus={(e) => e.preventDefault()}
           onPointerDownOutside={onAnchor}
           onFocusOutside={onAnchor}
-          onPointerEnter={enter}
+          // Crossing onto the bubble only holds off the close, never opens: a bubble that keyboard focus opened
+          // under a resting mouse would otherwise come back after focus moved on.
+          onPointerEnter={(e) => {
+            if (hoverPointer(e.pointerType)) clearTimeout(timer.current);
+          }}
           onPointerLeave={leave}
         >
           {children}
