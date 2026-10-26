@@ -151,6 +151,8 @@ export const featureKeysPtBR = {
       proposed: "Proposta",
     },
     empty: "Nenhuma conversa ainda.",
+    // A DM with no message yet: a word to start (an agent's row says who it is instead).
+    sayHi: "Diga oi para {{name}}.",
     closed: "Fechada",
     working: "trabalhando…",
     missionProgress: "{{done}} de {{total}} itens",
