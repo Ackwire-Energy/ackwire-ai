@@ -97,6 +97,9 @@ export const ptBR = {
     flow: {
       email: "Oi. Qual é o seu e-mail?",
       emailLead: "Vale para entrar ou para criar uma conta.",
+      toAsk: "Para pedir para entrar na {{org}}.",
+      toJoin: "Para entrar na {{org}}.",
+      toConnectAi: "Para conectar sua IA.",
       emailUp: "Vamos criar sua conta. Qual é o seu e-mail de trabalho?",
       emailUpLead: "Com o e-mail do trabalho, o time te acha mais fácil.",
       emailPlaceholder: "voce@empresa.com",

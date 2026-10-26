@@ -90,6 +90,9 @@ export const en: Translations = {
     flow: {
       email: "Hi. What's your email?",
       emailLead: "It works to sign in or to create an account.",
+      toAsk: "To ask to join {{org}}.",
+      toJoin: "To join {{org}}.",
+      toConnectAi: "To connect your AI.",
       emailUp: "Let's create your account. What's your work email?",
       emailUpLead: "With your work email, your team finds you more easily.",
       emailPlaceholder: "you@company.com",

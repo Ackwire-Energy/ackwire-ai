@@ -72,6 +72,10 @@ describe("an invitation link asks to join", () => {
     expect(screen().getByLabelText("Seu e-mail").hasAttribute("aria-describedby")).toBe(false);
     // The answer goes to that address: a likely typo is offered first.
     await click(button("Você quis dizer ana@gmail.com?"));
+    // Signing in instead takes the address typed here along.
+    expect(screen().getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe(
+      "/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com",
+    );
     const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
     expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
     expect(note.hasAttribute("aria-describedby")).toBe(false);

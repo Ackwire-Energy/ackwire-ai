@@ -112,6 +112,9 @@ export const authConfigQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.authConfig, queryFn: () => api.account.authConfig(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
   queryOptions({ queryKey: keys.channels(orgId), queryFn: () => api.chat.channels(orgId), staleTime: 30_000 });
+/** An invitation's preview (its page, and the sign-in that leads to it). */
+export const invitationQuery = (api: ApiClient, token: string) =>
+  queryOptions({ queryKey: keys.invitation(token), queryFn: () => api.orgs.previewInvitation(token), retry: false });
 
 // ── Account ─────────────────────────────────────────────────────────────────
 

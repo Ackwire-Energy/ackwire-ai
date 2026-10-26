@@ -194,6 +194,48 @@ describe("Entrar (e-mail primeiro)", () => {
   });
 });
 
+describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
+  const LINK = { orgName: "Acme", email: "", role: "member", kind: "link", invitedBy: null, agents: [] } as const;
+  const at = (redirect: string, email?: string) =>
+    `/login?${new URLSearchParams({ redirect, ...(email ? { email } : {}) })}`;
+
+  test("from an invitation link's Sign in: its workspace, and the address typed there already filled in", async () => {
+    const { api } = authApi(ACCOUNT, { state: seedState({ me: null, previews: { lnk: LINK } }) });
+    await renderApp(at("/invite/lnk"), { api, auth: createFakeAuth().auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    expect(lead()).toBe("Para pedir para entrar na Acme.");
+    cleanup();
+
+    await renderApp(at("/invite/lnk", "marina@acme.com.br"), { api, auth: createFakeAuth().auth });
+    await settle(4);
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(lead()).toBe("Para pedir para entrar na Acme.");
+    expect(screen().getByText("marina@acme.com.br")).toBeTruthy();
+  });
+
+  test("an email invitation's: to join; the ready email's Connect your AI: to connect it", async () => {
+    const { api } = authApi(ACCOUNT, { state: seedState({ me: null }) });
+    await renderApp(at("/invite/valid"), { api, auth: createFakeAuth().auth });
+    expect(lead()).toBe("Para entrar na Acme.");
+    cleanup();
+
+    await renderApp(at(`/org/${ORG_ID}?connect=ai`), { api, auth: createFakeAuth().auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    expect(lead()).toBe("Para conectar sua IA.");
+  });
+
+  test("a link that no longer works, an unknown one, or anywhere else: the general line", async () => {
+    const { api } = authApi(ACCOUNT, {
+      state: seedState({ me: null, previews: { off: { ...LINK, closed: true } } }),
+    });
+    for (const redirect of ["/invite/off", "/invite/nope", `/org/${ORG_ID}/drive`]) {
+      await renderApp(at(redirect), { api, auth: createFakeAuth().auth });
+      expect(lead()).toBe("Vale para entrar ou para criar uma conta.");
+      cleanup();
+    }
+  });
+});
+
 describe("Criar conta (e-mail novo)", () => {
   test("name, then a password with live help; creating the account goes to onboarding", async () => {
     const { api } = authApi(NEW);

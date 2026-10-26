@@ -1,7 +1,8 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
-import { keys, useAuthConfig, useMe } from "@agenteschat/client";
+import { invitationQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { signInPath } from "@agenteschat/client/lib/guards";
 import { ANSWER_POLL_MS, askView, JOIN_NAME_MAX, JOIN_NOTE_MAX } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail, passwordState } from "@agenteschat/client/lib/text";
 import { Alert, AvatarStack, Button, Card, Field, Input, Textarea } from "@agenteschat/ui";
@@ -24,11 +25,7 @@ export function InvitePage({ token }: { token: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const me = useMe();
-  const preview = useQuery({
-    queryKey: keys.invitation(token),
-    queryFn: () => api.orgs.previewInvitation(token),
-    retry: false,
-  });
+  const preview = useQuery(invitationQuery(api, token));
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -159,10 +156,7 @@ export function InvitePage({ token }: { token: string }) {
                 </Button>
                 <p className="auth__foot" style={{ margin: 0, fontSize: 14 }}>
                   {t("invite.haveAccountWithEmail")}{" "}
-                  <a
-                    className="ac-link"
-                    href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}&email=${encodeURIComponent(invitation.email)}`}
-                  >
+                  <a className="ac-link" href={signInPath(`/invite/${token}`, invitation.email)}>
                     {t("auth.signIn")}
                   </a>
                 </p>
@@ -249,9 +243,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   const [sent, setSent] = useState<AskToJoinResult | null>(null);
   const view = askView(preview, sent !== null);
   useQuery({
-    queryKey: keys.invitation(token),
-    queryFn: () => api.orgs.previewInvitation(token),
-    retry: false,
+    ...invitationQuery(api, token),
     refetchInterval: user && (view.state === "sent" || view.state === "approvedEmail") ? ANSWER_POLL_MS : false,
   });
   const [name, setName] = useState("");
@@ -434,7 +426,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
             {!user && (
               <p className="auth__foot" style={{ margin: 0, fontSize: 14 }}>
                 {t("invite.ask.haveAccount")}{" "}
-                <a className="ac-link" href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}>
+                <a className="ac-link" href={signInPath(`/invite/${token}`, isEmail(email) ? email.trim() : undefined)}>
                   {t("auth.signIn")}
                 </a>
               </p>
