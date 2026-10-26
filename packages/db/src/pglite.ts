@@ -15,8 +15,10 @@ import { pgDump } from "@electric-sql/pglite-tools/pg_dump";
 export const PGLITE_VERSION = "0.5.8";
 export const PG_MAJOR = 18;
 
-/** `pglite:///absolute/folder`: the folder, as written (no percent-encoding). */
+/** `pglite:///absolute/folder`: the folder, as written (no percent-encoding); on Windows `pglite:///C:\folder`. */
 const PGLITE_URL = /^pglite:\/\/(\/.*)$/;
+/** A Windows folder after the URL's third slash (`/C:\…`, `/C:/…`). */
+const WINDOWS_DRIVE = /^\/[A-Za-z]:[\\/]/;
 
 /** Next to the database's own files: the PGlite and the Postgres major that wrote them. */
 export const FOLDER_FILE = "agentes.json";
@@ -28,8 +30,13 @@ export interface FolderVersion {
 
 /** The folder of a `pglite:///…` database URL; null for any other URL. */
 export function pgliteFolder(url: string): string | null {
-  return PGLITE_URL.exec(url)?.[1] ?? null;
+  const path = PGLITE_URL.exec(url)?.[1];
+  if (!path) return null;
+  return WINDOWS_DRIVE.test(path) ? path.slice(1) : path;
 }
+
+/** The database URL of a folder (an absolute path): `pglite:///home/…`, or `pglite:///C:\Users\…` on Windows. */
+export const pgliteUrl = (folder: string) => `pglite://${folder.startsWith("/") ? "" : "/"}${folder}`;
 
 /** The folder holds another Postgres major's files: it opens only after a dump and a restore. */
 export class PgMajorMismatchError extends Error {

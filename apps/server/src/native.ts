@@ -30,6 +30,7 @@ import {
   openPglite,
   PG_MAJOR,
   PGLITE_VERSION,
+  pgliteUrl,
   PgMajorMismatchError,
   restorePglite,
 } from "@agenteschat/db";
@@ -146,7 +147,7 @@ async function nativeEnv(dir: string, env: NodeJS.ProcessEnv = process.env) {
   env.PUBLIC_URL ??= `http://127.0.0.1:${env.PORT}`;
   env.INSTALL_MODE ??= "native";
   env.WEB_DIR ??= join(PACKAGE, "web");
-  env.DATABASE_URL = `pglite://${files.db}`;
+  env.DATABASE_URL = pgliteUrl(files.db);
   env.FILES_DIR = files.files;
   env.HOST = "127.0.0.1";
   env.NODE_ENV = "production";
