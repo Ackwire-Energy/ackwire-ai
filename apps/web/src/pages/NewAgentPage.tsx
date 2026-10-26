@@ -32,6 +32,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Kbd,
   Logo,
@@ -128,7 +129,6 @@ interface Created {
   agent: Agent;
   look: Required<AgentAppearance>;
   channels: { id: string; name: string }[];
-  ownerName: string | null;
 }
 
 /** "Criar agente": the steps on a rail, a live preview of the agent on the right. */
@@ -370,7 +370,6 @@ function NewAgentFlow() {
       agent,
       look,
       channels: joined.map((c) => ({ id: c.id, name: c.name })),
-      ownerName: ownerFirst,
     });
     mood.react("happy", 2200);
     scrollTop();
@@ -486,15 +485,27 @@ function NewAgentFlow() {
 
   /* ---------- The step's content ---------- */
 
-  const head = (title: string, lead: string) => (
-    <header className="onb__head">
-      <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
+  const head = (title: string, lead?: string, hint?: string) => {
+    const h1 = (
       <h1 className="onb__title newag__title" ref={heading} tabIndex={-1}>
         {title}
       </h1>
-      <p className="onb__lead">{lead}</p>
-    </header>
-  );
+    );
+    return (
+      <header className="onb__head">
+        <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
+        {hint ? (
+          <div className="ac-hintline">
+            {h1}
+            <InfoHint name={t("common.about", { label: title })}>{hint}</InfoHint>
+          </div>
+        ) : (
+          h1
+        )}
+        {lead && <p className="onb__lead">{lead}</p>}
+      </header>
+    );
+  };
   const errorLine = (e: DraftError | undefined) =>
     e ? (
       <span className="newag__err" role="alert">
@@ -692,7 +703,11 @@ function NewAgentFlow() {
       const changed = role !== null && role !== "custom" && instructions !== original;
       return (
         <>
-          {head(t("newAgent.steps.instructions.title", g), t("newAgent.steps.instructions.lead"))}
+          {head(
+            t("newAgent.steps.instructions.title", g),
+            t("newAgent.steps.instructions.lead"),
+            t("agent.instructionsHelp", { ...g, org: org.name }),
+          )}
           <Textarea
             className="newag__textarea"
             rows={9}
@@ -739,10 +754,6 @@ function NewAgentFlow() {
               });
             }}
           />
-          <p className="newag__note ac-iconline">
-            <Icon name="info" size={16} />
-            <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
-          </p>
           {!instructions.trim() && <p className="small muted">{t("newAgent.noInstructions", g)}</p>}
         </>
       );
@@ -951,11 +962,15 @@ function NewAgentFlow() {
           </div>
           <KeySelect value={key} onChange={setKey} options={keys} />
           <div className="newag__sect">
-            <h2>
-              <Icon name="wallet" />
-              {t("newAgent.budgetTitle")}
-            </h2>
-            <span className="small muted">{t("newAgent.budgetHelp", g)}</span>
+            <div className="ac-hintline">
+              <h2>
+                <Icon name="wallet" />
+                {t("newAgent.budgetTitle")}
+              </h2>
+              <InfoHint name={t("common.about", { label: t("newAgent.budgetTitle") })}>
+                {`${t("newAgent.budgetHelp", g)} ${ownerFirst ? t("newAgent.warnsOwner", { name: ownerFirst }) : t("newAgent.warnsAdmins")}`}
+              </InfoHint>
+            </div>
           </div>
           <Card as="div" className="newag__card">
             <BudgetField
@@ -969,8 +984,7 @@ function NewAgentFlow() {
               <span className="small muted">
                 {defaultBudget === undefined
                   ? t("agent.budgetDefaultHelp")
-                  : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}{" "}
-                {ownerFirst ? t("newAgent.warnsOwner", { name: ownerFirst }) : t("newAgent.warnsAdmins")}
+                  : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}
               </span>
             )}
           </Card>
@@ -1000,7 +1014,7 @@ function NewAgentFlow() {
         list.length ? <span className="newag__chips">{list}</span> : <span className="muted">{empty}</span>;
       return (
         <>
-          {head(t("newAgent.steps.review.title", g), t("newAgent.steps.review.lead"))}
+          {head(t("newAgent.steps.review.title", g))}
           <Card as="div" className="newag__card newag__review">
             {row(
               "role",
@@ -1083,12 +1097,6 @@ function NewAgentFlow() {
               </span>,
             )}
           </Card>
-          <p className="newag__note ac-iconline">
-            <Icon name="shield" size={16} />
-            <span>
-              {ownerFirst ? t("newAgent.reviewNoteOwner", { name: ownerFirst }) : t("newAgent.reviewNoteAdmins")}
-            </span>
-          </p>
         </>
       );
     },
@@ -1181,7 +1189,6 @@ function NewAgentFlow() {
         <aside className="newag__aside" aria-label={t("newAgent.preview.label")}>
           <div className="newag__cap">
             <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>
-            <span className="small muted">{t("newAgent.preview.hint")}</span>
           </div>
           <div className="newag__pv" data-big={step === "identity" || undefined} data-open={previewOpen || undefined}>
             <div className="newag__pv-cover">
@@ -1359,71 +1366,40 @@ function CreatedMoment({
     t("newAgent.and"),
   );
   return (
-    <>
-      <section className="newag__born" aria-labelledby="ag-born">
-        <AgentBornSky color={created.look.color} at={phone ? [0.5, 0.26] : [0.8, 0.45]} calm={() => [text.current]} />
-        <span className="newag__born-agent">
-          <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
-        </span>
-        <div className="newag__born-text" ref={text}>
-          <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
-          <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
-            {t("newAgent.createdTitle", { name: agent.name })}
-          </h1>
-          <p className="newag__born-lead">
-            {channels.length > 0
-              ? t("newAgent.createdText", { channels: names, handle: agent.handle })
-              : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
-          </p>
-          <div className="newag__born-actions">
-            {first && (
-              <Button asChild variant="primary" className="newag__on-sky">
-                <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
-                  {t("newAgent.goTo", { channel: first.name })}
-                  <Icon name="arrowRight" size={16} />
-                </Link>
-              </Button>
-            )}
-            <Button asChild variant={first ? "default" : "primary"} className="newag__on-sky">
-              <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
-                {t("newAgent.openProfile")}
+    <section className="newag__born" aria-labelledby="ag-born">
+      <AgentBornSky color={created.look.color} at={phone ? [0.5, 0.26] : [0.8, 0.45]} calm={() => [text.current]} />
+      <span className="newag__born-agent">
+        <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
+      </span>
+      <div className="newag__born-text" ref={text}>
+        <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
+        <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
+          {t("newAgent.createdTitle", { name: agent.name })}
+        </h1>
+        <p className="newag__born-lead">
+          {channels.length > 0
+            ? t("newAgent.createdText", { channels: names, handle: agent.handle })
+            : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
+        </p>
+        <div className="newag__born-actions">
+          {first && (
+            <Button asChild variant="primary" className="newag__on-sky">
+              <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
+                {t("newAgent.goTo", { channel: first.name })}
+                <Icon name="arrowRight" size={16} />
               </Link>
             </Button>
-            <Button icon="plus" className="newag__on-sky" onClick={onAgain}>
-              {t("newAgent.createAnother")}
-            </Button>
-          </div>
+          )}
+          <Button asChild variant={first ? "default" : "primary"} className="newag__on-sky">
+            <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+              {t("newAgent.openProfile")}
+            </Link>
+          </Button>
+          <Button icon="plus" className="newag__on-sky" onClick={onAgain}>
+            {t("newAgent.createAnother")}
+          </Button>
         </div>
-      </section>
-      <div className="newag__nexts">
-        <Card as="div" className="newag__next">
-          <b>
-            <Icon name="message" size={16} />
-            {t("newAgent.next.hello.title")}
-          </b>
-          <span>
-            {first
-              ? t("newAgent.next.hello.inChannel", { handle: agent.handle, channel: first.name })
-              : t("newAgent.next.hello.text", { handle: agent.handle })}
-          </span>
-        </Card>
-        <Card as="div" className="newag__next">
-          <b>
-            <Icon name="bell" size={16} />
-            {created.ownerName
-              ? t("newAgent.next.alerts.owner", { name: created.ownerName })
-              : t("newAgent.next.alerts.admins")}
-          </b>
-          <span>{t("newAgent.next.alerts.text")}</span>
-        </Card>
-        <Card as="div" className="newag__next">
-          <b>
-            <Icon name="shield" size={16} />
-            {t("newAgent.next.profile.title")}
-          </b>
-          <span>{t("newAgent.next.profile.text")}</span>
-        </Card>
       </div>
-    </>
+    </section>
   );
 }

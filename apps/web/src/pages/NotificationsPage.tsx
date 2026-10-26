@@ -1460,7 +1460,7 @@ export function NotificationsPage() {
         ? t("notifications.toast.doneQuestion", { name })
         : n.kind === "approval"
           ? t("notifications.toast.doneApproval")
-          : t("notifications.toast.doneOther"),
+          : undefined,
     );
   };
 
@@ -1523,8 +1523,7 @@ export function NotificationsPage() {
 
   const startReply = (n: AppNotification) => {
     if (!replyTarget(n)) {
-      if (n.kind === "approval")
-        toast.show(t("notifications.toast.decideThere"), "info", undefined, t("notifications.toast.decideThereDetail"));
+      if (n.kind === "approval") toast.show(t("notifications.toast.decideThere"), "info");
       return;
     }
     setReplying(n.id);
@@ -1609,15 +1608,10 @@ export function NotificationsPage() {
       { type: "readAll", filter },
       {
         onSuccess: (res) =>
-          toast.show(
-            t("notifications.toast.readAll", { count: res.ids.length || count }),
-            "info",
-            {
-              label: t("notifications.toast.undo"),
-              run: () => action.mutate({ type: "unreadMany", ids: res.ids }),
-            },
-            t("notifications.toast.readAllDetail"),
-          ),
+          toast.show(t("notifications.toast.readAll", { count: res.ids.length || count }), "info", {
+            label: t("notifications.toast.undo"),
+            run: () => action.mutate({ type: "unreadMany", ids: res.ids }),
+          }),
       },
     );
   };
@@ -1879,13 +1873,6 @@ export function NotificationsPage() {
           <Button variant="ghost" size="sm" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
             {t("notifications.more")}
           </Button>
-        </div>
-      )}
-
-      {filter === "all" && items.length > 0 && (
-        <div className="nt-foot ac-iconline">
-          <Icon name="check" size={14} />
-          {t("notifications.foot")}
         </div>
       )}
     </div>

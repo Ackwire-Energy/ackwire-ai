@@ -145,7 +145,12 @@ describe("grammar", () => {
     expect(isFeminineName("Theo")).toBe(false);
     expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
     expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
-    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toContain("entra no contexto dela");
+    expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toBe(
+      "O que a Ada aprendeu com as conversas e as correções do time.",
+    );
+    expect(t("agent.instructionsHelp", { ...agentGrammar(t, "Atlas"), org: "Acme" })).toEndWith(
+      "escreva aqui só o que é do Atlas.",
+    );
   });
 
   test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {

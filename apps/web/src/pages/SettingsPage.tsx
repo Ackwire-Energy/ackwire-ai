@@ -34,7 +34,6 @@ import { parseAmount } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
-  CardFooter,
   CardHeader,
   Chip,
   Dialog,
@@ -42,6 +41,7 @@ import {
   DialogFooter,
   Field,
   Icon,
+  InfoHint,
   Input,
   List,
   Meter,
@@ -249,6 +249,8 @@ function GeneralSection() {
     });
   };
   const ideas = (["who", "now", "never"] as const).map((k) => t(`settings.contextIdeas.${k}`));
+  const orgName = name.trim() || org.name;
+  const contextTitle = t("settings.contextTitle", { name: orgName });
   const missing = ideas.filter((label) => !context.toLowerCase().includes(label.toLowerCase()));
 
   return (
@@ -276,7 +278,6 @@ function GeneralSection() {
           <div className="settings-row">
             <div className="settings-row__text">
               <span className="settings-row__label">{t("orgLogo.label")}</span>
-              <span className="settings-row__help">{t("orgLogo.labelHelp")}</span>
             </div>
             <div className="settings-row__control">
               <OrgMark logo={org.logo} size={40} className="settings__org-logo" />
@@ -292,7 +293,6 @@ function GeneralSection() {
               <label className="settings-row__label" htmlFor="set-name">
                 {t("settings.name")}
               </label>
-              <span className="settings-row__help">{t("settings.nameHelp")}</span>
             </div>
             <div className="settings-row__control">
               <Input
@@ -310,8 +310,12 @@ function GeneralSection() {
           </div>
           <div className="settings-row">
             <div className="settings-row__text">
-              <span className="settings-row__label">{t("settings.timezone")}</span>
-              <span className="settings-row__help">{t("settings.timezoneHelp")}</span>
+              <span className="ac-hintline">
+                <span className="settings-row__label">{t("settings.timezone")}</span>
+                <InfoHint name={t("common.about", { label: t("settings.timezone") })}>
+                  {t("settings.timezoneHelp")}
+                </InfoHint>
+              </span>
             </div>
             <div className="settings-row__control">
               <ZoneSelect
@@ -327,11 +331,13 @@ function GeneralSection() {
           </div>
           <div className="settings-row">
             <div className="settings-row__text">
-              <label className="settings-row__label" htmlFor="set-action-check">
-                {t("settings.actionCheck")}
-              </label>
-              <span className="settings-row__help" id="set-action-check-help">
-                {t("settings.actionCheckHelp")}
+              <span className="ac-hintline">
+                <label className="settings-row__label" htmlFor="set-action-check">
+                  {t("settings.actionCheck")}
+                </label>
+                <InfoHint name={t("common.about", { label: t("settings.actionCheck") })} id="set-action-check-hint">
+                  {t("settings.actionCheckHelp")}
+                </InfoHint>
               </span>
             </div>
             <div className="settings-row__control">
@@ -340,7 +346,7 @@ function GeneralSection() {
                 checked={settings.data?.actionCheck ?? true}
                 onCheckedChange={(on) => save({ actionCheck: on })}
                 disabled={!editable || !settings.data}
-                aria-describedby="set-action-check-help"
+                aria-describedby="set-action-check-hint"
               />
             </div>
           </div>
@@ -351,8 +357,11 @@ function GeneralSection() {
         <CardHeader
           id="sec-context"
           icon="agent"
-          title={t("settings.contextTitle", { name: name.trim() || org.name })}
-          subtitle={t("settings.contextSubtitle")}
+          title={contextTitle}
+          hint={{
+            name: t("common.about", { label: contextTitle }),
+            text: `${t("settings.contextSubtitle")} ${t("settings.contextHelp", { name: orgName })}`,
+          }}
         />
         <Textarea
           ref={contextRef}
@@ -374,7 +383,6 @@ function GeneralSection() {
             ))}
           </div>
         )}
-        <CardFooter>{t("settings.contextHelp", { name: name.trim() || org.name })}</CardFooter>
       </Card>
 
       <SettingsTiles />
@@ -417,14 +425,21 @@ function UsageStatisticsCard() {
       <div className="settings-rows">
         <div className="settings-row">
           <div className="settings-row__text">
-            <label className="settings-row__label" htmlFor="set-telemetry">
-              {t("settings.telemetry.label")}
-            </label>
-            <span className="settings-row__help" id="set-telemetry-help">
-              {t("settings.telemetry.help")}
-              {data.envOff &&
-                ` ${t(data.report.install === "desktop" ? "settings.telemetry.envOffDesktop" : "settings.telemetry.envOff")}`}
+            <span className="ac-hintline">
+              <label className="settings-row__label" htmlFor="set-telemetry">
+                {t("settings.telemetry.label")}
+              </label>
+              <InfoHint name={t("common.about", { label: t("settings.telemetry.label") })} id="set-telemetry-hint">
+                {t("settings.telemetry.help")}
+              </InfoHint>
             </span>
+            {data.envOff && (
+              <span className="settings-row__help" id="set-telemetry-help">
+                {t(
+                  data.report.install === "desktop" ? "settings.telemetry.envOffDesktop" : "settings.telemetry.envOff",
+                )}
+              </span>
+            )}
           </div>
           <div className="settings-row__control">
             <Switch
@@ -432,7 +447,7 @@ function UsageStatisticsCard() {
               checked={data.enabled && !data.envOff}
               onCheckedChange={(on) => set.mutate(on)}
               disabled={data.envOff || set.isPending}
-              aria-describedby="set-telemetry-help"
+              aria-describedby={data.envOff ? "set-telemetry-hint set-telemetry-help" : "set-telemetry-hint"}
             />
           </div>
         </div>
@@ -540,7 +555,6 @@ function SettingsTiles() {
               </span>
               <div className="ac-card__heading">
                 <h3>{t(`settings.section.${s.id}`)}</h3>
-                <p className="ac-card__sub">{t(`settings.tile.${s.id}`)}</p>
               </div>
               <Icon name="chevronRight" size={16} className="settings-tile__chevron" />
             </div>
@@ -575,12 +589,12 @@ function KeysSection() {
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
   return (
     <Card aria-labelledby="sec-keys">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
+      <div className="row" style={{ gap: 12 }}>
+        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-keys" className="ac-card__title">
             {t("settings.keysTitle")}
           </h2>
-          <span className="small muted">{t("settings.keysSubtitle")}</span>
+          <InfoHint name={t("common.about", { label: t("settings.keysTitle") })}>{t("settings.keysSubtitle")}</InfoHint>
         </div>
         <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
           {t("settings.addKey")}
@@ -796,16 +810,7 @@ export function KeyDialog({
               />
             </Field>
           )}
-          <Field
-            label={t("settings.keyValue")}
-            id="key-value-set"
-            error={error}
-            help={
-              <>
-                <KeySite provider={provider} /> {t("connectors.apiKeyHelp")}
-              </>
-            }
-          >
+          <Field label={t("settings.keyValue")} id="key-value-set" error={error} help={<KeySite provider={provider} />}>
             <Input
               type="password"
               autoComplete="off"
@@ -818,9 +823,17 @@ export function KeyDialog({
             <Field
               label={t("onboarding.anthropicWorkspace")}
               id="key-ws-set"
-              help={t("onboarding.anthropicWorkspaceHelp")}
+              hint={{
+                name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
+                text: t("onboarding.anthropicWorkspaceHelp"),
+              }}
             >
-              <Input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} autoComplete="off" />
+              <Input
+                value={workspaceId}
+                onChange={(e) => setWorkspaceId(e.target.value)}
+                placeholder={t("settings.workspaceIdPlaceholder")}
+                autoComplete="off"
+              />
             </Field>
           )}
         </DialogBody>
@@ -918,7 +931,10 @@ function DefaultBudgetCard() {
         <Field
           label={t("settings.defaultBudget")}
           id="set-default-budget"
-          help={t("settings.defaultBudgetHelp")}
+          hint={{
+            name: t("common.about", { label: t("settings.defaultBudget") }),
+            text: t("settings.defaultBudgetHelp"),
+          }}
           error={invalid ? t("agent.budgetInvalid") : undefined}
         >
           <Input

@@ -59,6 +59,7 @@ import {
   FilterChip,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Menu,
   MenuItem,
@@ -301,10 +302,6 @@ export function RoutinesPage() {
           <div>
             <h1>{t("routines.title")}</h1>
             <p className="routines-head__sub">{t("routines.subtitle")}</p>
-            <p className="routines-head__guard ac-iconline">
-              <Icon name="shield" size={14} />
-              {t("routines.guard")}
-            </p>
           </div>
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
             {t("routines.new")}
@@ -323,9 +320,7 @@ export function RoutinesPage() {
                 {t("routines.new")}
               </Button>
             }
-          >
-            {t("routines.empty")}
-          </EmptyState>
+          />
         )}
         {list.length > 0 && (
           <>
@@ -1116,12 +1111,17 @@ function RoutineDetails({
         )}
       </DetailsSection>
       <DetailsSection title={t("routines.panel.access")}>
-        <p className="routine-details__sentence">{t(`routines.access.${r.access}`)}</p>
-        <p className="small muted">{t(`routines.access.${r.access}Help`)}</p>
+        <p className="routine-details__sentence">
+          <span className="ac-hintline">
+            {t(`routines.access.${r.access}`)}
+            <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
+              {t("routines.access.hint")}
+            </InfoHint>
+          </span>
+        </p>
       </DetailsSection>
       <DetailsSection title={t("routines.panel.report")}>
         <p className="routine-details__sentence">{t(`routines.report.${r.report}`)}</p>
-        <p className="small muted">{t(`routines.report.${r.report}Help`)}</p>
       </DetailsSection>
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
@@ -1687,7 +1687,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             <Field
               label={t("routines.form.event")}
               id="nr-event"
-              help={t("routines.form.eventHelp", { org: org.name })}
+              hint={{
+                name: t("common.about", { label: t("routines.form.event") }),
+                text: t("routines.form.eventHelp", { org: org.name }),
+              }}
             >
               <Select
                 value={event}
@@ -1710,17 +1713,20 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               onValueChange={setReport}
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
-            <p className="small muted">{t(`routines.report.${report}Help`)}</p>
           </div>
           <div className="routine-kind">
-            <span className="ac-field__label">{t("routines.form.access")}</span>
+            <span className="ac-hintline">
+              <span className="ac-field__label">{t("routines.form.access")}</span>
+              <InfoHint name={t("common.about", { label: t("routines.form.access") })}>
+                {t("routines.access.hint")}
+              </InfoHint>
+            </span>
             <Segmented
               label={t("routines.form.access")}
               value={access}
               onValueChange={setAccess}
               options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
             />
-            <p className="small muted">{t(`routines.access.${access}Help`)}</p>
           </div>
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">

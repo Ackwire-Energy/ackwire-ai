@@ -350,6 +350,22 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
   });
 });
 
+describe("empty conversations", () => {
+  test("a channel: its greeting and the suggestions; a DM with a person: the greeting alone", async () => {
+    await open(seedState(), `c/${GENERAL_ID}`);
+    await settle(4);
+    const channel = document.querySelector(".ac-empty") as HTMLElement;
+    expect(channel.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi em #general");
+    expect(channel.querySelector(".ac-empty__text")).toBeNull();
+    cleanup();
+    await open(seedState(), "dm/person/u-joao");
+    await settle(4);
+    const dm = document.querySelector(".ac-empty") as HTMLElement;
+    expect(dm.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi para João");
+    expect(dm.querySelector(".ac-empty__text")).toBeNull();
+  });
+});
+
 describe("direct messages with an agent", () => {
   test("empty DM: 'Diga oi para a Ada' with first messages from her role; one goes to the composer", async () => {
     await open(seedState(), `dm/agent/${ADA_ID}`);
@@ -394,8 +410,8 @@ describe("direct messages with an agent", () => {
     const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
     await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Fechar" })));
     expect(screen().queryByRole("complementary", { name: "Perfil da Ada" })).toBeNull();
-    expect(document.body.textContent).toContain(
-      "Converse direto com a Ada. Peça para lembrar ou esquecer algo, ou para mudar como ela trabalha.",
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
     );
     // The sidebar lists the DM under "Mensagens diretas".
     await settle(4);

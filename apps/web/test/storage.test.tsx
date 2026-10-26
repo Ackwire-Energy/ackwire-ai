@@ -56,6 +56,8 @@ describe("Configurações → Armazenamento", () => {
     const s = section();
     const ours = within(s).getByRole("radio", { name: /Armazenamento do agentes/ });
     expect(ours.getAttribute("aria-checked")).toBe("true");
+    // The title, then the choices: no line between them.
+    expect(s.textContent?.indexOf("Armazenamento do agentes")).toBe("Armazenamento".length);
     expect(s.textContent).toContain("Seus arquivos ficam no nosso armazenamento, separados por workspace.");
     expect(s.textContent).toContain("Em uso");
     for (const name of ["Google Drive", "OneDrive"]) {

@@ -41,6 +41,11 @@ describe("profile photo", () => {
     await click(within(menu).getByRole("menuitem", { name: /^Perfil/ }));
     await settle(2);
     const profile = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
+    // Photo and @ need no line; the time zone's use is its ⓘ, which also describes the picker.
+    expect(profile.querySelectorAll(".ac-field__help, .small.muted")).toHaveLength(0);
+    const zone = within(profile).getByRole("button", { name: "Sobre Fuso horário" });
+    const zoneHint = document.getElementById(zone.getAttribute("aria-describedby") ?? "");
+    expect(zoneHint?.textContent).toBe("Mostra a sua hora local no seu cartão de perfil.");
     await click(within(profile).getByRole("button", { name: "Trocar foto" }));
     const dialog = screen().getByRole("dialog", { name: "Foto do perfil" });
     expect(within(dialog).getByRole("button", { name: /Solte uma imagem aqui/ })).toBeTruthy();

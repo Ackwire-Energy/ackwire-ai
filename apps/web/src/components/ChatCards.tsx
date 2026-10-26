@@ -123,7 +123,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
       </div>
       <p className="ac-approval__title">{p.title}</p>
       {editing && pending ? (
-        <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`} help={t("proposals.finalHelp")}>
+        <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
           <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
         </Field>
       ) : (

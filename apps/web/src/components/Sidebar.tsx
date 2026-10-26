@@ -1128,15 +1128,12 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
         <DialogBody>
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
             <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
-            <div className="stack-4" style={{ gap: 2, flex: 1 }}>
-              <span style={{ fontWeight: 600 }}>{t("photo.label")}</span>
-              <span className="small muted">{t("photo.labelHelp")}</span>
-            </div>
+            <span style={{ fontWeight: 600, flex: 1 }}>{t("photo.label")}</span>
             <Button size="sm" type="button" onClick={() => setPhoto(true)}>
               {t("photo.change")}
             </Button>
           </div>
-          <Field label={t("shell.handle")} id="me-handle" help={t("shell.handleHelp")}>
+          <Field label={t("shell.handle")} id="me-handle">
             <AffixInput
               prefix="@"
               value={handle}
@@ -1147,7 +1144,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
           <Field
             label={t("shell.timezone")}
             id="me-zone"
-            help={t("shell.timezoneHelp")}
+            hint={{ name: t("common.about", { label: t("shell.timezone") }), text: t("shell.timezoneHelp") }}
             error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
           >
             <ZoneSelect value={zone || "UTC"} disabled={useOrgZone} onChange={setZone} />

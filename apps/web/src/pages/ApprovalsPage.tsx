@@ -47,6 +47,7 @@ import {
 } from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { EmailLetter } from "@/components/EmailLetter";
+import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import {
   MissionCommandsPending,
@@ -268,12 +269,6 @@ export function ApprovalsPage() {
                 t("approvals.nothing")
               )}
             </p>
-            <p className="ap-head__guard">
-              <span aria-hidden="true" className="ap-head__guard-icon">
-                <Icon name="shield" size={14} />
-              </span>
-              {t("approvals.guard")}
-            </p>
           </div>
         </header>
         <Toolbar
@@ -330,7 +325,7 @@ export function ApprovalsPage() {
           commands === 0 &&
           !missionWaiting && (
             <EmptyState sky title={t("approvals.emptyTitle")}>
-              {t("approvals.empty")}
+              <HelpLink slug="approvals">{t("approvals.how")}</HelpLink>
             </EmptyState>
           )}
         {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
@@ -685,7 +680,7 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
     );
   return (
     <div className="ap-refuse">
-      <label htmlFor={id}>{t("approvals.refuseLabel", { The: g.The, name: g.name })}</label>
+      <label htmlFor={id}>{t("approvals.refuseLabel")}</label>
       <textarea
         id={id}
         ref={ref}
@@ -1090,7 +1085,7 @@ function ApprovalDetails({
       <DetailsSection title={t("approvals.panel.exact")}>
         {/* Values in words; nested values and the tool's own name behind "Detalhes técnicos". */}
         <ExactAction approval={a} />
-        <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
+        <p className="ap-bound">{t("approvals.panel.bound")}</p>
         {pr && (
           <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
             {t("approvals.panel.openPr")}
