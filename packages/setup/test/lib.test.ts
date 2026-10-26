@@ -28,12 +28,15 @@ import {
   installedCommands,
   isComposeFile,
   isTailnetUrl,
+  lastLine,
   networkOf,
   nextSteps,
   normalizeDomain,
+  outputLine,
   type PlanInput,
   PROBLEMS,
   parseOptions,
+  plainStep,
   planSteps,
   privateStart,
   qrCode,
@@ -41,6 +44,7 @@ import {
   readTailscaleStatus,
   resolveChoice,
   secretEntries,
+  sentence,
   sshTarget,
   sshTunnel,
   stopCommand,
@@ -176,6 +180,59 @@ describe("answers", () => {
     expect(domainProblem("localhost")).not.toBeNull();
     expect(domainProblem("10.0.0.1")).not.toBeNull();
     expect(domainProblem("box.tail1234.ts.net")).toContain("Tailscale");
+  });
+
+  test("a problem shown on its own starts as a sentence", () => {
+    expect(sentence("that isn't a domain name like chat.example.com.")).toBe(
+      "That isn't a domain name like chat.example.com.",
+    );
+  });
+});
+
+describe("output", () => {
+  test("a command's latest line, under a wait: no colors, and no mark of an installer's own", () => {
+    expect(outputLine(" Container agentes-agentes-1  Started\r")).toBe("Container agentes-agentes-1  Started");
+    expect(outputLine("\x1b[2m◒  Installing the packages for the agents' browser and screens\x1b[0m")).toBe(
+      "Installing the packages for the agents' browser and screens",
+    );
+    expect(outputLine("◇  Bun 1.4.4 (SHA-256 checked)")).toBe("Bun 1.4.4 (SHA-256 checked)");
+    expect(outputLine("│  ")).toBe("");
+    expect(outputLine("E: Unable to locate package docker-ce")).toBe("E: Unable to locate package docker-ce");
+    // The Linux console's marks (TERM=linux), two spaces after them as after the others.
+    expect(outputLine("o  The runner, from https://agents.example.com")).toBe(
+      "The runner, from https://agents.example.com",
+    );
+    expect(outputLine("-  Installing the packages for the agents' browser")).toBe(
+      "Installing the packages for the agents' browser",
+    );
+    expect(outputLine("x  download failed")).toBe("download failed");
+    expect(outputLine("o pacote foi instalado")).toBe("o pacote foi instalado");
+  });
+
+  test("a failed command's reason is its last line with words, without the mark before it", () => {
+    const installer = [
+      "agentes.chat connect this computer",
+      "◇  Bun 1.4.4 (SHA-256 checked)",
+      "◒  Downloading the runner from https://agents.example.com",
+      "curl: (22) The requested URL returned error: 404",
+      "■  download failed",
+      "",
+    ].join("\n");
+    expect(lastLine(installer)).toBe("download failed");
+    expect(lastLine("x  download failed\r\n")).toBe("download failed");
+    expect(lastLine("Error response from daemon: no space left on device\n")).toBe(
+      "Error response from daemon: no space left on device",
+    );
+    expect(lastLine("")).toBe("");
+  });
+
+  test("--json's steps are plain sentences: a command the frame puts on a line of its own follows its words", () => {
+    expect(plainStep("On a server, open it through an SSH tunnel:\n$ ssh -L 3000:localhost:3000 ana@203.0.113.7")).toBe(
+      "On a server, open it through an SSH tunnel: ssh -L 3000:localhost:3000 ana@203.0.113.7",
+    );
+    expect(plainStep("Open http://localhost:3000 and create your account.")).toBe(
+      "Open http://localhost:3000 and create your account.",
+    );
   });
 });
 
@@ -863,7 +920,7 @@ describe("the end", () => {
     });
     expect(local).toEqual([
       "Open http://localhost:3001 and sign in.",
-      "On a server, open it from your computer through an SSH tunnel: ssh -L 3001:localhost:3001 ana@203.0.113.7",
+      "On a server, open it from your computer through an SSH tunnel:\n$ ssh -L 3001:localhost:3001 ana@203.0.113.7",
     ]);
     const proxy = nextSteps({
       network: "proxy",
@@ -923,20 +980,11 @@ describe("an SSH tunnel", () => {
 
   test("a public domain starts privately: the owner's account through a tunnel to the domain, on the same port", () => {
     const ssh = at("198.51.100.20 51234 172.31.5.6 2222");
-    const start = privateStart({ domain: "chat.example.com", port: "3000", ssh, interactive: true });
-    expect(start.note).toBe(
-      "Starting agentes.chat privately first (docker compose up -d): chat.example.com goes live once your account exists. The first time downloads about 2 GB…",
-    );
-    expect(start.steps).toEqual([
-      "From your computer, open a tunnel to this server: ssh -p 2222 -L 3000:localhost:3000 ana@chat.example.com",
+    // The tunnel's command on a line of its own ("$ "), to copy whole.
+    expect(privateStart({ domain: "chat.example.com", port: "3000", ssh }).steps).toEqual([
+      "From your computer, open a tunnel to this server:\n$ ssh -p 2222 -L 3000:localhost:3000 ana@chat.example.com",
       "Open http://localhost:3000 and create your account: the first one owns the instance. It has to be port 3000 on your computer too: until chat.example.com goes live, sign-up works only at that address.",
     ]);
-    // Without a terminal nothing waits for the account: whether this run makes the domain live depends on it.
-    const piped = privateStart({ domain: "chat.example.com", port: "3000", ssh, interactive: false });
-    expect(piped.note).toBe(
-      "Starting agentes.chat privately first (docker compose up -d). The first time downloads about 2 GB…",
-    );
-    expect(piped.steps).toEqual(start.steps);
   });
 });
 
