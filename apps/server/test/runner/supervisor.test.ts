@@ -1070,6 +1070,12 @@ test.if(posix)(
               };
               return { pid: 50_000 + chromes.length, port: 9400 + chromes.length, exited, kill };
             },
+            // Its debugging endpoint lists the page of its window: a click on Browser waits for that.
+            fetch: (async () =>
+              new Response(
+                JSON.stringify([{ id: "P1", type: "page", url: "about:blank" }]),
+              )) as unknown as typeof fetch,
+            windowDrawMs: 0,
           },
         });
         workerRuns.push(done);
