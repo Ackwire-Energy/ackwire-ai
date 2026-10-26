@@ -1,5 +1,5 @@
 import { Logo } from "@agenteschat/ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { AuthHorizon } from "@/components/Sky";
 import "./auth.css";
 
@@ -8,13 +8,16 @@ import "./auth.css";
  * column, the logo on top and the sky's horizon at the bottom.
  */
 export function AuthShell({ children }: { children: ReactNode }) {
+  const col = useRef<HTMLElement>(null);
   return (
     <div className="auth">
-      <AuthHorizon />
+      <AuthHorizon clear={() => [col.current]} />
       <span className="auth__logo">
         <Logo size={24} />
       </span>
-      <main className="auth__col">{children}</main>
+      <main className="auth__col" ref={col}>
+        {children}
+      </main>
     </div>
   );
 }

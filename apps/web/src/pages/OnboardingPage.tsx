@@ -1859,6 +1859,7 @@ function DoneStep({
 }) {
   const { t } = useTranslation();
   const text = useRef<HTMLDivElement>(null);
+  const crew = useRef<HTMLDivElement>(null);
   const names = joinNames(
     agents.map((a) => a.name),
     t("newAgent.and"),
@@ -1876,7 +1877,7 @@ function DoneStep({
     .join(" ");
   return (
     <section className="onb__welcome" aria-labelledby="onb-welcome-title">
-      <WelcomeSky calm={() => [text.current]} />
+      <WelcomeSky calm={() => [text.current]} clear={() => [crew.current]} />
       <div className="onb__welcome-text" ref={text}>
         <h1 id="onb-welcome-title" className="onb__welcome-title">
           {t("onboarding.done.title", { org: orgName })}
@@ -1885,7 +1886,7 @@ function DoneStep({
       </div>
       {agents.length > 0 && (
         // The faces are hidden from screen readers (the lead names them); the computer says what it is.
-        <div className="onb__crew">
+        <div className="onb__crew" ref={crew}>
           {agents.map((a) => (
             <AgentAvatar
               key={a.key}
