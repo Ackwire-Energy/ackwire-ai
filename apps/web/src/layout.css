@@ -6399,17 +6399,14 @@ a.machine-row__name:hover {
   min-width: 0;
   gap: 6px;
 }
-/* The facts line up under the name, past the portrait (96px + the 18px gap). */
+/*
+ * The facts start at the card's edge, under the portrait, as on Configurações → Computadores: a portrait is as wide
+ * as its drawing (a tower half a laptop's), so an indent past it lines up with nothing.
+ */
 .machine-page__facts {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-left: 114px;
-}
-@media (max-width: 640px) {
-  .machine-page__facts {
-    padding-left: 0;
-  }
 }
 /* Agents using the computer: one row each (face, name, what it may use), to its page. */
 .machine-page__agents {
