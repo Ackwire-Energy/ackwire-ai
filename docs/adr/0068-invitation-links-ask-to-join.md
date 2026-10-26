@@ -40,8 +40,9 @@ by an account with it.
    waiting per workspace (counted under an advisory lock, so it holds across replicas); one waiting request per
    address (a partial unique index); a denied address can't ask again through a link while the denial is kept;
    requests close unanswered after 14 days; rows are deleted 90 days after their answer or expiry, in the daily
-   tick. A typed request gets the same answer whatever the address (already a member, already waiting or denied):
-   a link never tells whoever holds it who works at a workspace or who was turned down. A paused workspace's link
+   tick. A typed request gets the same answer whatever the address (already a member, already waiting or denied),
+   and a full workspace refuses every typed address alike: a link never tells whoever holds it who works at a
+   workspace or who was turned down. A paused workspace's link
    says only that it no longer works.
 9. **One link per workspace, shown again whenever needed.** Its token is an HMAC of its id under a key derived from
    `AGENTES_SECRET` (purpose `invite-links`, as the git proxy's credential, ADR 0024); only the token's hash is

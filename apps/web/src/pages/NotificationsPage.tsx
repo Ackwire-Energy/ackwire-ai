@@ -1279,7 +1279,7 @@ function WaitCard({
       data-n={n.id}
       data-wait=""
       data-burst=""
-      aria-label={`${name}: ${l.title ?? l.text ?? ""}`}
+      aria-label={[name, l.title ?? l.text].filter(Boolean).join(": ")}
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);

@@ -316,6 +316,7 @@ test("the admins' notice: who asks, a Members chip, and it opens Members", async
   const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
   await settle(6);
   const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
+  expect(notice.getAttribute("aria-label")).toBe("Bruno Lima");
   expect(notice.textContent).toContain("Bruno Lima e outras pessoas pedem para entrar");
   expect(notice.querySelector(".ac-chip")?.textContent).toBe("Membros");
   await click(within(notice).getByRole("button", { name: "Abrir" }));
