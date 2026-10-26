@@ -1084,8 +1084,9 @@ export class RunnerDaemon implements RequestObserver {
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
     }
-    // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good.
-    void this.desktops.stopAll(new Set(list.map((a) => a.id))).catch(() => undefined);
+    // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good; the
+    // others take their agent's current name and handle.
+    void this.desktops.serve(list).catch(() => undefined);
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
     this.agents = list;
     try {

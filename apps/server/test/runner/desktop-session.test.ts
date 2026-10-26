@@ -700,6 +700,10 @@ test("a desktop an earlier runner left running gets this runner's flags at once 
     },
   });
   next.restore();
+  // Its agent as the earlier runner knew it may be out of date: nothing until this runner hears of it.
+  await next.sweep();
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(0);
+  await next.serve([dev]);
   await next.sweep();
   expect(t.fake.of("agentes-xvnc")).toHaveLength(0);
   connected = true;
@@ -728,6 +732,7 @@ test("a desktop an earlier runner left running gets this runner's flags at once 
   await next.sweep();
   const after = new DesktopSessions(t.opts);
   after.restore();
+  await after.serve([dev]);
   t.clock.now += 60_000;
   await after.sweep();
   expect(t.fake.of("agentes-xvnc")).toHaveLength(1);
@@ -744,6 +749,7 @@ test("a running desktop's new look waits while someone watches it, its agent's b
   await leftByEarlierRunner(t, dev);
   const next = new DesktopSessions(t.opts);
   next.restore();
+  await next.serve([dev]);
   const looks = () => t.fake.of("agentes-look").filter(live).length;
   const release = next.hold(dev.id);
   t.clock.now += 2 * 60_000;
@@ -774,6 +780,7 @@ test("a running desktop that can't take the flags or the look keeps what it has,
   t.fake.exits.set("agentes-look", 2);
   const next = new DesktopSessions(t.opts);
   next.restore();
+  await next.serve([dev]);
   t.clock.now += 60_000;
   await next.sweep();
   expect(t.logs).toContain(
@@ -794,6 +801,7 @@ test("a running desktop that can't take the flags or the look keeps what it has,
   t.fake.hangs.add("agentes-look");
   const after = new DesktopSessions({ ...t.opts, stepMs: 30 });
   after.restore();
+  await after.serve([dev]);
   t.clock.now += 60_000;
   await after.sweep();
   expect(t.fake.of("agentes-xvnc")).toHaveLength(2);
@@ -831,6 +839,7 @@ test.if(posix)(
       };
       const next = new DesktopSessions({ ...t.opts, system });
       next.restore();
+      await next.serve([dev]);
       await next.sweep();
       expect(readFileSync(calls, "utf8").split("\n").slice(-3)).toEqual([
         ":20 -set SendPrimary=0",
@@ -861,6 +870,7 @@ test("running desktops take a new look one after another; one renamed takes it a
   t.fake.hangs.add("agentes-look");
   const next = new DesktopSessions(t.opts);
   next.restore();
+  await next.serve([dev, ops]);
   t.clock.now += 60_000;
   const swept = next.sweep();
   const looks = () => t.fake.of("agentes-look").filter(live);
@@ -874,15 +884,15 @@ test("running desktops take a new look one after another; one renamed takes it a
   expect(t.logs.filter((l) => l.endsWith("took this runner's look while running"))).toHaveLength(2);
   t.fake.hangs.clear();
 
-  // Renamed, dev's terminal prompt names it anew.
+  // Renamed (the server's list says so), dev's terminal prompt names it anew.
   const renamed = { ...dev, name: "Dev Two" };
-  await next.ensure(renamed);
+  await next.serve([renamed, ops]);
   t.clock.now += 60_000;
   await next.sweep();
   const home = path.join(t.folders, "dev", ".agentes", "home");
   expect(looks()[2]?.argv).toEqual(lookCommand(home, await lookOf(t, renamed), true).argv);
 
-  // Single-user mode moved ops's folder with its new handle: its session still has the old HOME.
+  // Single-user mode moved ops's folder with its new handle (a request had it): its session still has the old HOME.
   await next.ensure({ ...ops, handle: "ops2", name: "Ops" });
   t.clock.now += 60_000;
   await next.sweep();
@@ -1006,7 +1016,7 @@ test("the desktops of agents this computer no longer serves stop; the others go 
   const t = setup();
   await t.desktops.ensure(dev);
   await t.desktops.ensure(ops);
-  await t.desktops.stopAll(new Set([ops.id]));
+  await t.desktops.serve([ops]);
   expect([dev, ops].map((a) => t.desktops.status(a).running)).toEqual([false, true]);
   await t.desktops.stopAll();
   expect(t.desktops.status(ops).running).toBe(false);

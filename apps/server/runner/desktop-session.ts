@@ -439,10 +439,10 @@ interface Desktop extends Saved {
   /** Its Browser's socket, while it listens. */
   browser?: Server;
   /**
-   * Its `refresh`: one waits for its turn, and what of it this runner has settled, its `LIVE_PARAMS` and its look
-   * (done, or failed and left to the next runner).
+   * Its `refresh`: whether its agent is known as it is now (`current`), one waits for its turn, and what of it this
+   * runner has settled, its `LIVE_PARAMS` and its look (done, or failed and left to the next runner).
    */
-  refresh: { queued: boolean; params: boolean; look: boolean };
+  refresh: { current: boolean; queued: boolean; params: boolean; look: boolean };
 }
 
 /** Browser's socket: in the password file's folder, root's for the agent in system mode. */
@@ -537,9 +537,7 @@ export class DesktopSessions {
       let d = this.desktops.get(agent.id);
       const running = d !== undefined && this.alive(d);
       if (d && running) {
-        // Renamed: the terminal's prompt names the agent, so the look is due again.
-        if (desktopName(agent) !== desktopName(d.agent)) d.refresh.look = false;
-        d.agent = agent;
+        this.current(d, agent);
         d.lastUsed = this.now();
       } else {
         if (d) await this.end(d);
@@ -645,6 +643,18 @@ export class DesktopSessions {
   }
 
   /**
+   * The agents this computer serves now (the server's list, at each connection and change): the desktops of the
+   * others stop (`stopAll`), and each running one takes its agent's current name and handle.
+   */
+  serve(agents: readonly AgentScope[]) {
+    for (const { id, handle, name } of agents) {
+      const d = this.desktops.get(id);
+      if (d) this.current(d, { id, handle, ...(name === undefined ? {} : { name }) });
+    }
+    return this.stopAll(new Set(agents.map((a) => a.id)));
+  }
+
+  /**
    * Desktops a previous run of the runner left running are taken back when
    * the pid it saved is still that display's Xtigervnc (a pid can be
    * reused); the others' files go.
@@ -666,7 +676,7 @@ export class DesktopSessions {
           file,
           lastUsed: this.now(),
           streams: 0,
-          refresh: { queued: false, params: false, look: false },
+          refresh: { current: false, queued: false, params: false, look: false },
         };
         this.add(d);
         void this.listenBrowser(d);
@@ -689,7 +699,7 @@ export class DesktopSessions {
         continue;
       }
       if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
-      if (!d.refresh.queued && !(d.refresh.params && d.refresh.look)) {
+      if (d.refresh.current && !d.refresh.queued && !(d.refresh.params && d.refresh.look)) {
         d.refresh.queued = true;
         // One that throws (its agent's user isn't known before the runner reaches the server) is tried again at the
         // next sweep.
@@ -835,7 +845,7 @@ export class DesktopSessions {
           file: path.join(this.dir, `${id8(agent)}.json`),
           lastUsed: saved.startedAt,
           streams: 0,
-          refresh: { queued: false, params: true, look: looked === 0 },
+          refresh: { current: true, queued: false, params: true, look: looked === 0 },
         };
         writeJson(d.file, saved);
         this.add(d);
@@ -888,6 +898,17 @@ export class DesktopSessions {
     clearTimeout(timer);
     if (code === "late" && p.pid) this.sys.kill(p.pid, "SIGTERM");
     return code;
+  }
+
+  /**
+   * The agent of a running desktop as it is now (a request, the server's list). Renamed, its look is due again: the
+   * terminal's prompt names it. A refresh waits for this: a single-user agent's user (`opts.user`) is found by its
+   * handle, and one taken back from an earlier runner may be stale, its folder since moved to a new handle.
+   */
+  private current(d: Desktop, agent: AgentScope) {
+    if (desktopName(agent) !== desktopName(d.agent)) d.refresh.look = false;
+    d.agent = agent;
+    d.refresh.current = true;
   }
 
   /** What its look depends on besides its HOME (desktop-look.ts), on this computer, from this runner. */
