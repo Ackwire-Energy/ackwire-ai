@@ -448,7 +448,7 @@ export const desktopEn: DesktopTranslations = {
     },
     accounts: {
       titleClaude: "Claude accounts",
-      titleCodex: "Codex accounts",
+      titleCodex: "ChatGPT accounts",
       org: "Organization",
       thisMac: "This {{device}}'s account",
       thisMacHint: "The one in {{tool}}",

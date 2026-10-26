@@ -1727,7 +1727,7 @@ export const en: Translations = {
         planModel: "Model",
         preview: "Thinks with <b>{{brain}}</b>.",
         previewMoved: "Thinks with <b>{{brain}}</b> on <b>{{computer}}</b>.",
-        account: { claude_code: "Claude account", codex: "Codex account" },
+        account: { claude_code: "Claude account", codex: "ChatGPT account" },
         accountLocked: "Only {{name}} changes it",
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
@@ -1750,7 +1750,7 @@ export const en: Translations = {
           max: "Thinks as much as it can. Much slower and pricier.",
         },
         add: {
-          title: { claude_code: "Add a Claude account", codex: "Add a Codex account" },
+          title: { claude_code: "Add a Claude account", codex: "Add a ChatGPT account" },
           stepOne: {
             claude_code: "Sign in to Claude with the other account",
             codex: "Sign in to ChatGPT with the other account",

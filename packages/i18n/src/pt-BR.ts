@@ -1741,7 +1741,7 @@ export const ptBR = {
         planModel: "Modelo",
         preview: "Pensa com <b>{{brain}}</b>.",
         previewMoved: "Pensa com <b>{{brain}}</b> no <b>{{computer}}</b>.",
-        account: { claude_code: "Conta do Claude", codex: "Conta do Codex" },
+        account: { claude_code: "Conta do Claude", codex: "Conta do ChatGPT" },
         accountLocked: "Só {{name}} troca",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
@@ -1764,7 +1764,7 @@ export const ptBR = {
           max: "Pensa o máximo que puder. Bem mais lento e caro.",
         },
         add: {
-          title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do Codex" },
+          title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: { claude_code: "Entre no Claude com a outra conta", codex: "Entre no ChatGPT com a outra conta" },
           stepOneText: {
             claude_code: "Abre a página do próprio Claude. Se ela entrar na conta errada, saia de lá e tente de novo.",

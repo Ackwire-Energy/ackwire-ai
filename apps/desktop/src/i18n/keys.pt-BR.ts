@@ -461,7 +461,7 @@ export const desktopPtBR = {
     },
     accounts: {
       titleClaude: "Contas do Claude",
-      titleCodex: "Contas do Codex",
+      titleCodex: "Contas do ChatGPT",
       org: "Organização",
       thisMac: "Conta deste {{device}}",
       thisMacHint: "A que está no {{tool}}",
