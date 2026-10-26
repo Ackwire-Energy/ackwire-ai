@@ -5,7 +5,7 @@ setupDom();
 
 import { afterEach } from "bun:test";
 import { cleanup } from "@testing-library/react";
-import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -49,6 +49,21 @@ describe("route guards", () => {
   test("/login when already signed in goes to the redirect target", async () => {
     const { router } = await renderApp(`/login?redirect=/org/${ORG_ID}/drive`, { api: createFakeApi() });
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
+  });
+
+  test("a redirect back to a deep link keeps its query, out of the last parameter", async () => {
+    const target = `/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=budget`;
+    const { router } = await renderApp(`/login?redirect=${encodeURIComponent(target)}`, { api: createFakeApi() });
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
+  });
+
+  test("an email's Connect your AI: #general with the dialog open, and the address drops the request", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}?connect=ai`, { api: createFakeApi() });
+    await settle();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA" })).toBeTruthy();
+    expect(router.state.location.search).toEqual({});
   });
 
   test("open redirects are dropped", async () => {

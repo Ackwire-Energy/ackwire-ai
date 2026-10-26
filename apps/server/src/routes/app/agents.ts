@@ -186,12 +186,10 @@ export function agentRoutes(deps: AppDeps) {
             provider: ProviderId,
             label: z.string().trim().min(1).max(80),
             apiKey: z.string().min(8).max(500),
-            workspaceId: z
-              .string()
-              .max(128)
-              .nullable()
-              .optional()
-              .openapi({ description: "Anthropic workspace, for keys not scoped to one (`anthropic-workspace-id`)." }),
+            workspaceId: z.string().max(128).nullable().optional().openapi({
+              description:
+                "Claude Console workspace ID, for a key that works in more than one workspace (sent as `anthropic-workspace-id`).",
+            }),
             organization: z.string().max(128).nullable().optional().openapi({ description: "OpenAI organization id." }),
             project: z.string().max(128).nullable().optional().openapi({ description: "OpenAI project id." }),
             makeDefault: z

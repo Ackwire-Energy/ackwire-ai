@@ -21,8 +21,10 @@ export const CONNECT_INTENT_THRESHOLD = 0.6;
 export const CONNECT_AUTO_OPEN_THRESHOLD = 0.9;
 
 const INTENTS: Record<ConnectIntentKind, string> = {
-  claude: "Connect or use Claude: a Claude plan or subscription (Pro, Max, Team), Claude Code, or Anthropic.",
-  chatgpt: "Connect or use ChatGPT: a ChatGPT plan or subscription (Plus, Pro, Team), Codex, or OpenAI's subscription.",
+  claude:
+    "Connect or use Claude: a Claude plan or subscription (Pro, Max, Team, Enterprise), Claude Code, or Anthropic.",
+  chatgpt:
+    "Connect or use ChatGPT: a ChatGPT plan or subscription (Plus, Pro, Business, Enterprise), Codex, or OpenAI's subscription.",
   api_key:
     "Connect an AI with an API key, or a provider other than a Claude or ChatGPT plan (OpenAI API, Anthropic API, DeepSeek, Gemini, Kimi, GLM, MiniMax, OpenRouter...).",
   any: "Set up or connect an AI without saying which one, or ask how to make the agents work.",

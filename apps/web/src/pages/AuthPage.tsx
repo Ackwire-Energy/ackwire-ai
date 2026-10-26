@@ -161,10 +161,11 @@ export function AuthPage({
     if (initialEmail && isEmail(initialEmail)) void lookUp(initialEmail);
   }, []);
 
+  // `to` is a path with its query (an email's `?open=`, `?connect=ai`): an href, not a route.
   const enter = async (to: string) => {
     prepareBurst(header.current ?? document.body)();
     qc.clear();
-    await navigate({ to });
+    await navigate({ href: to });
   };
 
   const signIn = async () => {

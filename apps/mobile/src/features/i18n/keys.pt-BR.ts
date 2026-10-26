@@ -1365,7 +1365,7 @@ export const featureKeysPtBR = {
     importSkip: "Não uso, pular",
     agentsAda: "Eu já estou aqui",
     thinkOwn: "Pensam com a sua chave ou assinatura",
-    thinkOwnSub: "Chave de API, Claude ou ChatGPT: você liga no computador, em Configurações.",
+    thinkOwnSub: "Chave de API, Claude ou ChatGPT: você conecta pela web, em Configurações › Contas de IA.",
     share: "Compartilhar link de convite",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
     emailsPlaceholder: "nome@empresa.com",

@@ -27,6 +27,7 @@ import {
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
@@ -988,7 +989,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 leading: <ProviderLogo id={provider} size="sm" />,
                 description: available
                   ? modelDescription(t, i18n.language, m)
-                  : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
+                  : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
               })),
             ),
           ]}

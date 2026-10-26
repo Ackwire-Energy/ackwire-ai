@@ -76,6 +76,36 @@ describe("Calendário: views, moves and series", () => {
     expect(within(col).getByRole("button", { name: "Standup, 09:00–09:30" })).toBeTruthy();
   });
 
+  test("an invitation's link opens its event on the event's week; closing it drops the link", async () => {
+    const api = createFakeApi(seedState());
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 21, 15);
+    const event = await api.calendar.create(ORG_ID, {
+      title: "Revisão trimestral",
+      start: day.toISOString(),
+      end: new Date(day.getTime() + 3600_000).toISOString(),
+      recurrence: "none",
+      participants: [],
+    });
+    const { router } = await renderApp(`/org/${ORG_ID}/calendar?open=${event.id}&day=${toYmd(day)}`, { api });
+    await settle(8);
+    const details = screen().getByRole("region", { name: "Revisão trimestral" });
+    expect(details.textContent).toContain("15:00");
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(3);
+    expect(screen().queryByRole("region", { name: "Revisão trimestral" })).toBeNull();
+    expect(router.state.location.search).toEqual({});
+    expect(screen().getByRole("button", { name: "Revisão trimestral, 15:00–16:00" })).toBeTruthy();
+  });
+
+  test("a link whose day doesn't exist opens on today's week", async () => {
+    for (const day of ["2026-13-45", "2026-02-30", "garbage", "20261028"]) {
+      await renderApp(`/org/${ORG_ID}/calendar?open=x&day=${day}`, { api: createFakeApi(seedState()) });
+      await settle(8);
+      expect(document.querySelector(`[data-day="${toYmd(today)}"]`), day).not.toBeNull();
+      cleanup();
+    }
+  });
+
   test("views: Mês and Agenda; T goes back to today; arrows move the day", async () => {
     await go();
     const range = () => document.querySelector(".cal-page__range")?.textContent ?? "";

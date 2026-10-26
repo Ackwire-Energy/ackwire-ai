@@ -10,7 +10,7 @@ import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
-import { sendQueuedEmail } from "./email";
+import { type EmailArt, sendQueuedEmail } from "./email";
 import { publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
@@ -66,6 +66,8 @@ export interface JobDeps extends RunExecutorDeps {
   search?: SearchIndexResolver;
   /** Transactional email (job `email.send`). */
   email?: EmailSender;
+  /** Where emails get their pictures (`emailArtFor`); absent: from each link's own server. */
+  emailArt?: EmailArt;
   /** Push to the phone app (job `push.send`); absent = push off. */
   push?: PushSender | null;
   /** Org storage (job `storage.migrate`). */
@@ -431,7 +433,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "email.send": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
-      await sendQueuedEmail(deps.email, job.payload);
+      await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");

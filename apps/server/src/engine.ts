@@ -50,6 +50,8 @@ import {
   createToolGateway,
   createWikiToolSource,
   createWorkspaceToolSource,
+  type EmailArt,
+  emailArtAt,
   type GitProxyDeps,
   hubBrainLink,
   type JobDeps,
@@ -107,6 +109,8 @@ export interface EngineOptions {
   replicaId?: string;
   /** Tools on demand (ADR 0043; default on). Tests turn it off: every granted tool is listed. */
   toolsOnDemand?: boolean;
+  /** Where emails get their pictures (`emailArtFor` at boot); default: linked from `PUBLIC_URL`'s `/email/`. */
+  emailArt?: EmailArt;
 }
 
 /**
@@ -377,6 +381,7 @@ export function buildEngine(o: EngineOptions) {
     context,
     search: adapters.search,
     email: adapters.email,
+    emailArt: o.emailArt ?? emailArtAt(config.PUBLIC_URL),
     push: adapters.push,
     storage,
     artifacts,

@@ -106,7 +106,7 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
   claude_code:
     "The Claude account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   codex:
-    "The Codex account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+    "The ChatGPT account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
