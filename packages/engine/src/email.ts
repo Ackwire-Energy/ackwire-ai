@@ -17,7 +17,10 @@ export type { EmailArt, EmailLocale } from "./email/layout";
 
 const { users, organizations, agents, approvals } = schema;
 
-/** The sender's name when `EMAIL_FROM` is unset: the name on the logo and in the subjects. */
+/**
+ * The sender's name when `EMAIL_FROM` is unset: the name on the logo and in the subjects. The self-host setup
+ * writes the same into a new server's `.env` (`senderAt` in packages/setup/src/lib.ts).
+ */
 const SENDER_NAME = "agentes.chat";
 
 /** The sender when `EMAIL_FROM` is unset, at this server's host (the Cloud's is ola@agentes.chat). */
