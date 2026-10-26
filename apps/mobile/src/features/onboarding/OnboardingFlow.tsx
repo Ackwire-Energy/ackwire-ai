@@ -20,7 +20,6 @@ import { Sky } from "@/sky/Sky";
 import { AgentAvatar, Button, fieldText, Icon, IconButton, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
-import { joinNames } from "../shared/logic";
 import { TextArea } from "../shared/TextArea";
 import { AiStep } from "./AiStep";
 import {
@@ -28,6 +27,7 @@ import {
   GUIDE,
   HOST,
   introducesAt,
+  inviteEach,
   OPTIONAL,
   PRESET_LOOK,
   PRESET_ROLE,
@@ -38,6 +38,7 @@ import {
   progressAt,
   STEPS,
   type StepId,
+  stepText,
   zoneLabel,
 } from "./logic";
 
@@ -45,10 +46,9 @@ import {
  * The first run on the phone: signed in with no workspace yet, one
  * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
- * (optional; on the computer for now) → Agentes (they think with the workspace's key or a subscription, set on the
- * computer; nothing to pay or paste on the phone) →
- * Pessoas (optional: share a link or type e-mails) → Pronto, which opens the DM with Ada. The computer step
- * stays for the computer ("Depois, no computador").
+ * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
+ * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto, which opens the DM with Ada.
+ * No computer step.
  */
 export function OnboardingFlow() {
   const { t, i18n } = useTranslation();
@@ -67,9 +67,9 @@ export function OnboardingFlow() {
   const [emails, setEmails] = useState<string[]>([]);
   const [typing, setTyping] = useState("");
   const [bad, setBad] = useState<string[]>([]);
-  const [sent, setSent] = useState(0);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A failure belongs to the step it happened on: going on or back leaves it there.
+  const [error, setError] = useState<{ at: StepId; text: string } | null>(null);
   const zone = phoneTimezone();
   const orgName = name.trim();
   // The AI step's key, for the workspace just created (no workspace is chosen yet: it gets the id).
@@ -86,7 +86,7 @@ export function OnboardingFlow() {
       await work();
       setStep(typeof then === "function" ? then() : then);
     } catch {
-      setError(t("mobile.onb.failed"));
+      setError({ at: step, text: t("mobile.onb.failed") });
     } finally {
       setPending(false);
     }
@@ -158,20 +158,17 @@ export function OnboardingFlow() {
     }
   };
 
-  const sendInvites = () =>
-    run(async () => {
-      if (!created) return;
-      let ok = 0;
-      for (const email of emails) {
-        await api.orgs
-          .invite(created.orgId, { email, role: "member" })
-          .then(() => {
-            ok++;
-          })
-          .catch(() => undefined);
-      }
-      setSent(ok);
-    }, "done");
+  // An invitation that fails keeps its address on the step, with the line that says so: only those go again.
+  const sendInvites = async () => {
+    if (!created) return;
+    setPending(true);
+    setError(null);
+    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email, role: "member" }));
+    setPending(false);
+    setEmails(failed);
+    if (failed.length) setError({ at: "team", text: t("mobile.onb.invitesFailed") });
+    else setStep("done");
+  };
 
   const shareLink = async () => {
     if (!created) return;
@@ -179,7 +176,7 @@ export function OnboardingFlow() {
       const { url } = await api.invites.createLink(created.orgId);
       await Share.share({ message: t("mobile.onb.shareMessage", { org: orgName, url }) });
     } catch {
-      setError(t("mobile.onb.failed"));
+      setError({ at: step, text: t("mobile.onb.failed") });
     }
   };
 
@@ -228,16 +225,7 @@ export function OnboardingFlow() {
 
   const host = HOST[step];
   const count = [...chosen].filter((p) => !agentIds[p]).length;
-  const titles: Record<StepId, [string, string]> = {
-    workspace: [t("onboarding.workspace.title"), t("onboarding.workspace.lead")],
-    context: [t("onboarding.context.title"), t("onboarding.context.lead")],
-    import: [t("onboarding.import.title"), t("mobile.onb.importLead")],
-    agents: [t("onboarding.agents.title"), t("onboarding.agents.lead")],
-    ai: [t("onboarding.keyStep.title"), aiSaved ? t("connectAi.key.saved") : t("onboarding.keyStep.lead")],
-    team: [t("onboarding.team.title"), t("onboarding.team.lead")],
-    done: [t("onboarding.done.title", { org: orgName }), doneText(t, chosen)],
-  };
-  const [title, lead] = titles[step];
+  const [title, lead] = stepText(t, step, { org: orgName, chosen, aiSaved });
 
   const primary: Partial<Record<StepId, { label: string; onPress: () => void; ready: boolean }>> = {
     workspace: {
@@ -291,9 +279,9 @@ export function OnboardingFlow() {
       onBack={back && !pending ? () => setStep(back) : undefined}
       footer={
         <>
-          {error ? (
+          {error?.at === step ? (
             <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-              {error}
+              {error.text}
             </Text>
           ) : null}
           {action ? (
@@ -431,7 +419,6 @@ export function OnboardingFlow() {
           />
           {bad.length ? <Note icon="help" text={t("mobile.onb.invalidEmail")} danger /> : null}
           <Note icon="agent" text={t("mobile.onb.membersNote")} />
-          {/* In the lead's order: the e-mails first, then the link (whoever opens it asks; the lead says so). */}
           <Button
             variant="secondary"
             wide
@@ -439,50 +426,11 @@ export function OnboardingFlow() {
             label={t("mobile.onb.share")}
             onPress={() => void shareLink()}
           />
-        </>
-      ) : null}
-
-      {step === "done" ? (
-        <>
-          <Line
-            lead={<Faces presets={PRESETS.filter((p) => agentIds[p])} />}
-            title={t("onboarding.done.agents")}
-            sub={t("mobile.onb.doneAgents", {
-              names: names(
-                t,
-                PRESETS.filter((p) => agentIds[p]),
-              ),
-            })}
-          />
-          <Line
-            lead={<Icon name="mail" size={18} />}
-            title={t("onboarding.done.invites")}
-            sub={t("mobile.onb.doneInvites", { count: sent })}
-          />
-          <Line
-            lead={<Icon name="laptop" size={18} />}
-            title={t("mobile.onb.computer")}
-            sub={t("mobile.onb.computerLater")}
-            end={t("mobile.onb.laterTag")}
-          />
+          <Note icon="shield" text={t("mobile.onb.shareNote")} />
         </>
       ) : null}
     </StepFrame>
   );
-}
-
-const names = (t: (k: string) => string, presets: Preset[]) =>
-  joinNames(
-    presets.map((p) => t(`onboarding.presets.${p}.name`)),
-    t("newAgent.and"),
-  );
-
-function doneText(t: ReturnType<typeof useTranslation>["t"], chosen: ReadonlySet<Preset>) {
-  const list = PRESETS.filter((p) => chosen.has(p)).map((p) => t(`onboarding.presets.${p}.name`));
-  if (list.length === 0) return t("onboarding.done.textNone");
-  return t(list.length === 1 ? "onboarding.done.textOne" : "onboarding.done.textMany", {
-    names: joinNames(list, t("newAgent.and")),
-  });
 }
 
 /** Each source's official logo (assets/images/brands/README.md). */
@@ -491,11 +439,10 @@ const IMPORT_LOGO = {
   OpenBot: require("../../../assets/images/brands/openbot.png"),
 } as const;
 
-/** Trazer agentes: the two sources, and how to bring them (on the computer, for now). */
+/** Trazer agentes: the two sources it brings from (on the web: the lead says where). */
 function ImportStep() {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
-  const [open, setOpen] = useState(false);
   return (
     <>
       {(["OpenMausBot", "OpenBot"] as const).map((source) => (
@@ -507,17 +454,13 @@ function ImportStep() {
             </View>
           }
           title={t(`mobile.onb.import${source}`)}
-          sub={t(`mobile.onb.import${source}Desc`)}
-          onPress={() => setOpen(true)}
         />
       ))}
-      {open ? <Note icon="laptop" text={t("mobile.onb.importLater")} /> : null}
-      <Note icon="lock" text={t("mobile.onb.importNever")} />
     </>
   );
 }
 
-/** Agentes: the ready team (Ada always), and how they think (the workspace's key or a subscription, on the computer). */
+/** Agentes: the ready team, Ada always (what they think with is the next step's). */
 function AgentsStep({
   chosen,
   created,
@@ -563,7 +506,6 @@ function AgentsStep({
           </Pressable>
         );
       })}
-      <Line lead={<Icon name="bolt" size={18} />} title={t("mobile.onb.thinkOwn")} sub={t("mobile.onb.thinkOwnSub")} />
     </>
   );
 }
@@ -580,7 +522,7 @@ function StepFrame({
 }: {
   step: StepId;
   title: string;
-  lead: string;
+  lead?: string | undefined;
   host: Preset;
   onBack?: (() => void) | undefined;
   footer: ReactNode;
@@ -683,18 +625,6 @@ function Host({ host, intro, happy }: { host: Preset; intro: boolean; happy: boo
   );
 }
 
-function Faces({ presets }: { presets: Preset[] }) {
-  return (
-    <View style={styles.faces}>
-      {presets.slice(0, 3).map((p, i) => (
-        <View key={p} style={i > 0 ? styles.overlap : undefined}>
-          <AgentAvatar agent={{ ...PRESET_LOOK[p], id: p }} size={22} live={false} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
 function Field({ label, ...props }: { label: string } & ComponentProps<typeof TextInput>) {
   const { colors: c } = useTheme();
   return (
@@ -724,17 +654,8 @@ function Line({
   onPress?: (() => void) | undefined;
 }) {
   const { colors: c } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      accessibilityRole={onPress ? "button" : undefined}
-      style={({ pressed }) => [
-        styles.line,
-        { borderColor: c.line },
-        pressed && onPress ? { backgroundColor: c.sunken } : null,
-      ]}
-    >
+  const content = (
+    <>
       <View style={styles.lead}>{lead}</View>
       <View style={styles.grow}>
         <Text variant="body" style={styles.bold}>
@@ -751,6 +672,17 @@ function Line({
           {end}
         </Text>
       ) : null}
+    </>
+  );
+  // Without an action it's a plain row: a Pressable with nothing to do reads as a dimmed button to VoiceOver.
+  if (!onPress) return <View style={[styles.line, { borderColor: c.line }]}>{content}</View>;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.line, { borderColor: c.line }, pressed ? { backgroundColor: c.sunken } : null]}
+    >
+      {content}
     </Pressable>
   );
 }
@@ -813,8 +745,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  // Wide enough for three overlapping faces (3 × 22 − 2 × 9), so the stack stays inside the margin.
-  lead: { width: 48, alignItems: "center" },
+  lead: { width: 38, alignItems: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   // The web's `.imp-mark` tile (apps/web/src/components/import-flow.css).
@@ -829,7 +760,5 @@ const styles = StyleSheet.create({
   },
   logo: { width: 22, height: 22 },
   box: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-  faces: { flexDirection: "row" },
-  overlap: { marginLeft: -9 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
 });

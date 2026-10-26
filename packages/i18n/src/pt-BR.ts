@@ -98,7 +98,6 @@ export const ptBR = {
       email: "Oi. Qual é o seu e-mail?",
       emailLead: "Vale para entrar ou para criar uma conta.",
       emailUp: "Vamos criar sua conta. Qual é o seu e-mail de trabalho?",
-      emailUpLead: "Com o e-mail do trabalho, o time te acha mais fácil.",
       emailPlaceholder: "voce@empresa.com",
       didYouMean: "Você quis dizer {{email}}?",
       continue: "Continuar",
@@ -106,8 +105,6 @@ export const ptBR = {
       password: "Bom te ver de novo.",
       passwordLead: "Agora a sua senha.",
       wrong: "Hmm, essa senha não bateu.",
-      wrongLead: "Tente de novo ou peça um link para criar outra.",
-      wrongLeadNoReset: "Confira e tente de novo.",
       social: "Você entra com {{providers}}.",
       socialLead: "Essa conta não tem senha. Continue por aqui.",
       createPassword: "Prefiro criar uma senha",
@@ -196,7 +193,6 @@ export const ptBR = {
       agents_other: "{{names}} já trabalham lá.",
       name: "Seu nome",
       email: "Seu e-mail",
-      emailHelp: "A resposta chega neste e-mail.",
       note: "Algo que eles devam saber? (opcional)",
       noteHelp: "Quem é você, ou quem mandou o link",
       send: "Pedir para entrar",
@@ -594,9 +590,6 @@ export const ptBR = {
     removeInvite: "Remover {{email}}",
     done: {
       title: "Boas-vindas à {{org}}",
-      /** The phone's last step, which has no first message to send: it also says how to start. */
-      textOne: "{{names}} já está no #general. Mande um oi e peça a primeira tarefa.",
-      textMany: "{{names}} já estão no #general. Mande um oi e peça a primeira tarefa.",
       inGeneralOne: "{{names}} já está no #general.",
       inGeneralMany: "{{names}} já estão no #general.",
       textNone: "O #general está pronto. Crie um agente quando quiser.",
@@ -605,9 +598,7 @@ export const ptBR = {
       wikiImporting: "As notas do Obsidian ainda estão chegando na wiki.",
       wikiPages_one: "A wiki tem {{count}} página do Obsidian.",
       wikiPages_other: "A wiki tem {{count}} páginas do Obsidian.",
-      agents: "Agentes",
       computerPending: "Pendente",
-      invites: "Convites",
       open: "Abrir o #general",
       first: {
         read: "Li o que você escreveu sobre a {{org}}. Posso começar por isto?",
@@ -8330,9 +8321,6 @@ export const ptBR = {
     agentWaiting: "{{The}} {{name}} começa a usar assim que ele ficar pronto.",
     managedHint: "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
     continue: "Pode seguir enquanto isso.",
-    plans:
-      "Os agentes podem pensar com o seu próprio plano de IA, com login neste computador. Não precisa de chave de API.",
-    plansMarks: "Claude, ChatGPT, GLM, Kimi e outros planos de IA",
     eta: {
       minutes_one: "Falta cerca de 1 min",
       minutes_other: "Faltam uns {{count}} min",
@@ -8483,7 +8471,6 @@ export const ptBR = {
       notAnswering: "O {{computer}} não está respondendo",
       notAnsweringHelp: "Costuma voltar em poucos minutos. Já estamos cuidando.",
       offline: "O {{computer}} está offline",
-      offlineHelp: "Desde {{time}}. {{The}} {{name}} espera o computador voltar.",
       offlineHelpPlain: "{{The}} {{name}} espera o computador voltar.",
       noRoom: "O {{computer}} já mostra o máximo de telas que consegue. Tente de novo daqui a pouco.",
       unavailable: "A tela {{of}} {{name}} não pode ser mostrada agora",

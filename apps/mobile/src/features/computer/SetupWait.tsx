@@ -11,15 +11,12 @@ import {
   useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, type IconName, LineIcon, ProviderStack, SheetScreen, Text } from "@/ui";
+import { Button, Icon, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";
@@ -66,11 +63,11 @@ function Steps({ n, total }: { n: number; total: number }) {
   );
 }
 
-function Line({ icon, leading, text, apart }: { icon?: IconName; leading?: ReactNode; text: string; apart?: boolean }) {
+function Line({ icon, text }: { icon: IconName; text: string }) {
   const c = useColors();
   return (
-    <View style={[styles.line, apart ? [styles.apart, { borderTopColor: c.line }] : null]}>
-      {leading ?? (icon ? <LineIcon variant="small" name={icon} size={16} color={c.muted} /> : null)}
+    <View style={styles.line}>
+      <LineIcon variant="small" name={icon} size={16} color={c.muted} />
       <Text variant="small" tone="muted" style={styles.grow}>
         {text}
       </Text>
@@ -80,31 +77,25 @@ function Line({ icon, leading, text, apart }: { icon?: IconName; leading?: React
 
 /**
  * The workspace's computer on its way, as the web's preparing screen: the server's portrait, "Preparando o
- * computador da Acme", the steps ("Passo 3 de 4 · Instalando os programas") or why it waits, the time left, who
- * hears when it's ready (owners, by email), the agent that waits for it, the size and the plans. Ready: its
- * name and that the agents work on it.
+ * computador da Acme" with its ⓘ (one user per agent), the steps ("Passo 3 de 4 · Instalando os programas") or why
+ * it waits, the time left, who hears when it's ready (owners, by email) and the size. Ready: its name.
  */
-export function SetupWait({
-  view,
-  agentName,
-  online = false,
-}: {
-  view: SetupView;
-  agentName?: string;
-  online?: boolean;
-}) {
+export function SetupWait({ view, online = false }: { view: SetupView; online?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const wait = useSetupWait(view);
   const orgName = org?.name ?? "";
   const pending = setupPending(view);
+  const name = t("computerSetup.title", { org: orgName });
   return (
     <View style={styles.wait}>
       <View style={styles.head}>
         <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state={setupPortrait(view, online)} size={96} />
-        <Text variant="title" style={styles.center}>
-          {pending ? t("computerSetup.notice.title", { org: orgName }) : t("computerSetup.title", { org: orgName })}
-        </Text>
+        <InfoHint name={t("common.about", { label: name })} text={t("computerSetup.users")} variant="title" center>
+          <Text variant="title" style={styles.center}>
+            {pending ? t("computerSetup.notice.title", { org: orgName }) : name}
+          </Text>
+        </InfoHint>
         {view.step ? (
           <>
             <Steps n={view.stepNumber} total={SETUP_STEPS.length} />
@@ -129,20 +120,7 @@ export function SetupWait({
           text={wait.emailed ? t("computerSetup.email.you", { email: wait.email }) : t("computerSetup.email.here")}
         />
       ) : null}
-      {agentName && pending ? (
-        <Line icon="clock" text={t("computerSetup.agentWaiting", agentGrammar(t, agentName))} />
-      ) : null}
       {view.specs ? <Line icon="server" text={t("computerSetup.specs", view.specs)} /> : null}
-      <Line icon="agent" text={t("computerSetup.users")} />
-      <Line
-        apart
-        leading={
-          <LineIcon variant="small" size={20}>
-            <ProviderStack ids={PLAN_MARKS} label={t("computerSetup.plansMarks")} />
-          </LineIcon>
-        }
-        text={t("computerSetup.plans")}
-      />
     </View>
   );
 }
@@ -209,8 +187,6 @@ const styles = StyleSheet.create({
   steps: { flexDirection: "row", gap: 6, alignSelf: "stretch", paddingHorizontal: 24, paddingTop: 4 },
   bar: { flex: 1, height: 4, borderRadius: 2 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  // The plans' marks are wider than the icons above: a row of their own, so the facts keep one text column.
-  apart: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
   grow: { flex: 1, minWidth: 0 },
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
   card: {

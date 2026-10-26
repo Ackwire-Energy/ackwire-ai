@@ -110,7 +110,7 @@ test("the first run: kept, hidden, under an invitation's screen once mounted; ne
 
 test("every icon of the design is there", () => {
   const required =
-    "home chat agent bell search plus send back more check x clock shield wait hash chev right image file camera mic target list reply copy pin eyeoff moon sun globe out code server mail chart pen doc sparkle smile laptop archive circle pause flag".split(
+    "home chat agent bell search plus send back more check x clock shield wait hash chev right image file camera mic target list reply copy pin eyeoff moon sun globe out code server mail chart pen doc sparkle smile laptop archive circle pause flag info".split(
       " ",
     );
   for (const name of required) expect(ICON_NAMES).toContain(name as (typeof ICON_NAMES)[number]);

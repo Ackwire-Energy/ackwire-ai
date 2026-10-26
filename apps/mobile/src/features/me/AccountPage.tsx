@@ -250,7 +250,14 @@ export function AccountPage({
             />
           </View>
         </GroupedField>
-        <GroupedField label={t("mobile.me.account.timezone")} onPress={onZone}>
+        <GroupedField
+          label={t("mobile.me.account.timezone")}
+          hint={{
+            name: t("common.about", { label: t("mobile.me.account.timezone") }),
+            text: t("mobile.me.account.timezoneHint"),
+          }}
+          onPress={onZone}
+        >
           <Text variant="callout" numberOfLines={1}>
             {zoneLabel}
           </Text>
@@ -261,7 +268,6 @@ export function AccountPage({
           {shownProblem ?? error}
         </Text>
       ) : null}
-      <GroupedFooter>{t("mobile.me.account.footer")}</GroupedFooter>
       <View style={styles.gapBig} />
       <GroupedList>
         <GroupedRow icon="x" label={t("mobile.me.deleteAccount")} danger chevron onPress={onDelete} />

@@ -43,7 +43,7 @@ export interface AddAccountProps {
   local?: boolean;
   /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
   ready?: boolean;
-  /** Under the steps, before where the account stays. */
+  /** Under the steps. */
   note?: ReactNode;
   onAdded: (account: MachineAccount) => void;
 }
@@ -262,6 +262,8 @@ function AddAccountFlow({
     />
   );
 
+  // Where the account stays and what to do on the wrong one: the sign-in step's ⓘ.
+  const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer });
   let steps: ReactNode;
   if (plan) {
     const site = new URL(plan.site);
@@ -280,7 +282,6 @@ function AddAccountFlow({
             />
           }
         >
-          <StepText>{t("aiAccounts.add.keySite", { site: site.host })}</StepText>
           {provider === "zai" ? <StepText>{t("connectAi.zaiTeam")}</StepText> : null}
         </Step>
         <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={sent ? waiting : undefined}>
@@ -305,13 +306,10 @@ function AddAccountFlow({
           divider
           state={login ? "done" : "now"}
           title={t("agentPage.work.brain.add.stepOne.codex")}
+          hint={signInHint}
           side={login ? openAgain(login.url) : startButton(t("agentPage.work.brain.add.open.codex"), !ready)}
         >
-          <StepText>
-            {starting
-              ? t("agentPage.work.brain.add.starting", { computer })
-              : t("agentPage.work.brain.add.stepOneText.codex")}
-          </StepText>
+          {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
         </Step>
         {login?.userCode ? (
           <Step n={3} divider title={t("agentPage.work.brain.add.deviceCode")} side={waiting}>
@@ -348,17 +346,14 @@ function AddAccountFlow({
           n={1}
           state={login && opened ? "done" : "now"}
           title={t("agentPage.work.brain.add.stepOne.claude_code")}
+          hint={signInHint}
           side={
             login
               ? openAgain(login.url)
               : startButton(t("agentPage.work.brain.add.open.claude_code"), !emailOk || !ready)
           }
         >
-          <StepText>
-            {starting
-              ? t("agentPage.work.brain.add.starting", { computer })
-              : t("agentPage.work.brain.add.stepOneText.claude_code")}
-          </StepText>
+          {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
           {asks ? (
             <>
               <TextInput
@@ -378,9 +373,7 @@ function AddAccountFlow({
                 editable={!starting}
                 style={input}
               />
-              <StepText>
-                {startFailed === "email" || !emailOk ? t("aiAccounts.add.emailInvalid") : t("aiAccounts.add.emailHelp")}
-              </StepText>
+              {startFailed === "email" || !emailOk ? <StepText>{t("aiAccounts.add.emailInvalid")}</StepText> : null}
             </>
           ) : null}
         </Step>
@@ -419,7 +412,6 @@ function AddAccountFlow({
       )}
       {starting ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
       {note}
-      {!plan ? <Note icon="lock">{t("agentPage.work.brain.add.safe", { computer })}</Note> : null}
     </View>
   );
 }
