@@ -37,6 +37,23 @@ describe("buttons and kbd", () => {
     expect(b.querySelector(".ac-btn__kbd")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  test("a Button that toggles stays pushed in while on (aria-pressed), hovered or not; a ghost one keeps its plate", async () => {
+    render(<Button aria-pressed>Teclado</Button>);
+    expect(body().getByRole("button", { name: "Teclado" }).getAttribute("aria-pressed")).toBe("true");
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) =>
+      new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
+    const pressed = rule('.ac-btn[aria-pressed="true"]');
+    expect(pressed).toContain("background: var(--sunken)");
+    expect(pressed).toContain("color: var(--ink)");
+    expect(pressed).toContain("inset 0 0 0 1px var(--line)");
+    expect(rule('.ac-btn--ghost[aria-pressed="true"]')).toContain("background: var(--plate)");
+    // At the hover's weight, after it, so a pressed button stays pushed in under the pointer; before the focus ring.
+    const at = (selector: string) => css.lastIndexOf(`\n${selector} {`);
+    expect(at(".ac-btn:hover")).toBeLessThan(at('.ac-btn[aria-pressed="true"]'));
+    expect(at('.ac-btn[aria-pressed="true"]')).toBeLessThan(at(".ac-btn:focus-visible"));
+  });
+
   test("Kbd is a <kbd>", () => {
     const { container } = render(<Kbd>esc</Kbd>);
     expect(container.querySelector("kbd.ac-kbd")?.textContent).toBe("esc");

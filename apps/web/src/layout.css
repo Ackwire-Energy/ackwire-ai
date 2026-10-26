@@ -1609,10 +1609,6 @@ p {
   border-bottom: 1px solid var(--line);
   padding-bottom: 12px;
 }
-.code-viewer .ac-btn[aria-pressed="true"] {
-  background: var(--plate);
-  color: var(--ink);
-}
 .code-viewer__body.ac-dialog__body {
   flex: 1 1 auto;
   padding: 12px 0 20px;
@@ -1705,10 +1701,6 @@ p {
   font-size: 12.5px;
   line-height: 17px;
   color: var(--faint);
-}
-.chart-card__top .ac-btn[aria-pressed="true"] {
-  background: var(--plate);
-  color: var(--ink);
 }
 .chart-card__body {
   padding: 8px 16px 16px;

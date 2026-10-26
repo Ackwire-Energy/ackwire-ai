@@ -42,16 +42,22 @@
   font-size: 16px;
 }
 /*
- * In control, in the steps' line's place under the screen and as tall (13px text on the dialog's 22px line): the
- * keys, and what programs there can see. A phone's Keyboard button sits on the text's first line.
+ * In control, in the steps' line's place under the screen and as tall (13px text on a 22px line): the keys, and
+ * what programs there can see. A phone's Keyboard button leads it with no baseline to share (a button's is its
+ * icon's bottom edge, about 4 px under its label's), so the words' first line is centred on the button, a touch
+ * control as tall as `--control-h-md`.
  */
 .dsk-line {
   flex: none;
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 8px;
   min-height: 22px;
   font-size: 13px;
+  line-height: 22px;
+}
+.dsk-line > .ac-btn ~ * {
+  margin-top: calc((var(--control-h-md) - 22px) / 2);
 }
 /* What the computer copied when the browser kept it out of the person's clipboard, with Copy: one line, cut to fit. */
 .dsk-got {

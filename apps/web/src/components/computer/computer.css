@@ -441,6 +441,23 @@
     white-space: normal;
   }
 }
+/*
+ * A phone's head: the name and the line under it share the first row with Close, and the actions get a row of their
+ * own under them, so the name never folds into short lines beside a button. Full screen's bar keeps one row.
+ */
+@media (max-width: 640px) {
+  .cmp-dialog:not(.is-screen-only) > .ac-dialog__head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 8px;
+  }
+  .cmp-dialog:not(.is-screen-only) .cmp-acts {
+    grid-area: 2 / 2 / 3 / 4;
+  }
+  .cmp-acts:empty {
+    display: none;
+  }
+}
 
 /* The DM header's button: its dot in the agent's color while it works, amber while a request waits. */
 .brw-dm[data-state="live"]::after {

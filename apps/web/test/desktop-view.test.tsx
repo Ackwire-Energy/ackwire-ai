@@ -968,6 +968,30 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(desk, ".dsk-line")).toContain("min-height: 22px");
   });
 
+  test("a phone's Keyboard button leads the line with the words' first line on its middle", async () => {
+    const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
+    // Not a baseline: a button's is its icon's bottom edge, about 4 px under its label's.
+    const line = rule(desk, ".dsk-line");
+    expect(line).toContain("align-items: flex-start");
+    expect(line).toContain("line-height: 22px");
+    // The 22 px line's middle on the button's, a touch control as tall as the ruler's default step: (40 − 22) / 2.
+    expect(rule(desk, ".dsk-line > .ac-btn ~ *")).toContain("margin-top: calc((var(--control-h-md) - 22px) / 2)");
+    const kit = await Bun.file(
+      new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
+    ).text();
+    expect(kit).toContain("@media (pointer: coarse) {\n  .ac-btn--sm {\n    min-height: var(--control-h-md);");
+  });
+
+  test("a phone's head: the name and its line share a row with Close, the actions get a row of their own", async () => {
+    const phone = (await css()).split("@media (max-width: 640px) {")[1] ?? "";
+    const head = phone.split(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head {")[1]?.split("}")[0] ?? "";
+    expect(head).toContain("display: grid");
+    expect(head).toContain("grid-template-columns: auto minmax(0, 1fr) auto");
+    expect(phone.split(".cmp-dialog:not(.is-screen-only) .cmp-acts {")[1]?.split("}")[0]).toContain(
+      "grid-area: 2 / 2 / 3 / 4",
+    );
+  });
+
   test("full screen on the agent's screen: the screen alone on its ground, what floats over it hidden after a while", async () => {
     const text = await css();
     const dialog = rule(text, ".ac-dialog.cmp-dialog.is-screen-only");
