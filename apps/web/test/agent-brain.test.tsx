@@ -421,7 +421,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     }
   });
 
-  test("Adicionar conta (Codex): the code to type there; once the computer signs in, the account is chosen", async () => {
+  test("Adicionar conta (ChatGPT): its settings first, then the sign-in on its button; the account is chosen", async () => {
     const codex: MachineAccount = { ...work, id: "acct_codex", kind: "codex", label: "Pessoal", plan: "Plus" };
     const { state, api } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [] });
     // The computer finishes the first sign-in as soon as the page asks.
@@ -429,6 +429,18 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     const d = await brainDialog();
     await pick(d, "Conta do ChatGPT", /^Adicionar conta/);
     await settle(8);
+    // Showing the steps starts nothing: device code sign-in has to be allowed in ChatGPT first.
+    expect(state.calls.some((c) => c.method === "machines.beginAccountLogin")).toBe(false);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do ChatGPT" });
+    expect(within(block).getByRole("link", { name: "Abrir as configurações do ChatGPT" })).toBeTruthy();
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com ChatGPT" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
     expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
       ORG_ID,
       "machine_1",

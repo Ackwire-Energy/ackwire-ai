@@ -17,11 +17,16 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * provider's own sign-in and its link opens here, in a window of its own.
  * Claude: the account to sign in to (optional) goes with the click; the code
  * Claude shows comes back by "Colar" (sent by itself only when it is this
- * sign-in's) or by hand, sealed here to the computer's key. Codex: the device
- * page and the one-time code to type there. A coding plan: its own key page,
- * then the key, sealed the same way; it never reaches our server. The page
- * asks every 2 s; Voltar or closing stops the sign-in on the computer.
+ * sign-in's) or by hand, sealed here to the computer's key. ChatGPT: device
+ * code sign-in allowed in its settings first, then the device page and the
+ * one-time code to type there. A coding plan: its own key page, then the key,
+ * sealed the same way; it never reaches our server. Every start is a click,
+ * never the block showing. The page asks every 2 s; Voltar or closing stops
+ * the sign-in on the computer.
  */
+
+/** Where ChatGPT allows signing in with a code (Settings › Security): Codex's device sign-in needs it. */
+const CHATGPT_SECURITY = "https://chatgpt.com/#settings/Security";
 
 export interface AddAccountProps {
   machineId: string;
@@ -33,7 +38,16 @@ export interface AddAccountProps {
   again?: string;
   /** The account to sign in to (Claude), when it is already known. */
   email?: string | null;
-  onBack: () => void;
+  /** Claude: ask which account (the person already has one on that computer). Signing in again always asks. */
+  askEmail?: boolean;
+  /** The computer is one the person connected: its own browser may open the page itself. */
+  local?: boolean;
+  /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
+  ready?: boolean;
+  /** Under the steps, before where the account stays. */
+  note?: ReactNode;
+  /** Its own head, with Back; without it, the place that shows it says what it is. */
+  onBack?: () => void;
   onAdded: (account: MachineAccount) => void;
 }
 
@@ -43,13 +57,44 @@ export function AddAccount(props: AddAccountProps) {
   return <AddAccountFlow key={attempt} {...props} onRetry={() => setAttempt((n) => n + 1)} />;
 }
 
-function Step({ n, children, side }: { n: number; children: ReactNode; side?: ReactNode }) {
+/** A numbered step: its number on the title's line, the text under it, its button at the side. */
+export function Step({ n, children, side }: { n: number; children: ReactNode; side?: ReactNode }) {
   return (
-    <div className="agp-addacct__step">
+    <div className="agp-addacct__step ac-iconline">
       <i aria-hidden="true">{n}</i>
       <span className="agp-addacct__text">{children}</span>
       {side}
     </div>
+  );
+}
+
+/** A maker's own page (a sign-in, its settings, where a key is made), opened from the click in a window of its own. */
+export function OpenPage({
+  href,
+  primary,
+  onOpened,
+  children,
+}: {
+  href: string;
+  primary?: boolean;
+  onOpened?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Button asChild size="sm" variant={primary ? "primary" : "default"}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => {
+          if (openPopup(href)) e.preventDefault();
+          onOpened?.();
+        }}
+      >
+        <Icon name="external" size={14} />
+        {children}
+      </a>
+    </Button>
   );
 }
 
@@ -60,6 +105,10 @@ function AddAccountFlow({
   provider,
   again,
   email: knownEmail,
+  askEmail,
+  local,
+  ready = true,
+  note,
   onBack,
   onAdded,
   onRetry,
@@ -86,9 +135,13 @@ function AddAccountFlow({
   const running = useRef<string | null>(null);
   const gone = useRef(false);
   const reported = useRef(false);
-  // The dropdown that opened this block is gone: keyboard focus starts here.
+  // With its own head, the dropdown that opened this block is gone: keyboard focus starts here. In a panel under a
+  // picker, focus stays on the option the person just chose.
   const box = useRef<HTMLElement>(null);
-  useEffect(() => box.current?.focus(), []);
+  const headed = onBack !== undefined;
+  useEffect(() => {
+    if (headed) box.current?.focus();
+  }, [headed]);
   const status = useAccountLogin(org.id, machineId, login?.loginId ?? null);
   const result = status.data;
 
@@ -122,9 +175,6 @@ function AddAccountFlow({
   // biome-ignore lint/correctness/useExhaustiveDependencies: one sign-in per mount ("Tentar de novo" remounts)
   useEffect(() => {
     gone.current = false;
-    // Codex's code is what the person types: it starts at once. Claude starts on its button (with the account
-    // to sign in to), a plan once its key is pasted.
-    if (kind === "codex") void begin();
     return () => {
       gone.current = true;
       const id = running.current;
@@ -223,7 +273,13 @@ function AddAccountFlow({
         <Button size="sm" icon="copy" disabled={sent} onClick={() => void paste()}>
           {t("aiAccounts.add.paste")}
         </Button>
-        <Button size="sm" variant="primary" loading={sending} disabled={!valid || sent} onClick={() => void send()}>
+        <Button
+          size="sm"
+          variant="primary"
+          loading={sending}
+          disabled={!valid || sent || !ready}
+          onClick={() => void send()}
+        >
           {t("agentPage.work.brain.add.send", { computer })}
         </Button>
       </span>
@@ -251,6 +307,18 @@ function AddAccountFlow({
   const key = code.trim();
   const keyOk = plan ? planKeyFits(plan, key) : key.length > 0;
 
+  // Opened on the click itself, then sent to the provider's page once the computer has it.
+  const start = () => {
+    const popup = openPopup();
+    setOpened(true);
+    void begin(popup);
+  };
+  const openAgain = (url: string) => (
+    <OpenPage href={url} onOpened={() => setOpened(true)}>
+      {t("agentPage.work.brain.add.openAgain")}
+    </OpenPage>
+  );
+
   let steps: ReactNode;
   if (plan) {
     const site = new URL(plan.site);
@@ -259,24 +327,14 @@ function AddAccountFlow({
         <Step
           n={1}
           side={
-            <Button asChild size="sm" variant={opened ? "default" : "primary"}>
-              <a
-                href={plan.site}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (openPopup(plan.site)) e.preventDefault();
-                  setOpened(true);
-                }}
-              >
-                <Icon name="external" size={14} />
-                {t("aiAccounts.add.openKeys", { site: site.host })}
-              </a>
-            </Button>
+            <OpenPage href={plan.site} primary={!opened} onOpened={() => setOpened(true)}>
+              {t("aiAccounts.add.openKeys", { site: site.host })}
+            </OpenPage>
           }
         >
           <b>{t("aiAccounts.add.keyStep", { maker: plan.maker })}</b>
           <span>{t("aiAccounts.add.keySite", { site: site.host })}</span>
+          {provider === "zai" && <span>{t("connectAi.zaiTeam")}</span>}
         </Step>
         <Step n={2} side={sent ? waiting : undefined}>
           <label htmlFor={codeId}>
@@ -293,26 +351,17 @@ function AddAccountFlow({
   } else if (kind === "codex") {
     steps = (
       <>
+        <Step n={1} side={<OpenPage href={CHATGPT_SECURITY}>{t("connectAi.chatgptCode.open")}</OpenPage>}>
+          <b>{t("connectAi.chatgptCode.title")}</b>
+          <span>{t("connectAi.chatgptCode.text")}</span>
+        </Step>
         <Step
-          n={1}
+          n={2}
           side={
             login ? (
-              <Button asChild size="sm" variant={opened ? "default" : "primary"}>
-                <a
-                  href={login.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => {
-                    if (openPopup(login.url)) e.preventDefault();
-                    setOpened(true);
-                  }}
-                >
-                  <Icon name="external" size={14} />
-                  {opened ? t("agentPage.work.brain.add.openAgain") : t("agentPage.work.brain.add.open.codex")}
-                </a>
-              </Button>
+              openAgain(login.url)
             ) : (
-              <Button size="sm" variant="primary" loading disabled>
+              <Button size="sm" variant="primary" icon="external" loading={starting} disabled={!ready} onClick={start}>
                 {t("agentPage.work.brain.add.open.codex")}
               </Button>
             )
@@ -320,13 +369,13 @@ function AddAccountFlow({
         >
           <b>{t("agentPage.work.brain.add.stepOne.codex")}</b>
           <span>
-            {login
-              ? t("agentPage.work.brain.add.stepOneText.codex")
-              : t("agentPage.work.brain.add.starting", { computer })}
+            {starting
+              ? t("agentPage.work.brain.add.starting", { computer })
+              : t("agentPage.work.brain.add.stepOneText.codex")}
           </span>
         </Step>
         {login?.userCode && (
-          <Step n={2} side={waiting}>
+          <Step n={3} side={waiting}>
             <b>{t("agentPage.work.brain.add.deviceCode")}</b>
             <span className="agp-addacct__code">
               <output aria-label={t("agentPage.work.brain.add.deviceCode")}>{login.userCode}</output>
@@ -342,39 +391,23 @@ function AddAccountFlow({
   } else {
     const typed = email.trim();
     const emailOk = !typed || isEmail(typed);
+    // Which account, only where it helps: signing in again, or a second account beside one already there.
+    const asks = !login && (askEmail || again !== undefined);
     steps = (
       <>
         <Step
           n={1}
           side={
             login ? (
-              <Button asChild size="sm">
-                <a
-                  href={login.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => {
-                    if (openPopup(login.url)) e.preventDefault();
-                    setOpened(true);
-                  }}
-                >
-                  <Icon name="external" size={14} />
-                  {t("agentPage.work.brain.add.openAgain")}
-                </a>
-              </Button>
+              openAgain(login.url)
             ) : (
               <Button
                 size="sm"
                 variant="primary"
                 icon="external"
                 loading={starting}
-                disabled={!emailOk}
-                onClick={() => {
-                  // Opened on the click itself, then sent to Claude's page once the computer has it.
-                  const popup = openPopup();
-                  setOpened(true);
-                  void begin(popup);
-                }}
+                disabled={!emailOk || !ready}
+                onClick={start}
               >
                 {t("agentPage.work.brain.add.open.claude_code")}
               </Button>
@@ -387,7 +420,7 @@ function AddAccountFlow({
               ? t("agentPage.work.brain.add.starting", { computer })
               : t("agentPage.work.brain.add.stepOneText.claude_code")}
           </span>
-          {!login && (
+          {asks && (
             <span className="agp-addacct__paste">
               <Input
                 id={emailId}
@@ -405,7 +438,7 @@ function AddAccountFlow({
               />
             </span>
           )}
-          {!login && (
+          {asks && (
             <span>
               {startFailed === "email" || !emailOk ? t("aiAccounts.add.emailInvalid") : t("aiAccounts.add.emailHelp")}
             </span>
@@ -422,11 +455,13 @@ function AddAccountFlow({
               false,
               key.length > 0,
             )}
-            <span>
-              {sent
-                ? t("agentPage.work.brain.add.sent", { computer })
-                : t("agentPage.work.brain.add.local", { computer })}
-            </span>
+            {(sent || local) && (
+              <span>
+                {sent
+                  ? t("agentPage.work.brain.add.sent", { computer })
+                  : t("agentPage.work.brain.add.local", { computer })}
+              </span>
+            )}
           </Step>
         )}
       </>
@@ -435,15 +470,17 @@ function AddAccountFlow({
 
   return (
     <section ref={box} tabIndex={-1} className="agp-addacct" aria-label={title}>
-      <div className="agp-addacct__head">
-        <b className="row" style={{ gap: 8 }}>
-          {plan && <ProviderLogo id={provider ?? ""} size="xs" />}
-          {title}
-        </b>
-        <Button size="sm" variant="ghost" icon="chevronLeft" onClick={onBack}>
-          {t("common.back")}
-        </Button>
-      </div>
+      {onBack && (
+        <div className="agp-addacct__head">
+          <b className="row" style={{ gap: 8 }}>
+            {plan && <ProviderLogo id={provider ?? ""} size="xs" />}
+            {title}
+          </b>
+          <Button size="sm" variant="ghost" icon="chevronLeft" onClick={onBack}>
+            {t("common.back")}
+          </Button>
+        </div>
+      )}
       {ended ? (
         <div className="agp-addacct__step">
           <SettingNote icon="alert" live>
@@ -456,6 +493,7 @@ function AddAccountFlow({
       ) : (
         steps
       )}
+      {note}
       {!plan && <SettingNote icon="lock">{t("agentPage.work.brain.add.safe", { computer })}</SettingNote>}
     </section>
   );

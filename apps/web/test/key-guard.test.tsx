@@ -53,17 +53,20 @@ describe("an API key in a message: nothing goes out until the person chooses", (
     expect(composer().value).toBe("");
   });
 
-  test("an admin saves it as the organization's key instead: the key dialog opens with it", async () => {
+  test("an admin saves it as the organization's key instead: Connect an AI opens on the key, with it", async () => {
     const { state } = await open();
     await send(`minha chave ${KEY}`);
     await click(within(guard() as HTMLElement).getByRole("button", { name: "Salvar como chave" }));
-    const add = screen().getByRole("dialog", { name: "Adicionar uma chave de API" });
-    expect((within(add).getByLabelText("Chave da API") as HTMLInputElement).value).toBe(KEY);
-    expect(within(add).getByRole("combobox", { name: "Provedor" }).textContent).toContain("Claude");
+    const add = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    expect((within(add).getByLabelText("Cole aqui") as HTMLInputElement).value).toBe(KEY);
+    const makers = within(add).getByRole("group", { name: "Provedor" });
+    expect(within(makers).getByRole("button", { name: "Claude" }).getAttribute("aria-pressed")).toBe("true");
     await click(within(add).getByRole("button", { name: "Salvar chave" }));
     expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
       provider: "anthropic",
     });
+    expect(add.textContent).toContain("Salva. Todo agente sem plano pensa com ela.");
+    await click(within(add).getByRole("button", { name: "Pronto" }));
     expect(composer().value).toBe("minha chave");
     expect(posts(state)).toEqual([]);
   });

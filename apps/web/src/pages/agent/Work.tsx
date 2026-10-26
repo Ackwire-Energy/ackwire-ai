@@ -1055,6 +1055,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     again={signedOut ? current?.id : undefined}
                     {...(signedOut && isPlanId(current?.provider) ? { provider: current.provider } : {})}
                     email={signedOut ? current?.email : undefined}
+                    askEmail={view.ownSignIn || accounts.some((a) => a.mine)}
+                    local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
                       setAdded((list) => [...list.filter((x) => x.id !== a.id), a]);

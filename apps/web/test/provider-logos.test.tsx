@@ -4,7 +4,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { AiPicker } from "@/components/ai/ConnectAiSteps";
 import { ExecutorMark } from "@/components/missions/MissionBits";
+import { SetupPlans } from "@/components/WorkspaceComputer";
 import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs, title } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
@@ -89,6 +91,21 @@ describe("provider marks where a provider is named", () => {
     expect(brainLine().textContent).toBe("Claude Sonnet 5.5");
     expect(marks(brainLine())).toEqual([]);
     expect(brainLine().querySelector(".ac-icon")).not.toBeNull();
+  });
+
+  test("several makers in one line: the computer's plans and the API key row, by four marks each, overlapped", () => {
+    const { container } = render(
+      <>
+        <SetupPlans />
+        <AiPicker choice="claude" onPick={() => {}} />
+      </>,
+    );
+    const [plans, key] = [...container.querySelectorAll(".ac-brand-stack")];
+    expect(plans && marks(plans)).toEqual(["claude", "openai", "zai", "kimi"]);
+    expect(plans?.getAttribute("aria-label")).toBe("Claude, ChatGPT, GLM, Kimi e outros planos de IA");
+    expect(key && marks(key)).toEqual(["claude", "openai", "deepseek", "kimi"]);
+    // The row says the makers in words: its marks are decorative.
+    expect(key?.getAttribute("aria-hidden")).toBe("true");
   });
 
   test("missions: Claude Code and Codex by their makers' marks", () => {
