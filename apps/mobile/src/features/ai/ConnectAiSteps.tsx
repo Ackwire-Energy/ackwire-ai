@@ -2,7 +2,7 @@ import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AiChoice,
   KEY_MARKS,
@@ -596,7 +596,9 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
       </GroupedList>
       {maker ? (
         <>
-          <GroupedHeader>{t("mobile.ai.keyOf", providerGrammar(t, form.provider))}</GroupedHeader>
+          <GroupedHeader>
+            {t(maker.masculine ? "mobile.ai.keyOfM" : "mobile.ai.keyOfF", { provider: maker.label })}
+          </GroupedHeader>
           <GroupedList>
             <GroupedRow
               icon="out"
