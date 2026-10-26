@@ -79,9 +79,10 @@ export function useSetupWait(view: SetupView | null, held: boolean) {
     : { eta: null, email: false, now: null };
 }
 
+/** Every wait leads with the orbit, as work under way does: the clock is for the "as soon as it's ready" lines. */
 const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   preparing: "spinner",
-  waiting: "waiting",
+  waiting: "spinner",
   problem: "alert",
   ready: "check",
   paused: "pause",
@@ -104,7 +105,7 @@ export function SetupProgress({ view }: { view: SetupView }) {
   // The lines under it lead with 14px too, so every line's words start in one column.
   return (
     <p className="setup-progress setup-progress--line ac-iconline" role="status">
-      {view.phase === "preparing" ? <Spinner size={14} /> : <Icon name={PHASE_ICON[view.phase]} size={14} />}
+      {PHASE_ICON[view.phase] === "spinner" ? <Spinner size={14} /> : <Icon name={PHASE_ICON[view.phase]} size={14} />}
       <span>{t(view.textKey)}</span>
     </p>
   );
@@ -113,7 +114,8 @@ export function SetupProgress({ view }: { view: SetupView }) {
 /**
  * The wait in words, under the steps: the time left, then who hears when it's ready. Only owners get the
  * email, so only they are told so (`promisesEmail`); everyone else is told it shows here. `bell` false: the time
- * left alone, where a line of the caller's own says what happens once it's ready.
+ * left alone, where a line of the caller's own says what happens once it's ready; with no time to give, owners
+ * still read that they'll be emailed.
  */
 export function SetupWaitLines({ view, reader, bell = true }: { view: SetupView; reader: WaitReader; bell?: boolean }) {
   const { t } = useTranslation();
@@ -127,7 +129,7 @@ export function SetupWaitLines({ view, reader, bell = true }: { view: SetupView;
           {etaLine(t, eta)}
         </p>
       )}
-      {bell && (
+      {(bell || (emailed && !eta)) && (
         <p className="setup-line ac-iconline">
           <Icon name={emailed ? "mail" : "bell"} size={14} />
           <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
@@ -258,18 +260,19 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 
 /**
  * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
- * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), and
- * the faces of the agents that wait for it, each named by its label. Everyone sees it; closed, it stays closed
- * until the state (or the step) changes.
+ * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), or the
+ * wait for a computer, with "avisamos por e-mail" for owners, and the faces of the agents that wait for it, each
+ * named by its label. Everyone sees it; closed, it stays closed until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const reader = useWaitReader();
   const view = useSetupView(org.id);
   const pending = setupPending(view);
   const agents = useAgents(org.id);
   const machines = useMachines(org.id, pending);
-  const { eta } = useSetupWait(view, org.standing?.state === "hold");
+  const { eta, email } = useSetupWait(view, reader.held);
   const [hidden, setHidden] = useState(() => storage.get(STORAGE_KEYS.setupNoticeHidden));
   if (!pending) return null;
   const key = setupNoticeKey(org.id, view);
@@ -280,6 +283,7 @@ export function ComputerSetupNotice() {
       ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
       : t(view.textKey),
     eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
+    view.phase === "waiting" && email && reader.owner ? t("computerSetup.email.short") : null,
   ]
     .filter(Boolean)
     .join(" · ");

@@ -348,7 +348,7 @@ function ComputerStage({
     framed = false;
     body = (
       <>
-        <DialogHead sub={t("agentComputer.sub.preparing")} />
+        <DialogHead sub={t(f.setup.chipKey)} />
         <div className="cmp-prep">
           <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="paused" size={96} />
           <b className="cmp-prep__title">{t("computerSetup.notice.title", { org: org.name })}</b>

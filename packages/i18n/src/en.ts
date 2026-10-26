@@ -8240,7 +8240,7 @@ export const en: Translations = {
     specs: "{{cpus}} CPUs · {{memoryGb}} GB of memory · {{diskGb}} GB of disk",
     chip: {
       preparing: "Being prepared",
-      capacity: "Taking longer",
+      capacity: "In line",
       problem: "Problem",
       ready: "Ready",
       paused: "Paused",
@@ -8259,12 +8259,11 @@ export const en: Translations = {
       restarting: "Restarting after the update",
       network: "Setting up its network",
       firewall: "Setting up its protection",
-      finishing: "Running the last checks",
     },
     stepOf: "Step {{n}} of {{total}} · {{step}}",
     status: {
       preparing: "Getting the computer ready.",
-      capacity: "This is taking longer than usual.",
+      capacity: "Waiting for an available computer",
       problem: "Something went wrong while preparing it. We're on it.",
       ready: "Ready.",
       paused: "Not being prepared while the workspace is on hold.",
@@ -8288,6 +8287,8 @@ export const en: Translations = {
     email: {
       you: "We'll email you at {{email}} when it's ready.",
       here: "It shows here as soon as it's ready.",
+      /** After the capacity wait's line, for owners. */
+      short: "we'll email you",
     },
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
@@ -8387,12 +8388,7 @@ export const en: Translations = {
       held: "Paused for now",
       unavailable: "Its screen can't be shown right now",
       noScreen: "Doesn't use a screen or a browser",
-      preparing_one: "Being prepared · about 1 min left",
-      preparing_other: "Being prepared · about {{count}} min left",
-      preparingSoon: "Being prepared · almost ready",
       preparingPlain: "Being prepared",
-      slow: "Taking longer than usual · we'll email you",
-      slowPlain: "Taking longer than usual",
       problem: "Problem preparing it · we're on it",
       notAnswering: "Not answering · we're on it",
       offline: "Offline since {{time}}",
@@ -8410,7 +8406,6 @@ export const en: Translations = {
       askedOther: "Live · {{name}} asked {{person}}",
       held: "Paused for now · you can watch",
       paused: "Paused on {{computer}} · you can watch",
-      preparing: "Being prepared",
       notAnswering: "Not answering",
       offline: "Offline since {{time}}",
     },

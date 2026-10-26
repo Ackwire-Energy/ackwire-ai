@@ -1,5 +1,5 @@
 import { openBrowserAsync } from "expo-web-browser";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { Button, Icon, type IconName, InfoHint, Text, useTheme } from "@/ui";
@@ -9,12 +9,23 @@ import { useColors } from "../shared/hooks";
  * The pieces the web's AI panels are made of (`SettingNote`, the numbered `Step`, `OpenPage`), on the phone.
  */
 
-/** A line with its icon (the web's `SettingNote`): why something waits, what is safe, what went wrong. */
-export function Note({ icon, children, live = false }: { icon: IconName; children: ReactNode; live?: boolean }) {
+/**
+ * A line with its icon (the web's `SettingNote`): why something waits, what is safe, what went wrong. `icon` may be
+ * a mark of its own, 15 pt (the orbit of work under way).
+ */
+export function Note({
+  icon,
+  children,
+  live = false,
+}: {
+  icon: IconName | ReactElement;
+  children: ReactNode;
+  live?: boolean;
+}) {
   const c = useColors();
   return (
     <View style={styles.note} accessibilityLiveRegion={live ? "polite" : undefined}>
-      <Icon name={icon} size={15} color={icon === "x" ? c.danger : c.muted} />
+      {typeof icon === "string" ? <Icon name={icon} size={15} color={icon === "x" ? c.danger : c.muted} /> : icon}
       <Text variant="small" tone={icon === "x" ? "danger" : "muted"} style={styles.grow}>
         {children}
       </Text>
