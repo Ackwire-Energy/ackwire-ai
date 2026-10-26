@@ -117,8 +117,8 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
       ? (dir.agentById.get(a.id)?.name ?? t("channel.unknownAgent"))
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
 
-/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first names of `total` people. */
-function namesText(t: TFunction, names: string[], total = names.length, max = 2) {
+/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people. */
+function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
   const shown = names.slice(0, max);
   if (total <= shown.length) return joinNames(shown, t("notifications.and"));
   return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
@@ -318,7 +318,7 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       // Merged while unread: the first ones to ask, by name, then how many more.
       const asked = askersOf(n);
       return asked.total > 1
-        ? k("joinRequestMany", { names: namesText(t, asked.names, asked.total) })
+        ? k("joinRequestMany", { names: namesText(t, asked.names, 2, asked.total) })
         : k("joinRequest", { name: asked.names[0] });
     }
     case "reaction":
@@ -1294,7 +1294,7 @@ function WaitCard({
         !asked
           ? [name, l.title ?? l.text].filter(Boolean).join(": ")
           : asked.total > 1
-            ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, asked.total) })
+            ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
             : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] })
       }
       onClick={(e) => {
