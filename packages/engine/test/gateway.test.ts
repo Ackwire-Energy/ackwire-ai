@@ -262,7 +262,8 @@ test("no credential: core has no platform key; a module can provide one", async 
   await revokeCredential(f.db, f.owner.id, f.org.id, f.credential.id);
   await expect(call(f)).rejects.toBeInstanceOf(MissingCredentialError);
   await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: null });
-  await expect(call(f)).rejects.toBeInstanceOf(MissingCredentialError);
+  // `runErrorDetail` reads this text, and the app finds the provider by its label.
+  await expect(call(f)).rejects.toThrow("Add an API key for Claude in the workspace settings");
   await f.close();
 
   // Resolution order: agent key → org key for the provider → platform key.

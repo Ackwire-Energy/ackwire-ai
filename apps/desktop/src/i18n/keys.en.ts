@@ -335,7 +335,7 @@ export const desktopEn: DesktopTranslations = {
     claudeName: "Claude Code",
     claudeDesc: "Writes and changes code in the allowed folders, with your Claude account.",
     codexName: "Codex",
-    codexDesc: "Writes and changes code in the allowed folders, with your OpenAI account.",
+    codexDesc: "Writes and changes code in the allowed folders, with your ChatGPT account.",
     notInstalled: "Not installed on this {{device}}. If you install it later, it shows up here.",
     found: "Found",
     notFound: "Not found",
@@ -448,7 +448,7 @@ export const desktopEn: DesktopTranslations = {
     },
     accounts: {
       titleClaude: "Claude accounts",
-      titleCodex: "Codex accounts",
+      titleCodex: "ChatGPT accounts",
       org: "Organization",
       thisMac: "This {{device}}'s account",
       thisMacHint: "The one in {{tool}}",

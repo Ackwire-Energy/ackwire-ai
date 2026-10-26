@@ -316,7 +316,7 @@ export const envVars = {
   PLATFORM_ANTHROPIC_API_KEY: {
     schema: z.string().optional(),
     description:
-      "Platform Anthropic key (Cloud): organizations without a key of their own, and the onboarding option “Chave do agentes”, use it. Usage is still recorded per organization.",
+      "The platform's Claude API key (Cloud): organizations without a key of their own, and the onboarding option “Use the agentes.chat key”, use it. Usage is still recorded per organization.",
     section: "Agents",
     secret: true,
   },

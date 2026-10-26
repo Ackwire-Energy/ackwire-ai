@@ -67,6 +67,7 @@ test("an Anthropic-compatible provider's key: its models become available, and i
   expect(models.models.find((m) => m.id === "deepseek-flash")).toMatchObject({ available: true, recommended: true });
   expect(models.models.find((m) => m.id === "glm-5.3")).toMatchObject({ available: false, recommended: false });
   expect(models.providers.find((p) => p.id === "deepseek")).toMatchObject({ label: "DeepSeek", hasKey: true });
+  expect(models.providers.find((p) => p.id === "anthropic")?.label).toBe("Claude");
   const patched = await api("/settings", { method: "PATCH", json: { defaultCredentialIds: { deepseek: key.id } } });
   expect(patched.status).toBe(200);
   expect(

@@ -36,7 +36,7 @@ export interface ProviderInfo {
  * stores the provider id as text, so no migration is needed.
  */
 export const PROVIDERS = {
-  anthropic: { label: "Anthropic", protocol: "anthropic" },
+  anthropic: { label: "Claude", protocol: "anthropic" },
   openai: { label: "OpenAI", protocol: "openai" },
   deepseek: {
     label: "DeepSeek",

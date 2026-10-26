@@ -11,7 +11,7 @@ own machine). The setup writes it for you. Sign-in cookies, the only browser ori
 anything, and every link the app sends come from it. Opened at any other address, sign-in fails with
 "Invalid origin" and saving fails with `bad_origin`.
 
-The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
+The server needs no model key of its own. Each organization adds its own keys (Claude, OpenAI,
 DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
@@ -657,7 +657,7 @@ ones a self-hosted instance usually touches:
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 
-**Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
+**Model keys.** Each organization adds its own keys (Claude, OpenAI, DeepSeek, Kimi, Z.ai or
 MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
@@ -772,7 +772,7 @@ party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Anthropic, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Claude (Anthropic), OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
 | TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
