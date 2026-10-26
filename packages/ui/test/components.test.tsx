@@ -160,6 +160,13 @@ describe("ApprovalCard", () => {
     expect(within(card).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
   });
 
+  test("the detail sits in a well in both themes, never in the page's tone (the light card's own white)", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-approval")).toContain("background: var(--surface-raised);");
+    expect(rule(".ac-approval__detail")).toContain("background: var(--surface-sunken);");
+  });
+
   test("decided card shrinks and uses a done/neutral chip", () => {
     const { container } = render(
       <>

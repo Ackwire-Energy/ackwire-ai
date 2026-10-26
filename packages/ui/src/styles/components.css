@@ -985,6 +985,7 @@ textarea.ac-input {
   line-height: 22px;
   font-weight: 600;
 }
+/* A well in both themes: the page's tone is the light card's own white, which left the text indented in nothing. */
 .ac-approval__detail {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -992,7 +993,7 @@ textarea.ac-input {
   line-height: 18px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
-  background: var(--surface);
+  background: var(--surface-sunken);
   border-radius: var(--radius-sm);
   overflow-wrap: anywhere;
   /* Long, multi-line details (an email's recipients, subject and body) keep their lines and scroll. */

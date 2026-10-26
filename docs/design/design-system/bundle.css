@@ -69,7 +69,7 @@ body { margin: 0; font-family: var(--font-sans); font-size: 15px; line-height: 2
 .ac-chip--done { color: var(--success); }
 .ac-chip .ac-icon { width: 14px; height: 14px; }
 .ac-approval__title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
-.ac-approval__detail { margin: 0; padding: var(--space-2) var(--space-3); font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--ink-muted); background: var(--surface); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.ac-approval__detail { margin: 0; padding: var(--space-2) var(--space-3); font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; color: var(--ink-muted); background: var(--surface-sunken); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
 .ac-approval__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .ac-approval--done { gap: var(--space-2); }
 .ac-approval--done .ac-approval__title { font-weight: 400; color: var(--ink-muted); }
