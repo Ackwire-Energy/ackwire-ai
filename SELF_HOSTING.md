@@ -859,23 +859,36 @@ least used first; each starts again at its next use. An agent's desktop stops wh
 computer (archived, or moved to another one).
 
 Each agent's desktop has the agentes.chat look: its wallpaper and a dock at the bottom center (the mark,
-which opens the apps menu, then Files, Terminal and a button for each open window), one workspace and no
-desktop icons. The runner writes it into that desktop's own settings (`<agent folder>/.agentes/home`, or
-the agent's own home with `--system`), never your user's or the computer's, so your own desktop stays as
-it is. For its rounded windows, also install Orchis and the SVG loader it draws its buttons with (Debian
-12 and 13, Ubuntu 24.04; `--system --desktop` installs them where apt has them); without them the
-desktops use GTK's and XFCE's own theme. Orchis takes about 42 MB on Debian 13 with what it brings along
-(GTK 2's theme engines among them), and its package alone about 84 MB on Ubuntu 24.04, where it carries
-every color variant (the desktops use only Orchis-Light):
+which opens the apps menu, then Browser, Files and Terminal), one workspace and no desktop icons; its
+terminal's prompt shows the agent's name. Browser opens the agent's own browser on its desktop, the one
+it browses with, so a person who signs in to a site there signs the agent in (the first time, the
+browser is installed first, which takes about a minute). The runner writes the look into that desktop's
+own settings (`<agent folder>/.agentes/home`, or the agent's own home with `--system`), never your
+user's or the computer's, so your own desktop stays as it is. For its rounded windows, also install
+Orchis and the SVG loader it draws its buttons with (Debian 12 and 13, Ubuntu 24.04; `--system
+--desktop` installs them where apt has them); without them the desktops use GTK's and XFCE's own theme.
+Orchis takes about 42 MB on Debian 13 with what it brings along (GTK 2's theme engines among them), and
+its package alone about 84 MB on Ubuntu 24.04, where it carries every color variant (the desktops use
+only Orchis-Light):
 
 ```sh
 sudo apt install --no-install-recommends orchis-gtk-theme librsvg2-common
 ```
 
+On Debian 13 and Ubuntu 25.04 or newer, also install the dock's plugin, so an app's open windows show on
+its own icon in the dock (`--system --desktop` installs it where apt has it; Debian 12 and Ubuntu 22.04
+and 24.04 don't have it, and there each open window gets a button of its own after the icons):
+
+```sh
+sudo apt install --no-install-recommends xfce4-docklike-plugin
+```
+
 What a person changes on a desktop (its theme, its panel) stays until the runner writes the look again:
-for a new version of the look, once Orchis or the SVG loader is installed or removed (running the
-installer again with `--desktop` installs them), or when the agent's folder moves (without `--system`,
-it is renamed with the agent's handle).
+for a new version of the look, once Orchis, the SVG loader or the dock's plugin is installed or removed
+(running the installer again with `--desktop` installs them), when the agent is renamed, or when the
+agent's folder moves (without `--system`, it is renamed with the agent's handle). The runner writes it
+as a desktop starts, so a desktop that is running keeps its look until its next start (after a reboot,
+say): desktops stay on, and a new look doesn't close what is open on them.
 
 Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
 terminal are for the person who connected the computer, since they act as its user: by default every

@@ -3,8 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import {
+  type AgentScope,
   MACHINE_PROTOCOL_VERSION,
   MAX_FRAME_BYTES,
+  type MachineErrorCode,
   parseAccess,
   parsePause,
 } from "@agenteschat/adapters/machine-protocol";
@@ -15,7 +17,7 @@ import { BrowserManager, type BrowserManagerOptions } from "./browser";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
-import { RUNNER_VERSION, RunnerError } from "./errors";
+import { RUNNER_VERSION, RunnerError, toMachineError } from "./errors";
 import { type HandlerContext, handleRequest } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { readLines } from "./lines";
@@ -62,6 +64,12 @@ export interface WorkerOptions {
   browser?: Pick<BrowserManagerOptions, "command" | "chrome" | "startChrome" | "isOurChrome">;
 }
 
+/**
+ * Root answers for the agent's desktop within that desktop's start, whose steps each have a limit; an ask it never
+ * answers would hold the agent's browser commands behind it.
+ */
+const DESKTOP_MS = 2 * 60_000;
+
 /** Until the supervisor says otherwise, nothing is allowed. */
 const NOTHING_ALLOWED: WorkerState = {
   access: { folders: [], tools: { claude: false, codex: false, commands: false } },
@@ -89,12 +97,15 @@ export class WorkerLink {
   private readonly desktops = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "desktop.ensured" }>) => void>();
   private nextEnsure = 0;
   onState: (state: WorkerState) => void = () => {};
+  /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
+  onShow: (showId: string, agent: AgentScope) => void = () => {};
   /** The supervisor is gone (stdin closed). */
   onEnd: () => void = () => {};
 
   constructor(
     input: Readable,
     private readonly output: Writable,
+    private readonly desktopMs = DESKTOP_MS,
   ) {
     readLines(
       input,
@@ -111,7 +122,7 @@ export class WorkerLink {
     this.onEnd();
   }
 
-  /** Desktops asked for get no answer once the session or the link is gone (the supervisor drops them). */
+  /** Desktops still asked for fail when the session or the link ends, as the work that asked for them does. */
   private unanswered(message: string) {
     for (const answer of [...this.desktops.values()]) {
       answer({ type: "desktop.ensured", ensureId: "", error: { code: "internal", message } });
@@ -160,9 +171,28 @@ export class WorkerLink {
       case "desktop.ensured":
         if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
         return;
+      case "browser.show": {
+        const agent = f.agent as Partial<AgentScope> | undefined;
+        if (typeof f.showId === "string" && typeof agent?.id === "string" && typeof agent.handle === "string") {
+          this.onShow(f.showId, agent as AgentScope);
+        }
+        return;
+      }
       default:
         this.session?.onMessage(line);
     }
+  }
+
+  /** Chrome for Testing installs first, for that click. */
+  showing(showId: string) {
+    this.write(JSON.stringify({ type: "browser.showing", showId } satisfies WorkerLinkFrame));
+  }
+
+  /** The agent's Chrome is on its desktop, or why it isn't. */
+  shown(showId: string, error?: { code: MachineErrorCode; message: string }) {
+    this.write(
+      JSON.stringify({ type: "browser.shown", showId, ...(error ? { error } : {}) } satisfies WorkerLinkFrame),
+    );
   }
 
   /**
@@ -172,7 +202,12 @@ export class WorkerLink {
   desktop(use: WorkerDesktopUse): Promise<WorkerDesktop> {
     const ensureId = String(++this.nextEnsure);
     return new Promise((resolve, reject) => {
+      const late = setTimeout(() => {
+        const error = { code: "internal" as const, message: "The agent's desktop didn't start in time" };
+        this.desktops.get(ensureId)?.({ type: "desktop.ensured", ensureId, error });
+      }, this.desktopMs);
       this.desktops.set(ensureId, (reply) => {
+        clearTimeout(late);
         this.desktops.delete(ensureId);
         if (reply.desktop) resolve(reply.desktop);
         else reject(new RunnerError(reply.error?.code ?? "internal", reply.error?.message ?? "No desktop"));
@@ -302,6 +337,16 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
   leases.unref?.();
   void browser.closeAll();
+  link.onShow = (showId, agent) => {
+    const shown =
+      agent.id === o.agentId
+        ? agentWorkspace(workspaceReal, agent).then((folder) => browser.show(agent, folder, () => link.showing(showId)))
+        : Promise.reject(new RunnerError("not_allowed", "This worker serves another agent"));
+    shown.then(
+      () => link.shown(showId),
+      (err: unknown) => link.shown(showId, toMachineError(err)),
+    );
+  };
   const own = process.getuid?.() ?? null;
   const desktopUse = new DesktopManager({
     desktops: {
