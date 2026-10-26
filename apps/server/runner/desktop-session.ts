@@ -14,6 +14,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import type { Server } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -26,10 +27,12 @@ import {
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
 import type { Launcher } from "./agent-users";
+import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "./desktop-browser";
+import { desktopName, lookCommand, lookDock, lookTheme } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
-import { hasBunTerminal, runtimeName } from "./launch";
+import { hasBunTerminal, runtimeName, thisRunner } from "./launch";
 import { tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
 import { KeyedQueue } from "./queue";
@@ -48,29 +51,43 @@ import { KeyedQueue } from "./queue";
  *   is root's: Xvnc reads it on every connection, so an agent that could
  *   write it would swap the two passwords and turn its watchers into
  *   controllers.
- * - Started on demand (`ensure`), stopped after `DESKTOP_IDLE_MS` with no
- *   stream and no use (the agent's Chrome on it in use counts), started again
- *   (at most 3 times in 10 minutes) when it ends by itself.
+ * - Its look (`desktop-look.ts`) is XFCE's settings in its HOME, written there
+ *   as the agent before a start when the HOME's marker names another look.
+ *   Its Browser reaches the runner on a socket next to the password file
+ *   (`desktop-browser.ts`), open while the desktop runs.
+ * - Started the first time it is needed (`ensure`: the agent's screen or
+ *   browser, a person opening it), then left on: none stops for being idle,
+ *   so what a person left open on it is still there later. Started again (at
+ *   most 3 times in 10 minutes) when it ends by itself. It stops when its
+ *   agent leaves this computer, or its workspace is suspended.
+ * - Parked only when room runs short (`makeRoom`, before a desktop or a
+ *   headed Chrome starts): the least recently used ones nobody watches or
+ *   uses, untouched for `PARK_AFTER_MS`, until `MIN_FREE_BYTES` are free and,
+ *   for a new desktop, a display. One parked starts again like a first time.
  * - Desktops outlive the runner (their own sessions; the service has
  *   `KillMode=process`): the next runner takes them back from
  *   `<runner home>/desktop/<id8>.json` once the pid there is still that
  *   display's Xtigervnc.
  */
 
-/** A desktop with no stream and no use for this long stops (Chrome on it with it). */
-export const DESKTOP_IDLE_MS = 15 * 60_000;
+/** Memory left free before a desktop or a headed Chrome starts: desktops are parked to keep it. */
+export const MIN_FREE_BYTES = 1.5 * 1024 ** 3;
+/** A desktop untouched this long, unwatched and unused, may be parked (an open request keeps it touched). */
+export const PARK_AFTER_MS = 60 * 60_000;
 const SWEEP_MS = 60_000;
 /** Xvnc listens within a few hundred ms. */
 const XVNC_START_MS = 5000;
+/**
+ * The steps before X, run as the agent (the prepare, the look), take milliseconds: one still running after this
+ * is held up (a pipe in its HOME, a hung disk), and is stopped rather than left to block the agent's desktop.
+ */
+const STEP_MS = 10_000;
 const KILL_WAIT_MS = 3000;
 /** A desktop that ended by itself starts again this many times within the window, then stays off. */
 const RESTARTS = { max: 3, windowMs: 10 * 60_000 };
 /** Agents' displays are :20 to :69, one slot each. */
 const FIRST_DISPLAY = 20;
 const SLOT_COUNT = 50;
-/** Memory a desktop takes with a headed Chrome on it (about 780 MB measured), and what the computer keeps for the rest. */
-const DESKTOP_BYTES = 800 * 1024 * 1024;
-const RESERVED_BYTES = 2 * 1024 * 1024 * 1024;
 const SLOTS_FILE = "slots.json";
 /** System mode: where root keeps each agent's password file (`<uid>/passwd`). */
 const SYSTEM_RUN_DIR = "/run/agentes-desktop";
@@ -99,17 +116,22 @@ const INSTALL = `sudo apt install --no-install-recommends ${[
   "adwaita-icon-theme",
   "elementary-xfce-icon-theme",
   "fonts-noto-core",
+  "fonts-noto-cjk",
 ].join(" ")}`;
 
 /**
- * Run as the agent: its desktop folder (0700), HOME and XFCE's session
- * settings there when it has none (`$3`), and a fresh cookie file. The cookie
- * comes on stdin (`xauth source -`), never in an argument.
+ * Run as the agent: its desktop folder (0700), HOME and XFCE's settings
+ * there (the session's when it has none, `$3`; xfwm4's vblank off, `$4`, or
+ * that one setting changed in the file xfwm4 keeps), and a fresh cookie file.
+ * The cookie comes on stdin (`xauth source -`), never in an argument.
  */
 const PREPARE = [
   'umask 077 && mkdir -p "$1" "$2" && chmod 700 "$1"',
-  'x="$2/.config/xfce4/xfconf/xfce-perchannel-xml"',
-  '{ [ -e "$x/xfce4-session.xml" ] || { mkdir -p "$x" && printf %s "$3" > "$x/xfce4-session.xml"; }; }',
+  'x="$2/.config/xfce4/xfconf/xfce-perchannel-xml" && w="$x/xfwm4.xml" && mkdir -p "$x"',
+  '{ [ -e "$x/xfce4-session.xml" ] || printf %s "$3" > "$x/xfce4-session.xml"; }',
+  // xfwm4 writes every one of its settings to its file on its first start, so a desktop that ran before has it.
+  // A failure here only leaves the vblank on: the desktop still starts.
+  String.raw`{ if [ -e "$w" ]; then sed 's/\(name="vblank_mode" type="string" value="\)[^"]*/\1off/' "$w" > "$w.new" && mv "$w.new" "$w"; else printf %s "$4" > "$w"; fi || true; }`,
   'rm -f "$1/Xauthority" && exec xauth -q -f "$1/Xauthority" source -',
 ].join(" && ");
 
@@ -123,6 +145,21 @@ const XFCE_SESSION_SETTINGS = `<?xml version="1.0" encoding="UTF-8"?>
     <property name="ssh-agent" type="empty">
       <property name="enabled" type="bool" value="false"/>
     </property>
+  </property>
+</channel>
+`;
+
+/**
+ * xfwm4's compositor shows nothing new before the screen's next vblank, and
+ * Xtigervnc's vblank clock ticks once a second while no viewer is connected:
+ * with nobody watching, what an app drew reached the agent's screen (and its
+ * screenshots) up to 2 s late. A virtual screen has no refresh to wait for:
+ * off.
+ */
+const XFWM4_SETTINGS = `<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="vblank_mode" type="string" value="off"/>
   </property>
 </channel>
 `;
@@ -154,9 +191,19 @@ export function vncPasswordFile(full: string, view: string): Buffer {
 const newPassword = () =>
   Array.from({ length: 8 }, () => PASSWORD_ALPHABET[randomInt(PASSWORD_ALPHABET.length)]).join("");
 
-/** Desktops one computer runs at once: what its memory holds after a reserve for everything else (7 on 8 GB). */
-export function defaultMaxDesktops(totalBytes: number = os.totalmem()): number {
-  return Math.max(1, Math.floor((totalBytes - RESERVED_BYTES) / DESKTOP_BYTES));
+/** `MemAvailable` from `/proc/meminfo`'s text, in bytes; null when it isn't there. */
+export function memAvailableBytes(meminfo: string): number | null {
+  const kb = /^MemAvailable:\s+(\d+)\s+kB$/m.exec(meminfo)?.[1];
+  return kb === undefined ? null : Number(kb) * 1024;
+}
+
+/** The memory Linux says is available now; null elsewhere. */
+function hostMemAvailable(): number | null {
+  try {
+    return memAvailableBytes(readFileSync("/proc/meminfo", "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /** Where and as whom an agent's desktop runs. */
@@ -242,6 +289,8 @@ export interface DesktopSystem {
   uid: number | null;
   /** A command's full path on `pathList` (default: the runner's PATH); null when it isn't there. */
   which(command: string, pathList?: string): string | null;
+  /** A file is there (the look's theme). */
+  exists(file: string): boolean;
   spawn(argv: string[], opts: DesktopSpawnOptions): DesktopProcess;
   /** A process's command line; null when it isn't running. */
   cmdline(pid: number): string[] | null;
@@ -279,6 +328,7 @@ export const hostSystem = (): DesktopSystem => ({
     const found = resolveCommand(command, pathList);
     return path.isAbsolute(found) ? found : null;
   },
+  exists: existsSync,
   spawn: spawnProcess,
   cmdline(pid) {
     try {
@@ -311,13 +361,19 @@ export interface DesktopSessionsOptions {
   /** Tests: where X keeps display locks (`/tmp`), and system mode's password folders (`/run/agentes-desktop`). */
   lockDir?: string;
   runDir?: string;
-  maxDesktops?: number;
-  idleMs?: number;
+  /** Tests: the memory available now (default: `/proc/meminfo`; null: not known, never short). */
+  memAvailable?: () => number | null;
   now?: () => number;
-  /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): not idle then. */
+  /** Tests: `STEP_MS`. */
+  stepMs?: number;
+  /** Whether the agent's Chrome on its desktop is in use (its commands, its live view's viewers): never parked then. */
   inUse?: (agentId: string) => boolean;
   /** A viewer of the agent's desktop came or went (`status().streams`). */
   onViewers?: (agentId: string) => void;
+  /** Browser on the agent's desktop was clicked (`desktop-browser.ts`); without it the desktop has no socket for it. */
+  openBrowser?: (agent: AgentScope, installing: () => void) => Promise<void>;
+  /** How this runner starts itself, which Browser runs (default: this process). */
+  runner?: string[];
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -340,11 +396,16 @@ interface Desktop extends Saved {
   /** Its `<id8>.json`. */
   file: string;
   lastUsed: number;
-  /** Open viewers: a desktop being watched isn't idle. */
+  /** Open viewers: a desktop being watched is never parked. */
   streams: number;
   /** Being stopped on purpose: its processes ending isn't a crash. */
   ending?: boolean;
+  /** Its Browser's socket, while it listens. */
+  browser?: Server;
 }
+
+/** Browser's socket: in the password file's folder, root's for the agent in system mode. */
+const browserSocket = (passwd: string) => path.join(path.dirname(passwd), BROWSER_SOCKET);
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isPid = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0;
@@ -372,16 +433,19 @@ export class DesktopSessions {
   private readonly restarts = new Map<string, number[]>();
   /** Displays of desktops being started. */
   private readonly claimed = new Set<number>();
-  private launching = 0;
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
   private readonly sys: DesktopSystem;
   private readonly dir: string;
   private readonly now: () => number;
+  private readonly stepMs: number;
+  private readonly runner: string[];
 
   constructor(private readonly opts: DesktopSessionsOptions) {
     this.sys = opts.system ?? hostSystem();
     this.dir = path.join(opts.home, "desktop");
     this.now = opts.now ?? Date.now;
+    this.stepMs = opts.stepMs ?? STEP_MS;
+    this.runner = opts.runner ?? thisRunner();
   }
 
   /** `hello.desktop`: whether this computer can run the agents' desktops, and what to install when it can't. */
@@ -403,20 +467,69 @@ export class DesktopSessions {
     return { available: true, ...DESKTOP_SIZE };
   }
 
-  /** Starts the agent's desktop, or only marks it used when it runs (`desktop.session.start`). */
-  ensure(agent: AgentScope): Promise<MachineReplies["desktop.session.start"]> {
+  /**
+   * Starts the agent's desktop, or only marks it used when it runs (`desktop.session.start`, a stream opening).
+   * `chrome`: the agent's Chrome is about to start on it, so there must be room for that too.
+   */
+  ensure(agent: AgentScope, opts: { chrome?: boolean } = {}): Promise<MachineReplies["desktop.session.start"]> {
     return this.serial(agent.id, async () => {
-      const d = this.desktops.get(agent.id);
-      if (d && this.alive(d)) {
+      let d = this.desktops.get(agent.id);
+      const running = d !== undefined && this.alive(d);
+      if (d && running) {
         d.agent = agent;
         d.lastUsed = this.now();
-        return this.started(d, false);
+      } else {
+        if (d) await this.end(d);
+        const info = this.info();
+        if (!info.available) throw new RunnerError("desktop_unavailable", info.reason ?? "Desktops can't run here");
+        d = await this.start(agent);
       }
-      if (d) await this.end(d);
-      const info = this.info();
-      if (!info.available) throw new RunnerError("desktop_unavailable", info.reason ?? "Desktops can't run here");
-      return this.started(await this.start(agent), true);
+      if (opts.chrome && !(await this.makeRoom(agent.id))) {
+        throw new RunnerError(
+          "desktop_busy",
+          "This computer is short of memory for the agent's browser on its desktop",
+        );
+      }
+      return this.started(d, !running);
     });
+  }
+
+  /**
+   * Room for a headed Chrome, or with `display` for one more desktop: while less than `MIN_FREE_BYTES` is
+   * available, or no display is free, parks desktops (`parkable`), least recently used first. False: still no
+   * room, with nothing left to park. Where the memory isn't known (not Linux) only the displays count.
+   */
+  async makeRoom(forAgentId: string, display = false): Promise<boolean> {
+    const full = () => {
+      const free = (this.opts.memAvailable ?? hostMemAvailable)();
+      return (free !== null && free < MIN_FREE_BYTES) || (display && this.freeSlots().length === 0);
+    };
+    while (full()) {
+      const [oldest] = [...this.desktops.values()]
+        .filter((d) => this.parkable(d, forAgentId))
+        .sort((a, b) => a.lastUsed - b.lastUsed);
+      if (!oldest) return false;
+      await this.serial(oldest.agent.id, async () => {
+        if (this.desktops.get(oldest.agent.id) !== oldest || !this.parkable(oldest, forAgentId)) return;
+        this.opts.log(`the desktop of ${oldest.agent.handle} was parked to make room: nobody used it for an hour`);
+        await this.end(oldest);
+      });
+    }
+    return true;
+  }
+
+  /**
+   * Nobody watches it, its agent doesn't use it, and nothing touched it for `PARK_AFTER_MS`.
+   * ponytail: parking closes what was left open on the least-used desktops, which on 8 GB happens only with many
+   * agents browsing at once; a per-agent memory measure replaces the hour rule if that ever bites.
+   */
+  private parkable(d: Desktop, forAgentId: string) {
+    return (
+      d.agent.id !== forAgentId &&
+      d.streams === 0 &&
+      this.now() - d.lastUsed >= PARK_AFTER_MS &&
+      !this.opts.inUse?.(d.agent.id)
+    );
   }
 
   stop(agent: AgentScope): Promise<MachineReplies["desktop.session.stop"]> {
@@ -442,7 +555,7 @@ export class DesktopSessions {
     return { display, socket, xauthority, home, passwords };
   }
 
-  /** A viewer on the agent's desktop: it doesn't stop as idle until the returned release is called. */
+  /** A viewer on the agent's desktop: it isn't parked until the returned release is called. */
   hold(agentId: string): (() => void) | null {
     const d = this.desktops.get(agentId);
     if (!d) return null;
@@ -459,9 +572,13 @@ export class DesktopSessions {
     };
   }
 
-  /** Every desktop stops (the machine's desktop switch went off). */
-  async stopAll() {
-    await Promise.all([...this.desktops.values()].map((d) => this.stop(d.agent).catch(() => undefined)));
+  /**
+   * Every desktop stops (the machine's desktop switch went off), or every one but those of `keep`: the agents
+   * this computer still serves (one archived or moved to another computer leaves).
+   */
+  async stopAll(keep: ReadonlySet<string> = new Set()) {
+    const leaving = [...this.desktops.values()].filter((d) => !keep.has(d.agent.id));
+    await Promise.all(leaving.map((d) => this.stop(d.agent).catch(() => undefined)));
   }
 
   /**
@@ -502,7 +619,9 @@ export class DesktopSessions {
       const file = path.join(this.dir, name);
       const saved = parseSaved(readJson(file));
       if (saved && !this.desktops.has(saved.agent.id) && this.isXvnc(saved.pid, saved.display)) {
-        this.add({ ...saved, file, lastUsed: this.now(), streams: 0 });
+        const d: Desktop = { ...saved, file, lastUsed: this.now(), streams: 0 };
+        this.add(d);
+        void this.listenBrowser(d);
         this.opts.log(`the desktop of ${saved.agent.handle} on :${saved.display} is running; taken back`);
       } else {
         rmSync(file, { force: true });
@@ -510,23 +629,14 @@ export class DesktopSessions {
     }
   }
 
-  /** Desktops that ended by themselves start again; idle ones stop. */
-  async sweep() {
-    const idleMs = this.opts.idleMs ?? DESKTOP_IDLE_MS;
-    const idle = (d: Desktop) => d.streams === 0 && this.now() - d.lastUsed >= idleMs && !this.opts.inUse?.(d.agent.id);
+  /**
+   * Desktops that ended by themselves start again (one taken back from an earlier runner has no exit to wait
+   * on). The agent's Chrome in use on one touches it, so it isn't parked as soon as that Chrome closes.
+   */
+  sweep() {
     for (const d of [...this.desktops.values()]) {
-      if (!this.alive(d)) {
-        this.ended(d);
-        continue;
-      }
-      if (!idle(d)) continue;
-      await this.serial(d.agent.id, async () => {
-        if (this.desktops.get(d.agent.id) !== d || !idle(d)) return;
-        this.opts.log(
-          `the desktop of ${d.agent.handle} stopped: nobody used it for ${Math.round(idleMs / 60_000)} minutes`,
-        );
-        await this.end(d);
-      }).catch(() => undefined);
+      if (!this.alive(d)) this.ended(d);
+      else if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
     }
   }
 
@@ -546,15 +656,17 @@ export class DesktopSessions {
 
   private add(d: Desktop) {
     this.desktops.set(d.agent.id, d);
-    this.sweepTimer ??= setInterval(() => void this.sweep(), SWEEP_MS);
+    this.sweepTimer ??= setInterval(() => this.sweep(), SWEEP_MS);
     (this.sweepTimer as { unref?: () => void }).unref?.();
   }
 
   private async start(agent: AgentScope): Promise<Desktop> {
-    if (this.desktops.size + this.launching >= (this.opts.maxDesktops ?? defaultMaxDesktops())) {
-      throw new RunnerError("desktop_busy", "This computer already runs as many desktops as its memory allows");
+    if (!(await this.makeRoom(agent.id, true))) {
+      throw new RunnerError(
+        "desktop_busy",
+        "This computer has no room for another desktop, and every one on it is in use",
+      );
     }
-    this.launching++;
     let display: number | null = null;
     try {
       const user = await this.opts.user(agent);
@@ -587,17 +699,45 @@ export class DesktopSessions {
       }
       const log = openSync(logFile, "w", 0o600);
       try {
-        const script = [...user.prefix, "/bin/sh", "-c", PREPARE, "sh", user.dir, user.home, XFCE_SESSION_SETTINGS];
+        const script = [
+          ...user.prefix,
+          "/bin/sh",
+          "-c",
+          PREPARE,
+          "sh",
+          user.dir,
+          user.home,
+          XFCE_SESSION_SETTINGS,
+          XFWM4_SETTINGS,
+        ];
         const prepare = this.sys.spawn(script, {
           cwd: "/",
           env: user.env,
           input: `add :${display} . ${randomBytes(16).toString("hex")}\n`,
           log,
         });
-        if ((await prepare.exited) !== 0) {
+        const prepared = await this.step(prepare);
+        if (prepared !== 0) {
           throw new RunnerError(
             "internal",
-            `The agent's desktop couldn't be prepared: ${tailLines(logFile, 3).join(" ")}`,
+            `The agent's desktop couldn't be prepared: ${prepared === "late" ? `still running after ${this.stepMs / 1000} s` : tailLines(logFile, 3).join(" ")}`,
+          );
+        }
+        // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
+        const exists = (file: string) => this.sys.exists(file);
+        const look = lookCommand(user.home, {
+          theme: lookTheme(exists),
+          dock: lookDock(exists),
+          agent,
+          shell: user.env.SHELL ?? "",
+          browser: [...this.runner, "desktop-browser", browserSocket(files.passwd)],
+        });
+        const looked = await this.step(
+          this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
+        );
+        if (looked !== 0) {
+          this.opts.log(
+            `the desktop of ${agent.handle} keeps the look its home has: writing the agentes.chat look ${looked === "late" ? `was stopped after ${this.stepMs / 1000} s` : `failed (exit ${looked})`}`,
           );
         }
         this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
@@ -646,15 +786,53 @@ export class DesktopSessions {
         this.add(d);
         void x.exited.then(() => this.ended(d));
         void session.exited.then(() => this.ended(d));
+        await this.listenBrowser(d);
         this.opts.log(`the desktop of ${agent.handle} started on :${display}`);
         return d;
       } finally {
         closeSync(log);
       }
     } finally {
-      this.launching--;
       if (display !== null) this.claimed.delete(display);
     }
+  }
+
+  /**
+   * Browser on the desktop reaches the runner on its socket (`desktop-browser.ts`), for as long as the desktop runs.
+   * Why a click failed goes in the log: the desktop's note says it in a person's words.
+   */
+  private async listenBrowser(d: Desktop) {
+    const open = this.opts.openBrowser;
+    if (!open) return;
+    const socket = browserSocket(d.passwd);
+    try {
+      const server = await serveBrowser(socket, (installing) =>
+        open(d.agent, installing).catch((err: unknown) => {
+          this.opts.log(
+            `Browser on the desktop of ${d.agent.handle} didn't open: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw err;
+        }),
+      );
+      if (d.ending) closeBrowser(server, socket);
+      else d.browser = server;
+    } catch (err) {
+      this.opts.log(
+        `Browser on the desktop of ${d.agent.handle} can't reach the runner: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** A step before X: its exit code, or "late" once it has run `STEP_MS` (then it is stopped). */
+  private async step(p: DesktopProcess): Promise<number | null | "late"> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<"late">((resolve) => {
+      timer = setTimeout(() => resolve("late"), this.stepMs);
+    });
+    const code = await Promise.race([p.exited, late]);
+    clearTimeout(timer);
+    if (code === "late" && p.pid) this.sys.kill(p.pid, "SIGTERM");
+    return code;
   }
 
   /** Xvnc's own pid once it holds the display and its socket is there; its output says why when it doesn't. */
@@ -742,6 +920,7 @@ export class DesktopSessions {
       while (this.isXvnc(d.pid, d.display) && Date.now() < deadline) await sleep(50);
       if (this.isXvnc(d.pid, d.display)) this.sys.kill(d.pid, "SIGKILL");
     }
+    if (d.browser) closeBrowser(d.browser, browserSocket(d.passwd));
     rmSync(d.file, { force: true });
     rmSync(d.passwd, { force: true });
     if (this.desktops.size === 0) this.close();
@@ -785,6 +964,14 @@ export class DesktopSessions {
     }
   }
 
+  /** The display slots no desktop of ours and no other process holds. */
+  private freeSlots(): number[] {
+    const ours = new Set([...this.claimed, ...[...this.desktops.values()].map((d) => d.display)]);
+    return [...Array(SLOT_COUNT).keys()].filter(
+      (slot) => !ours.has(FIRST_DISPLAY + slot) && this.displayFree(FIRST_DISPLAY + slot),
+    );
+  }
+
   /**
    * The agent's display: the one it had before (`slots.json`) when nobody
    * holds it, else the first free one no other agent had, else any free one.
@@ -795,13 +982,11 @@ export class DesktopSessions {
     const slots = new Map(
       isRecord(saved) ? Object.entries(saved).filter((e): e is [string, number] => isSlot(e[1])) : [],
     );
-    const ours = new Set([...this.claimed, ...[...this.desktops.values()].map((d) => d.display)]);
-    const free = (slot: number) => !ours.has(FIRST_DISPLAY + slot) && this.displayFree(FIRST_DISPLAY + slot);
+    const open = this.freeSlots();
     const own = slots.get(agentId);
-    let slot = own !== undefined && free(own) ? own : undefined;
+    let slot = own !== undefined && open.includes(own) ? own : undefined;
     if (slot === undefined) {
       const others = new Set([...slots].filter(([id]) => id !== agentId).map(([, s]) => s));
-      const open = [...Array(SLOT_COUNT).keys()].filter(free);
       slot = open.find((s) => !others.has(s)) ?? open[0];
     }
     if (slot === undefined) throw new RunnerError("desktop_busy", "Every display for the agents' desktops is taken");
@@ -813,13 +998,6 @@ export class DesktopSessions {
     return FIRST_DISPLAY + slot;
   }
 }
-
-/** The name viewers see for the desktop. */
-const desktopName = (agent: AgentScope) =>
-  (agent.name || agent.handle)
-    .replace(/\p{Cc}/gu, " ")
-    .trim()
-    .slice(0, 60) || "agent";
 
 /**
  * Xtigervnc's flags (after `:N`): its fixed size; VNC only on the Unix

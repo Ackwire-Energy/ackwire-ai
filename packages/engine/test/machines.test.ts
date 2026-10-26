@@ -12,6 +12,7 @@ import {
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
+  createAgent,
   createMachineHub,
   declineSecret,
   deleteMachine,
@@ -381,6 +382,23 @@ describe("pairing", () => {
 });
 
 describe("machines and targets", () => {
+  test("a computer lists its agents in the order they came, as the agents' own list does", async () => {
+    f = await setup();
+    const qa = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "QA", handle: "qa" },
+      { model: "claude-sonnet-5-5" },
+    );
+    const box = await pair();
+    // The newer agent moves there first: the order its rows were written in isn't the one people see.
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, qa.id, box.machineId);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, box.machineId);
+    const [machine] = await listMachines(f.db, f.owner.id, f.org.id);
+    expect(machine?.agents.map((a) => a.handle)).toEqual(["dev", "qa"]);
+  });
+
   test("list, rename and delete: every member sees them, only the pairer or an admin changes them", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -398,11 +416,18 @@ describe("machines and targets", () => {
       agents: [{ id: f.agent.id, handle: "dev" }],
       workspace: null,
       canManage: false,
+      mode: "single",
     });
     expect((await listMachines(f.db, bia.id, f.org.id))[0]).toMatchObject({
       workspace: RUNNER.workspace,
       canManage: true,
     });
+    // A runner in system mode (ADR 0057) says so at hello: each agent its own user, not the pairing folder.
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { mode: "system" } })
+      .where(eq(schema.machines.id, mine.machineId));
+    expect((await listMachines(f.db, carl.id, f.org.id))[0]?.mode).toBe("system");
 
     await expect(renameMachine(deps(), carl.id, f.org.id, mine.machineId, { name: "x" })).rejects.toThrow(
       ForbiddenError,
@@ -706,7 +731,19 @@ describe("tools on a connected machine", () => {
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');
     expect(status.content).not.toContain(RUNNER.workspace);
-    expect((await call(ctx, "computer_stop", {})).content).toContain("only its owner");
+    // Turning a computer on and off is a sandbox's: a computer of the workspace has no such tools.
+    expect(listed?.filter((t) => t.name.startsWith("computer_")).map((t) => t.name)).toEqual(["computer_status"]);
+
+    // The workspace's own computer is always on.
+    const kind = (k: "managed" | "connected") =>
+      f.db.update(schema.machines).set({ kind: k }).where(eq(schema.machines.id, paired.machineId));
+    await kind("managed");
+    expect((await call(ctx, "computer_status", {})).content).toContain(
+      `You are on "Build box", this workspace's own computer (Linux), always on: answering now.`,
+    );
+    const ownRunCode = (await f.tools?.list(ctx))?.find((t) => t.name === "run_code");
+    expect(ownRunCode?.description).toContain(`Runs on "Build box" (Linux), this workspace's own computer, always on`);
+    await kind("connected");
 
     expect(await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.kind, "sandbox"))).toEqual([]);
     expect(await f.db.select().from(schema.sandboxes)).toEqual([]);

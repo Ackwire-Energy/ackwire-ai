@@ -73,6 +73,11 @@ describe("agent page: tabs and the URL", () => {
     await openTab(/^Atividade/);
     expect(router.state.location.search).toMatchObject({ tab: "activity" });
     expect(screen().getByRole("searchbox", { name: "Buscar execuções" })).toBeTruthy();
+    // The month on top: runs per day in pixels, the numbers as its legend (from the server's counts).
+    const month = screen().getByRole("region", { name: /^O mês de / });
+    expect(within(month).getByRole("img", { name: /^142 execuções em / })).toBeTruthy();
+    expect(month.querySelector("canvas.ac-month-runs")).toBeTruthy();
+    expect(month.querySelector(".agp-month__legend")?.textContent).toContain("142");
     cleanup();
     await go("?tab=memory");
     expect(
@@ -103,6 +108,45 @@ describe("agent page: tabs and the URL", () => {
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
     expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
     expect(work.textContent).toContain("o modelo da organização");
+  });
+});
+
+describe("agent page: what it does", () => {
+  test("the start of its instructions in whole sentences, never a full stop before the ellipsis", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions =
+        "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder, e volta com o que achou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos; para mudanças grandes, abre o PR como rascunho e explica o plano ali.\nNunca faz merge sozinho: pede revisão a uma pessoa.";
+    await go("", state);
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    const text = does.querySelector(".agp-prose")?.textContent ?? "";
+    expect(text).toEndWith("explica o plano ali.");
+    expect(text).not.toContain("…");
+    expect(text).not.toContain("Nunca faz merge");
+  });
+
+  test("instructions in Markdown (an imported agent's) read as plain words, in three lines at most", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions = [
+        "# SOUL.md - Quem você é",
+        "",
+        "_Você não é um chatbot. Você está se tornando alguém._",
+        "",
+        "## Verdades",
+        "",
+        "- **Ajude de verdade.** Pule o “Ótima pergunta!” e ajude.",
+        "- Tenha opiniões.",
+        "- Seja cuidadosa com o que é dos outros.",
+        "- Lembre do que importa.",
+      ].join("\n");
+    await go("", state);
+    const does = screen().getByRole("region", { name: "O que a Ada faz" });
+    expect(does.querySelector(".agp-prose")?.textContent).toBe(
+      "Você não é um chatbot. Você está se tornando alguém.\nAjude de verdade. Pule o “Ótima pergunta!” e ajude.\nTenha opiniões.",
+    );
   });
 });
 

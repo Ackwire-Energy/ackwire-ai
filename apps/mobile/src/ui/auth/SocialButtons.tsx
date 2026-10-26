@@ -3,6 +3,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
+import { inviteHeaders } from "@/features/auth/invite";
 import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
@@ -61,7 +62,11 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient().signIn.social({ provider, callbackURL: "/" });
+      const res = await authClient().signIn.social({
+        provider,
+        callbackURL: "/",
+        fetchOptions: { headers: inviteHeaders() },
+      });
       if (res.error) onError(t("mobile.auth.social.failed"));
     } catch {
       onError(t("mobile.auth.errors.network"));
@@ -81,7 +86,12 @@ export function SocialButtons({
       if (!credential.identityToken) return onError(t("mobile.auth.social.failed"));
       setBusy(true);
       rememberSignIn("apple");
-      const res = await authClient().signIn.social({ provider: "apple", idToken: { token: credential.identityToken } });
+      // From an invitation: its token lets a closed server create the account (the server's user-create hook).
+      const res = await authClient().signIn.social({
+        provider: "apple",
+        idToken: { token: credential.identityToken },
+        fetchOptions: { headers: inviteHeaders() },
+      });
       if (res.error) onError(t("mobile.auth.social.failed"));
     } catch (e) {
       // Closing Apple's sheet is not an error.

@@ -256,7 +256,8 @@ export async function handoffReplyIntent(
  * - Another agent's answer (`ask_agent` with `wait`): `woke`; the answer
  *   comes later as a notice.
  * - Approvals and secrets: `held`. Text never grants or decides them; the
- *   card does (the fast reply may answer meanwhile).
+ *   card does. Such a run takes no new messages at all (`holdsMessages`,
+ *   they get a run of their own), and steering never asks here for one.
  * - A question to people: null (the message already answered it, on insert).
  * - A mission's own wait, its computer: null (read when it resumes).
  *

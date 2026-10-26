@@ -28,7 +28,7 @@ import {
   type HelperWindow,
   helperCommand,
 } from "./desktop-helper";
-import { DESKTOP_IDLE_MS, type DesktopSystem, hostSystem } from "./desktop-session";
+import { type DesktopSystem, hostSystem } from "./desktop-session";
 import {
   centerOf,
   contains,
@@ -53,7 +53,7 @@ import { KeyedQueue } from "./queue";
 /**
  * Desktop use (ADR 0062): the agent drives its own desktop (ADR 0058)
  * through a helper (`desktop-helper.py`), one per agent, started on its first
- * use and stopped after `DESKTOP_IDLE_MS` without one.
+ * use and stopped after `HELPER_IDLE_MS` without one (its desktop stays on).
  *
  * - The helper runs as this process's own user, so desktop use is served
  *   only where this process is the agent's own OS user (system mode: the
@@ -95,6 +95,8 @@ const SESSION_READY_MS = 20_000;
 const SESSION_POLL_MS = 300;
 const FAILURES_MAX = 3;
 const SWEEP_MS = 60_000;
+/** A helper nobody used for this long stops; its desktop goes on. */
+export const HELPER_IDLE_MS = 15 * 60_000;
 /** About what one wheel click scrolls, and the most clicks one action sends. */
 const WHEEL_PIXELS = 60;
 const WHEEL_MAX = 50;
@@ -671,7 +673,7 @@ export class DesktopManager {
 
   /** Helpers nobody used for the idle time stop (their desktops go on). */
   sweep() {
-    const idleMs = this.opts.idleMs ?? DESKTOP_IDLE_MS;
+    const idleMs = this.opts.idleMs ?? HELPER_IDLE_MS;
     for (const use of this.uses.values()) {
       if (!use.helper || this.queue.busy(use.agent.id) || this.now() - use.lastUsed < idleMs) continue;
       this.opts.log(

@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { artifactRefs } from "../lib/artifacts";
+import { newerSetup } from "../lib/computer";
 import {
   allItems,
   matchesFilter,
@@ -42,6 +43,7 @@ import type {
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
+  ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
   DirectMessage,
@@ -59,7 +61,7 @@ import type {
   IssueStatus,
   Machine,
   MachineAccessReduce,
-  MailActionName,
+  MailAccountUpdate,
   MailImapInput,
   Message,
   MessageMemory,
@@ -119,6 +121,21 @@ export const useHealth = () => {
   const api = useApi();
   return useQuery({ queryKey: keys.health, queryFn: () => api.system.health(), staleTime: 5 * 60_000 });
 };
+
+/** The usage report's switch: `null` for everyone but the installation's owner. */
+export const useServerTelemetry = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.telemetry, queryFn: () => api.system.telemetry() });
+};
+
+export function useSetServerTelemetry() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.system.setTelemetry(enabled),
+    onSuccess: (telemetry) => qc.setQueryData(keys.telemetry, telemetry),
+  });
+}
 
 export function useCreateOrganization() {
   const api = useApi();
@@ -614,6 +631,24 @@ export function useStartOAuth(orgId: string) {
   });
 }
 
+/** Where the phone app's OAuth lands: the callback hands `state` and `code` back to the app. */
+export const APP_OAUTH_RETURN = "app:connectors";
+
+/** The phone app finishes an authorization it started (see `APP_OAUTH_RETURN`). */
+export function useCompleteOAuth(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
+    // It may finish a catalog connection or a server connected by address (their own list).
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
+  });
+}
+
 export const useGitHubApp = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.githubApp(orgId), queryFn: () => api.githubApp.info(orgId), staleTime: 30_000 });
@@ -712,6 +747,18 @@ export const useMailFolders = (orgId: string, accountId: string | null) => {
   });
 };
 
+/** Addresses a mailbox has sent from: what the addresses screen offers. */
+export const useMailSuggestedAddresses = (orgId: string, accountId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.mailSuggested(orgId, accountId ?? ""),
+    queryFn: () => api.mail.suggestedAddresses(orgId, accountId ?? ""),
+    enabled: Boolean(accountId),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+};
+
 /** An agent's access and rules per mailbox. */
 export const useAgentMail = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
@@ -739,16 +786,8 @@ export function useMailAction(orgId: string) {
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string }) => api.mail.connectComposio(orgId, input),
     }),
     update: useMutation({
-      mutationFn: ({
-        accountId,
-        ...input
-      }: {
-        accountId: string;
-        label?: string;
-        password?: string;
-        offActions?: MailActionName[];
-        askActions?: MailActionName[];
-      }) => api.mail.update(orgId, accountId, input),
+      mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>
+        api.mail.update(orgId, accountId, input),
       onSuccess: done,
       meta: { silent: true },
     }),
@@ -1144,9 +1183,9 @@ export function useCorrectMessage(orgId: string) {
 
 // ── Invites, custom MCP ─────────────────────────────────────────────────────
 
-export const useCustomServers = (orgId: string) => {
+export const useCustomServers = (orgId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId) });
+  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId), enabled });
 };
 
 export function useCustomServerAction(orgId: string) {
@@ -1946,6 +1985,30 @@ export const useHostComputer = (orgId: string, enabled = true) => {
     queryFn: () => api.machines.host(orgId),
     enabled,
     retry: false,
+    meta: { quiet: true },
+  });
+};
+
+/**
+ * The workspace's own computer on its way (ADR 0056 §10): `machine.provisioning` events keep it live in the
+ * org shell; `pollMs` where no socket is open (the onboarding), a time or one picked from the last answer.
+ */
+export const useComputerSetup = (
+  orgId: string,
+  enabled = true,
+  pollMs: number | false | ((setup: ComputerSetup | undefined) => number | false) = false,
+) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: keys.computerSetup(orgId),
+    queryFn: async () =>
+      newerSetup(qc.getQueryData(keys.computerSetup(orgId)), await api.machines.computerSetup(orgId)),
+    enabled: enabled && orgId.length > 0,
+    retry: false,
+    refetchInterval: typeof pollMs === "function" ? (query) => pollMs(query.state.data) : pollMs,
+    // Events keep it current; a reconnect asks again (what came while offline is gone).
+    staleTime: 5 * 60_000,
     meta: { quiet: true },
   });
 };

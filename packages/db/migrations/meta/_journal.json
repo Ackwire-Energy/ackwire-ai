@@ -719,8 +719,43 @@
     {
       "idx": 102,
       "version": "7",
-      "when": 1792876168749,
-      "tag": "0102_agent_audit",
+      "when": 1792898767185,
+      "tag": "0102_usage_report",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1792906167604,
+      "tag": "0103_usage_report_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1792913238586,
+      "tag": "0104_provisioning_ready_time",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1792913258591,
+      "tag": "0105_drop_eta_seconds",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1792913278591,
+      "tag": "0106_mail_account_aliases",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1792923278591,
+      "tag": "0107_agent_audit",
       "breakpoints": true
     }
   ]

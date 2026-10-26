@@ -506,10 +506,12 @@ export async function insertMessageWithRuns(
         -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
         -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
         -- Background runs (a routine's) hold no conversation: a person's message never goes to one.
+        -- Nor does a run waiting on an approval: the agent answers in a run of its own meanwhile
+        -- (one waiting on a secret or a mission's decision hands it on after the insert: steering.ts).
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
         join ${agents} ra on ra.id = r.agent_id
         where ${deliver}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
-          and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+          and r.status in ('queued', 'running', 'waiting_input')
           and not r.background
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
@@ -533,6 +535,19 @@ export async function insertMessageWithRuns(
               and ${audienceSql("ra", sql`${userId}::text`)})
           )
         order by r.agent_id, r.created_at desc
+      ), held as (
+        -- A reply in a thread where the agent's run waits on an approval (it takes nothing new):
+        -- the agent answers it in a run of its own, as that run would have read it.
+        select distinct r.agent_id from ${agentRuns} r
+        join ${agents} ra on ra.id = r.agent_id
+        where ${startRuns}::boolean and ${deliver}::boolean and ${threadId}::uuid is not null
+          and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+          and r.thread_root_id = ${threadId}::uuid and r.status = 'waiting_approval' and not r.background
+          and ra.archived_at is null
+          and r.agent_id not in (select agent_id from answered)
+          and r.agent_id not in (select agent_id from muted)
+          and r.agent_id <> all(${referenced}::uuid[])
+          and ${audienceSql("ra", sql`${userId}::text`)}
       ), steered as (
         -- Queued on the run only while it is still active: one that ended since (its unread messages
         -- already handed on) is never appended to; the message starts a run of its own below instead.
@@ -540,7 +555,7 @@ export async function insertMessageWithRuns(
         update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
           updated_at = now()
         from active a where r.id = a.id
-          and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+          and r.status in ('queued', 'running', 'waiting_input')
           and ${threadOk} and not exists (select 1 from archived) and exists (select 1 from fresh)
         returning r.id, r.agent_id
       ), m as (
@@ -577,7 +592,9 @@ export async function insertMessageWithRuns(
         insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
         select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
           coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1
-        from answering an where exists (select 1 from m)
+        from (select agent_id, trig from answering
+          union select agent_id, 'mention' from held where agent_id not in (select agent_id from answering)) an
+        where exists (select 1 from m)
           and an.agent_id not in (select agent_id from steered)
         on conflict do nothing
         returning id, agent_id

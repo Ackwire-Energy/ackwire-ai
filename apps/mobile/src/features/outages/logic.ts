@@ -33,6 +33,8 @@ export interface MachineOutage {
   machineId: string;
   name: string;
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: MachineOutageAgent[];
   waitingRuns: number;
@@ -68,16 +70,31 @@ export function namesText(t: TFunction, names: readonly string[]): string {
     : t("mobile.names.two", { first: p.first, second: p.second });
 }
 
-/** The notice: "O MacBook Air desconectou" and "Ada e Theo esperam por ele · 3 tarefas". */
-export function noticeText(t: TFunction, o: OutageLike) {
+/**
+ * The notice: "O MacBook Air desconectou" and "Ada e Theo esperam por ele · 3 tarefas". On the Cloud the
+ * workspace's computer isn't answering, and it is being looked after: nothing to do there.
+ */
+export function noticeText(t: TFunction, o: OutageLike, cloud = false) {
   const n = outageNotice(o);
   const names = o.agents.map((a) => a.name);
   const who =
     names.length === 1
       ? t("mobile.outage.whoOne", { name: names[0] })
       : t("mobile.outage.whoMany", { names: namesText(t, names) });
-  const sub = n.tasks > 0 ? `${who} · ${t("mobile.outage.tasks", { count: n.tasks })}` : who;
-  return { title: t("mobile.outage.title", { computer: n.computer }), sub };
+  const sub = [
+    cloud ? t("mobile.outage.cloudSub") : null,
+    who,
+    n.tasks > 0 ? t("mobile.outage.tasks", { count: n.tasks }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    title: cloud
+      ? t("mobile.outage.titleCloud", { computer: n.computer })
+      : t("mobile.outage.title", { computer: n.computer }),
+    a11y: cloud ? t("mobile.outage.a11yCloud") : t("mobile.outage.a11y"),
+    sub,
+  };
 }
 
 /** "2 rotinas esperando", "1 conversa esperando", "3 tarefas esperando" (or "Nada esperando"). */
@@ -123,8 +140,9 @@ export function targetText(t: TFunction, x: TargetOption) {
       }),
     };
   }
-  if (x.kind === "cloud")
-    return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.cloudDesc") };
+  if (x.kind === "cloud") return { title, tag: null, desc: t("mobile.outage.sheet.cloudDesc") };
+  // The workspace's own computer: always on, a user of its own for each agent.
+  if (x.managed) return { title, tag: t("mobile.outage.sheet.cloudTag"), desc: t("mobile.outage.sheet.managedDesc") };
   const brains = x.brains.map((b) => BRAIN_NAME[b]).join(t("mobile.outage.sheet.and"));
   return {
     title,

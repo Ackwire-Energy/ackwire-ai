@@ -1,9 +1,11 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { appLocale } from "@agenteschat/i18n/locale";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
@@ -17,6 +19,7 @@ const {
   channelMembers,
   users,
   accounts,
+  agents,
 } = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
@@ -63,7 +66,7 @@ export interface Membership {
   role: MemberRole;
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
-  /** The workspace's standing (`standing.ts`; getMembership). */
+  /** The workspace's standing (`standing.ts`). */
   standing?: WorkspaceStanding;
 }
 
@@ -74,6 +77,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
+      standing: STANDING_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
@@ -173,8 +177,9 @@ export async function updateOrganization(
   orgId: string,
   input: { name?: string; context?: string },
 ) {
-  await requirePermission(db, actorId, orgId, "configure");
+  const before = await requirePermission(db, actorId, orgId, "configure");
   const [row] = await db.update(organizations).set(input).where(eq(organizations.id, orgId)).returning();
+  if (row && row.name !== before.orgName) await followWorkspaceName(db, orgId, before.orgName, row.name);
   caches.orgs.delete(`${orgId}:`);
   return row;
 }
@@ -191,22 +196,38 @@ export async function countUsers(db: Database): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** The installation's first account: the person who set it up. */
+export async function installOwner(db: Database): Promise<string | null> {
+  const [first] = await db.select({ id: users.id }).from(users).orderBy(asc(users.createdAt), asc(users.id)).limit(1);
+  return first?.id ?? null;
+}
+
+/** Who may create an account (ADR 0006): see `isSignupAllowed`. */
+export interface SignupPolicy {
+  /** `ALLOW_SIGNUP`: anyone. */
+  allowSignup: boolean;
+  /** An owner link (`OWNER_CLAIM_SHA256`) or the desktop app's owner key (`OWNER_KEY_SHA256`) makes the first account (ADR 0060 §6). */
+  ownerByLink: boolean;
+}
+
 /**
  * Self-hosted sign-up policy: the first account may always register (there is
- * no other way in); after that, only with ALLOW_SIGNUP or a pending
+ * no other way in), unless the installation waits for its owner's link or key,
+ * which make it on their own path; after that, only with ALLOW_SIGNUP or a pending
  * invitation for that email (or from a valid org invite link). Open sign-up on a reachable server would let
  * anyone create organizations (and spend model credits) on it.
  */
 export async function isSignupAllowed(
   db: Database,
   email: string,
-  allowSignup: boolean,
+  policy: SignupPolicy,
   now = new Date(),
   /** The token of an org invite link the person is signing up from. */
   inviteToken?: string | null,
 ) {
-  if (allowSignup) return true;
-  if ((await countUsers(db)) === 0) return true;
+  if (policy.allowSignup && !policy.ownerByLink) return true;
+  if ((await countUsers(db)) === 0) return !policy.ownerByLink;
+  if (policy.allowSignup) return true;
   if (inviteToken) {
     const link = await findInviteLink(db, inviteToken);
     if (link && !link.link.revokedAt && link.link.expiresAt > now) return true;
@@ -234,7 +255,7 @@ const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
  * allowed for that e-mail). This tells whether the e-mail has an account, so
  * the route that serves it is rate limited.
  */
-export async function signInOptions(db: Database, email: string, allowSignup: boolean, inviteToken?: string | null) {
+export async function signInOptions(db: Database, email: string, policy: SignupPolicy, inviteToken?: string | null) {
   const rows = await db
     .select({ providerId: accounts.providerId })
     .from(users)
@@ -245,7 +266,7 @@ export async function signInOptions(db: Database, email: string, allowSignup: bo
       account: false,
       password: false,
       providers: [] as SignInProvider[],
-      canSignUp: await isSignupAllowed(db, email, allowSignup, new Date(), inviteToken),
+      canSignUp: await isSignupAllowed(db, email, policy, new Date(), inviteToken),
     };
   }
   const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
@@ -255,6 +276,18 @@ export async function signInOptions(db: Database, email: string, allowSignup: bo
     providers: [...new Set(ids.filter((id) => SIGN_IN_PROVIDERS.has(id)))] as SignInProvider[],
     canSignUp: false,
   };
+}
+
+/** Whether the account signs in with a password (its credential row has one). */
+export async function hasPassword(db: Database, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(
+      and(eq(accounts.userId, userId), eq(accounts.providerId, "credential"), sql`${accounts.password} is not null`),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 /**
@@ -410,6 +443,29 @@ export type UserLocale = (typeof USER_LOCALES)[number];
 export async function setMyLocale(db: Database, userId: string, locale: UserLocale) {
   if (!USER_LOCALES.includes(locale)) throw new ValidationError("locale must be pt-BR or en");
   await db.update(users).set({ locale }).where(eq(users.id, userId));
+}
+
+/**
+ * The app language a request's `Accept-Language` asks for: its most preferred English or Portuguese tag
+ * ("en-GB,en;q=0.9" → en, "pt-PT" → pt-BR), else null. The web app sends its own language in it.
+ */
+export function requestLocale(acceptLanguage: string | null | undefined): UserLocale | null {
+  const tags = (acceptLanguage ?? "")
+    .split(",")
+    .map((part) => {
+      const [tag = "", ...params] = part.split(";").map((s) => s.trim().toLowerCase());
+      const q = params.find((p) => p.startsWith("q="));
+      return { tag, q: q ? Number(q.slice(2)) : 1 };
+    })
+    .filter((l) => l.q > 0)
+    .sort((a, b) => b.q - a.q);
+  return appLocale(tags.map((l) => l.tag));
+}
+
+/** Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. */
+export async function isEmailVerified(db: Database, userId: string) {
+  const [row] = await db.select({ verified: users.emailVerified }).from(users).where(eq(users.id, userId));
+  return row?.verified === true;
 }
 
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {
@@ -685,26 +741,62 @@ async function findInviteLink(db: Database, token: string) {
   return row ?? null;
 }
 
-/** What the invite page shows before signing in (`email` is empty for an org link). */
+/** How many of the organization's agents an invitation shows ("Ada, Theo e Lia já trabalham lá"). */
+const INVITE_AGENTS = 3;
+
+/** The organization's first agents (not archived), for an invitation page: name and look only. */
+async function inviteAgents(db: Database, orgId: string) {
+  return db
+    .select({ id: agents.id, name: agents.name, appearance: agents.appearance })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .orderBy(asc(agents.createdAt))
+    .limit(INVITE_AGENTS);
+}
+
+/**
+ * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
+ * invited (their name), the role and a few of its agents. Only for a valid token, which reached the person.
+ */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
     .select({
+      orgId: organizationInvitations.orgId,
       orgName: organizations.name,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
       acceptedAt: organizationInvitations.acceptedAt,
+      invitedBy: users.name,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
+    .leftJoin(users, eq(users.id, organizationInvitations.invitedByUserId))
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
   if (!row) {
     const link = await findInviteLink(db, token);
     if (!link || link.link.revokedAt || link.link.expiresAt <= now) return null;
-    return { orgName: link.orgName, email: "", role: link.link.role, kind: "link" as const };
+    const [creator] = link.link.createdByUserId
+      ? await db.select({ name: users.name }).from(users).where(eq(users.id, link.link.createdByUserId))
+      : [];
+    return {
+      orgName: link.orgName,
+      email: "",
+      role: link.link.role,
+      kind: "link" as const,
+      invitedBy: creator?.name ?? null,
+      agents: await inviteAgents(db, link.link.orgId),
+    };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
-  return { orgName: row.orgName, email: row.email, role: row.role, kind: "email" as const };
+  return {
+    orgName: row.orgName,
+    email: row.email,
+    role: row.role,
+    kind: "email" as const,
+    invitedBy: row.invitedBy ?? null,
+    agents: await inviteAgents(db, row.orgId),
+  };
 }
 
 /**

@@ -4,6 +4,11 @@
 #   curl -fsSL https://agentes.chat/install | sh
 #   curl -fsSL https://agentes.chat/install | sh -s -- --plan      prints what it would do, does nothing
 #
+# --plan (--dry-run too) is this installer's own plan: it runs nothing, the setup included. The setup
+# writes and starts nothing until its last question is answered: for its plan, stop it at its first
+# question (Ctrl-C), then run the setup command this printed again with --dry-run (with sudo if this
+# ran itself again with sudo).
+#
 # To read it before it runs: curl -fsSLo install.sh https://agentes.chat/install, then sh install.sh.
 #
 # It gets this computer ready, then hands over to the setup (@agenteschat/setup), which asks its few
@@ -37,8 +42,8 @@ main() {
       --plan | --dry-run) PLAN=1 ;;
       --yes | -y) YES=1 ;;
       --native)
-        die "Running without Docker (--native) isn't available yet." \
-          "Use Docker: on a Mac, Docker Desktop, OrbStack or Colima; on Linux, this installer sets it up."
+        die "This installer can't run agentes.chat without Docker yet (--native)." \
+          "On a Mac, the agentes.chat app runs it with no Docker (Use your own server, then Run agentes.chat on this Mac). Or use Docker: on a Mac, Docker Desktop, OrbStack or Colima; on Linux, this installer sets it up."
         ;;
       --dir)
         [ "$n" -gt 0 ] || die "--dir needs a folder, like --dir /srv/agentes."
@@ -142,8 +147,8 @@ main() {
   elif command -v docker >/dev/null 2>&1; then
     die "Docker is on this Mac, but it doesn't answer." "Start it (Docker Desktop, OrbStack or Colima) and run this again."
   else
-    die "agentes.chat runs on Docker, and this Mac doesn't have it." \
-      "Install Docker Desktop, OrbStack or Colima, start it, and run this again."
+    die "This installer runs agentes.chat on Docker, and this Mac doesn't have it." \
+      "Install Docker Desktop, OrbStack or Colima, start it, and run this again. Or, with no Docker, open the agentes.chat app: Use your own server, then Run agentes.chat on this Mac."
   fi
 
   if [ -z "$DIR" ]; then
@@ -187,7 +192,10 @@ Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup optio
   --dir <folder>      Where agentes.chat lives: /opt/agentes as root, ~/agentes otherwise.
   --yes               On Linux, install Docker without asking first. A Mac needs Docker Desktop,
                       OrbStack or Colima running.
-  --plan              Print what it would do, and do nothing (--dry-run too).
+  --plan              Print what it would do, and do nothing (--dry-run too). Not the setup's
+                      plan: stop the setup at its first question (Ctrl-C), then run the setup
+                      command this printed again with --dry-run (with sudo if this ran itself
+                      again with sudo).
   -h, --help
 
 Every other option goes to the setup, like --network local or --email skip; the guide lists them:

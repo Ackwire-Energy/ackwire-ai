@@ -16,15 +16,22 @@ import {
   startVersionWatch,
   VERSION_CHECK_MS,
 } from "./lib/app-version";
-import { inDesktopApp } from "./lib/desktop";
+import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
+import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { snapshotStore } from "./lib/snapshot-store";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
 const i18n = await loadI18n(savedLocale());
 document.documentElement.lang = i18n.language;
-// In agentes for Mac (ADR 0036): the site draws the window's title bar (desktop.css).
-if (inDesktopApp()) document.documentElement.dataset.desktop = "mac";
+// In the desktop app (ADR 0036): the site draws the window's title bar (desktop.css), with room for a Mac's
+// buttons only there; and "this Mac" is this computer's own name.
+const platform = desktopPlatform();
+if (platform) {
+  document.documentElement.dataset.desktop = platform;
+  applyDesktopDevice(i18n, platform);
+  if (asksForPhone(window.location.search)) askForPhone();
+}
 const toasts = createToastStore();
 const api = createApiClient();
 
@@ -59,8 +66,8 @@ const router = createRouter({
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
-  // Page changes cross-fade where the browser has the View Transitions API (CSS fallback in layout.css).
-  defaultViewTransition: true,
+  // No View Transitions: they freeze the whole page while the next one renders (the sidebar's pill
+  // stalled mid-slide). Each page's main fades in on mount instead (layout.css).
 });
 
 declare module "@tanstack/react-router" {
@@ -99,7 +106,25 @@ if (connectorError) {
   window.history.replaceState(null, "", window.location.pathname);
 }
 
-const services: AppServices = { api, auth: createBetterAuthClient(), queryClient, i18n, toasts };
+const services: AppServices = {
+  api,
+  auth: createBetterAuthClient(window.location.origin, () => i18n.language),
+  queryClient,
+  i18n,
+  toasts,
+};
+
+// The confirmation email's link: wherever `/` then goes, the person hears how it went.
+const confirmation = emailConfirmedToast(window.location.search);
+if (confirmation) {
+  window.history.replaceState(null, "", window.location.pathname);
+  void announceConfirmation(confirmation, {
+    auth: services.auth,
+    t: i18n.t,
+    show: toasts.show,
+    me: () => queryClient.fetchQuery({ ...meQuery(api), staleTime: 0 }),
+  });
+}
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");

@@ -22,6 +22,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
+  type AgentColor,
   Alert,
   Avatar,
   Button,
@@ -44,10 +45,20 @@ import {
   Segmented,
   Skeleton,
   SkeletonGroup,
+  selectionSkyUrl,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -63,13 +74,14 @@ import {
   onMenuLookChange,
   setMenuLook,
 } from "@/lib/context-menu";
-import { inDesktopApp } from "@/lib/desktop";
+import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { markOpen } from "@/lib/perf";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
+import { AddPasswordDialog } from "./AddPassword";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
@@ -80,6 +92,10 @@ import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
+
+/** The chosen item's sky: both themes, the CSS picks one. */
+const selectionSky = (color: AgentColor = "sky") =>
+  ({ "--sel-sky": selectionSkyUrl(color), "--sel-sky-dark": selectionSkyUrl(color, true) }) as CSSProperties;
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
 function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
@@ -218,55 +234,29 @@ export function Sidebar() {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
 
-  // The active item's soft pill slides between items (one indicator, measured). Only the middle
-  // scrolls: the workspace card on top and the foot stay put.
+  // Only the middle scrolls: the workspace card on top and the foot stay put. The active item
+  // paints its own background (no sliding pill).
   const navRef = useRef<HTMLDivElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [indicator, setIndicator] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
-  // Measure from the active item itself, and again whenever anything in the sidebar changes size
-  // (lists loading, fonts swapping in, the workspace card), so the pill never sits off its item.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on navigation and when the lists load
+  // The list fades out at an edge only while there is more to scroll past it (no hard cut).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the lists load
   useLayoutEffect(() => {
     const nav = navRef.current;
     if (!nav) return;
-    // The list fades out at an edge only while there is more to scroll past it (no hard cut).
     const edges = () => {
       nav.dataset.fadeTop = String(nav.scrollTop > 1);
       nav.dataset.fadeBottom = String(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
     };
-    const measure = () => {
-      edges();
-      const active = nav.querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
-      if (!active) {
-        setIndicator(null);
-        return;
-      }
-      const n = nav.getBoundingClientRect();
-      const a = active.getBoundingClientRect();
-      const next = { top: a.top - n.top + nav.scrollTop, left: a.left - n.left, width: a.width, height: a.height };
-      setIndicator((prev) =>
-        prev &&
-        prev.top === next.top &&
-        prev.left === next.left &&
-        prev.width === next.width &&
-        prev.height === next.height
-          ? prev
-          : next,
-      );
-    };
-    measure();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    edges();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(edges);
     ro?.observe(nav);
     for (const child of Array.from(nav.children)) ro?.observe(child);
-    document.fonts?.ready.then(measure).catch(() => {});
-    window.addEventListener("resize", measure);
     nav.addEventListener("scroll", edges, { passive: true });
     return () => {
       ro?.disconnect();
-      window.removeEventListener("resize", measure);
       nav.removeEventListener("scroll", edges);
     };
-  }, [pathname, channels.data, dir.agents.length, people.length, rail]);
+  }, [channels.data, dir.agents.length, people.length, rail]);
 
   // The open conversation stays in sight: once per navigation (as soon as its row exists), a row
   // hidden past the list's edge is brought to the middle. Later scrolling is the person's.
@@ -283,7 +273,7 @@ export function Sidebar() {
   }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
+    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
       <div className="sidebar__top">
         <div className="sidebar__org">
           <WorkspaceMenu
@@ -322,18 +312,6 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar__scroll" ref={navRef}>
-        {indicator && (
-          <span
-            className="sidebar__indicator"
-            aria-hidden="true"
-            style={{
-              transform: `translate(${indicator.left}px, ${indicator.top}px)`,
-              width: indicator.width,
-              height: indicator.height,
-            }}
-          />
-        )}
-
         {/* The tools people use most stay in sight; the rest open beside the sidebar from More. */}
         <div className="sidebar__group sidebar__tools">
           <Link
@@ -731,6 +709,7 @@ function AgentRow({
       onClick={onOpen}
       data-unread={unread > 0}
       data-busy={busy}
+      style={selectionSky(color)}
     >
       {busy && <AgentTrail color={color} />}
       {busy && <AgentGlow color={color} />}
@@ -788,6 +767,15 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
+  const [addPassword, setAddPassword] = useState(false);
+  // The app's "Show QR code" for this server (Preferences › Servers).
+  useEffect(() => {
+    if (takePhoneAsk()) setPhone(true);
+    return onPhoneAsk(() => {
+      takePhoneAsk();
+      setPhone(true);
+    });
+  }, []);
   const mine = dir.memberById.get(me.user.id);
   const photo = mine?.image ?? me.user.image;
   const zone = mine?.timezone || browserTimezone() || "UTC";
@@ -821,7 +809,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         <Avatar name={me.user.name} size="sm" imageUrl={photo} />
         <span className="sidebar__user-text">
           <span className="sidebar__user-name">{me.user.name}</span>
-          {budgetUsed !== null && <BudgetBar percent={budgetUsed} />}
+          {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>
       </button>
       <MenuOverlay
@@ -858,6 +846,15 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
           >
             {t("shell.openOnPhone")}
           </MenuOverlayItem>
+          {me.user.hasPassword === false && (
+            <MenuOverlayItem
+              icon="key"
+              description={t("shell.addPasswordHint")}
+              onSelect={pick(() => setAddPassword(true))}
+            >
+              {t("shell.addPassword")}
+            </MenuOverlayItem>
+          )}
           <MenuOverlayRow icon="bulb" label={t("shell.theme")}>
             <Segmented
               size="sm"
@@ -929,6 +926,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
+      <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
     </>
   );
 }
@@ -1185,8 +1183,11 @@ export function isTimeZone(zone: string) {
   }
 }
 
-/** Thin bar + "37%": how much of the agents' monthly budgets the workspace used. */
-function BudgetBar({ percent }: { percent: number }) {
+/**
+ * Thin bar + "37%": how much of the agents' monthly budgets the workspace used, named where nothing else says
+ * what it is (under the person's name). Nothing used, nothing drawn: the bar's smallest mark means "a little".
+ */
+function BudgetBar({ percent, label }: { percent: number; label?: string }) {
   const { t, i18n } = useTranslation();
   const level = percent >= 100 ? "full" : percent >= 80 ? "high" : "ok";
   return (
@@ -1196,8 +1197,9 @@ function BudgetBar({ percent }: { percent: number }) {
       title={t("shell.budgetUsedHint", { percent: formatPercent(i18n.language, percent) })}
       aria-hidden="true"
     >
+      {label && <span className="sidebar__usage-label">{label}</span>}
       <span className="sidebar__usage-track">
-        <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
+        {percent > 0 && <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, percent)}%` }} />}
       </span>
       <span className="sidebar__usage-value">{formatPercent(i18n.language, percent)}</span>
     </span>

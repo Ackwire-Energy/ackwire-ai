@@ -6,6 +6,7 @@ import type { Message } from "./messages";
 import type { Notice } from "./notices";
 import { enqueue } from "./outbox";
 import { missStaleRoutineRun } from "./routine-firing";
+import { holdsMessages } from "./run-hold";
 import { type AgentRun, replyThreadOf } from "./runs";
 
 const { agentRuns, messages } = schema;
@@ -143,7 +144,7 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
 /**
  * A notice for one run (another agent's answer, a late result): while the
  * run is still active it reads it at its next step (queued on that run, in
- * its conversation); once it ended, the notice goes to its conversation and
+ * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
  * joins the agent's run there or starts one, unless agents already went back
  * and forth up to `NOTICE_WAKE_MAX_HOP` (then it is only written, and read by
  * the agent's next run there). In the caller's transaction; publish with
@@ -158,11 +159,13 @@ export async function deliverNoticeToRun(
   notice: Notice,
 ): Promise<{ message: Message; runs: AgentRun[] }> {
   const [current] = await tx
-    .select({ status: agentRuns.status })
+    .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
     .from(agentRuns)
     .where(eq(agentRuns.id, run.id))
     .for("update");
-  const active = Boolean(current && ACTIVE.includes(current.status));
+  // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
+  // notice wakes the agent in a run of its own instead.
+  const active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
   const delivered = await deliverNotice(tx, {
     orgId: run.orgId,
     agentId: run.agentId,

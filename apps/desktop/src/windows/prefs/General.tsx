@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { BROWSER_NOTIFY_PREF } from "../../control/browser";
-import { DOCK_PREF } from "../../control/dock";
+import { DOCK_PREF, MENU_BAR_PREF, menuBarShown } from "../../control/dock";
 import { NOTCH_PREF } from "../../control/notch";
-import { siteOf } from "../../control/server";
+import { SITE_NOTIFY_PREF } from "../../control/notify";
+import { homeServer } from "../../control/server";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
-import { chosenServer, usePref } from "../../hooks";
+import { useLocalServer, usePref } from "../../hooks";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
@@ -21,18 +22,27 @@ export function General() {
   const snap = useSnapshot();
   const toast = useToast();
   const homes = pairedHomes(snap);
+  const works = homes.length > 0;
+  const mac = host.platform === "mac";
+  const local = useLocalServer();
   const current = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? "";
   const [name, setName] = useState(current);
   const [saving, setSaving] = useState(false);
   const [launch, setLaunch] = useState<boolean | null>(null);
+  const [notifySite, setNotifySite] = usePref(SITE_NOTIFY_PREF, true);
   const [notify, setNotify] = usePref("notify", true);
-  // Off by default: the request already comes by push and in the site's "Esperando você".
+  // Off by default: the request already comes by push and in the site's "Waiting for you".
   const [notifyBrowser, setNotifyBrowser] = usePref(BROWSER_NOTIFY_PREF, false);
   // Off by default: the window only exists while it's on.
   const [notch, setNotch] = usePref(NOTCH_PREF, false);
   const [dock, setDock] = usePref(DOCK_PREF, true);
+  const [menuBar, setMenuBar] = usePref<boolean | null>(MENU_BAR_PREF, null);
   const [leaving, setLeaving] = useState<Home | null>(null);
   const [busy, setBusy] = useState(false);
+  const iconShown = menuBarShown(menuBar, dock, works || local.run);
+  useEffect(() => {
+    void host.setTrayVisible(iconShown).catch(() => {});
+  }, [host, iconShown]);
 
   // The name arrives with the first status.
   useEffect(() => {
@@ -77,106 +87,131 @@ export function General() {
     }
   };
 
+  /** The app keeps the Dock icon or the menu bar icon: turning one off turns the other on. */
+  const showDock = (on: boolean) => {
+    setDock(on);
+    if (!on) setMenuBar(true);
+    host.setDock(on).catch(() => {
+      setDock(!on);
+      toast(t("desktop.common.error"), "alert");
+    });
+  };
+  const showMenuBar = (on: boolean) => {
+    setMenuBar(on);
+    if (!on && !dock) showDock(true);
+  };
+
   return (
     <>
       <PrefHead title={t("desktop.prefs.general.title")} lead={t("desktop.prefs.general.lead")} />
 
-      <CardTitle>{t("desktop.prefs.general.thisMac")}</CardTitle>
-      <PrefCard>
-        <PrefRow
-          lead={<MacPortrait state={macStateOf(homes)} />}
-          title={t("desktop.prefs.general.name")}
-          desc={t("desktop.prefs.general.nameDesc")}
-          htmlFor="machine-name"
-          end={
-            <form
-              className="dk-inline-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void saveName();
-              }}
-            >
-              <Input
-                id="machine-name"
-                value={name}
-                maxLength={64}
-                aria-label={t("desktop.prefs.general.nameLabel")}
-                onChange={(e) => setName(e.target.value)}
-              />
-              {name.trim() && name.trim() !== current && (
-                <Button type="submit" size="sm" loading={saving}>
-                  {t("desktop.prefs.general.save")}
-                </Button>
-              )}
-            </form>
-          }
-        />
-      </PrefCard>
-
-      <CardTitle>{t("desktop.prefs.general.orgs")}</CardTitle>
-      <PrefCard>
-        {homes.length === 0 && (
-          <PrefRow title={t("desktop.prefs.general.noOrgsTitle")} desc={t("desktop.prefs.general.noOrgsBody")} />
-        )}
-        {homes.map((h) => {
-          const agents = h.status?.agents ?? [];
-          return (
+      {works && (
+        <>
+          <CardTitle>{t("desktop.prefs.general.thisMac")}</CardTitle>
+          <PrefCard>
             <PrefRow
-              key={h.homeId}
-              lead={<OrgTile name={orgName(h)} logo={h.logo} size="lg" />}
-              title={
-                <>
-                  {orgName(h)} <ConnectionChip status={h.status} running={h.running} />
-                </>
-              }
-              desc={
-                <>
-                  {agents.length > 0 && (
-                    <span className="dk-avs">
-                      {agents.slice(0, 5).map((a) => (
-                        <AgentFace key={a.id} agent={a} size="xs" />
-                      ))}
-                    </span>
-                  )}
-                  {agents.length
-                    ? t("desktop.prefs.general.agents", { count: agents.length })
-                    : t("desktop.prefs.general.noAgents")}
-                  {h.status?.workspace && (
-                    <>
-                      {" · "}
-                      <span className="dk-path">{shortPath(h.status.workspace)}</span>
-                    </>
-                  )}
-                </>
-              }
+              lead={<MacPortrait state={macStateOf(homes)} />}
+              title={t("desktop.prefs.general.name")}
+              desc={t("desktop.prefs.general.nameDesc")}
+              htmlFor="machine-name"
               end={
-                <>
-                  <Button size="sm" variant="ghost" onClick={() => void host.openExternal(siteOf([h], chosenServer()))}>
-                    {t("desktop.common.open")}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setLeaving(h)}>
-                    {t("desktop.prefs.general.leave")}
-                  </Button>
-                </>
+                <form
+                  className="dk-inline-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveName();
+                  }}
+                >
+                  <Input
+                    id="machine-name"
+                    value={name}
+                    maxLength={64}
+                    aria-label={t("desktop.prefs.general.nameLabel")}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  {name.trim() && name.trim() !== current && (
+                    <Button type="submit" size="sm" loading={saving}>
+                      {t("desktop.prefs.general.save")}
+                    </Button>
+                  )}
+                </form>
               }
             />
-          );
-        })}
-        <PrefRow
-          title={
-            <Button size="sm" icon="plus" onClick={() => void host.showWindow("welcome")}>
-              {t("desktop.tray.addOrg")}
-            </Button>
-          }
-          desc={t("desktop.prefs.general.addHint")}
-        />
-      </PrefCard>
+          </PrefCard>
+
+          <CardTitle>{t("desktop.prefs.general.orgs")}</CardTitle>
+          <PrefCard>
+            {homes.map((h) => {
+              const agents = h.status?.agents ?? [];
+              const server = homeServer(h);
+              const orgId = h.status?.org?.id;
+              return (
+                <PrefRow
+                  key={h.homeId}
+                  lead={<OrgTile name={orgName(h)} logo={h.logo} size="lg" />}
+                  title={
+                    <>
+                      {orgName(h)} <ConnectionChip status={h.status} running={h.running} />
+                    </>
+                  }
+                  desc={
+                    <>
+                      {agents.length > 0 && (
+                        <span className="dk-avs">
+                          {agents.slice(0, 5).map((a) => (
+                            <AgentFace key={a.id} agent={a} size="xs" />
+                          ))}
+                        </span>
+                      )}
+                      {agents.length
+                        ? t("desktop.prefs.general.agents", { count: agents.length })
+                        : t("desktop.prefs.general.noAgents")}
+                      {h.status?.workspace && (
+                        <>
+                          {" · "}
+                          <span className="dk-path">{shortPath(h.status.workspace)}</span>
+                        </>
+                      )}
+                    </>
+                  }
+                  end={
+                    <>
+                      {server && orgId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void host.openExternal(`${server}/org/${encodeURIComponent(orgId)}`)}
+                        >
+                          {t("desktop.common.open")}
+                        </Button>
+                      )}
+                      {/* The server here's own organizations work here by its rule (its computer, ADR 0060). */}
+                      {!(local.run && server === local.url) && (
+                        <Button size="sm" variant="ghost" className="dk-danger-text" onClick={() => setLeaving(h)}>
+                          {t("desktop.prefs.general.leave")}
+                        </Button>
+                      )}
+                    </>
+                  }
+                />
+              );
+            })}
+            <PrefRow desc={t("desktop.prefs.general.orgsHint")} />
+          </PrefCard>
+        </>
+      )}
 
       <CardTitle>{t("desktop.prefs.general.behavior")}</CardTitle>
       <PrefCard>
         <PrefRow
           title={t("desktop.prefs.general.launchTitle")}
-          desc={t("desktop.prefs.general.launchDesc")}
+          desc={
+            local.run
+              ? t("desktop.prefs.general.launchHere")
+              : works
+                ? t("desktop.prefs.general.launchDesc")
+                : undefined
+          }
           htmlFor="launch"
           end={
             <Switch
@@ -194,53 +229,72 @@ export function General() {
           }
         />
         <PrefRow
-          title={t("desktop.prefs.general.notifyTitle")}
-          desc={t("desktop.prefs.general.notifyDesc")}
-          htmlFor="notify"
-          end={<Switch id="notify" checked={notify} onCheckedChange={setNotify} />}
-        />
-        <PrefRow
-          title={t("desktop.prefs.general.notifyBrowserTitle")}
-          desc={t("desktop.prefs.general.notifyBrowserDesc")}
-          htmlFor="notify-browser"
-          end={<Switch id="notify-browser" checked={notifyBrowser} onCheckedChange={setNotifyBrowser} />}
-        />
-        <PrefRow
-          title={t("desktop.prefs.general.dockTitle")}
-          desc={t("desktop.prefs.general.dockDesc")}
-          htmlFor="dock"
+          title={t("desktop.prefs.general.notifySiteTitle")}
+          desc={t("desktop.prefs.general.notifySiteDesc")}
+          htmlFor="notify-site"
           end={
             <Switch
-              id="dock"
-              checked={dock}
+              id="notify-site"
+              checked={notifySite}
               onCheckedChange={(on) => {
-                setDock(on);
-                host.setDock(on).catch(() => {
-                  setDock(!on);
-                  toast(t("desktop.common.error"), "alert");
-                });
+                setNotifySite(on);
+                void host.setSiteNotify(on).catch(() => {});
               }}
             />
           }
         />
-        <PrefRow
-          title={t("desktop.prefs.general.notchTitle")}
-          desc={t("desktop.prefs.general.notchDesc")}
-          htmlFor="notch"
-          end={
-            <Switch
-              id="notch"
-              checked={notch}
-              onCheckedChange={(on) => {
-                setNotch(on);
-                host.setNotch(on).catch(() => {
-                  setNotch(!on);
-                  toast(t("desktop.common.error"), "alert");
-                });
-              }}
+        {works && (
+          <>
+            <PrefRow
+              title={t("desktop.prefs.general.notifyTitle")}
+              desc={t("desktop.prefs.general.notifyDesc")}
+              htmlFor="notify"
+              end={<Switch id="notify" checked={notify} onCheckedChange={setNotify} />}
             />
-          }
-        />
+            <PrefRow
+              title={t("desktop.prefs.general.notifyBrowserTitle")}
+              desc={t("desktop.prefs.general.notifyBrowserDesc")}
+              htmlFor="notify-browser"
+              end={<Switch id="notify-browser" checked={notifyBrowser} onCheckedChange={setNotifyBrowser} />}
+            />
+          </>
+        )}
+        {mac && (
+          <>
+            <PrefRow
+              title={t("desktop.prefs.general.dockTitle")}
+              desc={t("desktop.prefs.general.dockDesc")}
+              htmlFor="dock"
+              end={<Switch id="dock" checked={dock} onCheckedChange={showDock} />}
+            />
+            <PrefRow
+              title={t("desktop.prefs.general.menuBarTitle")}
+              desc={t("desktop.prefs.general.menuBarDesc")}
+              htmlFor="menu-bar"
+              end={<Switch id="menu-bar" checked={iconShown} onCheckedChange={showMenuBar} />}
+            />
+          </>
+        )}
+        {mac && works && (
+          <PrefRow
+            title={t("desktop.prefs.general.notchTitle")}
+            desc={t("desktop.prefs.general.notchDesc")}
+            htmlFor="notch"
+            end={
+              <Switch
+                id="notch"
+                checked={notch}
+                onCheckedChange={(on) => {
+                  setNotch(on);
+                  host.setNotch(on).catch(() => {
+                    setNotch(!on);
+                    toast(t("desktop.common.error"), "alert");
+                  });
+                }}
+              />
+            }
+          />
+        )}
       </PrefCard>
 
       <Dialog

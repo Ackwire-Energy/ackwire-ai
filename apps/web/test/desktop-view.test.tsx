@@ -1,17 +1,17 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { BrowserHandoff, DesktopStatus, SocketFactory } from "@agenteschat/client";
+import type { Agent, BrowserHandoff, DesktopStatus, SocketFactory } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
-import { act, cleanup, fireEvent } from "@testing-library/react";
-import { DesktopView } from "@/components/desktop/DesktopView";
-import { ADA_ID, createFakeApi, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { ComputerDialog } from "@/components/computer/ComputerDialog";
+import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
-import { renderApp, renderPage, screen, settle } from "./render";
+import { renderPage, screen, settle } from "./render";
 
-/** A person's socket to the desktop: the server side closes it with a code. */
+/** A person's socket to the screen: the server side closes it with a code. */
 class DesktopSocket {
   binaryType = "blob";
   closed = false;
@@ -35,9 +35,11 @@ class DesktopSocket {
   }
 }
 
-/** noVNC's RFB as the panel drives it: how it was set, what it pasted and pressed; `emit` plays its events. */
+/** noVNC's RFB as the screen drives it: how it was set, what it pasted and pressed; `emit` plays its events. */
 class FakeRfb {
   static all: FakeRfb[] = [];
+  /** Like noVNC, it draws into a canvas of its own inside the screen. */
+  static drawsCanvas = false;
   viewOnly = false;
   qualityLevel = 6;
   compressionLevel = 2;
@@ -45,6 +47,7 @@ class FakeRfb {
   resizeSession = false;
   focusOnClick = true;
   background = "";
+  focused = 0;
   pasted: string[] = [];
   keys: [number, string | null, boolean | undefined][] = [];
   /** It took its socket in the tick the socket was made, before anything could arrive on it. */
@@ -57,6 +60,12 @@ class FakeRfb {
   ) {
     this.onTime = !ws.late;
     FakeRfb.all.push(this);
+    if (FakeRfb.drawsCanvas) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1280;
+      canvas.height = 900;
+      el.appendChild(canvas);
+    }
   }
   addEventListener(type: string, fn: (e: Event) => void) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
@@ -70,22 +79,18 @@ class FakeRfb {
   sendKey(keysym: number, code: string | null, down?: boolean) {
     this.keys.push([keysym, code, down]);
   }
-  focus() {}
+  focus() {
+    this.focused++;
+  }
   disconnect() {
     this.ws.close();
   }
 }
 mock.module("@novnc/novnc", () => ({ default: FakeRfb }));
 
-const RUNNING: Partial<DesktopStatus> = {
-  available: true,
-  reason: null,
-  running: true,
-  canControl: true,
-  canStart: true,
-};
+const RUNNING: Partial<DesktopStatus> = { available: true, reason: null, running: true, canControl: true };
 
-/** The desktop sockets apart from the realtime one. */
+/** The screen sockets apart from the realtime one. */
 function socketsFor() {
   const desktops: DesktopSocket[] = [];
   const realtime = fakeSockets();
@@ -98,29 +103,37 @@ function socketsFor() {
   return { factory, desktops };
 }
 
-function backend(desktop: Partial<DesktopStatus>) {
+/** Ada on a Linux computer of the workspace's, which serves screens; self-host. */
+async function backend(desktop: Partial<DesktopStatus>) {
   const state = seedState();
   const api = createFakeApi(state);
   const fake = fakeBrowserOf.get(api);
-  if (!fake) throw new Error("no fake browser");
+  const machines = fakeMachinesOf.get(api);
+  if (!fake || !machines) throw new Error("no fakes");
+  const m = machines.pair({ name: "Servidor de casa", os: "linux", mode: "system" });
+  await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
   fake.desktops.set(ADA_ID, desktop);
-  return { state, api, fake, sockets: socketsFor() };
+  return { state, api, fake, machines, machine: m, sockets: socketsFor() };
 }
 
-async function panel(desktop: Partial<DesktopStatus> = RUNNING) {
-  const b = backend(desktop);
-  const r = await renderPage(<DesktopView agentId={ADA_ID} name="Ada" />, {
+async function dialog(desktop: Partial<DesktopStatus> = RUNNING) {
+  const b = await backend(desktop);
+  const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+  let closed = 0;
+  const r = await renderPage(<ComputerDialog agent={ada} open onClose={() => closed++} />, {
     api: b.api,
     org: true,
     createSocket: b.sockets.factory,
   });
-  await settle(6);
-  return { ...r, ...b };
+  await settle(8);
+  return { ...r, ...b, closed: () => closed };
 }
 
 const calls = (s: { state: ReturnType<typeof seedState> }, method: string) =>
   s.state.calls.filter((c) => c.method === method).map((c) => c.args);
 const rfb = () => FakeRfb.all.at(-1) as FakeRfb;
+const sub = () => (document.querySelector(".ac-dialog__sub") as HTMLElement).textContent;
+const view = () => within(screen().getByRole("dialog", { name: "Computador da Ada" }));
 const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(4);
@@ -152,9 +165,44 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe("the agent's desktop panel", () => {
+/**
+ * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
+ * `picture()`. The DOM here draws nothing, so that copy's context is this stand-in while it's on; the canvases
+ * on the page keep their own.
+ */
+function screenPixels() {
+  let shows = false;
+  const proto = Object.getPrototypeOf(document.createElement("canvas")) as HTMLCanvasElement;
+  const getContext = proto.getContext;
+  const copy = {
+    drawImage() {},
+    getImageData: (_x: number, _y: number, w: number, h: number) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let i = 3; i < data.length; i += 4) data[i] = 255;
+      // One spot of the desktop's sky is enough to tell a picture from a black screen.
+      if (shows) data.set([75, 147, 255, 255], 4 * (w + 1));
+      return { data };
+    },
+  };
+  proto.getContext = function (this: HTMLCanvasElement, ...args: Parameters<HTMLCanvasElement["getContext"]>) {
+    return this.isConnected ? getContext.apply(this, args) : copy;
+  } as unknown as typeof proto.getContext;
+  FakeRfb.drawsCanvas = true;
+  return {
+    picture: () => {
+      shows = true;
+    },
+    restore: () => {
+      proto.getContext = getContext;
+      FakeRfb.drawsCanvas = false;
+    },
+  };
+}
+const waitLooks = () => act(async () => new Promise((r) => setTimeout(r, 260)));
+
+describe("the agent's screen in the computer dialog", () => {
   test("watching: a socket of its own in binary, view-only at quality 3, scaled; live once noVNC connects", async () => {
-    const t = await panel();
+    const t = await dialog();
     expect(t.sockets.desktops).toHaveLength(1);
     const ws = t.sockets.desktops[0];
     expect(ws?.url).toBe(`ws://localhost:3000/api/desktop?orgId=${ORG_ID}&agentId=${ADA_ID}&mode=watch`);
@@ -171,25 +219,120 @@ describe("the agent's desktop panel", () => {
       resizeSession: false,
       focusOnClick: false,
     });
-    expect(screen().getByText("Abrindo a tela da Ada…")).toBeTruthy();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(sub()).toBe("Abrindo…");
     await connected();
-    expect(screen().queryByText("Abrindo a tela da Ada…")).toBeNull();
-    expect(screen().getByText("Ao vivo · você só assiste")).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    expect(view().getByRole("img", { name: "Tela da Ada, ao vivo" })).toBeTruthy();
+    expect(view().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    // No power and no fold: the screen starts by itself and stays on.
+    expect(view().queryByRole("button", { name: "Desligar" })).toBeNull();
+    expect(view().queryByRole("button", { name: "Recolher" })).toBeNull();
     // Watching gives no way to type into it.
-    expect(screen().queryByRole("textbox", { name: "Texto para colar na tela da Ada" })).toBeNull();
+    expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
+  });
+
+  test("Live once a picture is there: a screen that just started stays black a moment, and says Opening meanwhile", async () => {
+    const pixels = screenPixels();
+    try {
+      await dialog({ ...RUNNING, running: false });
+      await connected();
+      await waitLooks();
+      expect(sub()).toBe("Abrindo…");
+      expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+      expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+      pixels.picture();
+      await waitLooks();
+      expect(sub()).toBe("Ao vivo · você está assistindo");
+      expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+      expect(view().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    } finally {
+      pixels.restore();
+    }
+  });
+
+  test("a screen that stays one flat color for good is shown as it is after a while, not Opening forever", async () => {
+    const pixels = screenPixels();
+    try {
+      await dialog();
+      await connected();
+      await waitLooks();
+      expect(sub()).toBe("Abrindo…");
+      setSystemTime(new Date(Date.now() + 10_500));
+      await waitLooks();
+      expect(sub()).toBe("Ao vivo · você está assistindo");
+    } finally {
+      setSystemTime();
+      pixels.restore();
+    }
+  });
+
+  test("a screen that isn't running opens like any other: no Off and no Turn on; an older computer's refusal reads as opening", async () => {
+    const t = await dialog({ ...RUNNING, running: false });
+    // Opening the stream starts it.
+    expect(t.sockets.desktops).toHaveLength(1);
+    expect(document.body.textContent).not.toMatch(/Desligad|Ligar|está desligada/);
+    // An older computer still refuses a screen that isn't running; the server starts it and the next try opens.
+    await act(async () => t.sockets.desktops[0]?.serverClose(4502, "desktop_off"));
+    await settle(4);
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Desligad|Ligar/);
+    await act(async () => new Promise((r) => setTimeout(r, 1100)));
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(2);
+    await connected();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("held, its screen not running: nothing starts it, the pause said once; once the hold ends it opens", async () => {
+    const t = await dialog({ ...RUNNING, running: false, held: true });
+    expect(t.sockets.desktops).toHaveLength(0);
+    expect(view().getAllByText("A Ada está em pausa por enquanto")).toHaveLength(1);
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+
+    t.fake.desktops.set(ADA_ID, { ...RUNNING, running: false });
+    await act(async () => t.services.queryClient.invalidateQueries({ queryKey: keys.agentDesktop(ORG_ID, ADA_ID) }));
+    await settle(6);
+    expect(t.sockets.desktops).toHaveLength(1);
+    await connected();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("held while watching: the pause over the live screen; the stream's `held` close is the held cover, not opening", async () => {
+    const t = await dialog({ ...RUNNING, held: true });
+    await connected();
+    expect(view().getByText("A Ada está em pausa por enquanto")).toBeTruthy();
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+
+    // Its screen went away meanwhile: the server starts none for a held agent. The close alone says so, before
+    // the screen's state (asked again at the close, and still saying it runs) could.
+    await act(async () => t.sockets.desktops[0]?.serverClose(4502, "held"));
+    await settle(6);
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(view().getAllByText("A Ada está em pausa por enquanto")).toHaveLength(1);
+    expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
+    // Not running and held: no socket tries again until the hold ends.
+    t.fake.desktops.set(ADA_ID, { ...RUNNING, running: false, held: true });
+    await act(async () => t.services.queryClient.invalidateQueries({ queryKey: keys.agentDesktop(ORG_ID, ADA_ID) }));
+    await act(async () => new Promise((r) => setTimeout(r, 1100)));
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(1);
   });
 
   test("4409: someone else took control, the screen hides; once handed back it opens again", async () => {
-    const t = await panel();
+    const t = await dialog();
     await connected();
     const joao = controlOf(ADA_ID, "u-joao");
     t.fake.handoffs.set(joao.id, joao);
     await act(async () => t.sockets.desktops[0]?.serverClose(4409, "someone_in_control"));
     await settle(6);
     expect(screen().getByText("João está no controle")).toBeTruthy();
-    expect(screen().getByText("João no controle · tela oculta")).toBeTruthy();
-    expect(screen().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+    expect(sub()).toBe("João no controle · tela oculta");
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
     expect(t.sockets.desktops).toHaveLength(1);
 
     t.fake.handoffs.set(joao.id, { ...joao, status: "done" });
@@ -198,53 +341,104 @@ describe("the agent's desktop panel", () => {
     expect(t.sockets.desktops).toHaveLength(2);
     expect(t.sockets.desktops[1]?.url).toContain("mode=watch");
     await connected();
-    expect(screen().getByText("Ao vivo · você só assiste")).toBeTruthy();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
   });
 
-  test("off: Ligar only for who may turn it on; it starts and the screen opens", async () => {
-    const viewer = await panel({ ...RUNNING, running: false, canStart: false });
-    expect(screen().getByText("A tela da Ada está desligada")).toBeTruthy();
-    expect(screen().queryByRole("button", { name: "Ligar" })).toBeNull();
-    expect(viewer.sockets.desktops).toHaveLength(0);
-    cleanup();
-
-    const t = await panel({ ...RUNNING, running: false });
-    await click(screen().getByRole("button", { name: "Ligar" }));
-    expect(calls(t, "desktop.start")).toEqual([[ORG_ID, ADA_ID]]);
+  test("too many watching: it says so and tries again; no room for another screen: Tentar de novo", async () => {
+    const t = await dialog();
+    await act(async () => t.sockets.desktops[0]?.serverClose(4429, "too_many"));
     await settle(4);
-    expect(t.sockets.desktops).toHaveLength(1);
+    expect(screen().getByText("Muita gente assistindo agora.")).toBeTruthy();
+    expect(screen().getByText("Tentando de novo…")).toBeTruthy();
+    expect(sub()).toBe("Abrindo…");
+    await act(async () => new Promise((r) => setTimeout(r, 1100)));
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(2);
+
+    await act(async () => t.sockets.desktops[1]?.serverClose(4502, "desktop_busy"));
+    await settle(4);
+    expect(
+      screen().getByText("O Servidor de casa já mostra o máximo de telas que consegue. Tente de novo daqui a pouco."),
+    ).toBeTruthy();
+    // Nothing by itself: a person tries again.
+    await act(async () => new Promise((r) => setTimeout(r, 1100)));
+    await settle(2);
+    expect(t.sockets.desktops).toHaveLength(2);
+    await click(view().getByRole("button", { name: "Tentar de novo" }));
+    expect(t.sockets.desktops).toHaveLength(3);
   });
 
-  test("the bar: Assumir takes the desktop's own handoff, control opens at quality 6 with the person's keyboard; Devolver hands it back", async () => {
+  test("Assumir takes the screen's own handoff, control opens at quality 6 with the person's keyboard; Devolver hands it back", async () => {
     localStorage.setItem("agentes.screen.keyboard", "br");
-    const t = await panel();
+    const t = await dialog();
     await connected();
-    await click(screen().getByRole("button", { name: "Assumir o controle" }));
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
     expect(calls(t, "browser.takeover")).toEqual([[ORG_ID, ADA_ID, "desktop"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("&mode=control&keyboard=br");
     expect(t.sockets.desktops[0]?.closed).toBe(true);
     expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, focusOnClick: true });
     await connected();
-    expect(screen().getByText("Você no controle · a Ada espera")).toBeTruthy();
-    expect(screen().getByText(/os programas do computador do agente podem ver a tela/)).toBeTruthy();
+    // The person's keys go to the screen at once.
+    expect(rfb().focused).toBeGreaterThan(0);
+    expect(sub()).toBe("Você no controle · a Ada espera");
+    expect(
+      screen().getByText(
+        "Enquanto você está no controle, os programas do computador da Ada podem ver a tela e o que você digita.",
+      ),
+    ).toBeTruthy();
 
-    await click(screen().getByRole("button", { name: "Devolver" }));
-    await click(screen().getByRole("button", { name: "Devolver" }));
-    expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1"]]);
+    // Esc in control goes to the computer: the dialog stays.
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    expect(t.closed()).toBe(0);
+
+    await click(view().getByRole("button", { name: "Devolver" }));
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
+    await click(view().getAllByRole("button", { name: "Devolver" }).at(-1) as HTMLElement);
+    expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
   });
 
-  test("Colar texto: the desktop's clipboard, then Shift+Insert; what the desktop copies waits behind Copiar", async () => {
+  test("full screen is the page's, so leaving it with Esc lets the first click on Devolver work", async () => {
+    let requested = null as Element | null;
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: function (this: Element) {
+        requested = this;
+        return Promise.resolve();
+      },
+    });
+    const t = await dialog();
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    // The page goes full screen, not the dialog: noVNC's capture layer on the page stays inside it.
+    expect(requested).toBe(document.documentElement);
+    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(true);
+    // In full screen Esc only leaves full screen, even in control.
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    await settle(2);
+    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(false);
+    expect(t.closed()).toBe(0);
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
+  });
+
+  test("Colar texto: the screen's clipboard, then Shift+Insert; what the screen copies waits behind Copiar", async () => {
     const copied: string[] = [];
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: async (v: string) => void copied.push(v) },
     });
-    const t = await panel();
+    const t = await dialog();
     await connected();
-    await click(screen().getByRole("button", { name: "Assumir o controle" }));
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     await connected();
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=control");
@@ -252,7 +446,7 @@ describe("the agent's desktop panel", () => {
     await act(async () => t.sockets.desktops[0]?.serverClose(1000));
     await settle(2);
 
-    const field = screen().getByRole("textbox", { name: "Texto para colar na tela da Ada" });
+    const field = view().getByRole("textbox", { name: "Texto para colar no computador da Ada" });
     await act(async () => fireEvent.change(field, { target: { value: "Olá, ação: êõú ç — 日本" } }));
     await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
     expect(rfb().pasted).toEqual(["Olá, ação: êõú ç — 日本"]);
@@ -266,12 +460,13 @@ describe("the agent's desktop panel", () => {
     await settle(2);
     expect(copied).toEqual([]);
     expect(screen().getByText("ls -la /tmp")).toBeTruthy();
-    await click(screen().getByRole("button", { name: "Copiar" }));
+    expect(screen().getByText("Copiado no computador da Ada:")).toBeTruthy();
+    await click(view().getByRole("button", { name: "Copiar" }));
     expect(copied).toEqual(["ls -la /tmp"]);
   });
 
   test("a page kept for the Back button lets its screen go, and opens it again when the person comes back", async () => {
-    const t = await panel();
+    const t = await dialog();
     await connected();
     const page = (type: "pagehide" | "pageshow", persisted: boolean) =>
       act(async () => void window.dispatchEvent(Object.assign(new Event(type), { persisted })));
@@ -288,28 +483,73 @@ describe("the agent's desktop panel", () => {
     expect(t.sockets.desktops).toHaveLength(2);
     expect(t.sockets.desktops[1]?.url).toContain("mode=watch");
     await connected();
-    expect(screen().getByText("Ao vivo · você só assiste")).toBeTruthy();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
   });
 
-  test("the agent's page: a line under its browser; Ver a tela opens the live panel, as does ?desktop=1", async () => {
-    const b = backend(RUNNING);
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: b.api, createSocket: b.sockets.factory });
-    await settle(8);
-    expect(screen().getByText("Ligada · ao vivo")).toBeTruthy();
-    expect(b.sockets.desktops).toHaveLength(0);
-    await click(screen().getByRole("button", { name: "Ver a tela" }));
-    await settle(4);
-    expect(screen().getByRole("group", { name: "Tela da Ada" })).toBeTruthy();
-    expect(b.sockets.desktops).toHaveLength(1);
+  test("can't show on self-host: the reason, and for whoever paired it the command to run there", async () => {
+    const t = await dialog({ ...RUNNING, available: false, reason: "not_allowed" });
+    expect(t.sockets.desktops).toHaveLength(0);
+    expect(screen().getByText("As telas estão desligadas no Servidor de casa. Ligue lá:")).toBeTruthy();
+    // A system-mode computer's settings are its administrator's.
+    expect(document.querySelector(".machine-command__code")?.textContent).toBe(
+      "sudo agentes-runner tools enable desktop",
+    );
+    expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
     cleanup();
 
-    const asked = backend(RUNNING);
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?desktop=1`, {
-      api: asked.api,
-      createSocket: asked.sockets.factory,
-    });
-    await settle(8);
-    expect(screen().getByRole("group", { name: "Tela da Ada" })).toBeTruthy();
-    expect(asked.sockets.desktops).toHaveLength(1);
+    const outdated = await dialog({ ...RUNNING, available: false, reason: "runner_outdated" });
+    expect(outdated.sockets.desktops).toHaveLength(0);
+    expect(screen().getByText("Atualize o agentes no Servidor de casa para ver a tela da Ada.")).toBeTruthy();
+  });
+});
+
+describe("the dialog's size (computer.css)", () => {
+  const css = () => Bun.file(new URL("../src/components/computer/computer.css", import.meta.url).pathname).text();
+  const rule = (text: string, selector: string) => text.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+
+  test("the screen fills what its stage gets, keeping its shape; no mode sizes it on its own", async () => {
+    const text = await css();
+    const stage = rule(text, ".cmp-body .dsk-stage,\n.cmp-body > .cmp-stage");
+    expect(stage).toContain("container-type: size");
+    expect(stage).toContain("flex: 1 1 0");
+    expect(rule(text, ".cmp-body .dsk-screen,\n.cmp-body .cmp-stage__box")).toContain(
+      "width: min(100cqw, 100cqh * 1280 / 900)",
+    );
+    // In control and in full screen alike: nothing outranks the stage's own measure.
+    expect(text).not.toMatch(/is-control \.dsk-screen\s*\{[^}]*width/);
+    expect(text).not.toMatch(/is-full \.(dsk-screen|cmp-stage__box)/);
+    const full = rule(text, ".ac-dialog.cmp-dialog.is-full");
+    expect(full).toContain("width: 100%");
+    expect(full).toContain("height: 100%");
+  });
+
+  test("one frame for the screen, its covers and the agent's page, its steps' line kept while there are none", async () => {
+    const text = await css();
+    // The wait for the workspace's computer is as wide, so its screen opens in place.
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
+      "width: calc(var(--cmp-screen) + 32px + var(--cmp-side))",
+    );
+    expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
+      "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
+    );
+    expect(rule(text, ".cmp-steps-row")).toContain("height: 22px");
+    // The page at 16:10 takes the most of its stage in the same frame, never a size of its own.
+    expect(rule(text, ".cmp-body .brw-ac__page")).toContain("width: min(100cqw, 100cqh * 16 / 10)");
+    expect(text).not.toContain("--cmp-page-room");
+  });
+
+  test("in control the tools take a column beside the screen only where it leaves the screen larger", async () => {
+    const text = await css();
+    const query = "(min-width: 1080px) and (min-aspect-ratio: 139 / 100)";
+    const wide = text.split(`@media ${query} {`)[1] ?? "";
+    expect(rule(wide, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain("--cmp-side: 252px");
+    expect(wide).toMatch(/grid-template-columns: minmax\(0, 1fr\) 240px/);
+    expect(wide).toMatch(/\.dsk\.is-control > \.brw-ac__foot \{[^}]*grid-area: tools/);
+    // Elsewhere under it, where the steps' line was, and the dialog grows by them while there is room.
+    const narrow = text.split(`@media not all and ${query} {`)[1] ?? "";
+    expect(rule(narrow, "  .ac-dialog.cmp-dialog:where(:has(.dsk.is-control))")).toContain(
+      "height: min(94dvh, calc(var(--cmp-screen) * 900 / 1280 + 212px))",
+    );
+    expect(rule(narrow, "  .cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
   });
 });

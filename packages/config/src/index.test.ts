@@ -87,13 +87,25 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, AGENT_DEFAULT_MODEL: "Claude Sonnet" })).toThrow(/AGENT_DEFAULT_MODEL/);
   });
 
-  test("external provisioning needs the operator API, which serves its requests", () => {
+  test("external provisioning needs the operator API, which serves its requests, and no computer of the server's own", () => {
     expect(loadConfig(valid).MACHINE_PROVISIONING).toBe("off");
     expect(() => loadConfig({ ...valid, MACHINE_PROVISIONING: "external" })).toThrow(/OPERATOR_API_TOKEN/);
     const token = "t".repeat(32);
-    expect(
-      loadConfig({ ...valid, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: token }).MACHINE_PROVISIONING,
-    ).toBe("external");
+    const external = { ...valid, MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: token };
+    expect(loadConfig(external).MACHINE_PROVISIONING).toBe("external");
+    expect(() => loadConfig({ ...external, HOST_COMPUTER_TOKEN: "h".repeat(32) })).toThrow(/HOST_COMPUTER_TOKEN/);
+    expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
+  });
+
+  test("the usage report is on unless TELEMETRY says off (on/off, or any yes/no word)", () => {
+    expect(loadConfig(valid).TELEMETRY).toBe("on");
+    expect(loadConfig(valid).TELEMETRY_URL).toBe("https://telemetry.agentes.chat/v1/report");
+    expect(loadConfig({ ...valid, TELEMETRY: "off" }).TELEMETRY).toBe("off");
+    expect(loadConfig({ ...valid, TELEMETRY: "false" }).TELEMETRY).toBe("off");
+    expect(loadConfig({ ...valid, TELEMETRY: "on" }).TELEMETRY).toBe("on");
+    expect(() => loadConfig({ ...valid, TELEMETRY: "sometimes" })).toThrow(/TELEMETRY/);
+    expect(loadConfig(valid).INSTALL_MODE).toBeUndefined();
+    expect(() => loadConfig({ ...valid, INSTALL_MODE: "kubernetes" })).toThrow(/INSTALL_MODE/);
   });
 
   test("ignores variables that are not in the schema", () => {

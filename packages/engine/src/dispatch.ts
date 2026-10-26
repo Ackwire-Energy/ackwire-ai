@@ -4,6 +4,7 @@ import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
+import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
@@ -73,9 +74,16 @@ export async function startOrJoinRun(
   // hold no slot): the message goes to it, read at its next step, instead of a second run.
   if (trigger !== "forum" && !options.background) {
     // Several runs may be active (in the agents' DM one per person behind them; elsewhere a person's run
-    // next to an unattended one): the message joins the newest it may (`mayJoin`).
+    // next to an unattended one, or one held by a decision): the message joins the newest it may
+    // (`mayJoin`). A run waiting on an approval, a secret or a mission's decision takes nothing new
+    // (`holdsMessages`): the agent answers this in a run of its own meanwhile.
     const active = await tx
-      .select({ id: agentRuns.id, triggerMessageId: agentRuns.triggerMessageId })
+      .select({
+        id: agentRuns.id,
+        orgId: agentRuns.orgId,
+        status: agentRuns.status,
+        triggerMessageId: agentRuns.triggerMessageId,
+      })
       .from(agentRuns)
       .where(
         and(
@@ -96,7 +104,12 @@ export async function startOrJoinRun(
       .orderBy(sql`${agentRuns.createdAt} desc`)
       .limit(10);
     for (const run of active) {
-      if (run.triggerMessageId === message.id || !(await mayJoin(tx, message, run.id))) continue;
+      if (
+        run.triggerMessageId === message.id ||
+        (await holdsMessages(tx, run)) ||
+        !(await mayJoin(tx, message, run.id))
+      )
+        continue;
       if (await queueOnRun(tx, run.id, message.id)) return { joined: run.id };
       break;
     }

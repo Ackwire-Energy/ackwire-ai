@@ -1,5 +1,6 @@
 import { and, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { enqueue } from "./outbox";
+import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 
 const { agentRuns } = schema;
@@ -19,7 +20,7 @@ export async function enqueueRunJob(
 ): Promise<{ run: typeof agentRuns.$inferSelect | null; steered: string | null }> {
   const threadRootId = message.threadId ?? message.id;
   const [active] = await tx
-    .select({ id: agentRuns.id })
+    .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
     .from(agentRuns)
     .where(
       and(
@@ -33,8 +34,10 @@ export async function enqueueRunJob(
     )
     .orderBy(sql`${agentRuns.createdAt} desc`)
     .limit(1);
-  // Queued only while that run is still active; one that just ended: the notice starts a run.
-  if (active && (await queueOnRun(tx, active.id, message.id))) return { run: null, steered: active.id };
+  // Queued only while that run is still active; one that just ended, or one held by a decision (an
+  // approval, the mission's own: `holdsMessages`), and the notice starts a run.
+  if (active && !(await holdsMessages(tx, active)) && (await queueOnRun(tx, active.id, message.id)))
+    return { run: null, steered: active.id };
   const [run] = await tx
     .insert(agentRuns)
     .values({

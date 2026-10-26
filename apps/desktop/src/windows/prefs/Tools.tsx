@@ -12,23 +12,22 @@ import {
 import { useTranslation } from "react-i18next";
 import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
+import { toolsHere } from "../../control/this-mac";
+import { useLocalServer } from "../../hooks";
 import { useToast } from "../../ui/Toast";
+import { listNames } from "../../ui/time";
 import { ToolAccounts } from "./Accounts";
 import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
 
 /** Tools are for the whole computer: every organization gets the same switch. */
 export function Tools() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const store = useStore();
   const snap = useSnapshot();
   const toast = useToast();
+  const local = useLocalServer();
   const homes = pairedHomes(snap);
-  const tools: RunnerTools = homes.find((h) => h.access)?.access?.tools ?? {
-    claude: false,
-    codex: false,
-    commands: false,
-    browser: false,
-  };
+  const { tools, commandsOnlyFor } = toolsHere(homes);
   const executors: ControlStatus["executors"] = homes.find((h) => h.status)?.status?.executors ?? {};
 
   const set = async (tool: keyof RunnerTools, on: boolean) => {
@@ -120,10 +119,23 @@ export function Tools() {
             />
           }
           under={
-            <span className="dk-honest">
-              <Icon name="alert" size={14} />
-              <span>{homes.length > 1 ? t("desktop.tools.commandsWarnOrgs") : t("desktop.tools.commandsWarn")}</span>
-            </span>
+            <>
+              {commandsOnlyFor.length > 0 && (
+                <span className="dk-help">
+                  {t("desktop.tools.commandsSome", { orgs: listNames(commandsOnlyFor, i18n.language) })}
+                </span>
+              )}
+              <span className="dk-honest">
+                <Icon name="alert" size={14} />
+                <span>
+                  {local.run
+                    ? t("desktop.tools.commandsWarnHere")
+                    : homes.length > 1
+                      ? t("desktop.tools.commandsWarnOrgs")
+                      : t("desktop.tools.commandsWarn")}
+                </span>
+              </span>
+            </>
           }
         />
         <PrefRow

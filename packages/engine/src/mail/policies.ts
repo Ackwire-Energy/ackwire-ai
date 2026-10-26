@@ -4,7 +4,7 @@ import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
-import { levelOf, MAIL_SCOPES, mailGrants, orgMailAccounts } from "./accounts";
+import { levelOf, MAIL_SCOPES, mailboxAddresses, mailGrants, orgMailAccounts } from "./accounts";
 import { isEmailAddress, normalizeAddress, normalizeAddressRule } from "./text";
 
 const { mailAccounts, mailAgentPolicies, agentScopes } = schema;
@@ -179,9 +179,12 @@ export async function setAgentMail(
   await requirePermission(db, actorId, orgId, "manage_agents");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  const accounts = (await orgMailAccounts(db, orgId)).filter((a) => a.id === accountId && a.status !== "pending");
-  if (accounts.length === 0) throw new NotFoundError("Mailbox not found", "mail.account_not_found");
+  const [account] = (await orgMailAccounts(db, orgId)).filter((a) => a.id === accountId && a.status !== "pending");
+  if (!account) throw new NotFoundError("Mailbox not found", "mail.account_not_found");
   const policy = normalizeMailPolicy(input.policy);
+  if (policy.fromAddress && !mailboxAddresses(account).includes(policy.fromAddress)) {
+    throw new ValidationError("fromAddress must be one of the mailbox's addresses", "mail.from_not_mailbox");
+  }
   const scopes = scopesFor(input.level, input.canDelete);
   caches.scopes.delete(`${orgId}:${agentId}`);
   await db.transaction(async (tx) => {

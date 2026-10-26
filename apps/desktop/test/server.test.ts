@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ControlStatus } from "@agenteschat/adapters/runner-control";
-import { openSiteLabel, serverFromPref, siteOf } from "../src/control/server";
+import { appServer, homeServer, serverKind, serverName } from "../src/control/server";
 import type { Home } from "../src/control/store";
-import { createDesktopI18n } from "../src/i18n";
 
 const home = (status: Partial<ControlStatus> | null): Home => ({
   homeId: "h1",
@@ -28,24 +27,28 @@ const home = (status: Partial<ControlStatus> | null): Home => ({
   logo: null,
 });
 
-describe("the server the app signs in to", () => {
-  test("agentes.chat until another one is chosen", () => {
-    expect(serverFromPref(null)).toBe("https://agentes.chat");
-    expect(serverFromPref("https://box.tail1234.ts.net")).toBe("https://box.tail1234.ts.net");
-    expect(serverFromPref("http://box.tail1234.ts.net")).toBe("https://agentes.chat");
+describe("the servers this app opens", () => {
+  test("https anywhere, plain http only on this computer", () => {
+    expect(appServer("agentes.tail1234.ts.net")).toBe("https://agentes.tail1234.ts.net");
+    expect(appServer("http://127.0.0.1:4310")).toBe("http://127.0.0.1:4310");
+    expect(appServer("http://localhost:3000/login")).toBe("http://localhost:3000");
+    expect(appServer("http://192.168.1.20:3000")).toBeNull();
+    expect(appServer("http://chat.example.com")).toBeNull();
   });
 
-  test("the site opens on the organization's own server, else on the chosen one", () => {
-    const chosen = "https://box.tail1234.ts.net";
-    expect(siteOf([home({ server: "https://chat.example.com" })], chosen)).toBe("https://chat.example.com");
-    expect(siteOf([home({ paired: false, server: "https://chat.example.com" })], chosen)).toBe(chosen);
-    expect(siteOf([home(null)], chosen)).toBe(chosen);
-    expect(siteOf([], chosen)).toBe(chosen);
+  test("each kind of server, and how it reads", () => {
+    expect(serverKind("https://agentes.chat")).toBe("cloud");
+    expect(serverKind("http://127.0.0.1:4310")).toBe("here");
+    expect(serverKind("https://agentes.tail1234.ts.net")).toBe("tailnet");
+    expect(serverKind("https://chat.example.com")).toBe("own");
+    expect(serverName("https://agentes.chat")).toBe("agentes.chat");
+    expect(serverName("https://chat.example.com:8443")).toBe("chat.example.com:8443");
+    expect(serverName("http://127.0.0.1:4310")).toBe("127.0.0.1:4310");
   });
 
-  test("the link to the site names another server by its host", () => {
-    const { t } = createDesktopI18n("pt-BR");
-    expect(openSiteLabel("https://agentes.chat", t)).toBe("Abrir agentes");
-    expect(openSiteLabel("https://box.tail1234.ts.net", t)).toBe("Abrir box.tail1234.ts.net");
+  test("a home's server, as an origin", () => {
+    expect(homeServer(home({ server: "https://chat.example.com/" }))).toBe("https://chat.example.com");
+    expect(homeServer(home({ server: "http://192.168.1.20" }))).toBeNull();
+    expect(homeServer(home(null))).toBeNull();
   });
 });

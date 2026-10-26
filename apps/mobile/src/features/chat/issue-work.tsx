@@ -3,7 +3,7 @@ import { type IssueWorkRef, issueTakenOf } from "@agenteschat/client/lib/issues"
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
+import { Icon, LineIcon, Text } from "@/ui";
 import { StateChip } from "../issues/parts";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
@@ -72,7 +72,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
       accessibilityRole="link"
       style={({ pressed }) => [styles.line, pressed && styles.pressed]}
     >
-      <Icon name="issue" size={13} color={c.faint} />
+      <LineIcon name="issue" size={13} color={c.faint} variant="caption" />
       <Text variant="caption" tone="faint" style={styles.grow}>
         {t("chat.issueWork.taken", { name })}{" "}
         <Text variant="caption" tone="muted">

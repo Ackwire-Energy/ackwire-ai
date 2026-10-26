@@ -12,7 +12,7 @@ anything, and every link the app sends come from it. Opened at any other address
 "Invalid origin" and saving fails with `bad_origin`.
 
 The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
-DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → API keys**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -20,6 +20,8 @@ never sent to browsers.
 - A 64-bit Linux server (amd64 or arm64), or a Mac with Docker Desktop, OrbStack or Colima for
   trying it. It runs on Docker Engine with the Compose v2 plugin (`docker compose`), 2.23.1 or
   newer, and on Linux the installer below installs both when they're missing (Docker after asking).
+  Without Docker, it also runs as one program with its database built in (On this computer, without
+  Docker).
 - Nothing else: the installer fetches the Bun it runs the setup on. With Node.js 18 or newer,
   `npx @agenteschat/setup` is the same setup, and it also runs from the app's image.
 - Sizing has not been measured yet. As a starting point for a small team: 2 vCPUs, 4 GB of RAM and
@@ -55,21 +57,28 @@ tailnet can open it: no domain, no open port, nothing on the public internet.
 
    It installs what's missing, then runs the setup in `/opt/agentes` (`~/agentes` for a user who
    can already use Docker). Press Enter for **Tailscale**, paste the key, and press Enter to skip
-   email, or set it up (Email, under Configuration). The setup checks Docker, writes `.env` with
-   generated secrets (readable by you only), downloads `docker-compose.yml`, starts Tailscale,
-   writes `PUBLIC_URL` from the address Tailscale gives the server, starts the app, and waits for
-   the certificate and `/api/health`. The first time, it downloads about 2 GB. Done when it prints:
+   email, or set it up (Email, under Configuration). Then Enter once more to make this server your
+   agents' computer (This server as the agents' computer, under Agent computers), and once more for
+   the usage statistics question (Optional services and what they receive). The setup checks
+   Docker, writes `.env` with generated secrets (readable by you only), downloads
+   `docker-compose.yml`, starts Tailscale, writes `PUBLIC_URL` from the address Tailscale gives the
+   server, starts the app, waits for the certificate and `/api/health`, and sets up the agents'
+   computer. The first time, it downloads about 2 GB, and the agents' computer takes a few minutes
+   more. Done when it prints:
 
    ```
    ✓ On your tailnet as agentes.tail1234.ts.net
    ✓ .env: PUBLIC_URL=https://agentes.tail1234.ts.net
    ✓ HTTPS certificate ready
    ✓ agentes.chat <version> is up
+   ✓ Agents' computer: this machine
 
      https://agentes.tail1234.ts.net
+
+       App:  agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net
    ```
 
-   then a QR code for your phone, and what to do next.
+   then that link's QR code for your phone, and what to do next.
 5. **Your account.** On a computer in your tailnet, open that address and sign up. The first account
    is always allowed and becomes the owner; after it, sign-up is closed and people join by
    invitation. Onboarding then creates your organization and asks for its model key.
@@ -99,6 +108,11 @@ option of the setup passes through (`--network local`, `--email skip`):
 ```sh
 curl -fsSL https://agentes.chat/install | sh -s -- --plan
 ```
+
+That's the installer's own plan: it runs nothing, not even the setup, so it can't show what the setup
+would do. The setup writes and starts nothing until its last question is answered: for its plan, stop
+it at its first question (Ctrl-C), then run the setup command the installer printed again with
+`--dry-run` (with `sudo` if the installer ran itself again with `sudo`).
 
 Without a terminal (cloud-init, a CI job) nothing is asked: the setup takes its defaults and the
 options given, and Docker is installed only with `--yes`.
@@ -138,16 +152,17 @@ one's container (Caddy or Tailscale), which `docker compose up` alone would leav
    web app, **Open on your phone** (**Abrir no celular** in Portuguese) in the account menu shows
    one that also signs you in. Or, on the app's sign-in screen, tap the server line
    (**Server: agentes.chat · Change**, or **Servidor: agentes.chat · Trocar**), then
-   **Scan QR code**, or type the address and tap **Use this server**.
+   **Scan QR code** (**Escanear QR code**), or type the address and tap **Use this server**
+   (**Usar este servidor**).
 4. The app shows your server's address. Confirm, then sign in (the web app's code signs you in by
    itself).
 
 If the app can't reach the server, open the Tailscale app, check that it's connected, and try again.
 **Back to agentes.chat**, on the screen **Change** opens, goes back to agentes.chat Cloud.
 
-The QR code is a link, `agenteschat://connect?server=<the address, URL-encoded>`. The web app's adds
-`&token=<a one-time sign-in>`, which works once, within 3 minutes, for whoever scans it: show it to
-your own phone only.
+The QR code is a link, `agenteschat://connect?server=<the address, URL-encoded>`, the one the setup
+prints as **App**. The web app's adds `&token=<a one-time sign-in>`, which works once, within 3
+minutes, for whoever scans it: show it to your own phone only.
 
 </details>
 
@@ -158,12 +173,36 @@ Agents run commands and code, drive a browser, and can think with Claude Code or
 you connect (Agent computers, below). A computer must reach the instance, so on Tailscale, install
 Tailscale on it and sign in to the same tailnet first.
 
-- **A Mac:** the agentes.chat desktop app. On its first screen, click the server line
-  (**Server: agentes.chat · Change**), paste your address (`https://agentes.<your-tailnet>.ts.net`),
-  click **Use this server**, and sign in when the browser opens. **Add organization** has the same
-  line.
+The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a window of its own:
+
+1. On its first screen, under **Sign in to agentes.chat**, click **Use your own server**, then
+   **Connect to my server**.
+2. Type your address (`https://agentes.<your-tailnet>.ts.net`), or click **Use** next to one the app
+   found: it looks on this computer and, when Tailscale is connected, on your tailnet. Plain http works
+   only for an instance on the same computer (`http://127.0.0.1:…`), which the app then opens at the
+   address it gives itself (`PUBLIC_URL`, such as `http://localhost:3000`): it accepts sign-ins only there.
+3. Sign in, as in the browser. The link the setup prints at the end (`agenteschat://connect?…`) does
+   steps 1 and 2 for you; the app shows the address in large type and asks before it connects.
+
+**Servers** in the app's Preferences (and its menus) switches between instances; each keeps its own
+sign-in.
+
+- **Agents on that Mac or Linux computer:** in the instance's onboarding or **Settings → Computers**,
+  click **Use this Mac** (**Use this computer** on Linux). The app asks first, in its own dialog naming
+  the instance and the organization. Its agents start with no folders of yours and commands off, even
+  when other organizations' agents there have commands on; you choose more in the app's Preferences. On
+  Windows, and with agentes.chat Cloud, the app is only a window onto the workspace and nothing of the
+  computer is used. Nor on the computer that runs the instance: its agents work there through the
+  instance itself (This server as the agents' computer, below), so the app doesn't offer it.
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
+
+Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), the page that offers the app (Settings →
+Computers, and onboarding's computer step) asks agentes.chat for its newest version as it opens, from
+your browser or the app's window: the request names the system and, like any request a page makes to
+another site, carries this instance's address (its `Origin` header) and the browser's IP. The app asks
+agentes.chat for its own updates when it starts and every 6 hours, naming its system and processor (its
+version too, when it installs one). On Linux the AppImage updates itself; a deb downloads the new deb.
 
 </details>
 
@@ -195,14 +234,19 @@ AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' npx -y @agenteschat/setup --netwo
 No Node.js or Docker on the server? As root, the installer gets what's missing and then runs the
 same setup: give it `--yes` and the same options. Its own lines go to stderr, so stdout is still
 the setup's JSON; a failure before the setup starts is a line on stderr and exit code 1. Its
-`--plan` (`--dry-run` too) prints the installer's plan and runs nothing, not even the setup.
+`--plan` (`--dry-run` too) prints the installer's plan and runs nothing, not even the setup. The
+setup's plan as JSON comes from the setup itself, with `--dry-run --json`: through `npx`, or on a
+server the installer set up, the setup command it printed, with `--dry-run --json`.
 
 ```sh
 curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' sh -s -- --yes --network tailscale --email skip --json
 ```
 
 - Every answer is a flag or an `AGENTES_SETUP_<OPTION>` variable; `--help` lists them, and a flag
-  wins over a variable. With `--json` nothing is asked: a missing answer is a failed check.
+  wins over a variable. With `--json` nothing is asked: a missing answer is a failed check, and the
+  two yes/no questions take their defaults. The server becomes its agents' computer where it can be
+  (on Linux as root, with systemd, apt-get and 4 GB of memory or more, and on a Mac; `--computer no`
+  says otherwise), and the usage statistics are on (`--telemetry off` says otherwise).
 - stdout is one JSON object, and progress goes to stderr. Exit code 0: done; 1: a check failed;
   2: a wrong option.
 - `--dry-run --json` returns the plan and changes nothing.
@@ -220,13 +264,19 @@ Done:
   "url": "https://agentes.tail1234.ts.net",
   "health": { "status": "ok", "version": "…", "edition": "selfhost" },
   "ownerExists": false,
+  "appLink": "agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net",
   "phoneLink": "agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net",
+  "computer": "on",
+  "telemetry": "on",
   "nextSteps": ["On a computer or phone signed in to your tailnet, open https://agentes.tail1234.ts.net and create your account: the first one owns this instance.", "…"]
 }
 ```
 
-Give the person `url` and `nextSteps`: the first account, created from a device in the tailnet, owns
-the instance. A failure names the check, what happened and the fix:
+Give the person `url`, `appLink` (it opens the agentes.chat phone or desktop app on this server;
+`null` for an http address, which the phone app doesn't open) and `nextSteps`: the first account,
+created from a device in the tailnet, owns the instance. `computer` is `on` when this server is its
+agents' computer, `off` when answered no, and `skipped` where it can't be.
+A failure names the check, what happened and the fix:
 
 ```json
 {
@@ -263,6 +313,8 @@ the instance. A failure names the check, what happened and the fix:
 | `port` | Another program uses the app's port, or 80 and 443 for a public domain | `HOST_PORT=3001` in `.env`, or stop that program. |
 | `app.config` | The app refused a value in `.env` | The values `error` names. |
 | `app.health`, `tailscale.timeout` | Something didn't answer in time (`--timeout`, 300 s by default) | `docker compose logs agentes`, or `tailscale`. |
+| `computer` | `--computer yes` on a machine that can't be the agents' computer: sign-up is open, a provisioner gives workspaces their computers, no root or no systemd on Linux, or it's already connected as a computer. Or one of the first two was turned on after a yes, and agentes.chat won't start with the token | What `fix` says, or `--computer no`. |
+| `computer.install`, `computer.off`, `computer.token` | The agents' computer didn't install or wasn't accepted (agentes.chat itself is up, and the result still has `url` and `appLink`) | What `fix` says, then the same command again. Its log shows its state: `journalctl -u agentes-runner` on Linux, `~/.agentes-runner/runner.log` on a Mac. |
 
 </details>
 
@@ -352,7 +404,7 @@ The setup's **This machine only** choice runs agentes.chat at http://localhost:3
 laptop. By hand, in an empty directory:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/agentes-chat/agentes-chat/main/docker-compose.yml
+curl -fsSLO https://agentes.chat/install/docker-compose.yml
 (umask 077 && printf 'AGENTES_SECRET=%s\nPOSTGRES_PASSWORD=%s\nPUBLIC_URL=http://localhost:3000\n' "$(openssl rand -base64 48)" "$(openssl rand -hex 24)" > .env)
 docker compose up -d
 ```
@@ -383,6 +435,156 @@ machines, use Tailscale or put it behind HTTPS, or try it through an SSH tunnel 
 localhost, and parts of the web app need one. With no proxy in front, nothing sets
 `X-Forwarded-For`, so the sign-in rate limits can't tell clients apart. And Docker opens a published
 port past the host's firewall.
+
+</details>
+
+<details>
+<summary><b>On this computer, without Docker</b></summary>
+
+agentes.chat also runs as one program with its database built in, with nothing else to install: no
+Docker, no Postgres to set up. The desktop app's **Run agentes.chat on this computer** does it with no
+terminal (below), and on a computer without a screen the installer will do it with
+`install.sh --native`. By hand, from a release package, further below.
+
+- **The database is PGlite:** real Postgres compiled to WebAssembly, running inside that program,
+  with pgvector. It's the same engine the tests run on, so the migrations and the queries are the
+  same as with Docker.
+- **Everything lives in one folder,** `~/.agentes`: the database in `db/`, uploaded files in `files/`
+  (`FILES_DIR`), the settings in `.env`, the log in `logs/server.log`. Jobs already live in the
+  database, and live updates run in memory.
+- **Its limits:** one process, which answers queries one at a time, for a person or a small team,
+  while that computer is on. It takes about 0.5 to 1 GB of memory. Each change reaches the disk before
+  it's confirmed, as with Postgres, but nothing makes backups for you: copy the folder now and then,
+  with it stopped (Backing up, below). Moving the database or upgrading it takes memory of about ten
+  times its size (`du -sh ~/.agentes/db`): with 8 GB, up to about 500 MB. For a bigger team or a
+  server that's always on, use the one-command install with Docker and full Postgres. Moving there
+  later is a dump and a restore (below).
+
+It listens on this computer only (`127.0.0.1`), and answers only at its own address (opened as
+`localhost`, it sends the browser there). To reach it from your phone or a teammate's computer, put it
+on your tailnet with `tailscale serve` (on this computer:
+`tailscale serve --bg --https=443 http://127.0.0.1:4310`) and set `PUBLIC_URL` in `~/.agentes/.env` to
+the `https://…ts.net` address it prints, then start it again. The desktop app does both with one
+switch.
+
+**From the desktop app** (macOS and Linux). On its first screen, click **Use your own server**, then
+**Run agentes.chat on this Mac** (this computer, on Linux). Your name comes from this computer; type
+your email (your team sees it). **Reach it from your phone and teammates** puts it on your tailnet
+(off; you can turn it on later), and **Send anonymous usage statistics** is on (it writes `TELEMETRY`
+in `~/.agentes/.env`). **Start agentes.chat** then prepares the folder and the database (the first time
+takes a little longer), starts it, creates your owner account, makes this computer your agents'
+computer and opens agentes.chat, signed in.
+
+- **It runs inside the app.** It starts with the app (Open at login turns on), starts again by itself
+  if it stops, and stops when you quit the app (which asks first: nobody can use it until you open the
+  app again). Its files come with the app and update with it; the previous version and a copy of the
+  database stay in `~/.agentes`, and an update that doesn't answer within 3 minutes goes back to them by
+  itself, and stays there until the next version.
+- **Only its own answer counts.** Other programs and accounts on this computer can listen on its port,
+  so the app trusts the server only once its own process answers there (it names itself in
+  `~/.agentes/server.json`, which only you can write). Until then nothing of yours goes to that port: not
+  your sign-in, not this computer's token, not your agents' connections (they pause while it is down).
+  If something else holds the port when it starts, it moves to a free one. With reach on, Tailscale
+  shares it only while it runs.
+- **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
+  whenever your session ends. For a browser on another device, add one in your account menu, **Add a
+  password**.
+- **Preferences › Servers › agentes.chat on this Mac:** reach (Tailscale needs HTTPS turned on for your
+  tailnet, which **Turn it on** opens; on Linux, connect Tailscale with `sudo tailscale up`, and run
+  `sudo tailscale set --operator=$USER` once), the phone's QR code, usage statistics, **Back up now**
+  (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
+  and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
+  brings both back.
+- **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
+  `~/.agentes/logs/server.log`.
+- A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
+  offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
+  running, start it the way you installed it.
+- **Moving it to a server:** quit the app, dump the database with the app's own copy of the server,
+  then follow Moving to Docker (below) from step 2. On a Mac:
+  `BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql`
+  (on Linux, the deb's `/usr/bin/agentes-runner` in its place).
+
+**Usage statistics.** Like any self-hosted install, it sends agentes.chat an anonymous usage report
+once a day (Optional services and what they receive lists every field in it). To turn it off, put
+`TELEMETRY=off` in `~/.agentes/.env` and start it again (the desktop app's **Send anonymous usage
+statistics** switch does that), or use the switch in **Settings → General → Usage statistics**.
+Installed by hand, `agentes-server telemetry` prints the next report and sends nothing (with the server
+stopped); while it runs, and from the desktop app, **See what is sent** there shows the same.
+
+**By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
+(`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
+names each package's SHA-256. Check it, then:
+
+```sh
+mkdir -p ~/.agentes/app
+tar -xzf agentes-native-1.4.0-linux-x64.tar.gz -C ~/.agentes/app --strip-components 1
+~/.agentes/app/1.4.0/bin/agentes-server --data ~/.agentes
+```
+
+The first start makes the folder (readable by you only) and its `.env`, with a new `AGENTES_SECRET`
+and a free port from 4310, migrates the database and answers at `http://127.0.0.1:4310` (it prints the
+address; `PORT` in `.env` changes it). Open it and create the owner account: the first account owns the
+installation, unless `OWNER_CLAIM_SHA256` keeps it for an owner link (Configuration, Sign-up). `AGENTES_SECRET`
+encrypts the keys organizations store: it travels with the folder in a backup, and changing it makes
+them unreadable.
+
+| Command (each takes `--data <folder>`, default `~/.agentes`) | Does |
+| --- | --- |
+| `agentes-server` | Runs it until Ctrl-C. In-progress agent runs get 20 seconds to finish. |
+| `agentes-server service install` | Starts it with this computer: at login on macOS (launchd), from boot on Linux (a systemd user unit, kept after you log out). `uninstall` and `status` too. |
+| `agentes-server migrate` | Updates the database to this version, then exits (every start does it too). |
+| `agentes-server db dump --out agentes.sql` | The whole database as SQL. |
+| `agentes-server db restore --in agentes.sql` | A dump into a folder with no database yet (or the upgrade, below). If it fails, the folder stays as it was. |
+| `agentes-server db check` | Opens the database and prints what wrote it. |
+| `agentes-server telemetry` | Prints the next usage report, exactly, and sends nothing. |
+| `agentes-server version` | Its version, and its PGlite's and Postgres's. |
+
+On a Mac the service starts when you log in, so a Mac mini that must come back by itself after a
+power cut needs automatic login (System Settings › Users & Groups; FileVault turns it off) and **Start
+up automatically after a power failure** (System Settings › Energy).
+
+When it stops at once, its exit code says why: 3, another `agentes-server` (or another program) uses
+that folder (the message names its process); 4, the database needs an upgrade (below); 5, another
+program uses the port (set `PORT` in `.env`). Its log, `~/.agentes/logs/server.log`, says it too.
+
+**Backing up.** Stop it (Ctrl-C, or `agentes-server service uninstall`), copy the whole folder
+(`~/.agentes`, with the `AGENTES_SECRET` of its `.env`, which the keys stored in the database need),
+then start it again (`service install`). To restore, put the folder back. A dump (`db dump`) is the
+other way, for moving the data elsewhere; it holds the database, without `files/` or `.env`.
+
+**Upgrading** is extracting the new version beside the old one, then running its `service install`
+once, so the service starts the new version (by hand, start the new one on the same folder):
+
+```sh
+~/.agentes/app/1.5.0/bin/agentes-server service install --data ~/.agentes
+```
+
+When a version moves PGlite to a new Postgres major (its release notes say so), the new one refuses
+the old folder with exit 4 until it is upgraded, with the server stopped: `db dump` with the old
+version, then `db restore` with the new one, which keeps the old database in `backups/`, then the new
+version's `service install`:
+
+```sh
+~/.agentes/app/1.4.0/bin/agentes-server service uninstall
+~/.agentes/app/1.4.0/bin/agentes-server db dump --data ~/.agentes --out ~/agentes-upgrade.sql
+~/.agentes/app/1.5.0/bin/agentes-server db restore --data ~/.agentes --in ~/agentes-upgrade.sql
+~/.agentes/app/1.5.0/bin/agentes-server service install --data ~/.agentes
+```
+
+**Moving to Docker.** The dump restores into the Docker install's Postgres 18:
+
+1. Stop it (`agentes-server service uninstall`, or Ctrl-C), then dump:
+   `agentes-server db dump --data ~/.agentes --out agentes.sql`.
+2. Install with Docker (Quick start, or This machine only, by hand), but don't start the app yet: in
+   the new install's `.env`, put the `AGENTES_SECRET` of `~/.agentes/.env`, then start only the
+   database, `docker compose up -d postgres`.
+3. Restore into it, still empty:
+   `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.
+4. Start the app, `docker compose up -d`, copy the uploaded files into its volume, and give them to
+   the app's user (the copy arrives as root's):
+   `docker compose cp ~/.agentes/files/. agentes:/data/files/`, then
+   `docker compose exec -u root agentes chown -R bun:bun /data/files`. Sign in as before.
 
 </details>
 
@@ -441,6 +643,7 @@ ones a self-hosted instance usually touches:
 | `TS_EXTRA_ARGS` | | More `tailscale up` flags. The setup puts `--advertise-tags` here for an OAuth client secret. |
 | `TAILSCALE_FUNNEL` | `false` | `true` opens the instance to the internet at the same address (What needs a public URL). Only `true` or `false`. |
 | `ALLOW_SIGNUP` | `false` | `true` lets anyone create an account. |
+| `OWNER_CLAIM_SHA256` | | While no account exists, only the owner link made with it creates the first one (Sign-up, below). `OWNER_KEY_SHA256` is the desktop app's. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
 | `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. |
@@ -452,14 +655,28 @@ ones a self-hosted instance usually touches:
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | Files in an S3-compatible bucket instead, when all four are set. `S3_REGION` (default `auto`); `S3_PATH_STYLE=true` for MinIO and Garage. |
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
+| `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 
 **Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
-MiniMax) in **Settings → API keys**, and each agent uses one of them. Usage and cost are recorded per agent.
+MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
-**Sign-up.** The first account is always allowed. After it, with `ALLOW_SIGNUP=false` (the default),
-only invited people get in: invited by email from **Settings → Members and invitations**, or through
-an invite link, which works without email. Keep sign-up closed on an instance reachable from the
-internet.
+**Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
+it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
+email from **Settings → Members and invitations**, or through an invite link, which works without
+email. Keep sign-up closed on an instance reachable from the internet. To keep the first account for
+its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex) of a one-time token (the setup doesn't make
+one yet); then only `<PUBLIC_URL>/owner#claim=<token>` creates it, with a password, and every other
+sign-up waits until it has. In the folder with `.env`:
+
+```sh
+token=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')
+echo "OWNER_CLAIM_SHA256=$(printf %s "$token" | openssl dgst -sha256 | sed 's/^.*= //')" >> .env
+docker compose up -d
+echo "Owner link: <PUBLIC_URL>/owner#claim=$token"
+```
+
+The link works once, so treat it like a password until you've used it. `OWNER_KEY_SHA256` does the
+same for the desktop app that runs the server on its own computer.
 
 **Email.** Without `SMTP_URL` or `MILLIONSEND_API_KEY`, the app writes each email to its log instead
 of sending it (`docker compose logs agentes | grep 'email (not sent'`), so an invitation link can
@@ -486,7 +703,7 @@ with their email, sign-ins with their IP address and browser, workspaces, invita
 sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
 credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/standing` puts a
 workspace on hold (its agents stop) or suspends it (nobody can use it, and what its agents are doing
-stops), and brings it back; `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
+stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to write about it); `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
 `PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
@@ -500,10 +717,58 @@ which removes the file as soon as it is read. Leave it `off` and people connect 
 <details>
 <summary><b>Optional services and what they receive</b></summary>
 
-Nothing on the instance contacts agentes.chat on its own: it sends no usage report or telemetry. If
-a release ever adds one, it is listed here first, with what it sends and how to turn it off. Besides
-the model providers each organization chooses, it talks to a third party only when you turn that
-service on:
+**The usage report.** The instance sends agentes.chat anonymous usage statistics: counts such as people,
+agents, machine sizes and AI tokens used, never messages, files or names. The first goes about an hour
+after the server first starts, then one a day at that time, restarts or not (one that came due while
+the server was off goes about 10 minutes after it starts again), as JSON in a POST to `TELEMETRY_URL`
+(`https://telemetry.agentes.chat/v1/report`). A send that fails is tried again three times within
+about 2.5 hours, then dropped: the next day's report replaces it. These are all its fields:
+
+| Field | What it is |
+| --- | --- |
+| `report` | The report's format: `1`. |
+| `instance` | A random id made at the server's first start. Nothing else in the report identifies the server. |
+| `version`, `edition`, `install` | The server's version, as `/api/health` gives it (`0.0.0` while releases aren't numbered yet); `selfhost`; `docker`, `native` or `desktop`. |
+| `os`, `arch`, `uptimeHours` | The server's system (`linux`, `darwin`), processor (`x64`, `arm64`) and hours since it started. |
+| `host.size` | The machine the server runs on: its logical CPUs (`cpus`) and memory (`memoryGb`, to 0.5 GB), the disk holding the server's files (`diskGb`, to 1 GB: `FILES_DIR`, the data volume with Docker, else its working folder), and `limit` (`cpus`, `memoryGb`) when a container lets the server use less of the machine. |
+| `host.container` | Whether the server runs in a container. |
+| `host.load` | How busy that whole machine got over the last day, sampled every 5 minutes: the average and highest load per CPU (`loadAvg`, `loadPeak`: the 5-minute load average divided by the machine's CPUs, 1 is every CPU busy), the average and highest share of its memory in use (`memoryAvg`, `memoryPeak`, from 0 to 1), and the hours the samples cover (`hours`); `null` with no sample from the last day. |
+| `organizations` | How many workspaces. |
+| `people` | How many accounts (`total`), and how many used the server in the last 1, 7 and 30 days (`active1d`, `active7d`, `active30d`). |
+| `agents` | How many agents, archived ones aside. |
+| `computers` | The computers connected to the server and seen in the last 30 days, with agents or not (this server's own, once for all the workspaces it serves; the ones people connected; one given by a provisioner), one line for each `kind` (`host`, `connected`, `managed`), `os`, `arch` and `size` (as above; `null` when their runner is too old to say), with how many computers are alike (`count`), how many `agents` use them, and their last day's `load` (as above, their averages averaged and the highest peaks; `null` when none said how busy it got in the last day). The 50 lines with the most computers. |
+| `lastDay.runs`, `lastDay.toolCalls` | Agent runs started, and tool calls they made, in the last 24 hours. |
+| `lastDay.desktopMinutes`, `lastDay.terminalMinutes` | Minutes people watched or controlled agents' desktops, and had terminals open, in the last 24 hours. |
+| `lastDay.models` | For each AI provider and model used in the last 24 hours (the 50 most used): `provider`, `model`, `calls`, `inputTokens` (cached ones included) and `outputTokens`. A model that isn't in agentes.chat's model list (a name someone typed, a deployment, a fine-tune) goes as `other`. |
+
+It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
+workspaces, people or computers (the request itself comes from your server's address, as any request
+does). `docker compose run --rm agentes telemetry` (without Docker, `agentes-server telemetry`) prints
+exactly the next report, whether it is on or off, and sends nothing; in the app, **Settings → General →
+Usage statistics → See what is sent** shows the same. Turn it off either way:
+
+- `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts); without
+  Docker, in `~/.agentes/.env`, then start it again. This wins over the switch below.
+- The switch in **Settings → General → Usage statistics**. Only the installation's first account (the
+  person who set it up) sees it.
+
+**Downloads and updates.** Installing and updating fetch files from agentes.chat, and those requests
+carry nothing about the instance beyond what any download does: the installer
+(`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has
+none (`https://agentes.chat/install/docker-compose.yml`), the packages that run it without Docker
+(`https://agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and the
+desktop app's own updates: a check at start and every 6 hours (`https://agentes.chat/api/desktop/latest`,
+naming its system and processor) and, when it installs one, `https://agentes.chat/api/desktop/update`
+(its version and package type too) and `/api/desktop/download/…`. The page that offers the app asks
+for its newest version from the browser (Connect a computer, above, says what that request carries).
+The instance itself downloads nothing from agentes.chat.
+
+An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, Chrome
+for Testing from Google the first time an agent opens the browser there, and, on Linux, the packages
+agents' screens and browsers need from the system's own package sources.
+
+Besides that report and the model providers each organization chooses, the instance talks to a third
+party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
@@ -514,7 +779,7 @@ service on:
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | A phone signed in to the instance | For each push to that phone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
-| Tailscale | `COMPOSE_PROFILES=tailscale` | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
+| Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
 
 Connectors (MCP servers, GitHub, Linear and the others) receive what agents send them, within the
 scopes you grant each agent.
@@ -554,6 +819,16 @@ Commands run as the user that runs the runner, so give it a dedicated user or a 
 `agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
+On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
+installer's `--system` option (below) installs them; with the command above, install them once
+(Debian and Ubuntu names; on Debian 13 and Ubuntu 24.04, `libasound2t64` in place of `libasound2`):
+
+```sh
+sudo apt install --no-install-recommends libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
+  libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2
+```
+
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a
 hand (to sign in, say); and people can open a terminal there, a shell as the agent. Both need the
@@ -563,19 +838,57 @@ and Ubuntu names); then turn both on at that computer:
 ```sh
 sudo apt install --no-install-recommends tigervnc-standalone-server xauth dbus-x11 xfce4-session \
   xfwm4 xfce4-panel xfdesktop4 xfce4-settings thunar xfce4-terminal adwaita-icon-theme \
-  elementary-xfce-icon-theme fonts-noto-core
+  elementary-xfce-icon-theme fonts-noto-core fonts-noto-cjk
 agentes-runner tools enable desktop terminal
 ```
 
 Keep `--no-install-recommends`: without it every desktop gets a screen locker nobody can unlock, more
 background services, and a set of empty folders in each agent's home. `agentes-runner status` says
-whether each of the two can run there and, when one can't, what is missing.
+whether each of the two can run there and, when one can't, what is missing. `fonts-noto-cjk` is for
+Chinese, Japanese and Korean, which the agent's browser and apps otherwise show as empty boxes; it takes
+about 91 MB on Debian 13 and on Ubuntu 24.04 (a download of 57 MB and 61 MB), and `--system --desktop`
+installs it where apt has it.
+
 `agentes-runner desktop-check --agent <handle>` starts that agent's desktop, logs in to it and opens a
 terminal, then stops what it started (stop the runner first). Agents use their desktop with the
 **Use its desktop** permission, which new agents have. A desktop takes about 0.2 GB of memory, 0.8 GB
-with the agent's browser on it. It turns on when the agent needs it (or with **Turn on** on its
-page), turns off after 15 minutes unused, and the computer runs as many at once as its memory holds
-after 2 GB for the rest (7 on 8 GB).
+with the agent's browser on it. It starts the first time the agent, or someone watching, needs it, and
+then stays on, so what a person left open there is still there later. Only when the computer runs short
+of memory (under 1.5 GB free) or of displays (50) does it close the desktops nobody touched for an hour,
+least used first; each starts again at its next use. An agent's desktop stops when the agent leaves the
+computer (archived, or moved to another one).
+
+Each agent's desktop has the agentes.chat look: its wallpaper and a dock at the bottom center (the mark,
+which opens the apps menu, then Browser, Files and Terminal), one workspace and no desktop icons; its
+terminal's prompt shows the agent's name. Browser opens the agent's own browser on its desktop, the one
+it browses with, so a person who signs in to a site there signs the agent in (the first time, the
+browser is installed first, which takes about a minute). The runner writes the look into that desktop's
+own settings (`<agent folder>/.agentes/home`, or the agent's own home with `--system`), never your
+user's or the computer's, so your own desktop stays as it is. For its rounded windows, also install
+Orchis and the SVG loader it draws its buttons with (Debian 12 and 13, Ubuntu 24.04; `--system
+--desktop` installs them where apt has them); without them the desktops use GTK's and XFCE's own theme.
+Orchis takes about 42 MB on Debian 13 with what it brings along (GTK 2's theme engines among them), and
+its package alone about 84 MB on Ubuntu 24.04, where it carries every color variant (the desktops use
+only Orchis-Light):
+
+```sh
+sudo apt install --no-install-recommends orchis-gtk-theme librsvg2-common
+```
+
+On Debian 13 and Ubuntu 25.04 or newer, also install the dock's plugin, so an app's open windows show on
+its own icon in the dock (`--system --desktop` installs it where apt has it; Debian 12 and Ubuntu 22.04
+and 24.04 don't have it, and there each open window gets a button of its own after the icons):
+
+```sh
+sudo apt install --no-install-recommends xfce4-docklike-plugin
+```
+
+What a person changes on a desktop (its theme, its panel) stays until the runner writes the look again:
+for a new version of the look, once Orchis, the SVG loader or the dock's plugin is installed or removed
+(running the installer again with `--desktop` installs them), when the agent is renamed, or when the
+agent's folder moves (without `--system`, it is renamed with the agent's handle). The runner writes it
+as a desktop starts, so a desktop that is running keeps its look until its next start (after a reboot,
+say): desktops stay on, and a new look doesn't close what is open on them.
 
 Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
 terminal are for the person who connected the computer, since they act as its user: by default every
@@ -586,7 +899,7 @@ can. Give the runner a user of its own, or a VM. On a Linux server, the installe
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
-(`agentes-runner tools enable terminal`); the Mac app doesn't have them yet.
+(`agentes-runner tools enable terminal`); the desktop app doesn't have them yet.
 
 Use HTTPS with a certificate from a public authority (Tailscale and the Caddy profile get one). Over
 plain http the computer's token travels unencrypted, and the runner's background service doesn't
@@ -626,20 +939,36 @@ runs there can see its screen and keys, so agents never type passwords into desk
 in with take control, and the sign-in stays in the agent's home. Mac and Windows computers have no
 desktop use.
 
-**This server as the agents' computer (Linux).** The machine agentes.chat runs on can be a computer
-too, for the organizations the installation's first account made and is an owner or an admin of,
-with each agent as its own user on it. Set a token in `.env` and give the same one to the runner, as
-root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you changed it):
+**This server as the agents' computer.** The machine agentes.chat runs on can be a computer too, for
+the organizations the installation's first account made and is an owner or an admin of. The setup
+does it by default, after asking: on Linux each agent gets a user of its own with a screen (as root,
+with systemd: yes by default with apt-get and 4 GB of memory or more, no by default otherwise, saying why),
+and on a Mac agents work as you, in folders of their own, with a browser, Claude Code and Codex, and
+commands off unless you say yes. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
+`host-computer-token` beside it (readable by you only), installs what runs the agents there from the
+address the app is published on (`BIND_ADDRESS` and `HOST_PORT`), and waits for it to answer, up to
+90 seconds. Running the setup again leaves it running while it answers and is up to date, and sets it
+up again when agentes.chat brings a newer version. Answering no leaves `HOST_COMPUTER_TOKEN=` empty,
+so the setup doesn't ask again; `--computer yes` on a later run turns it on, and `--computer no`
+after a yes empties the token, removes `host-computer-token` and prints the command that removes the
+service. It's skipped, saying why, while sign-up is open (`ALLOW_SIGNUP=true`) or a provisioner gives
+every workspace its computer (`MACHINE_PROVISIONING=external`), since the server won't start with the
+token then; on Linux without root or systemd; inside the image; and on a machine already connected as
+a computer, whose connection stays as it is.
+
+By hand on Linux (a server set up before, say): set a token in `.env` and give the same one to the
+agents' computer, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you
+changed it):
 
 ```sh
 (umask 077 && openssl rand -base64 48 | tr -d '\n' > /root/host-computer-token)
 echo "HOST_COMPUTER_TOKEN=$(cat /root/host-computer-token)" >> .env
 docker compose up -d
-curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system \
+curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system --desktop \
   --server http://127.0.0.1:3000 --host-token-file /root/host-computer-token
 ```
 
-Within a minute it shows as "Computador deste servidor" in each of those organizations, and agents
+Within a minute it shows as "This server's computer" in each of those organizations, and agents
 without a computer start using it; admins stop it per organization there. `HOST_COMPUTER_TOKEN` can't
 be set with `ALLOW_SIGNUP=true`, and a new token retires the old one's connections when the server
 restarts.
@@ -688,7 +1017,7 @@ Download the compose file again with each release, since a release can change it
 restart:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/agentes-chat/agentes-chat/main/docker-compose.yml
+curl -fsSLO https://agentes.chat/install/docker-compose.yml
 docker compose pull
 docker compose up -d
 ```
@@ -701,8 +1030,8 @@ Migrations run when the new version starts, so that is the whole upgrade for a s
 compose file runs `ghcr.io/agentes-chat/agentes:latest`, the latest release, for amd64 and arm64;
 `:1.2.3` and `:1.2` tags exist alongside it, and `:edge` follows `main`. To hold a version, set
 `AGENTES_IMAGE` in `.env` to a version tag or a digest (`ghcr.io/agentes-chat/agentes@sha256:…`),
-and download the compose file of that version's tag (`…/agentes-chat/v1.2.3/docker-compose.yml`)
-instead of `main`'s. This prints the digest you have:
+and download that version's compose file (`docker-compose.yml` at the repository's `v1.2.3` tag)
+instead of agentes.chat's latest one. This prints the digest you have:
 
 ```sh
 docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/agentes-chat/agentes:latest
@@ -862,6 +1191,11 @@ for the agents' desktops and terminals), HTTP/1.1 to the app, and a read timeout
 **An agent's desktop or terminal "isn't available on this computer".** Run `agentes-runner status` on
 that computer: its `Desktops` and `Terminal` lines say what is missing (the runner on Bun 1.3.5 or
 newer, the packages, or the switch), as in Agent computers above.
+
+**An agent's browser "is missing system libraries".** Chrome for Testing can't load them on that
+computer. The message names the first few and the runner's log all of them; install the packages
+under Agent computers above. On a computer installed with `--system`, running that same install
+command again installs them.
 
 **`extension "vector" is not available` at the first start.** The database is a Postgres without
 pgvector. Use the compose file's `pgvector/pgvector` image; on a database of your own, install

@@ -9,7 +9,7 @@ import {
   usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { commandInReason } from "@agenteschat/client/lib/machines";
+import { canReduceAccess, commandInReason } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -104,7 +104,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         subtitle={t("browser.machine.description")}
         action={
           switchedOn &&
-          m.canManage && (
+          canReduceAccess(m) && (
             <Button size="sm" variant="ghost" aria-label={t("browser.machine.turnOffLabel")} onClick={onTurnOff}>
               {t("browser.machine.turnOff")}
             </Button>

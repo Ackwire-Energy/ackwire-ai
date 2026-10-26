@@ -8,6 +8,7 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
+import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
   isAnsweredNotice,
@@ -457,7 +458,8 @@ export type Block =
   | { kind: "heading"; inline: Inline[] }
   | { kind: "bullet"; inline: Inline[]; ordinal: string | null }
   | { kind: "quote"; inline: Inline[] }
-  | { kind: "code"; text: string };
+  | { kind: "code"; lang: string; text: string; open?: boolean }
+  | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] };
 
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
@@ -497,41 +499,70 @@ export function parseInline(text: string): Inline[] {
   }, []);
 }
 
-/** Blocks: fenced code, headings, lists, quotes and paragraphs (lines of a paragraph keep their breaks). */
+/**
+ * Blocks: fenced code (with its language), tables (the web's rule: `tableAt` from the shared parser, so a
+ * table right under a sentence is still a table), headings, lists, quotes and paragraphs (lines of a
+ * paragraph keep their breaks).
+ */
 export function parseBlocks(body: string): Block[] {
   const out: Block[] = [];
-  const parts = body.split(/```[a-zA-Z0-9_+-]*\n?([\s\S]*?)```/g);
-  parts.forEach((chunk, i) => {
-    if (i % 2 === 1) {
-      out.push({ kind: "code", text: chunk.replace(/\n$/, "") });
-      return;
-    }
-    let para: string[] = [];
-    const flush = () => {
-      if (para.length) out.push({ kind: "paragraph", inline: parseInline(para.join("\n")) });
-      para = [];
-    };
-    for (const raw of chunk.split("\n")) {
-      const line = raw.trimEnd();
-      if (!line.trim()) {
-        flush();
-        continue;
-      }
-      const heading = /^#{1,6}\s+(.*)$/.exec(line);
-      const bullet = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(line);
-      const quote = /^>\s?(.*)$/.exec(line);
-      if (heading) {
-        flush();
-        out.push({ kind: "heading", inline: parseInline(heading[1] ?? "") });
-      } else if (bullet) {
-        flush();
-        out.push({ kind: "bullet", inline: parseInline(bullet[2] ?? ""), ordinal: bullet[1] ?? null });
-      } else if (quote) {
-        flush();
-        out.push({ kind: "quote", inline: parseInline(quote[1] ?? "") });
-      } else para.push(line);
-    }
-    flush();
-  });
+  const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
+  for (let i = 0; i < parts.length; i += 3) {
+    const text = parts[i] ?? "";
+    // The last part may hold a block still being written (no closing fence yet): the web's rule, so an
+    // answer that is still streaming shows its code (or "Montando o gráfico…") instead of the raw text.
+    const last = i + 3 >= parts.length;
+    const open = last ? /```([a-zA-Z0-9_+-]*)\n([\s\S]*)$/.exec(text) : null;
+    if (open) {
+      textBlocks(text.slice(0, open.index), out);
+      const code = (open[2] ?? "").replace(/`{1,2}$/, "").replace(/\n$/, "");
+      out.push({ kind: "code", lang: open[1] ?? "", text: code, open: true });
+    } else textBlocks(last ? text.replace(/```[a-zA-Z0-9_+-]*$/, "") : text, out); // a fence still opening
+    if (i + 2 < parts.length)
+      out.push({ kind: "code", lang: parts[i + 1] ?? "", text: (parts[i + 2] ?? "").replace(/\n$/, "") });
+  }
   return out;
+}
+
+function textBlocks(chunk: string, out: Block[]) {
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length) out.push({ kind: "paragraph", inline: parseInline(para.join("\n")) });
+    para = [];
+  };
+  const lines = chunk.split("\n");
+  for (let n = 0; n < lines.length; n++) {
+    const table = tableAt(lines, n);
+    if (table) {
+      flush();
+      const cells = (row: string[]) => row.map((c) => parseInline(c));
+      out.push({
+        kind: "table",
+        header: cells(table.table.header),
+        rows: table.table.rows.map(cells),
+        align: table.table.align,
+      });
+      n = table.next - 1;
+      continue;
+    }
+    const line = (lines[n] ?? "").trimEnd();
+    if (!line.trim()) {
+      flush();
+      continue;
+    }
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    const bullet = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(line);
+    const quote = /^>\s?(.*)$/.exec(line);
+    if (heading) {
+      flush();
+      out.push({ kind: "heading", inline: parseInline(heading[1] ?? "") });
+    } else if (bullet) {
+      flush();
+      out.push({ kind: "bullet", inline: parseInline(bullet[2] ?? ""), ordinal: bullet[1] ?? null });
+    } else if (quote) {
+      flush();
+      out.push({ kind: "quote", inline: parseInline(quote[1] ?? "") });
+    } else para.push(line);
+  }
+  flush();
 }

@@ -1,14 +1,85 @@
-import type { SignInProvider } from "@agenteschat/client";
+import type { AppNotification, SignInProvider } from "@agenteschat/client";
+import type { i18n as I18n, TFunction } from "i18next";
 import { useEffect } from "react";
 
 /**
- * The site inside agentes for Mac (ADR 0036): the app's main window loads it and
- * sets `window.__agentesDesktop` before it starts. The site gets nothing of
- * the Mac; it only draws its own title bar and sends Google/Apple sign-in to
- * the browser (`apps/desktop/src-tauri/src/main_window.rs`).
+ * The site inside the agentes.chat desktop app (ADR 0036, ADR 0066): the app's main window loads it and
+ * sets `window.__agentesDesktop` before it starts. The site gets nothing of the computer; it draws its own
+ * title bar and sends Google/Apple sign-in to the browser (`apps/desktop/src-tauri/src/main_window.rs`).
  */
 export const inDesktopApp = () =>
   typeof window !== "undefined" && Boolean((window as { __agentesDesktop?: unknown }).__agentesDesktop);
+
+export type DesktopPlatform = "mac" | "windows" | "linux";
+
+/** The system the app runs on; apps from before Windows and Linux say nothing, and were Macs. */
+export function desktopPlatform(): DesktopPlatform | null {
+  if (!inDesktopApp()) return null;
+  const platform = (window as { __agentesDesktop?: { platform?: unknown } }).__agentesDesktop?.platform;
+  return platform === "windows" || platform === "linux" ? platform : "mac";
+}
+
+/**
+ * `{{device}}` in the site's words about this computer ("Use this Mac", "Use this computer"), in the
+ * page's language, kept right when the language changes.
+ */
+export function applyDesktopDevice(i18n: I18n, platform: DesktopPlatform) {
+  const apply = () => {
+    const interpolation = i18n.options.interpolation ?? {};
+    interpolation.defaultVariables = {
+      ...interpolation.defaultVariables,
+      device: i18n.t(`machines.thisMac.device.${platform}`),
+    };
+    i18n.options.interpolation = interpolation;
+  };
+  apply();
+  i18n.on("languageChanged", apply);
+}
+
+/** What a phone gets pushed (apps/server push.ts), and so what the desktop app shows while in the background. */
+const NOTICE_KINDS = [
+  "mention",
+  "dm",
+  "agent_question",
+  "approval",
+  "forum_turn",
+  "mission_stopped",
+  "routine_failed",
+  "routine_paused",
+  "browser_handoff",
+] as const;
+type NoticeKind = (typeof NOTICE_KINDS)[number];
+const isNoticeKind = (kind: string): kind is NoticeKind => (NOTICE_KINDS as readonly string[]).includes(kind);
+/** Kinds whose own title says what it is (the approval's action, the mission's name); the rest say their text. */
+const TITLED = new Set(["approval", "forum_turn", "mission_stopped", "routine_failed", "routine_paused"]);
+const NOTICE_TITLE_MAX = 80;
+const NOTICE_BODY_MAX = 180;
+
+const oneLine = (text: string, max: number) => {
+  const one = text.replace(/\s+/g, " ").trim();
+  return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
+};
+
+/**
+ * The desktop app's notification for one that just arrived (`notification.upserted`): new and unread, of a
+ * kind a phone would get pushed, or waiting on the person. Its page is the inbox, where it is on top. Merged
+ * into one already there, read, or done: none.
+ */
+export function desktopNotice(
+  t: TFunction,
+  orgId: string,
+  n: Pick<AppNotification, "kind" | "waiting" | "count" | "readAt" | "doneAt" | "latest">,
+): { title: string; body: string; path: string } | null {
+  if (n.readAt || n.doneAt || n.count > 1) return null;
+  const kind = isNoticeKind(n.kind) ? n.kind : n.waiting ? "waiting" : null;
+  if (!kind) return null;
+  const [first, second] = TITLED.has(kind) ? [n.latest.title, n.latest.text] : [n.latest.text, n.latest.title];
+  return {
+    title: oneLine(t(`desktopNotice.${kind}`), NOTICE_TITLE_MAX),
+    body: oneLine(first ?? second ?? "", NOTICE_BODY_MAX),
+    path: `/org/${encodeURIComponent(orgId)}/notifications`,
+  };
+}
 
 /** The window opens this in the browser instead of loading it (main_window.rs). */
 export const BROWSER_SIGN_IN_PATH = "/desktop/sign-in";
@@ -56,12 +127,17 @@ export const browserChallenge = {
 };
 
 /**
- * What the site may ask of this Mac (ADR 0036, `this_mac` in main_window.rs): which organizations it is
- * connected to, connecting it to one (the site confirms the runner's code with its own session), reconnecting
- * it, the app's Preferences on a tab and its access requests. Nothing else reaches the Mac.
+ * What the site may ask of this computer (ADR 0036, `this_mac` in main_window.rs): which of this server's
+ * organizations it works for, pairing it with one (the app asks the person in its own dialog first; the site
+ * then confirms the runner's code with its own session), reconnecting it, the app's Preferences on a tab, its
+ * access requests, the badge and notifications. Nothing else reaches the computer.
  */
 export interface ThisMacStatus {
   orgs: { orgId: string; machineId: string | null; connection: string }[];
+  /** False where agents can't work on this computer for this server (agentes.chat, a server on it, Windows). */
+  agentsHere?: boolean;
+  /** This server runs inside the app on this computer: the app signs its owner in ("Continue on this Mac"). */
+  local?: boolean;
 }
 
 type Invoke = (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -83,8 +159,12 @@ export function pageReady() {
 
 export const thisMac = {
   status: () => invoke<ThisMacStatus>({ kind: "status" }),
-  /** The runner's code for the site to confirm; null when this Mac is already in `orgId`. */
-  connect: (orgId: string) => invoke<{ userCode: string | null }>({ kind: "connect", orgId }),
+  /**
+   * The runner's code for the site to confirm; null when this computer is already in `orgId`. `orgName` is
+   * what the app's own dialog names (display only).
+   */
+  connect: (orgId: string, orgName?: string) =>
+    invoke<{ userCode: string | null }>({ kind: "connect", orgId, ...(orgName ? { orgName } : {}) }),
   /** The socket again (this Mac went offline for `orgId`). */
   reconnect: (orgId: string) => invoke<unknown>({ kind: "reconnect", orgId }),
   openPrefs: (tab: "folders" | "tools" | "updates") => invoke<unknown>({ kind: "prefs", tab }),
@@ -94,7 +174,37 @@ export const thisMac = {
   badge: (waiting: number, unread: number) => invoke<unknown>({ kind: "badge", waiting, unread }),
   /** The Mac's Go menu: the person's organizations (⌘⌥1–9). */
   orgs: (orgs: { id: string; name: string }[]) => invoke<unknown>({ kind: "orgs", orgs }),
+  /** A notification while the app is in the background (the app limits how many); `path` opens on a click. */
+  notify: (title: string, body: string, path: string) => invoke<unknown>({ kind: "notify", title, body, path }),
+  /**
+   * On the server the app runs here: the app signs its owner in (its owner key buys a one-time sign-in, which
+   * this window trades at `/desktop/handover`; the key never reaches the page). The window moves there.
+   */
+  signIn: () => invoke<unknown>({ kind: "signIn" }),
 };
+
+/**
+ * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"
+ * opens once the account menu is on screen.
+ */
+const phone = { asked: false, listeners: new Set<() => void>() };
+export const asksForPhone = (search: string) => new URLSearchParams(search).get("open") === "phone";
+export function askForPhone() {
+  phone.asked = true;
+  for (const listener of phone.listeners) listener();
+}
+/** True once per ask. */
+export function takePhoneAsk() {
+  const asked = phone.asked;
+  phone.asked = false;
+  return asked;
+}
+export function onPhoneAsk(listener: () => void) {
+  phone.listeners.add(listener);
+  return () => {
+    phone.listeners.delete(listener);
+  };
+}
 
 /** The window's title in the app (and the tab's in a browser) while a screen shows; back when it goes. */
 export function useDocumentTitle(title: string | undefined) {

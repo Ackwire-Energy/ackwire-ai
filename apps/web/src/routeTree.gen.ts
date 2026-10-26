@@ -13,12 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConectarRouteImport } from './routes/conectar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as OwnerRouteImport } from './routes/owner'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as TermosRouteImport } from './routes/termos'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as TermosRouteImport } from './routes/termos'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as DesktopHandoverRouteImport } from './routes/desktop.handover'
 import { Route as DesktopSignInRouteImport } from './routes/desktop.sign-in'
 import { Route as DesktopSignedInRouteImport } from './routes/desktop.signed-in'
 import { Route as DevGalleryRouteImport } from './routes/dev.gallery'
@@ -72,9 +74,9 @@ const OnboardingRoute = OnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const OwnerRoute = OwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
@@ -87,9 +89,14 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -97,9 +104,14 @@ const TermosRoute = TermosRouteImport.update({
   path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesktopHandoverRoute = DesktopHandoverRouteImport.update({
+  id: '/desktop/handover',
+  path: '/desktop/handover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesktopSignInRoute = DesktopSignInRouteImport.update({
@@ -271,12 +283,14 @@ export interface FileRoutesByFullPath {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/reset-password': typeof ResetPasswordRoute
+  '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
-  '/terms': typeof TermsRoute
-  '/termos': typeof TermosRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/termos': typeof TermosRoute
+  '/terms': typeof TermsRoute
+  '/desktop/handover': typeof DesktopHandoverRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
@@ -315,12 +329,14 @@ export interface FileRoutesByTo {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/reset-password': typeof ResetPasswordRoute
+  '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
-  '/terms': typeof TermsRoute
-  '/termos': typeof TermosRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/termos': typeof TermosRoute
+  '/terms': typeof TermsRoute
+  '/desktop/handover': typeof DesktopHandoverRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
@@ -359,12 +375,14 @@ export interface FileRoutesById {
   '/conectar': typeof ConectarRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/reset-password': typeof ResetPasswordRoute
+  '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
-  '/terms': typeof TermsRoute
-  '/termos': typeof TermosRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/termos': typeof TermosRoute
+  '/terms': typeof TermsRoute
+  '/desktop/handover': typeof DesktopHandoverRoute
   '/desktop/sign-in': typeof DesktopSignInRoute
   '/desktop/signed-in': typeof DesktopSignedInRoute
   '/dev/gallery': typeof DevGalleryRoute
@@ -405,12 +423,14 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
-    | '/reset-password'
+    | '/owner'
     | '/privacidade'
     | '/privacy'
-    | '/terms'
-    | '/termos'
+    | '/reset-password'
     | '/signup'
+    | '/termos'
+    | '/terms'
+    | '/desktop/handover'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
     | '/dev/gallery'
@@ -449,12 +469,14 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
-    | '/reset-password'
+    | '/owner'
     | '/privacidade'
     | '/privacy'
-    | '/terms'
-    | '/termos'
+    | '/reset-password'
     | '/signup'
+    | '/termos'
+    | '/terms'
+    | '/desktop/handover'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
     | '/dev/gallery'
@@ -492,12 +514,14 @@ export interface FileRouteTypes {
     | '/conectar'
     | '/login'
     | '/onboarding'
-    | '/reset-password'
+    | '/owner'
     | '/privacidade'
     | '/privacy'
-    | '/terms'
-    | '/termos'
+    | '/reset-password'
     | '/signup'
+    | '/termos'
+    | '/terms'
+    | '/desktop/handover'
     | '/desktop/sign-in'
     | '/desktop/signed-in'
     | '/dev/gallery'
@@ -537,12 +561,14 @@ export interface RootRouteChildren {
   ConectarRoute: typeof ConectarRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
-  ResetPasswordRoute: typeof ResetPasswordRoute
+  OwnerRoute: typeof OwnerRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   PrivacyRoute: typeof PrivacyRoute
-  TermsRoute: typeof TermsRoute
-  TermosRoute: typeof TermosRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  TermosRoute: typeof TermosRoute
+  TermsRoute: typeof TermsRoute
+  DesktopHandoverRoute: typeof DesktopHandoverRoute
   DesktopSignInRoute: typeof DesktopSignInRoute
   DesktopSignedInRoute: typeof DesktopSignedInRoute
   DevGalleryRoute: typeof DevGalleryRoute
@@ -580,11 +606,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
+    '/owner': {
+      id: '/owner'
+      path: '/owner'
+      fullPath: '/owner'
+      preLoaderRoute: typeof OwnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacidade': {
@@ -601,11 +627,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -615,11 +648,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desktop/handover': {
+      id: '/desktop/handover'
+      path: '/desktop/handover'
+      fullPath: '/desktop/handover'
+      preLoaderRoute: typeof DesktopHandoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/desktop/sign-in': {
@@ -919,12 +959,14 @@ const rootRouteChildren: RootRouteChildren = {
   ConectarRoute: ConectarRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
-  ResetPasswordRoute: ResetPasswordRoute,
+  OwnerRoute: OwnerRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   PrivacyRoute: PrivacyRoute,
-  TermsRoute: TermsRoute,
-  TermosRoute: TermosRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  TermosRoute: TermosRoute,
+  TermsRoute: TermsRoute,
+  DesktopHandoverRoute: DesktopHandoverRoute,
   DesktopSignInRoute: DesktopSignInRoute,
   DesktopSignedInRoute: DesktopSignedInRoute,
   DevGalleryRoute: DevGalleryRoute,

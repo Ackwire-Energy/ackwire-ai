@@ -1,11 +1,17 @@
+import { checkServer } from "@agenteschat/client/lib/server";
 import { invoke } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { Candidate } from "../control/first-run";
+import type { LocalServerStatus, ReachResult, StepChange, Tailnet } from "../control/local-server";
+import { platformOf } from "../control/platform";
+import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 import {
   type AppInfo,
+  type BadgeCounts,
   type Host,
   type MenuAction,
   type NotchInfo,
@@ -38,6 +44,7 @@ export function createTauriHost(): Host {
   return {
     window: name,
     fake: false,
+    platform: platformOf(navigator.userAgent),
     listRunners: () => invoke<RunnerInfo[]>("runners_list"),
     send: (homeId, line) => invoke<void>("runner_send", { homeId, line }),
     addRunner: () => invoke<string>("runner_add"),
@@ -46,10 +53,18 @@ export function createTauriHost(): Host {
     onRunnerState: (cb) => subscribe<RunnerStateChange>("runner://state", cb),
     onShown: (cb) => subscribe<WindowName>("window://shown", cb),
     openExternal: (url) => invoke<void>("open_external", { url }),
-    setServer: (url) => invoke<void>("set_server", { url }),
+    servers: () => invoke<ServerList>("servers_get"),
+    chooseServer: (server, page) => invoke<void>("server_choose", { server, page: page ?? null }),
+    removeServer: (server) => invoke<void>("server_remove", { server }),
+    discover: () => invoke<Candidate[]>("discover"),
+    // From the web view itself: every server answers `/api/instance` to any origin (it is public).
+    checkServer: (server) => checkServer(server),
+    takeLink: () => invoke<string | null>("link_take"),
+    onLink: (cb) => subscribe<null>("link://pending", () => cb()),
     revealFolder: (path) => invoke<void>("reveal_folder", { path }),
     pickFolder: () => invoke<string | null>("pick_folder"),
     setTrayState: (state: TrayState) => invoke<void>("set_tray_state", { state }),
+    setTrayVisible: (show) => invoke<void>("tray_visible", { show }),
     showWindow: (w) => invoke<void>("show_window", { name: w }),
     hideWindow: (w) => invoke<void>("hide_window", { name: w }),
     quit: () => invoke<void>("quit_app"),
@@ -69,5 +84,22 @@ export function createTauriHost(): Host {
     onMenuAction: (cb) => subscribe<MenuAction>("menu://action", cb),
     thisMacListening: () => invoke<void>("this_mac_listening"),
     setDock: (show) => invoke<void>("dock_set", { show }),
+    setSiteNotify: (on) => invoke<void>("notify_site_set", { on }),
+    onBadge: (cb) => subscribe<BadgeCounts>("badge://counts", cb),
+    localServer: () => invoke<LocalServerStatus>("local_server_status"),
+    onLocalServer: (cb) => subscribe<LocalServerStatus>("local-server://status", cb),
+    installLocalServer: (choice) => invoke<void>("local_server_install", { choice }),
+    onSetupStep: (cb) => subscribe<StepChange>("local-server://step", cb),
+    startLocalServer: () => invoke<void>("local_server_start"),
+    stopLocalServer: (forget) => invoke<void>("local_server_stop", { forget }),
+    restartLocalServer: () => invoke<void>("local_server_restart"),
+    setLocalReach: (on) => invoke<ReachResult>("local_server_reach", { on }),
+    setLocalUsage: (on) => invoke<void>("local_server_usage", { on }),
+    backupLocalServer: () => invoke<string>("local_server_backup"),
+    localDiagnostics: () => invoke<string>("local_server_diagnostics"),
+    syncLocalHomes: (rotate) => invoke<void>("local_server_sync", { rotate }),
+    tailscale: () => invoke<Tailnet>("tailscale_status"),
+    openTailscale: (page) => invoke<void>("tailscale_open", { page }),
+    onNewHostHome: (cb) => subscribe<string>("host://new", cb),
   };
 }

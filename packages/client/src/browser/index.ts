@@ -84,6 +84,21 @@ export function usesBrowser(run: { tool?: string | null; work?: LiveWork[] }): b
   return false;
 }
 
+const SCREENS: readonly ScreenKind[] = ["browser", "desktop"];
+/** Which of the agent's screens a tool is on, if any. */
+const screenOfTool = (tool: string | null | undefined) => SCREENS.find((s) => isScreenTool(tool, s)) ?? null;
+
+/** The agent works on its computer now: its current tool, or its latest call, is on its browser or its screen. */
+export function usesScreen(run: { tool?: string | null; work?: LiveWork[] }): boolean {
+  if (screenOfTool(run.tool)) return true;
+  const work = run.work ?? [];
+  for (let i = work.length - 1; i >= 0; i--) {
+    const w = work[i];
+    if (w?.kind === "call") return screenOfTool(w.tool) !== null;
+  }
+  return false;
+}
+
 /** One line of "what the agent is doing in its browser", from its run's live work. */
 export interface BrowserStep {
   id: string;
@@ -109,6 +124,29 @@ export function browserSteps(work: LiveWork[] | undefined): BrowserStep[] {
         ]
       : [],
   );
+}
+
+/** A step on either screen, with the screen it was on (the computer's step strip). */
+export interface ScreenStep extends BrowserStep {
+  screen: ScreenKind;
+}
+
+/** The calls of a run on its browser and its screen, in order. */
+export function screenSteps(work: LiveWork[] | undefined): ScreenStep[] {
+  return (work ?? []).flatMap((w) => {
+    const screen = w.kind === "call" ? screenOfTool(w.tool) : null;
+    if (!screen || w.kind !== "call") return [];
+    return [
+      {
+        id: w.id,
+        tool: w.tool.replace(/^mcp__agentes__/, ""),
+        detail: w.detail,
+        running: w.running,
+        ...(w.since ? { since: w.since } : {}),
+        screen,
+      },
+    ];
+  });
 }
 
 /**
@@ -215,12 +253,6 @@ export interface TakeoverInput {
   screen?: ScreenKind;
 }
 
-/** "Parar" one of the agent's screens: the browser by default ("Desligar" for its desktop). */
-export interface StopInput {
-  agentId: string;
-  screen?: ScreenKind;
-}
-
 /** "Pronto" or "Devolver" with what the person wants the agent to know (it reads it as their words). */
 export interface DoneInput {
   handoffId: string;
@@ -279,14 +311,8 @@ export function useBrowserHandoffMutations(orgId: string) {
       onSuccess: apply,
     }),
     stop: useMutation({
-      mutationFn: (v: string | StopInput) =>
-        typeof v === "string" ? api.browser.stop(orgId, v) : api.browser.stop(orgId, v.agentId, v.screen),
+      mutationFn: (agentId: string) => api.browser.stop(orgId, agentId),
       meta: { silent: true },
-      onSuccess: (_done, v) => {
-        if (typeof v !== "string" && v.screen === "desktop") {
-          void qc.invalidateQueries({ queryKey: keys.agentDesktop(orgId, v.agentId) });
-        }
-      },
     }),
   };
 }

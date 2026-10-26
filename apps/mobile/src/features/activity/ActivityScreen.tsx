@@ -6,6 +6,7 @@ import {
   useNotifications,
   useRoutines,
 } from "@agenteschat/client";
+import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +20,7 @@ import {
   LargeTitleScreen,
   LIST_AVATAR,
   LIST_INSET,
+  LineIcon,
   ListRow,
   SectionHeader,
   Sky,
@@ -31,6 +33,7 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining, minutesLeft } from "../shared/logic";
 import { Tile, tapHaptic, useSurface } from "../shared/parts";
+import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import {
   type ActivityFilter,
@@ -118,8 +121,9 @@ export function ActivityScreen() {
 }
 
 /**
- * One thing waiting on you (`.wyA`): who asks and the kind (amber, the waiting color), the exact request,
- * the fuse and "expira em" (requests) or where and when, and one button: Revisar or Responder.
+ * One thing waiting on you (`.wyA`): who asks and the kind (amber, the waiting color), the exact request in
+ * words, the fuse and "expira em" (requests) or where and when, and one button: Revisar or Responder. The
+ * whole card opens it too.
  */
 function WaitingCardView({ item: n }: { item: AppNotification }) {
   const { t } = useTranslation();
@@ -131,6 +135,9 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const surface = useSurface();
   const act = useNotificationAction(orgId);
   const card = waitingCardOf(n);
+  // A request's title in words, from the request itself (the notification keeps the tool's raw title).
+  const request = useWaitingApprovals().find((a) => a.id === n.source.approvalId);
+  const title = card.kind === "approval" && request ? approvalTitle(t, request) : card.title;
   // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
   const dms = useDms(orgId);
   const href = notificationHref(n, agentDmOf(dms.data));
@@ -149,10 +156,12 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     if (href) router.push(href);
   };
   return (
-    <View
-      style={[styles.wcard, surface]}
-      accessible={!href}
-      accessibilityLabel={[name, kind, card.title].filter(Boolean).join(", ")}
+    <Pressable
+      onPress={href ? open : undefined}
+      disabled={!href}
+      style={({ pressed }) => [styles.wcard, surface, pressed && styles.wpressed]}
+      accessibilityRole={href ? "button" : undefined}
+      accessibilityLabel={[name, kind, title].filter(Boolean).join(", ")}
     >
       <View style={styles.hd}>
         {who ? <Face who={who} size={22} live={false} /> : null}
@@ -163,15 +172,15 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         ) : null}
         <View style={styles.grow} />
         <View style={styles.kind}>
-          <Icon name={KIND_ICON[card.kind]} size={13} color={c.amber} />
+          <LineIcon name={KIND_ICON[card.kind]} size={13} color={c.amber} variant="footnote" />
           <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
             {kind}
           </Text>
         </View>
       </View>
-      {card.title ? (
+      {title ? (
         <Text variant="callout" tone="ink" numberOfLines={3} style={styles.semibold}>
-          {card.title}
+          {title}
         </Text>
       ) : null}
       {/* Who asked while nobody watched, then why (ADR 0053 §8), as on the request itself. */}
@@ -194,11 +203,11 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         <View style={styles.grow} />
         {href ? <Button variant="primary" size="sm" label={button} onPress={open} /> : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-const KIND_ICON = { approval: "shield", question: "help", forum: "chat", browser: "globe" } as const;
+const KIND_ICON = { approval: "wait", question: "help", forum: "chat", browser: "globe" } as const;
 
 /** Faces of the crew drawn over "Nada esperando você". */
 const CREW = 3;
@@ -286,7 +295,7 @@ const NAMES = "\u2063names\u2063";
 
 /**
  * One item, in Conversas' row: the faces, who did what (the names bold)
- * and when, the snippet and where; a dot on the left while unread. Swipe right to mark read or unread,
+ * and when, the snippet and where; a red dot on the right while unread. Swipe right to mark read or unread,
  * left for "Feito"; tapping opens where it happened.
  */
 const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppNotification; divider: boolean }) {
@@ -430,6 +439,7 @@ const styles = StyleSheet.create({
   inset: { marginHorizontal: 16 },
   cards: { gap: 10, paddingHorizontal: 16 },
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
+  wpressed: { opacity: 0.85 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
   kind: { flexDirection: "row", alignItems: "center", gap: 4 },
   ft: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 36 },

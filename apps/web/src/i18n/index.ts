@@ -1,4 +1,5 @@
 import { resources } from "@agenteschat/i18n";
+import { appLocale } from "@agenteschat/i18n/locale";
 import i18n, { type i18n as I18n } from "i18next";
 import { initReactI18next } from "react-i18next";
 
@@ -12,29 +13,20 @@ export const DEFAULT_LOCALE: LocaleCode = "pt-BR";
 
 const STORAGE_KEY = "agentes.locale";
 
-/** The browser's language mapped to ours ("pt-PT" → pt-BR, "en-GB" → en), else null. */
-export function browserLocale(languages: readonly string[] = browserLanguages()): LocaleCode | null {
-  for (const l of languages) {
-    const tag = l.toLowerCase();
-    if (tag.startsWith("pt")) return "pt-BR";
-    if (tag.startsWith("en")) return "en";
-  }
-  return null;
-}
 function browserLanguages(): readonly string[] {
   if (typeof navigator === "undefined") return [];
   return navigator.languages?.length ? navigator.languages : navigator.language ? [navigator.language] : [];
 }
 
-/** The saved choice; for someone new, the browser's language; else pt-BR. */
-export function savedLocale(languages?: readonly string[]): LocaleCode {
+/** The saved choice; for someone new, the browser's language ("pt-PT" → pt-BR, "en-GB" → en); else pt-BR. */
+export function savedLocale(languages: readonly string[] = browserLanguages()): LocaleCode {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && locales.some((l) => l.code === saved)) return saved as LocaleCode;
   } catch {
     // Storage unavailable (private mode): fall through.
   }
-  return browserLocale(languages) ?? DEFAULT_LOCALE;
+  return appLocale(languages) ?? DEFAULT_LOCALE;
 }
 
 const retryOnce = <T>(load: () => Promise<T>) => load().catch(() => load());
@@ -84,7 +76,8 @@ export async function loadI18n(lng: LocaleCode): Promise<I18n> {
     resources: { [lng]: { translation: strings } },
     lng,
     fallbackLng: DEFAULT_LOCALE,
-    interpolation: { escapeValue: false },
+    // `device`: this computer's name in the desktop app's words ("Use this Mac"; lib/desktop.ts sets it there).
+    interpolation: { escapeValue: false, defaultVariables: { device: "Mac" } },
     initAsync: false,
     returnNull: false,
   });
@@ -98,7 +91,8 @@ export function createI18n(lng: LocaleCode = DEFAULT_LOCALE): I18n {
     resources,
     lng,
     fallbackLng: DEFAULT_LOCALE,
-    interpolation: { escapeValue: false },
+    // `device`: this computer's name in the desktop app's words ("Use this Mac"; lib/desktop.ts sets it there).
+    interpolation: { escapeValue: false, defaultVariables: { device: "Mac" } },
     initAsync: false,
     returnNull: false,
   });

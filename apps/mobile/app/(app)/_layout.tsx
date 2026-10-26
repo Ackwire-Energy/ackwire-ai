@@ -19,7 +19,7 @@ export const unstable_settings = { anchor: "(tabs)" };
 export default function AppLayout() {
   const { colors } = useTheme();
   const org = useOrgGate();
-  // Signed in, the organization not known yet (the splash covers this) or none (`NoOrganization` covers it):
+  // Signed in, the organization not known yet (the splash covers this) or none (the first run, `OnboardingFlow`, covers it):
   // the screens need one, so they mount once it's chosen, at the URL the app opened with.
   if (!org.state) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   return <AppStack />;
@@ -39,6 +39,7 @@ function AppStack() {
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
+  const setupSheet = useFormSheetOptions([0.7, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -51,13 +52,21 @@ function AppStack() {
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={formSheet} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen
+        name="connectors/oauth"
+        options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}
+      />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
+      <Stack.Screen name="computer-setup" options={setupSheet} />
       <Stack.Screen name="me" options={meSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
+      <Stack.Screen name="code" options={formSheet} />
+      <Stack.Screen name="chart" options={formSheet} />
       <Stack.Screen
         name="images"
         options={{
@@ -70,6 +79,10 @@ function AppStack() {
       <Stack.Screen name="handoff/[id]" options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }} />
       <Stack.Screen
         name="file/[id]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
+      <Stack.Screen
+        name="computer/[agentId]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
       />
     </Stack>

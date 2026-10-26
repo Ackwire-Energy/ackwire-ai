@@ -18,12 +18,14 @@ import {
   MAIL_SCOPES,
   type MailAccountRow,
   type MailDeps,
+  mailboxAddresses,
   mailSlugs,
   markNeedsReconnect,
   openAccount,
   orgMailAccounts,
 } from "./accounts";
 import { agentMailPolicies, type MailPolicy } from "./policies";
+import { type MailPreview, mailDetail, withoutReplyPrefix } from "./preview";
 import {
   addressDomain,
   cutBody,
@@ -136,6 +138,22 @@ function replyRecipients(original: MailMessage, own: string[], replyAll: boolean
   return { to, cc };
 }
 
+/**
+ * The mailbox address a message reached, so the answer goes out from it: our
+ * own From (a message we sent), then To, then Cc, then where the server
+ * delivered it (an alias only: servers deliver every alias to the main
+ * address). Null = none of them is ours.
+ */
+export function arrivedAt(m: MailMessage, own: string[]): string | null {
+  const mine = own.map(normalizeAddress);
+  const ours = (a: string) => mine.includes(normalizeAddress(a));
+  if (m.from && ours(m.from.address)) return normalizeAddress(m.from.address);
+  const seen = [...m.to, ...m.cc].map((a) => a.address).find(ours);
+  if (seen) return normalizeAddress(seen);
+  const delivered = (m.deliveredTo ?? []).find((a) => ours(a) && normalizeAddress(a) !== mine[0]);
+  return delivered ? normalizeAddress(delivered) : null;
+}
+
 const prefixed = (prefix: string, subject: string) =>
   subject.toLowerCase().startsWith(prefix.toLowerCase()) ? subject : `${prefix} ${subject}`;
 
@@ -246,8 +264,29 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
 
   function toolsFor(account: MailAccountRow, slug: string, policy: MailPolicy, askToSend: boolean): ToolDefinition[] {
     const label = `[Email ${account.address}]`;
-    const fromAddress = policy.fromAddress ?? account.address;
-    const own = [account.address, ...(policy.fromAddress ? [policy.fromAddress] : [])];
+    const own = [...new Set([...mailboxAddresses(account), ...(policy.fromAddress ? [policy.fromAddress] : [])])];
+    /** The agent's own address, when a person pinned one: the only From it may use. */
+    const pinned = policy.fromAddress;
+    const allowedFrom = pinned ? [pinned] : own;
+    /** New mail: the pinned address, else the mailbox's default. */
+    const newFrom = pinned ?? account.defaultFrom ?? account.address;
+    /** An answer (reply, forward, reply draft): the pinned address, else the one the message reached, else the default. */
+    const answerFrom = (original: MailMessage | null) =>
+      pinned ?? (original ? arrivedAt(original, own) : null) ?? account.defaultFrom ?? account.address;
+    /** The From the model asked for, if any (checked against `allowedFrom` before anything runs). */
+    const askedFrom = (input: Record<string, unknown>) => (str(input.from) ? normalizeAddress(str(input.from)) : null);
+    const fromRefusal = (input: Record<string, unknown>): CallCheck | null => {
+      const from = askedFrom(input);
+      if (!from || allowedFrom.includes(from)) return null;
+      return {
+        ok: false,
+        message: pinned
+          ? `Not allowed: send from ${pinned} (the only From address this agent may use).`
+          : `Not allowed: ${from} is not an address of this mailbox. Use one of ${shown(own)}.`,
+      };
+    };
+    /** Only an address other than the mailbox's own goes to the provider (which sends as itself by default). */
+    const fromField = (from: string) => (from !== account.address ? { from } : {});
 
     const make = (
       verb: string,
@@ -438,7 +477,9 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       from: {
         type: "string",
         maxLength: 320,
-        description: `Optional; the only From this agent may use is ${fromAddress}.`,
+        description: pinned
+          ? `Optional; the only From this agent may use is ${pinned}.`
+          : `Optional; one of ${shown(own)}. By default a reply or forward goes out from the address the message was sent to, and a new email from ${newFrom}.`,
       },
     };
 
@@ -448,7 +489,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       if (verb === "send") {
         return {
           kind: "send",
-          from: fromAddress,
+          from: askedFrom(input) ?? newFrom,
           to: addresses(input.to),
           cc: addresses(input.cc),
           bcc: addresses(input.bcc),
@@ -462,7 +503,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         const r = replyRecipients(original, own, input.reply_all === true);
         return {
           kind: "reply",
-          from: fromAddress,
+          from: askedFrom(input) ?? answerFrom(original),
           to: r.to,
           cc: [...new Set([...r.cc, ...addresses(input.cc)])],
           bcc: addresses(input.bcc),
@@ -472,7 +513,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       }
       return {
         kind: "forward",
-        from: fromAddress,
+        from: askedFrom(input) ?? answerFrom(original),
         to: addresses(input.to),
         cc: addresses(input.cc),
         bcc: addresses(input.bcc),
@@ -481,27 +522,63 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       };
     };
 
+    const detailBody = (body: string) =>
+      body.length > DETAIL_BODY_CHARS ? `${body.slice(0, DETAIL_BODY_CHARS)}\n[…]` : body;
+    /** The message a reply, forward or reply draft answers, when `checkCall` read it. */
+    const originalOf = (id: string): MailPreview["original"] => {
+      if (!id) return null;
+      const m = recalled(account.id, id);
+      return m ? { subject: m.subject, from: m.from?.address ?? null } : null;
+    };
+
     const describeSend = (verb: "send" | "reply" | "forward") => (input: Record<string, unknown>) => {
       const p = plan(verb, input);
       if (!p) {
         return {
           title: `${verb === "reply" ? "Reply to" : "Forward"} email ${str(input.message_id)} from ${account.address}`,
-          detail: `From: ${fromAddress}\n\n${str(input.body).slice(0, DETAIL_BODY_CHARS)}`,
+          detail: `From: ${askedFrom(input) ?? answerFrom(null)}\n\n${str(input.body).slice(0, DETAIL_BODY_CHARS)}`,
         };
       }
       const action = verb === "send" ? "Send email to" : verb === "reply" ? "Reply by email to" : "Forward email to";
-      const body = p.body.length > DETAIL_BODY_CHARS ? `${p.body.slice(0, DETAIL_BODY_CHARS)}\n[…]` : p.body;
       return {
         title: `${action} ${[...p.to, ...p.cc, ...p.bcc].join(", ")}: "${oneLine(p.subject, 120)}"`,
-        detail: [
-          `From: ${p.from}`,
-          `To: ${p.to.join(", ")}`,
-          ...(p.cc.length > 0 ? [`Cc: ${p.cc.join(", ")}`] : []),
-          ...(p.bcc.length > 0 ? [`Bcc: ${p.bcc.join(", ")}`] : []),
-          `Subject: ${p.subject}`,
-          "",
-          body,
-        ].join("\n"),
+        detail: mailDetail({
+          from: p.from,
+          to: p.to,
+          cc: p.cc,
+          bcc: p.bcc,
+          subject: p.subject,
+          body: detailBody(p.body),
+          original: verb === "send" ? null : originalOf(str(input.message_id)),
+        }),
+      };
+    };
+
+    /** A draft's From: asked for, else as an answer to the message it replies to, else new mail's. */
+    const draftFrom = (input: Record<string, unknown>) => {
+      const replyTo = str(input.in_reply_to);
+      return askedFrom(input) ?? (replyTo ? answerFrom(recalled(account.id, replyTo)) : newFrom);
+    };
+
+    /** A draft as its card shows it: From, To, Subject, the text and the message it answers. */
+    const describeDraft = (input: Record<string, unknown>) => {
+      const to = [...addresses(input.to), ...addresses(input.cc), ...addresses(input.bcc)];
+      const replyTo = str(input.in_reply_to);
+      const original = replyTo
+        ? (originalOf(replyTo) ?? { subject: withoutReplyPrefix(str(input.subject)), from: null })
+        : null;
+      const verb = replyTo ? "Save a draft reply" : "Save a draft";
+      return {
+        title: `${verb}${to.length > 0 ? ` to ${to.join(", ")}` : ""} in ${account.address}: "${oneLine(str(input.subject), 120)}"`,
+        detail: mailDetail({
+          from: draftFrom(input),
+          to: addresses(input.to),
+          cc: addresses(input.cc),
+          bcc: addresses(input.bcc),
+          subject: str(input.subject),
+          body: detailBody(str(input.body)),
+          original,
+        }),
       };
     };
 
@@ -509,13 +586,8 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     const checkSend =
       (verb: "send" | "reply" | "forward") =>
       async (input: Record<string, unknown>, ctx: ToolContext): Promise<CallCheck> => {
-        const from = str(input.from) ? normalizeAddress(str(input.from)) : null;
-        if (from && from !== fromAddress) {
-          return {
-            ok: false,
-            message: `Not allowed: send from ${fromAddress} (the only From address this agent may use).`,
-          };
-        }
+        const refused = fromRefusal(input);
+        if (refused) return refused;
         if (verb !== "send") {
           const read = await checkMessage(ctx.db, str(input.message_id));
           if (!read.ok) return read;
@@ -563,7 +635,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
           const p = plan(verb, input);
           if (!p) return { content: "Could not read the original message.", isError: true };
           const mail: OutgoingMail = {
-            ...(policy.fromAddress ? { from: policy.fromAddress } : {}),
+            ...fromField(p.from),
             to: p.to,
             cc: p.cc,
             bcc: p.bcc,
@@ -655,20 +727,18 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
       "Save a draft in the mailbox for a person to review and send (never sends).",
       { properties: { ...outgoingProps, in_reply_to: MESSAGE_ID }, required: ["subject", "body"] },
       {
-        checkCall: async (input) => {
-          const from = str(input.from) ? normalizeAddress(str(input.from)) : null;
-          return from && from !== fromAddress
-            ? {
-                ok: false,
-                message: `Not allowed: drafts are from ${fromAddress} (the only From address this agent may use).`,
-              }
-            : { ok: true };
+        describe: describeDraft,
+        checkCall: async (input, ctx) => {
+          const refused = fromRefusal(input);
+          if (refused) return refused;
+          // A reply draft answers a message this agent may read (and its card says which one).
+          return str(input.in_reply_to) ? checkMessage(ctx.db, str(input.in_reply_to)) : { ok: true };
         },
         execute: async (input, ctx) => {
           try {
             const saved = await withMailbox(ctx.db, account, (p) =>
               p.createDraft({
-                ...(policy.fromAddress ? { from: policy.fromAddress } : {}),
+                ...fromField(draftFrom(input)),
                 to: addresses(input.to),
                 cc: addresses(input.cc),
                 bcc: addresses(input.bcc),

@@ -8,6 +8,7 @@ import { useState } from "react";
 import {
   ApprovalCard,
   Avatar,
+  AvatarStack,
   Button,
   Card,
   CardFooter,
@@ -25,6 +26,7 @@ import {
   MessageText,
   Meter,
   RunMark,
+  Steps,
 } from "../src";
 
 const body = () => within(document.body);
@@ -113,7 +115,7 @@ describe("Avatar", () => {
 });
 
 describe("Chip", () => {
-  test("always renders its icon with the word", () => {
+  test("a state renders its icon with the word", () => {
     const { container } = render(
       <Chip icon="waiting" tone="waiting">
         Aguardando você
@@ -123,6 +125,13 @@ describe("Chip", () => {
     expect(chip?.className).toBe("ac-chip ac-chip--waiting");
     expect(chip?.querySelector("svg.ac-icon")).not.toBeNull();
     expect(chip?.textContent).toBe("Aguardando você");
+  });
+
+  test("a value goes without an icon, same shape", () => {
+    const { container } = render(<Chip>Issue: ACME-177</Chip>);
+    const chip = container.querySelector(".ac-chip");
+    expect(chip?.querySelector("svg")).toBeNull();
+    expect(chip?.textContent).toBe("Issue: ACME-177");
   });
 });
 
@@ -409,6 +418,20 @@ describe("Logo, Icon, Meter", () => {
     expect(meter.getAttribute("aria-valuenow")).toBe("12.3");
     expect((meter.firstElementChild as HTMLElement).style.width).toBe("31%");
   });
+
+  test("steps: the ones before the current are done; the current is under way, not done (on the last one too)", () => {
+    const bars = (current: number) => {
+      const { container, unmount } = render(<Steps current={current} total={4} label={`Passo ${current} de 4`} />);
+      const state = [...container.querySelectorAll(".ac-steps__bar")].map((b) =>
+        b.hasAttribute("data-current") ? "now" : b.getAttribute("data-done") === "true" ? "done" : "",
+      );
+      unmount();
+      return state;
+    };
+    expect(bars(1)).toEqual(["now", "", "", ""]);
+    expect(bars(2)).toEqual(["done", "now", "", ""]);
+    expect(bars(4)).toEqual(["done", "done", "done", "now"]);
+  });
 });
 
 describe("Diff", () => {
@@ -491,5 +514,28 @@ describe("ListRow and RunMark", () => {
     expect(mark.getAttribute("role")).toBeNull();
     expect(mark.dataset.status).toBe("failed");
     expect(mark.style.width).toBe("8px");
+  });
+});
+
+describe("text and faces that are never cut", () => {
+  test("an empty state's text wraps in even lines; initials in a stack keep their whole tile", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-empty__text")).toContain("text-wrap: balance");
+    expect(rule('.ac-avatar-stack > .ac-avatar[data-kind="person"]:not(:has(img)) + .ac-avatar')).toContain(
+      "margin-left: 0",
+    );
+    // The tiles that rule tells apart: initials have no image, a photo does.
+    render(
+      <AvatarStack>
+        <Avatar name="Marina Alves" size="sm" />
+        <Avatar name="Theo" size="sm" kind="agent" />
+      </AvatarStack>,
+    );
+    const [initials, agent] = Array.from(document.querySelectorAll(".ac-avatar-stack > .ac-avatar"));
+    expect(initials?.getAttribute("data-kind")).toBe("person");
+    expect(initials?.querySelector("img")).toBeNull();
+    expect(initials?.textContent).toBe("MA");
+    expect(agent?.getAttribute("data-kind")).toBe("agent");
   });
 });

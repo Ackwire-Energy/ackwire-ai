@@ -2,6 +2,7 @@ import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
   useAiAccounts,
+  useComputerSetup,
   useConnections,
   useCredentials,
   useInvitations,
@@ -10,12 +11,15 @@ import {
   usePlatformKey,
   useRemoveCredential,
   useRotateCredential,
+  useServerTelemetry,
+  useSetServerTelemetry,
   useSettings,
   useSkills,
   useStorage,
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -56,7 +60,7 @@ import { AuditSection } from "@/components/Audit";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
-import { ErrorState, LoadingList } from "@/components/Loading";
+import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
@@ -92,6 +96,8 @@ export function SettingsPage({
   const { org } = useOrg();
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
   const current = visible.some((s) => s.id === section) ? section : "general";
+  const setup = useComputerSetup(org.id);
+  const edition = computerEdition(setup.data);
 
   return (
     <div className="settings">
@@ -137,9 +143,18 @@ export function SettingsPage({
         {current !== "members" && current !== "general" && (
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              {t(`settings.sectionText.${current}`)}
-            </p>
+            {current !== "computers" ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {t(`settings.sectionText.${current}`)}
+              </p>
+            ) : edition ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {edition === "cloud" ? t("computers.leadCloud") : t("computers.lead")}
+              </p>
+            ) : setup.isError ? null : (
+              // Never one edition's words before the server says which this is (the section says if it couldn't).
+              <LoadingLine width={320} />
+            )}
           </header>
         )}
         {current === "general" && <GeneralSection />}
@@ -285,6 +300,7 @@ function GeneralSection() {
             <div className="settings-row__control">
               <Input
                 id="set-name"
+                spellCheck={false}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={saveName}
@@ -365,8 +381,80 @@ function GeneralSection() {
       </Card>
 
       <SettingsTiles />
+      <UsageStatisticsCard />
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
     </>
+  );
+}
+
+/**
+ * The usage report's switch (ADR 0060 §5): the title, the switch and "Ver o que é enviado". Only the
+ * installation's owner gets it (the API answers `null` to everyone else, and on agentes.chat itself).
+ */
+function UsageStatisticsCard() {
+  const { t } = useTranslation();
+  const telemetry = useServerTelemetry();
+  const set = useSetServerTelemetry();
+  const [open, setOpen] = useState(false);
+  const data = telemetry.data;
+  if (!data) return null;
+  return (
+    <Card aria-labelledby="sec-telemetry">
+      <CardHeader
+        id="sec-telemetry"
+        icon="chart"
+        title={t("settings.telemetry.title")}
+        action={
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setOpen(true);
+              void telemetry.refetch();
+            }}
+          >
+            {t("settings.telemetry.see")}
+          </Button>
+        }
+      />
+      <div className="settings-rows">
+        <div className="settings-row">
+          <div className="settings-row__text">
+            <label className="settings-row__label" htmlFor="set-telemetry">
+              {t("settings.telemetry.label")}
+            </label>
+            <span className="settings-row__help" id="set-telemetry-help">
+              {t("settings.telemetry.help")}
+              {data.envOff &&
+                ` ${t(data.report.install === "desktop" ? "settings.telemetry.envOffDesktop" : "settings.telemetry.envOff")}`}
+            </span>
+          </div>
+          <div className="settings-row__control">
+            <Switch
+              id="set-telemetry"
+              checked={data.enabled && !data.envOff}
+              onCheckedChange={(on) => set.mutate(on)}
+              disabled={data.envOff || set.isPending}
+              aria-describedby="set-telemetry-help"
+            />
+          </div>
+        </div>
+      </div>
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t("settings.telemetry.dialogTitle")}
+        description={t("settings.telemetry.dialogText")}
+        closeLabel={t("common.close")}
+        width={560}
+      >
+        <DialogBody>
+          <pre className="md__code" style={{ margin: 0, maxHeight: 420 }}>
+            {JSON.stringify(data.report, null, 2)}
+          </pre>
+        </DialogBody>
+      </Dialog>
+    </Card>
   );
 }
 

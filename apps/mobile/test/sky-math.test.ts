@@ -8,8 +8,11 @@ import {
   fromSurface,
   fuseField,
   gridOf,
+  horizonField,
   MAX_PLAN_ITEMS,
   paletteUniform,
+  pillField,
+  pillWorkField,
   rgba,
   shaderBayer,
   shaderCell,
@@ -87,15 +90,27 @@ describe("palettes", () => {
 });
 
 test("every shader declares the uniforms the component passes", () => {
-  for (const kind of ["sky", "fuse", "bar", "track", "sweep"] as const) {
+  for (const kind of ["sky", "fuse", "bar", "track", "sweep", "pill", "pillwork", "horizon"] as const) {
     const src = shaderSource(kind);
-    for (const u of ["size", "px", "t", "last", "fade", "pal"]) expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
+    for (const u of ["size", "px", "t", "last", "fade", "clear", "pal"])
+      expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
     expect(src).toContain("half4 main(float2 pos)");
     expect(src).toContain("float field(");
   }
   expect(shaderSource("fuse")).toContain("uniform float remaining;");
   expect(shaderSource("bar")).toContain("uniform float value;");
   expect(shaderSource("track")).toContain("uniform float states[48];");
+  expect(shaderSource("horizon")).toContain("uniform float level;");
+});
+
+test("the launch sky: nothing above its level, deepest at the bottom", () => {
+  const half = horizonField(0.5);
+  expect(half(0.3, 0.2, 0, 0, 0)).toBe(0);
+  expect(half(0.3, 1, 0, 0, 0)).toBeGreaterThan(0.9);
+  expect(half(0.3, 0.8, 0, 0, 0)).toBeGreaterThan(half(0.3, 0.6, 0, 0, 0));
+  // Before it rises (and after it sinks), not even the wave shows.
+  for (const u of [0, 0.25, 0.5, 0.75]) expect(horizonField(0)(u, 0.999, 3, 0, 0)).toBe(0);
+  expect(shaderSource("horizon")).toContain("v - (1.0 - level) + 0.08 * level * sin(u * 6.0 + t * 1.1)");
 });
 
 test("the working line's sweep: a band that crosses left to right every 5 s, over a faint wash", () => {
@@ -104,4 +119,17 @@ test("the working line's sweep: a band that crosses left to right every 5 s, ove
   expect(sweepField(0.5, 0, 0, 0, 0)).toBeLessThan(0.1);
   expect(sweepField(0.2, 0, 5, 0, 0)).toBeCloseTo(sweepField(0.2, 0, 0, 0, 0), 5);
   expect(shaderSource("sweep")).toContain("mod(t * 0.32, 1.6) - 0.3");
+});
+
+test("the header pill: sky only at its right end; working, a sweep that crosses it", () => {
+  // Idle: nothing on the left half, the color gathers at the right end.
+  expect(pillField(0.3, 0.5, 0, 0, 0)).toBe(0);
+  expect(pillField(1, 0, 0, 0, 0)).toBeGreaterThan(0.4);
+  expect(shaderSource("pill")).toContain("(u - 0.55) / 0.45");
+  // Working: the band's center starts off the left edge and reaches the middle ~1.9 s later, every 3.8 s.
+  expect(pillWorkField(0.5, 0, 0.8 / 0.42, 0, 0)).toBeGreaterThan(pillWorkField(0.5, 0, 0, 0, 0));
+  expect(pillWorkField(0.4, 0, 1.6 / 0.42, 0, 0)).toBeCloseTo(pillWorkField(0.4, 0, 0, 0, 0), 1);
+  expect(shaderSource("pillwork")).toContain("mod(t * 0.42, 1.6) - 0.3");
+  // Over glass the lowest tone is see-through.
+  expect(shaderSource("pill")).toContain("if (clear > 0.5 && idx < 0.5) return half4(0.0);");
 });

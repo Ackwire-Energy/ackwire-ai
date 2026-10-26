@@ -25,6 +25,7 @@
     "./brand/marks": "./src/brand/marks.ts",
     "./sky/engine": "./src/sky/engine.ts",
     "./sky/math": "./src/sky/math.ts",
+    "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
     "./timezones": "./src/timezones.ts"
   },

@@ -567,6 +567,10 @@ textarea.ac-input {
 .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
 }
+/* Initials fill their tile: the next one starts past it, only its ring overlapping, so no letter is cut. */
+.ac-avatar-stack > .ac-avatar[data-kind="person"]:not(:has(img)) + .ac-avatar {
+  margin-left: 0;
+}
 
 /* Message: a fixed avatar column at the top, the text column beside it. */
 .ac-msg {
@@ -870,21 +874,15 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
-/* Asked while nobody watched: one quiet line with its icon. */
-.ac-approval__origin {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 18px;
-  color: var(--ink-muted);
-}
+/* Asked while nobody watched: on the line of who asks, with its icon. */
 .ac-approval__origin > svg {
-  flex: none;
-  margin-top: 2px;
+  margin: 0 3px 0 1px;
+  vertical-align: -2px;
 }
-/* Why the agent asks, in its words, read before the action. */
+.ac-approval__action {
+  min-width: 0;
+}
+/* Why the agent asks, in its words, after the action. */
 .ac-approval__why {
   margin: 0;
   font-size: 13.5px;
@@ -1606,6 +1604,17 @@ textarea.ac-input {
   line-height: 24px;
   font-weight: 650;
 }
+.ac-dialog__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ac-dialog__sub {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
 .ac-dialog__desc {
   margin: 0;
   padding: 0 20px 12px;
@@ -1632,6 +1641,10 @@ textarea.ac-input {
 }
 .ac-dialog__body > * {
   flex: none;
+}
+/* With no footer under it, the body keeps the dialog's own edge below its last item. */
+.ac-dialog__body:last-child {
+  padding-bottom: 20px;
 }
 .ac-dialog__list {
   flex: 1 1 auto;
@@ -1918,6 +1931,8 @@ a.ac-list__row:focus-visible {
 .ac-empty__text {
   margin: 0 auto;
   max-width: 52ch;
+  /* Centered lines of even length: a short last word never sits on a line of its own. */
+  text-wrap: balance;
 }
 .ac-empty__actions {
   display: flex;
@@ -1987,13 +2002,36 @@ a.ac-list__row:focus-visible {
   gap: var(--space-1);
 }
 .ac-steps__bar {
+  position: relative;
   flex: 1;
   height: 4px;
+  overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--line);
 }
 .ac-steps__bar[data-done="true"] {
   background: var(--ink);
+}
+/* The step under way: ink travels along its bar, like the top progress bar (half-lit, still, without motion). */
+.ac-steps__bar[data-current]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--ink);
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-steps__bar[data-current]::before {
+    animation: ac-top-progress 1.4s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-steps__bar[data-current]::before {
+    width: 100%;
+    opacity: 0.35;
+  }
 }
 .ac-eyebrow {
   font-size: 12px;
@@ -2779,6 +2817,15 @@ a.ac-list__row:focus-visible {
 .ac-switch[data-disabled] {
   opacity: 0.5;
   cursor: not-allowed;
+}
+/* Off and unavailable: an outline, not a filled track, so it never reads as a switch that is just off (in dark
+   mode dimming alone barely shows). */
+.ac-switch[data-disabled]:not([data-state="checked"]) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+.ac-switch[data-disabled]:not([data-state="checked"]) .ac-switch__thumb {
+  background: var(--line-strong);
 }
 .ac-switch__thumb {
   display: block;
@@ -3894,6 +3941,10 @@ a.ac-list__row:focus-visible {
   box-shadow:
     inset 0 0 0 1px var(--line),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+/* The tile already holds the agent at work (its face moves): no halo around it, which looked like a bigger box. */
+.ac-avatar--framed.ac-avatar--running::after {
+  content: none;
 }
 .ac-avatar--framed .ac-avatar__canvas {
   left: 0;
@@ -5696,6 +5747,9 @@ a.ac-list__row:focus-visible {
   .ac-dialog__body {
     padding: 4px 16px;
   }
+  .ac-dialog__body:last-child {
+    padding-bottom: 16px;
+  }
   .ac-dialog__list {
     padding: 0 16px;
   }
@@ -5785,6 +5839,13 @@ a.ac-list__row:focus-visible {
 .ac-run-mark,
 .ac-run-key {
   display: block;
+  image-rendering: pixelated;
+}
+/* An agent's month (MonthRuns): the row's whole width, 2px cells. */
+.ac-month-runs {
+  display: block;
+  width: 100%;
+  height: 80px;
   image-rendering: pixelated;
 }
 .ac-run-key {
@@ -6824,16 +6885,16 @@ label.ac-setrow__title {
   border: 0;
 }
 
-/* Carousel: one row that slides item by item; the arrows step back when it all fits. */
+/*
+ * Carousel: one row that slides item by item. The arrows float over its edges, only where there is
+ * more to see, and the row fades out under them: the first item always starts where rows that fit do.
+ */
 .ac-carousel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
   min-width: 0;
 }
 .ac-carousel__track {
   display: flex;
-  flex: 1;
   gap: 6px;
   min-width: 0;
   padding: 2px;
@@ -6849,9 +6910,20 @@ label.ac-setrow__title {
   flex: none;
   scroll-snap-align: start;
 }
+.ac-carousel[data-more="end"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+.ac-carousel[data-more="start"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+.ac-carousel[data-more="both"] .ac-carousel__track {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
 .ac-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-raised);
   display: grid;
-  flex: none;
   place-items: center;
   width: 28px;
   height: 28px;
@@ -6862,21 +6934,25 @@ label.ac-setrow__title {
   box-shadow: var(--e1), var(--top);
   color: var(--muted);
   cursor: pointer;
+  transform: translateY(-50%);
   transition:
     color 0.15s,
     opacity 0.15s;
+}
+.ac-carousel__arrow:first-child {
+  left: 0;
+}
+.ac-carousel__arrow:last-child {
+  right: 0;
 }
 .ac-carousel__arrow:hover:not(:disabled) {
   color: var(--ink);
 }
 .ac-carousel__arrow:disabled {
-  opacity: 0.35;
-  cursor: default;
+  opacity: 0;
+  pointer-events: none;
 }
 .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
-}
-.ac-carousel--fits .ac-carousel__arrow {
-  display: none;
 }

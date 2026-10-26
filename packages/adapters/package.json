@@ -11,7 +11,8 @@
     "./runner-control": "./src/runner-control.ts",
     "./command-policy": "./src/command-policy.ts",
     "./secret-box": "./src/secret-box.ts",
-    "./redact": "./src/redact.ts"
+    "./redact": "./src/redact.ts",
+    "./host-stats": "./src/host-stats.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

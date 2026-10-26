@@ -35,7 +35,7 @@ import {
   useToast,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
-import { AgentBrowserRow } from "../browser/AgentBrowserRow";
+import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
@@ -249,7 +249,7 @@ function Profile({ id }: { id: string }) {
           ) : null}
           {waitingNow ? (
             <NowPill
-              leading={<Icon name="shield" size={15} color={c.amber} />}
+              leading={<Icon name="wait" size={15} color={c.amber} />}
               label={t("mobile.intentAgents.nowWaiting", { title: waitingNow.title })}
               onPress={() => router.push(`/approval/${waitingNow.id}`)}
             />
@@ -361,7 +361,7 @@ function Profile({ id }: { id: string }) {
           </Section>
         ) : null}
 
-        <AgentBrowserRow agentId={id} decides={decides} busy={busy} />
+        <AgentComputerRow agentId={id} />
 
         {thinks ? (
           <Section title={t("mobile.intentAgents.thinks")}>
@@ -418,6 +418,18 @@ function Profile({ id }: { id: string }) {
                     ? t("mobile.intentAgents.uses.asksOwner", { name: owner })
                     : t("mobile.intentAgents.uses.asksAdmins")}
               </Text>
+            ) : null}
+            {decides ? (
+              // Ferramentas: a new service for this agent starts in Conectores (who uses it is chosen there).
+              <View style={styles.foot}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="plus"
+                  label={t("mobile.connectors.fromAgent")}
+                  onPress={() => router.push("/connectors")}
+                />
+              </View>
             ) : null}
           </Section>
         ) : null}

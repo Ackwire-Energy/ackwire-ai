@@ -213,14 +213,19 @@ export function OptionCard({
   );
 }
 
-/** Onboarding step bars + "Passo 1 de 4 · Organização". */
+/** Step bars + "Passo 2 de 4 · Contexto": `current` (from 1) is the step under way, the ones before it are done. */
 export function Steps({ current, total, label }: { current: number; total: number; label: ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div className="ac-steps" aria-hidden="true">
         {Array.from({ length: total }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: fixed number of bars
-          <span key={i} className="ac-steps__bar" data-done={i < current} />
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed number of bars
+            key={i}
+            className="ac-steps__bar"
+            data-done={i < current - 1}
+            data-current={i === current - 1 || undefined}
+          />
         ))}
       </div>
       <span className="ac-eyebrow">{label}</span>

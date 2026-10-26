@@ -3,3 +3,9 @@ declare module "*.py" {
   const source: string;
   export default source;
 }
+
+/** Images as base64 text (`assets/*.png.b64`). */
+declare module "*.b64" {
+  const base64: string;
+  export default base64;
+}

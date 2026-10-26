@@ -1,17 +1,28 @@
 /**
  * The phone app's line icons: 24×24, stroke 1.7, round caps and joins.
- * Pure data (react-native-svg draws it in ./Icon.tsx); `fill` marks the few filled dots, `sw` a
- * different stroke width.
+ * Pure data (react-native-svg draws it in ./Icon.tsx); `fill` marks the few filled dots and pixels
+ * (`opacity` fades a pixel), `sw` a different stroke width.
  */
 export type IconShape =
   | { t: "path"; d: string; sw?: number }
   | { t: "circle"; cx: number; cy: number; r: number; fill?: boolean }
-  | { t: "rect"; x: number; y: number; w: number; h: number; rx: number };
+  | { t: "rect"; x: number; y: number; w: number; h: number; rx: number; fill?: boolean; opacity?: number };
 
 const p = (d: string, sw?: number): IconShape => (sw ? { t: "path", d, sw } : { t: "path", d });
 const c = (cx: number, cy: number, r: number, fill?: boolean): IconShape =>
   fill ? { t: "circle", cx, cy, r, fill } : { t: "circle", cx, cy, r };
 const r = (x: number, y: number, w: number, h: number, rx: number): IconShape => ({ t: "rect", x, y, w, h, rx });
+/** A filled square pixel, faded to `opacity`. */
+const px = (x: number, y: number, s: number, opacity: number): IconShape => ({
+  t: "rect",
+  x,
+  y,
+  w: s,
+  h: s,
+  rx: 0,
+  fill: true,
+  opacity,
+});
 
 export const ICONS = {
   home: [p("M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z")],
@@ -30,6 +41,8 @@ export const ICONS = {
   check: [p("m5 12.5 4.5 4.5L19 7.5")],
   x: [p("M6 6l12 12M18 6 6 18")],
   clock: [c(12, 12, 8.5), p("M12 7.5V12l3 2")],
+  /** Waits on you: three pixels burning out, the request's fuse in small (no shield). */
+  wait: [px(2, 9.5, 5, 1), px(9.5, 9.5, 5, 0.6), px(17, 9.5, 5, 0.3)],
   shield: [p("M12 3.5 5 6.5v5c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9v-5Z"), p("m9 12 2 2 4-4")],
   hash: [p("M5 9h14M5 15h14M10 4 8 20M16 4l-2 16")],
   chev: [p("m6 9 6 6 6-6")],
@@ -47,6 +60,7 @@ export const ICONS = {
   list: [p("M9 6.5h11M9 12h11M9 17.5h11"), p("M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01", 2.6)],
   reply: [p("M4 5h16v9H11l-4 3.5V14H4Z"), p("M9 9h6")],
   copy: [r(8, 8, 11.5, 11.5, 2.5), p("M5 15.5V6.5A1.5 1.5 0 0 1 6.5 5h9")],
+  expand: [p("M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5")],
   pin: [p("M9 4h6l-1 5 3.5 3.5h-11L10 9Z"), p("M12 12.5V20")],
   eyeoff: [
     p("M4 4l16 16"),

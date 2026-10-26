@@ -1,8 +1,9 @@
+import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import { mobileEn } from "./keys.en";
 import { mobilePtBR } from "./keys.pt-BR";
 
+export type { AppLocale };
 /** The app's locales: pt-BR is the default, English the alternative (same as the web). */
-export type AppLocale = "pt-BR" | "en";
 export const DEFAULT_LOCALE: AppLocale = "pt-BR";
 
 const MOBILE: Record<AppLocale, object> = { "pt-BR": mobilePtBR, en: mobileEn };
@@ -45,10 +46,5 @@ export function withMobileKeys(
 
 /** The phone's languages (most preferred first) mapped to ours: "pt-PT" → pt-BR, "en-GB" → en, else pt-BR. */
 export function pickLocale(tags: readonly (string | null | undefined)[]): AppLocale {
-  for (const tag of tags) {
-    const t = (tag ?? "").toLowerCase();
-    if (t.startsWith("pt")) return "pt-BR";
-    if (t.startsWith("en")) return "en";
-  }
-  return DEFAULT_LOCALE;
+  return appLocale(tags) ?? DEFAULT_LOCALE;
 }

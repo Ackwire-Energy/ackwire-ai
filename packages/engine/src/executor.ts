@@ -96,7 +96,7 @@ import {
 import { routineBriefOf } from "./routine-brief";
 import { routineRunWaitingForComputer } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
-import { type ReleaseReason, releaseInbox, takeInbox } from "./run-inbox";
+import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
   absorbBrowserCall,
@@ -542,6 +542,10 @@ async function executeRunInner(
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
+    // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
+    // read gets a run of its own; nothing sent to the agent waits behind the decision.
+    if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
+      await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
     // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
   };
 

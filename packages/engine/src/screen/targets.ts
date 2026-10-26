@@ -381,8 +381,20 @@ const ON_IMAGE: Record<ScreenKind, { where: string; closeUp: string; present: st
 const PRESENT_AT = 0.6;
 /** A first box this small (of each side) is looked at again on a close-up, when the surface takes one. */
 const ZOOM_BELOW = 0.15;
-/** A close-up's size in screen pixels, at their native size: as measured for small desktop targets. */
+/** The image Jev sees of a close-up, whatever part of the screen it shows: Jev takes none under 280 px a side. */
 const CLOSE_UP = { width: 480, height: 300 };
+/**
+ * The most a close-up enlarges the screen. At native size Jev's box on a 14 px control (a title bar's ×)
+ * lands on its neighbor; on 240×150 of the screen enlarged twice, it doesn't.
+ */
+const CLOSE_UP_ZOOM = 2;
+/**
+ * A close-up shows at least this many times the first box's height and width. Up close Jev may box the
+ * target whole, larger than at first (a folder with its name under it); a box over half the close-up's
+ * height or 80% of its width isn't one control, so this leaves room for 1.5 times the first box's height
+ * and 1.2 times its width.
+ */
+const CLOSE_UP_ROOM = { height: 3, width: 1.5 };
 
 /** One control: a box taller than half the image or wider than 80% of it isn't one. */
 const clearBox = (b: JudgeBox) => {
@@ -397,29 +409,48 @@ const centerOf = (image: ScreenImage, b: JudgeBox) => ({
   y: Math.round((image.origin?.y ?? 0) + ((b.top + b.bottom) / 2) * image.viewport.height),
 });
 
-/** The close-up around a point: `CLOSE_UP` centered on it, moved to stay inside the screen. */
-function closeUpAround(point: { x: number; y: number }, image: ScreenImage): ScreenRegion {
+/**
+ * The part of the screen a close-up of `box` shows: `CLOSE_UP_ROOM` times the box, and at least
+ * `CLOSE_UP` over `CLOSE_UP_ZOOM`, in `CLOSE_UP`'s shape, centered on the box and kept inside the screen.
+ */
+function closeUpAround(box: JudgeBox, image: ScreenImage): ScreenRegion {
   const origin = image.origin ?? { x: 0, y: 0 };
-  const width = Math.min(CLOSE_UP.width, image.viewport.width);
-  const height = Math.min(CLOSE_UP.height, image.viewport.height);
+  const screen = image.viewport;
+  const perPixel = Math.max(
+    1 / CLOSE_UP_ZOOM,
+    (CLOSE_UP_ROOM.height * (box.bottom - box.top) * screen.height) / CLOSE_UP.height,
+    (CLOSE_UP_ROOM.width * (box.right - box.left) * screen.width) / CLOSE_UP.width,
+  );
+  const width = Math.min(Math.round(CLOSE_UP.width * perPixel), screen.width);
+  const height = Math.min(Math.round(CLOSE_UP.height * perPixel), screen.height);
+  const center = centerOf(image, box);
   const within = (at: number, from: number, side: number, span: number) =>
     Math.round(Math.min(Math.max(at - span / 2, from), from + side - span));
   return {
-    x: within(point.x, origin.x, image.viewport.width, width),
-    y: within(point.y, origin.y, image.viewport.height, height),
+    x: within(center.x, origin.x, screen.width, width),
+    y: within(center.y, origin.y, screen.height, height),
     width,
     height,
   };
+}
+
+/** `image` drawn at `CLOSE_UP`'s size (a JPEG at the runner's quality); what it shows, and where, stay the same. */
+async function asCloseUp(image: ScreenImage): Promise<ScreenImage> {
+  const data = await new Bun.Image(Buffer.from(image.data, "base64"))
+    .resize(CLOSE_UP.width, CLOSE_UP.height)
+    .jpeg({ quality: 70 })
+    .toBase64();
+  return { ...image, data, ...CLOSE_UP };
 }
 
 /**
  * Looks for the target on an image of the screen (Jev's Box, plus whether it's
  * there). With marks (an annotated screenshot), the point lands on a marked
  * element's ref, so the action stays as exact as a ref; else it's a point.
- * With `zoom`, a small first box is boxed again on a close-up at the screen's
- * native size (small desktop targets: menu items, icons), and the close-up's
- * answer is the one taken. Words that can't be undone (delete, discard…) are
- * never taken at a bare point.
+ * With `zoom`, a small first box is boxed again on a close-up of the screen
+ * around it, up to twice as large (small desktop targets: menu items, icons,
+ * a title bar's buttons), and the close-up's answer is the one taken. Words
+ * that can't be undone (delete, discard…) are never taken at a bare point.
  */
 export async function locateOnImage(input: {
   judge: Judge;
@@ -470,9 +501,10 @@ export async function locateOnImage(input: {
 
   const small = first.box.right - first.box.left <= ZOOM_BELOW && first.box.bottom - first.box.top <= ZOOM_BELOW;
   if (input.zoom && small) {
-    const close = await input.zoom(closeUpAround(point, input.image)).catch(() => null);
+    const taken = await input.zoom(closeUpAround(first.box, input.image)).catch(() => null);
     // Only an image that says where it sits maps back; without one the first answer stands.
-    const second = close?.origin ? await boxOn(close, words.closeUp).catch(() => null) : null;
+    const close = taken?.origin ? await asCloseUp(taken).catch(() => null) : null;
+    const second = close ? await boxOn(close, words.closeUp).catch(() => null) : null;
     if (close && second) {
       // Up close it isn't there, or isn't one control: the first box was most likely on a neighbor.
       if (!second.box || second.present < PRESENT_AT || !clearBox(second.box)) {

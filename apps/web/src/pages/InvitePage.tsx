@@ -131,7 +131,12 @@ export function InvitePage({ token }: { token: string }) {
                   <Input value={invitation.email} readOnly />
                 </Field>
                 <Field label={t("auth.yourName")} id="inv-name">
-                  <Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+                  <Input
+                    autoComplete="name"
+                    spellCheck={false}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
                 </Field>
                 <Field label={t("invite.createPassword")} id="inv-pass" help={t("auth.passwordHelp")}>
                   <Input

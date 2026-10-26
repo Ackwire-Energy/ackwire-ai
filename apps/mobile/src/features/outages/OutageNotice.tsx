@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Icon, Text } from "@/ui";
-import { useColors } from "../shared/hooks";
+import { useColors, useEdition } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { computerIcon, type MachineOutage, noticeText } from "./logic";
 import { useMachineOutages } from "./queries";
@@ -33,14 +33,16 @@ function OutageNotice({ outage: o }: { outage: MachineOutage }) {
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
-  const text = noticeText(t, o);
+  // The Cloud has no other computer to switch to.
+  const cloud = useEdition() === "cloud";
+  const text = noticeText(t, o, cloud);
   return (
     <View style={[styles.card, surface]}>
       <View
         style={styles.line}
         accessible
         accessibilityRole="summary"
-        accessibilityLabel={`${t("mobile.outage.a11y")}. ${text.title}. ${text.sub}`}
+        accessibilityLabel={`${text.a11y}. ${text.title}. ${text.sub}`}
       >
         <Icon name={computerIcon(o.platform)} size={22} color={c.amber} />
         <View style={styles.tx}>
@@ -52,13 +54,15 @@ function OutageNotice({ outage: o }: { outage: MachineOutage }) {
           </Text>
         </View>
       </View>
-      <Button
-        variant="primary"
-        size="sm"
-        wide
-        label={t("mobile.outage.switch")}
-        onPress={() => openSwitchComputer(o.machineId)}
-      />
+      {!cloud && (
+        <Button
+          variant="primary"
+          size="sm"
+          wide
+          label={t("mobile.outage.switch")}
+          onPress={() => openSwitchComputer(o.machineId)}
+        />
+      )}
     </View>
   );
 }

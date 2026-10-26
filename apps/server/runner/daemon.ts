@@ -1,11 +1,13 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { LoadWindow, machineSize, sampleLoad } from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
   isAccountId,
   isAccountKind,
+  LOAD_SAMPLE_MS,
   MACHINE_PROTOCOL_VERSION,
   type MachineAgent,
   type MachineOs,
@@ -284,6 +286,8 @@ export class RunnerDaemon implements RequestObserver {
   private pairing: AbortController | null = null;
   private stopWatch: (() => void) | null = null;
   private readonly timers: ReturnType<typeof setInterval>[] = [];
+  /** Protocol 22: how busy this computer got over the last day (rides on `pong`). */
+  private readonly load = new LoadWindow();
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private stopping = false;
@@ -350,6 +354,8 @@ export class RunnerDaemon implements RequestObserver {
       // System mode: the agents' Chromes are their workers'.
       inUse: (agentId) => (this.session?.supervisor ?? this.session?.browser)?.onDesktopInUse(agentId) ?? false,
       onViewers: () => this.session?.supervisor?.stateChanged(),
+      openBrowser: (agent, installing) => this.openBrowser(agent, installing),
+      runner: this.self.command,
       get agentUsers() {
         return daemon.session?.agentUser != null;
       },
@@ -386,10 +392,33 @@ export class RunnerDaemon implements RequestObserver {
           : "The browser on the agent's desktop needs this computer's desktop and browser switches on",
       );
     }
-    const started = await this.desktops.ensure(agent);
+    const started = await this.desktops.ensure(agent, { chrome: use === "browser" });
     const s = this.desktops.session(agent.id);
     if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
     return { ...started, xauthority: s.xauthority, home: s.home };
+  }
+
+  /**
+   * Browser on the agent's desktop (`desktop-browser.ts`): its own Chrome there, behind the switches that put it
+   * there (ADR 0058 §7), on a computer that isn't paused; in system mode its worker's (`Supervisor.showBrowser`).
+   */
+  async openBrowser(agent: AgentScope, installing: () => void): Promise<void> {
+    const session = this.session;
+    if (!session) {
+      throw new RunnerError(
+        "internal",
+        "This computer isn't connected to agentes.chat right now; try again in a minute",
+      );
+    }
+    const { tools } = this.access();
+    if (tools.browser !== true || tools.desktop !== true) {
+      throw new RunnerError("not_allowed", "The browser is turned off on this computer");
+    }
+    if (this.pauseState().paused) {
+      throw new RunnerError("paused", "This computer is paused; open the browser again once it resumes");
+    }
+    if (session.supervisor) return session.supervisor.showBrowser(agent, installing);
+    return session.browser.show(agent, await this.agentFolder(agent), installing);
   }
 
   /** As whom a terminal on the agent's computer runs, like its desktop. */
@@ -440,6 +469,14 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
+    const sample = () =>
+      void sampleLoad()
+        .then((s) => this.load.add(s))
+        .catch(() => undefined);
+    sample();
+    const load = setInterval(sample, LOAD_SAMPLE_MS);
+    load.unref?.();
+    this.timers.push(load);
     this.expireRequests();
   }
 
@@ -819,13 +856,18 @@ export class RunnerDaemon implements RequestObserver {
       desktopUse,
     };
     // `hello` lists the accounts it already knows; a fresh look (each runs its CLI) never delays connecting:
-    // it lands in `hello` if it finishes first, else comes right after as `accounts.changed`.
+    // it lands in `hello` if it finishes first, else comes after as `accounts.changed`. Nothing reaches the
+    // server between `hello` and `welcome`, so what changed in that gap goes out with `welcome`.
     this.accounts.refresh(true).catch(() => undefined);
+    /** The accounts and usage the last `hello` carried (JSON). */
+    let told: string | undefined;
     const connection = new RunnerConnection({
       url: connectUrl(config.server),
       token: config.token,
       info: () => {
         const accounts = this.accounts.snapshot();
+        const usage = this.ownUsage();
+        told = JSON.stringify([accounts, usage]);
         return {
           ...this.info(workspaceReal),
           browser: browser.info(),
@@ -833,12 +875,13 @@ export class RunnerDaemon implements RequestObserver {
           terminal: this.terminals.info(),
           desktopUse: desktopUse.info(),
           ...(accounts ? { accounts } : {}),
-          ...this.ownUsage(),
+          ...usage,
           // Who may control a desktop or open a terminal follows it (ADR 0058 §4).
           ...(agentUser ? { mode: "system" as const } : {}),
         };
       },
       executors: () => this.helloExecutors(),
+      load: () => this.load.summary(),
       context,
       // System mode: the agents' tasks and MCP calls are their workers'.
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
@@ -859,6 +902,11 @@ export class RunnerDaemon implements RequestObserver {
       onWelcome: () => {
         this.flushDecisions();
         this.syncLogo(config);
+        const accounts = this.accounts.snapshot();
+        const usage = this.ownUsage();
+        if (accounts && JSON.stringify([accounts, usage]) !== told) {
+          this.send({ type: "accounts.changed", accounts, ...usage });
+        }
       },
       ...(this.opts.dial ? { dial: this.opts.dial } : {}),
     });
@@ -931,6 +979,7 @@ export class RunnerDaemon implements RequestObserver {
       exec: access.tools.commands,
       paused: this.pauseState(),
       access,
+      size: machineSize(workspaceReal),
     };
   }
 
@@ -1035,6 +1084,8 @@ export class RunnerDaemon implements RequestObserver {
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
     }
+    // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good.
+    void this.desktops.stopAll(new Set(list.map((a) => a.id))).catch(() => undefined);
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
     this.agents = list;
     try {

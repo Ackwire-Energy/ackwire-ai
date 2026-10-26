@@ -3,6 +3,7 @@ import type { ScreenKind } from "./types";
 /** React Query keys. Everything under ["org", orgId] is dropped when switching organizations. */
 export const keys = {
   health: ["health"] as const,
+  telemetry: ["telemetry"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   phoneSignIn: ["phone-sign-in"] as const,
@@ -32,6 +33,8 @@ export const keys = {
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
+  /** Whether the agent has a run going now (its newest running run, if any). */
+  runningRuns: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs", "running"] as const,
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,
@@ -70,6 +73,8 @@ export const keys = {
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
   machineOutages: (orgId: string) => ["org", orgId, "machines", "outages"] as const,
+  /** The workspace's own computer on its way (ADR 0056 §10); `machine.provisioning` events set it. */
+  computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
   machineDevice: (userCode: string) => ["machine-device", userCode] as const,
   desktopLatest: (target: string, arch: string) => ["desktop-latest", target, arch] as const,
@@ -133,6 +138,7 @@ export const keys = {
   mailProviders: (orgId: string) => ["org", orgId, "mail", "providers"] as const,
   mailAccounts: (orgId: string) => ["org", orgId, "mail", "accounts"] as const,
   mailFolders: (orgId: string, accountId: string) => ["org", orgId, "mail", "folders", accountId] as const,
+  mailSuggested: (orgId: string, accountId: string) => ["org", orgId, "mail", "suggested", accountId] as const,
   agentMail: (orgId: string, agentId: string) => ["org", orgId, "mail", "agent", agentId] as const,
   /** Every database read (prefix). */
   databases: (orgId: string) => ["org", orgId, "databases"] as const,
@@ -147,4 +153,6 @@ export const keys = {
   browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
   /** The agent's desktop (ADR 0058): its state as this person sees it. */
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
+  /** Every agent's screen (`agentDesktop`'s prefix). */
+  agentDesktops: (orgId: string) => ["org", orgId, "desktop"] as const,
 };

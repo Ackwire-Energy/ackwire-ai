@@ -21,6 +21,7 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 import { useTranslation } from "react-i18next";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { useOrg } from "@/components/org-context";
+import { SetupWaitLines, useSetupView, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { KeyDialog } from "@/pages/SettingsPage";
@@ -311,6 +312,8 @@ function PlanForAgent({
   const toast = useToast();
   const brain = useAgentBrain(org.id, agentId);
   const machines = useMachines(org.id);
+  const setup = useSetupView(org.id);
+  const reader = useWaitReader();
   const [added, setAdded] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const view = brain.data;
@@ -346,6 +349,7 @@ function PlanForAgent({
         <DialogBody>
           {picker}
           <SettingNote icon="alert">{blocked}</SettingNote>
+          {!computer && setup && <SetupWaitLines view={setup} reader={reader} />}
         </DialogBody>
         <DialogFooter>
           <Button onClick={onBack}>{t("common.back")}</Button>

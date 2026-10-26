@@ -46,6 +46,10 @@ export function commandInReason(reason: string | null | undefined): string | nul
   return m?.[1] ?? null;
 }
 
+/** Turns the agents' screens on at the computer: its runner's settings, which are root's in system mode (ADR 0057). */
+export const screensOnCommand = (m: Pick<Machine, "mode">) =>
+  `${m.mode === "system" ? "sudo " : ""}agentes-runner tools enable desktop`;
+
 /** The last part of a path: "/Users/you/Projects/loja-v5" → "loja-v5". */
 export function folderName(path: string): string {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
@@ -86,6 +90,12 @@ export function computerKind(os: string | null | undefined, cloud = false): Comp
   if (v === "windows" || v === "win32") return "windows";
   return "linux";
 }
+
+/**
+ * Who may turn a tool off or take a folder away here: an admin or whoever connected it, never on the
+ * workspace's own computer, where nobody in the workspace could turn them back on (ADR 0056 §10).
+ */
+export const canReduceAccess = (m: Pick<Machine, "canManage" | "kind">) => m.canManage && m.kind !== "managed";
 
 /** Paused wins over online (a paused machine is still connected); otherwise online or offline. */
 export function computerState(m: Pick<Machine, "online" | "paused">, now = Date.now()): ComputerState {

@@ -30,6 +30,7 @@ export interface EnvVarDefinition {
     | "Email for agents"
     | "Push"
     | "Operator"
+    | "Usage report"
     | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
@@ -77,9 +78,14 @@ export const envVars = {
     section: "Server",
   },
   DATABASE_URL: {
-    schema: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
+    schema: z
+      .string()
+      .regex(
+        /^(postgres(ql)?:\/\/|pglite:\/\/\/)/,
+        "must be a postgres:// or postgresql:// URL, or pglite:/// and an absolute folder",
+      ),
     description:
-      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS.",
+      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS. Native mode (`agentes-server`, no Docker) sets it to `pglite:///<folder>`: the database built into the server, in that folder, for one process.",
     section: "Database",
     example: "postgres://agenteschat:password@db.example.com:5432/agenteschat?sslmode=require",
     secret: true,
@@ -107,6 +113,24 @@ export const envVars = {
     schema: z.stringbool().default(false),
     description:
       "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
+    section: "Sign-in",
+  },
+  OWNER_CLAIM_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner link's token)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the token in an owner link (`<PUBLIC_URL>/owner#claim=<token>`). While no account exists, only that link creates the first account, the installation's owner; every other sign-up waits. Unset: the first account to sign up owns the installation.",
+    section: "Sign-in",
+  },
+  OWNER_KEY_SHA256: {
+    schema: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "must be 64 hex characters (the SHA-256 of the owner key)")
+      .optional(),
+    description:
+      "SHA-256 (hex) of the key the agentes.chat desktop app keeps when it runs this server on the same computer. Only that key creates the first account (the owner, with no password), and the app signs that owner in with it again whenever the session ends. Set by the desktop app.",
     section: "Sign-in",
   },
   TERMS_URL: {
@@ -190,7 +214,20 @@ export const envVars = {
   },
   APPLE_APP_BUNDLE_ID: {
     schema: z.string().optional(),
-    description: "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively.",
+    description:
+      "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively. With `APPLE_TEAM_ID`, invitation and password reset links open the app (`/.well-known/apple-app-site-association`).",
+    section: "Sign-in",
+  },
+  ANDROID_APP_PACKAGE: {
+    schema: z.string().optional(),
+    description:
+      "Package of the Android app (e.g. `chat.agentes.app`). With `ANDROID_APP_CERT_SHA256`, invitation and password reset links open the app (`/.well-known/assetlinks.json`).",
+    section: "Sign-in",
+  },
+  ANDROID_APP_CERT_SHA256: {
+    schema: z.string().optional(),
+    description:
+      "SHA-256 fingerprints of the Android app's signing certificates (`AA:BB:…`), comma-separated (e.g. the upload key and Play's app signing key).",
     section: "Sign-in",
   },
   AGENT_DEFAULT_MODEL: {
@@ -606,7 +643,7 @@ export const envVars = {
       .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
       .optional(),
     description:
-      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true`. Unset: off.",
+      "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true` or `MACHINE_PROVISIONING=external`. Unset: off.",
     section: "Sandbox",
     example: "<output of openssl rand -base64 48>",
     secret: true,
@@ -614,7 +651,7 @@ export const envVars = {
   DESKTOP_RELEASES_TOKEN: {
     schema: z.string().optional(),
     description:
-      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`). Unset: those endpoints answer 404.",
+      "Fine-grained GitHub token (read-only contents) for the repository that publishes the desktop app's releases and the server's. The server reads the latest `desktop-v*` release with it (`/api/desktop/latest`, `/api/desktop/download/...`), and the packages that run agentes.chat without Docker from the latest `v*` one (`/api/native/latest`, `/api/native/download/...`). Unset: those endpoints answer 404.",
     section: "Sandbox",
     secret: true,
   },
@@ -623,7 +660,8 @@ export const envVars = {
       .string()
       .regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/repo")
       .default("agentes-chat/agentes.chat"),
-    description: "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app.",
+    description:
+      "GitHub repository (`owner/repo`) whose releases tagged `desktop-v<version>` hold the desktop app, and `v<version>` the packages without Docker.",
     section: "Sandbox",
   },
   OPERATOR_API_TOKEN: {
@@ -643,11 +681,38 @@ export const envVars = {
       "Port of the operator API's listener, on the same `HOST`; only with `OPERATOR_API_TOKEN`. The compose file doesn't publish it: containers on the same Docker network reach it as `agentes:3001`.",
     section: "Operator",
   },
+  SUPPORT_EMAIL: {
+    schema: z.email().optional(),
+    description:
+      "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
+    section: "Operator",
+    example: "support@example.com",
+  },
   MACHINE_PROVISIONING: {
     schema: z.enum(["off", "external"]).default("off"),
     description:
-      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. Needs `OPERATOR_API_TOKEN`.",
+      "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People can't connect computers of their own then (pairing answers 403 `machine.pairing_off`). Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
     section: "Operator",
+  },
+  TELEMETRY: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("on"),
+    description:
+      "Send anonymous usage statistics to agentes.chat once a day: counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names. `off` stops it, whatever the switch in Settings → General says (the installation's owner can turn it off there too). `docker compose run --rm agentes telemetry` prints exactly what would be sent; SELF_HOSTING.md lists every field.",
+    section: "Usage report",
+  },
+  TELEMETRY_URL: {
+    schema: z.url().default("https://telemetry.agentes.chat/v1/report"),
+    description: "Where the usage report is sent (the report as JSON in a POST).",
+    section: "Usage report",
+  },
+  INSTALL_MODE: {
+    schema: z.enum(["docker", "native", "desktop"]).optional(),
+    description:
+      "How this server was installed, as the usage report says it: `docker`, `native` or `desktop`. The desktop app sets it, and `agentes-server` (no Docker) when it isn't set. Unset: `docker` inside a container, else `native`.",
+    section: "Usage report",
   },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),

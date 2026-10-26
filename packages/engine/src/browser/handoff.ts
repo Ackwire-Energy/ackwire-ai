@@ -1,5 +1,4 @@
 import {
-  type AgentScope,
   type BrowserHandoffInfo,
   type MachineReplies,
   type PubSub,
@@ -81,8 +80,6 @@ interface Screen {
   tool: { name: string; scope: string };
   /** The computer it runs on while no open handoff holds one. */
   machine(agent: { machineId: string | null; browserMachineId: string | null }): string | null;
-  /** "Parar" on the computer. */
-  stop(hub: MachineCaller, machineId: string, agent: AgentScope): Promise<unknown>;
   /** Who may take control of it, besides who may watch it (throws). */
   mayControl?(db: Database, userId: string, orgId: string, agentId: string): Promise<unknown>;
   /** The agent's request for a person: its tool, and its card (the app translates `code`). */
@@ -97,8 +94,6 @@ const SCREENS: Record<ScreenKind, Screen> = {
     tool: { name: "browser_open", scope: BROWSER_SCOPE },
     // The one its browser tools last used: a mission's or its own, whichever run used it.
     machine: (agent) => agent.browserMachineId ?? agent.machineId,
-    stop: (hub, machineId, agent) =>
-      hub.call<"browser.stop">(machineId, { op: "browser.stop", agent }, { timeoutMs: 30_000 }),
     ask: { tool: ASK_PERSON_TOOL, card: "Help needed in the browser", code: "browser_handoff" },
   },
   desktop: {
@@ -108,8 +103,6 @@ const SCREENS: Record<ScreenKind, Screen> = {
     on: "on your desktop",
     tool: { name: "desktop_do", scope: DESKTOP_SCOPE },
     machine: (agent) => agent.machineId,
-    stop: (hub, machineId, agent) =>
-      hub.call<"desktop.session.stop">(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 30_000 }),
     // A desktop in control has a terminal: who may run commands as its OS user (ADR 0058 §4).
     mayControl: requireComputerDriver,
     ask: { tool: DESKTOP_ASK_PERSON_TOOL, card: "Help needed on the desktop", code: "desktop_handoff" },
@@ -541,9 +534,8 @@ export function openHandoffsOfMachine(db: Executor, machineId: string) {
     .where(and(eq(browserHandoffs.machineId, machineId), inArray(browserHandoffs.status, OPEN)));
 }
 
-/** The agent's page with that screen open (the app reads `?browser=1`, `?desktop=1`). */
-export const agentBrowserLink = (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
-  `/org/${orgId}/agents/${agentId}?${screen}=1`;
+/** The agent's page with its computer open (`?computer=1`; older links' `?browser=1` and `?desktop=1` open it too). */
+export const agentBrowserLink = (orgId: string, agentId: string) => `/org/${orgId}/agents/${agentId}?computer=1`;
 
 /**
  * An open handoff as the computer's desktop app shows it (`browser.handoff`):
@@ -562,7 +554,7 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
       : row.kind === "ask"
         ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
         : `/org/${row.orgId}/c/${where.channelId}`
-    : agentBrowserLink(row.orgId, row.agentId, row.screen);
+    : agentBrowserLink(row.orgId, row.agentId);
   return {
     status: row.status === "active" && row.controllerUserId ? "active" : "pending",
     ...(person?.name ? { controller: person.name } : {}),
@@ -1260,11 +1252,11 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
 }
 
 /**
- * "Parar" on the live view or the computer page: stops one of the agent's
- * screens now (a browser closes; its logins stay in its profile). Whoever may
- * watch it may stop it; the agent's next browser call opens a fresh one.
- * Everyone watching hears it (`browser.stopped` on every replica: their card
- * says it was stopped, by whom).
+ * "Parar" on the live view or the computer page: the agent's browser closes
+ * now (its logins stay in its profile). Whoever may watch it may stop it; the
+ * agent's next browser call opens a fresh one. Everyone watching hears it
+ * (`browser.stopped` on every replica: their card says it was stopped, by
+ * whom). The agent's screen has no stop: it stays on (ADR 0058 §1).
  */
 export async function stopAgentBrowser(
   db: Database,
@@ -1273,25 +1265,21 @@ export async function stopAgentBrowser(
   orgId: string,
   agentId: string,
   pubsub?: PubSub,
-  screen: ScreenKind = "browser",
 ) {
-  await requireBrowserAccess(db, actorId, orgId, agentId, undefined, screen);
+  await requireBrowserAccess(db, actorId, orgId, agentId);
   if (!hub) throw new ValidationError("Connected computers are not available on this server");
-  const machineId = await browserMachineOf(db, orgId, agentId, screen);
+  const machineId = await browserMachineOf(db, orgId, agentId, "browser");
   if (!machineId) throw new ValidationError("This agent has no computer");
   const agent = await getAgentCached(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  await SCREENS[screen].stop(hub, machineId, {
-    id: agentId,
-    handle: agent.handle,
-    ...(agent.name ? { name: agent.name } : {}),
-  });
+  const scope = { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) };
+  await hub.call<"browser.stop">(machineId, { op: "browser.stop", agent: scope }, { timeoutMs: 30_000 });
   await pubsub
     ?.publish(BROWSER_HANDOFF_TOPIC, {
       type: "browser.stopped",
       orgId,
       agentId,
-      screen,
+      screen: "browser",
       byUserId: actorId,
       at: new Date().toISOString(),
     })

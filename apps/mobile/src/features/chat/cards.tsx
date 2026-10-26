@@ -13,9 +13,17 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Chip, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
-import { approvalRisk } from "../approvals/logic";
-import { ApprovalDetails, ApprovalFuse, ApprovalTraits, ApprovalWhy } from "../approvals/parts";
+import { Button, Chip, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
+import { approvalAction, approvalRisk } from "../approvals/logic";
+import {
+  ApprovalDetails,
+  ApprovalEmailLetter,
+  ApprovalFuse,
+  ApprovalSaid,
+  ApprovalTraits,
+  approvalTitleText,
+  useOriginShort,
+} from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -101,7 +109,7 @@ export function StepsCard({ runId, steps }: { runId: string; steps: number }) {
                 key={l.key}
                 style={[styles.step, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
               >
-                {l.note ? <Icon name="chat" size={15} color={c.faint} /> : <Icon name="check" size={15} color={c.ok} />}
+                <LineIcon name={l.note ? "chat" : "check"} size={15} color={l.note ? c.faint : c.ok} variant="small" />
                 <Text variant="small" tone={l.note ? "muted" : "ink2"} style={styles.grow}>
                   {l.text}
                 </Text>
@@ -202,6 +210,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   const approval = useApproval(orgId, approvalId);
   const decide = useDecideApproval(orgId);
   const a = approval.data;
+  const origin = useOriginShort({ origin: a?.origin ?? null });
   if (!a) return null;
   if (a.status !== "pending") {
     const ok = a.status === "approved";
@@ -209,7 +218,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
       <View style={[styles.done, surface]}>
         <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
-          {t(`mobile.chat.approval.${a.status}`, { title: a.title })}
+          {t(`mobile.chat.approval.${a.status}`, { title: approvalTitleText(t, a) })}
         </Text>
       </View>
     );
@@ -235,19 +244,19 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
   return (
     <View style={[styles.askcard, raised]}>
       <View style={styles.label}>
-        <Icon name="shield" size={15} color={c.amber} />
-        <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]}>
-          {t("mobile.chat.approval.asks")}
+        <LineIcon name="wait" size={15} color={c.amber} variant="footnote" />
+        <Text variant="footnote" tone="muted" style={[styles.medium, styles.grow]} numberOfLines={1}>
+          {origin ? `${t("mobile.chat.approval.asks")} · ${origin}` : t("mobile.chat.approval.asks")}
         </Text>
         {high ? <Chip label={t("mobile.approval.highRisk")} /> : null}
       </View>
-      <ApprovalWhy approval={a} name={name} />
       <Text variant="title" style={styles.h4}>
-        {a.title}
+        {approvalTitleText(t, a)}
       </Text>
       <View style={styles.askBody}>
+        {a.email ? <ApprovalEmailLetter email={a.email} /> : <ApprovalDetails approval={a} />}
+        <ApprovalSaid approval={a} name={name} />
         <ApprovalTraits approval={a} />
-        <ApprovalDetails approval={a} />
         <ApprovalFuse approval={a} />
       </View>
       {a.canDecide ? (
@@ -269,7 +278,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
                 variant="primary"
                 wide
                 icon="check"
-                label={t("mobile.approval.approve")}
+                label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
                 disabled={decide.isPending}
                 onPress={approve}
               />

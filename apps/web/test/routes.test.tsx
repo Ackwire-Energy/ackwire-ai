@@ -97,4 +97,20 @@ describe("route guards", () => {
       screen().getByRole("button", { name: /^Conta: .+\. 26% do orçamento dos agentes usado este mês$/ }),
     ).toBeTruthy();
   });
+
+  test("the budget under the person's name says what it is; nothing used, no bar drawn", async () => {
+    const api = createFakeApi();
+    const usage = () => document.querySelector(".sidebar__user .sidebar__usage") as HTMLElement;
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle();
+    expect(usage().textContent).toBe("Orçamento26%");
+    expect(usage().querySelector(".sidebar__usage-bar")).toBeTruthy();
+    cleanup();
+    const overview = api.orgs.overview;
+    api.orgs.overview = async (orgId) => ({ ...(await overview(orgId)), budgetUsedPercent: 0 });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle();
+    expect(usage().textContent).toBe("Orçamento0%");
+    expect(usage().querySelector(".sidebar__usage-bar")).toBeNull();
+  });
 });

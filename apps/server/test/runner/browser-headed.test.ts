@@ -5,6 +5,7 @@ import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adap
 import {
   BrowserManager,
   type BrowserManagerOptions,
+  ChromeStartError,
   chromeEnv,
   chromeLaunchArgs,
   type OwnChrome,
@@ -61,12 +62,17 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const log: string[] = [];
   const chromes: FakeChrome[] = [];
   const desk = fakeDesktops(log);
-  /** Headed starts still to fail, as a Chrome does when its display goes away under it. */
-  const fails = { headed: 0 };
+  /**
+   * Headed starts still to fail, as a Chrome does when its display goes away under it; and whether every start
+   * fails as one missing a library does.
+   */
+  const fails = { headed: 0, libraries: false };
   let clock = 1_000_000;
   const manager = new BrowserManager({
     home,
-    log: () => {},
+    log: (line) => {
+      if (line.includes("didn't start")) log.push(line);
+    },
     send: () => true,
     secret: async () => null,
     command: [process.execPath, FAKE],
@@ -76,10 +82,18 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
     now: () => clock,
     idleMs: 60_000,
     async startChrome(_exe, args, _profile, env): Promise<OwnChrome> {
+      if (fails.libraries) {
+        log.push("chrome failed");
+        throw new ChromeStartError(
+          "the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
+          `missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+          ["libnspr4.so"],
+        );
+      }
       if (fails.headed > 0 && !args.includes("--headless=new")) {
         fails.headed--;
         log.push("chrome failed");
-        throw new Error("Chrome closed while starting (another Chrome may be using this profile)");
+        throw new Error("Chrome closed while starting");
       }
       const c: FakeChrome = { args, env, killed: false };
       chromes.push(c);
@@ -134,6 +148,8 @@ test("headed: maximized on the agent's display, no automation bars, the debuggin
   expect(args).toContain("--disable-blink-features=AutomationControlled");
   expect(args).not.toContain("--headless=new");
   expect(args.some((a) => a.startsWith("--window-size"))).toBe(false);
+  // Its windows' class is the dock's Browser's, so the dock shows them on Browser.
+  expect(args).toContain("--class=agentes-browser");
   expect(args.at(-1)).toBe("about:blank");
   expect(chromeLaunchArgs(EXE, "/p", "linux", null, true, "https://shop.example/cart").at(-1)).toBe(
     "https://shop.example/cart",
@@ -152,7 +168,9 @@ test("headless as before: its own window size, none of the headed flags", () => 
   expect(args).toContain("--headless=new");
   expect(args).toContain("--window-size=1280,800");
   expect(args.some((a) => a.startsWith("--test-type"))).toBe(false);
-  for (const flag of ["--start-maximized", "--ozone-platform=x11"]) expect(args).not.toContain(flag);
+  for (const flag of ["--start-maximized", "--ozone-platform=x11", "--class=agentes-browser"]) {
+    expect(args).not.toContain(flag);
+  }
   expect(args.at(-1)).toBe("about:blank");
 });
 
@@ -286,6 +304,30 @@ test.if(posix)(
   },
 );
 
+test.if(posix)(
+  "a Chrome missing libraries says so, isn't tried headless, and its desktop isn't blamed for it",
+  async () => {
+    const t = setup();
+    t.fails.libraries = true;
+    const failed = await t.act("open", ["https://shop.example/"], true).then(
+      () => null,
+      (e: unknown) => e as RunnerError,
+    );
+    expect(failed?.message).toBe(
+      "Couldn't start the agent's browser: the agent's computer is missing system libraries Chrome needs (libnspr4.so); install them on it, then try again",
+    );
+    expect(t.log).toEqual([
+      "desktop dev",
+      "chrome failed",
+      `the browser of dev didn't start: missing libnspr4.so: ${EXE}: error while loading shared libraries: libnspr4.so`,
+    ]);
+    // Once they're installed, the next command starts it on its desktop.
+    t.fails.libraries = false;
+    expect(await t.act("open", ["https://shop.example/"], true)).toMatchObject({ success: true });
+    expect(headed(last(t))).toBe(true);
+  },
+);
+
 test.if(posix)("in use on its desktop keeps the desktop; its desktop's viewers keep it", async () => {
   const t = setup();
   await t.act("open", ["https://a.example/"], false);
@@ -350,3 +392,143 @@ test.if(posix)("the request's desktop counts only while the machine's desktop sw
   expect(t.chromes).toHaveLength(3);
   expect(headed(last(t))).toBe(false);
 });
+
+/** Chrome's own debugging endpoint, as `show` asks it to bring a window to the front. */
+function fakeDevTools() {
+  const d = {
+    urls: [] as string[],
+    targets: [
+      { id: "SW1", type: "service_worker", url: "https://shop.example/sw.js" },
+      { id: "P7", type: "page", url: "https://shop.example/cart" },
+      { id: "P2", type: "page", url: "https://shop.example/" },
+    ],
+  };
+  const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    d.urls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url.endsWith("/json/list")) return new Response(JSON.stringify(d.targets));
+    return new Response("Target activated");
+  }) as typeof fetch;
+  return Object.assign(d, { fetchFn });
+}
+
+test.if(posix)(
+  "Browser on its desktop: the agent's own Chrome there, started, moved even while watched or a turn is open, or in front",
+  async () => {
+    const devtools = fakeDevTools();
+    const t = setup({ fetch: devtools.fetchFn });
+    const folder = await agentWorkspace(t.ws, dev);
+    let installs = 0;
+    const installing = () => void installs++;
+
+    // Not running: started on the desktop, with the agent's profile; Chrome for Testing is here, nothing installs.
+    await t.manager.show(dev, folder, installing);
+    expect(t.log).toEqual(["desktop dev", "chrome"]);
+    expect(headed(last(t))).toBe(true);
+    expect(last(t).args).toContain(`--user-data-dir=${path.join(folder, ".agentes", "browser")}`);
+    expect(installs).toBe(0);
+    expect(devtools.urls).toEqual([]);
+
+    // Already there: no other Chrome, its window to the front on its most recent page.
+    await t.manager.show(dev, folder, installing);
+    expect(t.chromes).toHaveLength(1);
+    expect(devtools.urls).toEqual([
+      "GET http://127.0.0.1:9301/json/list",
+      "GET http://127.0.0.1:9301/json/activate/P7",
+    ]);
+    // Its last tab closed and Chrome still up: a blank one, in a window of its own.
+    devtools.targets = devtools.targets.filter((x) => x.type !== "page");
+    devtools.urls = [];
+    await t.manager.show(dev, folder, installing);
+    expect(t.chromes).toHaveLength(1);
+    expect(devtools.urls).toEqual([
+      "GET http://127.0.0.1:9301/json/list",
+      "PUT http://127.0.0.1:9301/json/new?about:blank",
+    ]);
+
+    // Headless while a person's turn is open and its live view is watched: a click from the desktop moves it there,
+    // on the page it showed.
+    await t.act("open", ["https://shop.example/cart"], false);
+    expect(headed(last(t))).toBe(false);
+    t.manager.setHandoff(dev.id, { status: "active", controller: "Ana" });
+    await t.manager.streamStart(dev, "watch");
+    await t.manager.show(dev, folder, installing);
+    expect(t.chromes).toHaveLength(3);
+    expect(headed(last(t))).toBe(true);
+    expect(last(t).args.at(-1)).toBe("https://shop.example/cart");
+    expect(t.chromes.filter((c) => !c.killed)).toHaveLength(1);
+  },
+);
+
+test.if(posix)(
+  "Browser on its desktop: a desktop that failed a moment ago is tried again; one that can't take Chrome says why",
+  async () => {
+    const t = setup();
+    const folder = await agentWorkspace(t.ws, dev);
+    t.desk.fails = "This computer has no room for another desktop";
+    await t.act("open", ["https://shop.example/"], true);
+    expect(headed(last(t))).toBe(false);
+    // The agent's own commands wait 5 minutes before trying its desktop again; a person on that desktop doesn't.
+    t.desk.fails = null;
+    await t.manager.show(dev, folder, () => {});
+    expect(t.log).toEqual(["desktop dev", "chrome", "desktop dev", "chrome"]);
+    expect(headed(last(t))).toBe(true);
+
+    const failure = (p: Promise<void>) =>
+      p.then(
+        () => null,
+        (err: unknown) => [(err as RunnerError).code, (err as RunnerError).message],
+      );
+    // No room for Chrome on its desktop: the click fails with the desktop's own reason, and starts no Chrome
+    // headless instead, nor stops the one the agent runs.
+    const other = setup();
+    const otherFolder = await agentWorkspace(other.ws, dev);
+    other.desk.fails = "This computer is short of memory for the agent's browser on its desktop";
+    expect(await failure(other.manager.show(dev, otherFolder, () => {}))).toEqual([
+      "desktop_busy",
+      "This computer is short of memory for the agent's browser on its desktop",
+    ]);
+    expect(other.chromes).toHaveLength(0);
+    await other.act("open", ["https://shop.example/"], false);
+    expect(await failure(other.manager.show(dev, otherFolder, () => {}))).toEqual([
+      "desktop_busy",
+      "This computer is short of memory for the agent's browser on its desktop",
+    ]);
+    expect(other.chromes).toHaveLength(1);
+    expect(other.chromes[0]?.killed).toBe(false);
+    // Chrome itself fails to start there: that is the answer, not a headless one.
+    const third = setup();
+    third.fails.headed = 1;
+    expect(await failure(third.manager.show(dev, await agentWorkspace(third.ws, dev), () => {}))).toEqual([
+      "internal",
+      "Couldn't start the agent's browser: Chrome closed while starting",
+    ]);
+    expect(third.chromes).toHaveLength(0);
+  },
+);
+
+test.if(posix)(
+  "Browser on its desktop before the agent's first browser: Chrome for Testing installs first, and says so",
+  async () => {
+    // A computer without Chrome for Testing until `agent-browser install` ran.
+    let log = "";
+    const installs = () =>
+      existsSync(log)
+        ? readFileSync(log, "utf8")
+            .split("\n")
+            .filter((l) => l && (JSON.parse(l) as { args: string[] }).args[0] === "install").length
+        : 0;
+    const t = setup({ chrome: () => (installs() > 0 ? EXE : null) });
+    log = path.join(t.home, "ab.log");
+    const folder = await agentWorkspace(t.ws, dev);
+    const said: number[] = [];
+    await t.manager.show(dev, folder, () => said.push(installs()));
+    // Said before the install, which then ran once; Chrome opened on the desktop.
+    expect(said).toEqual([0]);
+    expect(installs()).toBe(1);
+    expect(headed(last(t))).toBe(true);
+    // Installed: the next click says nothing of it.
+    await t.manager.show(dev, folder, () => said.push(installs()));
+    expect(said).toEqual([0]);
+  },
+);

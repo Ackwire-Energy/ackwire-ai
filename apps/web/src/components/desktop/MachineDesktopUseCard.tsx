@@ -12,6 +12,7 @@ const TURN_ON = "agentes-runner tools enable desktop && agentes-runner tools ena
  * Apps on the agents' desktops, on a computer's page (ADR 0062): whether agents can use apps on their own
  * desktops there; when not, on Linux the computer's own words on what is missing (each agent its own user,
  * packages) with the command in them, elsewhere that it takes a Linux computer; or the two switches to turn on.
+ * Not on the workspace's own computer, whose page says what is on it instead.
  */
 export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();

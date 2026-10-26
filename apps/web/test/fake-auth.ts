@@ -6,6 +6,9 @@ export function createFakeAuth(
     signUp?: AuthResult;
     reset?: AuthResult;
     redeem?: boolean;
+    oneTime?: AuthResult;
+    claim?: AuthResult;
+    verification?: AuthResult;
     onSignIn?: () => void;
   } = {},
 ) {
@@ -20,6 +23,10 @@ export function createFakeAuth(
     signUp: async (input) => {
       calls.push({ method: "signUp", args: [input] });
       return options.signUp ?? { ok: true };
+    },
+    sendVerificationEmail: async (email) => {
+      calls.push({ method: "sendVerificationEmail", args: [email] });
+      return options.verification ?? { ok: true };
     },
     signInSocial: async (provider, callbackURL) => {
       calls.push({ method: "signInSocial", args: [provider, callbackURL] });
@@ -43,6 +50,14 @@ export function createFakeAuth(
     desktopRedeem: async (verifier) => {
       calls.push({ method: "desktopRedeem", args: [verifier] });
       return options.redeem ?? false;
+    },
+    signInOneTime: async (token) => {
+      calls.push({ method: "signInOneTime", args: [token] });
+      return options.oneTime ?? { ok: true };
+    },
+    ownerClaim: async (input) => {
+      calls.push({ method: "ownerClaim", args: [input] });
+      return options.claim ?? { ok: true };
     },
   };
   return { auth, calls };

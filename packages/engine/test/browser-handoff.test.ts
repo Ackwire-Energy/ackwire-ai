@@ -198,7 +198,10 @@ describe("browser_ask_person", () => {
       handoff: { status: string; note: string | null };
     }[];
     expect(updates.at(-1)?.handoff).toMatchObject({ status: "done", note: null });
-    expect(JSON.stringify(heard)).not.toContain("4821");
+    // Ids are random hex and may hold those digits by chance: none of the note may be in what is left.
+    const words = JSON.stringify(heard).replace(/[0-9a-f-]{8,}/g, "");
+    expect(words).not.toContain("4821");
+    expect(words).not.toContain("cartão");
   });
 
   test("past its deadline it expires and the run goes on", async () => {
@@ -499,7 +502,7 @@ describe("take over", () => {
     const [row] = await handoffs();
     if (!row) throw new Error("no handoff");
     expect(row.runId).toBeNull();
-    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/agents/${f.agent.id}?browser=1`);
+    expect((await handoffInfo(f.db, row))?.link).toBe(`/org/${f.org.id}/agents/${f.agent.id}?computer=1`);
   });
 
   test("a run that isn't the agent's can't carry a take over; one that already ended binds nothing", async () => {
@@ -968,7 +971,7 @@ describe("live view", () => {
     await Bun.sleep(20);
     expect(calls.find((c) => c.op === "browser.act" && c.command === "open")).toMatchObject({
       args: ["https://shop.example.com/login"],
-      link: `/org/${f.org.id}/agents/${f.agent.id}?browser=1`,
+      link: `/org/${f.org.id}/agents/${f.agent.id}?computer=1`,
     });
     expect(streams(calls).at(-1)).toMatchObject({ op: "browser.stream.start", mode: "control" });
     expect(lastStatus(a.got)).toMatchObject({ mode: "control", controllerUserId: f.owner.id, hidden: false });

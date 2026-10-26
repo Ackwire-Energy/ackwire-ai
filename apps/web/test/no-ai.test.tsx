@@ -122,6 +122,18 @@ describe("no AI connected: above the composer", () => {
     await click(screen().getByRole("button", { name: "Sem IA" }));
     expect(dialog("Conectar uma IA")).not.toBeNull();
   });
+
+  test("the agent's page: who it thinks with says no AI too, not the model it's set to, and connects one", async () => {
+    await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }), `agents/${ADA_ID}`);
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.textContent).toContain("Pensa comSem IA");
+    expect(work.textContent).not.toContain("o modelo da organização");
+    await click(within(work).getByRole("button", { name: "Conectar uma IA" }));
+    expect(dialog("Conectar uma IA")).not.toBeNull();
+    cleanup();
+    await open(seedState({ aiStatus: aiStatus(true, ATLAS_ID) }), `agents/${ADA_ID}`);
+    expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("o modelo da organização");
+  });
 });
 
 describe("the agent's no-AI card", () => {
@@ -193,6 +205,23 @@ describe("the agent's no-AI card", () => {
     ]);
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
     expect(dialog("Conectar o seu plano do Claude")).toBeNull();
+  });
+
+  test("a plan while the workspace's computer is on its way: it waits, for the time left; a key meanwhile", async () => {
+    const state = walters(withCard({ intent: "claude" }), ADA_ID);
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "preparing", step: "installing", secondsLeft: 330 });
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await brain(orgId, agentId)), computer: null });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
+    const plan = dialog("Conectar o seu plano do Claude") as HTMLElement;
+    expect(plan.textContent).toContain(
+      "Disponível quando o computador ficar pronto. Dá para usar uma chave de API agora.",
+    );
+    expect(plan.textContent).toContain("Faltam uns 6 min");
+    expect(within(plan).getByRole("button", { name: "Chave de API" })).toBeTruthy();
   });
 
   test("connected elsewhere: 'Responder agora'; still no AI: it says so and keeps Connect", async () => {

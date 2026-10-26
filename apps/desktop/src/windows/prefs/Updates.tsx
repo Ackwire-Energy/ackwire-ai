@@ -3,14 +3,15 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../../app";
 import { noteLines } from "../../control/version";
-import type { UpdateCheck } from "../../hooks";
+import { type UpdateCheck, useLocalServer } from "../../hooks";
 import { useToast } from "../../ui/Toast";
 import { clock } from "../../ui/time";
 import { CardTitle, PrefCard, PrefHead } from "./shared";
 
 /**
  * Updates (ADR 0036 §9): one click installs the signed update and reopens the app. When that can't
- * happen (a release without the updater bundle, a failed download) the manual steps come back.
+ * happen (a release without the updater bundle, a failed download, a Linux package) the download and, on a
+ * Mac, the manual steps come back.
  */
 export function Updates({ update }: { update: UpdateCheck }) {
   const { t, i18n } = useTranslation();
@@ -19,6 +20,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
   const { latest, available, required } = update.state;
   const [installing, setInstalling] = useState(false);
   const [manual, setManual] = useState(false);
+  const local = useLocalServer();
 
   const install = async () => {
     setInstalling(true);
@@ -68,6 +70,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
                   })
                 : t("desktop.prefs.updates.neverChecked")}
             </small>
+            {local.run && <small className="dk-help">{t("desktop.server.updatesWithApp")}</small>}
           </span>
           <Button size="sm" loading={update.checking} onClick={() => void checkNow()}>
             {t("desktop.prefs.updates.checkNow")}
@@ -91,11 +94,15 @@ export function Updates({ update }: { update: UpdateCheck }) {
             <>
               <CardTitle>{t("desktop.prefs.updates.howTitle")}</CardTitle>
               <PrefCard padded>
-                <ol className="dk-steps-list">
-                  <li>{t("desktop.prefs.updates.step1")}</li>
-                  <li>{t("desktop.prefs.updates.step2")}</li>
-                  <li>{t("desktop.prefs.updates.step3")}</li>
-                </ol>
+                {host.platform === "mac" ? (
+                  <ol className="dk-steps-list">
+                    <li>{t("desktop.prefs.updates.step1")}</li>
+                    <li>{t("desktop.prefs.updates.step2")}</li>
+                    <li>{t("desktop.prefs.updates.step3")}</li>
+                  </ol>
+                ) : (
+                  <p className="dk-help">{t("desktop.prefs.updates.installerNote")}</p>
+                )}
                 <div className="dk-ver__acts">
                   <Button variant="primary" icon="download" onClick={() => void host.openExternal(latest.url)}>
                     {t("desktop.prefs.updates.download", { version: latest.version })}

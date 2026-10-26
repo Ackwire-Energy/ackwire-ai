@@ -1,15 +1,22 @@
 name: CI
 
 # All verification runs here.
-# Every pull request and every push to main; a `v*` tag also publishes the image. Each job runs only
-# when something it covers changed (shared packages, the lockfile and this file run everything);
-# docs and READMEs alone run only the secret scan and the boundaries check. A manual run or a release tag
-# checks everything.
+# Every pull request that is not a draft and every push to main; a `v*` tag also publishes the image.
+# A draft runs nothing (each push to a pull request is a full run, paid by the minute): marking it
+# ready for review starts the run. Each job runs only when something it covers changed (shared
+# packages, the lockfile and this file run everything); docs and READMEs alone run only the secret
+# scan and the boundaries check. A manual run or a release tag checks everything.
+#
+# Runners are sized by price: jobs that last seconds run on 2 vCPU ARM (billing rounds each job up
+# to a whole minute, and ARM costs a third less per minute). The tests stay on 4 vCPU x64: on 4 vCPU
+# ARM the backend shards took 2.5x as long (603 and 667 s against 229 and 275 s, 2026-10-26), which
+# cost more than the cheaper minute saves.
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -32,7 +39,8 @@ defaults:
 jobs:
   changes:
     name: What changed
-    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft != true
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     permissions:
       contents: read
@@ -45,8 +53,9 @@ jobs:
       mobile: ${{ steps.groups.outputs.mobile }}
       desktop: ${{ steps.groups.outputs.desktop }}
       image: ${{ steps.groups.outputs.image }}
+      docker: ${{ steps.groups.outputs.docker }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       - name: Changed files
         id: filter
         if: github.event_name != 'workflow_dispatch' && github.ref_type != 'tag'
@@ -91,7 +100,7 @@ jobs:
           CHANGES: ${{ steps.filter.outputs.changes || '[]' }}
         run: |
           changed() { [ "$ALL" = true ] || { [ "$CODE" = true ] && jq -e --arg g "$1" 'any(.[]; . == $g)' <<<"$CHANGES" >/dev/null; }; }
-          for g in code shared backend web mobile desktop; do
+          for g in code shared backend web mobile desktop docker; do
             if changed "$g"; then echo "$g=true"; else echo "$g=false"; fi >> "$GITHUB_OUTPUT"
           done
           if changed shared || changed backend || changed web || changed docker; then echo image=true; else echo image=false; fi >> "$GITHUB_OUTPUT"
@@ -101,10 +110,10 @@ jobs:
     name: Lint, boundaries, typecheck, build
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       # A tag publishes exactly the version /api/health reports; a tag that disagrees with
       # apps/server/package.json is refused before anything runs.
       - name: Tag must match the server version
@@ -119,15 +128,15 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-${{ runner.os }}-
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-
       - &install
         run: bun install --frozen-lockfile
       - name: Lint and format
         run: bun run lint
       - name: Shell scripts
         if: success() || failure()
-        run: shellcheck install.sh deploy/*.sh deploy/backup/*.sh
+        run: shellcheck install.sh deploy/*.sh deploy/backup/*.sh scripts/*.sh
       # No test shard covers scripts/, so the checks' own tests run here. The boundaries check itself runs in
       # the secrets job, which docs-only changes run too.
       - name: Boundaries check's own test
@@ -173,7 +182,7 @@ jobs:
     name: Test (backend ${{ matrix.shard }}/2)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -187,7 +196,7 @@ jobs:
               packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
               apps/server
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       - *setup-bun
       - *cache-bun
       - *install
@@ -219,7 +228,7 @@ jobs:
     if: >-
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
@@ -227,7 +236,7 @@ jobs:
       MOBILE: ${{ needs.changes.outputs.mobile }}
       DESKTOP: ${{ needs.changes.outputs.desktop }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       - *setup-bun
       - *cache-bun
       - *install
@@ -268,10 +277,11 @@ jobs:
   # internal notes in public files. Every change runs this job, docs included; the check needs no install.
   secrets:
     name: Secret scan and boundaries
-    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft != true
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
         with:
           fetch-depth: 0
       # Bun first: the boundaries check below still runs when the scan fails.
@@ -285,22 +295,27 @@ jobs:
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
   # probe, the first sign-up (the installation's owner), an organization, a second sign-up refused
   # (sign-up is closed by default), the web app, the runner download and install.sh at /install,
-  # then an upgrade's steps on the same volumes, and the backup profile: a dump and its restore.
+  # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
+  # and the backup profile: a dump and its restore.
   # amd64 only, nothing pushed.
+  # A pull request runs it only when the image's own files changed (Dockerfile, compose files, the
+  # backup image): code changes are the tests' job, and every push to main still runs it.
   # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
   # would crowd main's out of the repository's cache quota.
   compose:
     name: Image boots with docker compose
     needs: changes
-    if: needs.changes.outputs.image == 'true'
-    runs-on: ubuntu-latest
+    if: >-
+      needs.changes.outputs.image == 'true' &&
+      (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     env:
       AGENTES_IMAGE: agentes:ci
       AGENTES_BACKUP_IMAGE: agentes-backup:ci
       URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -353,6 +368,8 @@ jobs:
           docker compose up -d
           healthy
           curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
+          docker compose run --rm -T agentes telemetry > report.json
+          jq -e '.report == 1 and .install == "docker" and .host.container and .people.total == 1' report.json
       # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
       # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
       - name: Back up and restore
@@ -391,10 +408,10 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
             slug: amd64
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+            runner: blacksmith-4vcpu-ubuntu-2404-arm
             slug: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -402,7 +419,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -454,7 +471,7 @@ jobs:
   publish:
     name: Publish the images
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       contents: read
@@ -500,12 +517,12 @@ jobs:
     if: >-
       github.ref_type == 'tag' && !cancelled() &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@v1 # v7.0.1
       - name: Attach install.sh to the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -515,13 +532,52 @@ jobs:
             gh release create "$TAG" --verify-tag --title "agentes.chat ${TAG#v}" --generate-notes
           gh release upload "$TAG" install.sh --clobber
 
+  # A version tag's release also carries agentes.chat without Docker (ADR 0060 §2): one package per
+  # computer (macOS and Linux, x64 and arm64), each with the Bun install.sh pins, and native.json, signed
+  # with the desktop updater's key, which the installer checks before it downloads anything. After
+  # release-install, which makes the release.
+  release-native:
+    name: Release the native packages
+    needs: [changes, check, test-backend, test-web, secrets, compose, release-install]
+    if: >-
+      github.ref_type == 'tag' && !cancelled() &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: useblacksmith/checkout@v1 # v7.0.1
+      - *setup-bun
+      - *cache-bun
+      - *install
+      - name: Build the packages
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bun scripts/native-package.ts packages --version "${TAG#v}" --out "$RUNNER_TEMP/native"
+      - name: Sign native.json
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          bun run tauri signer sign "$RUNNER_TEMP/native/native.json"
+          test -s "$RUNNER_TEMP/native/native.json.sig"
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd "$RUNNER_TEMP/native"
+          gh release upload "$TAG" agentes-native-*.tar.gz native.json native.json.sig --clobber --repo "$GITHUB_REPOSITORY"
+
   # The one check to require once branch protection is on: red when any job failed or was
-  # cancelled; a skipped job is fine (nothing it covers changed).
+  # cancelled; a skipped job is fine (nothing it covers changed). A draft gets no result at all.
   done:
     name: CI result
-    if: always()
-    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish, release-install]
-    runs-on: ubuntu-latest
+    if: always() && github.event.pull_request.draft != true
+    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish, release-install, release-native]
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 2
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

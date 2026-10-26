@@ -12,7 +12,8 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
-import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH } from "@/lib/desktop";
+import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH, thisMac } from "@/lib/desktop";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 
 /**
  * Sign in and sign up in one flow: the e-mail
@@ -20,9 +21,22 @@ import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PAT
  * provider the account signs in with, or the name and a new password).
  * "Esqueci a senha" happens in place. The agent reacts to what you do.
  * In the Mac app, Google/GitHub/Apple open in the browser and the window
- * waits for the sign-in to come back ("browser", ADR 0036).
+ * waits for the sign-in to come back ("browser", ADR 0036). On the server the
+ * app runs on this computer, its owner has no password: "Continue on this Mac"
+ * asks the app, which signs them in (ADR 0060 §6).
  */
-type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent" | "browser";
+type Step =
+  | "email"
+  | "password"
+  | "social"
+  | "noPassword"
+  | "name"
+  | "newPassword"
+  | "closed"
+  | "forgot"
+  | "sent"
+  | "browser"
+  | "ownerWaits";
 
 /** How often the Mac app's window asks whether the browser finished, and for how long. */
 const REDEEM_EVERY_MS = 2000;
@@ -92,6 +106,27 @@ export function AuthPage({
   const [browser, setBrowser] = useState<{ provider: SignInProvider; verifier: string; challenge: string } | null>(
     null,
   );
+  // This server runs inside the app here: the app signs its owner in.
+  const [local, setLocal] = useState(false);
+  const [ownerPending, setOwnerPending] = useState(false);
+  useEffect(() => {
+    if (!desktop) return;
+    void thisMac
+      .status()
+      .then((s) => setLocal(s.local === true))
+      .catch(() => {});
+  }, [desktop]);
+  const continueHere = async () => {
+    setOwnerPending(true);
+    setError(null);
+    try {
+      // The app moves this window to the sign-in it made; nothing to do here after.
+      await thisMac.signIn();
+    } catch {
+      setError(t("common.unknownError"));
+      setOwnerPending(false);
+    }
+  };
 
   const go = (next: Step) => {
     setError(null);
@@ -111,7 +146,7 @@ export function AuthPage({
       const found = await api.account.signInOptions({ email: value.trim() });
       setOptions(found);
       setPassword("");
-      if (found.account) go(found.password ? "password" : "social");
+      if (found.account) go(found.password ? "password" : found.providers.length > 0 ? "social" : "noPassword");
       else go(found.canSignUp ? "name" : "closed");
     } catch (e) {
       fail(e);
@@ -164,6 +199,8 @@ export function AuthPage({
       return;
     }
     rememberSignIn("email");
+    // A server that sends email sent this address a link to confirm it: the onboarding says where it went.
+    if (canReset) sessionStore.set(STORAGE_KEYS.confirmationSent, email.trim().toLowerCase());
     await enter(redirect ?? "/onboarding");
   };
 
@@ -260,6 +297,7 @@ export function AuthPage({
       ? [t("auth.flow.wrong"), canReset ? t("auth.flow.wrongLead") : t("auth.flow.wrongLeadNoReset")]
       : [t("auth.flow.password"), t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
+    noPassword: [t("auth.flow.noPassword"), local ? t("auth.desktopOwner.text") : t("auth.flow.noPasswordLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
     newPassword: [
       first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
@@ -272,8 +310,11 @@ export function AuthPage({
       t("auth.desktop.browser"),
       t("auth.desktop.browserLead", { provider: browser ? t(`auth.provider.${browser.provider}`) : "" }),
     ],
+    ownerWaits: [t("auth.flow.ownerWaits"), t("auth.flow.ownerWaitsLead")],
   };
-  const [title, lead] = bubble[step];
+  // No account yet, and only the installer's owner link makes the first one: nothing to sign in to here.
+  const shown: Step = config.data?.ownerClaim ? "ownerWaits" : step;
+  const [title, lead] = bubble[shown];
 
   const fix = step === "email" || step === "forgot" ? emailTypoFix(email) : null;
   const help = passwordHelp(t, password);
@@ -347,157 +388,193 @@ export function AuthPage({
             state={pending || step === "browser" ? "writing" : undefined}
             expression={expression}
           />
-          <div className="auth__bubble" key={`${step}-${wrong}`} aria-live="polite">
+          <div className="auth__bubble" key={`${shown}-${wrong}`} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
             <p className="auth__lead">{lead}</p>
           </div>
         </header>
 
-        <div className="auth__step" key={step}>
-          {who}
+        {shown !== "ownerWaits" && (
+          <div className="auth__step" key={shown}>
+            {who}
 
-          {(step === "email" || step === "forgot") && (
-            <div className="auth__field">
+            {local && (step === "email" || step === "noPassword") && (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
+                  block
+                  loading={ownerPending}
+                  onClick={() => void continueHere()}
+                >
+                  {t("auth.desktopOwner.continue")}
+                </Button>
+                {step === "email" && (
+                  <>
+                    <p className="auth__fine">{t("auth.desktopOwner.text")}</p>
+                    <div className="auth__or">{t("common.or")}</div>
+                  </>
+                )}
+              </>
+            )}
+
+            {(step === "email" || step === "forgot") && (
+              <div className="auth__field">
+                <Input
+                  className="auth__big"
+                  type="email"
+                  inputMode="email"
+                  aria-label={t("auth.email")}
+                  autoComplete="email"
+                  placeholder={t("auth.flow.emailPlaceholder")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  invalid={error !== null}
+                  autoFocus
+                />
+                {fix && (
+                  <button type="button" className="auth__fix" onClick={() => setEmail(fix)}>
+                    {t("auth.flow.didYouMean", { email: fix })}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {step === "password" && (
+              <div className="auth__field">
+                {passwordInput(false)}
+                {capsNote}
+              </div>
+            )}
+
+            {step === "name" && (
               <Input
                 className="auth__big"
-                type="email"
-                inputMode="email"
-                aria-label={t("auth.email")}
-                autoComplete="email"
-                placeholder={t("auth.flow.emailPlaceholder")}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                invalid={error !== null}
+                aria-label={t("auth.yourName")}
+                autoComplete="name"
+                spellCheck={false}
+                placeholder={t("auth.flow.namePlaceholder")}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 autoFocus
               />
-              {fix && (
-                <button type="button" className="auth__fix" onClick={() => setEmail(fix)}>
-                  {t("auth.flow.didYouMean", { email: fix })}
-                </button>
-              )}
-            </div>
-          )}
+            )}
 
-          {step === "password" && (
-            <div className="auth__field">
-              {passwordInput(false)}
-              {capsNote}
-            </div>
-          )}
+            {step === "newPassword" && (
+              <div className="auth__field">
+                {passwordInput(true)}
+                <PasswordHelp password={password} />
+                {capsNote}
+              </div>
+            )}
 
-          {step === "name" && (
-            <Input
-              className="auth__big"
-              aria-label={t("auth.yourName")}
-              autoComplete="name"
-              placeholder={t("auth.flow.namePlaceholder")}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-          )}
+            {error && (
+              <p className="auth__error" role="alert">
+                <Icon name="alert" size={14} />
+                {error}
+              </p>
+            )}
 
-          {step === "newPassword" && (
-            <div className="auth__field">
-              {passwordInput(true)}
-              <PasswordHelp password={password} />
-              {capsNote}
-            </div>
-          )}
-
-          {error && (
-            <p className="auth__error" role="alert">
-              <Icon name="alert" size={14} />
-              {error}
-            </p>
-          )}
-
-          {submitLabel[step] && (
-            <Button type="submit" variant="primary" size="lg" block kbd={["↵"]} loading={pending} disabled={!ready}>
-              {submitLabel[step]}
-            </Button>
-          )}
-
-          {step === "email" && allProviders.length > 0 && (
-            <>
-              <div className="auth__or">{t("common.or")}</div>
-              <SocialButtons
-                callbackURL={redirect ?? "/"}
-                providers={allProviders}
-                onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
-              />
-            </>
-          )}
-
-          {step === "password" && canReset && (
-            <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
-              {t("auth.forgotPassword")}
-            </button>
-          )}
-
-          {step === "social" && (
-            <>
-              <SocialButtons
-                callbackURL={redirect ?? "/"}
-                providers={linkedProviders}
-                onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
-              />
-              {canReset && (
-                <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
-                  {t("auth.flow.createPassword")}
-                </button>
-              )}
-            </>
-          )}
-
-          {step === "browser" && (
-            <>
-              <Button type="button" size="lg" block onClick={reopenBrowser}>
-                {t("auth.desktop.reopen")}
+            {submitLabel[step] && (
+              <Button
+                type="submit"
+                variant={local && step === "email" ? "default" : "primary"}
+                size="lg"
+                block
+                kbd={["↵"]}
+                loading={pending}
+                disabled={!ready}
+              >
+                {submitLabel[step]}
               </Button>
-              <button type="button" className="auth__quiet" onClick={() => go("email")}>
-                {t("auth.desktop.otherWay")}
+            )}
+
+            {step === "email" && allProviders.length > 0 && (
+              <>
+                <div className="auth__or">{t("common.or")}</div>
+                <SocialButtons
+                  callbackURL={redirect ?? "/"}
+                  providers={allProviders}
+                  onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
+                />
+              </>
+            )}
+
+            {step === "password" && canReset && (
+              <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
+                {t("auth.forgotPassword")}
               </button>
-            </>
-          )}
+            )}
 
-          {step === "closed" && (
-            <Button type="button" size="lg" block onClick={() => go("email")}>
-              {t("auth.flow.otherEmail")}
-            </Button>
-          )}
+            {step === "social" && (
+              <>
+                <SocialButtons
+                  callbackURL={redirect ?? "/"}
+                  providers={linkedProviders}
+                  onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
+                />
+                {canReset && (
+                  <button type="button" className="auth__quiet" onClick={() => go("forgot")}>
+                    {t("auth.flow.createPassword")}
+                  </button>
+                )}
+              </>
+            )}
 
-          {step === "forgot" && (
-            <button type="button" className="auth__quiet" onClick={() => go(options?.password ? "password" : "email")}>
-              {t("auth.flow.back")}
-            </button>
-          )}
-
-          {step === "sent" && (
-            <>
-              {mail && (
-                <Button asChild variant="primary" size="lg" block>
-                  <a href={mail.url} target="_blank" rel="noopener noreferrer">
-                    {t("auth.flow.openMail", { app: mail.name })}
-                  </a>
+            {step === "browser" && (
+              <>
+                <Button type="button" size="lg" block onClick={reopenBrowser}>
+                  {t("auth.desktop.reopen")}
                 </Button>
-              )}
-              <Button type="button" size="lg" block onClick={() => go("password")}>
-                {t("auth.flow.backToSignIn")}
-              </Button>
-            </>
-          )}
+                <button type="button" className="auth__quiet" onClick={() => go("email")}>
+                  {t("auth.desktop.otherWay")}
+                </button>
+              </>
+            )}
 
-          {(step === "email" || step === "newPassword") && termsUrl && privacyUrl && (
-            <p className="auth__fine">
-              {t("auth.termsBefore")}
-              <a href={termsUrl}>{t("auth.terms")}</a>
-              {t("auth.termsMiddle")}
-              <a href={privacyUrl}>{t("auth.privacy")}</a>
-              {t("auth.termsAfter")}
-            </p>
-          )}
-        </div>
+            {(step === "closed" || step === "noPassword") && (
+              <Button type="button" size="lg" block onClick={() => go("email")}>
+                {t("auth.flow.otherEmail")}
+              </Button>
+            )}
+
+            {step === "forgot" && (
+              <button
+                type="button"
+                className="auth__quiet"
+                onClick={() => go(options?.password ? "password" : "email")}
+              >
+                {t("auth.flow.back")}
+              </button>
+            )}
+
+            {step === "sent" && (
+              <>
+                {mail && (
+                  <Button asChild variant="primary" size="lg" block>
+                    <a href={mail.url} target="_blank" rel="noopener noreferrer">
+                      {t("auth.flow.openMail", { app: mail.name })}
+                    </a>
+                  </Button>
+                )}
+                <Button type="button" size="lg" block onClick={() => go("password")}>
+                  {t("auth.flow.backToSignIn")}
+                </Button>
+              </>
+            )}
+
+            {(step === "email" || step === "newPassword") && termsUrl && privacyUrl && (
+              <p className="auth__fine">
+                {t("auth.termsBefore")}
+                <a href={termsUrl}>{t("auth.terms")}</a>
+                {t("auth.termsMiddle")}
+                <a href={privacyUrl}>{t("auth.privacy")}</a>
+                {t("auth.termsAfter")}
+              </p>
+            )}
+          </div>
+        )}
       </form>
     </AuthShell>
   );

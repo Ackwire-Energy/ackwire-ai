@@ -156,6 +156,7 @@ test("outages: offline computers with computer-brain agents, waiting routines vs
       machineId: s.pro,
       name: "MacBook Pro",
       platform: "mac",
+      managed: false,
       online: true,
       brains: ["claude_code"],
       reasonOff: null,
@@ -165,6 +166,7 @@ test("outages: offline computers with computer-brain agents, waiting routines vs
       machineId: s.pc,
       name: "PC do escritório",
       platform: "windows",
+      managed: false,
       online: false,
       brains: ["claude_code"],
       reasonOff: "offline",
@@ -173,6 +175,16 @@ test("outages: offline computers with computer-brain agents, waiting routines vs
   ]);
   const withCloud = await listMachineOutages({ ...s.outageDeps, cloudAvailable: true }, f.owner.id, f.org.id);
   expect(withCloud.targets.at(-1)).toEqual({ kind: "cloud", available: true, brains: [] });
+});
+
+test("outages: the workspace's own computer is marked managed, its system never said", async () => {
+  const s = await scene();
+  await f.db.update(schema.machines).set({ kind: "managed" }).where(eq(schema.machines.id, s.pro));
+  const { targets } = await listMachineOutages(s.outageDeps, f.owner.id, f.org.id);
+  expect(targets.find((t) => t.kind === "machine" && t.machineId === s.pro)).toMatchObject({
+    managed: true,
+    platform: "other",
+  });
 });
 
 test("outages: a member sees only the agents they own; none when the computer is back", async () => {

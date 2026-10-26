@@ -1,9 +1,37 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseOptions } from "../../../packages/setup/src/lib";
+import { loadConfig } from "@agenteschat/config";
+import { en } from "../../../packages/i18n/src/en";
+import {
+  computerFiles,
+  HOST_LAUNCHD_LABEL,
+  HOST_SERVICE,
+  hostLogFile,
+  hostState,
+  hostTokenConflict,
+  installedCommands,
+  parseOptions,
+  SYSTEM_RUNNER_HOME,
+  TELEMETRY_TEXT,
+} from "../../../packages/setup/src/lib";
+import { SYSTEM_RUNNER_HOME as RUNNER_SYSTEM_HOME } from "../runner/config";
+import { HostComputer } from "../runner/host";
+import { installScript, SYSTEM_LAUNCHER, SYSTEM_RUNNER_DIR } from "../runner/install-script";
+import {
+  LAUNCHD_LABEL,
+  launchdPlist,
+  launchdPlistPath,
+  SERVICE_NAME,
+  SYSTEM_UNIT_PATH,
+  systemdSystemUnit,
+} from "../runner/service";
 import { createApp } from "../src/app";
+
+// The install.sh tests spawn shells and stubs, which take seconds on a loaded machine; the preload's longer
+// default timeout reaches only the first test file of a run.
+setDefaultTimeout(30_000);
 
 /**
  * install.sh: served at /install, and its decisions per machine, read from `--plan`. The commands it
@@ -99,23 +127,140 @@ const composeDownload = (asset: string) =>
   `$ curl -fsSL --proto =https --retry 3 -o <tmp>/docker-compose https://github.com/docker/compose/releases/download/v5.5.1/${asset}`;
 
 describe("GET /install", () => {
-  test("serves install.sh as a shell script, never cached, ahead of the web app", async () => {
+  const app = () => {
     const web = tempDir("web");
     writeFileSync(join(web, "index.html"), '<!doctype html><div id="root"></div>');
-    const app = createApp({
-      edition: "selfhost",
-      version: "1",
-      modules: [],
-      pingDatabase: async () => {},
-      webDir: web,
-    });
+    return createApp({ edition: "selfhost", version: "1", modules: [], pingDatabase: async () => {}, webDir: web });
+  };
+
+  test("serves install.sh as a shell script, never cached, ahead of the web app", async () => {
+    const server = app();
     for (const path of ["/install", "/install.sh"]) {
-      const res = await app.request(path);
+      const res = await server.request(path);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toStartWith("text/x-shellscript");
       expect(res.headers.get("cache-control")).toBe("no-store");
       expect(await res.text()).toBe(text);
     }
+  });
+
+  test("serves the repository's docker-compose.yml, the one the setup downloads into a folder that has none", async () => {
+    const res = await app().request("/install/docker-compose.yml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toStartWith("application/yaml");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.text()).toBe(readFileSync(join(import.meta.dir, "../../../docker-compose.yml"), "utf8"));
+  });
+});
+
+describe("the setup reads the agents' computer the way the runner writes it", () => {
+  test("its service's name, and its log on a Mac", () => {
+    expect(HOST_SERVICE).toBe(SERVICE_NAME);
+    const home = "/Users/ana/.agentes-runner";
+    const plist = launchdPlist({ runtime: "/usr/local/bin/bun", script: `${home}/agentes-runner.mjs`, home });
+    expect(plist).toContain(`<key>StandardOutPath</key>\n  <string>${hostLogFile(home)}</string>`);
+  });
+
+  test("where its service and its runner are, and the home a connected computer's token is in", () => {
+    expect(HOST_LAUNCHD_LABEL).toBe(LAUNCHD_LABEL);
+    expect(SYSTEM_RUNNER_HOME).toBe(RUNNER_SYSTEM_HOME);
+    expect(computerFiles(true, "/Users/ana", "/Users/ana/.agentes-runner")).toEqual({
+      service: launchdPlistPath("/Users/ana"),
+      bundle: "/Users/ana/.agentes-runner/agentes-runner.mjs",
+      command: "/Users/ana/.agentes-runner/bin/agentes-runner",
+      log: hostLogFile("/Users/ana/.agentes-runner"),
+    });
+    expect(computerFiles(false, "/root", "/root/.agentes-runner")).toEqual({
+      service: SYSTEM_UNIT_PATH,
+      bundle: `${SYSTEM_RUNNER_DIR}/agentes-runner.mjs`,
+      command: SYSTEM_LAUNCHER,
+      log: null,
+    });
+    // The installer's own runner paths, and its check for a connected computer.
+    const script = installScript("https://agentes.test");
+    expect(script).toContain('BUNDLE="$SYSTEM_DIR/agentes-runner.mjs"');
+    expect(script).toContain('BUNDLE="$RUNNER_HOME/agentes-runner.mjs"');
+    expect(script).toContain('LAUNCHER="$RUNNER_HOME/bin/agentes-runner"');
+    expect(script).toContain(`grep -q '"token"' "$RUNNER_HOME/config.json"`);
+  });
+
+  test("whether its service lets agents run commands, from the unit and the plist the runner writes", () => {
+    const launch = {
+      runtime: "/opt/agentes-runner/bin/bun",
+      script: "/opt/agentes-runner/agentes-runner.mjs",
+      home: "/x",
+    };
+    const host = ["host", "--server", "http://127.0.0.1:3000", "--token-file", "/opt/agentes/host-computer-token"];
+    for (const write of [systemdSystemUnit, launchdPlist]) {
+      expect(installedCommands(write(launch, host))).toBe(true);
+      expect(installedCommands(write(launch, [...host, "--no-exec"]))).toBe(false);
+      // A connected computer's own service isn't this server's.
+      expect(installedCommands(write(launch, ["start"]))).toBeNull();
+    }
+  });
+
+  test("each setting the setup won't add the token beside is one the server refuses to start with", () => {
+    const valid = { DATABASE_URL: "postgres://u:p@localhost:5432/db", AGENTES_SECRET: "x".repeat(48) };
+    const token = { HOST_COMPUTER_TOKEN: "t".repeat(64), OPERATOR_API_TOKEN: "o".repeat(64) };
+    const env = (setting: string) => Object.fromEntries([setting.split("=") as [string, string]]);
+    for (const content of ["ALLOW_SIGNUP=true\n", "MACHINE_PROVISIONING=external\n"]) {
+      const conflict = hostTokenConflict(content);
+      if (!conflict) throw new Error(`no conflict for ${content}`);
+      expect(() => loadConfig({ ...valid, ...token, ...env(conflict.now) })).toThrow(
+        /HOST_COMPUTER_TOKEN can't be set/,
+      );
+      expect(() => loadConfig({ ...valid, ...token, ...env(conflict.off) })).not.toThrow();
+    }
+    expect(hostTokenConflict("ALLOW_SIGNUP=false\nMACHINE_PROVISIONING=off\n")).toBeNull();
+  });
+
+  test("the usage statistics question says what the web app's switch says", () => {
+    const { label, help } = en.settings.telemetry;
+    expect(TELEMETRY_TEXT.join(" ")).toBe(`${label}: ${help.charAt(0).toLowerCase()}${help.slice(1)}`);
+  });
+
+  test("each state of `agentes-runner host`, from the lines it logs", async () => {
+    const answers: [string, () => Promise<Response>][] = [
+      ["on", async () => Response.json({ orgs: [] })],
+      ["off", async () => new Response("{}", { status: 404 })],
+      ["refused", async () => new Response("{}", { status: 401 })],
+      [
+        "unreachable",
+        async () => {
+          throw new Error("Unable to connect");
+        },
+      ],
+    ];
+    for (const [state, answer] of answers) {
+      const lines: string[] = [];
+      const computer = new HostComputer({
+        server: "http://127.0.0.1:3000",
+        token: () => "t".repeat(64),
+        state: tempDir("host"),
+        name: "box",
+        system: false,
+        exec: false,
+        // As `agentes-runner host` writes it: a time stamp, then the line.
+        log: (line) => lines.push(`${new Date().toISOString()} ${line}`),
+        start: () => ({ exited: new Promise(() => {}), kill: () => {} }),
+        fetch: answer,
+      });
+      await computer.sync();
+      expect(hostState(lines.join("\n"))).toBe(state as ReturnType<typeof hostState>);
+    }
+    const lines: string[] = [];
+    const noToken = new HostComputer({
+      server: "http://127.0.0.1:3000",
+      token: () => null,
+      state: tempDir("host"),
+      name: "box",
+      system: false,
+      exec: false,
+      log: (line) => lines.push(`${new Date().toISOString()} ${line}`),
+      start: () => ({ exited: new Promise(() => {}), kill: () => {} }),
+    });
+    await noToken.sync();
+    expect(hostState(lines.join("\n"))).toBe("no_token");
   });
 });
 
@@ -229,8 +374,9 @@ describe("install.sh", () => {
   test("a Mac without Docker, or with it stopped, is told what to install or start; --native isn't there yet", async () => {
     const none = await plan(mac);
     expect(none.code).toBe(1);
-    expect(none.err).toContain("agentes.chat runs on Docker, and this Mac doesn't have it.");
+    expect(none.err).toContain("This installer runs agentes.chat on Docker, and this Mac doesn't have it.");
     expect(none.err).toContain("Docker Desktop, OrbStack or Colima");
+    expect(none.err).toContain("Run agentes.chat on this Mac");
     expect(none.out).not.toContain("Bun");
     expect(none.changes).toEqual([]);
 
@@ -241,7 +387,7 @@ describe("install.sh", () => {
     for (const machine of [mac, linuxRoot]) {
       const native = await plan(machine, ["--native"]);
       expect(native.code).toBe(1);
-      expect(native.err).toContain("(--native) isn't available yet");
+      expect(native.err).toContain("can't run agentes.chat without Docker yet (--native)");
       expect(native.calls).toEqual([]);
     }
   });
@@ -249,6 +395,7 @@ describe("install.sh", () => {
   test("every option it hands the setup is one the setup knows", async () => {
     const runs = [
       await plan(linuxRoot, ["--yes", "--network", "local", "--email", "skip"]),
+      await plan(linuxRoot, ["--yes", "--computer", "no", "--computer-commands", "no", "--telemetry", "off"]),
       await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--json"]),
       await plan({ ...mac, docker: "28.5.1", bun: "1.4.4" }, ["--network", "local"]),
       await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--email", "skip"], { piped: text }),

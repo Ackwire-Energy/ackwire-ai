@@ -24,6 +24,7 @@ import {
   applyReactions,
   applyReceiptEvent,
   applyTyping,
+  applyWorkspaceEvent,
   type BrowserFrame,
   type BrowserInputEvent,
   type BrowserLiveStatus,
@@ -37,6 +38,7 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheTask,
+  consultSeeds,
   createBrowserLiveConnection,
   dismissRun,
   dropProvisional,
@@ -47,9 +49,11 @@ import {
   isNotificationEvent,
   keys,
   markStopping,
+  type OpenConsult,
   RealtimeConnection,
   type ReceiptsState,
   realtimeUrl,
+  reconcileConsults,
   reconcileRuns,
   refreshMission,
   retargetProvisional,
@@ -73,6 +77,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { checkAppVersion } from "@/lib/app-version";
+import { desktopNotice, inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
@@ -323,6 +328,9 @@ export function createStreamsStore(
     /** The server's active runs for a channel (load, reconnect): stale rows go away. */
     reconcile: (channelId: string, active: ActiveRun[], askedAt = now()) =>
       set({ ...state, streams: reconcileRuns(state.streams, channelId, active, now(), askedAt) }),
+    /** The server's questions still out in a channel (load, reconnect): the "asking…" line. */
+    reconcileConsults: (channelId: string, open: OpenConsult[], askedAt = now()) =>
+      set({ ...state, consults: reconcileConsults(state.consults, channelId, open, askedAt, now()) }),
     /** "Continuar" went through (or there is nothing left to continue: `newRunId` null). */
     continued: (runId: string, newRunId: string | null) =>
       set({ ...state, continued: { ...state.continued, [runId]: newRunId } }),
@@ -378,6 +386,8 @@ export function RealtimeProvider({
   const toast = useToast();
   const { t, i18n } = useTranslation();
   const streams = useMemo(() => createStreamsStore(), []);
+  // Questions agents asked that are still out, as the server lists them with the active runs.
+  useEffect(() => consultSeeds.subscribe(streams.reconcileConsults), [streams]);
   const [connection, setConnection] = useState<RealtimeConnection | null>(null);
   // Latest `t` without reconnecting when the language changes.
   const tRef = useRef(t);
@@ -398,6 +408,12 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
+      // The workspace's computer on its way and its standing may have moved meanwhile, and so may the computers
+      // (one back online, a pause) and the agents' screens.
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
@@ -410,6 +426,11 @@ export function RealtimeProvider({
       if (isAgentUnavailable(event)) streams.unavailable(event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
+      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
+      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
+        const notice = desktopNotice(tRef.current, orgId, event.notification);
+        if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
+      }
       // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);
@@ -458,6 +479,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
+      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);

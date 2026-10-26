@@ -1299,72 +1299,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- the agent's browser outside a conversation (agent page, its panel, the DM's dialog) ---------- */
-.brw-now {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-.brw-now .brw-ac,
-.brw-dialog .brw-ac {
-  max-width: none;
-  margin-top: 0;
-}
-.brw-now__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
-  background: var(--bg);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.brw-now__row[data-tone="warn"] {
-  background: var(--raised);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
-    var(--e1);
-}
-.brw-now__ic {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 10px 10px 10px 4px;
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--ink2);
-}
-.brw-now__row[data-tone="warn"] .brw-now__ic {
-  background: var(--warn-soft);
-  box-shadow: none;
-  color: var(--warn);
-}
-.brw-now__t {
-  flex: 1 1 200px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.brw-now__t b {
-  font-size: 14px;
-  font-weight: 600;
-}
-.brw-now__t span {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.brw-dialog .ac-dialog__body {
-  padding-bottom: 20px;
-}
-
-/* The DM header's "Navegador": a dot while the agent is in its browser, amber while a request waits. */
+/* The DM header's "Computador": a dot while the agent works on its computer, amber while a request waits. */
 .brw-dm.ac-btn {
   position: relative;
 }

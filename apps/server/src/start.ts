@@ -12,6 +12,7 @@ import {
   createImapPoller,
   createLogEmailSender,
   createMemoryPresence,
+  createMemoryPubSub,
   createMemoryRateLimiter,
   createMillionSendSender,
   createPostgresBlobStore,
@@ -55,6 +56,7 @@ import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
 import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
+import { startTelemetry } from "./telemetry";
 import { version } from "./version";
 import { startWorkers } from "./workers";
 
@@ -64,6 +66,12 @@ const RUN_DRAIN_MS = 20_000;
 export interface StartOptions {
   edition: Edition;
   modules?: AgentesModule[];
+  /**
+   * Answer only requests addressed to this server's own names (`127.0.0.1:<PORT>`, `localhost:<PORT>`
+   * and `PUBLIC_URL`'s host), with a 421 for any other: native mode listens on loopback, where a web
+   * page that points a name of its own at 127.0.0.1 (DNS rebinding) would otherwise reach it.
+   */
+  ownHostsOnly?: boolean;
 }
 
 /**
@@ -72,7 +80,7 @@ export interface StartOptions {
  * Shared by the self-hosted entrypoint (`src/main.ts`) and any entrypoint
  * that adds public modules (ADR 0002); only `modules` differ.
  */
-export async function startServer({ edition, modules = [] }: StartOptions) {
+export async function startServer({ edition, modules = [], ownHostsOnly = false }: StartOptions) {
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
@@ -103,7 +111,8 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
 
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
-    pubsub: await createPostgresPubSub(postgresJsNotifier(database.client)),
+    // PGlite (native mode) is one process: nothing to tell other replicas.
+    pubsub: database.client ? await createPostgresPubSub(postgresJsNotifier(database.client)) : createMemoryPubSub(),
     presence: createMemoryPresence(),
     rateLimiter: createMemoryRateLimiter(),
     keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
@@ -170,6 +179,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     desktops: engine.desktops,
     log,
   });
+  const telemetry = startTelemetry({ db: database.db, config, log });
 
   const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
   const webDir = resolve(config.WEB_DIR);
@@ -214,13 +224,29 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     browserLive: engine.browserLive,
     streams: createStreamSockets({ db: database.db, auth, config, broker: engine.streams }),
   });
+  const publicUrl = new URL(config.PUBLIC_URL);
+  const ownHosts = ownHostsOnly
+    ? new Set([`127.0.0.1:${config.PORT}`, `localhost:${config.PORT}`, publicUrl.host])
+    : null;
+  /**
+   * A 421 for a name not its own; and a page opened at another of its own names goes to `PUBLIC_URL`,
+   * the only origin that sign-in and saving accept. Temporary: `PUBLIC_URL` changes with Tailscale.
+   */
+  const ownHostAnswer = (req: Request) => {
+    const host = req.headers.get("host") ?? "";
+    if (!ownHosts || host === publicUrl.host) return null;
+    if (!ownHosts.has(host)) return new Response("This server answers only at its own address.\n", { status: 421 });
+    if (req.method !== "GET" || !req.headers.get("accept")?.includes("text/html")) return null;
+    const { pathname, search } = new URL(req.url);
+    return Response.redirect(new URL(pathname + search, publicUrl).href, 302);
+  };
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
     port: config.PORT,
     // Bun's default (10 s) cuts a request still waiting on its answer: opening a site in an agent's
     // browser waits for the page, and a closed browser starts first (up to 90 s on the computer).
     idleTimeout: 120,
-    fetch: (req, srv) => realtime.fetch(req, srv, (r) => app.fetch(r)),
+    fetch: (req, srv) => ownHostAnswer(req) ?? realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
@@ -231,6 +257,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     log,
     pubsub: adapters.pubsub,
     hub: engine.machineHub,
+    emails: adapters.email.delivers,
   });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
@@ -246,6 +273,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // No new jobs; HTTP stops taking requests (the new deploy serves them). Not awaited: the
     // promise resolves only once every socket is closed, and browser tabs never close theirs.
     workers.stop();
+    telemetry.stop();
     void server.stop();
     void operator?.stop();
     // Runners reconnect to the next instance, and people's desktops and terminals open again there.

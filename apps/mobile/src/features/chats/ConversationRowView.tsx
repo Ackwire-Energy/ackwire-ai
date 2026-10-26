@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, ListRow, PixelOrbit, Text } from "@/ui";
+import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -90,7 +90,9 @@ export const ConversationRowView = memo(function ConversationRowView({
     line = (
       <View style={styles.work}>
         {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
-        {lines.state === "waiting" ? <Icon name="shield" size={14} color={c.amber} /> : null}
+        {lines.state === "waiting" ? (
+          <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+        ) : null}
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text
             variant="small"
@@ -108,7 +110,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = [verb, agentState.title].filter(Boolean).join(" · ");
     line = (
       <View style={styles.work}>
-        <Icon name="shield" size={14} color={c.amber} />
+        <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text variant="small" style={[LIST_PREVIEW, styles.em, { color: c.amber }]}>
             {verb}
@@ -121,7 +123,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = t("mobile.outage.rowWaiting", { computer: agentState.computer });
     line = (
       <View style={styles.work}>
-        <Icon name="clock" size={14} color={c.muted} />
+        <LineIcon name="clock" size={14} color={c.muted} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           {label}
         </Text>

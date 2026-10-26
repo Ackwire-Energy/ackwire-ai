@@ -33,9 +33,10 @@ describe("no hardcoded UI text", () => {
         const where = (i: number) => `${relative(root, f)}:${source.slice(0, i).split("\n").length}`;
         for (const m of source.matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)) {
           const text = (m[1] ?? "").trim();
-          // `=> Promise<…>`, `->`: types and arrows, not markup; a prop list after `<b />,`.
+          // `=> Promise<…>`, `->`: types and arrows, not markup; a prop list after `<b />,`; one generic type joined
+          // to the next (`Pick<…> & Partial<…>`, `Map<…> | Set<…>`).
           const prev = source[(m.index ?? 0) - 1];
-          if (prev === "=" || prev === "-" || /^[,;]/.test(text)) continue;
+          if (prev === "=" || prev === "-" || /^[,;]/.test(text) || /^[&|] *[\w.]+$/.test(text)) continue;
           // Code between generics/operators, not JSX text.
           if (!text || /=>|;|\(|\)|&&|\|\||=|\bconst\b|\breturn\b|\bnew\b|\*/.test(text) || allowed(text)) continue;
           offenders.push(`${where(m.index ?? 0)} text "${text}"`);

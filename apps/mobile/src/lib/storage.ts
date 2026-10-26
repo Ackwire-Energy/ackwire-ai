@@ -44,6 +44,8 @@ export const STORED = {
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */
   threadsCollapsed: "threads-collapsed",
+  /** An invitation opened before signing in: accepted once the person is in (features/auth/invite.ts). */
+  invite: "invite",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

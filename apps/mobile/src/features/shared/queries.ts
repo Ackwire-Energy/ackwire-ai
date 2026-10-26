@@ -19,14 +19,20 @@ import { useNow, useOrgId } from "./hooks";
  */
 
 /**
- * Who works on what now: active missions, then agent runs in progress in the
- * conversations you are in (`GET …/active-runs`, for everyone).
+ * Everything agents are on: active missions, then agent runs in progress in the
+ * conversations you are in (`GET …/active-runs`, for everyone), runs stopped on a person included.
  */
-export function useWorkingNow() {
+export function useActiveWork() {
   const orgId = useOrgId();
   const runs = useWorkingRuns(orgId);
   const missions = useMissionList(orgId, { status: "active" });
   return useMemo(() => workingNow(runs.data, missions.data?.missions), [runs.data, missions.data]);
+}
+
+/** Who is working now: the active work without the runs waiting on a person (those say "espera seu ok"). */
+export function useWorkingNow() {
+  const all = useActiveWork();
+  return useMemo(() => all.filter((w) => !w.waiting), [all]);
 }
 
 /** My threads and missions, the latest 50 (Conversas' rows and the Threads tab). */

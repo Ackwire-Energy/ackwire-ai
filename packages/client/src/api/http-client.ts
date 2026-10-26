@@ -1,3 +1,5 @@
+import { CLOUD_SERVER } from "../lib/server";
+import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
@@ -37,6 +39,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -97,6 +100,7 @@ import type {
   MoveAgentsResult,
   NotificationCount,
   NotificationPage,
+  OpenConsult,
   Organization,
   OrgOverview,
   OrgPlanUsage,
@@ -117,6 +121,7 @@ import type {
   ScopeGrant,
   SearchHit,
   SecretRequest,
+  ServerTelemetry,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -164,6 +169,8 @@ const threadQuery = (f: Partial<ThreadFilters>) => ({
 export function createHttpApi(options: TransportOptions = {}): HttpApi {
   const request = createRequester(options);
   const files = createFileRequester(options);
+  // agentes.chat itself, for its public answers (the desktop app's newest build): another origin, no cookie.
+  const cloud = createRequester({ baseUrl: CLOUD_SERVER, ...(options.fetch ? { fetch: options.fetch } : {}) });
   /** Prefix for URLs the platform opens itself (file links); "" on the web. */
   const base = (options.baseUrl ?? "").replace(/\/+$/, "");
   const nullOn = async <T>(status: number, run: () => Promise<T>): Promise<T | null> => {
@@ -219,6 +226,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).account,
       disconnect: (orgId, accountId) =>
         request<void>(`${org(orgId)}/mail/accounts/${enc(accountId)}`, { method: "DELETE" }),
+      suggestedAddresses: async (orgId, accountId) =>
+        (await request<{ addresses: string[] }>(`${org(orgId)}/mail/accounts/${enc(accountId)}/suggested-addresses`))
+          .addresses,
       folders: async (orgId, accountId) =>
         (await request<{ folders: MailFolder[] }>(`${org(orgId)}/mail/accounts/${enc(accountId)}/folders`)).folders,
       agent: async (orgId, agentId) =>
@@ -282,12 +292,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
-      stop: (orgId, agentId, screen = "browser") =>
-        request<void>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/stop`, { json: {} }),
+      stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
-      start: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/desktop/start`, { json: {} }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),
@@ -305,6 +313,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           throw error;
         }
       },
+      telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
+      setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
     },
     waitlist: {
       join: async (input) => {
@@ -320,6 +330,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
+      addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
     },
     orgs: {
       create: (input) =>
@@ -418,10 +429,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       activeRuns: async (orgId, channelId) => {
         const askedAt = Date.now();
         const res = await nullOn(404, () =>
-          request<{ runs: ActiveRun[] }>(`${org(orgId)}/channels/${enc(channelId)}/active-runs`),
+          request<{ runs: ActiveRun[]; consults?: OpenConsult[] }>(
+            `${org(orgId)}/channels/${enc(channelId)}/active-runs`,
+          ),
         );
         // What the agents working here haven't read yet ("lê na próxima pausa" after a reload).
         if (res) steerStore.reconcile(channelId, res.runs, askedAt);
+        // Questions agents asked from here still out (the "asking…" line after a reload).
+        if (res?.consults) consultSeeds.publish(channelId, res.consults, askedAt);
         return res ? res.runs : null;
       },
       usage: async (orgId) => {
@@ -506,6 +521,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: input,
           })
         ).authorizeUrl,
+      completeOAuth: (orgId, input) =>
+        request<{ connectionId: string; connector: string }>(`${org(orgId)}/connectors/oauth/complete`, {
+          json: input,
+        }),
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
     },
@@ -575,6 +594,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       remove: (orgId, machineId) => request<void>(`${org(orgId)}/machines/${enc(machineId)}`, { method: "DELETE" }),
       host: (orgId) => nullOn(404, () => request<HostComputer>(`${org(orgId)}/machines/host`)),
       hostOn: (orgId) => request<HostComputer>(`${org(orgId)}/machines/host`, { json: {} }),
+      computerSetup: (orgId) => request<ComputerSetup>(`${org(orgId)}/computer-setup`),
       device: (userCode) => request<DeviceRequest>(`/api/app/machines/device/${enc(userCode)}`),
       confirmDevice: (orgId, userCode, input) =>
         request<Machine>(`${org(orgId)}/machines/device/${enc(userCode)}/confirm`, { json: input }),
@@ -587,8 +607,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         // The new access, bare or wrapped.
         return "access" in out ? out.access : out;
       },
-      desktopLatest: (target, arch) =>
-        nullOn(404, () => request<DesktopRelease>("/api/desktop/latest", { query: { target, arch } })),
+      // A self-hosted server has no builds of its own (no `DESKTOP_RELEASES_TOKEN`): agentes.chat's, then.
+      desktopLatest: async (target, arch) =>
+        (await nullOn(404, () => request<DesktopRelease>("/api/desktop/latest", { query: { target, arch } }))) ??
+        (await nullOn(404, () => cloud<DesktopRelease>("/api/desktop/latest", { query: { target, arch } }))),
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),

@@ -2,6 +2,7 @@ import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import {
+  countUsers,
   deriveSecret,
   emailLocale,
   isSignupAllowed,
@@ -10,6 +11,8 @@ import {
   queueEmail,
   recordSession,
   recordSignUp,
+  requestLocale,
+  type SignupPolicy,
   sha256,
 } from "@agenteschat/engine";
 import { expo } from "@better-auth/expo";
@@ -20,6 +23,7 @@ import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import { desktopSignIn } from "./desktop-sign-in";
 import type { Logger } from "./logger";
+import { ownerSignIn } from "./owner-claim";
 
 /**
  * Sign-in for people, built on Better Auth (ADR 0006):
@@ -45,11 +49,18 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
    * `x-invite-token`), for the user-create hook of the same request.
    */
   const clearedByLink = new Map<string, number>();
+  const policy = signupPolicy(config);
   const assertSignupAllowed = async (email: string, inviteToken?: string | null) => {
     const key = email.toLowerCase();
     const cleared = clearedByLink.get(key);
     if (cleared !== undefined && cleared > Date.now()) return;
-    if (!(await isSignupAllowed(db, email, config.ALLOW_SIGNUP, new Date(), inviteToken))) {
+    if (!(await isSignupAllowed(db, email, policy, new Date(), inviteToken))) {
+      if (policy.ownerByLink && (await countUsers(db)) === 0) {
+        throw new APIError("FORBIDDEN", {
+          code: OWNER_CLAIM_REQUIRED,
+          message: "This server waits for its owner: open its owner link.",
+        });
+      }
       throw new APIError("FORBIDDEN", {
         message: "Sign-up is closed on this agentes.chat instance. Ask an organization owner for an invitation.",
       });
@@ -69,7 +80,12 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
-    plugins: [expo(), phoneSignIn, desktopSignIn()],
+    plugins: [
+      expo(),
+      phoneSignIn,
+      desktopSignIn(),
+      ownerSignIn({ db, config, log, mint: (adapter, userId) => mintSignIn(adapter, `${FOR_USER}${userId}`) }),
+    ],
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
@@ -97,20 +113,27 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       // Only when a real email sender is configured (MillionSend or SMTP); sent through the outbox.
       ...(emailEnabled
         ? {
-            sendResetPassword: async ({
-              user,
-              url,
-              token,
-            }: {
-              user: { email: string; locale?: string | null };
-              url: string;
-              token: string;
-            }) => {
+            sendResetPassword: async (
+              {
+                user,
+                token,
+              }: {
+                user: { email: string; locale?: string | null };
+                url: string;
+                token: string;
+              },
+              request?: Request,
+            ) => {
+              // Straight to our page (not Better Auth's redirect): the same link opens the phone app when it is
+              // installed (universal link / App Link, app-links.ts) and the website otherwise; both reset with it.
+              const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+              // An account with no language yet (made by the owner link, or before sign-up kept one): the request's.
+              const locale = emailLocale(user.locale ?? requestLocale(request?.headers.get("accept-language")));
               await queueEmail(db, {
                 orgId: null,
                 key: `password-reset:${sha256(token)}`,
                 to: [user.email],
-                template: { kind: "password_reset", locale: emailLocale(user.locale), url },
+                template: { kind: "password_reset", locale, url },
               });
             },
           }
@@ -121,20 +144,26 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
           emailVerification: {
             sendOnSignUp: true,
             autoSignInAfterVerification: true,
-            sendVerificationEmail: async ({
-              user,
-              url,
-              token,
-            }: {
-              user: { email: string; locale?: string | null };
-              url: string;
-              token: string;
-            }) => {
+            // The onboarding says the link works for an hour (`onboarding.confirmation.sent`).
+            expiresIn: 60 * 60,
+            sendVerificationEmail: async (
+              {
+                user,
+                url,
+                token,
+              }: {
+                user: { email: string; locale?: string | null };
+                url: string;
+                token: string;
+              },
+              request?: Request,
+            ) => {
+              const locale = emailLocale(user.locale ?? requestLocale(request?.headers.get("accept-language")));
               await queueEmail(db, {
                 orgId: null,
                 key: `verify-email:${sha256(token)}`,
                 to: [user.email],
-                template: { kind: "verify_email", locale: emailLocale(user.locale), url },
+                template: { kind: "verify_email", locale, url: confirmationLanding(url) },
               });
             },
           },
@@ -158,6 +187,8 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
         // The app's window asks every 2 s while the browser signs in.
         "/desktop/redeem": { window: 60, max: 40 },
         "/desktop/handoff": { window: 60, max: 10 },
+        "/owner-claim": { window: 60, max: 10 },
+        "/owner-key": { window: 60, max: 10 },
       },
     },
     advanced: {
@@ -185,9 +216,13 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => {
-            await assertSignupAllowed(user.email);
-            return { data: { ...user, email: user.email.toLowerCase() } };
+          // Social sign-up too (the phone's Apple sign-in from an invitation): an org invite link's token in
+          // the request (`x-invite-token`) opens sign-up for it, as it does for e-mail sign-up.
+          before: async (user, context) => {
+            await assertSignupAllowed(user.email, context?.headers?.get("x-invite-token")?.trim() || null);
+            // The sign-up's own language from the start: the confirmation email goes out before any other choice.
+            const locale = requestLocale(context?.headers?.get("accept-language"));
+            return { data: { ...user, email: user.email.toLowerCase(), ...(locale ? { locale } : {}) } };
           },
           after: async (user) => {
             try {
@@ -239,6 +274,29 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
   return session ? (session.user as SessionUser) : null;
 }
 
+/** `APIError` code of a sign-up refused because the first account waits for its owner's link or key. */
+export const OWNER_CLAIM_REQUIRED = "OWNER_CLAIM_REQUIRED";
+
+/**
+ * The confirmation link, landing on `/?email_confirmed=1`, where the web app says how it went
+ * (apps/web/src/lib/email-confirmation.ts), whenever the request named no other page: the phone app's sign-up
+ * and a new link asked for later name none.
+ */
+function confirmationLanding(verifyUrl: string): string {
+  const url = new URL(verifyUrl);
+  const back = url.searchParams.get("callbackURL");
+  if (!back || back === "/") url.searchParams.set("callbackURL", "/?email_confirmed=1");
+  return url.toString();
+}
+
+/** Who may sign up here (ADR 0006; the owner's link or key, ADR 0060 §6). */
+export function signupPolicy(config: Config): SignupPolicy {
+  return {
+    allowSignup: config.ALLOW_SIGNUP,
+    ownerByLink: Boolean(config.OWNER_CLAIM_SHA256 || config.OWNER_KEY_SHA256),
+  };
+}
+
 /** Sign-in options the login and sign-up pages need to render. */
 export function authUiConfig(config: Config) {
   return {
@@ -250,23 +308,34 @@ export function authUiConfig(config: Config) {
     landing: config.LANDING_PAGE,
     termsUrl: config.TERMS_URL ?? null,
     privacyUrl: config.PRIVACY_URL ?? null,
+    supportEmail: config.SUPPORT_EMAIL ?? null,
   };
 }
 
 /** How long the sign-in in "Abrir no celular" (the web app's QR code) lasts. */
 const PHONE_SIGN_IN_TTL_MS = 3 * 60_000;
 const phoneSignInKey = (token: string) => `phone-sign-in:${sha256(token)}`;
+/** A minted sign-in for a user rather than for a session's user (the owner key's, `owner-claim.ts`). */
+const FOR_USER = "user:";
 
-/**
- * A one-time sign-in for the phone, minted from a signed-in session: single use, a few minutes long, stored
- * as a hash, and void once that session ends (signing out on the web voids a QR code still on screen).
- */
-export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
+/** Single use, a few minutes long, stored as a hash: for the session with this token, or `user:<id>`. */
+async function mintSignIn(
+  adapter: { createVerificationValue: (v: { identifier: string; value: string; expiresAt: Date }) => Promise<unknown> },
+  value: string,
+) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + PHONE_SIGN_IN_TTL_MS);
-  const { internalAdapter } = await auth.$context;
-  await internalAdapter.createVerificationValue({ identifier: phoneSignInKey(token), value: sessionToken, expiresAt });
+  await adapter.createVerificationValue({ identifier: phoneSignInKey(token), value, expiresAt });
   return { token, expiresIn: PHONE_SIGN_IN_TTL_MS / 1000 };
+}
+
+/**
+ * A one-time sign-in for the phone, minted from a signed-in session: void once that session ends
+ * (signing out on the web voids a QR code still on screen).
+ */
+export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
+  const { internalAdapter } = await auth.$context;
+  return mintSignIn(internalAdapter, sessionToken);
 }
 
 /**
@@ -283,13 +352,17 @@ const phoneSignIn = {
       async (ctx) => {
         const { internalAdapter } = ctx.context;
         const minted = await internalAdapter.consumeVerificationValue(phoneSignInKey(ctx.body.token));
-        const from = minted ? await internalAdapter.findSession(minted.value) : null;
-        if (!from || from.session.expiresAt < new Date()) {
-          throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
+        let user: Awaited<ReturnType<typeof internalAdapter.findUserById>> = null;
+        if (minted?.value.startsWith(FOR_USER))
+          user = await internalAdapter.findUserById(minted.value.slice(FOR_USER.length));
+        else if (minted) {
+          const from = await internalAdapter.findSession(minted.value);
+          if (from && from.session.expiresAt >= new Date()) user = from.user;
         }
-        const session = await internalAdapter.createSession(from.user.id);
-        await setSessionCookie(ctx, { session, user: from.user });
-        return ctx.json({ user: { id: from.user.id, name: from.user.name, email: from.user.email } });
+        if (!user) throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
+        const session = await internalAdapter.createSession(user.id);
+        await setSessionCookie(ctx, { session, user });
+        return ctx.json({ user: { id: user.id, name: user.name, email: user.email } });
       },
     ),
   },

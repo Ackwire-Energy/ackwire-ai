@@ -75,7 +75,7 @@ import {
 } from "@agenteschat/client/lib/chat";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
-import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, standingRefusalText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -2796,6 +2796,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
   const revealed = useRevealedText(live?.text ?? "");
   const liveFailed = live?.status === "failed";
+  // Refused by the workspace's standing: its own words, not the server's English.
+  const refusal = liveFailed ? standingRefusalText(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
@@ -3081,9 +3083,11 @@ export const TimelineMessage = memo(function TimelineMessage({
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />
               <span style={{ flex: 1 }}>
-                {live.error
-                  ? t("channel.runFailed", { agent: name, reason: live.error })
-                  : t("channel.runFailedNoReason", { agent: name })}
+                {refusal
+                  ? t("channel.runRefused", { agent: name, reason: refusal })
+                  : live.error
+                    ? t("channel.runFailed", { agent: name, reason: live.error })
+                    : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"
@@ -3099,7 +3103,12 @@ export const TimelineMessage = memo(function TimelineMessage({
           <RunBrowserCard run={live} name={name} />
           {!liveFailed && revealed && (
             <MessageText>
-              <MessageBody body={revealed} resolveMention={dir.mentionName} live={!liveStopped} />
+              <MessageBody
+                body={revealed}
+                resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
+              />
             </MessageText>
           )}
           {liveStopped ? (
@@ -3143,6 +3152,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   resolveMention={dir.mentionName}
                   renderMention={renderMention}
                   wikiLink={wikiLink}
+                  accent={colorOf(agent)}
                 />
               </MessageText>
             )}

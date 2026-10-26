@@ -2,12 +2,10 @@ import { describe, expect, test } from "bun:test";
 import type { MachineTask } from "@agenteschat/client";
 import {
   approvalAction,
-  approvalFacts,
   approvalRisk,
   approvalSaid,
   approvalTable,
   approvalTraits,
-  humanKey,
   waitingApprovals,
 } from "../../src/features/approvals/logic";
 import {
@@ -33,19 +31,20 @@ describe("requests to approve", () => {
     expect(approvalAction({ tool: "post_message", scope: "slack:post_message" })).toBe("other");
   });
 
+  test("a mailbox's scope says what a mail tool does: a draft is a tap, nothing leaves", () => {
+    const draft = { tool: "mail_support_draft", scope: "mail:draft", params: {} };
+    expect(approvalAction(draft)).toBe("draft");
+    expect(approvalRisk(draft)).toBe("normal");
+    expect(approvalTraits(draft)).toEqual(["unsent", "deletable"]);
+    expect(approvalRisk({ tool: "mail_support_archive", scope: "mail:organize" })).toBe("normal");
+    expect(approvalRisk({ tool: "mail_support_reply", scope: "mail:send" })).toBe("high");
+    expect(approvalAction({ tool: "mail_support_trash", scope: "mail:delete" })).toBe("delete");
+  });
+
   test("what it touches, in plain words", () => {
     expect(approvalTraits({ tool: "deploy", scope: "x", params: {} })).toEqual(["production", "reversible"]);
     expect(approvalTraits({ tool: "send_email", scope: "mail", params: {} })).toEqual(["irreversible", "external"]);
     expect(approvalTraits({ tool: "update", scope: "x", params: { env: "production" } })).toEqual(["production"]);
-  });
-
-  test("the exact values, as facts", () => {
-    expect(approvalFacts({ pull_number: 42, repo: "agentes", draft: false, files: ["a"], empty: " " })).toEqual([
-      ["Pull number", "42"],
-      ["Repo", "agentes"],
-      ["Draft", "false"],
-    ]);
-    expect(humanKey("baseBranch")).toBe("Base branch");
   });
 
   test("waiting on you: pending, yours to decide, not expired, closest to expiring first", () => {
@@ -137,6 +136,24 @@ describe("the exact request", () => {
       { label: "Base", value: "main" },
     ]);
     expect(approvalTable(approval({ id: "b", params: { title: "Oi" } }))).toEqual([{ label: "Title", value: "Oi" }]);
+  });
+
+  test("a tool run by name: its arguments in words, without the name; objects one level in", () => {
+    const a = approval({
+      id: "s",
+      connector: "custom:sentry",
+      params: { name: "get_event_stacktrace", arguments: { issueId: "ACME-177", eventId: "abc" }, files: ["a"] },
+    });
+    expect(approvalTable(a, 6)).toEqual([
+      { label: null, value: "custom:sentry" },
+      { label: "Issue id", value: "ACME-177" },
+      { label: "Event id", value: "abc" },
+    ]);
+    const long = "x".repeat(80);
+    expect(approvalTable(approval({ id: "l", params: { query: long } }))).toEqual([]);
+    expect(approvalTable(approval({ id: "l", params: { query: long } }), 6, undefined, true)).toEqual([
+      { label: "Query", value: long },
+    ]);
   });
 
   test("what the agent said before: its why, else the last turn", () => {

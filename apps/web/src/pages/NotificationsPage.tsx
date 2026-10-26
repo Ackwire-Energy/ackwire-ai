@@ -1,4 +1,4 @@
-import type { AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
+import type { Agent, AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
 import {
   dropNotification,
   useApproval,
@@ -12,7 +12,8 @@ import {
   useNotifications,
   useThreadMessages,
 } from "@agenteschat/client";
-import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import {
@@ -27,11 +28,13 @@ import {
   snoozeTimes,
   sortWaiting,
   stepCells,
+  workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import {
   Button,
   Chip,
+  ComputerIcon,
   cx,
   ExpiryFuse,
   Icon,
@@ -54,7 +57,7 @@ import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { approvalAction } from "@/components/ApprovalItem";
+import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
 import { requestBrowserCard } from "@/components/browser/open";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -62,7 +65,7 @@ import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
-import { ExactAction } from "./ApprovalsPage";
+import { ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
@@ -136,6 +139,23 @@ function Face({
     return <AgentAvatar agentId={actor.id} name={name} size={size} state={state} className={className} labelled />;
   return (
     <ActorAvatar actor={{ type: "person", id: actor.id }} name={name} size={size} className={className} labelled />
+  );
+}
+
+/** Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. */
+function SystemFace({ n }: { n: AppNotification }) {
+  if (n.kind === "computer_ready")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
+      </span>
+    );
+  if (n.kind !== "org_standing") return null;
+  const status = n.latest.statusTo;
+  return (
+    <span className="nt-sys" aria-hidden="true">
+      <Icon name={status === "active" ? "check" : status === "suspended" ? "block" : "pause"} size={16} />
+    </span>
   );
 }
 
@@ -238,6 +258,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
   const k = (key: WhatKey, values: Record<string, unknown>) => (
     <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} />
   );
+  const own = workspaceHeadline(n);
+  if (own) return t(own);
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -280,11 +302,6 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
     case "reaction":
       return k("reaction", { names, count });
-    case "org_standing":
-      if (n.latest.statusTo === "suspended") return t("standing.notification.suspended");
-      return n.latest.statusTo === "active" ? t("standing.notification.active") : t("standing.notification.hold");
-    case "computer_ready":
-      return t("computerSetup.notification.ready");
   }
 }
 
@@ -572,6 +589,8 @@ function Row({
   const unread = n.readAt === null;
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
+  const own = workspaceHeadline(n);
+  const label = own ? t(own) : name;
   const reaction = n.kind === "reaction";
   const group = n.actors.length > 1;
   const other = n.actors.find((a, i) => i > 0 && (a.id !== first?.id || a.type !== first?.type));
@@ -586,8 +605,10 @@ function Row({
       <Face actor={first} dir={dir} size="sm" className="nt-av22" />
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
-  ) : (
+  ) : first ? (
     <Face actor={first} dir={dir} className="nt-av28" />
+  ) : (
+    <SystemFace n={n} />
   );
   const l = n.latest;
   // Asked while nobody watched (ADR 0053 §8): who asked leads an approval's line, its why follows.
@@ -637,7 +658,7 @@ function Row({
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a focusable item (J/K, E, R, Enter) with its own actions inside
       tabIndex={0}
       data-n={n.id}
-      aria-label={unread ? t("notifications.unreadItem", { name }) : name}
+      aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);
@@ -823,21 +844,134 @@ function RoundWaits({ topicId }: { topicId: string }) {
   return <Chip icon="clock">{t("notifications.wait.roundWaits", { time: left })}</Chip>;
 }
 
-/** The approval's exact action (from Aprovações) and its verb. */
-function ApprovalBody({ approvalId }: { approvalId: string }) {
-  const { org } = useOrg();
-  const approval = useApproval(org.id, approvalId);
-  return approval.data ? <ExactAction approval={approval.data} max={3} /> : null;
-}
-
-function ApprovalVerb({ approvalId }: { approvalId?: string }) {
+/**
+ * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then the
+ * connector's logo (its name in a tooltip), "Só lê", its values in words and the agent's why behind "Por quê?".
+ */
+function ApprovalSay({
+  approvalId,
+  name,
+  why,
+  mine,
+  fallback,
+}: {
+  approvalId: string;
+  name: string;
+  /** The notification's text (the why), for an approval that doesn't carry its own. */
+  why?: string;
+  mine: string | null;
+  fallback: string;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const approval = useApproval(org.id, approvalId ?? "", !!approvalId);
+  const approval = useApproval(org.id, approvalId);
+  const [open, setOpen] = useState(false);
+  const a = approval.data;
+  if (!a) return <h3>{fallback}</h3>;
+  const reason = approvalWhy(a) ?? why;
+  const values = approvalValues(a, { max: 3 }).map(([label, value]) => `${label}: ${value}`);
   return (
-    <span>
-      {approval.data ? t(`approvals.verb.${approvalAction(approval.data)}`) : t("notifications.wait.approval")}
-    </span>
+    <>
+      <p className="nt-say">
+        <Trans
+          i18nKey="notifications.wait.wants"
+          values={{ name, action: approvalDoing(t, a) }}
+          components={{ b: <b /> }}
+        />
+      </p>
+      {(a.connector || a.email || approvalReadsOnly(a) || values.length > 0 || reason) && (
+        <div className="nt-facts">
+          {(a.connector || a.email) && <ConnectorMark approval={a} />}
+          {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
+          {values.map((v) => (
+            <Chip key={v}>{v}</Chip>
+          ))}
+          {reason && (
+            <button
+              type="button"
+              className="nt-why-btn"
+              aria-expanded={open}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen((o) => !o);
+              }}
+            >
+              {open ? t("notifications.wait.hideWhy") : t("notifications.wait.why")}
+            </button>
+          )}
+        </div>
+      )}
+      {open && reason && (
+        <p className="nt-why">
+          <Snippet text={reason} mine={mine} />
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Aprovar / Recusar right on the card (a hold for high risk, a reason on refusal); others open Aprovações. */
+function ApprovalActs({
+  approvalId,
+  agent,
+  onOpen,
+  tail,
+}: {
+  approvalId: string;
+  agent?: Agent;
+  onOpen: () => void;
+  tail: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const approval = useApproval(org.id, approvalId);
+  const [refusing, setRefusing] = useState(false);
+  const a = approval.data;
+  if (a?.canDecide && a.status === "pending") {
+    if (refusing) return <RefuseBox approval={a} agent={agent} onCancel={() => setRefusing(false)} />;
+    return (
+      <div className="nt-wacts">
+        <ApproveButton approval={a} />
+        <Button
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setRefusing(true);
+          }}
+        >
+          {t("approval.refuse")}
+        </Button>
+        <span className="nt-grow" />
+        {tail}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+        >
+          {t("notifications.wait.openApprovals")}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="nt-wacts">
+      <Button
+        variant="primary"
+        size="sm"
+        icon="shield"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+      >
+        {t("notifications.wait.decide")}
+      </Button>
+      <span className="nt-grow" />
+      {tail}
+    </div>
   );
 }
 
@@ -1067,59 +1201,63 @@ function WaitCard({
     // An approval says who asked while nobody watched, then the agent's why (ADR 0053 §8).
     const origin = n.kind === "approval" ? approvalOriginWords({ origin: l.origin }) : null;
     const why = n.kind === "approval" && l.title ? l.text : undefined;
-    meta = (
-      <>
-        {n.kind === "approval" ? (
-          <>
-            <b>{name}</b>
-            <ApprovalVerb approvalId={n.source.approvalId} />
-          </>
-        ) : (
+    // An approval (AprovacaoConector B): the sentence says who and what; decided right here.
+    const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
+    const leftChip = left && leftMs !== null && (
+      <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
+        {leftMs <= URGENT_MS ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
+      </Chip>
+    );
+    const open = () => h.onOpen(n);
+    if (approvalId) {
+      meta = (
+        <>
+          <span>{whenText(t, i18n.language, n.createdAt)}</span>
+          {origin && (
+            <span className="nt-origin">
+              <Icon name="routines" size={14} />
+              {sayWords(t, origin)}
+            </span>
+          )}
+          <span className="nt-grow" />
+          {leftChip}
+        </>
+      );
+      head = (
+        <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />
+      );
+      body = <ApprovalActs approvalId={approvalId} agent={agent} onOpen={open} tail={tail} />;
+    } else {
+      meta = (
+        <>
           <span>
             <Headline n={n} dir={dir} channelName={channelName} />
           </span>
-        )}
-        <SourceChip n={n} channelName={channelName} />
-        <span>{whenText(t, i18n.language, n.createdAt)}</span>
-        <span className="nt-grow" />
-        {left && leftMs !== null && (
-          <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
-            {leftMs <= URGENT_MS ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
-          </Chip>
-        )}
-      </>
-    );
-    head = (
-      <>
-        <h3>{l.title ?? l.text ?? ""}</h3>
-        {(origin || why) && (
-          <p className="nt-ctx">
-            {origin && <b>{t("notifications.lead", { text: sayWords(t, origin) })} </b>}
-            {why && <Snippet text={why} mine={mine} />}
-          </p>
-        )}
-      </>
-    );
-    body = (
-      <>
-        {n.kind === "approval" && n.source.approvalId && <ApprovalBody approvalId={n.source.approvalId} />}
+          <SourceChip n={n} channelName={channelName} />
+          <span>{whenText(t, i18n.language, n.createdAt)}</span>
+          <span className="nt-grow" />
+          {leftChip}
+        </>
+      );
+      head = <h3>{l.title ?? l.text ?? ""}</h3>;
+      body = (
         <div className="nt-wacts">
           <Button
             variant="primary"
             size="sm"
-            icon={n.kind === "approval" ? "shield" : "external"}
+            icon="external"
             onClick={(e) => {
               e.stopPropagation();
-              h.onOpen(n);
+              open();
             }}
           >
-            {n.kind === "approval" ? t("notifications.wait.decide") : t("notifications.open")}
+            {t("notifications.open")}
           </Button>
           <span className="nt-grow" />
           {tail}
         </div>
-      </>
-    );
+      );
+    }
   }
   return (
     <article

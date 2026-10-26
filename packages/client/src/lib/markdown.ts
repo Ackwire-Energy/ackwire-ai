@@ -14,7 +14,10 @@ export type MdBlock =
   | { type: "quote"; text: string; lines: string[] }
   | { type: "embed"; target: string }
   | { type: "rule" }
-  | { type: "table"; header: string[]; rows: string[][] };
+  | { type: "table"; header: string[]; rows: string[][]; align: TableAlign[] };
+
+/** A column's alignment: from the separator (`:---`, `:---:`, `---:`), else right when every cell is a number. */
+export type TableAlign = "left" | "center" | "right";
 
 const LIST = /^\s*([-*+]|\d+[.)])\s+(.*)$/;
 const splitRow = (line: string) =>
@@ -23,6 +26,37 @@ const splitRow = (line: string) =>
     .replace(/^\||\|$/g, "")
     .split("|")
     .map((c) => c.trim());
+const TABLE_RULE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+// "429", "-17,2%", "~6,7%", "R$ 1.200", "$3.5k": numbers as people write them in a table.
+const NUMERIC = /^[~≈<>+-]?\s*(R\$|US\$|\$|€)?\s*[+-]?\d[\d.,\s]*(%|k|mil|mi|x)?$/i;
+
+/**
+ * A GFM table starting at `lines[i]` (a row with pipes, then the `|---|` rule), or null. Shared by the
+ * web and the phone app, so a table is a table anywhere in a message (also right under a sentence).
+ */
+export function tableAt(
+  lines: readonly string[],
+  i: number,
+): { table: Extract<MdBlock, { type: "table" }>; next: number } | null {
+  const line = lines[i] ?? "";
+  const rule = lines[i + 1] ?? "";
+  if (!line.includes("|") || !TABLE_RULE.test(rule)) return null;
+  const header = splitRow(line);
+  const marks = splitRow(rule);
+  const rows: string[][] = [];
+  let j = i + 2;
+  while (j < lines.length && (lines[j] as string).includes("|") && (lines[j] as string).trim())
+    rows.push(splitRow(lines[j++] as string));
+  const align = header.map((_, c): TableAlign => {
+    const m = marks[c] ?? "";
+    if (m.startsWith(":") && m.endsWith(":")) return "center";
+    if (m.endsWith(":")) return "right";
+    if (m.startsWith(":")) return "left";
+    const cells = rows.map((r) => (r[c] ?? "").replace(/[*_`]/g, "").trim()).filter(Boolean);
+    return cells.length > 0 && cells.every((v) => NUMERIC.test(v)) ? "right" : "left";
+  });
+  return { table: { type: "table", header, rows, align }, next: j };
+}
 
 export function parseMarkdown(source: string, options: { breaks?: boolean } = {}): MdBlock[] {
   const join = options.breaks ? "\n" : " ";
@@ -55,15 +89,10 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
       i++;
       continue;
     }
-    const next = lines[i + 1] ?? "";
-    if (line.includes("|") && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(next)) {
-      const header = splitRow(line);
-      const rows: string[][] = [];
-      i += 2;
-      while (i < lines.length && (lines[i] as string).includes("|") && (lines[i] as string).trim()) {
-        rows.push(splitRow(lines[i++] as string));
-      }
-      out.push({ type: "table", header, rows });
+    const table = tableAt(lines, i);
+    if (table) {
+      out.push(table.table);
+      i = table.next;
       continue;
     }
     if (/^\s*>/.test(line)) {
@@ -99,7 +128,7 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
     const para: string[] = [];
     while (i < lines.length) {
       const l = lines[i] as string;
-      if (!l.trim() || /^(#{1,6})\s|^\s*```|^\s*>/.test(l) || LIST.test(l)) break;
+      if (!l.trim() || /^(#{1,6})\s|^\s*```|^\s*>/.test(l) || LIST.test(l) || (para.length && tableAt(lines, i))) break;
       para.push(l.trim());
       i++;
     }
@@ -133,6 +162,41 @@ export function wikiLinksIn(text: string): string[] {
     if (title && !out.includes(title)) out.push(title);
   }
   return out;
+}
+
+const INLINE_ALL = new RegExp(INLINE.source, "g");
+
+/** A line's words without its inline marks: links and wiki links as their labels, an image as its alt text. */
+const plainInline = (text: string): string =>
+  text
+    .replace(/!(?=\[)/g, "")
+    .replace(INLINE_ALL, (tok, code, bold, em, link, _url, wiki, strike) =>
+      code
+        ? tok.slice(1, -1)
+        : bold || strike
+          ? plainInline(tok.slice(2, -2))
+          : em
+            ? plainInline(tok.slice(1, -1))
+            : link
+              ? plainInline(tok.slice(1, tok.indexOf("](")))
+              : wiki
+                ? parseWikiToken(tok).label
+                : tok,
+    );
+
+/**
+ * A Markdown text's prose as plain lines, the way a person reads it: each line of its paragraphs, list items
+ * and quotes, without their marks. Headings, rules, code, tables and embeds are left out: they frame what it
+ * says rather than say it.
+ */
+export function plainLines(source: string): string[] {
+  return parseMarkdown(source, { breaks: true })
+    .flatMap((b) =>
+      b.type === "paragraph" ? [b.text] : b.type === "list" ? b.items : b.type === "quote" ? b.lines : [],
+    )
+    .flatMap((text) => text.split("\n"))
+    .map((line) => plainInline(line).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 }
 
 /** Heading anchor ids for the outline: "Como pedimos acesso" → "como-pedimos-acesso". */

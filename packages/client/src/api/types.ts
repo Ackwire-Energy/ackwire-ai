@@ -9,10 +9,22 @@ export interface Health {
   edition: Edition;
 }
 
+/** The usage report's switch, for the installation's owner (`GET /api/app/telemetry`). */
+export interface ServerTelemetry {
+  /** The owner's switch. */
+  enabled: boolean;
+  /** `TELEMETRY=off` on the server: nothing is sent, whatever the switch says. */
+  envOff: boolean;
+  /** Exactly what the next report sends (shown as is). */
+  report: Record<string, unknown>;
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
   firstRun: boolean;
+  /** No account yet, and the first one only through the owner link (`/owner#claim=…`; absent: false). */
+  ownerClaim?: boolean;
   /** "Esqueci a senha" can send its e-mail. */
   passwordReset?: boolean;
   /** Signed out, `/` shows the marketing page; otherwise it goes to sign-in. */
@@ -20,6 +32,10 @@ export interface AuthConfig {
   /** Linked on the sign-in screen; the line shows only when both are set. */
   termsUrl?: string | null;
   privacyUrl?: string | null;
+  /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
+  supportEmail?: string | null;
+  /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
+  workspaceComputer?: boolean;
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -47,6 +63,8 @@ export interface Instance {
   url: string;
   signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
   signup: "open" | "invite";
+  /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
+  ownerClaim?: boolean;
 }
 
 /** "Abrir no celular": a sign-in for the phone, single use, a few minutes long. */
@@ -63,6 +81,19 @@ export interface User {
   name: string;
   email: string;
   image: string | null;
+  /** Signs in with a password (false: only Google or Apple, or the desktop app that runs the server). */
+  hasPassword?: boolean;
+  /** Opened the link that confirms the email address. */
+  emailVerified?: boolean;
+}
+
+/** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
+export type StandingState = "active" | "hold" | "suspended";
+
+/** What a member is told of the workspace's standing: `reason` only when the people who run the server show it. */
+export interface OrgStanding {
+  state: StandingState;
+  reason: string | null;
 }
 
 export interface OrgSummary {
@@ -71,6 +102,8 @@ export interface OrgSummary {
   role: Role;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
+  /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
+  standing?: OrgStanding;
 }
 
 export interface Me {
@@ -106,8 +139,14 @@ export interface Invitation {
 
 export interface InvitationPreview {
   orgName: string;
+  /** Empty for an org-wide invite link. */
   email: string;
   role: Role;
+  kind?: "email" | "link";
+  /** Who invited (their name), when known. */
+  invitedBy?: string | null;
+  /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
+  agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
 }
 
 export interface Credential {
@@ -156,14 +195,12 @@ export interface Agent {
   brain?: AgentBrainLine;
 }
 
-/** An agent on the team screen: when to call it and what it can do. */
+/** An agent on the team screen: what it can do. What it does comes from its instructions (`Agent`). */
 export interface TeamAgent {
   id: string;
   name: string;
   handle: string;
   role: string;
-  /** When to call it: its role, or the first sentence of its instructions. */
-  callFor: string;
   appearance: AgentLookInput | null;
   ownerUserId: string | null;
   /** What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…). */
@@ -364,6 +401,18 @@ export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "fa
 export type WaitMessageOutcome = "resolved" | "woke" | "held";
 
 /** A run the server still considers active in a channel (`GET …/channels/{id}/active-runs`). */
+/** A question an agent asked from a conversation, still out (`GET …/active-runs`): the working line's "asking…". */
+export interface OpenConsult {
+  /** The asking run (it may have ended: the answer wakes the agent). */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  channelId: string;
+  threadId: string;
+  /** When the question went out (ISO). */
+  since: string;
+}
+
 export interface ActiveRun {
   runId: string;
   agentId: string;
@@ -494,6 +543,9 @@ export type ChannelEvent =
       runId: string;
       status: "done" | "failed" | "waiting_approval";
       error?: string;
+      /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
     }
   // ── Chat delivery (packages/engine/src/events.ts) ───────────────────────────
   /**
@@ -668,6 +720,8 @@ export interface Approval {
   /** The connector it goes through ("github") and its account. */
   connector?: string | null;
   connectorAccount?: string | null;
+  /** The email itself, for mail drafts and sends; null for every other action. */
+  email?: ApprovalEmail | null;
   /** Why it asks (ADR 0053 §8): what the agent found and why this action. Shown above the action. */
   why?: string | null;
   /** Asked while nobody watched: by a routine (its name) or by an unattended run. Null: a person was there. */
@@ -675,6 +729,23 @@ export interface Approval {
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
+}
+
+/** The email a mail approval writes (draft, send, reply, forward), as its card shows it. */
+export interface ApprovalEmail {
+  verb: "draft" | "send" | "reply" | "forward";
+  /** The mailbox it goes through and its provider ("iCloud", "Gmail"; null: unknown). */
+  mailbox: string;
+  provider: string | null;
+  from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  /** The text, cut after 1500 characters. */
+  body: string;
+  /** The message it answers or forwards (its sender may be unknown). */
+  original: { subject: string; from: string | null } | null;
 }
 
 /** Who asked when nobody was watching (`approvals.origin`). */
@@ -915,6 +986,9 @@ export interface AgentDetail {
   defaultBudgetUsd?: number;
   tokensThisMonth: number;
   runsThisMonth: number;
+  failuresThisMonth: number;
+  /** This month's runs and failures per day of the month (UTC); only days with runs. */
+  runsByDay: { day: number; runs: number; failed: number }[];
   pendingApprovals: number;
   channels: AgentChannel[];
   createdAt: string;
@@ -2062,6 +2136,8 @@ export interface Machine {
   /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */
   os: string;
   arch: string;
+  /** `system`: each agent works as its own OS user, in its own folder (ADR 0057). Absent on older servers: `single`. */
+  mode?: "system" | "single";
   runnerVersion: string;
   /** `false`: started with `--no-exec` (files and uploads only). */
   execAllowed: boolean;
@@ -2090,6 +2166,37 @@ export interface HostComputer {
   machineId: string;
   /** false: an admin stopped it in this organization. */
   on: boolean;
+}
+
+/** The provisioner's steps while the workspace's own computer is being prepared (ADR 0056 §10), in order. */
+export type ComputerSetupStep = "reserving" | "starting" | "installing" | "connecting";
+
+/**
+ * `GET …/computer-setup` (every member): `pair` where people connect their own computers (the rest null);
+ * `external` where the workspace gets its own computer, and how far it is. `machine.provisioning` events carry
+ * the same fields but `mode`.
+ */
+export interface ComputerSetup {
+  mode: "external" | "pair";
+  state: "preparing" | "waiting" | "problem" | "ready" | null;
+  /** While `preparing`. */
+  step: ComputerSetupStep | null;
+  /** While `waiting`: `capacity` (taking longer than usual). */
+  reason: "capacity" | null;
+  since: string | null;
+  /** When people started waiting: the workspace's creation, or the computer's last revoke. */
+  requestedAt: string | null;
+  /** When the provisioner expects it ready; null while it can't say. */
+  expectedReadyAt: string | null;
+  /** `expectedReadyAt` less the server's clock when it answered (negative once past), so a device's clock doesn't matter. */
+  secondsLeft: number | null;
+  /** The server's clock when it answered less `requestedAt`, for the same reason. */
+  secondsWaited: number | null;
+  /** The server sends email: the workspace's owners get one when it's ready after a wait. */
+  notifyByEmail: boolean;
+  specs: { cpus: number; memoryGb: number; diskGb: number } | null;
+  /** The computer itself, once the provisioner made it. */
+  machineId: string | null;
 }
 
 /** The agent browser on a computer, as its runner reports it. Turned on at the computer (`access.tools.browser`). */
@@ -2181,8 +2288,10 @@ export interface OutageAgent {
 export interface MachineOutage {
   machineId: string;
   name: string;
-  /** The machine's `os` (`darwin`, `windows`, `linux`…). */
+  /** The machine's `os` (`darwin`, `windows`, `linux`…); `other` for the workspace's own computer. */
   platform: string;
+  /** The workspace's own computer (ADR 0056 §10). */
+  managed?: boolean;
   offlineSince: string;
   agents: OutageAgent[];
   /** Runs parked until the computer (or another one) can take them. */
@@ -2196,6 +2305,8 @@ export type OutageTarget =
       machineId: string;
       name: string;
       platform: string;
+      /** The workspace's own computer (ADR 0056 §10). */
+      managed?: boolean;
       online: boolean;
       brains: ComputerBrain[];
       /** Why it can't take them now, or null. */
@@ -3943,6 +4054,10 @@ export interface MailAccount {
   offActions: MailActionName[];
   /** Actions that always ask a person in this mailbox (`draft`, `organize`). */
   askActions: MailActionName[];
+  /** Other addresses of this mailbox: a reply goes out from the one the email arrived at. */
+  aliases: string[];
+  /** What new emails go out from; null = `address`. */
+  defaultFrom: string | null;
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }
@@ -3961,6 +4076,19 @@ export type MailActionName =
 
 /** Why an IMAP mailbox didn't connect (`422 { error }`). */
 export type MailConnectError = "auth" | "imap_unreachable" | "smtp_unreachable" | "tls" | "blocked_host" | "unknown";
+
+/** What a mailbox's PATCH changes (each field optional). */
+export interface MailAccountUpdate {
+  label?: string;
+  /** A new app password (IMAP): tested first, a `422` carries `MailConnectError`. */
+  password?: string;
+  offActions?: MailActionName[];
+  askActions?: MailActionName[];
+  /** The mailbox's other addresses (replaces the list). */
+  aliases?: string[];
+  /** One of `address` or `aliases`; null = `address`. */
+  defaultFrom?: string | null;
+}
 
 export interface MailImapInput {
   preset: string;
@@ -3994,7 +4122,7 @@ export interface MailPolicy {
   dailySendCap: number;
   /** Sends without asking (only with `allowedRecipients`). */
   sendWithoutAsking: boolean;
-  /** Send as this alias; null = the mailbox's address. */
+  /** The only address this agent sends from (one of the mailbox's); null = automatic (replies from where the email arrived). */
   fromAddress: string | null;
 }
 
@@ -4157,11 +4285,10 @@ export interface DesktopStatus {
   controllerUserId: string | null;
   handoff: BrowserHandoff | null;
   viewers: number;
-  /** This person may take control (and open the agent's terminal). */
+  /** This person may take control. */
   canControl: boolean;
-  /** This person may turn it on ("Ligar") and off ("Desligar"). */
-  canStart: boolean;
-  terminal: { available: boolean; reason: string | null; allowed: boolean };
+  /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
+  held: boolean;
 }
 
 /** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */

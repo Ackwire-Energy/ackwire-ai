@@ -7,7 +7,6 @@ import {
   hostOf,
   type PageGap,
   pageNoteOf,
-  profileBrowserOf,
   siteLetter,
   siteOf,
 } from "../../src/features/browser/logic";
@@ -123,19 +122,7 @@ describe("the page box with no page to show", () => {
   });
 });
 
-describe("the browser on the agent's profile", () => {
-  test("its owner and admins have the card while the browser is ready, a request waiting too", () => {
-    expect(profileBrowserOf(null, true)).toBe("card");
-    expect(profileBrowserOf({ status: "pending" }, true)).toBe("card");
-    expect(profileBrowserOf({ status: "active" }, true)).toBe("card");
-  });
-
-  test("anyone else: the request's row while it waits, the card while a person is in it, else nothing", () => {
-    expect(profileBrowserOf({ status: "pending" }, false)).toBe("waiting");
-    expect(profileBrowserOf({ status: "active" }, false)).toBe("card");
-    expect(profileBrowserOf(null, false)).toBeNull();
-  });
-
+describe("whether the agent may use its browser", () => {
   test("only for an agent granted its browser (all tools doesn't cover it)", () => {
     const access = (state: "granted" | "inherited" | "denied" | "off") => ({
       builtins: [{ scope: "browser:use", label: "Navegador", state, tools: [] }],

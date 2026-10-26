@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
+import type { OrgStanding } from "../api/types";
 import { MAX_UPLOAD_MB } from "./files";
 
 /**
@@ -16,6 +17,7 @@ const KNOWN = {
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
   "machine.pairing_invalid": "errors.machine.pairingInvalid",
+  "machine.pairing_off": "errors.machine.pairingOff",
   "machine.target_offline": "errors.machine.targetOffline",
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
@@ -72,12 +74,40 @@ const KNOWN = {
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
   "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
-  "org.paused": "standing.paused",
-  "org.suspended": "standing.suspended",
   "org.create_refused": "standing.createRefused",
-  "agent.paused": "standing.agentPaused",
   "machine.managed": "computerSetup.managedNotRemovable",
+  "machine.managed_access": "computerSetup.managedAccess",
 } as const;
+
+/** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */
+const STANDING_REFUSALS = {
+  "org.paused": ["standing.paused", "standing.onHold"],
+  "org.suspended": ["standing.suspended", "standing.suspendedFor"],
+  "agent.paused": ["standing.agentPaused", "standing.agentPaused"],
+} as const;
+
+/**
+ * A refusal by the workspace's standing in the person's words, with the reason when the workspace is told
+ * one: the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`… Null for any
+ * other code.
+ */
+export function standingRefusalText(
+  t: TFunction,
+  code: string | null | undefined,
+  params?: Record<string, unknown> | null,
+): string | null {
+  const plain = code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code;
+  const keys = plain ? STANDING_REFUSALS[plain as keyof typeof STANDING_REFUSALS] : undefined;
+  if (!keys) return null;
+  const reason = typeof params?.reason === "string" ? params.reason.trim() : "";
+  return reason ? t(keys[1], { reason }) : t(keys[0]);
+}
+
+/** The hold banner's line: the reason when the workspace is told one, else what a refused run says. Null unless on hold. */
+export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
+  if (standing?.state !== "hold") return null;
+  return standingRefusalText(t, "org.paused", { reason: standing.reason });
+}
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */
 export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
@@ -94,6 +124,8 @@ export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
 /** A known server code in the person's language; null for anything else (the caller keeps its own words). */
 export function knownErrorText(t: TFunction, error: unknown): string | null {
   if (!(error instanceof ApiError)) return null;
+  const standing = standingRefusalText(t, error.code, error.params);
+  if (standing) return standing;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
 }
@@ -101,8 +133,8 @@ export function knownErrorText(t: TFunction, error: unknown): string | null {
 /** Translated text for a failed request. */
 export function errorText(t: TFunction, error: unknown): string {
   if (error instanceof ApiError) {
-    const key = KNOWN[error.code as keyof typeof KNOWN];
-    if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
+    const known = knownErrorText(t, error);
+    if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");
   }

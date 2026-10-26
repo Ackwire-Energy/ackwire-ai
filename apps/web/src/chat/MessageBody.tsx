@@ -1,6 +1,7 @@
-import { Mention } from "@agenteschat/ui";
+import { type AgentColor, Mention } from "@agenteschat/ui";
 import { memo, type ReactNode, useCallback, useRef } from "react";
 import { splitSettled } from "@/chat/live-text";
+import { ChartAccent } from "@/components/ChartBlock";
 import { Markdown, type MentionRenderer, type WikiLinkRenderer } from "@/lib/markdown";
 
 /**
@@ -19,6 +20,7 @@ export function MessageBody({
   renderMention,
   wikiLink,
   live,
+  accent = "sky",
 }: {
   body: string;
   resolveMention?: (handle: string) => string | null;
@@ -28,6 +30,8 @@ export function MessageBody({
   wikiLink?: WikiLinkRenderer;
   /** Still streaming: settled blocks memoized, the tail's words fade in. */
   live?: boolean;
+  /** The writing agent's color: its charts take its tones. */
+  accent?: AgentColor;
 }) {
   const mention = useCallback(
     (handle: string, key: string) =>
@@ -49,13 +53,18 @@ export function MessageBody({
       ),
     [],
   );
-  if (!live) return <Markdown source={body} variant="message" mention={mention} wikiLink={wikiLink} />;
+  if (!live)
+    return (
+      <ChartAccent.Provider value={accent}>
+        <Markdown source={body} variant="message" mention={mention} wikiLink={wikiLink} />
+      </ChartAccent.Provider>
+    );
   const { settled, tail } = splitSettled(body);
   return (
-    <>
+    <ChartAccent.Provider value={accent}>
       {settled && <SettledBlocks source={settled} mention={stableMention} wikiLink={stableWiki} />}
       <Markdown source={tail} variant="message" mention={mention} wikiLink={wikiLink} words className="md--tail" />
-    </>
+    </ChartAccent.Provider>
   );
 }
 

@@ -150,7 +150,7 @@ describe("Notificações", () => {
     expect(document.body.textContent).toContain("reagiram à sua mensagem");
   });
 
-  test("an approval a routine asked while nobody watched says so, then the agent's why", async () => {
+  test("an approval says who wants what in one sentence, who asked, and the agent's why behind Por quê?", async () => {
     const asked = notification({
       id: "n-ap",
       kind: "approval",
@@ -167,10 +167,17 @@ describe("Notificações", () => {
       updatedAt: ago(5),
     });
     await go(seedState({ notifications: [asked] }));
-    const text = screen().getByRole("region", { name: "Esperando você" }).textContent ?? "";
-    const origin = text.indexOf("Pedido pela rotina «Vigiar erros» enquanto ninguém acompanhava.");
-    expect(origin).toBeGreaterThan(-1);
-    expect(text.indexOf("O erro 500 voltou depois do deploy 2.14.")).toBeGreaterThan(origin);
+    const region = screen().getByRole("region", { name: "Esperando você" });
+    const text = region.textContent ?? "";
+    expect(text).toContain("Pedido pela rotina «Vigiar erros» enquanto ninguém acompanhava");
+    expect(text).toContain("Atlas quer fazer um deploy");
+    expect(text).not.toContain("O erro 500 voltou depois do deploy 2.14.");
+    await click(within(region).getByRole("button", { name: "Por quê?" }));
+    expect(region.textContent).toContain("O erro 500 voltou depois do deploy 2.14.");
+    // Decided right here: a deploy takes a hold, and Recusar asks for the reason.
+    expect(within(region).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
+    await click(within(region).getByRole("button", { name: "Recusar" }));
+    expect(region.querySelector("textarea")).toBeTruthy();
   });
 
   test("Feito leaves at once (optimistic) and Desfazer brings it back", async () => {
@@ -358,6 +365,32 @@ describe("a new computer connected (ADR 0036, admins)", () => {
     await click(within(row).getByRole("button", { name: "Abrir" }));
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+  });
+});
+
+describe("what the workspace itself tells: nobody's face, its own", () => {
+  test("its computer ready, its standing: an icon where the face goes, and unread in the headline's weight", async () => {
+    const ready = notification({ id: "n-ready", kind: "computer_ready", updatedAt: ago(3) });
+    const hold = notification({
+      id: "n-hold",
+      kind: "org_standing",
+      latest: { statusTo: "hold" },
+      readAt: ago(1),
+      updatedAt: ago(2),
+    });
+    await go(seedState({ notifications: [ready, hold] }));
+    const row = (id: string) => document.querySelector(`[data-n="${id}"]`) as HTMLElement;
+    expect(row("n-ready").textContent).toContain("O computador do seu workspace está pronto");
+    for (const id of ["n-ready", "n-hold"]) expect(row(id).querySelector(".nt-who .nt-sys svg")).toBeTruthy();
+    expect(row("n-ready").classList.contains("is-unread")).toBe(true);
+    expect(row("n-hold").classList.contains("is-unread")).toBe(false);
+    // With nobody to name, a screen reader reads what it tells.
+    expect(row("n-ready").getAttribute("aria-label")).toBe("O computador do seu workspace está pronto, não lida");
+    expect(row("n-hold").getAttribute("aria-label")).toBe("O workspace está em espera: os agentes estão pausados");
+    // A headline with no name in it carries the unread weight whole.
+    const css = await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text();
+    expect(css).toMatch(/\.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 600/);
+    expect(css).toMatch(/\.nt-item:not\(\.is-unread\) \.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 500/);
   });
 });
 

@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { ControlStatus } from "@agenteschat/adapters/runner-control";
-import { type Home, isRefusedHome, reconnectTarget, type Snapshot } from "../src/control/store";
-import { desktopEn } from "../src/i18n/keys.en";
-import { desktopPtBR } from "../src/i18n/keys.pt-BR";
+import { type Home, isRefusedHome } from "../src/control/store";
+import { createDesktopI18n } from "../src/i18n";
 
-/** "Reconectar este Mac": which home the popover offers it for, and which one the connect window takes. */
+/** "Reconnect this Mac": which home the popover offers it for, and the words by platform. */
 
 const status = (over: Partial<ControlStatus> = {}): ControlStatus => ({
   paired: true,
@@ -29,7 +28,7 @@ const home = (homeId: string, st: ControlStatus | null): Home => ({
   logo: null,
 });
 
-describe("reconnect this Mac", () => {
+describe("reconnect this computer", () => {
   test("only a paired home the server refused offers it (not offline, outdated or unpaired)", () => {
     expect(isRefusedHome(home("a", status({ connection: "refused", refusedReason: "revoked" })))).toBe(true);
     expect(isRefusedHome(home("b", status({ connection: "offline" })))).toBe(false);
@@ -38,24 +37,12 @@ describe("reconnect this Mac", () => {
     expect(isRefusedHome(home("e", null))).toBe(false);
   });
 
-  test("the connect window takes the home the pref names, while it is still paired", () => {
-    const snap: Snapshot = {
-      loaded: true,
-      homes: [
-        home("a", status({ connection: "refused" })),
-        home("b", status({ paired: false, connection: "unpaired" })),
-      ],
-    };
-    expect(reconnectTarget(snap, "a")?.homeId).toBe("a");
-    expect(reconnectTarget(snap, "b")).toBeUndefined();
-    expect(reconnectTarget(snap, "gone")).toBeUndefined();
-    expect(reconnectTarget(snap, null)).toBeUndefined();
-    expect(reconnectTarget(snap, 42)).toBeUndefined();
-  });
-
-  test("the banner speaks of coming back with the same agents", () => {
-    expect(desktopPtBR.tray.reconnectMac).toBe("Reconectar este Mac");
-    expect(desktopPtBR.tray.refusedBody).toBe("Reconecte para voltar com os mesmos agentes e permissões.");
-    expect(desktopEn.tray.reconnectMac).toBe("Reconnect this Mac");
+  test("the banner speaks of coming back with the same agents, naming this computer", () => {
+    const pt = createDesktopI18n("pt-BR", "mac");
+    expect(pt.t("desktop.tray.reconnectMac")).toBe("Reconectar este Mac");
+    expect(pt.t("desktop.tray.refusedBody")).toBe("Reconecte para voltar com os mesmos agentes e permissões.");
+    expect(createDesktopI18n("en", "mac").t("desktop.tray.reconnectMac")).toBe("Reconnect this Mac");
+    expect(createDesktopI18n("pt-BR", "linux").t("desktop.tray.reconnectMac")).toBe("Reconectar este computador");
+    expect(createDesktopI18n("en", "linux").t("desktop.tray.reconnectMac")).toBe("Reconnect this computer");
   });
 });

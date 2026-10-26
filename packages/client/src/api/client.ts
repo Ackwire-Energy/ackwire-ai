@@ -46,6 +46,7 @@ import type {
   Channel,
   ChannelMember,
   CommandApproval,
+  ComputerSetup,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -94,7 +95,7 @@ import type {
   MachineOutages,
   MachineTask,
   MailAccount,
-  MailActionName,
+  MailAccountUpdate,
   MailFolder,
   MailImapInput,
   MailProviders,
@@ -159,6 +160,7 @@ import type {
   SecretBox,
   SecretRequest,
   SeriesScope,
+  ServerTelemetry,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -198,7 +200,12 @@ import type {
  * (test/fake-api.ts). Components never call `fetch` directly.
  */
 export interface ApiClient {
-  system: { health(): Promise<Health> };
+  system: {
+    health(): Promise<Health>;
+    /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
+    telemetry(): Promise<ServerTelemetry | null>;
+    setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+  };
   account: {
     authConfig(): Promise<AuthConfig>;
     /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */
@@ -209,6 +216,8 @@ export interface ApiClient {
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
+    /** A password for an account that has none (`password_set` 409 when it has one). */
+    addPassword(password: string): Promise<void>;
   };
   orgs: {
     create(input: {
@@ -398,6 +407,14 @@ export interface ApiClient {
     ): Promise<Connection>;
     /** Returns the provider URL to open; the server redirects back to `returnTo`. */
     startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
+    /**
+     * The phone app finishes an authorization it started (`returnTo: APP_OAUTH_RETURN`) with the `state` and
+     * `code` the callback handed back to it.
+     */
+    completeOAuth(
+      orgId: string,
+      input: { state: string; code: string },
+    ): Promise<{ connectionId: string; connector: string }>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
   };
   githubApp: {
@@ -435,6 +452,8 @@ export interface ApiClient {
     host(orgId: string): Promise<HostComputer | null>;
     /** Uses the server's computer again (admins); `remove` is how it stops. */
     hostOn(orgId: string): Promise<HostComputer>;
+    /** ADR 0056 §10: whether the workspace gets its own computer, and how far it is (every member). */
+    computerSetup(orgId: string): Promise<ComputerSetup>;
     /**
      * ADR 0036 §5, the device flow: the computer made the code; the person sees it here
      * (`machine.device_not_found` once expired, used or unknown).
@@ -969,12 +988,10 @@ export interface ApiClient {
       orgId: string,
       input: { provider: "gmail" | "outlook"; label?: string },
     ): Promise<{ accountId: string; redirectUrl: string }>;
-    /** A new name, or a new app password (reconnects an IMAP mailbox). */
-    update(
-      orgId: string,
-      accountId: string,
-      input: { label?: string; password?: string; offActions?: MailActionName[]; askActions?: MailActionName[] },
-    ): Promise<MailAccount>;
+    /** A new name, actions, other addresses and the default From, or a new app password (reconnects an IMAP mailbox). */
+    update(orgId: string, accountId: string, input: MailAccountUpdate): Promise<MailAccount>;
+    /** Addresses the mailbox has sent from (its sent folder), offered as its other addresses. */
+    suggestedAddresses(orgId: string, accountId: string): Promise<string[]>;
     disconnect(orgId: string, accountId: string): Promise<void>;
     folders(orgId: string, accountId: string): Promise<MailFolder[]>;
     /** An agent's access and rules per mailbox. */
@@ -1028,16 +1045,15 @@ export interface ApiClient {
      * `browser.bad_address` or `browser.open_failed`.
      */
     open(orgId: string, agentId: string, url: string): Promise<void>;
-    /** "Parar": closes the agent's browser now (its logins stay), or stops that screen. */
-    stop(orgId: string, agentId: string, screen?: ScreenKind): Promise<void>;
+    /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
+    stop(orgId: string, agentId: string): Promise<void>;
   };
   /**
-   * The agent's desktop (ADR 0058): its state and "Ligar". The screen itself is a WebSocket
-   * (`desktopSocketUrl`); control, "Devolver" and "Desligar" are the browser's screen routes with `desktop`.
+   * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which
+   * starts it when it isn't running; control and "Devolver" are the browser's screen routes with `desktop`.
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
-    start(orgId: string, agentId: string): Promise<void>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

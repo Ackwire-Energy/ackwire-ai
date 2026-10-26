@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
+import { excerpt } from "@agenteschat/client/lib/text";
 import { Avatar, Button, Card, CardFooter, Chip, Icon, Meter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -18,14 +19,15 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
-import { BrowserNow } from "./BrowserNow";
+import { ComputerNow } from "./ComputerNow";
 import { CardHead, useAgentEdit } from "./context";
-import { DesktopNow } from "./DesktopNow";
 import { Numbers } from "./Hero";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
-import { TerminalNow } from "./TerminalNow";
 import { WorkCard } from "./Work";
+
+/** "What it does": the start of its instructions in plain words, up to three lines and this many characters. */
+const DOES_PREVIEW = 280;
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
 export function OverviewTab() {
@@ -65,9 +67,7 @@ export function OverviewTab() {
       <ReadOnlyNote />
       <div className="agp-cols">
         <div className="agp-col">
-          <BrowserNow />
-          <DesktopNow />
-          <TerminalNow />
+          <ComputerNow />
           {(approvals > 0 || pending.length > 0) && (
             <div className="agp-attns">
               {approvals > 0 && (
@@ -129,7 +129,7 @@ export function OverviewTab() {
               }
             />
             {agent.instructions.trim() ? (
-              <p className="agp-prose agp-clamp">{agent.instructions}</p>
+              <p className="agp-prose">{excerpt(agent.instructions, DOES_PREVIEW)}</p>
             ) : (
               <p className="muted">{t("agent.noInstructions", g)}</p>
             )}

@@ -1,14 +1,24 @@
-//! agentes for macOS (ADR 0036): a menu bar icon, a popover and two small windows around the
-//! runners it spawns, one per organization, plus the main window with the whole site (ADR 0036, `main_window`).
-//! Rust stays thin: tray, windows, the runner children, single instance, start at login, notifications,
-//! native dialogs and self-update. Everything else lives in the runner (TypeScript) and in the web view.
+//! agentes.chat for macOS, Windows and Linux: the main window on the server open now (agentes.chat or a
+//! server of the person's own, `servers`), the welcome window that finds one, and, only while agents work on
+//! this computer for a server of the person's own, the runners it spawns (one per organization), the menu bar
+//! popover and Preferences' tabs for this computer. On a Mac or Linux it can also run agentes.chat itself, as
+//! its child (`local_server`, with this computer as its agents' computer, `host_sync`). Rust stays thin:
+//! windows, the tray, the server list, links, the children, single instance, start at login, notifications,
+//! native dialogs and self-update. Everything else lives in the runner and the server (TypeScript) and in the
+//! web view.
 
 mod cover;
+mod deep_link;
+mod discover;
 mod dock;
+mod host_sync;
+mod local_server;
 mod main_window;
 mod menus;
 mod notch;
 mod runners;
+mod servers;
+mod tailscale;
 mod tray;
 mod window_state;
 
@@ -17,7 +27,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Url, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
@@ -27,18 +37,11 @@ use tauri_plugin_updater::UpdaterExt;
 
 use runners::{RunnerInfo, Runners};
 
-/// agentes.chat: the site the main window loads (`main_window`). Its pages open there; the pages of the other
-/// servers the app signs in to open in the person's browser.
-const SITE: &str = "https://agentes.chat";
 const WINDOWS: &[&str] = &["popover", "welcome", "prefs"];
 
 /// When the popover last hid because it lost focus: a click on the tray icon blurs it first,
 /// and that same click must not open it again.
 struct PopoverClock(Mutex<Option<Instant>>);
-
-/// The server the next sign-in goes to ("Seu servidor" in the welcome window), as an https origin.
-#[derive(Default)]
-struct ChosenServer(Mutex<Option<String>>);
 
 #[derive(Serialize)]
 struct AppInfo {
@@ -47,36 +50,20 @@ struct AppInfo {
     arch: &'static str,
 }
 
-/// `https://host[:port]` of an https URL; None for anything else.
-fn https_origin(url: &str) -> Option<String> {
-    let parsed = tauri::Url::parse(url).ok()?;
-    if parsed.scheme() != "https" || parsed.host_str().is_none() {
-        return None;
-    }
-    Some(parsed.origin().ascii_serialization())
-}
-
-/// A page of one of `sites` (https origins): agentes.chat, the servers the organizations here are
-/// signed in to, and the one chosen for the next sign-in.
-fn is_site_url(url: &str, sites: &[String]) -> bool {
-    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return false;
-    }
-    https_origin(url).is_some_and(|origin| sites.contains(&origin))
-}
-
 /// The providers' own sign-in pages the runner gets from `claude auth login` / `codex login --device-auth`
-/// (ADR 0041): the account dialog's "Abrir o link" when the browser didn't open by itself.
+/// (ADR 0041): the account dialog's "Open the link" when the browser didn't open by itself.
 fn is_sign_in_url(url: &str) -> bool {
-    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return false;
-    }
     const PREFIXES: &[&str] = &[
         "https://claude.com/cai/oauth/authorize?",
         "https://claude.ai/oauth/authorize?",
         "https://auth.openai.com/codex/device",
     ];
     PREFIXES.iter().any(|p| url.starts_with(p))
+}
+
+/// The app's own builds ("Download version …" in Updates), whichever server it opens.
+fn is_app_download(url: &str) -> bool {
+    url.starts_with("https://agentes.chat/api/desktop/download/")
 }
 
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
@@ -149,23 +136,16 @@ fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, Stri
 /// The launch argument start at login passes, so a login start stays in the menu bar.
 const AUTOSTART_ARG: &str = "--autostart";
 
-/// Whether an organization here signs in to agentes.chat, the only site the main window loads.
-fn paired_to_site(app: &AppHandle) -> bool {
-    app.state::<Runners>().paired_servers().iter().any(|s| https_origin(s).as_deref() == Some(SITE))
-}
-
-/// "Open the app": the main window while an organization here is on agentes.chat, Preferences while they all
-/// are on their own servers, the welcome while this Mac isn't connected to any organization.
-fn open_app(app: &AppHandle) {
-    if paired_to_site(app) {
+/// "Open the app": the main window on the server open now, or the first run while there is none.
+pub(crate) fn open_app(app: &AppHandle) {
+    if servers::current(app).is_some() {
         let _ = main_window::open(app, None);
-    } else if app.state::<Runners>().any_paired() {
-        let _ = present(app, "prefs");
     } else {
         let _ = present(app, "welcome");
     }
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn toggle_popover(app: &AppHandle) {
     let Some(window) = app.get_webview_window("popover") else { return };
     if window.is_visible().unwrap_or(false) {
@@ -185,7 +165,18 @@ pub(crate) fn toggle_popover(app: &AppHandle) {
     }
 }
 
-/// Graceful quit: every runner gets `shutdown` and a few seconds, then the app exits.
+/// The children finish their work: every runner gets `shutdown` and a few seconds, and the server here
+/// drains (at most 25 s), side by side.
+fn stop_children(app: &AppHandle) {
+    let server = {
+        let app = app.clone();
+        std::thread::spawn(move || local_server::shutdown(&app))
+    };
+    app.state::<Runners>().shutdown_all();
+    let _ = server.join();
+}
+
+/// Graceful quit: the children stop, then the app exits.
 fn begin_quit(app: AppHandle) {
     let runners = app.state::<Runners>();
     if runners.is_quitting() {
@@ -200,7 +191,7 @@ fn begin_quit(app: AppHandle) {
         }
     }
     std::thread::spawn(move || {
-        app.state::<Runners>().shutdown_all();
+        stop_children(&app);
         app.exit(0);
     });
 }
@@ -228,27 +219,18 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+/// A page of a server this app opens goes to the main window, on that server; a provider's sign-in page and
+/// the app's own downloads open in the person's browser. Nothing else.
 #[tauri::command]
 fn open_external(app: AppHandle, url: String) -> Result<(), String> {
-    if is_site_url(&url, &[SITE.to_string()]) {
-        let page = url.parse().map_err(|_| "not a URL")?;
-        return main_window::open(&app, Some(page));
+    if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("not a link the app opens".into());
     }
-    let mut sites: Vec<String> =
-        app.state::<Runners>().servers().iter().filter_map(|s| https_origin(s)).collect();
-    let chosen = app.state::<ChosenServer>().0.lock().unwrap_or_else(|p| p.into_inner()).clone();
-    sites.extend(chosen);
-    if !is_site_url(&url, &sites) && !is_sign_in_url(&url) {
-        return Err("only our servers' pages and sign-in links open from the app".into());
+    if is_sign_in_url(&url) || is_app_download(&url) {
+        return app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string());
     }
-    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn set_server(chosen: tauri::State<'_, ChosenServer>, url: String) -> Result<(), String> {
-    let origin = https_origin(&url).ok_or("not an https address")?;
-    *chosen.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(origin);
-    Ok(())
+    let page: Url = url.parse().map_err(|_| "not a URL")?;
+    main_window::show_url(&app, page)
 }
 
 #[tauri::command]
@@ -339,15 +321,16 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
         .download_and_install(|_, _| {}, || {})
         .await
         .map_err(|e| e.to_string())?;
-    // The runners finish their work first, as when quitting; then the new app opens.
+    // The runners and the server here finish their work first, as when quitting; then the new app opens
+    // (and starts the server here's new version, `local_server`).
     tauri::async_runtime::spawn_blocking(move || {
-        app.state::<Runners>().shutdown_all();
+        stop_children(&app);
         app.restart();
     });
     Ok(true)
 }
 
-/// Turns the notch on or off (Preferências → Geral; the popover applies the saved choice at start).
+/// Turns the notch on or off (Preferences › General; the popover applies the saved choice at start).
 #[tauri::command]
 async fn notch_set(app: AppHandle, on: bool) -> Result<(), String> {
     notch::set_enabled(&app, on)
@@ -377,12 +360,31 @@ fn migrate_login_item(app: &AppHandle) {
     let _ = app;
 }
 
+/// The servers at start: as they were, or (the first start of an app that keeps a list) from the menu bar
+/// app's homes, whose Cloud ones retire before any runner starts (`runners::migrate`).
+fn starting_servers(app: &AppHandle) -> servers::ServerFile {
+    if let Some(file) = servers::read(app) {
+        return file;
+    }
+    let moved = runners::migrate(app);
+    let mut list = moved.servers;
+    if !moved.retire.is_empty() {
+        list.push(servers::CLOUD.to_string());
+        menus::retired_cloud_homes(app, moved.retired.unwrap_or_else(|| "~/agentes".into()));
+    }
+    servers::ServerFile { current: list.first().cloned(), servers: list }
+}
+
 pub fn run() {
     let builder = tauri::Builder::default()
-        // First: a second launch brings the running app's window back.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            open_app(app);
+        // First: a second launch brings the running app's window back; one carrying a link (Windows,
+        // Linux) goes to the deep-link plugin first (`deep_link.rs` shows it).
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if !deep_link::in_args(&argv) {
+                open_app(app);
+            }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .plugin(tauri_plugin_notification::init())
@@ -392,8 +394,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Runners::default())
         .manage(PopoverClock(Mutex::new(None)))
-        .manage(ChosenServer::default())
+        .manage(servers::Servers::default())
+        .manage(local_server::LocalServer::default())
+        .manage(host_sync::HostSync::default())
+        .manage(deep_link::PendingLink::default())
         .manage(main_window::Bridge::default())
+        .manage(main_window::Notices::default())
         .manage(menus::Zoom::default())
         .manage(cover::Cover::default())
         .manage(dock::Dock::default())
@@ -405,7 +411,6 @@ pub fn run() {
             runner_add,
             runner_remove,
             open_external,
-            set_server,
             reveal_folder,
             pick_folder,
             set_tray_state,
@@ -420,15 +425,35 @@ pub fn run() {
             notch_set,
             notch_info,
             notch_place,
+            servers::servers_get,
+            servers::server_choose,
+            servers::server_remove,
+            discover::discover,
+            deep_link::link_take,
+            local_server::local_server_status,
+            local_server::local_server_install,
+            local_server::local_server_start,
+            local_server::local_server_stop,
+            local_server::local_server_restart,
+            local_server::local_server_reach,
+            local_server::local_server_usage,
+            local_server::local_server_backup,
+            local_server::local_server_diagnostics,
+            local_server::local_server_sync,
+            tailscale::tailscale_status,
+            tailscale::tailscale_open,
+            tray::tray_visible,
             main_window::this_mac,
             main_window::this_mac_reply,
             main_window::this_mac_listening,
+            main_window::notify_site_set,
             dock::dock_set,
             menus::app_menu_set,
             menus::context_menu,
             cover::page_ready,
             cover::cover_retry,
-            cover::cover_hide
+            cover::cover_hide,
+            cover::cover_server
         ])
         .on_menu_event(|app, event| menus::on_event(app, event.id().as_ref()))
         .on_window_event(|window, event| match event {
@@ -438,15 +463,25 @@ pub fn run() {
                     *at = Some(Instant::now());
                 }
             }
+            WindowEvent::Focused(true) if window.label() == main_window::LABEL => {
+                main_window::focused(window.app_handle());
+            }
             // Welcome and Preferences really close (made again when they open).
             WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {}
             WindowEvent::Destroyed if MADE_ON_OPEN.contains(&window.label()) => sync_dock(window.app_handle()),
             WindowEvent::CloseRequested { api, .. } => {
-                // The other windows are made once and only hidden; quitting goes through "Sair".
+                // The other windows are made once and only hidden; quitting goes through "Quit".
                 api.prevent_close();
                 if window.label() == main_window::LABEL {
                     window_state::remember(window, false);
+                    // Some Linux desktops show no tray icon: there the window stays in reach, minimized.
+                    #[cfg(target_os = "linux")]
+                    {
+                        let _ = window.minimize();
+                        return;
+                    }
                     // ⌘W in full screen: out of full screen first, so no empty Space stays behind.
+                    #[cfg(not(target_os = "linux"))]
                     if window.is_fullscreen().unwrap_or(false) {
                         let _ = window.set_fullscreen(false);
                         let window = window.clone();
@@ -479,22 +514,28 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            tray::create(app.handle())?;
             let handle = app.handle().clone();
+            // Before the tray (it lists them) and before any runner (Cloud homes retire first).
+            servers::load(&handle, starting_servers(&handle));
+            tray::create(&handle)?;
             migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.
             let launcher = handle.autolaunch();
             if launcher.is_enabled().unwrap_or(false) {
                 let _ = launcher.enable();
             }
-            let runners = app.state::<Runners>();
-            runners.start_all(&handle);
-            // Started at login: the menu bar only (the welcome while nothing is paired, as before). Opened by
-            // hand: the main window, but only for an organization on agentes.chat, the one site it loads.
+            // The server here first (its own homes start with the rest); nothing starts without homes: in the
+            // Cloud, or with a server whose agents work elsewhere.
+            local_server::load(&handle);
+            app.state::<Runners>().start_all(&handle);
+            host_sync::start(&handle);
+            deep_link::setup(&handle);
+            // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
+            // the server open now, or the first run while there is none.
             let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
-            if !runners.any_paired() {
+            if servers::current(&handle).is_none() {
                 let _ = present(&handle, "welcome");
-            } else if !at_login && paired_to_site(&handle) {
+            } else if !at_login {
                 let _ = main_window::open(&handle, None);
             }
             // In the Dock from the start, like Slack (the popover then applies the person's choice).
@@ -526,4 +567,17 @@ pub fn run() {
         RunEvent::Reopen { .. } => open_app(app),
         _ => {}
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn what_opens_in_the_browser() {
+        assert!(is_sign_in_url("https://claude.ai/oauth/authorize?client_id=x"));
+        assert!(is_app_download("https://agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
+        assert!(!is_app_download("https://agentes.chat.evil.com/api/desktop/download/x"));
+        assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
+    }
 }

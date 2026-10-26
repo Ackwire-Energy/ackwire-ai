@@ -325,6 +325,8 @@ describe("secrets are refused to every read tool", () => {
     expect(secretRead("Bash", { command: "head < .env" }, scope)).toBe(true);
     expect(secretRead("Bash", { command: "ls -la ~/.agentes-runner" }, scope)).toBe(true);
     expect(secretRead("Bash", { command: "cat $(echo ~/.netrc)" })).toBe(true);
+    // The server's own computer's token, beside the install's .env, where a Mac's agents work too.
+    expect(secretRead("Bash", { command: "cat ../host-computer-token" }, scope)).toBe(true);
     // A search for a word is not a read of a file; code and docs are fine.
     expect(secretRead("Grep", { pattern: "credentials", path: "src" }, scope)).toBe(false);
     expect(secretRead("Read", { file_path: "src/auth.ts" }, scope)).toBe(false);
@@ -362,6 +364,7 @@ describe("secrets are refused to every read tool", () => {
       ".claude/.credentials.json",
       ".codex/auth.json",
       "accounts/codex/0193dddd-0000-4000-8000-000000000002/auth.json",
+      "host-computer-token",
     ]) {
       // The server refuses it anywhere; Claude Code's own Read is denied it at home and in a repository.
       expect([file, secretRead("Read", { file_path: `/w/dev/repos/acme/app/${file}` }, scope)]).toEqual([file, true]);

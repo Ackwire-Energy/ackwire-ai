@@ -148,7 +148,7 @@ describe("artifact viewer", () => {
     const { a } = await openChannel();
     const dialog = await openCard("Relatório de incidente: checkout");
     expect(within(dialog).getByRole("heading", { name: "O que aconteceu" })).toBeTruthy();
-    expect(dialog.querySelector("pre.md__code code")?.textContent).toContain("if (!cart.items.length)");
+    expect(dialog.querySelector("pre.code-card__code code")?.textContent).toContain("if (!cart.items.length)");
     expect(within(dialog).getByText("38 clientes").tagName).toBe("STRONG");
     await pick(dialog, "Baixar", "Original");
     await settle(3);
@@ -676,6 +676,7 @@ describe("artifact helpers", () => {
       type: "table",
       header: ["a", "b"],
       rows: [["1", "2"]],
+      align: ["right", "right"],
     });
   });
 });

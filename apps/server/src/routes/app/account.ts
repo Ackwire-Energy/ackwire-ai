@@ -9,6 +9,8 @@ import {
   createOrganization,
   deleteAccount,
   getOrganization,
+  hasPassword,
+  isEmailVerified,
   isValidTimeZone,
   listInvitations,
   listMembers,
@@ -25,12 +27,13 @@ import {
   setMyLocale,
   setOrgLogo,
   signInOptions,
+  toldReason,
   USER_LOCALES,
   updateOrganization,
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn } from "../../auth";
+import { authUiConfig, mintPhoneSignIn, signupPolicy } from "../../auth";
 import { clientIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import {
@@ -60,6 +63,7 @@ export function accountRoutes(deps: AppDeps) {
   const session = requireSession(deps.auth);
   for (const path of [
     "/me",
+    "/me/password",
     "/phone-sign-in",
     "/account",
     "/avatars/*",
@@ -85,6 +89,9 @@ export function accountRoutes(deps: AppDeps) {
               .boolean()
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
             firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
+            ownerClaim: z.boolean().openapi({
+              description: "No account yet, and only the owner link (`OWNER_CLAIM_SHA256`) creates the first one.",
+            }),
             passwordReset: z.boolean().openapi({ description: 'Offer "forgot password" (e-mail is configured).' }),
             landing: z
               .boolean()
@@ -97,18 +104,29 @@ export function accountRoutes(deps: AppDeps) {
               .string()
               .nullable()
               .openapi({ description: "Privacy policy linked on the sign-in screen (PRIVACY_URL)." }),
+            supportEmail: z.string().nullable().openapi({
+              description: "Where people write to whoever runs this server (SUPPORT_EMAIL): hold, suspension.",
+            }),
+            workspaceComputer: z.boolean().openapi({
+              description:
+                "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",
+            }),
           }),
         ),
       },
     }),
     async (c) => {
       const users = await countUsers(db);
+      // The first account of an installation that waits for its owner's link or key is made there, not here.
+      const ownerWaits = users === 0 && signupPolicy(config).ownerByLink;
       return c.json(
         {
           ...authUiConfig(config),
-          signupOpen: config.ALLOW_SIGNUP || users === 0,
-          firstRun: users === 0,
+          signupOpen: !ownerWaits && (config.ALLOW_SIGNUP || users === 0),
+          firstRun: users === 0 && !ownerWaits,
+          ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
+          workspaceComputer: config.MACHINE_PROVISIONING === "external",
         },
         200,
       );
@@ -150,7 +168,7 @@ export function accountRoutes(deps: AppDeps) {
       const limit = await deps.adapters.rateLimiter.consume(`sign-in-options:${ip}`, SIGN_IN_OPTIONS_PER_IP);
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
       const { email, inviteToken } = c.req.valid("json");
-      return c.json(await signInOptions(db, email, config.ALLOW_SIGNUP, inviteToken), 200);
+      return c.json(await signInOptions(db, email, signupPolicy(config), inviteToken), 200);
     },
   );
 
@@ -168,6 +186,16 @@ export function accountRoutes(deps: AppDeps) {
             email: z.string().openapi({ description: "Empty for an org-wide invite link." }),
             role: Role,
             kind: z.enum(["email", "link"]),
+            invitedBy: z.string().nullable().openapi({ description: "Who invited (their name), when known." }),
+            agents: z
+              .array(
+                z.object({
+                  id: z.uuid(),
+                  name: z.string(),
+                  appearance: z.object({ color: z.string(), eyes: z.string(), accessory: z.string() }).nullable(),
+                }),
+              )
+              .openapi({ description: "A few of the organization's agents (name and look)." }),
           }),
         ),
         404: errors[404],
@@ -190,7 +218,19 @@ export function accountRoutes(deps: AppDeps) {
       responses: {
         200: json(
           z.object({
-            user: z.object({ id: z.string(), name: z.string(), email: z.string(), image: z.string().nullable() }),
+            user: z.object({
+              id: z.string(),
+              name: z.string(),
+              email: z.string(),
+              image: z.string().nullable(),
+              hasPassword: z.boolean().openapi({
+                description:
+                  "Signs in with a password. False for social sign-ins only, and for the owner the desktop app signs in.",
+              }),
+              emailVerified: z.boolean().openapi({
+                description: "The person opened the link that confirms their email address.",
+              }),
+            }),
             organizations: z.array(Organization),
           }),
         ),
@@ -199,15 +239,27 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const memberships = await listMemberships(db, user.id);
+      const [memberships, password, verified] = await Promise.all([
+        listMemberships(db, user.id),
+        hasPassword(db, user.id),
+        isEmailVerified(db, user.id),
+      ]);
       return c.json(
         {
-          user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image ?? null,
+            hasPassword: password,
+            emailVerified: verified,
+          },
           organizations: memberships.map((m) => ({
             id: m.orgId,
             name: m.orgName,
             role: m.role,
             logo: m.orgLogo ?? null,
+            ...(m.standing ? { standing: { state: m.standing.state, reason: toldReason(m.standing) } } : {}),
           })),
         },
         200,
@@ -228,6 +280,30 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       await setMyLocale(db, c.get("user").id, c.req.valid("json").locale);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/me/password",
+      tags,
+      security,
+      summary: "Add a password to an account that has none",
+      description:
+        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers. Refused with `password_set` when it has one: changing a password is the reset flow.",
+      request: { body: body(z.object({ password: z.string().min(8).max(128) })) },
+      responses: { 204: noContent[204], ...errors, 409: errorResponse("Already has a password (`password_set`)") },
+    }),
+    async (c) => {
+      if (await hasPassword(db, c.get("user").id)) {
+        return apiError(c, 409, "password_set", "This account already has a password");
+      }
+      await deps.auth.api.setPassword({
+        body: { newPassword: c.req.valid("json").password },
+        headers: c.req.raw.headers,
+      });
       return c.body(null, 204);
     },
   );

@@ -55,6 +55,24 @@ export interface MachineExecutors {
   detectedAt?: string;
 }
 
+/** A computer's size as its runner reported it (protocol 22), the same shape as `MachineSize` in the protocol. */
+export interface MachineSizeRecord {
+  cpus: number;
+  memoryGb: number;
+  diskGb: number;
+  limit?: { cpus: number; memoryGb: number };
+}
+
+/** How busy a computer got over the last day (protocol 22: `MachineLoad` in the protocol), and when it said so. */
+export interface MachineLoadRecord {
+  loadAvg: number;
+  loadPeak: number;
+  memoryAvg: number;
+  memoryPeak: number;
+  hours: number;
+  at: string;
+}
+
 /**
  * What the machine allows beyond the agents' own folders (ADR 0036 §8,
  * protocol 10), as its runner last reported it (`hello.access`,
@@ -129,6 +147,10 @@ export const machines = pgTable(
     pausedUntil: timestamp({ withTimezone: true }),
     /** Folders and tools the machine allows (protocol 10); null: its runner doesn't report them. */
     access: jsonb().$type<MachineAccess>(),
+    /** Its size (protocol 22, kept from the last runner that said); null: unknown. */
+    size: jsonb().$type<MachineSizeRecord>(),
+    /** Its last day's load (protocol 22); null: unknown. */
+    load: jsonb().$type<MachineLoadRecord>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
     /**
@@ -159,9 +181,10 @@ export const machines = pgTable(
 /**
  * How far the workspace's computer is (ADR 0056 §10), with
  * `MACHINE_PROVISIONING=external`: `preparing` (`step`: reserving, starting,
- * installing, connecting), `waiting` (`reason`: approval, capacity) and
- * `problem` are the provisioner's to set; `ready` is set here, on the managed
- * computer's first hello. No row: nothing reported yet.
+ * installing, connecting), `waiting` (`reason`: capacity; an older
+ * provisioner's `approval` reads as capacity) and `problem` are the
+ * provisioner's to set; `ready` is set here, on the managed computer's first
+ * hello. No row: nothing reported yet.
  */
 export const machineProvisioning = pgTable("machine_provisioning", {
   orgId: uuid()
@@ -170,7 +193,12 @@ export const machineProvisioning = pgTable("machine_provisioning", {
   state: text().notNull(),
   step: text(),
   reason: text(),
-  etaSeconds: integer(),
+  /** With `preparing`: when the provisioner expects it ready (already past: any moment now). */
+  expectedReadyAt: timestamp({ withTimezone: true }),
+  /** When people started waiting: set when the computer is taken away; null: since the workspace was created. */
+  requestedAt: timestamp({ withTimezone: true }),
+  /** The wait was said to take over a minute: the owners were told they'd get the ready email. */
+  emailWhenReady: boolean().notNull().default(false),
   specs: jsonb().$type<{ cpus: number; memoryGb: number; diskGb: number }>(),
   /** When this state (and step or reason) began. */
   since: timestamp({ withTimezone: true }).notNull().defaultNow(),

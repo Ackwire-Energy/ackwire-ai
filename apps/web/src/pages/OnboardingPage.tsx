@@ -1,6 +1,22 @@
 import type { Machine, Model, Role } from "@agenteschat/client";
-import { keys, useConfirmDevice, useMachines, useSandboxSettings } from "@agenteschat/client";
-import { errorText } from "@agenteschat/client/lib/errors";
+import {
+  keys,
+  meQuery,
+  useAuthConfig,
+  useComputerSetup,
+  useConfirmDevice,
+  useMachines,
+  useSandboxSettings,
+} from "@agenteschat/client";
+import {
+  computerEdition,
+  type SetupView,
+  setupPending,
+  setupPortrait,
+  setupView,
+  WORKSPACE_COMPUTER_KIND,
+} from "@agenteschat/client/lib/computer";
+import { errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
 import {
@@ -42,9 +58,18 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import {
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { PlanTermsDialog } from "@/components/AgentBrain";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
@@ -53,14 +78,17 @@ import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
-import { OpenPrefsButton } from "@/components/ThisMac";
+import { OpenPrefsButton, useAgentsHere, useOrgName } from "@/components/ThisMac";
+import { SetupWait, type WaitReader } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
-import { inDesktopApp, thisMac } from "@/lib/desktop";
+import { thisMac } from "@/lib/desktop";
+import { sendNewLink } from "@/lib/email-confirmation";
 import { importedModel } from "@/lib/import";
 import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./onboarding.css";
 
@@ -91,6 +119,8 @@ const HOST: Record<OnboardingStepId, Preset> = {
 /** How long the guide keeps writing after a keystroke, and smiling after a step. */
 const TYPING_MS = 900;
 const HAPPY_MS = 1600;
+/** How often the workspace's computer is asked about while it's on its way (no socket is open here). */
+const COMPUTER_POLL_MS = 5000;
 
 /** `host`: the server's own computer. */
 type Computer = "cloud" | "machine" | "host" | null;
@@ -145,6 +175,7 @@ function useGuideMood() {
 export function OnboardingPage() {
   const { t, i18n } = useTranslation();
   const api = useApi();
+  const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
@@ -200,6 +231,10 @@ export function OnboardingPage() {
 
   const step = ONBOARDING_STEPS[index] ?? ONBOARDING_STEPS[0];
   const total = ONBOARDING_STEPS.length;
+  // The steps to answer ("done" is where they end), and those answered: one opened again counts once it's
+  // answered again, as the rail shows it.
+  const toAnswer = total - 1;
+  const answered = ONBOARDING_STEPS.filter((s) => s.id !== step.id && done.has(s.id)).length;
   const orgName = org.trim() || t("onboarding.yourCompany");
   const presetInfo = (p: Preset) => ({
     name: t(`onboarding.presets.${p}.name`),
@@ -236,6 +271,22 @@ export function OnboardingPage() {
   useEffect(() => {
     setMetAt((m) => (m[host] ? m : { ...m, [host]: step.id }));
   }, [host, step.id]);
+
+  // Each step's column opens centered, then stays where it opened: what changes in it (the computer's progress,
+  // a toggle) grows or shrinks it downward instead of moving the question and Back under the pointer.
+  const column = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again for each step and each of its screens
+  useLayoutEffect(() => {
+    const el = column.current;
+    if (!el) return;
+    const place = () => {
+      el.style.marginTop = "";
+      el.style.marginTop = `${el.getBoundingClientRect().top - (el.parentElement?.getBoundingClientRect().top ?? 0)}px`;
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [step.id, agentsPhase]);
 
   const saveWorkspace = useMutation({
     mutationFn: async () => {
@@ -392,7 +443,32 @@ export function OnboardingPage() {
   });
 
   const sandbox = useSandboxSettings(created?.orgId ?? "", Boolean(created) && step.id === "computer");
-  const cloudAvailable = sandbox.data?.available !== false;
+  // Daytona's sandboxes are a choice only on a server that has them.
+  const daytona = sandbox.data?.available === true;
+  // Where the workspace gets its own computer (ADR 0056 §10): no choice to make, only its progress (polled:
+  // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
+  // on its way every step follows it (the rail, the key step); the confirmation line follows `me` on focus.
+  const computerPoll = step.id === "computer" ? COMPUTER_POLL_MS : false;
+  const me = useQuery({ ...meQuery(api), refetchInterval: computerPoll, refetchOnWindowFocus: "always" });
+  const setup = useComputerSetup(
+    created?.orgId ?? "",
+    Boolean(created),
+    (data) => computerPoll || (setupPending(setupView(data)) ? COMPUTER_POLL_MS : false),
+  );
+  const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
+  // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
+  const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);
+  const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
+  const email = me.data?.user.email ?? "";
+  // The address this tab's sign-up was emailed a link to confirm: the first step says where it went. Read once and
+  // forgotten once confirmed or set up, so a later onboarding (another workspace) says nothing of it.
+  const [sentTo] = useState(() => sessionStore.get(STORAGE_KEYS.confirmationSent));
+  const verified = me.data?.user.emailVerified === true;
+  const confirmation = email !== "" && sentTo === email ? (verified ? "confirmed" : "sent") : null;
+  useEffect(() => {
+    if (verified) sessionStore.remove(STORAGE_KEYS.confirmationSent);
+  }, [verified]);
+  const resend = useMutation({ mutationFn: () => sendNewLink({ auth, t, show: toast.show }, email) });
 
   const saveComputer = useMutation({
     mutationFn: async () => {
@@ -424,6 +500,7 @@ export function OnboardingPage() {
   const finish = useMutation({
     mutationFn: async () => {
       if (!created) return;
+      sessionStore.remove(STORAGE_KEYS.confirmationSent);
       await qc.invalidateQueries({ queryKey: keys.me });
       await navigate({
         to: "/org/$orgId/c/$channelId",
@@ -485,6 +562,7 @@ export function OnboardingPage() {
     guide.cheer();
     go(index + 1);
   };
+  const skip = () => void advance("skip").catch(() => {});
 
   const busy =
     saveWorkspace.isPending ||
@@ -499,7 +577,7 @@ export function OnboardingPage() {
     (step.id === "workspace" && !org.trim()) ||
     (step.id === "agents" && agentsPhase === "key" && (!keyOk || !budgetOk)) ||
     (step.id === "import" && !flow.planned) ||
-    (step.id === "computer" && (computer === null || (computer === "machine" && !machine)));
+    (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine)));
 
   // What the rail shows under each done step.
   const railValue: Partial<Record<OnboardingStepId, string>> = {
@@ -511,9 +589,10 @@ export function OnboardingPage() {
           t("newAgent.and"),
         )
       : t("onboarding.railValue.skipped"),
-    computer:
-      computer === "cloud"
-        ? t("onboarding.done.computerCloud")
+    computer: workspaceComputer
+      ? t(workspaceComputer.chipKey)
+      : computer === "cloud"
+        ? t("onboarding.computer.cloud")
         : computer === "host"
           ? t("machines.host.label")
           : computer === "machine" && machine
@@ -543,26 +622,39 @@ export function OnboardingPage() {
                 ? t("onboarding.agents.importedTitle")
                 : t(`onboarding.${step.id}.title`),
             lead:
-              step.id === "agents" && metNames.length
-                ? t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
-                : t(`onboarding.${step.id}.lead`),
+              step.id === "agents" && metNames.length ? (
+                t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
+              ) : step.id === "computer" && workspaceComputer ? (
+                t(
+                  workspaceComputer.phase === "ready"
+                    ? "onboarding.computer.leadCloudReady"
+                    : "onboarding.computer.leadCloud",
+                )
+              ) : step.id === "import" ? (
+                // Its answer is long: the "skip" Theo says is the way out, right where it's said.
+                <Trans
+                  i18nKey="onboarding.import.leadWithSkip"
+                  components={{ skip: <button type="button" className="onb__link" onClick={skip} disabled={busy} /> }}
+                />
+              ) : (
+                t(`onboarding.${step.id}.lead`)
+              ),
           };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
   const primaryLabel =
     step.id === "done"
       ? t("onboarding.done.open")
-      : step.id === "computer" && computer === "cloud"
-        ? t("onboarding.actions.useCloud")
-        : step.id === "agents" && agentsPhase === "pick" && !needsKey && joining > 0
-          ? t("onboarding.actions.create", { count: joining })
-          : step.id === "agents" && agentsPhase === "key" && joining > 0
-            ? t("onboarding.actions.saveAndCreate", { count: joining })
-            : step.id === "team" && toSend.length > 0
-              ? t("onboarding.actions.invite", { count: toSend.length })
-              : t("onboarding.actions.continue");
-  // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception).
-  const showSkip = step.optional;
+      : step.id === "agents" && agentsPhase === "pick" && !needsKey && joining > 0
+        ? t("onboarding.actions.create", { count: joining })
+        : step.id === "agents" && agentsPhase === "key" && joining > 0
+          ? t("onboarding.actions.saveAndCreate", { count: joining })
+          : step.id === "team" && toSend.length > 0
+            ? t("onboarding.actions.invite", { count: toSend.length })
+            : t("onboarding.actions.continue");
+  // "Pular esta etapa" only on optional steps ("agents" never is, so its key phase needs no exception); the
+  // computer is one only where it is a choice, shown once its setup has answered.
+  const showSkip = step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.optional;
   const back = () => {
     if (step.id === "agents" && agentsPhase === "key") setAgentsPhase("pick");
     else go(index - 1);
@@ -576,16 +668,11 @@ export function OnboardingPage() {
         </span>
         <div className="onb__progress">
           <span className="onb__progress-text">
-            <span>
-              {done.size >= total - 1
-                ? t("onboarding.progress.done")
-                : t("onboarding.progress.left", { count: total - 1 - done.size })}
-            </span>
-            <span className="onb__progress-count">
-              {t("onboarding.progress.count", { n: done.size, total: total - 1 })}
-            </span>
+            {answered >= toAnswer
+              ? t("onboarding.progress.done")
+              : t("onboarding.progress.left", { count: toAnswer - answered })}
           </span>
-          <OnboardingProgress progress={done.size / (total - 1)} />
+          <OnboardingProgress progress={answered / toAnswer} />
         </div>
         <StepRail
           label={t("onboarding.stepsLabel")}
@@ -598,11 +685,13 @@ export function OnboardingPage() {
             name: t(`onboarding.stepNames.${s.id}`),
             done: done.has(s.id),
             disabled: i > reached || busy || (created === null && i > 0),
-            optional: s.optional,
+            // A computer is a choice only where people connect their own: the workspace's own says how far it is.
+            optional: s.id === "computer" ? edition === "selfhost" : s.optional,
             value: railValue[s.id],
+            ...(s.id === "computer" && workspaceComputer ? { note: t(workspaceComputer.chipKey) } : {}),
           }))}
         />
-        <OnboardingHorizon progress={done.size / (total - 1)} />
+        <OnboardingHorizon progress={answered / toAnswer} />
       </aside>
 
       <main
@@ -620,7 +709,7 @@ export function OnboardingPage() {
           void advance().catch(() => {});
         }}
       >
-        <div className="onb__body" key={`${step.id}-${agentsPhase}`}>
+        <div className="onb__body" key={`${step.id}-${agentsPhase}`} ref={column}>
           {(index > 0 || agentsPhase === "key") && (
             <button type="button" className="onb__back" onClick={back} disabled={busy}>
               <Icon name="chevronLeft" size={16} />
@@ -666,6 +755,7 @@ export function OnboardingPage() {
                   value={org}
                   onChange={(e) => setOrg(e.target.value)}
                   placeholder={t("onboarding.workspace.namePlaceholder")}
+                  spellCheck={false}
                   autoFocus
                 />
               </div>
@@ -758,12 +848,29 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {step.id === "computer" && created && (
+          {step.id === "computer" && created && workspaceComputer && (
+            <div className="onb__answer">
+              <WorkspaceComputerStep
+                view={workspaceComputer}
+                orgName={orgName}
+                reader={{ owner: true, email, held: hold !== null }}
+                hold={hold}
+              />
+            </div>
+          )}
+
+          {step.id === "computer" && created && setup.isLoading && (
+            <div className="onb__answer">
+              <Spinner />
+            </div>
+          )}
+
+          {step.id === "computer" && created && !workspaceComputer && !setup.isLoading && (
             <div className="onb__answer">
               <ComputerStep
                 orgId={created.orgId}
                 computer={computer}
-                cloudAvailable={cloudAvailable}
+                daytona={daytona}
                 machine={machine}
                 onChoose={(c) => {
                   // Leaving the server's computer for "this computer": the pairing starts from nothing.
@@ -868,7 +975,9 @@ export function OnboardingPage() {
                         <span className="ac-option__title">
                           {t("onboarding.brain.claudeCode", { computer: machine.name })}
                         </span>
-                        <span className="ac-option__desc">{t("onboarding.brain.claudeCodeDesc")}</span>
+                        <span className="ac-option__desc">
+                          {t("onboarding.brain.claudeCodeDesc", { computer: machine.name })}
+                        </span>
                       </span>
                     </OptionCard>
                     <OptionCard pressed={brain === "model"} onClick={() => setBrain("model")}>
@@ -969,14 +1078,31 @@ export function OnboardingPage() {
                 </>
               )}
               <p className="onb__help">
-                {t("onboarding.suggestedAuto")}{" "}
-                <button
-                  type="button"
-                  className="onb__link"
-                  onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
-                >
-                  {t("onboarding.keyStep.useComputer")}
-                </button>
+                {t("onboarding.suggestedAuto")}
+                {workspaceComputer ? (
+                  // The workspace's own computer has nothing to sign in to before the agents exist: a plan signs in
+                  // there after "Connect later", from where the workspace says its agents have no AI.
+                  <>
+                    <br />
+                    {t(
+                      setupPending(workspaceComputer)
+                        ? "onboarding.keyStep.planLater"
+                        : "onboarding.keyStep.planLaterReady",
+                      { computer: t("computerSetup.title", { org: orgName }) },
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="onb__link"
+                      onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
+                    >
+                      {t("onboarding.keyStep.useComputer", { computer: machine?.name ?? t("outage.someComputer") })}
+                    </button>
+                  </>
+                )}
               </p>
               <BudgetCard
                 value={budgetValue}
@@ -998,13 +1124,21 @@ export function OnboardingPage() {
               orgName={orgName}
               agents={crew}
               computer={
-                computer === "cloud"
-                  ? "cloud"
-                  : computer === "host"
-                    ? t("machines.host.label")
-                    : computer === "machine"
-                      ? (machine?.name ?? null)
-                      : undefined
+                workspaceComputer
+                  ? { status: t(workspaceComputer.chipKey), name: t("computerSetup.title", { org: orgName }) }
+                  : computer === "cloud"
+                    ? { name: t("onboarding.computer.cloud") }
+                    : computer === "host"
+                      ? { name: t("machines.host.label") }
+                      : computer === "machine" && machine
+                        ? { name: machine.name }
+                        : {
+                            status: t(
+                              computer === "machine"
+                                ? "onboarding.done.computerPending"
+                                : "onboarding.done.computerLater",
+                            ),
+                          }
               }
               invites={sent.size}
               wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
@@ -1036,7 +1170,7 @@ export function OnboardingPage() {
               {primaryLabel}
             </Button>
             {showSkip && (
-              <Button variant="ghost" onClick={() => void advance("skip").catch(() => {})} disabled={busy}>
+              <Button variant="ghost" onClick={skip} disabled={busy}>
                 {t("onboarding.skip")}
               </Button>
             )}
@@ -1047,6 +1181,27 @@ export function OnboardingPage() {
                 </Button>
                 <p className="onb__help">{t("connectAi.laterNote")}</p>
               </>
+            )}
+            {step.id === "workspace" && confirmation && (
+              <p className="onb__help onb__note" role="status">
+                <Icon name={confirmation === "confirmed" ? "check" : "mail"} size={14} />
+                <span>
+                  {t(`onboarding.confirmation.${confirmation}`, { email })}
+                  {confirmation === "sent" && !resend.data && (
+                    <>
+                      <br />
+                      <button
+                        type="button"
+                        className="onb__link"
+                        onClick={() => resend.mutate()}
+                        disabled={resend.isPending}
+                      >
+                        {t("auth.sendNewLink")}
+                      </button>
+                    </>
+                  )}
+                </span>
+              </p>
             )}
           </div>
         </div>
@@ -1076,7 +1231,7 @@ function HostAsk({
   happy: boolean;
   intro: string | null;
   title: string;
-  lead: string;
+  lead: ReactNode;
 }) {
   return (
     <header className="onb__ask">
@@ -1194,7 +1349,7 @@ function ChoiceCard({
 function ComputerStep({
   orgId,
   computer,
-  cloudAvailable,
+  daytona,
   machine,
   onChoose,
   onPaired,
@@ -1202,7 +1357,8 @@ function ComputerStep({
 }: {
   orgId: string;
   computer: Computer;
-  cloudAvailable: boolean;
+  /** This server has Daytona's sandboxes. */
+  daytona: boolean;
   machine: Machine | null;
   onChoose: (c: Computer) => void;
   onPaired: (m: Machine) => void;
@@ -1225,15 +1381,17 @@ function ComputerStep({
     if (found && !machine) onPaired(found);
   }, [found, machine, onPaired]);
 
-  // In the app: picking "Este Mac" is the consent; the app hands the runner's code over and we confirm it.
-  const app = inDesktopApp();
+  // In the app, where agents may work on this computer: picking "This Mac" asks in the app's own dialog, then
+  // the app hands the runner's code over and we confirm it.
+  const app = useAgentsHere();
+  const orgName = useOrgName(orgId);
   const confirm = useConfirmDevice();
   const [linking, setLinking] = useState<"idle" | "connecting" | "failed">("idle");
   const [other, setOther] = useState(false);
   const linkThisMac = async () => {
     setLinking("connecting");
     try {
-      const { userCode } = await thisMac.connect(orgId);
+      const { userCode } = await thisMac.connect(orgId, orgName);
       if (userCode) {
         onPaired(await confirm.mutateAsync({ orgId, userCode }));
       } else {
@@ -1276,20 +1434,21 @@ function ComputerStep({
           />
         )}
         <ChoiceCard
-          art={<ComputerPortrait kind="cloud" state={cloudAvailable ? "online" : "offline"} />}
-          title={t("onboarding.computer.cloud")}
-          desc={cloudAvailable ? t("onboarding.computer.cloudDesc") : t("onboarding.computer.cloudUnavailable")}
-          pressed={computer === "cloud"}
-          disabled={!cloudAvailable}
-          onClick={() => onChoose("cloud")}
-        />
-        <ChoiceCard
           art={<ComputerPortrait kind={machine ? computerKind(machine.os) : "mac"} state="online" />}
           title={app ? t("onboarding.computer.thisMac") : t("onboarding.computer.mine")}
           desc={app ? t("onboarding.computer.thisMacDesc") : t("onboarding.computer.mineDesc")}
           pressed={computer === "machine"}
           onClick={chooseMachine}
         />
+        {daytona && (
+          <ChoiceCard
+            art={<ComputerPortrait kind="cloud" state="online" />}
+            title={t("onboarding.computer.cloud")}
+            desc={t("onboarding.computer.cloudDesc")}
+            pressed={computer === "cloud"}
+            onClick={() => onChoose("cloud")}
+          />
+        )}
       </div>
 
       {computer === "cloud" && (
@@ -1364,6 +1523,49 @@ function ComputerStep({
         </Card>
       )}
     </>
+  );
+}
+
+/**
+ * Where the workspace gets its own computer: no choice, only its progress, live, with the time left and who
+ * hears when it's ready (whoever creates the workspace owns it); the person goes on meanwhile. On hold, the hold
+ * speaks instead of a time (its computer waits for the hold too).
+ */
+function WorkspaceComputerStep({
+  view,
+  orgName,
+  reader,
+  hold,
+}: {
+  view: SetupView;
+  orgName: string;
+  reader: WaitReader;
+  hold: string | null;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Card as="div" className="onb__workspace-computer">
+      <div className="row" style={{ gap: 16, alignItems: "center" }}>
+        <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state={setupPortrait(view, true)} size={96} />
+        <span className="stack-4" style={{ gap: 4, flex: "1 1 220px", minWidth: 0 }}>
+          <b>{t("computerSetup.title", { org: orgName })}</b>
+          <span className="small muted">{t("computerSetup.lead")}</span>
+        </span>
+      </div>
+      {hold && (
+        <p className="setup-line" role="status">
+          <Icon name="pause" size={14} />
+          <span>{hold}</span>
+        </p>
+      )}
+      <SetupWait view={view} reader={reader} />
+      {view.phase !== "ready" && (
+        <p className="onb__status">
+          <Icon name="check" />
+          <span>{t("computerSetup.continue")}</span>
+        </p>
+      )}
+    </Card>
   );
 }
 
@@ -1529,8 +1731,8 @@ function DoneStep({
   agents: CrewMember[];
   /** Pages imported from Obsidian; null while importing, undefined when none was brought. */
   wiki?: number | null;
-  /** "cloud", a machine's name, null while it waits to connect, undefined when skipped. */
-  computer: string | null | undefined;
+  /** How far it is ("Ready", "Later") in the tile's big type, and its name in words of its own. */
+  computer: { status?: string; name?: string };
   invites: number;
 }) {
   const { t } = useTranslation();
@@ -1539,14 +1741,6 @@ function DoneStep({
     agents.map((a) => a.name),
     t("newAgent.and"),
   );
-  const computerLabel =
-    computer === "cloud"
-      ? t("onboarding.done.computerCloud")
-      : computer === null
-        ? t("onboarding.done.computerPending")
-        : computer === undefined
-          ? t("onboarding.done.computerLater")
-          : computer;
   return (
     <>
       <section className="onb__welcome" aria-labelledby="onb-welcome-title">
@@ -1579,7 +1773,10 @@ function DoneStep({
         </Card>
         <Card as="div">
           <dt className="small muted">{t("onboarding.done.computer")}</dt>
-          <dd className="onb__stat">{computerLabel}</dd>
+          {computer.status && <dd className="onb__stat">{computer.status}</dd>}
+          {computer.name && (
+            <dd className={computer.status ? "onb__stat-of" : "onb__stat onb__stat--name"}>{computer.name}</dd>
+          )}
         </Card>
         <Card as="div">
           <dt className="small muted">{t("onboarding.done.invites")}</dt>

@@ -243,6 +243,12 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   const app = (path: string, init?: Parameters<Browser>[1]) => owner(`/api/app/organizations/${orgId}${path}`, init);
   const invite = () => app("/invitations", { json: { email: "new-hire@acme.test", role: "member" } });
   const error = async (res: Response) => ((await res.json()) as { error: Record<string, unknown> }).error;
+  // What its people are told (the banner, the suspended screen): never the note, the reason only when shown.
+  const told = async () =>
+    (
+      await body<{ organizations: { id: string; standing?: unknown }[] }>(await owner("/api/app/me"))
+    ).organizations.find((o) => o.id === orgId)?.standing;
+  expect(await told()).toEqual({ state: "active", reason: null });
 
   for (const bad of [
     { state: "paused", reason: "x", notice: "shown" },
@@ -274,6 +280,7 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   expect((await body<{ standing: unknown }>(await op(`/orgs/${orgId}`))).standing).toEqual(held);
   const onHold = await body<Page>(await op("/orgs?standing=hold"));
   expect(onHold.orgs.map((o) => [o.name, o.standing])).toEqual([["Acme", "hold"]]);
+  expect(await told()).toEqual({ state: "hold", reason: "Unpaid invoice" });
   // People still use it; nothing new goes out.
   expect((await app("/members")).status).toBe(200);
   const refused = await invite();
@@ -285,6 +292,8 @@ test("standing: hold, suspend and restore a workspace; the app API enforces it",
   });
 
   await body(await put(`/orgs/${orgId}/standing`, { state: "suspended", reason: "Phishing", notice: "silent" }));
+  // Silent: its people learn it is closed, not why; `/me` still lists it, for its screen.
+  expect(await told()).toEqual({ state: "suspended", reason: null });
   const locked = await app("/members");
   expect(locked.status).toBe(403);
   expect(await error(locked)).toEqual({ code: "org.suspended", message: "This workspace is unavailable for now." });
@@ -421,11 +430,40 @@ test("external provisioning: requests, progress, the workspace's computer and it
     { state: "waiting", reason: "bored" },
     { state: "problem", etaSeconds: -1 },
     { state: "preparing", specs: { cpus: 0, memoryGb: 8, diskGb: 75 } },
+    { state: "preparing", expectedReadyAt: "in ten minutes" },
+    { state: "preparing", expectedReadyAt: new Date(Date.now() + 8 * 86_400_000).toISOString() },
   ]) {
     expect({ bad, status: (await put(`/orgs/${orgId}/provisioning`, bad)).status }).toEqual({ bad, status: 400 });
   }
   expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/provisioning", { state: "problem" })).status).toBe(404);
   const specs = { cpus: 4, memoryGb: 8, diskGb: 75 };
+  // A time already past is normal: any moment now.
+  const readyAt = new Date(Date.now() - 5000).toISOString();
+  expect(
+    (
+      await put(`/orgs/${orgId}/provisioning`, {
+        state: "preparing",
+        step: "connecting",
+        specs,
+        expectedReadyAt: readyAt,
+      })
+    ).status,
+  ).toBe(204);
+  const progress = await body<Requests>(
+    await external.request("/api/operator/v1/machine-requests?limit=200", { headers: { authorization: BEARER } }),
+  );
+  expect(progress.requests.find((r) => r.orgId === orgId)?.provisioning).toEqual({
+    state: "preparing",
+    step: "connecting",
+    reason: null,
+    since: expect.any(String),
+    requestedAt: listed.requests.find((r) => r.orgId === orgId)?.createdAt,
+    expectedReadyAt: readyAt,
+    specs,
+  });
+  // An older client's words still go through.
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "approval" })).status).toBe(204);
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "preparing", etaSeconds: 600 })).status).toBe(204);
   expect((await put(`/orgs/${orgId}/provisioning`, { state: "preparing", step: "connecting", specs })).status).toBe(
     204,
   );
@@ -435,8 +473,12 @@ test("external provisioning: requests, progress, the workspace's computer and it
     step: null,
     reason: null,
     since: null,
-    etaSeconds: null,
+    requestedAt: null,
+    expectedReadyAt: null,
     specs: null,
+    secondsLeft: null,
+    secondsWaited: null,
+    notifyByEmail: false,
     machineId: null,
   });
 

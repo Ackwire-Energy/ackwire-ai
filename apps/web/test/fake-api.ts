@@ -34,6 +34,8 @@ import type {
   ScopeGrant,
   SearchHit,
   SecretRequest,
+  ServerTelemetry,
+  SignInOptions,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -116,6 +118,8 @@ export interface FakeState {
   me: Me | null;
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open, the landing page on). */
   authConfig?: Partial<AuthConfig>;
+  /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
+  signInOptions?: SignInOptions;
   /** The server `account.phoneSignIn` names (default: https://agentes.chat). */
   phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
@@ -179,6 +183,8 @@ export interface FakeState {
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
+  telemetry?: ServerTelemetry;
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
@@ -717,7 +723,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     return budget > 0 ? Math.round((spent / budget) * 1000) / 10 : 0;
   };
   return {
-    system: { health: async () => ({ status: "ok", version: "test", edition: "cloud" }) },
+    system: {
+      health: async () => ({ status: "ok", version: "test", edition: "cloud" }),
+      telemetry: async () => state.telemetry ?? null,
+      setTelemetry: async (enabled) => {
+        log("system.setTelemetry", enabled);
+        if (!state.telemetry) throw new ApiError(404, "not_found", "Not found");
+        state.telemetry = { ...state.telemetry, enabled };
+        return state.telemetry;
+      },
+    },
     waitlist: {
       join: async (input) => {
         log("waitlist.join", input);
@@ -736,10 +751,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         landing: true,
         ...state.authConfig,
       }),
-      signInOptions: async () => ({ account: false, password: false, providers: [], canSignUp: true }),
+      signInOptions: async () =>
+        state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true },
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
+      },
+      addPassword: async (password) => {
+        log("account.addPassword", { password });
+        if (state.me) state.me.user.hasPassword = true;
       },
       phoneSignIn: async () => {
         log("account.phoneSignIn");
@@ -999,7 +1019,6 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: a.name,
           handle: a.handle,
           role: a.role,
-          callFor: a.role,
           appearance: a.appearance ?? null,
           ownerUserId: a.ownerUserId,
           capabilities: ["drive", "issues"],
@@ -1141,6 +1160,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             : {}),
           tokensThisMonth: agentId === ADA_ID ? 3_100_000 : 210_000,
           runsThisMonth: agentId === ADA_ID ? 142 : 12,
+          failuresThisMonth: agentId === ADA_ID ? 2 : 0,
+          runsByDay:
+            agentId === ADA_ID
+              ? [
+                  { day: 1, runs: 70, failed: 1 },
+                  { day: 2, runs: 72, failed: 1 },
+                ]
+              : [{ day: 1, runs: 12, failed: 0 }],
           pendingApprovals: state.approvals.filter((x) => x.agentId === agentId && x.status === "pending").length,
           channels,
         };
@@ -1197,7 +1224,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         brains.set(agentId, next);
         return structuredClone(next);
       },
-      runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
+      runs: async (_orgId, filter = {}) =>
+        state.runs
+          .filter(
+            (r) => (!filter.agentId || r.agentId === filter.agentId) && (!filter.status || r.status === filter.status),
+          )
+          .slice(0, filter.limit),
       cancelRun: async (orgId, runId) => {
         log("agents.cancelRun", orgId, runId);
         if (state.runs.some((r) => r.id === runId && r.status !== "running" && r.status !== "queued"))
@@ -1467,6 +1499,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       startOAuth: async (orgId, connector, input) => {
         log("connectors.startOAuth", orgId, connector, input);
         return `https://github.com/login/oauth/authorize?state=s&return=${encodeURIComponent(input.returnTo)}`;
+      },
+      completeOAuth: async (orgId, input) => {
+        log("connectors.completeOAuth", orgId, input);
+        throw new Error("the web app finishes OAuth in the callback");
       },
       disconnect: async (orgId, connectionId) => {
         log("connectors.disconnect", orgId, connectionId);

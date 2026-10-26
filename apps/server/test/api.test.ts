@@ -21,22 +21,33 @@ describe("sign-up policy (self-host)", () => {
     expect(JSON.stringify(await res.json())).toContain("Sign-up is closed");
   });
 
-  test("auth-config: no landing page or legal links unless configured; password reset when email goes out", async () => {
-    // The test server's fake email sender delivers.
+  test("auth-config: no landing page, legal links or support address unless configured; password reset when email goes out", async () => {
+    // The test server's fake email sender delivers; people connect their own computers.
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
       landing: false,
       termsUrl: null,
       privacyUrl: null,
+      supportEmail: null,
       passwordReset: true,
+      workspaceComputer: false,
     });
     await t.close();
     t = await createTestServer({
-      env: { LANDING_PAGE: "true", TERMS_URL: "https://example.com/terms", PRIVACY_URL: "https://example.com/privacy" },
+      env: {
+        LANDING_PAGE: "true",
+        TERMS_URL: "https://example.com/terms",
+        PRIVACY_URL: "https://example.com/privacy",
+        SUPPORT_EMAIL: "help@example.com",
+        MACHINE_PROVISIONING: "external",
+        OPERATOR_API_TOKEN: "o".repeat(40),
+      },
     });
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
       landing: true,
       termsUrl: "https://example.com/terms",
       privacyUrl: "https://example.com/privacy",
+      supportEmail: "help@example.com",
+      workspaceComputer: true,
     });
   });
 
@@ -59,7 +70,9 @@ describe("sign-up policy (self-host)", () => {
     const token = url.split("/invite/")[1];
     expect((await ana(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
     const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
-    expect(me.organizations).toEqual([{ id: orgId, name: "Acme", role: "member", logo: null }] as never);
+    expect(me.organizations).toEqual([
+      { id: orgId, name: "Acme", role: "member", logo: null, standing: { state: "active", reason: null } },
+    ] as never);
   });
 });
 

@@ -1,9 +1,13 @@
+import { parseChart } from "@agenteschat/client/lib/chart";
+import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
-import { MONO } from "../shared/parts";
-import { type Inline, parseBlocks } from "./logic";
+import { ChartCard, ChartPending } from "./ChartCard";
+import { CodeCard } from "./CodeCard";
+import { parseBlocks } from "./logic";
+import { Spans, Table } from "./MessageSpans";
 
 /**
  * A message's text: paragraphs, lists, quotes, headings, bold, italic,
@@ -16,6 +20,7 @@ export const MessageText = memo(function MessageText({
   tail,
   muted = false,
   selectable = true,
+  accent,
 }: {
   body: string;
   streaming?: boolean;
@@ -27,6 +32,8 @@ export const MessageText = memo(function MessageText({
    * selection would float iOS's own "Copiar" bubble over it.
    */
   selectable?: boolean;
+  /** The writing agent's color: its charts take its tones. */
+  accent?: AgentColorName;
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
@@ -47,11 +54,18 @@ export const MessageText = memo(function MessageText({
           case "code":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i} style={[styles.code, { backgroundColor: c.sunken }]}>
-                <RNText selectable={selectable} style={[styles.mono, { color: c.ink2 }]}>
-                  {b.text}
-                </RNText>
-                {end}
+              <View key={i}>
+                <Fenced lang={b.lang} text={b.text} accent={accent} open={b.open === true} />
+                {/* A block still being written takes no fading tail or caret: its card grows instead. */}
+                {end && !b.open ? <Text variant="body">{end}</Text> : null}
+              </View>
+            );
+          case "table":
+            return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
+              <View key={i}>
+                <Table header={b.header} rows={b.rows} align={b.align} />
+                {end ? <Text variant="body">{end}</Text> : null}
               </View>
             );
           case "heading":
@@ -100,43 +114,16 @@ export const MessageText = memo(function MessageText({
   );
 });
 
-function Spans({ inline }: { inline: Inline[] }) {
-  const c = useColors();
-  return (
-    <>
-      {inline.map((s, i) => {
-        const key = `${i}-${s.kind}`;
-        switch (s.kind) {
-          case "bold":
-            return (
-              <RNText key={key} style={styles.bold}>
-                {s.text}
-              </RNText>
-            );
-          case "italic":
-            return (
-              <RNText key={key} style={styles.italic}>
-                {s.text}
-              </RNText>
-            );
-          case "code":
-            return (
-              <RNText key={key} style={[styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }]}>
-                {s.text}
-              </RNText>
-            );
-          case "mention":
-            return (
-              <RNText key={key} style={[styles.bold, { color: c.ink }]}>
-                {s.text}
-              </RNText>
-            );
-          default:
-            return <RNText key={key}>{s.text}</RNText>;
-        }
-      })}
-    </>
-  );
+/**
+ * A fenced block: a ```chart that reads as one is drawn; one still being written shows "Montando o
+ * gráfico…"; anything else is a code card (growing while it is written).
+ */
+function Fenced({ lang, text, accent, open }: { lang: string; text: string; accent?: AgentColorName; open: boolean }) {
+  const isChart = lang.toLowerCase() === "chart";
+  const chart = useMemo(() => (isChart && !open ? parseChart(text) : null), [isChart, open, text]);
+  if (chart) return <ChartCard spec={chart} {...(accent ? { accent } : {})} />;
+  if (isChart && open) return <ChartPending {...(accent ? { accent } : {})} />;
+  return <CodeCard lang={isChart ? "json" : lang} text={text} />;
 }
 
 /** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */
@@ -164,9 +151,4 @@ const styles = StyleSheet.create({
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },
   mark: { minWidth: 14 },
   quote: { borderLeftWidth: 3, paddingLeft: 10 },
-  code: { borderRadius: 10, padding: 10 },
-  mono: { fontFamily: MONO, fontSize: 14, lineHeight: 20 },
-  bold: { fontWeight: "700" },
-  italic: { fontStyle: "italic" },
-  inlineCode: { fontFamily: MONO, fontSize: 15 },
 });
