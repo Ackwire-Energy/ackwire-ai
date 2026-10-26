@@ -1045,7 +1045,7 @@ export const en: Translations = {
     },
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
-      text: "In ChatGPT, open Settings › Security and allow device code sign-in for Codex. On a Business or Enterprise plan, a workspace admin allows it.",
+      text: "In ChatGPT, open Settings\u00a0›\u00a0Security and allow device code sign-in for Codex. On a Business or Enterprise plan, a workspace admin allows it.",
       open: "Open ChatGPT settings",
     },
     zaiTeam: "On a team plan, use the key from your Team Plan page.",
@@ -3798,7 +3798,7 @@ export const en: Translations = {
       dmWith: "DM with {{name}}",
       homeHint: "The mission gets a thread: that's where {{name}} talks, asks for decisions and shows its work.",
       offline: "{{name}} is offline. The plan starts when it's back.",
-      needsMachine: "Missions run on a connected computer. Connect one to {{name}} in Settings › Computers.",
+      needsMachine: "Missions run on a connected computer. Connect one to {{name}} in Settings\u00a0›\u00a0Computers.",
       commandHint: "You can also start one by typing in any conversation's composer:",
       approvals: "Merge, deploy and rollback always ask for approval",
       start: "Start mission",
@@ -7340,7 +7340,7 @@ export const en: Translations = {
       help: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
       envOff: "Turned off in this server's settings (TELEMETRY=off). It can't be turned on from here.",
       envOffDesktop:
-        "Turned off in the agentes.chat app on the computer that runs this server, in Preferences › Servers. It can't be turned on from here.",
+        "Turned off in the agentes.chat app on the computer that runs this server, in Preferences\u00a0›\u00a0Servers. It can't be turned on from here.",
       see: "See what is sent",
       dialogTitle: "What is sent",
       dialogText: "Once a day. This is the next report, exactly.",
@@ -8601,7 +8601,7 @@ export const en: Translations = {
     phone: {
       otherApp: "{{name}} is using another app on its screen",
       fromComputer: "To watch its screen, open agentes.chat on a laptop",
-      chooseOnWeb: "Choose it on agentes.chat, in Settings › Computers.",
+      chooseOnWeb: "Choose it on agentes.chat, in Settings\u00a0›\u00a0Computers.",
     },
   },
 };
