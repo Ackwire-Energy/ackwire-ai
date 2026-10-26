@@ -7,8 +7,25 @@ import type {
   MissionDecision,
   ThreadInfo,
 } from "@agenteschat/client";
+import { resources } from "@agenteschat/i18n";
+import i18next, { type TFunction } from "i18next";
+import { featureKeysEn } from "../../src/features/i18n/keys.en";
+import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
+import { withMobileKeys } from "../../src/i18n/merge";
 
 /** Small builders for the screens' pure logic (only the fields each test cares about change). */
+
+/** The app's `t` in one language: the shared strings with the phone's own, as the app merges them. */
+export async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
+  const i18n = i18next.createInstance();
+  await i18n.init({
+    lng,
+    fallbackLng: "pt-BR",
+    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
+    interpolation: { escapeValue: false },
+  });
+  return i18n.t;
+}
 
 export const at = (minutesAgo: number, now = new Date(2026, 9, 17, 15, 0)) =>
   new Date(now.getTime() - minutesAgo * 60_000).toISOString();
