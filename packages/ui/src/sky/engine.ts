@@ -5,10 +5,12 @@
  * and the sprites pass behind). Ported from the landing (pages/landing/sky.ts)
  * and made palette-agnostic: any agent color, faded from any surface token.
  *
- * One animation loop runs for every sky on the page; a sky off screen or
- * hidden costs nothing. With reduced motion a sky is drawn once (and again
- * on resize or a theme change). Without a 2D context (tests, old browsers)
- * nothing is drawn and the element's CSS background shows.
+ * One animation loop runs for every sky on the page, about 30 frames a
+ * second, and only while a sky moves: a sky off screen costs nothing, and the
+ * browser holds the loop while the page is hidden. With reduced motion a sky
+ * is drawn once (and again on resize or a theme change), with no loop between.
+ * Without a 2D context (tests, old browsers) nothing is drawn and the
+ * element's CSS background shows.
  */
 import {
   blobsAt,
@@ -17,6 +19,7 @@ import {
   ditherIndex,
   drawSprite,
   pixelOf,
+  SKY_FRAME_MS,
   type SkyBlob,
   type SkyFrame,
   spriteTone,
@@ -88,7 +91,7 @@ function watchTheme() {
   if (themeWatch || typeof MutationObserver === "undefined" || typeof document === "undefined") return;
   themeWatch = new MutationObserver(() => {
     themeVersion++;
-    for (const s of live) s.dirty = true;
+    redrawSkies();
   });
   themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
 }
@@ -100,21 +103,22 @@ export const prefersReducedMotion = () =>
 
 interface Sky {
   dirty: boolean;
+  /** It draws on a coming frame: it moves and is on screen, or it is still and was asked to draw again. */
+  wanted(): boolean;
   step(dt: number): void;
 }
 const live = new Set<Sky>();
 let raf = 0;
 let last = 0;
 const hasRaf = () => typeof requestAnimationFrame === "function";
-/** About 30 frames a second: the dither moves in whole cells, more frames only cost. */
-const FRAME_MS = 32;
 function tick(now: number) {
-  if (now - last >= FRAME_MS) {
+  if (now - last >= SKY_FRAME_MS) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     for (const s of live) s.step(dt);
   }
-  raf = live.size && hasRaf() ? requestAnimationFrame(tick) : 0;
+  // With nothing to draw the loop stops; a sky that has something again wakes it (`wake`).
+  raf = hasRaf() && [...live].some((s) => s.wanted()) ? requestAnimationFrame(tick) : 0;
 }
 function wake() {
   if (raf || !hasRaf()) return;
@@ -291,6 +295,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
 
   const sky: Sky = {
     dirty: true,
+    wanted: () => visible && (!reduced || sky.dirty),
     step(dt) {
       if (!visible || !canvas.isConnected || canvas.offsetParent === null) return;
       // Behind a full-screen menu (MenuOverlay) the app is blurred: hold still there.
@@ -307,13 +312,17 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
   resize();
   const observers: { disconnect(): void }[] = [];
   if (typeof ResizeObserver !== "undefined") {
-    const ro = new ResizeObserver(() => resize());
+    const ro = new ResizeObserver(() => {
+      resize();
+      wake();
+    });
     ro.observe(host);
     observers.push(ro);
   }
   if (typeof IntersectionObserver !== "undefined") {
     const io = new IntersectionObserver(([e]) => {
       visible = e?.isIntersecting ?? true;
+      if (visible) wake();
     });
     io.observe(host);
     observers.push(io);
@@ -331,4 +340,5 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
 /** Marks every sky for a redraw (reduced motion draws only on demand). */
 export function redrawSkies() {
   for (const s of live) s.dirty = true;
+  wake();
 }

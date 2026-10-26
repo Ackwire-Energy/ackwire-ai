@@ -35,6 +35,21 @@ export async function waitFor(cond: () => boolean, timeoutMs = 3000) {
   }
 }
 
+/** Everything a Unix socket answers one connection that says `word`, until it closes. */
+export function socketAnswer(socket: string, word: string): Promise<string> {
+  return new Promise((resolve) => {
+    let got = "";
+    const conn = net.createConnection(socket);
+    conn.setEncoding("utf8");
+    conn.on("connect", () => conn.write(word));
+    conn.on("data", (chunk: string) => {
+      got += chunk;
+    });
+    conn.on("error", () => resolve(got));
+    conn.on("close", () => resolve(got));
+  });
+}
+
 /**
  * A stream's data socket in memory, the person's side in the test's hands:
  * what the runner sent, how it closed, how much it "holds" queued.

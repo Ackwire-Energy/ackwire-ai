@@ -60,8 +60,11 @@ export interface WorkerOptions {
   self?: { command: string[]; compiled: boolean };
   /** Tests: the computer desktop use sees, and how its helper starts. */
   desktop?: Pick<DesktopManagerOptions, "system" | "command">;
-  /** Tests: how `agent-browser` and Chrome start. */
-  browser?: Pick<BrowserManagerOptions, "command" | "chrome" | "startChrome" | "isOurChrome">;
+  /** Tests: how `agent-browser` and Chrome start, and Chrome's debugging endpoint. */
+  browser?: Pick<
+    BrowserManagerOptions,
+    "command" | "chrome" | "startChrome" | "isOurChrome" | "fetch" | "windowDrawMs"
+  >;
 }
 
 /**
