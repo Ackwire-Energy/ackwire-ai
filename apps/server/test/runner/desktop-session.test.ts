@@ -806,6 +806,48 @@ test("a running desktop that can't take the flags or the look keeps what it has,
   after.close();
 });
 
+test.if(posix)(
+  "the flags' own script sets each with tigervncconfig on the desktop's display and reads it back: 1.15's off, 1.12's 0",
+  async () => {
+    // A tigervncconfig that notes what it was asked on which display, and answers -get with what the server says.
+    const bin = tempDir("desk-bin-");
+    dirs.push(bin);
+    const calls = path.join(bin, "calls");
+    writeFileSync(
+      path.join(bin, "tigervncconfig"),
+      ["#!/bin/sh", 'echo "$DISPLAY $*" >> "$CALLS"', '[ "$1" = -get ] && echo "$SAYS"', "exit 0", ""].join("\n"),
+      { mode: 0o755 },
+    );
+    for (const says of ["off", "0", "on"]) {
+      const t = setup();
+      await leftByEarlierRunner(t, dev);
+      const system: DesktopSystem = {
+        ...t.fake.system,
+        spawn(argv, opts) {
+          if (!argv.includes("agentes-xvnc")) return t.fake.system.spawn(argv, opts);
+          const env = { ...opts.env, PATH: `${bin}:/usr/bin:/bin`, CALLS: calls, SAYS: says };
+          return { pid: 1, exited: Promise.resolve(Bun.spawnSync(argv, { env }).exitCode) };
+        },
+      };
+      const next = new DesktopSessions({ ...t.opts, system });
+      next.restore();
+      await next.sweep();
+      expect(readFileSync(calls, "utf8").split("\n").slice(-3)).toEqual([
+        ":20 -set SendPrimary=0",
+        ":20 -get SendPrimary",
+        "",
+      ]);
+      // A server that still says on refused it, though tigervncconfig exited 0.
+      expect(t.logs.at(-1)).toBe(
+        says === "on"
+          ? "the desktop of dev keeps its earlier SendPrimary until it starts again: setting it failed (exit 2)"
+          : "the desktop of dev took SendPrimary=0 while running",
+      );
+      next.close();
+    }
+  },
+);
+
 test("running desktops take a new look one after another; one renamed takes it again, one whose home moved keeps its own", async () => {
   const t = setup();
   // With bash, the look's terminal prompt says the agent's name.

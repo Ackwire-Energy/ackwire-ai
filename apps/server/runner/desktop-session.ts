@@ -101,7 +101,7 @@ const LIVE_PARAMS = ["SendPrimary=0"];
  * and 1.13 say 1 or 0.
  */
 const PARAMS_SCRIPT = [
-  "for a; do",
+  'for a in "$@"; do',
   // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameters, not a template literal
   "  n=${a%%=*} want=${a#*=}",
   '  got=$(tigervncconfig -set "$a" && tigervncconfig -get "$n") || exit 1',
