@@ -350,7 +350,7 @@ test.if(posix)("install.sh: --system needs root, and its flags go with it", () =
     encoding: "utf8",
     env: { ...process.env, HOME: h, AGENTES_RUNNER_HOME: path.join(h, "runner-home") },
   });
-  expect(elsewhere.stdout).toContain("Downloading the runner from http://127.0.0.1:9 ...");
+  expect(elsewhere.stdout).toContain("◒  Downloading the runner from http://127.0.0.1:9\n");
 });
 
 test.if(posix)("install.sh --runner-sha256: a bundle with another SHA-256 is never installed", () => {
@@ -452,9 +452,13 @@ test.if(posix)(
       `apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends ${packages.join(" ")}\n`;
 
     // --system alone, on Debian 12 or Ubuntu 22.04: the names as they are.
+    // Without a terminal: the title, then each wait once and its line, whole.
+    const head = "agentes.chat connect this computer\n";
     let r = step(false);
     expect(r.status).toBe(0);
-    expect(r.out).toBe("Installing the packages for the agents' browser ...\n");
+    expect(r.out).toBe(
+      `${head}◒  Installing the packages for the agents' browser\n◇  The packages for the agents' browser\n`,
+    );
     expect(r.calls).toBe(update + install(BROWSER_APT_PACKAGES));
     // What a computer with the desktops' packages still lacks: they bring every other library Chrome links.
     expect(BROWSER_APT_PACKAGES).toEqual(expect.arrayContaining(["libnss3", "libnspr4", "libasound2"]));
@@ -468,7 +472,9 @@ test.if(posix)(
 
     // With --desktop: one install with the screens' packages too.
     r = step(true, { known: t64 });
-    expect(r.out).toBe("Installing the packages for the agents' browser and screens ...\n");
+    const screens =
+      "◒  Installing the packages for the agents' browser and screens\n◇  The packages for the agents' browser and screens\n";
+    expect(r.out).toBe(`${head}${screens}`);
     // Then the screens' theme, their CJK fonts and their dock, each in its own call where apt has it: a failure
     // only says so.
     const look = install(DESKTOP_LOOK_APT_PACKAGES);
@@ -481,21 +487,20 @@ test.if(posix)(
     r = step(true, { known: t64, missing: ["orchis-gtk-theme"] });
     expect(r.status).toBe(0);
     expect(r.out).toContain(
-      "The agents' screens keep the stock theme: apt has no orchis-gtk-theme librsvg2-common here",
+      "▲  The agents' screens keep the stock theme: apt has no orchis-gtk-theme librsvg2-common here\n",
     );
     expect(r.calls.endsWith(look + cjk + dock)).toBe(true);
     r = step(true, { known: t64, missing: ["fonts-noto-cjk"] });
     expect(r.status).toBe(0);
     expect(r.out).toContain(
-      "The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no fonts-noto-cjk here",
+      "▲  The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no fonts-noto-cjk here\n",
     );
     expect(r.calls.endsWith(cjk + dock)).toBe(true);
     // Debian 12, Ubuntu 24.04: the theme and the fonts, and the panel's own dock.
     r = step(true, { known: t64, missing: ["xfce4-docklike-plugin"] });
     expect(r.status).toBe(0);
     expect(r.out).toBe(
-      "Installing the packages for the agents' browser and screens ...\n" +
-        "The agents' screens keep the panel's own dock: apt has no xfce4-docklike-plugin here\n",
+      `${head}${screens}▲  The agents' screens keep the panel's own dock: apt has no xfce4-docklike-plugin here\n`,
     );
 
     // No apt: what to install, by name.
@@ -503,8 +508,7 @@ test.if(posix)(
     expect(r.status).toBe(0);
     expect(r.calls).toBe("");
     expect(r.out).toBe(
-      "For the agents' browser and screens, install these packages (Debian names) with this computer's package manager:\n" +
-        `  ${[...BROWSER_APT_PACKAGES, ...DESKTOP_APT_PACKAGES].join(" ")}\n`,
+      `${head}▲  For the agents' browser and screens, install these packages (Debian names) with this computer's package manager: ${[...BROWSER_APT_PACKAGES, ...DESKTOP_APT_PACKAGES].join(" ")}\n`,
     );
   },
 );
