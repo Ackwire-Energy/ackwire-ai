@@ -16,6 +16,13 @@ const go = async (path: string, state = seedState()) => {
 };
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+/** A help line's link: to the page on agentes.chat in Portuguese, in a new tab with no referrer. */
+const expectHelpLink = (link: HTMLElement, page: string) => {
+  expect(link.getAttribute("href")).toBe(`https://agentes.chat/help/${page}?lang=pt-BR`);
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  expect(link.className).toBe("ac-link ac-link--muted");
+};
 
 describe("Aprovações", () => {
   const pills = () =>
@@ -45,6 +52,30 @@ describe("Aprovações", () => {
     expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados", "Todos3"]);
     expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
     expect(screen().getByText("Decididos há pouco")).toBeTruthy();
+  });
+
+  test("nothing waiting: All decided and one link to how approvals work; the header says no more", async () => {
+    const state = seedState();
+    state.approvals = [];
+    await go("approvals", state);
+    const empty = document.querySelector(".ac-empty") as HTMLElement;
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Tudo decidido");
+    const link = within(empty).getByRole("link", { name: "Como as aprovações funcionam" });
+    expectHelpLink(link, "approvals");
+    expect(empty.querySelector(".ac-empty__text")?.textContent).toBe("Como as aprovações funcionam");
+    expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  test("refusing asks why, optional; the exact action is approved only for its values", async () => {
+    await go("approvals?open=ap-merge");
+    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
+    expect(within(dialog).getByRole("region", { name: "A ação exata" }).textContent).toContain(
+      "Só para estes valores: qualquer mudança precisa de nova aprovação.",
+    );
+    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
+    const why = within(dialog).getByLabelText("Por que não?");
+    expect(why.getAttribute("placeholder")).toBe("Opcional");
+    expect(dialog.textContent).toContain("Vira uma lição na memória da Ada");
   });
 
   test("a normal-risk approval goes with one click", async () => {

@@ -2364,6 +2364,11 @@ p {
   color: var(--ink2);
   cursor: pointer;
 }
+/* A field's label outside a Field with its ⓘ: the line takes the label's type, so the ⓘ sits on its first line. */
+.ac-hintline:has(> .ac-field__label) {
+  font-size: 13px;
+  line-height: 18px;
+}
 /* Participant / member picker inside forms */
 .people-picker {
   display: flex;
