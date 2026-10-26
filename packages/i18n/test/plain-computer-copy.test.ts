@@ -90,7 +90,7 @@ const CLOUD_EXTRA = [
   "desktop.clipboard.got",
   "desktop.keyboard.label",
   "computers.leadCloud",
-  ...["title", "screens", "plans", "coding", "always"].map((k) => `computers.onIt.${k}`),
+  ...["title", "screens", "plans", "coding"].map((k) => `computers.onIt.${k}`),
   "agentPage.work.cell.computer",
   "agentPage.work.offlineCloud",
   "agentPage.work.brain.fallbackTitle",

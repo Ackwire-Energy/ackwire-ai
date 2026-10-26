@@ -8,6 +8,7 @@ import { useState } from "react";
 import {
   ApprovalCard,
   Avatar,
+  AvatarStack,
   Button,
   Card,
   CardFooter,
@@ -513,5 +514,28 @@ describe("ListRow and RunMark", () => {
     expect(mark.getAttribute("role")).toBeNull();
     expect(mark.dataset.status).toBe("failed");
     expect(mark.style.width).toBe("8px");
+  });
+});
+
+describe("text and faces that are never cut", () => {
+  test("an empty state's text wraps in even lines; initials in a stack keep their whole tile", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-empty__text")).toContain("text-wrap: balance");
+    expect(rule('.ac-avatar-stack > .ac-avatar[data-kind="person"]:not(:has(img)) + .ac-avatar')).toContain(
+      "margin-left: 0",
+    );
+    // The tiles that rule tells apart: initials have no image, a photo does.
+    render(
+      <AvatarStack>
+        <Avatar name="Marina Alves" size="sm" />
+        <Avatar name="Theo" size="sm" kind="agent" />
+      </AvatarStack>,
+    );
+    const [initials, agent] = Array.from(document.querySelectorAll(".ac-avatar-stack > .ac-avatar"));
+    expect(initials?.getAttribute("data-kind")).toBe("person");
+    expect(initials?.querySelector("img")).toBeNull();
+    expect(initials?.textContent).toBe("MA");
+    expect(agent?.getAttribute("data-kind")).toBe("agent");
   });
 });

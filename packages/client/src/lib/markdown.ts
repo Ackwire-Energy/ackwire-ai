@@ -135,6 +135,41 @@ export function wikiLinksIn(text: string): string[] {
   return out;
 }
 
+const INLINE_ALL = new RegExp(INLINE.source, "g");
+
+/** A line's words without its inline marks: links and wiki links as their labels, an image as its alt text. */
+const plainInline = (text: string): string =>
+  text
+    .replace(/!(?=\[)/g, "")
+    .replace(INLINE_ALL, (tok, code, bold, em, link, _url, wiki, strike) =>
+      code
+        ? tok.slice(1, -1)
+        : bold || strike
+          ? plainInline(tok.slice(2, -2))
+          : em
+            ? plainInline(tok.slice(1, -1))
+            : link
+              ? plainInline(tok.slice(1, tok.indexOf("](")))
+              : wiki
+                ? parseWikiToken(tok).label
+                : tok,
+    );
+
+/**
+ * A Markdown text's prose as plain lines, the way a person reads it: each line of its paragraphs, list items
+ * and quotes, without their marks. Headings, rules, code, tables and embeds are left out: they frame what it
+ * says rather than say it.
+ */
+export function plainLines(source: string): string[] {
+  return parseMarkdown(source, { breaks: true })
+    .flatMap((b) =>
+      b.type === "paragraph" ? [b.text] : b.type === "list" ? b.items : b.type === "quote" ? b.lines : [],
+    )
+    .flatMap((text) => text.split("\n"))
+    .map((line) => plainInline(line).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 /** Heading anchor ids for the outline: "Como pedimos acesso" → "como-pedimos-acesso". */
 export const headingId = (text: string) =>
   text

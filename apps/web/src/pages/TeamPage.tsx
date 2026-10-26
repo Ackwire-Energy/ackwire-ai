@@ -1,7 +1,9 @@
 import type { Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
-import { useTeam } from "@agenteschat/client";
+import { useAiStatus, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { excerpt } from "@agenteschat/client/lib/text";
 import {
   Avatar,
   Button,
@@ -23,8 +25,10 @@ import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingCards } from "@/components/Loading";
+import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useTheme } from "@/lib/theme";
 import "./team.css";
 
@@ -44,6 +48,9 @@ const CAPS = {
   forum: "message",
   wiki: "book",
   sandbox: "computer",
+  desktop: "pointer",
+  browser: "globe",
+  database: "database",
   github: "repo",
   sentry: "alert",
   linear: "layers",
@@ -53,6 +60,8 @@ const CAPS = {
 } as const satisfies Record<string, IconName>;
 type CapKey = keyof typeof CAPS;
 const HIDDEN_CAPS = new Set(["context", "memory", "skills", "setup"]);
+/** "What it does" on its card: the first line of its instructions, in whole sentences while they fit. */
+const SUMMARY_MAX = 160;
 const isCap = (k: string): k is CapKey => k in CAPS;
 
 /** How long a new consultation's line stays lit, in ms. */
@@ -154,6 +163,8 @@ export function TeamPage() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const team = useTeam(org.id);
+  // Asked with the page, so an agent's card opens already saying whether it can work.
+  useAiStatus(org.id);
   const data = team.data;
   const working = data?.agents.filter((a) => a.busy).length ?? 0;
   return (
@@ -170,7 +181,7 @@ export function TeamPage() {
         {can(org.role, "manage_agents") && (
           <Button asChild variant="primary" icon="plus">
             <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-              {t("team.newAgent")}
+              {t("shell.createAgent")}
             </Link>
           </Button>
         )}
@@ -408,6 +419,11 @@ function TeamSky({ team }: { team: Team }) {
 function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const aiStatus = useAiStatus(org.id);
+  const ai = aiStateOf(aiStatus.data, agent.id);
+  const dir = useDirectory(org.id);
+  // The same plain words as its page's "What it does", from the instructions every member can read.
+  const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
   return (
@@ -435,18 +451,23 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
               <PixelSpinner size={14} color={colorOf(agent)} />
               {t("team.workingNow")}
             </span>
+          ) : ai === "no_ai" ? (
+            <NoAiChip agentId={agent.id} />
           ) : (
-            <span className="team-card__status">
-              <Icon name="clock" size={14} />
-              {t("team.free")}
-            </span>
+            // Waiting (its computer away, a plan's limit reached) can't work now either: no word, never Available.
+            ai === "ready" && (
+              <span className="team-card__status">
+                <span className="team-card__dot" aria-hidden="true" />
+                {t("team.available")}
+              </span>
+            )
           )}
         </div>
       </div>
-      {agent.callFor && (
+      {summary && (
         <div className="team-card__sec">
-          <span className="team-card__eyebrow">{t("team.callFor")}</span>
-          <p className="team-card__call">{agent.callFor}</p>
+          <span className="team-card__eyebrow">{t("team.does")}</span>
+          <p className="team-card__call">{summary}</p>
         </div>
       )}
       <div className="team-card__sec">

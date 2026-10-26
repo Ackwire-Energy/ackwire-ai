@@ -122,6 +122,18 @@ describe("no AI connected: above the composer", () => {
     await click(screen().getByRole("button", { name: "Sem IA" }));
     expect(dialog("Conectar uma IA")).not.toBeNull();
   });
+
+  test("the agent's page: who it thinks with says no AI too, not the model it's set to, and connects one", async () => {
+    await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }), `agents/${ADA_ID}`);
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.textContent).toContain("Pensa comSem IA");
+    expect(work.textContent).not.toContain("o modelo da organização");
+    await click(within(work).getByRole("button", { name: "Conectar uma IA" }));
+    expect(dialog("Conectar uma IA")).not.toBeNull();
+    cleanup();
+    await open(seedState({ aiStatus: aiStatus(true, ATLAS_ID) }), `agents/${ADA_ID}`);
+    expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("o modelo da organização");
+  });
 });
 
 describe("the agent's no-AI card", () => {

@@ -1315,7 +1315,7 @@ function NewAgentRail({
         </Button>
       </div>
       <div className="newag__rail-title">
-        <b>{t("newAgent.railTitle")}</b>
+        <b>{t("newAgent.title")}</b>
         <span>{t("newAgent.railOrg", { org: org.name, role: t(`roles.${org.role}Lower`) })}</span>
       </div>
       <StepRail

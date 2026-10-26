@@ -396,6 +396,14 @@
 .nt-item:not(.is-unread) .nt-what b {
   font-weight: 500;
 }
+/* A headline that names nobody (the workspace's computer, its standing) is all subject: it takes the weight whole. */
+.nt-what:not(:has(b)) {
+  color: var(--ink);
+  font-weight: 600;
+}
+.nt-item:not(.is-unread) .nt-what:not(:has(b)) {
+  font-weight: 500;
+}
 .nt-tm {
   margin-left: auto;
   padding-left: 8px;
@@ -462,6 +470,17 @@
 }
 .nt-replied--quiet {
   color: var(--faint);
+}
+/* The face of what the workspace itself tells: its icon in a tile the size of the people's and agents'. */
+.nt-sys {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 30%;
+  background: var(--sunken);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 /* A group: two stacked faces. */
 .nt-stk {

@@ -158,6 +158,21 @@ export function groupByDay(list: AppNotification[], now = new Date()): [DayGroup
 /** The DM's or message's channel. */
 export const channelOf = (n: AppNotification) => n.source.channelId ?? n.source.dmId ?? null;
 
+/**
+ * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed): its
+ * headline's key, the whole of what it says; null for what someone did.
+ */
+export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
+  if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
+  if (n.kind !== "org_standing") return null;
+  const to = n.latest.statusTo;
+  return to === "suspended"
+    ? ("standing.notification.suspended" as const)
+    : to === "active"
+      ? ("standing.notification.active" as const)
+      : ("standing.notification.hold" as const);
+}
+
 /** Grouped (several replies or comments): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>
   n.count > 1 &&
