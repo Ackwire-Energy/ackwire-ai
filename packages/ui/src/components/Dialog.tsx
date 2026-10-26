@@ -1,5 +1,5 @@
 import { Dialog as RDialog } from "radix-ui";
-import { type CSSProperties, type ReactNode, useRef } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
 import { cx } from "../cx";
 import { Button } from "./Button";
 import { SearchField } from "./Toolbar";
@@ -52,6 +52,17 @@ export function Dialog({
     returnTo.current = document.activeElement as HTMLElement | null;
   }
   wasOpen.current = open;
+  // Toasts float over the dialog: pressing one isn't pressing outside it, which would close it. Read as the press
+  // starts, since a toast's own button can remove the toast before Radix looks, at the click.
+  const onToast = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    const pressed = (e: PointerEvent) => {
+      onToast.current = e.target instanceof Element && e.target.closest(".ac-toasts") !== null;
+    };
+    document.addEventListener("pointerdown", pressed, true);
+    return () => document.removeEventListener("pointerdown", pressed, true);
+  }, [open]);
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
@@ -60,6 +71,9 @@ export function Dialog({
           className={cx("ac-dialog", className)}
           style={{ "--ac-dialog-width": `${width}px` } as CSSProperties}
           onEscapeKeyDown={onEscapeKeyDown}
+          onPointerDownOutside={(e) => {
+            if (onToast.current) e.preventDefault();
+          }}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
             if (target?.isConnected) {

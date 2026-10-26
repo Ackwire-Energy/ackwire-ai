@@ -20,9 +20,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   type AgentScope,
-  DESKTOP_KEYBOARDS,
   DESKTOP_SIZE,
-  type DesktopKeyboard,
   type MachineReplies,
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
@@ -582,27 +580,6 @@ export class DesktopSessions {
   }
 
   /**
-   * The keyboard layout of the person taking control (ADR 0058 §5), set as the agent with `setxkbmap`.
-   * Best effort: without it, or when it fails, the desktop keeps the layout it had.
-   */
-  async setKeyboard(agent: AgentScope, keyboard: DesktopKeyboard): Promise<void> {
-    const d = this.desktops.get(agent.id);
-    if (!d || !this.alive(d)) return;
-    const user = await this.opts.user(agent);
-    const setxkbmap = this.sys.which("setxkbmap", user.env.PATH);
-    if (!setxkbmap) return;
-    const [layout = "us", variant]: readonly string[] = DESKTOP_KEYBOARDS[keyboard];
-    const argv = [...user.prefix, setxkbmap, "-layout", layout, ...(variant ? ["-variant", variant] : [])];
-    const p = this.sys.spawn(argv, {
-      cwd: d.home,
-      env: { ...user.env, HOME: d.home, DISPLAY: `:${d.display}`, XAUTHORITY: d.xauthority },
-    });
-    void p.exited.then((code) => {
-      if (code !== 0) this.opts.log(`the desktop of ${agent.handle} kept its keyboard: setxkbmap ${keyboard} failed`);
-    });
-  }
-
-  /**
    * Desktops a previous run of the runner left running are taken back when
    * the pid it saved is still that display's Xtigervnc (a pid can be
    * reused); the others' files go.
@@ -1002,7 +979,9 @@ export class DesktopSessions {
 /**
  * Xtigervnc's flags (after `:N`): its fixed size; VNC only on the Unix
  * socket, 0600; VncAuth with the password file (never `-ac` or `-nopw`);
- * viewers never resize it; no blacklist (TigerVNC counts attempts, not
+ * viewers never resize it; only a copy reaches the person in control, never
+ * a selection (PRIMARY is still set from what they paste, for Shift+Insert
+ * in a terminal); no blacklist (TigerVNC counts attempts, not
  * failures, so a burst of reconnects after a deploy would lock everyone out,
  * and behind a 0600 socket it protects nothing); X only through the cookie
  * file, no TCP; no screen saver.
@@ -1025,6 +1004,7 @@ function xvncArgs(files: { socket: string; xauthority: string; passwd: string },
     files.passwd,
     "-AlwaysShared",
     "-AcceptSetDesktopSize=0",
+    "-SendPrimary=0",
     "-FrameRate=30",
     "-UseBlacklist=0",
     "-auth",
