@@ -1498,20 +1498,186 @@ p {
   padding: 0;
   background: none;
 }
+/* Tables: a quiet box with a hairline, the header on a soft band, rows split by hairlines, numbers aligned
+   (right, tabular figures; the parser decides the side). A wide table scrolls inside its box. */
 .md__table {
   overflow: auto;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .md__table table {
   border-collapse: collapse;
+  min-width: 100%;
+  font-variant-numeric: tabular-nums;
 }
 .md__table th,
 .md__table td {
   /* Whole words in cells: a wide table scrolls inside its box instead of breaking "coluna" into "colu/na". */
   overflow-wrap: normal;
   min-width: 8ch;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  vertical-align: top;
+}
+.md__table th {
+  background: var(--plate);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.md__table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Fenced code (telas/Polimento.html, A · Cartão): the language, copy and full screen on top; colors from
+   the shared highlighter. The full screen viewer grows out of the card (CodeBlock.tsx). */
+.code-card {
+  margin: 2px 0;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.code-card__top {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  padding: 0 5px 0 14px;
+}
+.code-card__lang {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+.code-card__code,
+.code-viewer__code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--ink2);
+  tab-size: 2;
+}
+.code-card__code {
+  padding: 0 16px 14px;
+  overflow-x: auto;
+  max-height: 420px;
+}
+.md .code-card code,
+.md .code-viewer code {
+  padding: 0;
+  font-size: inherit;
+  background: none;
+  border-radius: 0;
+  color: inherit;
+}
+/* Copy: the icon turns into a check and "Copiado" slides out beside it. */
+.code-card__copy.ac-btn {
+  gap: 0;
+  padding: 0 8px;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+.code-card__copied {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    max-width 0.28s var(--out),
+    opacity 0.2s,
+    margin 0.28s var(--out);
+}
+.code-card__copy[data-done="true"] {
+  color: var(--ok);
+}
+.code-card__copy[data-done="true"] .code-card__copied {
+  max-width: 80px;
+  margin-left: 6px;
+  opacity: 1;
+}
+.code-viewer {
+  height: min(720px, calc(100dvh - 48px));
+}
+.code-viewer .ac-dialog__head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.code-viewer .ac-btn[aria-pressed="true"] {
+  background: var(--plate);
+  color: var(--ink);
+}
+.code-viewer__body.ac-dialog__body {
+  flex: 1 1 auto;
+  padding: 12px 0 20px;
+}
+.code-viewer__code {
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre;
+  counter-reset: code-line;
+}
+.code-viewer__code[data-wrap="true"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-line--numbered {
+  display: block;
+  padding: 0 20px 0 56px;
+  text-indent: -40px;
+}
+.code-line--numbered::before {
+  counter-increment: code-line;
+  content: counter(code-line);
+  display: inline-block;
+  width: 28px;
+  margin-right: 12px;
+  text-align: right;
+  text-indent: 0;
+  color: var(--faint);
+  opacity: 0.6;
+  user-select: none;
+}
+.code-tok--keyword {
+  color: var(--code-keyword);
+}
+.code-tok--string {
+  color: var(--code-string);
+}
+.code-tok--number {
+  color: var(--code-number);
+}
+.code-tok--function {
+  color: var(--code-function);
+}
+.code-tok--comment {
+  color: var(--faint);
+  font-style: italic;
+}
+.code-tok--inserted {
+  color: var(--ok);
+}
+.code-tok--deleted {
+  color: var(--danger);
+}
+:root {
+  --code-keyword: #7a3fd1;
+  --code-string: #1f7a45;
+  --code-number: #b05a00;
+  --code-function: #0b62c9;
+}
+[data-theme="dark"] {
+  --code-keyword: #c29bff;
+  --code-string: #7fd4a0;
+  --code-number: #f0b35a;
+  --code-function: #79b8ff;
 }
 
 /* ── Drive: pages/drive.css. The previews (the agent's Arquivos tab), the kind tag and the selection bar

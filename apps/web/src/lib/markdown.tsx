@@ -1,5 +1,6 @@
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { type ReactNode, useMemo } from "react";
+import { CodeBlock } from "@/components/CodeBlock";
 
 /**
  * A small, safe Markdown renderer for chat messages and artifact documents
@@ -183,9 +184,7 @@ export function Markdown({
         return <p key={k}>{inline(b.text, k)}</p>;
       case "code":
         return (
-          <pre key={k} className="md__code">
-            <code>{b.text}</code>
-          </pre>
+          <CodeBlock key={k} lang={b.lang} text={b.text} />
         );
       case "list": {
         const L = b.ordered ? "ol" : "ul";
@@ -237,7 +236,9 @@ export function Markdown({
                 <tr>
                   {b.header.map((h, j) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: static table
-                    <th key={j}>{inline(h, `${k}-h${j}`)}</th>
+                    <th key={j} style={{ textAlign: b.align[j] }}>
+                      {inline(h, `${k}-h${j}`)}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -247,7 +248,9 @@ export function Markdown({
                   <tr key={j}>
                     {r.map((c, x) => (
                       // biome-ignore lint/suspicious/noArrayIndexKey: static table
-                      <td key={x}>{inline(c, `${k}-${j}-${x}`)}</td>
+                      <td key={x} style={{ textAlign: b.align[x] }}>
+                        {inline(c, `${k}-${j}-${x}`)}
+                      </td>
                     ))}
                   </tr>
                 ))}
