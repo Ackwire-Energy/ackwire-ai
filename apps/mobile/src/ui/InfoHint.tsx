@@ -1,5 +1,13 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
-import { BackHandler, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  AccessibilityInfo,
+  BackHandler,
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { hintBack, hintClosed, hintOpened, hintTouched } from "./hints";
 import { Icon } from "./Icon";
 import { Text, type TextVariant, textLineOf } from "./Text";
@@ -39,7 +47,11 @@ export function useInfoHint({ name, text, variant, center = false }: InfoHintOpt
   }, [open]);
   const toggle = () => {
     if (open) hintClosed(id);
-    else hintOpened({ id, close: () => setOpen(false) });
+    else {
+      hintOpened({ id, close: () => setOpen(false) });
+      // VoiceOver has no live regions: without this it hears only "expanded" and has to look for the text.
+      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(text);
+    }
     setOpen(!open);
   };
   const touched = () => hintTouched(id);
@@ -56,7 +68,7 @@ export function useInfoHint({ name, text, variant, center = false }: InfoHintOpt
       <Icon name="info" size={GLYPH} color={open ? c.ink : c.muted} />
     </Pressable>
   );
-  // Always there, so TalkBack reads the text as it appears.
+  // Always there, so TalkBack reads the text as it appears (VoiceOver: the announcement above).
   const body = (
     <View accessibilityLiveRegion="polite" onTouchStart={touched}>
       {open ? (
