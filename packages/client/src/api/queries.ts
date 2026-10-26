@@ -33,6 +33,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AiStatus,
   ApiRule,
   AppNotification,
   Approval,
@@ -908,10 +909,23 @@ export const usePlatformKey = (orgId: string) => {
   });
 };
 
-/** Whether each agent has an AI to think with (the no-AI banner, card and chip). */
-export const useAiStatus = (orgId: string) => {
+/**
+ * Whether each agent has an AI to think with (the no-AI banner, card and chip). `pollMs` where no socket is open
+ * (the onboarding), a time or one picked from the last answer.
+ */
+export const useAiStatus = (
+  orgId: string,
+  enabled = true,
+  pollMs: number | false | ((status: AiStatus | undefined) => number | false) = false,
+) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.aiStatus(orgId), queryFn: () => api.agents.aiStatus(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.aiStatus(orgId),
+    queryFn: () => api.agents.aiStatus(orgId),
+    staleTime: 30_000,
+    enabled: enabled && orgId.length > 0,
+    refetchInterval: typeof pollMs === "function" ? (query) => pollMs(query.state.data) : pollMs,
+  });
 };
 
 export function useRotateCredential(orgId: string) {
