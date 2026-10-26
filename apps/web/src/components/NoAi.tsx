@@ -45,17 +45,19 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
     );
   }
   if (status.data.any || agentIds.length === 0) return null;
+  const action = t("noAi.banner.orgAction");
   return (
     <div className="noai-banner" role="status">
       <span className="noai-banner__text ac-iconline">
         <Icon name="plug" size={16} />
         <span className="ac-hintline">
           <b>{t("noAi.banner.org")}</b>
-          <InfoHint name={t("common.about", { label: t("noAi.banner.org") })}>{t("noAi.banner.orgHint")}</InfoHint>
+          {/* Named by its topic, the button's: the line beside it is a whole sentence. */}
+          <InfoHint name={t("common.about", { label: action })}>{t("noAi.banner.orgHint")}</InfoHint>
         </span>
       </span>
       <Button size="sm" onClick={() => connect.open({ agentId: agentIds.length === 1 ? agentIds[0] : undefined })}>
-        {t("noAi.banner.orgAction")}
+        {action}
       </Button>
     </div>
   );

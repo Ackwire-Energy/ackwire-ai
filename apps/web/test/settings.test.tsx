@@ -5,6 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -396,6 +397,26 @@ describe("Configurações da organização", () => {
     await go(state, "settings/storage");
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
     expect(document.querySelector("#sec-storage")).toBeNull();
+  });
+
+  test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {
+    await go(seedState(), "settings/usage");
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    expect(hintOf("Contas dos planos", plans)).toMatchObject({
+      text: "Os planos só dizem quanto a conta inteira usou. A parte de cada agente é uma estimativa, pelo que cada um gastou nela.",
+      hidden: true,
+    });
+    expect(shownText(plans)).not.toContain("estimativa");
+    for (const card of [plans, screen().getByRole("region", { name: "API da organização" })])
+      expect(card.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
+    cleanup();
+    const api = createFakeApi(seedState());
+    api.orgs.planUsage = async () => ({ month: "2026-10", money: true, accounts: [], api: [] });
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api });
+    await settle(5);
+    expect(shownText(screen().getByRole("region", { name: "Contas dos planos" }))).toBe(
+      "Contas dos planosNenhum agente pensa com um plano ainda.",
+    );
   });
 });
 

@@ -100,9 +100,10 @@ describe("no AI connected: above the composer", () => {
   test("the organization has none: everyone sees it in a channel with agents; Connect opens on Claude's sign-in for the first agent with no AI", async () => {
     await open(walters(seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) }), ADA_ID));
     const shown = banner();
-    // One line and Connect; that it can also be asked for in the chat is the line's ⓘ.
+    // One line and Connect; that it can also be asked for in the chat is the line's ⓘ, named by its topic (the
+    // line is a whole sentence).
     expect(shownText(shown as HTMLElement)).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
-    expect(hintOf("Os agentes ainda não têm uma IA.", shown as HTMLElement).text).toBe(
+    expect(hintOf("Conectar uma IA", shown as HTMLElement).text).toBe(
       "Você também pode pedir no chat, como “usar meu plano do Claude”.",
     );
     await click(within(shown as HTMLElement).getByRole("button", { name: "Conectar uma IA" }), 6);

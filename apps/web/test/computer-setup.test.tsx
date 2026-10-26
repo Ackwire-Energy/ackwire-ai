@@ -122,6 +122,9 @@ describe("the workspace's computer on its way: the notice on top of the work are
     expect(within(notice()).getByRole("img", { name: "Ada" })).toBeTruthy();
     expect(within(notice()).getByRole("img", { name: "Atlas" })).toBeTruthy();
     expect(notice().textContent).not.toContain("esperam por ele");
+    // On a phone too, where other notices drop their faces: here nothing else says who waits.
+    const css = await Bun.file(new URL("../src/responsive.css", import.meta.url).pathname).text();
+    expect(css.split("\n  .setup-notice .outage__crew {")[1]?.split("}")[0]).toContain("display: inline-flex");
     expect(notice().textContent).not.toMatch(TECHNICAL);
     // No promise to everyone: only owners hear of the email, and not here.
     expect(notice().textContent).not.toContain("Avisamos");
@@ -195,10 +198,10 @@ describe("no AI yet while the workspace's computer is on its way", () => {
     const banner = () => document.querySelector(".noai-banner") as HTMLElement;
     const ask = "Você também pode pedir no chat, como “usar meu plano do Claude”.";
     expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
-    expect(hintOf("Os agentes ainda não têm uma IA.", banner()).text).toBe(ask);
+    expect(hintOf("Conectar uma IA", banner()).text).toBe(ask);
     await push({ state: "ready", machineId: "00000000-0000-4000-8000-000000000999" });
     expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
-    expect(hintOf("Os agentes ainda não têm uma IA.", banner()).text).toBe(ask);
+    expect(hintOf("Conectar uma IA", banner()).text).toBe(ask);
   });
 });
 

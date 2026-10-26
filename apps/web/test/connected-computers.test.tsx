@@ -352,13 +352,14 @@ describe("Configurações → Computadores", () => {
     expect(card.textContent).not.toContain("Não precisa instalar nada antes");
   });
 
-  test("no build published (404): a calm note instead of the button; the terminal stays", async () => {
+  test("no build published (404): a calm note instead of the button, and nothing to install; the terminal stays", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
     const card = screen().getByRole("region", { name: "Conectar outro computador" });
     expect(within(card).queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
     expect(card.textContent).toContain("O app para Mac ainda não está disponível.");
+    expect(card.textContent).not.toContain("Instale o app do agentes.chat no Mac.");
     expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
   });
 

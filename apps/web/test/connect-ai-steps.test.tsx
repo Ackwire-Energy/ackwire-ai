@@ -239,6 +239,34 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).getByRole("link", { name: "Abrir de novo" })).toBeTruthy();
   });
 
+  test("a sign-in starting: the line under its title says the computer is asked, until it answers, and only then", async () => {
+    const { api, dialog, tile } = await connect();
+    // The computer answers only when let.
+    const begin = api.machines.beginAccountLogin;
+    let answer = () => {};
+    api.machines.beginAccountLogin = async (...args) => {
+      await new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      return begin(...args);
+    };
+    const signIn = async (plan: string) => {
+      const panel = within(dialog).getByRole("region", { name: `Seu plano do ${plan}` });
+      expect(shownText(panel)).not.toContain("Pedindo ao MacBook…");
+      await withPopup(async () => {
+        await click(within(panel).getByRole("button", { name: `Entrar com ${plan}` }));
+        expect(shownText(panel)).toContain("Pedindo ao MacBook…");
+        await act(async () => answer());
+        await settle(6);
+      });
+      expect(within(panel).getByRole("link", { name: "Abrir de novo" })).toBeTruthy();
+      expect(shownText(panel)).not.toContain("Pedindo ao MacBook…");
+    };
+    await signIn("Claude");
+    await click(tile("ChatGPT"));
+    await signIn("ChatGPT");
+  });
+
   test("Claude: the same account twice is refused, and the page says how to add another", async () => {
     const { machines, dialog } = await connect();
     machines?.endLogin("login_1", { state: "failed", duplicate: { label: "Trabalho" } });
@@ -260,6 +288,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(other.textContent).toBe("Outra conta do Claude, para um agente");
     await click(other);
     expect(within(dialog).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    // Who it replies to is said once, by its steps, for its one agent: the note about every agent goes.
+    expect(dialog.textContent).not.toContain("Eles só respondem a você");
+    expect(shownText(dialog).split("A Ada vai responder só a você.")).toHaveLength(2);
     const which = within(dialog).getByLabelText("Qual conta? (opcional)") as HTMLInputElement;
     expect(which.placeholder).toBe("Email da conta do Claude (opcional)");
     expect(shownText(dialog)).not.toContain("Vazio: você escolhe");

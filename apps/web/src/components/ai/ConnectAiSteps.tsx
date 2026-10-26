@@ -398,7 +398,8 @@ function PlanSteps({
               </span>
             </OptionCard>
           </div>
-          <SettingNote icon="lock">{t("connectAi.own.note")}</SettingNote>
+          {/* With another account, its steps say it once, for its one agent. */}
+          {!otherChosen && <SettingNote icon="lock">{t("connectAi.own.note")}</SettingNote>}
         </>
       )}
       {steps && (!ownable || otherChosen) && (
@@ -427,9 +428,9 @@ export interface KeyDraft {
 }
 
 /**
- * The API key: who charges for it (the row just chosen already names it), its maker by its mark, where that maker's
- * keys are made, then the key, pasted here. `onSave`: saved right here (the dialog); else the caller saves it with
- * its own button (the setup).
+ * The API key: who charges for it (a maker's key only: the agentes.chat key isn't paid to a provider; the row just
+ * chosen already names the panel), its maker by its mark, where that maker's keys are made, then the key, pasted
+ * here. `onSave`: saved right here (the dialog); else the caller saves it with its own button (the setup).
  */
 export function KeyPanel({
   draft,
@@ -462,9 +463,11 @@ export function KeyPanel({
   const pick = (next: ProviderId | "platform") => onDraft({ provider: next, apiKey });
   return (
     <Card as="section" className="ai-panel" aria-label={t("connectAi.key.title")}>
-      <p className="small muted" style={{ margin: 0 }}>
-        {t("connectAi.key.sub")}
-      </p>
+      {keyOf && (
+        <p className="small muted" style={{ margin: 0 }}>
+          {t("connectAi.key.sub")}
+        </p>
+      )}
       {locked ? (
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (

@@ -782,14 +782,18 @@ describe("Onboarding", () => {
     await skip();
     await keepOnly("Theo · PM");
     await click(button(/Criar 1 agente/), 8);
-    const makers = within(screen().getByRole("region", { name: "Chave de API" })).getByRole("group", {
-      name: "Provedor",
-    });
+    const panel = screen().getByRole("region", { name: "Chave de API" });
+    const makers = within(panel).getByRole("group", { name: "Provedor" });
     const ours = within(makers).getByRole("button", { name: "agentes.chat" });
     // The makers' 30 px tile, so every tile is as tall.
     expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
+    const PAYS = "Você paga pelo uso, direto ao provedor.";
+    expect(panel.textContent).toContain(PAYS);
     await click(ours, 2);
     expect(screen().queryByLabelText("Cole aqui")).toBeNull();
+    // Our key isn't paid to a provider: its own line says what it is.
+    expect(panel.textContent).not.toContain(PAYS);
+    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do agentes.chat.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 

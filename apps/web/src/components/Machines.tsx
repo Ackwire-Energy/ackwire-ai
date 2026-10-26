@@ -187,9 +187,12 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
   const app = useAgentsHere() && !download;
   return (
     <div className="machine-connect">
-      <p className="small muted" style={{ margin: 0 }}>
-        {app ? t("machines.thisMac.text") : t("machines.download.text")}
-      </p>
+      {/* With no build published there is nothing to install: the note below says the app isn't out yet. */}
+      {(app || release) && (
+        <p className="small muted" style={{ margin: 0 }}>
+          {app ? t("machines.thisMac.text") : t("machines.download.text")}
+        </p>
+      )}
       {app ? (
         <div className="row" style={{ gap: 12, alignItems: "center" }}>
           <ComputerPortrait kind="mac" state="online" />
