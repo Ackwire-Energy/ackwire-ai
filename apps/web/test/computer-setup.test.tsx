@@ -206,8 +206,23 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
     // What each agent has there, true for whoever reads it (Open shows only for who may watch): its browser and
     // files are on its screen.
     expect(on.textContent).toContain("Uma tela para cada agente, com o navegador e os arquivos dele");
-    expect(on.textContent).toContain("O Claude Code e o Codex, prontos para cada agente entrar");
-    expect(on.textContent).toContain("Planos de código da Z.ai (GLM), Kimi, MiniMax e OpenCode");
+    // The plans by their makers' marks, in one row under the screens, with no generic key icon.
+    const plans = on.querySelector(".setup-plans") as HTMLElement;
+    expect(plans.textContent).toBe(
+      "Os agentes podem pensar com o seu próprio plano de IA, com login neste computador. Não precisa de chave de API.",
+    );
+    const stack = within(plans).getByRole("img", { name: "Claude, ChatGPT, GLM, Kimi e outros planos de IA" });
+    expect([...stack.querySelectorAll(".ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual([
+      "claude",
+      "openai",
+      "zai",
+      "kimi",
+    ]);
+    expect(on.querySelector(".setup-facts li:last-child")?.textContent).toBe(
+      "Uma tela para cada agente, com o navegador e os arquivos dele",
+    );
+    // One icon only, the screens': the plans are led by their makers' marks, never a generic key.
+    expect(on.querySelectorAll("svg.ac-icon")).toHaveLength(1);
     expect(on.textContent).not.toMatch(/Abrir|assumir o controle/);
     // Not the cards of a computer someone connected: folders, tools, browser, apps.
     for (const name of ["Pastas liberadas", "Ferramentas", "Navegador", "Apps nas telas dos agentes"])

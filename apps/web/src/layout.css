@@ -6282,6 +6282,11 @@ a.machine-row__name:hover {
   font-size: 13px;
   color: var(--ink-muted);
 }
+/* The plans the agents sign in with, under a hairline: its overlapped marks are wider than the facts' icons. */
+.setup-plans {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
   flex-wrap: wrap;

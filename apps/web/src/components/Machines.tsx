@@ -62,7 +62,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
-import { SetupFacts, useSetupView } from "./WorkspaceComputer";
+import { SetupFacts, SetupPlans, useSetupView } from "./WorkspaceComputer";
 
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
@@ -910,15 +910,8 @@ function OnThisComputerCard() {
           <Icon name="computer" size={14} />
           {t("computers.onIt.screens")}
         </li>
-        <li className="ac-iconline">
-          <ProviderLogo id="claude_code" size="xs" />
-          {t("computers.onIt.plans")}
-        </li>
-        <li className="ac-iconline">
-          <Icon name="key" size={14} />
-          {t("computers.onIt.coding")}
-        </li>
       </ul>
+      <SetupPlans />
     </Card>
   );
 }
