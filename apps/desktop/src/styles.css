@@ -138,6 +138,20 @@ p {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+.dk-logo--lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px 14px 14px 4px;
+}
+/* Tailscale's icon in its own colors: its black file on light, its white file on dark (`ServerTile`). */
+.dk-tailscale {
+  width: 26px;
+  height: 26px;
+  fill: #1e1e1f;
+}
+[data-theme="dark"] .dk-tailscale {
+  fill: #fff;
+}
 .dk-org {
   flex: none;
   display: inline-grid;
