@@ -291,6 +291,17 @@ describe("Configurações → Computadores", () => {
     expect(document.querySelector(".machine-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
   });
 
+  test("which computer each agent uses: this server's computer, before its runner names it, by what it is", async () => {
+    const api = createFakeApi(seedState());
+    const agents = [{ id: ADA_ID, name: "Ada", handle: "ada" }];
+    fakeMachinesOf.get(api)?.pair({ name: "", kind: "host", agents });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
+    const trigger = within(card).getByRole("combobox", { name: "Computador de Ada" });
+    expect(trigger.textContent).toContain("Computador deste servidor");
+  });
+
   test("members see each agent's computer but don't pick for agents they don't own", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";

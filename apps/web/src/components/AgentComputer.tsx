@@ -35,7 +35,13 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { computerKind, computerState, folderName, foldersOfAgent } from "@agenteschat/client/lib/machines";
+import {
+  computerKind,
+  computerState,
+  folderName,
+  foldersOfAgent,
+  machineTitle,
+} from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -1015,8 +1021,11 @@ function AgentComputerRow({
     ) : (
       <ComputerIcon kind={computerKind(machines.find((m) => m.id === id)?.os)} size={16} />
     );
-  const nameOf = (id: string) =>
-    id === CLOUD ? noComputer.label(cloud ?? "cloud") : (machines.find((m) => m.id === id)?.name ?? id);
+  const host = t("machines.host.label");
+  const nameOf = (id: string) => {
+    const m = machines.find((x) => x.id === id);
+    return id === CLOUD ? noComputer.label(cloud ?? "cloud") : m ? machineTitle(m, host) : id;
+  };
   const options: SelectOption[] = [
     ...(cloud
       ? [
@@ -1034,7 +1043,7 @@ function AgentComputerRow({
       : []),
     ...choices.map((m) => ({
       value: m.id,
-      label: m.name,
+      label: machineTitle(m, host),
       description: t(`computers.agents.state.${computerState(m)}`),
     })),
   ].map((o) => ({ ...o, leading: iconOf(o.value) }));
