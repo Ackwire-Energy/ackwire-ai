@@ -139,13 +139,10 @@ export function ConnectorsSection({
 
   return (
     <Card aria-labelledby="sec-conn">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-conn" className="ac-card__title">
-            {t("connectors.title")}
-          </h2>
-          <span className="small muted">{t("connectors.subtitle", { org: org.name })}</span>
-        </div>
+      <div className="row" style={{ gap: 12 }}>
+        <h2 id="sec-conn" className="ac-card__title" style={{ flex: "1 1 280px" }}>
+          {t("connectors.title")}
+        </h2>
         {admin && (
           <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
             {t("connectors.add")}

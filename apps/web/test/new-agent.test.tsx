@@ -65,6 +65,36 @@ describe("Criar agente: steps", () => {
     expect(screen().getByRole("link", { name: "Sair sem criar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
     expect(screen().getByRole("link", { name: "Cancelar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
     expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).toContain("Seu agente");
+    // One short lead under the title; the preview is headed by its name alone.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Escolha um ponto de partida: o resto a gente preenche.",
+    );
+    expect(document.querySelector(".newag__cap")?.textContent).toBe("Prévia");
+  });
+
+  test("what a step needs explained: the instructions' and the budget's ⓘ; the tools keep the approval line", async () => {
+    await open();
+    await startAs("QA");
+    await proceed();
+    expect(title()).toBe("O que o Iris faz");
+    const hint = (name: string) =>
+      document.getElementById(screen().getByRole("button", { name }).getAttribute("aria-describedby") ?? "")
+        ?.textContent;
+    expect(hint("Sobre O que o Iris faz")).toBe(
+      "O contexto da Acme (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é do Iris.",
+    );
+    expect(document.querySelector(".newag__note")).toBeNull();
+    await proceed();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Escolha até onde o Iris vai em cada app.");
+    expect(document.querySelector(".newag__note")?.textContent).toBe(
+      "Merge, deploy e rollback sempre pedem aprovação no chat. Quem aprova é Walter.",
+    );
+    await proceed(2);
+    expect(title()).toBe("Modelo e orçamento");
+    expect(hint("Sobre Orçamento mensal")).toBe("Ao atingir o limite, o Iris para e avisa. Avisamos Walter aos 80%.");
+    expect(screen().getByText(/^Vazio: o padrão do workspace/).textContent).toBe(
+      "Vazio: o padrão do workspace (US$ 50).",
+    );
   });
 
   test("a role is required; picking one fills the rest (name, @, look, instructions, levels, channels, model)", async () => {
@@ -245,6 +275,8 @@ describe("Criar agente: steps", () => {
     expect(title()).toBe("Tudo certo com o Theo?");
     expect(content().textContent).toContain("PM · Organiza tarefas, resumos e o fórum.");
     expect(content().textContent).toContain("@theo");
+    // The title says it all: no lead, and no note under the summary.
+    expect(content().querySelector(".onb__lead, .newag__note")).toBeNull();
     await click(within(content()).getByRole("button", { name: "Editar Modelo e custo" }));
     expect(title()).toBe("Modelo e orçamento");
     await proceed();
@@ -427,7 +459,8 @@ describe("Criar agente: what gets created", () => {
     expect(screen().getByRole("link", { name: "Abrir perfil" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/agents/${agentId}`,
     );
-    expect(document.body.textContent).toContain("Avisos com Walter");
+    // Title, lead and the buttons: no cards after them.
+    expect(document.querySelector(".newag__born")?.nextElementSibling).toBeNull();
     // Every step is done; none can be reopened.
     expect(railStep("Papel").disabled).toBe(true);
     await click(screen().getByRole("button", { name: "Criar outro agente" }));

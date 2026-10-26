@@ -55,6 +55,13 @@
   padding: 38px 0 16px;
   box-sizing: border-box;
 }
+/*
+ * The step title's ⓘ: the line is as tall as the title's (`.onb__title`), so the ⓘ sits on its first line; the
+ * type stays small, so the ⓘ's nudge under the middle stays a hair, as beside a label.
+ */
+.ac-hintline:has(> .newag__title) {
+  line-height: calc(var(--onb-title-size) * var(--onb-title-leading));
+}
 .newag__cap {
   display: flex;
   align-items: center;
@@ -263,28 +270,6 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 8px 20px -8px rgba(4, 32, 63, 0.7);
 }
-.newag__nexts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-.newag__next {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px;
-}
-.newag__next b {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-}
-.newag__next span {
-  color: var(--muted);
-  font-size: 12.5px;
-}
 /* Under 1100px the preview is a compact card above the form (details on demand). */
 @media (max-width: 1100px) {
   .newag__work {
@@ -354,9 +339,6 @@
 @media (max-width: 820px) {
   .newag__work {
     padding: 0 16px;
-  }
-  .newag__nexts {
-    grid-template-columns: minmax(0, 1fr);
   }
   .newag__rv {
     grid-template-columns: minmax(0, 1fr) auto;

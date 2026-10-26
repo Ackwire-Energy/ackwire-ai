@@ -138,6 +138,8 @@ describe("Notificações", () => {
     expect(yesterday).toContain("O orçamento do mês acabou");
     // My own @mention is highlighted.
     expect(today.querySelector(".ac-mention")?.textContent).toBe("@walter");
+    // The list ends with its last day: no note under it.
+    expect(document.querySelector(".nt")?.lastElementChild?.getAttribute("aria-label")).toBe("Ontem");
     const filters = screen().getByRole("radiogroup", { name: "Filtrar notificações" });
     expect(within(filters).getByRole("radio", { name: /Tudo/ }).textContent).toContain("4");
     expect(within(filters).getByRole("radio", { name: /Não lidas/ }).textContent).toContain("3");
@@ -188,6 +190,8 @@ describe("Notificações", () => {
     expect(document.querySelector('[data-n="n-thread"]')).toBeNull();
     expect(state.calls.find((c) => c.method === "notifications.done")?.args).toEqual([ORG_ID, "n-thread", true]);
     expect(document.body.textContent).toContain("Marcado como feito");
+    // Nobody waits on a thread's notice: the toast is one line.
+    expect(document.querySelector(".ac-toast__detail")).toBeNull();
     await click(screen().getByRole("button", { name: "Desfazer" }));
     await settle(4);
     expect(state.calls.filter((c) => c.method === "notifications.done").at(-1)?.args).toEqual([
@@ -293,6 +297,7 @@ describe("Notificações", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "notifications.readAll")?.args).toEqual([ORG_ID, "all"]);
     expect(document.body.textContent).toContain("3 marcadas como lidas");
+    expect(document.querySelector(".ac-toast__detail")).toBeNull();
     await click(screen().getByRole("button", { name: "Desfazer" }));
     await settle(6);
     const undone = state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args[1]);
@@ -343,7 +348,9 @@ describe("Notificações", () => {
 
   test("empty: Tudo em dia", async () => {
     await go(seedState({ notifications: [] }));
-    expect(document.body.textContent).toContain("Tudo em dia");
+    expect(document.querySelector(".nt-calm")?.textContent).toBe(
+      "Tudo em diaQuando alguém precisar de você, aparece aqui.",
+    );
     expect((screen().getByRole("button", { name: "Marcar tudo como lido" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

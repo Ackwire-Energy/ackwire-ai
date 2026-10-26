@@ -473,7 +473,11 @@ describe("Drive", () => {
   test("empty state when there is nothing yet", async () => {
     await goDrive({ seed: false });
     expect(screen().getByText("Nenhum arquivo ainda")).toBeTruthy();
-    expect(screen().getByText(/aparecem aqui/)).toBeTruthy();
+    // The one line that fills it, under a subtitle that already says what the Drive holds.
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe("Arraste arquivos para cá para enviar.");
+    expect(document.querySelector(".drive-head__sub")?.textContent).toBe(
+      "Tudo o que pessoas e agentes criaram ou enviaram.",
+    );
   });
 
   test("grid or list, remembered", async () => {

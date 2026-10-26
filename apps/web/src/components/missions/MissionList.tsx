@@ -57,7 +57,7 @@ export function MissionsTab({
           )
         }
       >
-        {filtered ? t("threads.empty.noResultsText") : t("missions.empty.text")}
+        {filtered ? t("threads.empty.noResultsText") : null}
       </EmptyState>
     );
   }

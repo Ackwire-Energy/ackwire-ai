@@ -123,7 +123,6 @@ const CLOUD_EXTRA = [
   "scopes.browser_use.description",
   "access.areaText.browser.write",
   "missions.subtitle",
-  "missions.empty.text",
   "threads.empty.missions",
   "missions.share.lendText",
   "missions.waitingCloud",

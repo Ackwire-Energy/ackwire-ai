@@ -457,10 +457,7 @@ function Detail({ entry, onConnect }: { entry: Entry; onConnect: () => void }) {
           </ul>
         </div>
       )}
-      <div className="catalog-detail__part">
-        <h4 className="catalog-detail__h">{t("connectors.detail.after")}</h4>
-        <p className="catalog-detail__text">{t("connectors.detail.afterText")}</p>
-      </div>
+      <p className="catalog-detail__text">{t("connectors.detail.afterText")}</p>
       <div className="catalog-detail__act">
         {entry.available ? (
           <Button
