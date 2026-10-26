@@ -12,7 +12,7 @@ import type {
   Machine,
   SocketFactory,
 } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
 import { useChannelRealtime } from "@/realtime/context";
@@ -363,6 +363,19 @@ describe("the computer dialog, live", () => {
     expect(box().querySelector(".cmp-asked")?.textContent).toBe("“Entrar no banco com o token da empresa”");
     expect(view().getByRole("button", { name: "Pronto" })).toBeTruthy();
     expect(view().getByRole("button", { name: "Não consegui" })).toBeTruthy();
+  });
+
+  test("Ajudar refused (someone got there first): said in the head for a moment, not in a toast over the window", async () => {
+    const t = await dialog({ handoff: screenAsk() });
+    t.api.browser.takeControl = async () => {
+      throw new ApiError(409, "conflict", "Someone else is in control");
+    };
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    const said = box().querySelector(".ac-dialog__sub > .cmp-said");
+    expect(said?.textContent).toBe("Outra pessoa já está ajudando.");
+    expect(said?.getAttribute("role")).toBe("alert");
+    expect(box().querySelector(".cmp-sub")?.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".ac-toast")).toBeNull();
   });
 
   test("full screen on the agent's page keeps the dialog's layout: only its screen goes alone", async () => {

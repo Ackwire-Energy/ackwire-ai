@@ -19,7 +19,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AGENT_GRADIENTS, Button, ComputerPortrait, cx, Dialog, SkyStrip } from "@agenteschat/ui";
+import { AGENT_GRADIENTS, Button, ComputerPortrait, cx, Dialog, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,7 +27,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useKeyboardLock } from "@/hooks/useKeyboardLock";
 import { useNow } from "@/hooks/useNow";
-import { useToast } from "@/lib/toast";
+import { useSaid, useToast } from "@/lib/toast";
 import { BrowserCard, Cover, stepText } from "../browser/BrowserCard";
 import { DesktopView } from "../desktop/DesktopView";
 import { SwitchComputerDialog } from "../MachineOutages";
@@ -190,6 +190,8 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const bar = useBar(screenOnly, mine);
   const locked = useKeyboardLock(screenOnly && mine);
   const color = colorOf(agent);
+  // An action that failed, in place of the sub-line for a moment (`useSayFailed`).
+  const { said, say } = useSaid();
   const close = () => {
     setFull(false);
     onClose();
@@ -208,7 +210,17 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
       onOpenChange={(next) => !next && close()}
       title={t("agentComputer.title", g)}
       leading={<AgentAvatar agentId={agent.id} name={agent.name} size="sm" />}
-      subtitle={<span ref={setSub} className="cmp-sub" />}
+      subtitle={
+        <>
+          {said && (
+            <span key={said.at} className="cmp-said ac-iconline" role="alert">
+              <Icon name="alert" size={14} />
+              <span>{said.text}</span>
+            </span>
+          )}
+          <span ref={setSub} className="cmp-sub" hidden={said !== null} />
+        </>
+      }
       actions={<span ref={setActs} className="cmp-acts" />}
       closeLabel={t("common.close")}
       width={1280}
@@ -233,7 +245,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
         agent={agent}
         view={view}
         surface={surface}
-        slots={{ sub, actions: acts, full, setFull }}
+        slots={{ sub, actions: acts, full, setFull, say: (text) => say(text, true) }}
         onLeave={close}
       />
     </Dialog>
@@ -258,7 +270,6 @@ function ComputerStage({
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const navigate = useNavigate();
   const outages = useMachineOutages(org.id, can(org.role, "manage_agents"));
@@ -284,10 +295,7 @@ function ComputerStage({
     : t("agentComputer.sub.watching");
   const head: DialogHeadSlots = { ...slots, watching };
   const refused = (err: unknown) =>
-    toast.show(
-      (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"),
-      "error",
-    );
+    slots.say((err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"));
   const help = () => waiting && actions.takeControl.mutate(waiting.id, { onError: refused });
   const takeBrowser = () => actions.takeover.mutate(agent.id, { onError: refused });
   const retry = () => void view.desktopQ.refetch();

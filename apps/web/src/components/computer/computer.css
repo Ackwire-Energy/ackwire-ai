@@ -224,6 +224,12 @@
   opacity: 1;
   translate: none;
 }
+/* An action that failed brings the bar back for as long as the head says so. */
+.cmp-dialog:has(.cmp-said) > .ac-dialog__head {
+  opacity: 1;
+  translate: none;
+  pointer-events: auto;
+}
 .cmp-dialog .ac-dialog__head {
   padding-bottom: 8px;
 }
@@ -235,6 +241,13 @@
 }
 .cmp-sub:empty::before {
   content: "\00a0";
+}
+/* An action that failed, for a moment in the sub-line's place, as a toast would say it. */
+.cmp-said {
+  color: var(--ink);
+}
+.cmp-said > .ac-icon {
+  color: var(--danger);
 }
 .cmp-body {
   flex: 1 1 auto;

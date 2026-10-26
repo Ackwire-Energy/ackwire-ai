@@ -19,11 +19,11 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
 import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas";
-import { TOAST_MS, useToast } from "@/lib/toast";
+import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
 import { CantShowCover } from "../computer/covers";
-import { DialogHead, FullButton, useDialogHead } from "../computer/head";
+import { DialogHead, FullButton, useDialogHead, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useScreenKeys } from "./screen-keys";
@@ -87,8 +87,8 @@ export function DesktopView({
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const toast = useToast();
   const head = useDialogHead();
+  const sayFailed = useSayFailed();
   const createSocket = useContext(SocketFactoryContext);
   const actions = useBrowserHandoffMutations(org.id);
   const g = agentGrammar(t, name);
@@ -122,16 +122,9 @@ export function DesktopView({
   const inControl = mode === "control";
   const connect = blocked === null && !gaveUp;
   const { refetch } = status;
-  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
-  // What the clipboard just did, in the line under the screen in place of its words for as long as a toast would
-  // stay: the window fills the page, and a toast would land on its corner. `at` makes the same words said again new.
-  const [said, setSaid] = useState<{ text: string; error: boolean; at: number } | null>(null);
-  useEffect(() => {
-    if (!said) return;
-    const id = setTimeout(() => setSaid(null), TOAST_MS);
-    return () => clearTimeout(id);
-  }, [said]);
-  const say = (text: string, error = false) => setSaid({ text, error, at: Date.now() });
+  const didntWork = () => sayFailed(t("browser.live.actionFailed"));
+  // What the clipboard just did, in the line under the screen in place of its words.
+  const { said, say, unsay } = useSaid();
   const copied = () => say(t("desktop.clipboard.copied", g));
   const copyFailed = () => say(t("browser.live.actionFailed"), true);
   // What the computer copied when the browser kept it out of the person's clipboard: the line under the screen
@@ -153,7 +146,7 @@ export function DesktopView({
       setGot(written ? null : text);
       // The newest copy speaks: what is offered to copy isn't hidden behind an older word.
       if (written) copied();
-      else setSaid(null);
+      else unsay();
     },
   });
   // Leaving the page in control asks first: outside full screen Ctrl+W closes the tab, which in a terminal there
@@ -294,10 +287,10 @@ export function DesktopView({
     if (inControl) return;
     setHandingBack(false);
     setGot(null);
-    setSaid(null);
+    unsay();
     // Its field goes with control, and a field removed while focused may get no blur.
     setTyping(false);
-  }, [inControl]);
+  }, [inControl, unsay]);
   // In control, full screen starting or ending gives the keys back to the computer: a click on the full-screen
   // button leaves the browser's focus on it, where Space would toggle it and Esc would reach nothing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: full screen's changes move the keys too
@@ -330,9 +323,8 @@ export function DesktopView({
       { agentId, screen: "desktop" },
       {
         onError: (err) =>
-          toast.show(
+          sayFailed(
             (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.live.actionFailed"),
-            "error",
           ),
       },
     );
@@ -345,12 +337,12 @@ export function DesktopView({
         setBackNote("");
         onSettled?.();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
   };
   const giveUp = () => {
     if (!handoff) return;
-    actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: failedToast });
+    actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: didntWork });
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");

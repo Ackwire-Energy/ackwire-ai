@@ -1,5 +1,14 @@
 import { Icon } from "@agenteschat/ui";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 /**
  * Minimal toasts in the design language (neutral surface, overlay shadow,
@@ -27,8 +36,8 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
 
-/** How long a toast stays; a word said in a toast's place (a line of the computer's window) stays as long. */
-export const TOAST_MS = 6000;
+/** How long a toast stays; a word said in a toast's place (`useSaid`) stays as long. */
+const TOAST_MS = 6000;
 
 let nextId = 1;
 
@@ -139,3 +148,19 @@ export function ToastProvider({
 }
 
 export const useToast = () => useContext(ToastContext);
+
+/**
+ * A word said in a toast's place, for as long as a toast would stay: a window that fills the page says it in a line
+ * of its own, where a toast would land on its corner. `at` makes the same words said again new.
+ */
+export function useSaid() {
+  const [said, setSaid] = useState<{ text: string; error: boolean; at: number } | null>(null);
+  useEffect(() => {
+    if (!said) return;
+    const id = setTimeout(() => setSaid(null), TOAST_MS);
+    return () => clearTimeout(id);
+  }, [said]);
+  const say = useCallback((text: string, error = false) => setSaid({ text, error, at: Date.now() }), []);
+  const unsay = useCallback(() => setSaid(null), []);
+  return { said, say, unsay };
+}

@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Agent, BrowserHandoff, DesktopStatus, SocketFactory } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
@@ -592,6 +592,34 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
     expect(still()).toBeNull();
     expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+  });
+
+  test("Take control refused: said in the head, in its line's place, not in a toast over the window's corner", async () => {
+    const t = await dialog();
+    await connected();
+    replaceOn(t.api.browser, "takeover", async () => {
+      throw new ApiError(409, "conflict", "Someone else is in control");
+    });
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    const said = document.querySelector(".ac-dialog__sub > .cmp-said");
+    expect(said?.textContent).toBe("Outra pessoa já está ajudando.");
+    expect(said?.getAttribute("role")).toBe("alert");
+    expect(document.querySelector(".cmp-sub")?.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+  });
+
+  test("a hand back that fails: said in the head, the note kept to send again", async () => {
+    const t = await controlled();
+    replaceOn(t.api.browser, "done", async () => {
+      throw new ApiError(500, "internal", "Something broke");
+    });
+    await click(view().getByRole("button", { name: "Devolver" }));
+    const note = () => view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    await act(async () => fireEvent.change(note(), { target: { value: "Deixei aberto" } }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(document.querySelector(".ac-dialog__sub > .cmp-said")?.textContent).toBe("Não deu certo. Tente de novo.");
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(note().value).toBe("Deixei aberto");
   });
 
   test("control ended on the server first (4410): it opens again as a watcher over the same picture; a drop then says so", async () => {
@@ -1234,6 +1262,13 @@ describe("the dialog's size (computer.css)", () => {
       text.indexOf(
         "\n.cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-line-hidden :is(.cmp-asked, .dsk-line) {",
       ),
+    );
+    // An action that failed brings the bar back, its buttons live, while the head says so.
+    const failed = rule(text, ".cmp-dialog:has(.cmp-said) > .ac-dialog__head");
+    expect(failed).toContain("opacity: 1");
+    expect(failed).toContain("pointer-events: auto");
+    expect(text.indexOf("\n.cmp-dialog:has(.cmp-said) > .ac-dialog__head {")).toBeGreaterThan(
+      text.indexOf("\n.cmp-dialog.is-bar-hidden > .ac-dialog__head,"),
     );
     expect(text).not.toContain(":focus-within");
     // A cover over the screen (z-index 5) stays in the screen's own layer, under the bar.

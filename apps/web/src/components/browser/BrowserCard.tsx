@@ -54,7 +54,7 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useStreams } from "@/realtime/context";
-import { DialogHead, FullButton, FullScreenButton, useDialogHead } from "../computer/head";
+import { DialogHead, FullButton, FullScreenButton, useDialogHead, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
@@ -336,6 +336,7 @@ export function BrowserCard({
   const dir = useDirectory(org.id);
   const toast = useToast();
   const head = useDialogHead();
+  const sayFailed = useSayFailed();
   const openComputer = useOpenComputer();
   // The workspace's own computer is never off and nobody connects one: its words say so.
   const cloud = useComputerEdition(org.id) === "cloud";
@@ -556,7 +557,7 @@ export function BrowserCard({
     setText("");
   };
 
-  const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
+  const didntWork = () => sayFailed(t("browser.live.actionFailed"));
 
   /** Pronto (a request) or Devolver (a take over), with what the person wants the agent to know. */
   const finish = () => {
@@ -569,7 +570,7 @@ export function BrowserCard({
         fold();
         onSettled?.();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
   };
 
@@ -584,7 +585,7 @@ export function BrowserCard({
           fold();
           onSettled?.();
         },
-        onError: failedToast,
+        onError: didntWork,
       },
     );
   };
@@ -599,9 +600,8 @@ export function BrowserCard({
         else if (h.runId && place) rememberHeldPlace({ runId: h.runId, agentId, ...place });
       },
       onError: (err) =>
-        toast.show(
+        sayFailed(
           (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.live.actionFailed"),
-          "error",
         ),
     });
   };
@@ -615,7 +615,7 @@ export function BrowserCard({
         if (onFold) toast.show(t("browser.machine.stopped", g));
         fold();
       },
-      onError: failedToast,
+      onError: didntWork,
     });
 
   /** A site typed in the address bar: the card waits for its first frame. */
