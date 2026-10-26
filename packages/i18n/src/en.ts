@@ -131,6 +131,7 @@ export const en: Translations = {
       browserLead: "We'll come back here once you sign in with {{provider}}.",
       reopen: "Open the browser again",
       otherWay: "Sign in another way",
+      otherServer: "Use another server",
       opening: "Opening {{provider}}…",
       done: "All set.",
       doneLead: "You're signed in to the agentes app. You can close this tab.",
