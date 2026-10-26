@@ -1120,7 +1120,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           </View>
         ) : !showList ? (
           dmAgent && !isThread ? (
-            <FirstDay agent={dmAgent} bottomInset={composerHeight} onAsk={onSend} />
+            <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
           ) : (
             <View style={[styles.center, { paddingBottom: composerHeight }]}>
               <Text tone="faint" style={styles.emptyText}>

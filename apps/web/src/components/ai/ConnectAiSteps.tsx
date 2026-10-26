@@ -338,7 +338,6 @@ function PlanSteps({
         {setup && <SetupProgress view={setup} />}
         {setup && <SetupWaitLines view={setup} reader={reader} bell={false} />}
         {line(setup ? <Icon name="clock" size={14} /> : <Spinner size={14} />, later)}
-        {(setup?.phase === "waiting" || setup?.phase === "problem") && useKey}
       </div>
     );
   } else if (gate.state === "offline") {

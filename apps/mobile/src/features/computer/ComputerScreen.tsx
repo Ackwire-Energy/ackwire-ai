@@ -26,7 +26,7 @@ import { useMachineOutages } from "../outages/queries";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { goBack } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
-import { offersSwitch, onScreen, type PhoneStage, phoneStage, screenRequest } from "./logic";
+import { offersSwitch, onScreen, type PhoneStage, phoneStage, screenRequest, setupSub } from "./logic";
 import { SetupWait } from "./SetupWait";
 import { useAgentComputer, useAgentRun } from "./useAgentComputer";
 
@@ -142,8 +142,8 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     sub = t("agentComputer.sub.held");
     body = <Cover icon="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />;
   } else if (stage === "preparing" && f.setup) {
-    sub = t("agentComputer.sub.preparing");
-    body = <SetupWait view={f.setup} agentName={name} />;
+    sub = setupSub(t, f.setup);
+    body = <SetupWait view={f.setup} />;
   } else if (stage === "page" || stage === "otherApp") {
     const controlled = f.handoff?.status === "active" && Boolean(f.handoff.controllerUserId);
     // A closed browser shows nothing live to watch: "Ao vivo" alone, as on the web.
@@ -214,11 +214,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
         <Cover
           art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
           text={t("agentComputer.state.offline", { computer })}
-          help={
-            since
-              ? t("agentComputer.state.offlineHelp", { ...g, time: since })
-              : t("agentComputer.state.offlineHelpPlain", g)
-          }
+          help={t("agentComputer.state.offlineHelpPlain", g)}
           action={
             offersSwitch(f, manages, Boolean(outage)) ? (
               <Button

@@ -590,9 +590,6 @@ function MemoryFix({
           </Pressable>
         ) : null}
       </View>
-      <Text variant="small" tone="muted">
-        {t(`mobile.intentAgents.fix.fine${g}`, { name: agentName })}
-      </Text>
       <Button
         variant="primary"
         wide

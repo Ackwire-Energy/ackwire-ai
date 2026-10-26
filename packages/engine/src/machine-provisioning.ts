@@ -65,19 +65,11 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
     since: row?.since.toISOString() ?? null,
     /** When people started waiting: the computer's last removal, else the workspace's creation. */
     requestedAt: (row?.requestedAt ?? orgCreatedAt).toISOString(),
-    /** With `preparing`: when it should be ready; a time already past means any moment now. */
+    /** With `preparing`: the earliest ready time this wait was told; a time already past means it runs over. */
     expectedReadyAt: row?.expectedReadyAt?.toISOString() ?? null,
     specs: row?.specs ?? null,
   };
 }
-
-/**
- * How long the time left holds still after a report that moved the ready time later within a stage. A part running
- * past its time moves the provisioner's ready time later with the clock, one report at a time: counted down in
- * between, the time left would come back up at every report. A provisioner whose time keeps moving reports again
- * within this, so the time left stays as it said; one whose time stopped moving is counted down from then on.
- */
-const STEADY_MS = 60_000;
 
 /** No computer on its way to tell of: where people connect their own (`pair`), or a workspace that isn't active. */
 const NO_WAIT = {
@@ -90,7 +82,6 @@ const NO_WAIT = {
   expectedReadyAt: null,
   specs: null,
   secondsLeft: null,
-  secondsSteady: null,
   secondsWaited: null,
 } as const;
 
@@ -100,19 +91,15 @@ type SetupOrg = { createdAt: Date; standing: string };
 /**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
  * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
- * whether the owners get the ready email. After a report that moved the ready time later within a stage, the
- * seconds left are the ones it gave, still for `secondsSteady` of them, and counted down after that. A workspace
- * on hold or suspended waits for no computer (`setOrgStanding`): no state at all, unless its computer is ready.
+ * whether the owners get the ready email. A workspace on hold or suspended waits for no computer
+ * (`setOrgStanding`): no state at all, unless its computer is ready.
  */
 function setupStatus(row: ProvisioningRow | null, org: SetupOrg, emails: boolean, now = Date.now()) {
   if (org.standing !== "active" && row?.state !== "ready") return { ...NO_WAIT, notifyByEmail: emails };
   const readyAt = row?.expectedReadyAt ?? null;
-  const given = row?.delayedAt?.getTime() ?? now;
-  const countsFrom = row?.delayedAt ? given + STEADY_MS : now;
   return {
     ...provisioningStatus(row, org.createdAt),
-    secondsLeft: readyAt ? Math.round((readyAt.getTime() - given - Math.max(0, now - countsFrom)) / 1000) : null,
-    secondsSteady: readyAt ? Math.round(Math.max(0, countsFrom - now) / 1000) : null,
+    secondsLeft: readyAt ? Math.round((readyAt.getTime() - now) / 1000) : null,
     secondsWaited: Math.round((now - (row?.requestedAt ?? org.createdAt).getTime()) / 1000),
     notifyByEmail: emails,
   };
@@ -214,7 +201,7 @@ export interface ProvisioningInput {
   stage?: string | null;
   /** Kept with `waiting` only; `approval` reads as `capacity`. */
   reason?: ProvisioningReason | "approval" | null;
-  /** Kept with `preparing` only: when it should be ready. A time already past means any moment now. */
+  /** Kept with `preparing` only: when it should be ready, unless the wait was told an earlier time; none keeps it. */
   expectedReadyAt?: Date | null;
   /** An older provisioner's countdown, read as that many seconds from now. */
   etaSeconds?: number | null;
@@ -222,29 +209,16 @@ export interface ProvisioningInput {
   specs?: MachineSpecs | null;
 }
 
-/** How far ahead of this server's clock the provisioner's may run: its "now" can arrive that far in the future. */
-const CLOCK_SKEW_MS = 15_000;
-
-/**
- * When a report says it should be ready. While the last part runs over its estimate the provisioner keeps
- * sending the time of sending ("any moment now"): a time that is now by its clock never replaces a stored one
- * already past, so how long ago the first one was tells "almost ready" from "taking a little longer".
- */
-function readyTime(input: ProvisioningInput, stored: Date | null, now: Date): Date | null {
-  const reported =
-    input.expectedReadyAt ?? (input.etaSeconds == null ? null : new Date(now.getTime() + input.etaSeconds * 1000));
-  if (!reported) return null;
-  const overdue = stored !== null && stored.getTime() <= now.getTime();
-  return overdue && reported.getTime() <= now.getTime() + CLOCK_SKEW_MS ? stored : reported;
-}
-
 /**
  * The provisioner says how far the workspace's computer is; its members see it live (`machine.provisioning`)
  * when something they see changed. `ready` is not the provisioner's to say: it comes with the computer's
- * first hello, and stays until that computer is removed (`ConflictError` meanwhile). A wait said to take
- * over a minute (a ready time that far ahead, `waiting` or `problem`) promises the owners the ready email,
- * until it is ready. Only an active workspace waits for one (`OrgPausedError` otherwise): a report sent as it
- * was held would say again that a computer is on its way. False: no such workspace.
+ * first hello, and stays until that computer is removed (`ConflictError` meanwhile). One wait (`preparing` until
+ * ready or another state) counts down to the earliest ready time it was told: a part running long moves the
+ * provisioner's time later with the clock, so a later time is kept out and people see the wait run over, never a
+ * countdown that goes back up. A wait said to take over a minute (a ready time that far ahead, `waiting` or
+ * `problem`) promises the owners the ready email, until it is ready. Only an active workspace waits for one
+ * (`OrgPausedError` otherwise): a report sent as it was held would say again that a computer is on its way. False:
+ * no such workspace.
  */
 export async function setProvisioning(
   deps: ProvisioningDeps,
@@ -264,13 +238,14 @@ export async function setProvisioning(
     if (org.state !== "active") throw new OrgPausedError(org);
     const [before] = await tx.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
     const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
-    const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
-    // Within one step and stage, a ready time moved later is a part running long (STEADY_MS); one left where it was
-    // keeps counting down as it did.
-    const was = same && before?.stage === stage ? before.expectedReadyAt?.getTime() : undefined;
-    const at = expectedReadyAt?.getTime();
-    const delayedAt =
-      was === undefined || at === undefined || at < was ? null : at > was ? now : (before?.delayedAt ?? null);
+    const reported =
+      input.state !== "preparing"
+        ? null
+        : (input.expectedReadyAt ??
+          (input.etaSeconds == null ? null : new Date(now.getTime() + input.etaSeconds * 1000)));
+    // A report without a time is still the same wait: it keeps the earliest time the wait was told.
+    const kept = input.state === "preparing" && before?.state === "preparing" ? before.expectedReadyAt : null;
+    const expectedReadyAt = !reported || (kept && kept.getTime() < reported.getTime()) ? kept : reported;
     const long =
       input.state !== "preparing" ||
       (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
@@ -280,7 +255,6 @@ export async function setProvisioning(
       stage,
       reason,
       expectedReadyAt,
-      delayedAt,
       emailWhenReady: long || before?.emailWhenReady === true,
       specs: input.specs ?? before?.specs ?? null,
       since: same && before ? before.since : now,
@@ -464,7 +438,6 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
     stage: null,
     reason: null,
     expectedReadyAt: null,
-    delayedAt: null,
     requestedAt: now,
     emailWhenReady: false,
     specs: null,
@@ -590,7 +563,6 @@ export async function onManagedMachineHello(
     stage: null,
     reason: null,
     expectedReadyAt: null,
-    delayedAt: null,
     since: now,
     updatedAt: now,
   };

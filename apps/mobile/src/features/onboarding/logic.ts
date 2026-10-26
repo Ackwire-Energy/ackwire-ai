@@ -1,10 +1,12 @@
 import { isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
+import type { TFunction } from "i18next";
+import { joinNames } from "../shared/logic";
 
 /**
  * The phone's first run: one question per full screen, hosted by an
- * agent of the team, a strip of sky on top that fills as you go. The web's steps without the computer, which
- * stays for the computer ("Depois, no computador"). Pure: no React Native imports.
+ * agent of the team, a strip of sky on top that fills as you go. The web's steps without the computer's. Pure: no
+ * React Native imports.
  */
 export const STEPS = ["workspace", "context", "import", "agents", "ai", "team", "done"] as const;
 export type StepId = (typeof STEPS)[number];
@@ -44,6 +46,48 @@ export const HOST: Record<StepId, Preset> = {
   team: "theo",
   done: "ada",
 };
+
+/**
+ * A step's question and the one line under it. The phone can't import, so its import step says where to; the
+ * agents step has its own (Ada is a row of its own here); the team step has none (the link and the emails say it).
+ */
+export function stepText(
+  t: TFunction,
+  step: StepId,
+  { org, chosen, aiSaved }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean },
+): [title: string, lead?: string] {
+  switch (step) {
+    case "workspace":
+      return [t("onboarding.workspace.title"), t("onboarding.workspace.lead")];
+    case "context":
+      return [t("onboarding.context.title"), t("onboarding.context.lead")];
+    case "import":
+      return [t("onboarding.import.title"), t("mobile.onb.importLead")];
+    case "agents":
+      return [t("onboarding.agents.title"), t("mobile.onb.agentsLead")];
+    case "ai":
+      return [t("onboarding.keyStep.title"), aiSaved ? t("connectAi.key.saved") : t("onboarding.keyStep.lead")];
+    case "team":
+      return [t("onboarding.team.title")];
+    case "done": {
+      const names = PRESETS.filter((p) => chosen.has(p)).map((p) => t(`onboarding.presets.${p}.name`));
+      const lead =
+        names.length === 0
+          ? t("onboarding.done.textNone")
+          : t(names.length === 1 ? "onboarding.done.inGeneralOne" : "onboarding.done.inGeneralMany", {
+              names: joinNames(names, t("newAgent.and")),
+            });
+      return [t("onboarding.done.title", { org }), lead];
+    }
+  }
+}
+
+/** Sends each invitation in turn; the addresses whose invitation failed, in order. */
+export async function inviteEach(emails: string[], invite: (email: string) => Promise<unknown>): Promise<string[]> {
+  const failed: string[] = [];
+  for (const email of emails) await invite(email).catch(() => failed.push(email));
+  return failed;
+}
 
 /** Where the strip of sky is at a step (0 at the first, 1 when done). */
 export function progressAt(step: StepId): number {
