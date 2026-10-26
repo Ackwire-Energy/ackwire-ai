@@ -13,7 +13,7 @@ import {
   type ToolSource,
   verifyRunToolToken,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { answerSteering, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { missionRunner, pairedMachine, RUNNER, type TaskStartRequest } from "./mission-helpers";
 import { fakeGithub } from "./tool-fixtures";
@@ -98,6 +98,8 @@ async function runningRun(threadRootId?: string) {
     })
     .returning();
   if (!run) throw new Error("no run");
+  // A later runningRun's "hi", the same person writing again, may go into this run.
+  answerSteering(f, run);
   return run;
 }
 
