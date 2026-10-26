@@ -210,6 +210,8 @@ export const extraIcons = {
     ["rect", { x: "7", y: "7", width: "9.5", height: "9.5", rx: "2" }],
     ["path", { d: "M13 7V5.5a2 2 0 0 0-2-2H5.5a2 2 0 0 0-2 2V11a2 2 0 0 0 2 2H7" }],
   ],
+  /** "Tela cheia": two corners pulled apart. */
+  expand: [["path", { d: "M12 3.5h4.5V8M8 16.5H3.5V12M16.5 3.5 11.25 8.75M3.5 16.5l5.25-5.25" }]],
   /** "Apagar". */
   trash: [
     [
