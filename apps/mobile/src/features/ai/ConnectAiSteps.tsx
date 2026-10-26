@@ -446,7 +446,7 @@ function PlanSteps({
       <InfoCard icon="pause">{hold}</InfoCard>
     ) : (
       <View style={styles.gap}>
-        {setup && inWorkspace ? <SetupWait view={setup} agentName={agentName} /> : null}
+        {setup && inWorkspace ? <SetupWait view={setup} /> : null}
         <InfoCard icon="clock">
           {setup && !inWorkspace ? `${t(setup.textKey)} ` : ""}
           {t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}
@@ -529,13 +529,7 @@ function PlanSteps({
               subLines={2}
               onPress={() => void saveOwn()}
             />
-            <GroupedRow
-              label={t("connectAi.own.other", { brand })}
-              sub={t("connectAi.own.otherText", { computer })}
-              subLines={2}
-              checked={other}
-              onPress={() => setOther(true)}
-            />
+            <GroupedRow label={t("connectAi.own.other", { brand })} checked={other} onPress={() => setOther(true)} />
           </GroupedList>
           <Note icon="lock">{t("connectAi.own.note")}</Note>
         </>
@@ -551,7 +545,7 @@ function PlanSteps({
           askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
           local={view?.ownSignIn}
           ready={ready}
-          note={!coding ? <Note icon="lock">{t("aiAccounts.share.on", agentGrammar(t, agentName))}</Note> : null}
+          note={!coding ? <Note icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</Note> : null}
           onAdded={(a) => void assign(a)}
         />
       ) : null}

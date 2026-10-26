@@ -1,7 +1,8 @@
 import { openBrowserAsync } from "expo-web-browser";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
-import { Button, Icon, type IconName, Text, useTheme } from "@/ui";
+import { Button, Icon, type IconName, InfoHint, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -32,12 +33,14 @@ export function StepsCard({ children }: { children: ReactNode }) {
 }
 
 /**
- * A numbered step, one row of the steps' card: its number (a check once `done`, faint while it waits), the title,
- * the words under it and its buttons under them. `divider`: a hairline above it, inset to the words.
+ * A numbered step, one row of the steps' card: its number (a check once `done`, faint while it waits), the title
+ * (with an ⓘ when it has a `hint`), the words under it and its buttons under them. `divider`: a hairline above it,
+ * inset to the words.
  */
 export function Step({
   n,
   title,
+  hint,
   children,
   side,
   divider = false,
@@ -45,12 +48,19 @@ export function Step({
 }: {
   n: number;
   title: string;
+  hint?: string | undefined;
   children?: ReactNode;
   side?: ReactNode;
   divider?: boolean;
   state?: "now" | "done" | "later";
 }) {
+  const { t } = useTranslation();
   const c = useColors();
+  const head = (
+    <Text variant="callout" tone="ink" style={styles.bold}>
+      {title}
+    </Text>
+  );
   return (
     <View style={styles.step}>
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
@@ -64,9 +74,13 @@ export function Step({
         )}
       </View>
       <View style={styles.text}>
-        <Text variant="callout" tone="ink" style={styles.bold}>
-          {title}
-        </Text>
+        {hint ? (
+          <InfoHint name={t("common.about", { label: title })} text={hint} variant="callout">
+            {head}
+          </InfoHint>
+        ) : (
+          head
+        )}
         {children}
         {side ? <View style={styles.side}>{side}</View> : null}
       </View>

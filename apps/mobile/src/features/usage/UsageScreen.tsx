@@ -58,7 +58,6 @@ export function UsageScreen() {
             <UsageCard
               icon="laptop"
               title={t("usageViews.accounts.title")}
-              subtitle={t("usageViews.accounts.subtitle")}
               footer={data.accounts.length > 0 ? t("usageViews.estimate") : undefined}
             >
               {data.accounts.length === 0 ? (
@@ -182,7 +181,7 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
   const c = useColors();
   if (data.api.length === 0) return null;
   return (
-    <UsageCard icon="lock" title={t("usageViews.api.title")} subtitle={t("usageViews.api.subtitle")}>
+    <UsageCard icon="lock" title={t("usageViews.api.title")}>
       <View>
         {data.api.map((a, i) => {
           const name = dir.agentById.get(a.agentId)?.name ?? a.name;

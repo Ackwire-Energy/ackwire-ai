@@ -46,14 +46,13 @@ export function ResetPasswordScreen({ token }: { token: string | null }) {
     );
   if (state === "done")
     return (
-      <AuthScaffold title={t("mobile.reset.done")} subtitle={t("mobile.reset.doneLead")} expression="happy">
+      <AuthScaffold title={t("mobile.reset.done")} expression="happy">
         <Button variant="primary" wide label={t("mobile.reset.toSignIn")} onPress={toSignIn} />
       </AuthScaffold>
     );
   return (
     <AuthScaffold
       title={t("mobile.reset.title")}
-      subtitle={t("mobile.reset.lead")}
       agentMode={pending ? "run" : "idle"}
       {...(secret ? { expression: "closed" as const } : {})}
     >
