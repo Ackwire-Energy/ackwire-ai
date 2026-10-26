@@ -411,7 +411,7 @@ function AddAccountFlow({
             <b>{t("agentPage.work.brain.add.deviceCode")}</b>
             <span className="agp-addacct__code">
               <output aria-label={t("agentPage.work.brain.add.deviceCode")}>{login.userCode}</output>
-              <Button size="sm" icon="copy" onClick={() => void copy()}>
+              <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
                 {copied ? t("common.copied") : t("common.copy")}
               </Button>
             </span>

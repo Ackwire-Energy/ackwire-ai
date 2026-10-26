@@ -5,6 +5,7 @@ setupDom();
 
 import type { InvitationPreview, JoinRequest, JoinStatus } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
@@ -120,11 +121,15 @@ describe("an invitation link asks to join", () => {
 
   test("the answers: denied with the admin's note, approved by invitation, already in, a link that no longer works", async () => {
     await openLink(
-      { ...LINK, you: you({ request: { status: "denied", reason: "Só a equipe do estúdio" } }) },
+      { ...LINK, you: you({ request: { status: "denied", reason: "Só a <i>equipe</i> do estúdio" } }) },
       { signedIn: true },
     );
     expect(heading()).toBe("Seu pedido não foi aprovado");
-    expect(text()).toContain("Recado: Só a equipe do estúdio");
+    // As in the email: the label in bold, their words in quotes, as typed.
+    const note = document.querySelector(".invite-ask__reason");
+    expect(note?.textContent).toBe("Recado: “Só a <i>equipe</i> do estúdio”");
+    expect(note?.querySelector("b")?.textContent).toBe("Recado:");
+    expect(note?.querySelector("i")).toBeNull();
     expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você por e-mail.");
     cleanup();
 
@@ -331,6 +336,15 @@ test("a name typed with markup reads as typed, in Members and in the inbox", asy
 });
 
 describe("Members › Invitation link", () => {
+  test("Turn off's word ends where Copy ends above it: the text button's padding hangs past the edge", async () => {
+    const read = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
+    expect(await read("../src/pages/members.css")).toMatch(
+      /\.jr-link__foot > \.ac-btn--ghost \{\s*margin: 0 calc\(-1 \* var\(--control-px-sm\)\) 0 auto;\s*\}/,
+    );
+    const ui = await read("../../../packages/ui/src/styles/components.css");
+    expect(ui.split("\n.ac-btn--sm {").at(-1)?.split("}")[0]).toContain("padding: 0 var(--control-px-sm);");
+  });
+
   test("the link to copy, what it does, turning it off with its requests, an earlier link, making a new one", async () => {
     const until = new Date(Date.now() + 20 * 86_400_000).toISOString();
     const { state } = await members("", {
@@ -365,6 +379,22 @@ describe("Members › Invitation link", () => {
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(
       "http://localhost:3000/invite/k3J",
     );
+    // Copied: the word and its icon both say it.
+    const writes: string[] = [];
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (s: string) => void writes.push(s) },
+    });
+    try {
+      await click(within(invite).getByRole("button", { name: "Copiar" }));
+    } finally {
+      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+    const copied = within(invite).getByRole("button", { name: "Copiado" });
+    expect(writes).toEqual(["http://localhost:3000/invite/k3J"]);
+    expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
     // Who can get in through a shared link stays on screen, not behind an ⓘ.
     const linkLine = within(invite).getByText(
       /^Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,

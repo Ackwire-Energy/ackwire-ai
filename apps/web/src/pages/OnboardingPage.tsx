@@ -1818,7 +1818,7 @@ function TeamStep({
             aria-describedby="invite-link-hint invite-link-help"
             style={{ flex: 1, minWidth: 0 }}
           />
-          <Button icon="copy" onClick={() => void copy()} disabled={!link.data}>
+          <Button icon={copied ? "check" : "copy"} onClick={() => void copy()} disabled={!link.data}>
             {copied ? t("common.copied") : t("common.copy")}
           </Button>
         </div>

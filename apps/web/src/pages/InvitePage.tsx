@@ -14,6 +14,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { CenteredLayout } from "@/components/AuthLayout";
+import { TYPED_VALUES } from "@/i18n";
 import { lookOf } from "@/lib/look";
 import "./invite.css";
 
@@ -321,7 +322,16 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
     case "denied":
       body = (
         <Outcome expression="closed" title={t("invite.ask.deniedTitle")}>
-          {view.reason && <p className="invite-ask__reason">{t("invite.ask.reason", { reason: view.reason })}</p>}
+          {view.reason && (
+            <p className="invite-ask__reason">
+              <Trans
+                i18nKey="invite.ask.reasonSaid"
+                values={{ reason: view.reason }}
+                components={{ b: <b /> }}
+                {...TYPED_VALUES}
+              />
+            </p>
+          )}
           <p className="page-sub">{t("invite.ask.deniedText", { org })}</p>
         </Outcome>
       );
