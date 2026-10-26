@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import { consolidateItem, createIssueToolSource, insertMessage, linkRunActions } from "@agenteschat/engine";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -9,13 +9,9 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-/** A member of the organization (joined through an invite link), with their id. */
+/** A member of the organization (joined through an email invitation), with their id. */
 async function member(owner: ReturnType<typeof browser>, orgId: string, email: string) {
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
-  const b = browser(t);
-  await signUp(b, email, { inviteToken: token });
-  await b(`/api/app/invitations/${token}/accept`, { json: {} });
+  const b = await joinByInvitation(t, owner, orgId, email);
   const id = ((await (await b("/api/app/me")).json()) as { user: { id: string } }).user.id;
   return { b, id };
 }

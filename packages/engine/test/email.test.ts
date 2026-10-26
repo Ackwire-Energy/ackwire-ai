@@ -34,7 +34,17 @@ afterEach(async () => {
 const art = emailArtAt("https://x.test");
 const WEB_DIR = resolve(import.meta.dir, "../../../apps/web/public");
 /** Every field people type or agents write. */
-const TYPED = ["orgName", "inviterName", "inviterEmail", "email", "title", "agentName"];
+const TYPED = [
+  "orgName",
+  "inviterName",
+  "inviterEmail",
+  "email",
+  "title",
+  "agentName",
+  "name",
+  "approverName",
+  "reason",
+];
 const SENTINEL = "Zq9 evil.com";
 const withoutUrls = (s: string) => s.replace(/https?:\/\/\S+/g, "");
 const buttons = (t: EmailTemplate) =>
@@ -155,8 +165,9 @@ describe("the look", () => {
       // With it, the table could squeeze a fact's label mid-word to make room for a long value.
       expect(html).not.toMatch(/<td class="mu[^>]*word-break/);
     }
-    // Paragraphs, facts (first row and the rest), people's names and details, and the footer.
-    expect(holders.size).toBe(6);
+    // Paragraphs, facts (first row and the rest), people's names and details, a note (a denial's reason), and the
+    // footer.
+    expect(holders.size).toBe(7);
   });
 
   test("an expired invitation link's request names nobody and still reads", () => {

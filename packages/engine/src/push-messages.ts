@@ -67,6 +67,8 @@ interface Strings {
   browserHandoffBody: string;
   desktopHandoffTitle: (actor: string) => string;
   desktopHandoffBody: string;
+  joinRequestTitle: (name: string, org: string) => string;
+  joinRequestBody: string;
   waitingTitle: string;
   openBody: string;
 }
@@ -98,6 +100,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     browserHandoffBody: "Toque para abrir a tela.",
     desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
     desktopHandoffBody: "Abra o agentes.chat num notebook para ajudar.",
+    joinRequestTitle: (name, org) => `${name} pede para entrar na ${org}`,
+    joinRequestBody: "Toque para aprovar ou recusar.",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
   },
@@ -127,6 +131,8 @@ const STRINGS: Record<PushLocale, Strings> = {
     browserHandoffBody: "Tap to open the screen.",
     desktopHandoffTitle: (a) => `${a} needs you on the computer`,
     desktopHandoffBody: "Open agentes.chat on a laptop to help.",
+    joinRequestTitle: (name, org) => `${name} asks to join ${org}`,
+    joinRequestBody: "Tap to approve or deny.",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
   },
@@ -185,6 +191,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // open on the phone: its body says where it does.
       if (input.screen === "desktop") return out(s.desktopHandoffTitle(actor), text || s.desktopHandoffBody);
       return out(s.browserHandoffTitle(actor), text || s.browserHandoffBody);
+    case "join_request":
+      // The name the person typed, never their note: approving happens in the app, never from the notification.
+      return out(s.joinRequestTitle(input.title?.trim() || s.someone, input.label?.trim() || ""), s.joinRequestBody);
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }

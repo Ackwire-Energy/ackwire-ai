@@ -18,8 +18,11 @@ export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "w
 /** Kinds counted under "Menções": someone talks to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
 
-/** Waiting ones in this order: an agent's question, my turn at the table, an approval. */
-const WAITING_ORDER: NotificationKind[] = ["agent_question", "forum_turn", "approval"];
+/**
+ * Waiting ones in this order: an agent's question, my turn at the table, an approval, then someone asking to join
+ * (nobody's work waits on it).
+ */
+const WAITING_ORDER: NotificationKind[] = ["agent_question", "forum_turn", "approval", "join_request"];
 
 export const isSnoozed = (n: Pick<AppNotification, "snoozedUntil">, now = Date.now()) =>
   !!n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now;
@@ -221,7 +224,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
-  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" } };
+  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -238,6 +241,8 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
+  // Requests to join are answered in Members (ADR 0068).
+  if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   if (n.kind === "machine_connected" || n.kind === "computer_ready")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }

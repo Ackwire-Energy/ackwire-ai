@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer | undefined;
 afterEach(async () => {
@@ -246,11 +246,7 @@ describe("imports and the export", () => {
     expect((await b(imports, { json: { bundle: { ...BUNDLE, version: 2 }, dryRun: true } })).status).toBe(400);
 
     // A member: refused, the import and the export.
-    const res = await b(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-    const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
-    const member = browser(t as TestServer);
-    await signUp(member, "member@example.com", { inviteToken: token });
-    expect((await member(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
+    const member = await joinByInvitation(t as TestServer, b, orgId, "member@example.com");
     expect((await member(imports, { json: { bundle: BUNDLE, dryRun: true } })).status).toBe(403);
     expect((await member(`/api/app/organizations/${orgId}/export`)).status).toBe(403);
 

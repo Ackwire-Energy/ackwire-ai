@@ -19,6 +19,7 @@ import {
   listenForRunCancels,
   type MailDeps,
   pollImapWatches,
+  pruneJoinRequests,
   pruneMessageClientIds,
   pruneOperatorEvents,
   purgeDeletedArtifacts,
@@ -145,6 +146,9 @@ export function startWorkers(deps: WorkerDeps) {
     if (pruned > 0) log.info("pruned message client ids", { pruned });
     const events = await pruneOperatorEvents(db);
     if (events > 0) log.info("pruned operator events", { pruned: events });
+    // Requests to join answered or run out 90 days ago go; notices with nothing left waiting close (ADR 0068).
+    const requests = await pruneJoinRequests({ db, pubsub: deps.pubsub });
+    if (requests > 0) log.info("pruned join requests", { pruned: requests });
   });
 
   every("approvals", WORKER_INTERVALS_MS.approvals, async () => {

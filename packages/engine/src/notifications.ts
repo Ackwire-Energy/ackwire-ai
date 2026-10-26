@@ -66,6 +66,12 @@ export const NOTIFICATION_KINDS = [
   "org_standing",
   /** The workspace's own computer is ready (owners, ADR 0056 §10). */
   "computer_ready",
+  /**
+   * Someone asks to join through the invitation link (owners and admins, ADR 0068): waiting, one row per workspace
+   * merging the burst, `latest.title` the newest name, `source.label` the workspace's. No actor: the person isn't
+   * a member. Never their note.
+   */
+  "join_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -153,7 +159,7 @@ export interface NotificationDeps {
 type Row = typeof notifications.$inferSelect;
 
 /** Kinds whose events merge into one open row of their group. */
-const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction"]);
+const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction", "join_request"]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
 /** A read reaction row still takes new reactions for this long (the "9 min" span on the card). */

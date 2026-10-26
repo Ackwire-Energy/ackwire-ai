@@ -33,6 +33,7 @@ import type {
   ArtifactDetail,
   ArtifactFilters,
   ArtifactVersion,
+  AskToJoinResult,
   AuthConfig,
   BatchInviteResult,
   BrainKind,
@@ -79,12 +80,15 @@ import type {
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
+  InviteLink,
   Issue,
   IssueActivity,
   IssueColumn,
   IssueInput,
   IssuePatch,
   IssueStatus,
+  JoinApproval,
+  JoinRequest,
   Machine,
   MachineAccess,
   MachineAccessReduce,
@@ -207,7 +211,7 @@ export interface ApiClient {
   account: {
     authConfig(): Promise<AuthConfig>;
     /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */
-    signInOptions(input: { email: string; inviteToken?: string }): Promise<SignInOptions>;
+    signInOptions(input: { email: string }): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
@@ -929,10 +933,28 @@ export interface ApiClient {
     migration(orgId: string): Promise<StorageMigration | null>;
   };
   invites: {
-    /** Org-wide link: whoever joins with it becomes a member (7 days). */
-    createLink(orgId: string): Promise<{ url: string; expiresAt: string }>;
-    /** Expired invitation: ask the inviter for a new one. */
+    /**
+     * The workspace's invitation link (admins, ADR 0068): the active one, else a new one for 30 days. Whoever
+     * opens it can only ask to join.
+     */
+    createLink(orgId: string): Promise<{ id: string; url: string; expiresAt: string }>;
+    /** The links people can still ask with, earlier ones (no `url`) included. */
+    links(orgId: string): Promise<InviteLink[]>;
+    /** Nobody new can ask with it; the requests made through it close without emails. */
+    turnOff(orgId: string, linkId: string): Promise<void>;
+    /** Asks to join through a link: signed out with a name and an email, signed in as the account. */
+    ask(token: string, input: { name?: string; email?: string; note?: string }): Promise<AskToJoinResult>;
+    /** Expired email invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
+  };
+  /** Requests to join through the invitation link, for admins (ADR 0068). */
+  joinRequests: {
+    /** Waiting ones, oldest first. */
+    list(orgId: string): Promise<JoinRequest[]>;
+    /** `join.answered` / `join.expired` (409) when someone answered first or it ran out. */
+    approve(orgId: string, requestId: string, role: "member" | "admin"): Promise<JoinApproval>;
+    /** `reason` is told to the person by email. */
+    deny(orgId: string, requestId: string, reason?: string): Promise<void>;
   };
   /**
    * Phone app additions. Optional so older fakes and clients still type-check;
