@@ -1987,6 +1987,8 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--overlay);
   font-size: 14px;
   line-height: 20px;
+  /* Over a modal dialog too, which turns the page's own off. */
+  pointer-events: auto;
 }
 .ac-toast--error .ac-icon {
   color: var(--danger);
