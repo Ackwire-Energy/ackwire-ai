@@ -1,5 +1,6 @@
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
+import type { ReactNode } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
@@ -13,6 +14,8 @@ export interface ButtonProps {
   variant: ButtonVariant;
   size?: "md" | "sm";
   icon?: IconName;
+  /** Drawn before the label instead of an icon (a brand's mark), given the label's color. */
+  leading?: (color: string) => ReactNode;
   label: string;
   onPress: () => void;
   /** Full width. */
@@ -38,7 +41,16 @@ export function primaryLook(theme: Pick<Theme, "colors">) {
 }
 
 /** The tactile button: tonal gradient, a lit top edge, a spring press and a light haptic. */
-export function Button({ variant, size = "md", icon, label, onPress, wide = false, disabled = false }: ButtonProps) {
+export function Button({
+  variant,
+  size = "md",
+  icon,
+  leading,
+  label,
+  onPress,
+  wide = false,
+  disabled = false,
+}: ButtonProps) {
   const theme = useTheme();
   const { colors, shadows } = theme;
   const s = BUTTON_SIZES[size];
@@ -50,12 +62,12 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
       onPress={onPress}
       disabled={disabled}
       sink
+      fill={false}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
       style={[
         {
-          minHeight: s.height,
           borderRadius: s.radius,
           alignSelf: wide ? "stretch" : "flex-start",
           opacity: disabled ? 0.5 : 1,
@@ -66,7 +78,7 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
       <View
         style={[
           styles.face,
-          { borderRadius: s.radius, paddingHorizontal: s.padding },
+          { minHeight: s.height, borderRadius: s.radius, paddingHorizontal: s.padding },
           variant === "secondary" ? { backgroundColor: colors.raised } : null,
         ]}
       >
@@ -84,7 +96,7 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
             ]}
           />
         ) : null}
-        {icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
+        {leading ? leading(textColor) : icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
@@ -98,8 +110,10 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
 }
 
 const styles = StyleSheet.create({
+  // Sized by its content and the minimum height, never grown: a growing face inside the press's growing
+  // Pressable fills whatever height Yoga offers when it measures to fit, so a button beside a row's text
+  // stood as tall as the screen.
   face: {
-    flexGrow: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

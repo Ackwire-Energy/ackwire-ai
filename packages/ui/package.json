@@ -28,6 +28,7 @@
     "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
     "./names": "./src/names.ts",
+    "./plan-state": "./src/plan-state.ts",
     "./timezones": "./src/timezones.ts"
   },
   "scripts": {

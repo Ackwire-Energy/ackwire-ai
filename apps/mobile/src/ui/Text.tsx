@@ -52,6 +52,15 @@ export function systemText(style: TypeStyle, fontWeight?: Weight): TextStyle {
   return typeStyle(os, style, fontWeight);
 }
 
+/**
+ * The same for a one-line `TextInput`: no line height, which iOS adds under the text of a one-line field
+ * (it sits lower than a label beside it). Multi-line fields keep `systemText`.
+ */
+export function fieldText(style: TypeStyle, fontWeight?: Weight): TextStyle {
+  const { lineHeight: _drop, ...rest } = typeStyle(os, style, fontWeight);
+  return rest;
+}
+
 /** Where each variant sits on the native scale. */
 /** Large titles are bold on iOS (Mail, Settings) and regular on Android (Material headlines). */
 const TITLE_WEIGHT = os === "ios" ? weights.bold : weights.regular;

@@ -65,6 +65,8 @@ export type ActivityKind =
   | "readingForum"
   | "creatingChannel"
   | "offeringConnectAi"
+  | "askingAgent"
+  | "tellingAgent"
   | "usingTool";
 
 export interface Activity {
@@ -142,6 +144,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   // Setting up the workspace.
   create_channel: "creatingChannel",
   offer_connect_ai: "offeringConnectAi",
+  // Another agent of the team (the consultation card says who and what it answered).
+  ask_agent: "askingAgent",
+  tell_agent: "tellingAgent",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */

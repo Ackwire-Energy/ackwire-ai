@@ -1,3 +1,4 @@
+import type { ConsultationStatus, MessageConsultation } from "../api/types";
 import { routineReplyOf } from "./routines";
 
 type Meta = Record<string, unknown> | undefined;
@@ -55,6 +56,29 @@ export function noticeAgentHandle(notice: MessageNotice): string | null {
 
 /** An automatic line in the conversation (a notice): nothing groups with it. */
 export const isEventLine = (meta: Meta) => noticeOf(meta) !== null;
+
+const CONSULTATION_STATUSES: ReadonlySet<string> = new Set<ConsultationStatus>(["answered", "expired", "failed"]);
+
+/**
+ * Another agent's answer that carries its consultation (`consult_reply` refs: who asked whom, the question and
+ * the answer apart): the app shows it as the consultation card, not the text written for the asking agent.
+ * Null for older notices without them.
+ */
+export function consultationOfNotice(meta: Meta): { askerId: string; consultation: MessageConsultation } | null {
+  const notice = noticeOf(meta);
+  const r = notice?.kind === "consult_reply" ? notice.refs : null;
+  if (!r?.askerAgentId || !r.agentId || !r.question || !r.status || !CONSULTATION_STATUSES.has(r.status)) return null;
+  return {
+    askerId: r.askerAgentId,
+    consultation: {
+      agentId: r.agentId,
+      consultationId: r.consultationId ?? "",
+      status: r.status as ConsultationStatus,
+      question: r.question,
+      answer: r.answer ?? null,
+    },
+  };
+}
 
 type Said = { id: string; author: { type: string }; body: string; meta?: Record<string, unknown> };
 

@@ -176,23 +176,34 @@ function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void
       <View style={styles.faces}>
         {faces.map((a, i) => (
           <View key={a.id} style={i > 0 ? styles.overlap : undefined}>
-            <AgentFace agentId={a.id} size={30} live={false} />
+            <AgentFace agentId={a.id} size={34} live={false} />
           </View>
         ))}
       </View>
-      <View style={styles.grow}>
+      <View style={styles.hintText}>
         <Text variant="body" style={styles.bold}>
           {t("mobile.connectors.empty")}
         </Text>
         <Text variant="small" tone="muted">
           {t("mobile.connectors.emptySub")}
         </Text>
+        {admin ? (
+          // Under the text, spelled out: beside it, it squeezed the text into a narrow column; a globe alone
+          // didn't say it connects a service by its MCP address.
+          <Pressable
+            onPress={onAddress}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.connectors.addressTitle")}
+            hitSlop={6}
+            style={styles.byAddress}
+          >
+            <Icon name="globe" size={15} color={c.muted} />
+            <Text variant="small" style={styles.bold}>
+              {t("mobile.connectors.byAddress")}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
-      {admin ? (
-        <Pressable onPress={onAddress} accessibilityRole="button" accessibilityLabel={t("mobile.connectors.address")}>
-          <Icon name="globe" size={20} color={c.muted} />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -307,13 +318,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // A column: the team's faces on top, then the line, its text and "Pelo endereço" (in a row the faces
+  // took a third of the width and the text wrapped into a narrow block).
   empty: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    gap: 10,
     marginHorizontal: 16,
     marginTop: 8,
-    padding: 14,
+    padding: 16,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -321,6 +332,8 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  hintText: { gap: 2 },
+  byAddress: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 8 },
   suggestions: { gap: 10, paddingHorizontal: 16 },
   filters: { paddingTop: 20 },
   card: {

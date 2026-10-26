@@ -10,7 +10,16 @@ import type { AppHref } from "../links/logic";
  */
 
 /** The sheet's title, centered, with close (or back to "Novo") on the left. */
-export function SheetHeader({ title, icon = "x" }: { title: string; icon?: Extract<IconName, "x" | "back"> }) {
+export function SheetHeader({
+  title,
+  icon = "x",
+  onPress,
+}: {
+  title: string;
+  icon?: Extract<IconName, "x" | "back">;
+  /** Instead of closing the sheet (a page inside it goes back to the one before). */
+  onPress?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <View style={styles.head}>
@@ -18,7 +27,7 @@ export function SheetHeader({ title, icon = "x" }: { title: string; icon?: Extra
         icon={icon}
         label={icon === "x" ? t("mobile.common.close") : t("mobile.common.back")}
         plate
-        onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+        onPress={onPress ?? (() => (router.canGoBack() ? router.back() : router.replace("/")))}
       />
       <Text variant="title" style={styles.title} accessibilityRole="header" numberOfLines={1}>
         {title}

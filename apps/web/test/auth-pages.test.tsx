@@ -506,7 +506,7 @@ describe("Onboarding", () => {
     await click(button(keep.length ? /^Criar \d+ agentes?$/ : "Continuar"), 8);
     await click(button("Conectar depois"), 8);
     await skip();
-    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
   };
   /** Done: the welcome's sentences, the first message's box, who offers it, and the line under it. */
   const welcome = () => document.querySelector(".onb__welcome-lead")?.textContent;
@@ -956,7 +956,7 @@ describe("Onboarding", () => {
       { email: "marina@acme.com.br", role: "member" },
     ]);
 
-    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     expect(welcome()).toBe("Theo e Ada já estão no #general. Mandamos 1 convite por e-mail.");
     // Their computer ends the row of faces, as it is.
     expect(screen().getByRole("img", { name: "MacBook do Walter" }).getAttribute("data-state")).toBe("online");
@@ -980,7 +980,7 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
     await skip();
     expect(calls(state, "orgs.invite")).toHaveLength(0);
-    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     // No cards repeating the rail and the faces, and nothing said of what was skipped: no invitations, no computer.
     // No line over the title either: the welcome says it, and so does the rail's "Tudo certo" where it shows.
     expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card, .onb__eyebrow")).toBeNull();
@@ -1112,7 +1112,7 @@ describe("Onboarding", () => {
       else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
     }
     expect(calls(state, "chat.post")).toHaveLength(0);
-    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     await enter();
     await settle(4);
     expect(posted(state)).toEqual([{ body: "@theo o que fazemos hoje?", clientId: expect.any(String) }]);
@@ -1157,7 +1157,7 @@ describe("Onboarding", () => {
       return message;
     };
     await click(button("Enviar para Theo"), 8);
-    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     await type(ASK, "@theo o que fazemos hoje?");
     await click(button("Enviar para Theo"), 8);
     await click(button("Enviar para Theo"), 8);
@@ -1175,7 +1175,7 @@ describe("Onboarding", () => {
     state.failPosts = true;
     await click(button("Enviar para Theo"), 8);
     expect(document.querySelector(".ac-toast")?.textContent).toContain("Try again");
-    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     expect(askBox().value).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
     state.failPosts = false;
     await click(button("Enviar para Theo"), 8);

@@ -614,14 +614,14 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(anon?.key).toBe("chat.notice.routineHandoffAnon");
   });
 
-  test("another agent's answer and note say its name, not the agent-facing handle", () => {
+  test("another agent's answer and note say its name, not the agent-facing handle (no @)", () => {
     const reply = eventLineOf(agentMsg("n1", { notice: { kind: "consult_reply", text: "ok", from: "@infra" } }), names);
-    expect(reply).toMatchObject({ icon: "agent", key: "chat.notice.consultReply", values: { from: "@Infra" } });
+    expect(reply).toMatchObject({ icon: "agent", key: "chat.notice.consultReply", values: { from: "Infra" } });
     const unknown = eventLineOf(
       agentMsg("n2", { notice: { kind: "agent_note", text: "ok", refs: { agentHandle: "@zed" } } }),
       names,
     );
-    expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "@zed" } });
+    expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "zed" } });
     const anon = eventLineOf(agentMsg("n3", { notice: { kind: "consult_reply", text: "ok" } }), names);
     expect(anon?.key).toBe("chat.notice.consultReplyAnon");
   });

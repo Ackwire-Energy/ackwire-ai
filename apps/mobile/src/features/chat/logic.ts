@@ -140,8 +140,8 @@ export function eventLineOf(
   const notice = noticeOf(m.meta);
   if (!notice) return null;
   const handle = noticeAgentHandle(notice);
-  // `from` is written for the agent ("@infra"): the app says the agent's name.
-  const from = handle ? `@${names.agentByHandle(handle) ?? handle}` : notice.from;
+  // `from` is written for the agent ("@infra"): the app says the agent's name, without the @.
+  const from = handle ? (names.agentByHandle(handle) ?? handle) : notice.from;
   const icon = NOTICE_ICON[notice.kind] ?? "bell";
   const line = (key: string, values: Record<string, string> = {}): EventLineView => ({
     kind: "notice",
