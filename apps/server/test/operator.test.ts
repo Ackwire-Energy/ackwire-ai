@@ -538,6 +538,16 @@ test("external provisioning: requests, progress, the workspace's computer and it
   const after = await body<{ machines: { id: string }[] }>(await call("GET", `/orgs/${orgId}/machines`));
   expect(after.machines.map((m) => m.id)).not.toContain(issued.machineId);
   expect((await call("GET", "/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/machines")).status).toBe(404);
+
+  // Held (ended, say), it waits for no computer: a report for it is refused until it is active again.
+  expect((await put(`/orgs/${orgId}/standing`, { state: "hold", reason: "ended", notice: "shown" })).status).toBe(200);
+  const late = await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" });
+  expect({ status: late.status, code: ((await late.json()) as { error: { code: string } }).error.code }).toEqual({
+    status: 403,
+    code: "org.paused",
+  });
+  expect((await put(`/orgs/${orgId}/standing`, { state: "active", reason: "back", notice: "shown" })).status).toBe(200);
+  expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" })).status).toBe(204);
 });
 
 test("no answer carries a secret or a field named like one", async () => {

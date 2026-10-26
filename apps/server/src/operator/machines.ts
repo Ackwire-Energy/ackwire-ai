@@ -161,9 +161,14 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Say how far the workspace's computer is",
       description:
-        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. A ready time moved later within the same step and stage (a part running long) holds still on their screens for a minute: while it keeps moving, send it again within that minute. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed.",
+        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. A ready time moved later within the same step and stage (a part running long) holds still on their screens for a minute: while it keeps moving, send it again within that minute. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
       request: { params: OrgParams, body: body(ProvisioningInput) },
-      responses: { 204: noContent[204], ...errors, 409: errorResponse("The computer is ready") },
+      responses: {
+        204: noContent[204],
+        ...errors,
+        403: errorResponse("The workspace isn't active"),
+        409: errorResponse("The computer is ready"),
+      },
     }),
     async (c) => {
       const { expectedReadyAt, ...input } = c.req.valid("json");
@@ -217,7 +222,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Take the workspace's computer away",
       description:
-        "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now. 404 when the workspace has no such managed computer (also when it was already removed).",
+        "Before wiping or retiring it: its token and unused codes stop working, its connection closes, its agents are left with no computer, and an active workspace is a request again, waiting from now (one held or suspended waits for none). 404 when the workspace has no such managed computer (also when it was already removed).",
       request: { params: MachineParams },
       responses: { 204: noContent[204], ...errors },
     }),

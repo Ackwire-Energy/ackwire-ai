@@ -182,7 +182,8 @@ export interface StandingDeps {
  * Sets a workspace's standing (the operator API): at once in this process, within 5 s in the others. When
  * what the workspace sees changes (the state, or the reason it is told), its members hear `org.standing`;
  * with the notice `shown` the change goes into its audit log, and a new state notifies its owners and
- * admins. Suspending it also stops its runs and tasks now. Null when there is no such workspace.
+ * admins. Suspending it also stops its runs and tasks now. A workspace held or suspended waits for no computer:
+ * what its provisioner last said goes (`forgetProvisioning`). Null when there is no such workspace.
  */
 export async function setOrgStanding(
   deps: StandingDeps,
@@ -234,6 +235,11 @@ export async function setOrgStanding(
   }
   if (done.moved && after.notice === "shown") await notifyOrgStanding(deps, orgId, after).catch(() => {});
   // Every time, not only on the move: setting it again (a retry after a failure) finishes the job.
+  if (after.state !== "active") {
+    // Loaded here: provisioning checks the standing with this module.
+    const { forgetProvisioning } = await import("./machine-provisioning");
+    await forgetProvisioning(deps, orgId);
+  }
   if (after.state === "suspended") {
     // Loaded here: the run engine builds on this module.
     const { stopOrgWork } = await import("./cancel");

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import {
   agentComputerInfo,
   computerSetup,
@@ -701,6 +702,83 @@ describe("external provisioning", () => {
     await hello(heldComputer.token);
     expect(await state(held.organization.id)).toBe("ready");
     expect(await queued(held.organization.id)).toEqual([]);
+  });
+
+  test("a workspace held, suspended or ended waits for no computer; active again, it is a request like any other", async () => {
+    f = await setup();
+    const events = heard("machine.provisioning");
+    const row = async (orgId = f.org.id) => {
+      const [r] = await f.db
+        .select()
+        .from(schema.machineProvisioning)
+        .where(eq(schema.machineProvisioning.orgId, orgId));
+      return r ?? null;
+    };
+    // Waiting for capacity, then ended before any computer came: the wait goes, and its people hear it.
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    expect((await row())?.state).toBe("waiting");
+    const end = { state: "hold", reason: "ended", notice: "shown" } as const;
+    await setOrgStanding(deps(), f.org.id, end);
+    expect(await row()).toBeNull();
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id)).toMatchObject({
+      state: "preparing",
+      since: null,
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: "machine.provisioning",
+      state: "preparing",
+      reason: null,
+      since: null,
+    });
+    // A report sent as it was held is refused, so nothing says a computer is on its way again.
+    const late = await setProvisioning(deps(), f.org.id, { state: "preparing", step: "starting" }).catch((e) => e);
+    expect(late).toBeInstanceOf(OrgPausedError);
+    expect(late).toMatchObject({ code: "org.paused" });
+    expect(await row()).toBeNull();
+    // Set again (a retry): nothing left to drop, nothing heard.
+    const told = events.length;
+    await setOrgStanding(deps(), f.org.id, end);
+    expect(events).toHaveLength(told);
+
+    // Active again: a request like any other, and its reports count.
+    await setOrgStanding(deps(), f.org.id, { state: "active", reason: "reactivated", notice: "shown" });
+    expect(await requested()).toEqual(["Acme"]);
+    expect((await page()).requests[0]?.provisioning).toBeNull();
+    expect(await setProvisioning(deps(), f.org.id, { state: "preparing", step: "starting" })).toBe(true);
+
+    // A ready computer stays ready while its workspace is held or suspended; taken away then, no wait starts.
+    const { machineId, token } = await enrolled();
+    await hello(token);
+    await setOrgStanding(deps(), f.org.id, { state: "suspended", reason: "Abuse", notice: "silent" });
+    expect((await row())?.state).toBe("ready");
+    expect(await revokeManagedMachine(deps(), f.org.id, machineId)).toBe(true);
+    expect(await row()).toBeNull();
+    expect(await requested()).toEqual([]);
+    await setOrgStanding(deps(), f.org.id, { state: "active", reason: "Reviewed", notice: "silent" });
+    expect(await requested()).toEqual(["Acme"]);
+  });
+
+  test("the migration drops the waits of workspaces that weren't active before the server did it itself", async () => {
+    f = await setup();
+    const org = async (name: string, standing: "active" | "hold" | "suspended", state: string) => {
+      const made = await createOrganization(f.db, (await addUser(f.db, name.toLowerCase())).id, { name });
+      const orgId = made.organization.id;
+      await f.db.update(schema.organizations).set({ standing }).where(eq(schema.organizations.id, orgId));
+      await f.db.insert(schema.machineProvisioning).values({ orgId, state });
+      return orgId;
+    };
+    const waiting = await org("Waiting", "active", "waiting");
+    const ended = await org("Ended", "hold", "waiting");
+    const retired = await org("Retired", "hold", "preparing");
+    const closed = await org("Closed", "suspended", "problem");
+    const kept = await org("Kept", "hold", "ready");
+    await runMigration(f.db, "idle_provisioning");
+    await runMigration(f.db, "idle_provisioning");
+    const rows = await f.db
+      .select({ orgId: schema.machineProvisioning.orgId, state: schema.machineProvisioning.state })
+      .from(schema.machineProvisioning);
+    expect(Object.fromEntries(rows.map((r) => [r.orgId, r.state]))).toEqual({ [waiting]: "waiting", [kept]: "ready" });
+    for (const gone of [ended, retired, closed]) expect(rows.some((r) => r.orgId === gone)).toBe(false);
   });
 
   test("people see it without its insides and can't remove it; the provisioner can", async () => {

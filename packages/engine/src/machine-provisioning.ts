@@ -12,7 +12,7 @@ import { cleanMachineName, type MachineRow, machineOnline, removeMachine, sha256
 import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
-import { assertCanWork } from "./standing";
+import { assertCanWork, OrgPausedError, STANDING_COLUMNS } from "./standing";
 
 const { organizations, organizationMembers, users, machines, machineProvisioning, machineDeviceCodes, agents } = schema;
 
@@ -223,7 +223,8 @@ function readyTime(input: ProvisioningInput, stored: Date | null, now: Date): Da
  * when something they see changed. `ready` is not the provisioner's to say: it comes with the computer's
  * first hello, and stays until that computer is removed (`ConflictError` meanwhile). A wait said to take
  * over a minute (a ready time that far ahead, `waiting` or `problem`) promises the owners the ready email,
- * until it is ready. False: no such workspace.
+ * until it is ready. Only an active workspace waits for one (`OrgPausedError` otherwise): a report sent as it
+ * was held would say again that a computer is on its way (`forgetProvisioning`). False: no such workspace.
  */
 export async function setProvisioning(
   deps: ProvisioningDeps,
@@ -231,8 +232,10 @@ export async function setProvisioning(
   input: ProvisioningInput,
 ): Promise<boolean> {
   const { db } = deps;
-  const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId));
+  // Read here, not from the 5 s cache: a hold set in another process a moment ago counts.
+  const [org] = await db.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
   if (!org) return false;
+  if (org.state !== "active") throw new OrgPausedError(org);
   const [before] = await db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   const now = new Date();
   const step = input.state === "preparing" ? (input.step ?? null) : null;
@@ -411,8 +414,9 @@ export async function operatorMachines(db: Database, orgId: string) {
 
 /**
  * Takes the workspace's computer away (the provisioner wipes or retires it): its token and unused codes stop
- * working, its socket closes, its agents are left with no computer, and the workspace is back to waiting for
- * one from now (a request again while it is active). False: the workspace has no such managed computer.
+ * working, its socket closes, its agents are left with no computer, and an active workspace is back to waiting
+ * for one from now (a request again); one held or suspended waits for none until it is active again. False: the
+ * workspace has no such managed computer.
  */
 export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string, machineId: string) {
   const [machine] = await deps.db
@@ -443,6 +447,14 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   };
   await removeMachine(deps, machine, { type: "system", id: null }, async (tx) => {
     await supersedeCodes(tx, machine.id, now);
+    const [org] = await tx
+      .select({ state: organizations.standing })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+    if (org?.state !== "active") {
+      await tx.delete(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
+      return;
+    }
     await tx
       .insert(machineProvisioning)
       .values({ orgId, ...waiting })
@@ -451,6 +463,24 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   const [row] = await deps.db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   await publishProvisioning(deps, orgId, row ?? null, null);
   return true;
+}
+
+/**
+ * The workspace left `active` (held, suspended, ended): it is no request (`listMachineRequests`), so what the
+ * provisioner last said of its computer goes, and its people aren't told one is on its way. A ready computer
+ * stays ready. Once active again it is a request like any other.
+ */
+export async function forgetProvisioning(deps: ProvisioningDeps, orgId: string) {
+  const gone = await deps.db
+    .delete(machineProvisioning)
+    .where(and(eq(machineProvisioning.orgId, orgId), notReady))
+    .returning({ orgId: machineProvisioning.orgId });
+  if (gone.length === 0) return;
+  const [managed] = await deps.db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(and(eq(machines.orgId, orgId), eq(machines.kind, "managed"), isNull(machines.deletedAt)));
+  await publishProvisioning(deps, orgId, null, managed?.id ?? null);
 }
 
 /** What the ready email needs besides the database (the server sends email). */
