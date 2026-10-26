@@ -61,8 +61,8 @@ import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, writePref } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
+import { hintFor, PrefRow } from "../ui/settings";
 import { shortPath } from "../ui/time";
-import { hintFor, PrefRow } from "./prefs/shared";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
 const HORIZON: SkyOptions = {

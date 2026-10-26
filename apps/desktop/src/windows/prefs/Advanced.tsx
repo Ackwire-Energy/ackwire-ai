@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { orgName, pairedHomes } from "../../control/store";
 import { OrgTile, Stepper } from "../../ui/bits";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
-import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "./shared";
 
 /** The runner's defaults (the same numbers `agentes-runner` uses when the config has none). */
 export const DEFAULT_LIMITS: Required<Omit<ControlConfigPatch, "name">> = {

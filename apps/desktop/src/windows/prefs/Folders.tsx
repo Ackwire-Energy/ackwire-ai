@@ -6,9 +6,9 @@ import { useHost, useSnapshot, useStore } from "../../app";
 import { ControlError } from "../../control/client";
 import { type Home, orgName, pairedHomes } from "../../control/store";
 import { AgentFace, HelpLink, OrgTile } from "../../ui/bits";
+import { PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { baseName, listNames, shortPath } from "../../ui/time";
-import { PrefCard, PrefHead, PrefRow } from "./shared";
 
 export function Folders() {
   const { t } = useTranslation();

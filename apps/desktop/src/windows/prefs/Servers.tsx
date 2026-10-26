@@ -7,9 +7,9 @@ import { homeServer, type ServerKind, type ServerList, serverKind, serverName } 
 import { pairedHomes } from "../../control/store";
 import { useLocalServer, useOnShown } from "../../hooks";
 import { ReachProblem, ReachRow, ServerTile } from "../../ui/here";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
-import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "./shared";
 
 const KIND_SUB: Record<ServerKind, string> = {
   cloud: "desktop.servers.cloudSub",

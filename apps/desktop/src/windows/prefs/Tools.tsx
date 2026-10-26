@@ -14,10 +14,10 @@ import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
 import { toolsHere } from "../../control/this-mac";
 import { useLocalServer } from "../../hooks";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { listNames } from "../../ui/time";
 import { ToolAccounts } from "./Accounts";
-import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "./shared";
 
 /** Tools are for the whole computer: every organization gets the same switch. */
 export function Tools() {

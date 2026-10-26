@@ -33,8 +33,8 @@ import {
 } from "../../control/accounts";
 import { type Home, orgName } from "../../control/store";
 import { OrgTile } from "../../ui/bits";
+import { CardTitle, hintFor, PrefCard, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
-import { CardTitle, hintFor, PrefCard, PrefRow } from "./shared";
 
 /** What changes between Claude Code and Codex (names stay in the strings; sites are not words). */
 const KINDS: Record<

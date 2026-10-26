@@ -8,8 +8,8 @@ import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
 import { REASON_TEXT, type ServeProblem, type Tailnet } from "../control/local-server";
 import type { ServerKind } from "../control/server";
-import { hintFor, PrefRow } from "../windows/prefs/shared";
 import { CommandCopy } from "./bits";
+import { hintFor, PrefRow } from "./settings";
 import { useToast } from "./Toast";
 
 /** Connecting Tailscale where it has no app of its own to open (Linux). */
