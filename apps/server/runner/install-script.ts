@@ -1,3 +1,4 @@
+import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { DEFAULT_AGENT_UID_RANGE, SYSTEM_RUNNER_HOME } from "./config";
 
 /** Quotes a value for POSIX sh (single quotes; a `'` becomes `'\''`). */
@@ -182,8 +183,11 @@ HOST_TOKEN_FILE=""
 SERVER_FLAG=""
 ENROLL_FILE=""
 
-say() { printf '%s\\n' "$*"; }
-die() { printf 'agentes-runner: %s\\n' "$*" >&2; exit 1; }
+${TERM_SH}
+die() {
+  t_fail "$*"
+  exit 1
+}
 need_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\\\\\''/g")"; }
 sha256() {
@@ -191,18 +195,18 @@ sha256() {
 }
 
 usage() {
-  say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]"
-  say "       sh install.sh --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST] [--enroll-file FILE]"
-  say ""
-  say "  --system           Linux, as root: the runner for the whole computer, each agent as its own user"
-  say "  --desktop          with --system: also the packages for the agents' screens"
-  say "  --no-pair          with --system: don't connect it to the server now"
-  say "  --no-start         with --system: install or update without starting or restarting the service"
-  say "  --agent-uid-range  with --system: the uids agent users get (default ${uids})"
-  say "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)"
-  say "  --server           where this computer reaches the server, if not at $SERVER"
-  say "  --host-token-file  with --system (alone on a Mac): this server's own computer, with HOST_COMPUTER_TOKEN from this file"
-  say "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
+  printf '%s\\n' "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service] [--enroll-file FILE]" \\
+    "       sh install.sh --system [--desktop] [--no-pair] [--no-start] [--agent-uid-range FIRST-LAST] [--enroll-file FILE]" \\
+    "" \\
+    "  --system           Linux, as root: the runner for the whole computer, each agent as its own user" \\
+    "  --desktop          with --system: also the packages for the agents' screens" \\
+    "  --no-pair          with --system: don't connect it to the server now" \\
+    "  --no-start         with --system: install or update without starting or restarting the service" \\
+    "  --agent-uid-range  with --system: the uids agent users get (default ${uids})" \\
+    "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)" \\
+    "  --server           where this computer reaches the server, if not at $SERVER" \\
+    "  --host-token-file  with --system (alone on a Mac): this server's own computer, with HOST_COMPUTER_TOKEN from this file" \\
+    "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
 }
 
 download() {
@@ -211,14 +215,24 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -qO "$2" "$1"
   else
-    die "curl or wget is needed to download the runner"
+    echo "curl or wget is needed to download the runner" >&2
+    return 1
   fi
+}
+
+# The frame from here on, its runner commands drawing in it (AGENTES_FRAME=1): what the refusals above leave out.
+start_frame() {
+  t_intro "connect this computer"
+  AGENTES_FRAME=1
+  export AGENTES_FRAME
 }
 
 # Downloads the runner to $BUNDLE and writes $LAUNCHER (home $RUNNER_HOME, runtime $RUNTIME).
 get_runner() {
-  say "Downloading the runner from $SERVER ..."
-  download "$SERVER/runner/agentes-runner.mjs" "$BUNDLE.download" || die "download failed"
+  t_run "Downloading the runner from $SERVER" download "$SERVER/runner/agentes-runner.mjs" "$BUNDLE.download" || {
+    t_tail "$T_LOG"
+    die "download failed"
+  }
   if [ -n "$RUNNER_SHA256" ] && [ "$(sha256 "$BUNDLE.download")" != "$RUNNER_SHA256" ]; then
     rm -f "$BUNDLE.download"
     die "the runner download didn't match --runner-sha256; it was not installed"
@@ -233,12 +247,14 @@ get_runner() {
   } > "$LAUNCHER.new"
   chmod 755 "$LAUNCHER.new"
   mv -f "$LAUNCHER.new" "$LAUNCHER"
+  t_step "The runner, from $SERVER"
 }
 
 # Connects this computer, unless it already is (and no code was issued for it) or --no-pair.
 connect() {
   if [ -z "$ENROLL_FILE" ] && [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
-    say "This computer is already connected (runner updated). To connect it again: $LAUNCHER pair --server $SERVER"
+    t_step "This computer is already connected (runner updated). To connect it again:"
+    t_cmd "$LAUNCHER pair --server $SERVER"
   elif [ "$NO_PAIR" -eq 0 ]; then
     # Prints a code and a link, and waits until someone confirms it on the site (an issued code needs nobody).
     set -- pair --server "$SERVER"
@@ -246,7 +262,13 @@ connect() {
     if [ -n "$DIR" ]; then set -- "$@" --dir "$DIR"; fi
     if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
     if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
-    "$LAUNCHER" "$@" || die "connecting this computer failed"
+    t_gap
+    "$LAUNCHER" "$@" || {
+      PAIRED=$?
+      # Ctrl-C at the code: canceled, not failed.
+      if [ "$PAIRED" -eq 130 ]; then exit 130; fi
+      die "connecting this computer failed"
+    }
   fi
 }
 
@@ -267,28 +289,42 @@ apt_install() {
   apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "$@"
 }
 
+# $PACKAGES, then with --desktop the screens' theme, CJK fonts and dock, each in an apt call of its own:
+# apt lacks some of them on some releases, and those are named in $NOT_INSTALLED.
+apt_packages() {
+  NOT_INSTALLED=''
+  # shellcheck disable=SC2086
+  apt_install $PACKAGES || return
+  if [ "$DESKTOP" -eq 1 ]; then
+    # shellcheck disable=SC2086
+    apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $LOOK_PACKAGES ||
+      NOT_INSTALLED="$NOT_INSTALLED look"
+    # shellcheck disable=SC2086
+    apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $CJK_PACKAGES ||
+      NOT_INSTALLED="$NOT_INSTALLED cjk"
+    # shellcheck disable=SC2086
+    apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $DOCK_PACKAGES ||
+      NOT_INSTALLED="$NOT_INSTALLED dock"
+  fi
+}
+
 # The libraries the agents' browser loads, and with --desktop the packages for their screens.
 system_packages() {
   PACKAGES=$BROWSER_PACKAGES WHAT="the agents' browser"
   if [ "$DESKTOP" -eq 1 ]; then PACKAGES="$PACKAGES $DESKTOP_PACKAGES" WHAT="the agents' browser and screens"; fi
   if command -v apt-get >/dev/null 2>&1; then
-    say "Installing the packages for $WHAT ..."
-    # shellcheck disable=SC2086
-    apt_install $PACKAGES || die "installing the packages for $WHAT failed"
-    if [ "$DESKTOP" -eq 1 ]; then
-      # shellcheck disable=SC2086
-      apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $LOOK_PACKAGES ||
-        say "The agents' screens keep the stock theme: apt has no $LOOK_PACKAGES here"
-      # shellcheck disable=SC2086
-      apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $CJK_PACKAGES ||
-        say "The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no $CJK_PACKAGES here"
-      # shellcheck disable=SC2086
-      apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends $DOCK_PACKAGES ||
-        say "The agents' screens keep the panel's own dock: apt has no $DOCK_PACKAGES here"
-    fi
+    t_run "Installing the packages for $WHAT" apt_packages || {
+      t_tail "$T_LOG"
+      die "installing the packages for $WHAT failed"
+    }
+    t_step "The packages for $WHAT"
+    case $NOT_INSTALLED in *look*) t_warn "The agents' screens keep the stock theme: apt has no $LOOK_PACKAGES here" ;; esac
+    case $NOT_INSTALLED in
+      *cjk*) t_warn "The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no $CJK_PACKAGES here" ;;
+    esac
+    case $NOT_INSTALLED in *dock*) t_warn "The agents' screens keep the panel's own dock: apt has no $DOCK_PACKAGES here" ;; esac
   else
-    say "For $WHAT, install these packages (Debian names) with this computer's package manager:"
-    say "  $PACKAGES"
+    t_warn "For $WHAT, install these packages (Debian names) with this computer's package manager: $PACKAGES"
   fi
 }
 
@@ -325,9 +361,8 @@ fetch_bun() {
   case "$BUN_TARGET" in
 ${shaCases}
   esac
-  say "Downloading Bun $BUN_VERSION ..."
   WORK=$(mktemp -d) || { WHY="no temporary folder for it"; return 1; }
-  if ! download "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-$BUN_TARGET.zip" "$WORK/bun.zip"; then
+  if ! t_run "Downloading Bun $BUN_VERSION" download "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-$BUN_TARGET.zip" "$WORK/bun.zip"; then
     WHY="the download failed"
   elif [ "$(sha256 "$WORK/bun.zip")" != "$BUN_SHA256" ]; then
     WHY="the download didn't match its checksum, so it was not installed"
@@ -347,6 +382,7 @@ ${shaCases}
 get_bun() {
   RUNTIME="$SYSTEM_DIR/bin/bun"
   fetch_bun "$RUNTIME" || die "no Bun $BUN_VERSION for the runner: $WHY"
+  t_step "Bun $BUN_VERSION (SHA-256 checked)"
 }
 
 # This server's computer replaces the service a connected runner in $RUNNER_HOME runs as (the root unit,
@@ -357,6 +393,15 @@ not_connected_for_host() {
   fi
 }
 
+# The end of the frame: the command, by its name, then Done.
+finish() {
+  t_gap
+  t_info "The agentes-runner command is $LAUNCHER, for example:"
+  t_cmd "$1 status"
+  t_gap
+  t_end Done
+}
+
 install_system() {
   [ "$(id -u)" -eq 0 ] ||
     die "--system installs the runner for the whole computer: run it as root (curl -fsSL $SERVER/api/machines/install.sh | sudo sh -s -- --system)"
@@ -364,6 +409,7 @@ install_system() {
   SYSTEM_DIR=${shQuote(SYSTEM_RUNNER_DIR)}
   RUNNER_HOME=${shQuote(SYSTEM_RUNNER_HOME)}
   not_connected_for_host
+  start_frame
   system_packages
   BUNDLE="$SYSTEM_DIR/agentes-runner.mjs"
   LAUNCHER=${shQuote(SYSTEM_LAUNCHER)}
@@ -388,7 +434,7 @@ install_system() {
     connect
     if [ "$NO_START" -eq 0 ]; then "$LAUNCHER" service install --system || die "starting the service failed"; fi
   fi
-  say "The agentes-runner command is $LAUNCHER (for example: agentes-runner status)."
+  finish agentes-runner
 }
 
 install_user() {
@@ -399,6 +445,7 @@ install_user() {
     die "this computer is connected by the agentes app; manage it there (or set AGENTES_RUNNER_HOME to another folder)"
   fi
   not_connected_for_host
+  start_frame
   mkdir -p "$RUNNER_HOME/bin" "$RUNNER_HOME/runtime"
   chmod 700 "$RUNNER_HOME"
 
@@ -406,10 +453,19 @@ install_user() {
   # only when there is neither, since a runner there gets no screens and no terminal.
   RUNTIME=""
   for CANDIDATE in "$(command -v bun 2>/dev/null || true)" "$HOME/.bun/bin/bun"; do
-    if [ -n "$CANDIDATE" ] && has_terminal "$CANDIDATE"; then RUNTIME=$CANDIDATE; break; fi
+    if [ -n "$CANDIDATE" ] && has_terminal "$CANDIDATE"; then
+      RUNTIME=$CANDIDATE
+      t_step "Bun $("$RUNTIME" --version 2>/dev/null || true) ($RUNTIME)"
+      break
+    fi
   done
   if [ -z "$RUNTIME" ]; then
-    if fetch_bun "$RUNNER_HOME/runtime/bun"; then RUNTIME="$RUNNER_HOME/runtime/bun"; else say "No Bun $BUN_VERSION: $WHY."; fi
+    if fetch_bun "$RUNNER_HOME/runtime/bun"; then
+      RUNTIME="$RUNNER_HOME/runtime/bun"
+      t_step "Bun $BUN_VERSION (SHA-256 checked)"
+    else
+      t_warn "No Bun $BUN_VERSION: $WHY."
+    fi
   fi
   if [ -z "$RUNTIME" ]; then
     if command -v node >/dev/null 2>&1; then
@@ -420,14 +476,16 @@ install_user() {
     if [ -z "$RUNTIME" ] && command -v bun >/dev/null 2>&1; then RUNTIME=$(command -v bun); fi
     if [ -z "$RUNTIME" ] && [ -x "$HOME/.bun/bin/bun" ]; then RUNTIME="$HOME/.bun/bin/bun"; fi
     if [ -n "$RUNTIME" ]; then
-      say "The runner runs on $RUNTIME, so agents get no screens and no terminal on this computer: those need Bun 1.3.5 or newer."
+      t_warn "The runner runs on $RUNTIME, so agents get no screens and no terminal on this computer: those need Bun 1.3.5 or newer."
     fi
   fi
   if [ -z "$RUNTIME" ]; then
-    say "The runner needs Bun 1.3.5 or newer, or Node.js 22 or newer. Install one, then run this again:"
-    say "  Bun:    curl -fsSL https://bun.sh/install | bash"
-    say "  macOS:  brew install node"
-    say "  Linux:  https://nodejs.org/en/download (or: curl -fsSL https://fnm.vercel.app/install | bash && fnm install 22)"
+    T_FD=2
+    t_say "$C_FAIL$M_FAIL$C_OFF" "$C_BOLD" "The runner needs Bun 1.3.5 or newer, or Node.js 22 or newer. Install one, then run this again:"
+    t_cmd "curl -fsSL https://bun.sh/install | bash" "Bun:  "
+    t_cmd "brew install node" "macOS:"
+    t_cmd "https://nodejs.org/en/download (or: curl -fsSL https://fnm.vercel.app/install | bash && fnm install 22)" "Linux:"
+    t_end Stopped
     exit 1
   fi
 
@@ -437,7 +495,7 @@ install_user() {
     set -- service install --host --server "$SERVER" --token-file "$HOST_TOKEN_FILE"
     if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
     "$LAUNCHER" "$@" || die "installing this server's computer failed"
-    say "The agentes-runner command is $LAUNCHER (for example: $LAUNCHER status)."
+    finish "$LAUNCHER"
     return 0
   fi
   connect
@@ -453,20 +511,24 @@ install_user() {
 
   if [ "$SERVICE" -eq 1 ]; then
     if ! "$LAUNCHER" service install; then
-      say "Couldn't install the service. Start the runner yourself:"
-      say "  $LAUNCHER start"
+      t_warn "Couldn't install the service. Start the runner yourself:"
+      t_cmd "$LAUNCHER start"
     fi
   else
-    say "Start the runner (keep it running, for example in tmux):"
-    say "  $LAUNCHER start"
+    t_gap
+    t_info "Start the runner (keep it running, for example in tmux):"
+    t_cmd "$LAUNCHER start"
   fi
 
-  say ""
-  say "To use the agentes-runner command, add it to your PATH:"
-  say "  export PATH=\\"$RUNNER_HOME/bin:\\$PATH\\""
+  t_gap
+  t_info "To use the agentes-runner command, add it to your PATH:"
+  t_cmd "export PATH=\\"$RUNNER_HOME/bin:\\$PATH\\""
+  t_gap
+  t_end Done
 }
 
 main() {
+  t_init 1
   while [ $# -gt 0 ]; do
     case "$1" in
       --dir) need_value "$1" $#; DIR="$2"; shift 2 ;;

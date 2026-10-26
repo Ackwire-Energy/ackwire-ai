@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { type AgentScope, MACHINE_PROTOCOL_VERSION, type RunnerTools } from "@agenteschat/adapters/machine-protocol";
+import { createTerm, type Spinner, type Term } from "@agenteschat/setup/src/term";
 import {
   addFolder,
   ControlError,
@@ -211,40 +212,44 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
 
 /**
  * The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site.
- * With `--enroll-file`, redeems a code issued for this computer instead (ADR 0056 §10).
+ * With `--enroll-file`, redeems a code issued for this computer instead (ADR 0056 §10). Inside the
+ * installer's frame (AGENTES_FRAME=1) it draws on its line and leaves the end to the installer.
  */
 async function pair(p: Parsed): Promise<number> {
   const usage =
     "Usage: agentes-runner pair --server <url> [--enroll-file <path>] [--dir <workspace>] [--name <name>] [--no-exec] [--new]";
+  const term = createTerm();
+  term.intro("connect this computer");
+  // Typed wide: the code's callback sets it, and TypeScript would keep it narrowed to null.
+  let wait = null as Spinner | null;
+  /** A refusal in its own words, in place of the wait if one was turning. */
+  const refuse = (message: string) => {
+    if (wait) wait.fail(message);
+    else term.fail(message);
+    if (!term.inherited) term.end("Stopped");
+    return 1;
+  };
   let enrollCode: string | undefined;
   if (p.flags.has("enroll-file")) {
     // Taken first, so no failure below leaves the code on disk.
     try {
       enrollCode = takeEnrollCode(flagString(p, "enroll-file") ?? "");
     } catch (err) {
-      console.error(err instanceof Error ? err.message : String(err));
-      return 1;
+      return refuse(err instanceof Error ? err.message : String(err));
     }
   }
   if (p.flags.has("code")) {
-    console.error(
+    return refuse(
       "Pairing codes from the site are gone: run agentes-runner pair --server <url> and confirm the code it shows.",
     );
-    return 1;
   }
   const serverRaw = flagString(p, "server");
-  if (!serverRaw) {
-    console.error(usage);
-    return 1;
-  }
+  if (!serverRaw) return refuse(usage);
   const server = normalizeServerUrl(serverRaw);
   const home = runnerHome();
   const prev = storedOrNull(home);
   const managed = managedMessage(prev);
-  if (managed) {
-    console.error(managed);
-    return 1;
-  }
+  if (managed) return refuse(managed);
   // Created only once the connection worked.
   const workspace = expandHome(flagString(p, "dir") ?? prev?.workspace ?? "~/agentes");
   const exec = !p.flags.has("no-exec");
@@ -254,33 +259,39 @@ async function pair(p: Parsed): Promise<number> {
   process.once("SIGINT", onSignal);
   let grant: DeviceGrant;
   try {
-    grant = enrollCode
-      ? await redeemIssuedCode(server, enrollCode, { signal: ac.signal })
-      : await devicePair(
-          server,
-          deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
-          (code) => {
-            console.log("");
-            console.log(
-              `To connect this computer, open this link and confirm the code ${formatUserCode(code.userCode)}:`,
-            );
-            console.log("");
-            console.log(`  ${code.verificationUrl}`);
-            console.log("");
-            console.log(
-              `The code expires in ${Math.max(1, Math.round(code.expiresIn / 60))} minutes. Waiting for the confirmation...`,
-            );
-          },
-          { signal: ac.signal },
-        );
+    if (enrollCode) {
+      wait = term.spin("Connecting with the code issued for this computer");
+      grant = await redeemIssuedCode(server, enrollCode, { signal: ac.signal });
+    } else {
+      grant = await devicePair(
+        server,
+        deviceInfo(name, p.flags.has("new") ? undefined : previousMachineFor(prev, server)),
+        (code) => {
+          term.info(
+            `To connect this computer, open this link and confirm the code ${term.accent(formatUserCode(code.userCode))}:`,
+          );
+          term.command(code.verificationUrl);
+          wait = term.spin(
+            "Waiting for the confirmation",
+            `The code expires in ${Math.max(1, Math.round(code.expiresIn / 60))} minutes.`,
+          );
+        },
+        { signal: ac.signal },
+      );
+    }
   } catch (err) {
     if (err instanceof PairingError) {
-      if (err.code === "canceled") console.error("Canceled.");
-      else if (enrollCode) console.error(err.message);
-      else if (err.code === "denied") console.error("The connection was refused on the site. Nothing changed.");
-      else if (err.code === "expired") console.error("The code expired before it was confirmed. Run this again.");
-      else console.error(err.message);
-      return 1;
+      if (err.code === "canceled") {
+        if (wait) wait.fail("Canceled");
+        else term.fail("Canceled");
+        // An installer that started this stops on 130 without a word: this closes the frame.
+        term.end();
+        return 130;
+      }
+      if (enrollCode) return refuse(err.message);
+      if (err.code === "denied") return refuse("The connection was refused on the site. Nothing changed.");
+      if (err.code === "expired") return refuse("The code expired before it was confirmed. Run this again.");
+      return refuse(err.message);
     }
     throw err;
   } finally {
@@ -296,12 +307,18 @@ async function pair(p: Parsed): Promise<number> {
     desktop: false,
   });
   writeConfig(next, home);
-  console.log("");
-  console.log(
-    `Connected${grant.org.name ? ` to ${grant.org.name}` : ""} as "${next.name}". Workspace: ${workspaceReal}${exec ? "" : " (commands off)"}`,
-  );
-  console.log(`Config: ${configPath(home)}`);
-  console.log("Next: agentes-runner start (or agentes-runner service install to run it in the background)");
+  const connected = `Connected${grant.org.name ? ` to ${grant.org.name}` : ""} as "${next.name}"`;
+  const details = [`Workspace: ${workspaceReal}${exec ? "" : " (commands off)"}`, `Config: ${configPath(home)}`];
+  if (wait) wait.done(connected, ...details);
+  else term.step(connected, ...details);
+  if (!term.inherited) {
+    term.gap();
+    term.info("Next: start it, or run it in the background");
+    term.command("agentes-runner start");
+    term.command("agentes-runner service install");
+    term.gap();
+    term.end("Done");
+  }
   return 0;
 }
 
@@ -537,17 +554,17 @@ async function hostOnce(flags: NonNullable<ReturnType<typeof hostFlags>>, rotate
 }
 
 /** `service install --host`: `agentes-runner host` as this computer's service (the token from a file). */
-function installHost(p: Parsed): number {
+function installHost(p: Parsed, print: (line: string) => void): number {
   const flags = hostFlags(p);
   if (!flags?.tokenFile) {
-    console.error(
+    print(
       "Usage: agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]",
     );
     return 1;
   }
   const refusal = hostRefusal();
   if (refusal) {
-    console.error(refusal);
+    print(refusal);
     return 1;
   }
   const args = [
@@ -561,85 +578,113 @@ function installHost(p: Parsed): number {
     ...(flags.name ? ["--name", flags.name] : []),
     ...(flags.exec ? [] : ["--no-exec"]),
   ];
-  const print = (l: string) => console.log(l);
   if (process.platform === "linux") return installSystemService({ print, args, start: !p.flags.has("no-start") });
   return installService({ print, args });
 }
 
+/**
+ * What the service functions print, drawn: the first line ◇ (■ when it failed), the rest quiet, and the lines
+ * they indent as commands. Inside the installer's frame it draws on its line; by hand, in a frame of its own.
+ */
+function printed(term: Term, title: string, run: (print: (line: string) => void) => number): number {
+  term.intro(title, false);
+  const lines: string[] = [];
+  const code = run((line) => lines.push(line));
+  const [first, ...rest] = lines;
+  if (first !== undefined) {
+    if (code === 0) term.step(first);
+    else term.fail(first);
+  }
+  for (const line of rest) {
+    if (line.startsWith("  ")) term.command(line.trim());
+    else term.text(line, true);
+  }
+  if (!term.inherited) {
+    if (code === 0) term.gap();
+    term.end(code === 0 ? "Done" : "Stopped");
+  }
+  return code;
+}
+
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
 async function update(): Promise<number> {
+  const term = createTerm();
+  const refuse = (message: string) =>
+    printed(term, "update", (print) => {
+      print(message);
+      return 1;
+    });
   const stored = storedOrNull();
-  if (stored?.managedBy === "desktop") {
-    console.error(`${DESKTOP_MANAGED} To update, install the new version of the app.`);
-    return 1;
-  }
-  if (stored?.managedBy === "host") {
-    console.error(HOST_MANAGED);
-    return 1;
-  }
+  if (stored?.managedBy === "desktop")
+    return refuse(`${DESKTOP_MANAGED} To update, install the new version of the app.`);
+  if (stored?.managedBy === "host") return refuse(HOST_MANAGED);
   // A root runner never replaces itself with whatever the server sends.
   if (stored?.mode === "system") {
-    console.error(
+    return refuse(
       `This computer runs the runner for all its agents: update it with the installer, as root (curl -fsSL ${stored.server ?? "<server>"}/api/machines/install.sh | sh -s -- --system).`,
     );
-    return 1;
   }
   if (runningCompiled()) {
-    console.error(
+    return refuse(
       "This runner is a single executable: install its new version instead (agentes-runner update replaces the script only).",
     );
-    return 1;
   }
   const config = readConfig();
-  if (!config) {
-    console.error("Not connected yet: run the install command from Settings > Computers.");
-    return 1;
-  }
+  if (!config) return refuse("Not connected yet: run the install command from Settings > Computers.");
   const script = thisRunner()[1] ?? "";
   const url = `${config.server}/runner/agentes-runner.mjs`;
   const res = await fetch(url);
-  if (!res.ok) {
-    console.error(`Download failed: ${res.status} ${url}`);
-    return 1;
-  }
+  if (!res.ok) return refuse(`Download failed: ${res.status} ${url}`);
   const text = await res.text();
   if (!text.startsWith("#!") || !text.includes("agentes-runner")) {
-    console.error(`${url} doesn't look like the runner; nothing changed.`);
-    return 1;
+    return refuse(`${url} doesn't look like the runner; nothing changed.`);
   }
   writeFileSync(`${script}.new`, text, { mode: 0o755 });
   renameSync(`${script}.new`, script);
-  console.log(`Updated ${script}.`);
   if (!serviceStatus()) {
-    console.log("Restart the runner (agentes-runner start) to use it.");
-    return 0;
+    return printed(term, "update", (print) => {
+      print(`Updated ${script}.`);
+      print("Restart the runner (agentes-runner start) to use it.");
+      return 0;
+    });
   }
-  return installService({ print: (l) => console.log(l) });
+  return printed(term, "update", (print) => {
+    print(`Updated ${script}.`);
+    return installService({ print });
+  });
 }
 
 function status(): number {
+  const term = createTerm();
   const home = runnerHome();
   const stored = storedOrNull(home);
   const config = readConfig(home);
   const bun = (process.versions as { bun?: string }).bun;
-  console.log(
+  term.intro(
     `agentes-runner ${RUNNER_VERSION} (protocol ${MACHINE_PROTOCOL_VERSION}) on ${bun ? `bun ${bun}` : `${process.release.name} ${process.version}`}${runningCompiled() ? " (compiled)" : ""}`,
+    false,
   );
-  console.log(`Config: ${configPath(home)}`);
-  if (!config) console.log("Not connected.");
+  if (config) {
+    term.step(
+      `Connected${stored?.orgName ? ` to ${stored.orgName}` : ""} as "${config.name}"`,
+      `${config.server} · workspace ${config.workspace}`,
+    );
+  } else term.fail("Not connected.");
+  const holder = readLock(home);
+  if (holder && pidAlive(holder.pid)) term.step(`Running: pid ${holder.pid}${holder.mode ? ` (${holder.mode})` : ""}`);
+  else term.warn("Running: no");
+  const service = serviceStatus(undefined, stored?.mode === "system");
+  // systemd says how the unit is ("(active)", "(inactive)", "(failed)"); launchd and Windows only that it's there.
+  if (service && (service.endsWith("(active)") || !service.endsWith(")"))) term.step(`Service: ${service}`);
+  else term.warn(service ? `Service: ${service}` : "Service: not installed");
+  printDesktopAndTerminal(term, home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
+  term.gap();
+  term.text(`Config: ${configPath(home)}`, true);
   if (stored) {
     const { token: _token, ...visible } = stored;
-    console.log(JSON.stringify(visible, null, 2));
+    term.quiet(JSON.stringify(visible, null, 2).split("\n"));
   }
-  const holder = readLock(home);
-  console.log(
-    holder && pidAlive(holder.pid)
-      ? `Running: pid ${holder.pid}${holder.mode ? ` (${holder.mode})` : ""}`
-      : "Running: no",
-  );
-  const service = serviceStatus(undefined, stored?.mode === "system");
-  console.log(service ? `Service: ${service}` : "Service: not installed");
-  printDesktopAndTerminal(home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
+  term.end();
   return 0;
 }
 
@@ -647,7 +692,7 @@ function status(): number {
  * `status`: whether the agents' desktops and the terminal can run here (what `hello` tells the server), and
  * their switches. In system mode root runs them as each agent's own user, so being root is no reason.
  */
-function printDesktopAndTerminal(home: string, tools: RunnerTools | undefined, agentUsers: boolean) {
+function printDesktopAndTerminal(term: Term, home: string, tools: RunnerTools | undefined, agentUsers: boolean) {
   const log = () => undefined;
   const infos = [
     [
@@ -658,16 +703,14 @@ function printDesktopAndTerminal(home: string, tools: RunnerTools | undefined, a
     ["terminal", "Terminal", new Terminals({ log, user: async () => runnerTerminalUser(home), agentUsers }).info()],
   ] as const;
   for (const [tool, label, info] of infos) {
-    const state = !info.available
-      ? `unavailable: ${info.reason}`
-      : tools?.[tool]
-        ? "on"
-        : `off (agentes-runner tools enable ${tool})`;
-    console.log(`${label}: ${state}`);
+    if (!info.available) term.warn(`${label}: unavailable: ${info.reason}`);
+    else if (tools?.[tool]) term.step(`${label}: on`);
+    else term.warn(`${label}: off (agentes-runner tools enable ${tool})`);
   }
   if (!hasBunTerminal() && !runningCompiled() && process.platform !== "win32") {
-    console.log(
+    term.text(
       "The install command from Settings > Computers, run again, puts the runner on Bun 1.3.5 or newer (this computer stays connected).",
+      true,
     );
   }
 }
@@ -821,42 +864,67 @@ async function desktopCheck(p: Parsed): Promise<number> {
     console.error("Usage: agentes-runner desktop-check --agent <handle>");
     return 1;
   }
+  const term = createTerm();
+  term.intro(`desktop-check @${handle.replace(/^@/, "")}`, false);
+  const stopped = (message: string) => {
+    term.fail(message);
+    term.end("Stopped");
+    return 1;
+  };
   const agents = readAgents(home);
   const agent = resolveAgentHandle(agents, handle);
   const stored = storedOrNull(home);
   const workspace = stored?.workspace;
-  if (!agent || !workspace) {
-    console.error(unknownAgent(handle, agents));
-    return 1;
-  }
+  if (!agent || !workspace) return stopped(unknownAgent(handle, agents));
   const lock = acquireLock(home, "desktop-check");
-  if (!lock.ok) {
-    console.error(lockedMessage(home, lock.holder));
-    return 1;
-  }
+  if (!lock.ok) return stopped(lockedMessage(home, lock.holder));
+  let failed = 0;
+  const report: Report = {
+    ok: (text) => term.step(text),
+    fail: (text) => {
+      failed++;
+      term.fail(text);
+    },
+    skip: (text) => term.skipped(text),
+    log: (line) => term.quiet([line]),
+  };
+  let passed: boolean;
   try {
     if (stored?.mode === "system") {
       const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
       const launcher = systemLauncher(u);
       const desktop = await checkDesktop(
+        report,
         home,
         agent,
         { user: async () => systemDesktopUser(launcher, { uid: u.uid, gid: agentGid(u.user) }), agentUsers: true },
         { prefix: launcher.prefix, uid: u.uid },
       );
-      const terminal = await checkTerminal(agent, {
+      const terminal = await checkTerminal(report, agent, {
         user: async () => systemTerminalUser(launcher, agent),
         agentUsers: true,
       });
-      return desktop && terminal ? 0 : 1;
+      passed = desktop && terminal;
+    } else {
+      const folder = await agentWorkspace(prepareWorkspace(workspace), agent);
+      const desktop = await checkDesktop(report, home, agent, { user: async (a) => runnerUser(home, folder, a) });
+      const terminal = await checkTerminal(report, agent, { user: async () => runnerTerminalUser(folder) });
+      passed = desktop && terminal;
     }
-    const folder = await agentWorkspace(prepareWorkspace(workspace), agent);
-    const desktop = await checkDesktop(home, agent, { user: async (a) => runnerUser(home, folder, a) });
-    const terminal = await checkTerminal(agent, { user: async () => runnerTerminalUser(folder) });
-    return desktop && terminal ? 0 : 1;
   } finally {
     lock.release();
   }
+  term.gap();
+  term.end(failed ? `${failed} ${failed === 1 ? "check" : "checks"} failed` : "Every check passed");
+  return passed ? 0 : 1;
+}
+
+/** How a check says what it found: done, failed, left out, and the lines of what it runs. */
+interface Report {
+  ok(text: string): void;
+  fail(text: string): void;
+  skip(text: string): void;
+  log(line: string): void;
 }
 
 const since = (t0: number) => `${Math.round(performance.now() - t0)} ms`;
@@ -864,16 +932,17 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 
 /** Its desktop starts (or runs), both logins work, and a watcher's pointer is ignored; a desktop it started stops. */
 async function checkDesktop(
+  report: Report,
   home: string,
   agent: AgentScope,
   as: Pick<DesktopSessionsOptions, "user" | "agentUsers">,
   launcher?: { prefix: string[]; uid: number },
 ): Promise<boolean> {
-  const desktops = new DesktopSessions({ home, log: (line) => console.log(`     ${line}`), ...as });
+  const desktops = new DesktopSessions({ home, log: report.log, ...as });
   desktops.restore();
   const info = desktops.info();
   if (!info.available) {
-    console.log(`FAIL desktop: ${info.reason}`);
+    report.fail(`desktop: ${info.reason}`);
     return false;
   }
   const opened: VncConnection[] = [];
@@ -882,8 +951,8 @@ async function checkDesktop(
     const t0 = performance.now();
     const reply = await desktops.ensure(agent);
     started = reply.started;
-    console.log(
-      `ok   desktop: ${started ? "started" : "running already"} on :${reply.display} (${reply.width}×${reply.height}) in ${since(t0)}`,
+    report.ok(
+      `desktop: ${started ? "started" : "running already"} on :${reply.display} (${reply.width}×${reply.height}) in ${since(t0)}`,
     );
     const session = desktops.session(agent.id);
     if (!session) throw new Error("the desktop has no session");
@@ -892,7 +961,7 @@ async function checkDesktop(
       const vnc = await connectVnc(session.socket, password);
       opened.push(vnc);
       const init = await vncInit(vnc);
-      console.log(`ok   ${what}: logged in in ${since(t)}, ${init.width}×${init.height} "${init.name}"`);
+      report.ok(`${what}: logged in in ${since(t)}, ${init.width}×${init.height} "${init.name}"`);
       return vnc;
     };
     const control = await login("control (the full password)", session.passwords.full);
@@ -909,22 +978,22 @@ async function checkDesktop(
       return m ? `${m[1]},${m[2]}` : null;
     };
     const moved = await point(control, 100, 120);
-    if (moved === null) console.log("--   view-only: not checked (install xdotool to check it)");
+    if (moved === null) report.skip("view-only: not checked (install xdotool to check it)");
     else if (moved !== "100,120") throw new Error(`the person in control moved the pointer to ${moved}, not 100,120`);
     else {
       const after = await point(watch, 640, 400);
       if (after !== "100,120") throw new Error(`a watcher moved the pointer (to ${after})`);
-      console.log("ok   view-only: a watcher's pointer is ignored, the controller's moves it");
+      report.ok("view-only: a watcher's pointer is ignored, the controller's moves it");
     }
-    return await checkDesktopUse(desktops, agent, launcher);
+    return await checkDesktopUse(report, desktops, agent, launcher);
   } catch (err) {
-    console.log(`FAIL desktop: ${errorText(err)}`);
+    report.fail(`desktop: ${errorText(err)}`);
     return false;
   } finally {
     for (const vnc of opened) vnc.socket.destroy();
     if (started) {
       await desktops.stop(agent);
-      console.log("ok   desktop: stopped");
+      report.ok("desktop: stopped");
     }
     desktops.close();
   }
@@ -937,20 +1006,18 @@ async function checkDesktop(
  * agents may use their desktops here is said first.
  */
 async function checkDesktopUse(
+  report: Report,
   desktops: DesktopSessions,
   agent: AgentScope,
   launcher?: { prefix: string[]; uid: number },
 ): Promise<boolean> {
   const forAgents = new DesktopManager({ desktops, workers: launcher !== undefined, log: () => undefined }).info();
-  console.log(
-    forAgents.available
-      ? "ok   desktop use: agents can use their desktops here"
-      : `--   desktop use: agents can't use their desktops here: ${forAgents.reason}`,
-  );
+  if (forAgents.available) report.ok("desktop use: agents can use their desktops here");
+  else report.skip(`desktop use: agents can't use their desktops here: ${forAgents.reason}`);
   const uid = launcher?.uid ?? process.getuid?.() ?? null;
   const use = new DesktopManager({
     desktops,
-    log: (line) => console.log(`     ${line}`),
+    log: report.log,
     // The person at this computer drives the desktop this check started, as its own user (or the agent's).
     uids: () => (uid === null ? null : { runner: -1, agents: new Map([[agent.id, uid]]) }),
     ...(launcher ? { launcher } : {}),
@@ -959,38 +1026,38 @@ async function checkDesktopUse(
     let t0 = performance.now();
     const first = await use.look(agent);
     const elements = Object.keys(first.refs);
-    console.log(
-      `ok   desktop use: a look in ${since(t0)} with the helper starting (${first.snapshot.split("\n").length} lines, ${elements.length} elements, ${first.address})`,
+    report.ok(
+      `desktop use: a look in ${since(t0)} with the helper starting (${first.snapshot.split("\n").length} lines, ${elements.length} elements, ${first.address})`,
     );
     t0 = performance.now();
     await use.look(agent);
-    console.log(`ok   desktop use: a look in ${since(t0)}`);
+    report.ok(`desktop use: a look in ${since(t0)}`);
     const ref = elements[0];
     if (ref) {
       t0 = performance.now();
       const acted = await use.act(agent, { kind: "hover", at: { ref } }, true, { folder: process.cwd() });
-      console.log(
-        `ok   desktop use: a hover on ${ref} (${first.refs[ref]?.role}), settled${acted.settled === false ? " at the cap" : ""} and looked at, in ${since(t0)}`,
+      report.ok(
+        `desktop use: a hover on ${ref} (${first.refs[ref]?.role}), settled${acted.settled === false ? " at the cap" : ""} and looked at, in ${since(t0)}`,
       );
-    } else console.log("--   desktop use: nothing on the screen to act on");
+    } else report.skip("desktop use: nothing on the screen to act on");
     t0 = performance.now();
     const shot = await use.capture(agent, null);
-    console.log(
-      `ok   desktop use: a screenshot in ${since(t0)} (${shot.width}×${shot.height}, ${Math.round((shot.data.length * 3) / 4 / 1024)} KB, ${shot.marks.length} elements marked)`,
+    report.ok(
+      `desktop use: a screenshot in ${since(t0)} (${shot.width}×${shot.height}, ${Math.round((shot.data.length * 3) / 4 / 1024)} KB, ${shot.marks.length} elements marked)`,
     );
     t0 = performance.now();
     const close = await use.capture(agent, { x: 400, y: 250, width: 480, height: 300 });
-    console.log(`ok   desktop use: a close-up in ${since(t0)} (${close.width}×${close.height})`);
+    report.ok(`desktop use: a close-up in ${since(t0)} (${close.width}×${close.height})`);
     const { apps } = await use.apps(agent);
-    console.log(
-      `ok   desktop use: ${apps.length} apps to start (${apps
+    report.ok(
+      `desktop use: ${apps.length} apps to start (${apps
         .slice(0, 5)
         .map((a) => a.name)
         .join(", ")})`,
     );
     return true;
   } catch (err) {
-    console.log(`FAIL desktop use: ${errorText(err)}`);
+    report.fail(`desktop use: ${errorText(err)}`);
     return false;
   } finally {
     use.stopAll();
@@ -998,11 +1065,15 @@ async function checkDesktopUse(
 }
 
 /** A terminal opens as the agent's OS user in its folder, at its size, and ends with its shell. */
-async function checkTerminal(agent: AgentScope, as: Pick<TerminalsOptions, "user" | "agentUsers">): Promise<boolean> {
+async function checkTerminal(
+  report: Report,
+  agent: AgentScope,
+  as: Pick<TerminalsOptions, "user" | "agentUsers">,
+): Promise<boolean> {
   const terminals = new Terminals({ log: () => undefined, ...as });
   const info = terminals.info();
   if (!info.available) {
-    console.log(`FAIL terminal: ${info.reason}`);
+    report.fail(`terminal: ${info.reason}`);
     return false;
   }
   const decoder = new TextDecoder();
@@ -1033,12 +1104,12 @@ async function checkTerminal(agent: AgentScope, as: Pick<TerminalsOptions, "user
     await Promise.race([closed, sleep(10_000)]);
     const m = /CHECK=([^=\r\n]+)=(\d+)=([^\r\n]*)/.exec(output);
     if (!m) throw new Error(`no answer from the shell: ${JSON.stringify(output.slice(-300))}`);
-    console.log(
-      `ok   terminal: a shell as ${m[1]} in ${m[3]}, ${m[2]} columns, first output in ${Math.round(firstAt - t0)} ms`,
+    report.ok(
+      `terminal: a shell as ${m[1]} in ${m[3]}, ${m[2]} columns, first output in ${Math.round(firstAt - t0)} ms`,
     );
     return true;
   } catch (err) {
-    console.log(`FAIL terminal: ${errorText(err)}`);
+    report.fail(`terminal: ${errorText(err)}`);
     return false;
   } finally {
     terminals.closeAll();
@@ -1119,29 +1190,33 @@ async function main(argv: string[]): Promise<number> {
       const hostService = p.flags.has("host");
       const system =
         p.flags.has("system") || stored?.mode === "system" || (hostService && process.platform === "linux");
+      const term = createTerm();
       if (sub === "install") {
-        const managed = managedMessage(stored);
-        if (managed) {
-          console.error(managed);
-          return 1;
-        }
-        if (hostService) return installHost(p);
-        if (!system) return installService({ print: (l) => console.log(l) });
-        const range = flagString(p, "agent-uid-range");
-        const agentUidRange = range === undefined ? undefined : parseUidRange(range);
-        if (agentUidRange === null) {
-          console.error(
-            "--agent-uid-range takes two uids between 1000 and 59999, the first not above the second, like 20000-29999",
-          );
-          return 1;
-        }
-        return installSystemService({
-          print: (l) => console.log(l),
-          start: !p.flags.has("no-start"),
-          ...(agentUidRange ? { agentUidRange } : {}),
+        return printed(term, "service install", (print) => {
+          const managed = managedMessage(stored);
+          if (managed) {
+            print(managed);
+            return 1;
+          }
+          if (hostService) return installHost(p, print);
+          if (!system) return installService({ print });
+          const range = flagString(p, "agent-uid-range");
+          const agentUidRange = range === undefined ? undefined : parseUidRange(range);
+          if (agentUidRange === null) {
+            print(
+              "--agent-uid-range takes two uids between 1000 and 59999, the first not above the second, like 20000-29999",
+            );
+            return 1;
+          }
+          return installSystemService({
+            print,
+            start: !p.flags.has("no-start"),
+            ...(agentUidRange ? { agentUidRange } : {}),
+          });
         });
       }
-      if (sub === "uninstall") return uninstallService({ print: (l) => console.log(l), system });
+      if (sub === "uninstall")
+        return printed(term, "service uninstall", (print) => uninstallService({ print, system }));
       console.error("Usage: agentes-runner service install|uninstall");
       return 1;
     }

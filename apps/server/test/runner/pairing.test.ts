@@ -243,3 +243,79 @@ test("the code is shown as K7Q·4ZP; workspaces are named after the organization
   writeFileSync(path.join(base, "acme", "notes.txt"), "mine");
   expect(uniqueWorkspace(base, "Acme")).toBe(path.join(base, "acme-2"));
 });
+
+test("Ctrl-C while it waits for the confirmation: Canceled, and 130 for the installer that started it", async () => {
+  const dir = tempDir("pair-");
+  dirs.push(dir);
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (req) =>
+      new URL(req.url).pathname.endsWith("/device")
+        ? json(200, {
+            deviceCode: "dc",
+            userCode: "K7Q4ZP",
+            verificationUrl: "https://x.test/c",
+            expiresIn: 600,
+            interval: 1,
+          })
+        : json(400, { error: "authorization_pending" }),
+  });
+  try {
+    const proc = Bun.spawn(
+      [process.execPath, RUNNER, "pair", "--server", server.url.origin, "--home", path.join(dir, "home")],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+    let output = "";
+    while (!output.includes("Waiting for the confirmation")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value);
+    }
+    expect(output).toContain(
+      "●  To connect this computer, open this link and confirm the code K7Q·4ZP:\n     https://x.test/c\n",
+    );
+    proc.kill("SIGINT");
+    for (let next = await reader.read(); !next.done; next = await reader.read()) output += decoder.decode(next.value);
+    expect(await proc.exited).toBe(130);
+    expect(output).toContain("◒  Waiting for the confirmation\n■  Canceled\n");
+  } finally {
+    server.stop(true);
+  }
+}, 20_000);
+
+test("status, never connected: each state with its mark, and where the config lives", () => {
+  const home = tempDir("status-");
+  dirs.push(home);
+  const run = Bun.spawnSync([process.execPath, RUNNER, "status", "--home", home], {
+    env: { ...process.env, HOME: home },
+  });
+  const out = run.stdout.toString();
+  expect(run.exitCode).toBe(0);
+  expect(out).toStartWith("agentes.chat agentes-runner ");
+  expect(out).toContain("\n■  Not connected.\n▲  Running: no\n▲  Service: not installed\n");
+  expect(out).toContain(`\n   Config: ${path.join(home, "config.json")}\n`);
+  expect(out).not.toContain("\x1b");
+});
+
+test("service install's refusals keep their words as ■: a frame of its own by hand, none inside the installer's", () => {
+  const home = tempDir("service-");
+  dirs.push(home);
+  const install = (env: Record<string, string> = {}) =>
+    Bun.spawnSync([process.execPath, RUNNER, "service", "install", "--host", "--home", home], {
+      env: { ...process.env, HOME: home, ...env },
+    });
+  const usage =
+    "Usage: agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]";
+  const byHand = install();
+  expect(byHand.exitCode).toBe(1);
+  expect(byHand.stdout.toString()).toBe(`agentes.chat service install\n■  ${usage}\nStopped\n`);
+  const framed = install({ AGENTES_FRAME: "1" });
+  expect(framed.exitCode).toBe(1);
+  expect(framed.stdout.toString()).toBe(`■  ${usage}\n`);
+});

@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { installScript, RUNNER_BUN_SHA256, RUNNER_BUN_VERSION, shQuote } from "../../runner/install-script";
 import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
 import { removeDirs, tempDir } from "./helpers";
@@ -105,6 +106,8 @@ test("the install script quotes the server URL and is valid sh", () => {
   expect(script).toContain("grep -q '\"token\"'");
   expect(script).toContain("managedBy");
   expect(installScript("https://x.test/it's")).toContain("SERVER='https://x.test/it'\\''s'\n");
+  // The look of every agentes.chat command line, in sh (packages/setup/src/term-sh.ts).
+  expect(script).toContain(`\n${TERM_SH}`);
   if (process.platform !== "win32") {
     const check = spawnSync("sh", ["-n"], { input: script, encoding: "utf8" });
     expect(check.stderr).toBe("");
@@ -161,10 +164,55 @@ test.skipIf(process.platform === "win32")(
     r = fakeComputer({ node: fakeNode("20.18.0") }).install(script);
     expect(r.status).toBe(1);
     expect(r.out).toContain("The runner needs Bun 1.3.5 or newer, or Node.js 22 or newer.");
+    expect(r.out).toContain("     Bun:    curl -fsSL https://bun.sh/install | bash\n");
     expect(r.runtime).toBeUndefined();
   },
   // Six whole installs, each a shell running real tools: seconds on a busy computer.
   30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "without a terminal: the marks and whole lines, no line down the left, no color; a refusal in its words",
+  () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    const r = pc.install(installScript("https://x.test"));
+    expect(r.status).toBe(0);
+    expect(r.out).toStartWith("agentes.chat connect this computer\n◇  Bun 1.4.4 (");
+    expect(r.out).toContain("◒  Downloading the runner from https://x.test\n◇  The runner, from https://x.test\n");
+    expect(r.out).toContain(
+      `●  To use the agentes-runner command, add it to your PATH:\n     export PATH="${pc.home}/.agentes-runner/bin:$PATH"\n`,
+    );
+    expect(r.out).toEndWith("\nDone\n");
+    expect(r.out).not.toContain("\x1b");
+    expect(r.out).not.toContain("│");
+
+    const refused = pc.install(installScript("https://x.test"), ["--bogus"]);
+    expect(refused.status).toBe(1);
+    expect(refused.out).toBe("■  unknown option: --bogus\nStopped\n");
+  },
+);
+
+test.skipIf(process.platform === "win32")(
+  "Ctrl-C at the code stops the installer too, on 130, not as a failure",
+  () => {
+    const dir = tempDir("install-");
+    dirs.push(dir);
+    const site = path.join(dir, "site");
+    mkdirSync(path.join(site, "runner"), { recursive: true });
+    // Stands in for the runner: `pair` ends as Ctrl-C ends it.
+    writeFileSync(path.join(site, "runner", "agentes-runner.mjs"), "process.exit(130);\n");
+    const r = spawnSync("sh", ["-s", "--", "--no-service"], {
+      input: installScript(`file://${site}`),
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        AGENTES_RUNNER_HOME: path.join(dir, "home"),
+      },
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(130);
+    expect(r.stderr).not.toContain("connecting this computer failed");
+  },
 );
 
 test("every Bun build the installer picks has its SHA-256", () => {
