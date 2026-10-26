@@ -359,6 +359,11 @@ describe("Configurações → Computadores", () => {
     const command = commands().at(-1) ?? "";
     expect(command).toBe("curl -fsSL http://localhost:3000/api/machines/install.sh | sh");
     expect(command).not.toContain("--code");
+    // A command wider than a phone scrolls beside its copy button, never under it.
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".machine-command")).toContain("display: flex");
+    expect(rule(".machine-command__copy")).not.toContain("position: absolute");
     expect(shownText(card)).toContain("Rode no terminal do computador e confirme o código que ele mostrar.");
     expect(card.textContent).not.toContain("Não precisa instalar nada antes");
   });
