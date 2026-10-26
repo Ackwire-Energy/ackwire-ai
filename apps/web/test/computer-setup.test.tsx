@@ -197,6 +197,29 @@ describe("no AI yet while the workspace's computer is on its way", () => {
       "Os agentes ainda não têm uma IA para pensar. Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
     );
   });
+
+  test("on hold meanwhile: nothing works now, so the banner says no more than its usual hint", async () => {
+    const state = seedState({
+      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
+    });
+    const { socket } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
+    const banner = () => document.querySelector(".noai-banner")?.textContent ?? "";
+    expect(banner()).toContain("Uma chave de API já funciona agora.");
+    await act(async () =>
+      socket?.push({
+        type: "event",
+        scope: "org",
+        event: { type: "org.standing", orgId: ORG_ID, state: "hold", reason: null },
+      }),
+    );
+    await settle(6);
+    expect(screen().getByRole("region", { name: "Status do workspace" }).textContent).toContain(
+      "os agentes não respondem nem trabalham enquanto ele estiver em espera.",
+    );
+    expect(banner()).toBe(
+      "Os agentes ainda não têm uma IA para pensar. Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.Conectar uma IA",
+    );
+  });
 });
 
 describe("Configurações → Computadores: the workspace's own computer", () => {
