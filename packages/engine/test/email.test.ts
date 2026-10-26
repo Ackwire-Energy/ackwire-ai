@@ -42,10 +42,10 @@ const buttons = (t: EmailTemplate) =>
     (m) => ({ url: (m[1] ?? "").replaceAll("&amp;", "&"), label: m[2] ?? "" }),
   );
 
-function poisoned(t: EmailTemplate): EmailTemplate {
+function poisoned(t: EmailTemplate, value = SENTINEL): EmailTemplate {
   const o = structuredClone(t) as Record<string, unknown>;
-  for (const k of TYPED) if (typeof o[k] === "string") o[k] = SENTINEL;
-  if (Array.isArray(o.items)) o.items = o.items.map((i) => ({ ...i, agentName: SENTINEL, title: SENTINEL }));
+  for (const k of TYPED) if (typeof o[k] === "string") o[k] = value;
+  if (Array.isArray(o.items)) o.items = o.items.map((i) => ({ ...i, agentName: value, title: value }));
   return o as EmailTemplate;
 }
 
@@ -136,6 +136,27 @@ describe("the look", () => {
     const line = text.split("\n").find((l) => l.startsWith("Atlas")) ?? "";
     expect(line).toContain("3f2a9c1e");
     expect(line).not.toMatch(/\S{31}/u);
+    // "4 h ago" stays on one line.
+    expect(line).toEndWith(" · 4\u00a0h\u00a0ago");
+  });
+
+  test("a long typed word wraps where it lands instead of widening the card, and never breaks a label", () => {
+    const word = "W".repeat(30);
+    const holders = new Set<string>();
+    for (const sample of Object.values(EMAIL_SAMPLES)) {
+      const { html } = renderEmail(poisoned(sample as EmailTemplate, word), art);
+      for (const { index } of html.matchAll(new RegExp(word, "g"))) {
+        const before = html.slice(0, index);
+        const start = Math.max(before.lastIndexOf("<p "), before.lastIndexOf("<td "));
+        const tag = html.slice(start, html.indexOf(">", start) + 1);
+        expect(tag).toContain("word-break:break-word");
+        holders.add(tag.slice(0, tag.indexOf(" style=")));
+      }
+      // With it, the table could squeeze a fact's label mid-word to make room for a long value.
+      expect(html).not.toMatch(/<td class="mu[^>]*word-break/);
+    }
+    // Paragraphs, facts (first row and the rest), people's names and details, and the footer.
+    expect(holders.size).toBe(6);
   });
 
   test("an expired invitation link's request names nobody and still reads", () => {
@@ -270,8 +291,8 @@ describe("jobs queued before this look", () => {
     // A percentage only: owners who aren't admins never see money.
     expect(budget).toContain("Usou 80% do orçamento deste mês · Acme");
     expect(budget).not.toContain("US$");
-    expect(digest).toContain(`Ada · Merge PR #42 · há 5\u00a0h`);
-    expect(digest).toContain(`Um agente · Deploy · há 1\u00a0h`);
+    expect(digest).toContain(`Ada · Merge PR #42 · há\u00a05\u00a0h`);
+    expect(digest).toContain(`Um agente · Deploy · há\u00a01\u00a0h`);
     // No `afterHours`: the footer stops after its first sentence.
     expect(digest).toContain("Você recebeu este e-mail porque pode aprovar estes pedidos na Acme.\n");
   });

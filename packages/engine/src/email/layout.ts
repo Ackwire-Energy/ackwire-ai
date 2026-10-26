@@ -133,6 +133,12 @@ const plain = (t: Text) =>
 const T = (style: string) =>
   `role="presentation" cellpadding="0" cellspacing="0" border="0"${style ? ` style="${style}"` : ""}`;
 const P = `font-family:${SANS};mso-line-height-rule:exactly`;
+/**
+ * `P` where typed text goes: a word too long for the line breaks instead of widening the card, since a
+ * table cell grows to its longest word. Not on the facts' labels: there it would let a long value squeeze
+ * a label mid-word.
+ */
+const PW = `${P};word-break:break-word`;
 
 const cidOf = (file: string) => `${file.replace(/\.png$/, "")}@agentes.chat`;
 
@@ -153,7 +159,7 @@ function pictures(art: EmailArt) {
 
 function block(b: Block, src: (file: string) => string): string {
   if ("p" in b)
-    return `<p class="tx" style="margin:0 0 16px;${P};font-size:16px;line-height:24px;color:${L.text}">${html(b.p)}</p>`;
+    return `<p class="tx" style="margin:0 0 16px;${PW};font-size:16px;line-height:24px;color:${L.text}">${html(b.p)}</p>`;
   if ("small" in b)
     return `<p class="mu" style="margin:0 0 12px;${P};font-size:14px;line-height:20px;color:${L.muted}">${html(b.small)}</p>`;
   if ("h2" in b)
@@ -173,14 +179,14 @@ function block(b: Block, src: (file: string) => string): string {
       .map(
         ([label, value], i) => `<tr>
 <td class="mu${i ? " wh" : ""}" valign="top" style="padding:10px 12px 10px 0;${i ? `border-top:1px solid ${L.wellHair};` : ""}${P};font-size:14px;line-height:20px;color:${L.muted}">${esc(label)}</td>
-<td class="ink${i ? " wh" : ""}" valign="top" align="right" style="padding:10px 0;${i ? `border-top:1px solid ${L.wellHair};` : ""}${P};font-size:14px;line-height:20px;font-weight:600;color:${L.ink};text-align:right">${html(value)}</td>
+<td class="ink${i ? " wh" : ""}" valign="top" align="right" style="padding:10px 0;${i ? `border-top:1px solid ${L.wellHair};` : ""}${PW};font-size:14px;line-height:20px;font-weight:600;color:${L.ink};text-align:right">${html(value)}</td>
 </tr>`,
       )
       .join("")}</table></td></tr></table>`;
   if ("note" in b) {
     const warn = b.tone === "warn";
     return `<table width="100%" class="${warn ? "warn" : "well"}" ${T(`background:${warn ? L.warnSoft : L.well};border-radius:12px;margin:0 0 16px`)}><tr>
-<td class="${warn ? "warn-t" : "tx"}" style="padding:14px 16px;${P};font-size:15px;line-height:22px;color:${warn ? L.warn : L.text}">${html(b.note, warn ? "font-weight:700" : `font-weight:600;color:${L.ink}`)}</td></tr></table>`;
+<td class="${warn ? "warn-t" : "tx"}" style="padding:14px 16px;${PW};font-size:15px;line-height:22px;color:${warn ? L.warn : L.text}">${html(b.note, warn ? "font-weight:700" : `font-weight:600;color:${L.ink}`)}</td></tr></table>`;
   }
   if ("people" in b)
     return `<table width="100%" ${T("margin:0 0 8px")}>${b.people
@@ -192,9 +198,9 @@ function block(b: Block, src: (file: string) => string): string {
             : `<table ${T("")}><tr><td class="avp" width="30" height="30" align="center" valign="middle" style="width:30px;height:30px;border:1px solid ${L.border};border-radius:10px;background:${L.well};color:${L.text};${P};font-size:13px;line-height:30px;font-weight:700">${esc(initialsOf(p.name))}</td></tr></table>`
         }</td>
 <td valign="top" style="padding:0 0 12px">
-<p class="ink" style="margin:0;${P};font-size:15px;line-height:20px;font-weight:600;color:${L.ink}">${esc(p.name)}</p>${
+<p class="ink" style="margin:0;${PW};font-size:15px;line-height:20px;font-weight:600;color:${L.ink}">${esc(p.name)}</p>${
           p.detail
-            ? `<p class="mu" style="margin:0;${P};font-size:14px;line-height:20px;color:${L.muted}">${html(p.detail)}</p>`
+            ? `<p class="mu" style="margin:0;${PW};font-size:14px;line-height:20px;color:${L.muted}">${html(p.detail)}</p>`
             : ""
         }</td>
 </tr>`,
@@ -286,7 +292,7 @@ ${body}
 </td></tr>
 <tr><td style="padding:24px 0 0"><img class="sky" src="${esc(src("sky-band.png"))}" width="${SKY.width}" height="${SKY.height}" alt="" style="display:block;border:0;outline:none;width:${SKY.width}px;max-width:100%;height:auto"></td></tr>
 <tr><td style="padding:16px 0 40px">
-${doc.footer.map((f) => `<p class="fa" style="margin:0 0 6px;${P};font-size:13px;line-height:19px;color:${L.faint}">${esc(f)}</p>`).join("\n")}
+${doc.footer.map((f) => `<p class="fa" style="margin:0 0 6px;${PW};font-size:13px;line-height:19px;color:${L.faint}">${esc(f)}</p>`).join("\n")}
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

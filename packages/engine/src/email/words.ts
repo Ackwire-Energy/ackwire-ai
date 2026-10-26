@@ -108,7 +108,7 @@ const en = {
       n === 1
         ? ["In ", { b: org }, ", an agent asked to do something only a person can approve."]
         : ["In ", { b: org }, ", agents asked to do things only a person can approve."],
-    age: (h: number) => `${h} h ago`,
+    age: (h: number) => `${h}\u00a0h\u00a0ago`,
     more: (k: number) => `And ${k} more.`,
     button: (n: number): string => (n === 1 ? "Review the request" : "Open approvals"),
     why: (org: string, hours: number | undefined) =>
@@ -151,7 +151,7 @@ type Words = typeof en;
 
 const ptBR: Words = {
   sentBy: (host) => (host ? `Enviado pelo servidor do agentes.chat em ${host}.` : "Enviado pelo agentes.chat."),
-  fallback: "O botão não funcionou? Copie este endereço no navegador:",
+  fallback: "O botão não funcionou? Copie e cole este endereço no navegador:",
   role: { owner: "dono", admin: "admin", member: "membro" },
   anAgent: "Um agente",
   verify: {
@@ -246,7 +246,7 @@ const ptBR: Words = {
       n === 1
         ? ["Na ", { b: org }, ", um agente pediu para fazer algo que só uma pessoa pode aprovar."]
         : ["Na ", { b: org }, ", agentes pediram para fazer coisas que só uma pessoa pode aprovar."],
-    age: (h) => `há ${h} h`,
+    age: (h) => `há\u00a0${h}\u00a0h`,
     more: (k) => `E mais ${k}.`,
     button: (n) => (n === 1 ? "Ver o pedido" : "Abrir aprovações"),
     why: (org, hours) =>
