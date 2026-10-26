@@ -611,19 +611,25 @@ describe("Onboarding", () => {
     expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
   });
 
-  test('import: Theo\'s "pular" is the way out, and no two apps share a tile', async () => {
+  test('import: Theo\'s "pular" is the way out, and each app is shown by its official logo', async () => {
     const { state } = await start();
     await throughContext(state);
     expect(document.body.textContent).toContain("Se não usa, é só pular.");
-    // The apps we ship no mark for get their own letters.
+    // Each app's own logo, never letters or a generic icon; only "Outro app", which names many, keeps one.
     const tiles = [...document.querySelectorAll(".imp-source")].map((card) => [
       card.querySelector(".ac-option__title")?.textContent,
-      card.querySelector(".imp-mark")?.textContent,
+      card.querySelector(".imp-mark img")?.getAttribute("src") ?? card.querySelector(".imp-mark svg")?.tagName,
     ]);
-    expect(tiles).toContainEqual(["OpenClaw", "OC"]);
-    expect(tiles).toContainEqual(["Hermes Agent", "H"]);
-    expect(tiles).toContainEqual(["OpenBot.Run", "OR"]);
-    expect(tiles).toContainEqual(["Paperclip", "P"]);
+    expect(tiles).toEqual([
+      ["OpenClaw", "/brands/openclaw.svg"],
+      ["Hermes Agent", "/brands/hermes.svg"],
+      ["OpenBot.Run", "/brands/openbotrun.svg"],
+      ["Paperclip", "/brands/paperclip.svg"],
+      ["OpenMausBot", "/brands/openmausbot.svg"],
+      ["OpenBot", "/brands/openbot.png"],
+      ["Exportação do agentes.chat", "/favicon.svg"],
+      ["Outro app", "svg"],
+    ]);
     await click(button("pular"), 6);
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(railStep(/^Trazer seus agentes/).textContent).toContain("Pulado");

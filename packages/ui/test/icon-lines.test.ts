@@ -34,12 +34,6 @@ const PLACED_BY_HAND: Record<string, string> = {
     "menu items are one line (no wrapping) of 14px text on their own 20px line, which the 16px icon sits on",
   "apps/web/src/components/browser/browser.css .brw-note > .ac-icon":
     "the browser and desktop-use notes (MachineDesktopUseCard.tsx) are not on .ac-iconline yet",
-  "apps/web/src/components/import-flow.css .imp-tip .ac-icon":
-    "the import flow (ImportFlow.tsx) is not on .ac-iconline yet",
-  "apps/web/src/components/import-flow.css .imp-note .ac-icon": "the import flow is not on .ac-iconline yet",
-  "apps/web/src/components/import-flow.css .imp-todo .ac-icon": "the import flow is not on .ac-iconline yet",
-  "apps/web/src/components/import-flow.css .imp-missed .ac-icon": "the import flow is not on .ac-iconline yet",
-  "apps/web/src/components/import-flow.css .imp-export li .ac-icon": "the import flow is not on .ac-iconline yet",
 };
 
 describe("an icon before text sits on the text's first line", () => {

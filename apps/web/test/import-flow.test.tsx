@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -143,6 +143,56 @@ describe("Configurações → Importar e exportar", () => {
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     expect(within(nav).queryByRole("link", { name: "Importar e exportar" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Exportar este workspace" })).toBeNull();
+  });
+
+  test("each app by its official logo, in the maker's own dark file when the app (not the system) is dark", async () => {
+    const device = domWindow().happyDOM.settings.device;
+    const logos = () =>
+      Object.fromEntries(
+        [...document.querySelectorAll(".imp-source")].map((card) => [
+          card.querySelector(".ac-option__title")?.textContent,
+          card.querySelector(".imp-mark img")?.getAttribute("src") ?? null,
+        ]),
+      );
+    try {
+      // The system is dark, but the app is set to light: the light files.
+      device.prefersColorScheme = "dark";
+      localStorage.setItem("agentes.theme", "light");
+      await go();
+      expect(logos()["Hermes Agent"]).toBe("/brands/hermes.svg");
+      expect(logos().Paperclip).toBe("/brands/paperclip.svg");
+      cleanup();
+      // The app set to dark: Hermes and Paperclip by their dark files, the others read on both.
+      localStorage.setItem("agentes.theme", "dark");
+      await go();
+      expect(logos()).toEqual({
+        OpenClaw: "/brands/openclaw.svg",
+        "Hermes Agent": "/brands/hermes-dark.svg",
+        "OpenBot.Run": "/brands/openbotrun.svg",
+        Paperclip: "/brands/paperclip-dark.svg",
+        OpenMausBot: "/brands/openmausbot.svg",
+        OpenBot: "/brands/openbot.png",
+        "Exportação do agentes.chat": "/favicon.svg",
+        // It names many apps: no one maker's logo fits.
+        "Outro app": null,
+      });
+    } finally {
+      device.prefersColorScheme = "light";
+      localStorage.removeItem("agentes.theme");
+    }
+  });
+
+  test("its notes and lists lead each line with an icon on the line's first row", async () => {
+    await go();
+    const leads = [
+      ...document.querySelectorAll(".imp-note"),
+      ...screen().getByRole("region", { name: "Exportar este workspace" }).querySelectorAll("li"),
+    ];
+    expect(leads.length).toBeGreaterThan(5);
+    for (const line of leads) {
+      expect(line.classList.contains("ac-iconline")).toBe(true);
+      expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
+    }
   });
 
   test("a folder is recognized and planned on the server; unchecking an agent holds back what needs it; Importar applies and reports", async () => {
