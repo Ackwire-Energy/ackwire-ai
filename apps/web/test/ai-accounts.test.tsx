@@ -72,13 +72,16 @@ async function page(accounts: AiAccounts["accounts"], role: "owner" | "member" =
 }
 
 describe("Contas de IA", () => {
-  test("never blank: with no plan yet, one way to connect one", async () => {
+  test("never blank: with no plan yet, one way to connect one, the same picker as everywhere", async () => {
     await page([]);
     const plans = screen().getByRole("region", { name: "Seus planos" });
     expect(plans.textContent).toContain(
-      "Conecte o seu plano do Claude ou do ChatGPT e seus agentes pensam com ele, sem chave de API.",
+      "Conecte o seu plano de IA, como o Claude ou o ChatGPT, e os agentes pensam com ele: sem chave de API.",
     );
-    expect(within(plans).getByRole("button", { name: "Conectar uma IA" })).toBeTruthy();
+    await act(async () => fireEvent.click(within(plans).getByRole("button", { name: "Conectar uma IA" })));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    expect(within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" })).toBeTruthy();
   });
 
   test("a member sees their own plans with their meters, never the workspace's keys; an admin sees both", async () => {

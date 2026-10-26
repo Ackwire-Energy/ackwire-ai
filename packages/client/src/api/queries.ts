@@ -33,6 +33,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AiStatus,
   ApiRule,
   AppNotification,
   Approval,
@@ -409,7 +410,8 @@ export function cacheForumSuggestion(
   });
 }
 
-const newClientId = () =>
+/** A new message's `clientId`: sent again with the same one (its answer was lost), it's written only once. */
+export const newClientId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -976,10 +978,23 @@ export const usePlatformKey = (orgId: string) => {
   });
 };
 
-/** Whether each agent has an AI to think with (the no-AI banner, card and chip). */
-export const useAiStatus = (orgId: string) => {
+/**
+ * Whether each agent has an AI to think with (the no-AI banner, card and chip). `pollMs` where no socket is open
+ * (the onboarding), a time or one picked from the last answer.
+ */
+export const useAiStatus = (
+  orgId: string,
+  enabled = true,
+  pollMs: number | false | ((status: AiStatus | undefined) => number | false) = false,
+) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.aiStatus(orgId), queryFn: () => api.agents.aiStatus(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.aiStatus(orgId),
+    queryFn: () => api.agents.aiStatus(orgId),
+    staleTime: 30_000,
+    enabled: enabled && orgId.length > 0,
+    refetchInterval: typeof pollMs === "function" ? (query) => pollMs(query.state.data) : pollMs,
+  });
 };
 
 export function useRotateCredential(orgId: string) {
@@ -1804,22 +1819,30 @@ export function useSaveSandboxSettings(orgId: string) {
   });
 }
 
-/** `pollMs`: refetch this often (while starting or stopping); `false` = no polling. */
-/** "Quem pensa" (its owner or an admin; members don't load it). */
-export const useAgentBrain = (orgId: string, agentId: string, enabled = true) => {
+/**
+ * "Quem pensa" (its owner or an admin; members don't load it). `pollMs`: asked again this often where no event
+ * keeps it current (the onboarding opens no socket).
+ */
+export const useAgentBrain = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.agentBrain(orgId, agentId),
     queryFn: () => api.agents.brain(orgId, agentId),
     enabled,
     retry: false,
+    refetchInterval: pollMs,
   });
 };
 
 /** "Contas de IA": the viewer's AI accounts on every computer, and where they can add one. */
-export const useAiAccounts = (orgId: string, enabled = true) => {
+export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.aiAccounts(orgId), queryFn: () => api.machines.aiAccounts(orgId), enabled });
+  return useQuery({
+    queryKey: keys.aiAccounts(orgId),
+    queryFn: () => api.machines.aiAccounts(orgId),
+    enabled,
+    refetchInterval: pollMs,
+  });
 };
 
 /** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */

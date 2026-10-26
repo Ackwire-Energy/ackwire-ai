@@ -23,13 +23,12 @@ import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
-  isProviderId,
   keyLooksValid,
   PROVIDERS,
   type ProviderId,
+  providerGuess,
   providerLabel,
   providerOf,
-  providersForKey,
 } from "@agenteschat/client/lib/providers";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
@@ -711,10 +710,7 @@ export function KeyDialog({
     setLabel("");
     setApiKey(pasted ?? "");
     setWorkspaceId("");
-    // A pasted key says whose it is when only one provider's keys look like it; else the provider asked for.
-    const fits = pasted ? providersForKey(pasted) : [];
-    const guess = (fits.length === 1 ? fits[0]?.id : undefined) ?? suggested ?? fits[0]?.id ?? cred?.provider;
-    setProvider(guess && isProviderId(guess) ? guess : "anthropic");
+    setProvider(providerGuess(pasted, suggested ?? cred?.provider));
     setTouched(false);
   }, [mode, cred]);
   const valid = keyLooksValid(provider, apiKey);

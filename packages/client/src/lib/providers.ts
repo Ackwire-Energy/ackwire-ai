@@ -87,6 +87,13 @@ export const keyLooksValid = (provider: ProviderId, key: string) =>
  */
 export const providersForKey = (key: string) => PROVIDERS.filter((p) => p.pattern.test(key.trim()));
 
+/** Whose a pasted key is: the one provider whose keys look like it, else the one asked for, else the first that fits. */
+export function providerGuess(key: string | undefined, asked?: string): ProviderId {
+  const fits = key ? providersForKey(key) : [];
+  const guess = (fits.length === 1 ? fits[0]?.id : undefined) ?? asked ?? fits[0]?.id;
+  return guess && isProviderId(guess) ? guess : "anthropic";
+}
+
 /** Live keys per provider. */
 export function providersWithKeys(credentials: Credential[]) {
   return new Set(credentials.filter((c) => !c.revokedAt).map((c) => c.provider as string));

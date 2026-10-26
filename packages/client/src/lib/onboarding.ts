@@ -18,6 +18,14 @@ export const ONBOARDING_STEPS = [
 ] as const;
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 
+/**
+ * Who offers the first message when the onboarding ends: the first of these on the team. Lia's research needs a
+ * browser, which only a ready computer gives the agents (not one being prepared, nor a Daytona sandbox); Theo's plan
+ * needs nothing. Ada, the guide, is always on the team.
+ */
+export const firstAskOrder = (browser: boolean) =>
+  browser ? (["lia", "theo", "ada"] as const) : (["theo", "lia", "ada"] as const);
+
 /** A person to invite, as a chip: invalid addresses stay (marked) so they can be fixed or removed. */
 export interface InviteDraft {
   email: string;

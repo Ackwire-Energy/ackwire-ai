@@ -3,9 +3,13 @@ import {
   forwardRef,
   type InputHTMLAttributes,
   type ReactNode,
+  type RefObject,
   type TextareaHTMLAttributes,
   useContext,
   useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
 } from "react";
 import { cx } from "../cx";
 import { SearchField } from "./Toolbar";
@@ -90,16 +94,50 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ c
   return <input ref={ref} className={cx("ac-input", className)} {...rest} {...wiring} />;
 });
 
+/** A border-box height that fits the text: `scrollHeight` leaves the border out. */
+function fitText(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+}
+
+/**
+ * A textarea as tall as its text (up to its CSS max-height), measured again when the text changes and when a new
+ * width rewraps it (a window resize, a sidebar opening). `on` false leaves its height alone.
+ */
+export function useAutoGrow(ref: RefObject<HTMLTextAreaElement | null>, value: string, on = true) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measured again whenever the text changes
+  useLayoutEffect(() => {
+    if (on && ref.current) fitText(ref.current);
+  }, [ref, value, on]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!on || !el || typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fitText(el);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, on]);
+}
+
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   invalid?: boolean;
+  /** As tall as its text (a controlled `value`), growing and shrinking with it. */
+  autoGrow?: boolean;
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-  { className, invalid, rows = 4, ...rest },
+  { className, invalid, rows = 4, autoGrow = false, ...rest },
   ref,
 ) {
   const wiring = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
-  return <textarea ref={ref} rows={rows} className={cx("ac-input", className)} {...rest} {...wiring} />;
+  const box = useRef<HTMLTextAreaElement>(null);
+  useImperativeHandle(ref, () => box.current as HTMLTextAreaElement, []);
+  useAutoGrow(box, String(rest.value ?? ""), autoGrow);
+  return <textarea ref={box} rows={rows} className={cx("ac-input", className)} {...rest} {...wiring} />;
 });
 
 /** Input with a fixed prefix, e.g. "agentes.chat/" + address. */

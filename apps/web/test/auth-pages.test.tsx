@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { ImportInput, SignInOptions } from "@agenteschat/client";
+import { ApiError, type ImportInput, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -292,12 +292,25 @@ describe("Aceitar convite", () => {
 });
 
 describe("Onboarding", () => {
-  const start = async () => {
-    const state = seedState();
+  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}) => {
+    const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
     state.authConfig = { workspaceComputer: false };
     const api = createFakeApi(state);
+    // Each agent's view as the server makes it: the computer it was given (none until then), and that computer's
+    // own sign-in where whoever connected it owns the agent (this server's own computer has nobody).
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => {
+      const target = state.calls.filter((c) => c.method === "sandbox.setTarget" && c.args[1] === agentId).at(-1);
+      const machine = target ? fakeMachinesOf.get(api)?.peek(String(target.args[2])) : undefined;
+      return {
+        ...(await viewOf(orgId, agentId)),
+        computer: machine ? { machineId: machine.id, name: machine.name, online: machine.online } : null,
+        machines: [],
+        ownSignIn: machine !== undefined && machine.kind !== "host",
+      };
+    };
     const r = await renderApp("/onboarding", { api });
     return { ...r, api, state };
   };
@@ -362,7 +375,11 @@ describe("Onboarding", () => {
     expect(screen().getByText("Faltam 3 etapas")).toBeTruthy();
   };
 
-  /** … → (no computer) → Agentes (Ada and Theo), then the API key on its own screen. */
+  /** The AI step's picker, and one of its options. */
+  const picker = () => screen().getByRole("group", { name: "Qual IA eles vão usar?" });
+  const option = (name: RegExp) => within(picker()).getByRole("button", { name });
+
+  /** … → (no computer) → Agentes (Ada and Theo, made as the team is kept), then the API key, saved. */
   const throughAgents = async (state: ReturnType<typeof seedState>) => {
     await throughImport(state);
     await skip();
@@ -375,31 +392,47 @@ describe("Onboarding", () => {
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("false");
     expect(button(/Atlas · Ops/).getAttribute("aria-pressed")).toBe("false");
     expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
-    // No connected computer thinks for them: the key comes next, on its own screen.
-    await next();
-    expect(calls(state, "agents.create")).toHaveLength(0);
+    // The team is made as it's kept, before any AI: leaving the next screen leaves a whole team.
+    await click(button(/Criar 1 agente/), 8);
+    expect(calls(state, "agents.create")).toHaveLength(2);
+    expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
-    // Where to make the key reads as this page's own link.
-    expect(screen().getByRole("link", { name: /Crie a chave em platform.claude.com/ }).className).toContain("ac-link");
-    // The key is required there; the platform key isn't offered by this server.
-    expect(screen().queryByRole("button", { name: /Usar a chave do agentes.chat/ })).toBeNull();
-    const save = () => button(/Salvar e criar 1 agente/);
-    expect(save().hasAttribute("disabled")).toBe(true);
+    // No computer here: the API key first, and the plans (all six, dimmed) wait for one.
+    expect(document.body.textContent).toContain(
+      "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
+    );
+    expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
+    for (const name of [/^Claude$/, /^ChatGPT$/, /^GLM Coding$/, /^Kimi Code$/, /^MiniMax$/, /^OpenCode Go$/])
+      expect(option(name).querySelector(".ac-brand--off")).not.toBeNull();
+    // No "Avançado": the Claude workspace ID stays in Settings' key dialog.
+    expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
+    expect(document.body.textContent).not.toContain("ID do workspace");
+    // Where a key is made is a button in its step, never link text.
+    const keys = screen().getByRole("region", { name: "Chave de API" });
+    const makers = within(keys).getByRole("group", { name: "Provedor" });
+    expect(within(makers).getByRole("button", { name: "Claude" }).getAttribute("aria-pressed")).toBe("true");
+    expect(keys.textContent).toContain("Crie a sua chave de API do Claude");
+    const site = within(keys).getByRole("link", { name: "Abrir platform.claude.com" });
+    expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
+    expect(site.className).toContain("ac-btn");
+    // The platform key isn't offered by this server.
+    expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
+    // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     // New agents start on "Automático".
     expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
-    await type("Chave da API da Claude", "sk-errado");
-    await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Claude")));
+    await type("Cole aqui", "sk-errado");
+    await act(async () => fireEvent.blur(screen().getByLabelText("Cole aqui")));
     expect(document.body.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
-    await click(button("Avançado"), 1);
-    await type("ID do workspace no Claude Console", "wrkspc_01ABC");
-    await type("Chave da API da Claude", "sk-ant-api03-abcdefghijklmnop");
+    const save = () => button("Salvar e continuar");
+    expect(save().hasAttribute("disabled")).toBe(true);
+    await type("Cole aqui", "sk-ant-api03-abcdefghijklmnop");
     await click(save(), 6);
     await settle(4);
     expect(calls(state, "agents.addCredential")[0]?.args[1]).toEqual({
       provider: "anthropic",
       label: "Claude",
       apiKey: "[redacted]",
-      workspaceId: "wrkspc_01ABC",
     });
     const cred = state.credentials[state.credentials.length - 1];
     expect(
@@ -407,6 +440,44 @@ describe("Onboarding", () => {
         (c) => (c.args[1] as { defaultCredentialId?: string }).defaultCredentialId === cred?.id,
       ),
     ).toBe(true);
+  };
+
+  /** … → (no computer) → these join Ada, with no AI yet ("Conectar depois") → Time skipped: Done. */
+  const toDone = async (state: ReturnType<typeof seedState>, ...keep: string[]) => {
+    await throughImport(state);
+    await skip();
+    await keepOnly(...keep);
+    await click(button(keep.length ? /^Criar \d+ agentes?$/ : "Continuar"), 8);
+    await click(button("Conectar depois"), 8);
+    await skip();
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+  };
+  /** Done: the welcome's sentences, the first message's box, who offers it, and the line under it. */
+  const welcome = () => document.querySelector(".onb__welcome-lead")?.textContent;
+  const ASK = "Sua primeira mensagem no #general";
+  const askBox = () => screen().getByRole("textbox", { name: ASK }) as HTMLTextAreaElement;
+  const asker = () => document.querySelector(".onb__answer .onb__host-name")?.textContent;
+  const askLine = () => document.querySelector(".onb__first-line")?.textContent ?? null;
+  const agentId = (state: ReturnType<typeof seedState>, name: string) =>
+    state.agents.find((a) => a.name === name)?.id ?? "";
+  /** What each post of the first message sent: its text, and the `clientId` that tells a resend from a new one. */
+  const posted = (state: ReturnType<typeof seedState>) =>
+    calls(state, "chat.post").map((c) => c.args[2] as { body: string; clientId: string });
+  const THEO_ASKS = "@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?";
+  /** The workspace named, then an Obsidian vault of two notes picked in Contexto; `read`: and read. */
+  const pickVault = async ({ read = true } = {}) => {
+    await type("Nome", "Acme Saúde");
+    await next();
+    const vault = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
+    await act(async () => {
+      fireEvent.change(within(vault).getByLabelText("Escolher .zip ou .md"), {
+        target: { files: [new File(["Veja [[Clientes]]."], "Início.md"), new File(["Lista."], "Clientes.md")] },
+      });
+    });
+    await settle(8);
+    if (!read) return;
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
   };
 
   test("context: an Obsidian vault is read in the step and imported into the wiki on continue", async () => {
@@ -461,29 +532,32 @@ describe("Onboarding", () => {
     expect(screen().getByText("Falta 1 etapa")).toBeTruthy();
   });
 
-  test("Conectar depois: the agents come without a key and answer once an AI is connected", async () => {
+  test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
     const { state } = await start();
     await throughImport(state);
     await skip();
     await keepOnly("Theo · PM");
-    await next();
+    await click(button(/Criar 1 agente/), 8);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(document.body.textContent).toContain("Os agentes começam a responder quando uma IA estiver conectada.");
     // A key typed and then left for later isn't saved.
-    await type("Chave da API da Claude", "sk-ant-api03-abcdefghijklmnop");
+    await type("Cole aqui", "sk-ant-api03-abcdefghijklmnop");
     await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(calls(state, "agents.create")).toHaveLength(2);
     expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
   });
 
-  test("the key step's plan line goes to the computer step, where the plan signs in", async () => {
+  test("no computer yet: a plan's panel says where it signs in, and goes back to the computer step", async () => {
     const { state } = await start();
     await throughImport(state);
     await skip();
     await keepOnly("Theo · PM");
-    await next();
-    await click(button("Ou entre com o seu plano do Claude ou do ChatGPT no computador: sem chave."), 6);
+    await click(button(/Criar 1 agente/), 8);
+    await click(option(/^Claude$/), 6);
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
+    await click(within(panel).getByRole("button", { name: "Conectar um computador" }), 6);
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(button(/Outro computador/)).toBeTruthy();
   });
@@ -499,13 +573,222 @@ describe("Onboarding", () => {
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
 
-    // Its Claude Code isn't signed in yet: the agents think through a model, so the key screen comes as usual.
     expect(screen().queryByRole("heading", { name: "Quem pensa" })).toBeNull();
     await keepOnly("Theo · PM");
-    await next();
-    await click(button("Conectar depois"), 8);
+    await click(button(/Criar 1 agente/), 8);
+    // They go to it as they're made.
     expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+    // A computer that takes plans: every plan, then the key, with Claude chosen and its sign-in open, for Ada first.
+    for (const name of [
+      /^Claude$/,
+      /^ChatGPT$/,
+      /^GLM Coding$/,
+      /^Kimi Code$/,
+      /^MiniMax$/,
+      /^OpenCode Go$/,
+      /^Chave de API/,
+    ])
+      expect(option(name)).toBeTruthy();
+    expect(option(/^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    expect(document.body.textContent).toContain(
+      "Entre com o seu plano de IA e eles pensam com ele: sem chave de API. Ou use uma chave de API, paga pelo uso.",
+    );
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
+    expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
+    // Theo picked: another plan's tile keeps him while he has none.
+    const agent = () => screen().getByRole("combobox", { name: "Para qual agente" });
+    agent().focus();
+    await act(async () => fireEvent.keyDown(agent(), { key: "Enter" }));
+    await click(screen().getByRole("option", { name: "Theo" }));
+    await click(option(/^ChatGPT$/), 6);
+    expect(agent().textContent).toContain("Theo");
+    await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
+  });
+
+  test("a plan for Ada: she thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
+    const { state, api } = await start();
+    const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    // The computer finishes the sign-in as soon as the code goes.
+    fakeMachinesOf.get(api)?.endLogin("login_1", {
+      state: "done",
+      account: {
+        id: "acct_max",
+        kind: "claude_code",
+        label: "Claude Max",
+        email: "walter@acme.com.br",
+        plan: "max",
+        status: "active",
+        ownerId: "u-walter",
+        ownerName: "Walter",
+        mine: true,
+        usedBy: [],
+        usage: null,
+        provider: null,
+        keyHint: null,
+      },
+    });
+    await throughImport(state);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(
+        within(screen().getByRole("region", { name: "Seu plano do Claude" })).getByRole("button", {
+          name: "Entrar com Claude",
+        }),
+      );
+      await settle(6);
+    } finally {
+      window.open = realOpen;
+    }
+    await settle(6);
+    // No "Usar" to click: Ada thinks with it as soon as it's in.
+    const ada = calls(state, "agents.create").findIndex((c) => (c.args[1] as { name: string }).name === "Ada");
+    expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
+      { brain: "claude_code", account: "acct_max" },
+    ]);
+    expect(ada).toBeGreaterThan(-1);
+    expect(document.body.textContent).toContain("Ada agora pensa com Claude Max.");
+    const who = screen().getByRole("region", { name: "Quem pensa" });
+    expect([...who.querySelectorAll(".ai-who__row")].map((r) => r.textContent)).toEqual([
+      "AdaClaude Max",
+      "TheoSem IA",
+    ]);
+    expect(who.textContent).toContain("Cada plano pensa por um agente.");
+    const keyFor = within(who).getByRole("button", { name: "Chave de API para Theo" });
+    expect([...keyFor.querySelectorAll(".ac-brand-stack > .ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual(
+      ["claude", "openai"],
+    );
+    await click(keyFor, 4);
+    expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
+    // A plan is in: the step can be done now, the key or not.
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+    expect(screen().queryByRole("button", { name: "Conectar depois" })).toBeNull();
+    await next();
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+  });
+
+  test("a computer connected after the team is made: the agents move to it, and its plans sign in for them", async () => {
+    const { state, api, services } = await start();
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    await click(option(/^Claude$/), 6);
+    await click(button("Conectar um computador"), 6);
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    // This server's own computer connects meanwhile, and is picked.
+    const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    expect(button(/Computador deste servidor/).getAttribute("aria-pressed")).toBe("true");
+    await next();
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+    // The team kept: the ones made stay picked, and there's nothing left to make.
+    expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
+    await click(button(/Theo · PM/), 1);
+    expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
+    await next();
+    expect(calls(state, "agents.create")).toHaveLength(2);
+    expect(option(/^Claude$/).querySelector(".ac-brand--off")).toBeNull();
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+  });
+
+  test("the team made on a computer, then the Computer step skipped: the agents leave it, as the AI step says", async () => {
+    const { state, api } = await start();
+    const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    await throughImport(state);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+    // Back to the Computer step, and on without one this time.
+    await click(button("Voltar"), 4);
+    await click(button("Voltar"), 4);
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    await skip();
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id, null, null]);
+    await next();
+    // No computer for them now: the key first, the plans dimmed, and Claude's panel asks for one.
+    expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
+    await click(option(/^Claude$/), 6);
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
+    expect(within(panel).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
+  });
+
+  test("a computer's own sign-in that some agents can't switch to: the toast names the plan and the computer", async () => {
+    const { state, api, services } = await start();
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    api.agents.setBrain = async () => {
+      throw new Error("offline");
+    };
+    await next();
+    await settle(4);
+    expect(document.body.textContent).toContain(
+      "Alguns agentes não conseguiram passar a usar a conta do Claude no MacBook do Walter. Dá para trocar na página de cada um.",
+    );
+  });
+
+  test("where the server offers its own key: a seventh maker, by our mark, and nothing to paste", async () => {
+    const { state } = await start({ platformKey: true });
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    const makers = within(screen().getByRole("region", { name: "Chave de API" })).getByRole("group", {
+      name: "Provedor",
+    });
+    const ours = within(makers).getByRole("button", { name: "agentes.chat" });
+    // The makers' 30 px tile, so every tile is as tall.
+    expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
+    await click(ours, 2);
+    expect(screen().queryByLabelText("Cole aqui")).toBeNull();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+  });
+
+  test("an imported agent gets its own model back once a key that runs it is saved", async () => {
+    const { state } = await start();
+    await throughContext(state);
+    const input = screen().getByLabelText("Pasta para importar") as HTMLInputElement;
+    const root = join(import.meta.dir, "fixtures", "agent-import", "paperclip-company");
+    const walk = (dir: string): string[] =>
+      readdirSync(dir)
+        .sort()
+        .flatMap((n) => (statSync(join(dir, n)).isDirectory() ? walk(join(dir, n)) : [join(dir, n)]));
+    const files = walk(root).map((path) => {
+      const file = new File([readFileSync(path)], path.slice(path.lastIndexOf("/") + 1));
+      Object.defineProperty(file, "webkitRelativePath", { value: `paperclip-company/${path.slice(root.length + 1)}` });
+      return file;
+    });
+    Object.defineProperty(input, "files", { configurable: true, value: files });
+    await act(async () => fireEvent.change(input));
+    await settle(10);
+    await next();
+    await skip();
+    await keepOnly();
+    await keyAndCreate(/Criar 2 agentes/);
+    // Made on Automático with the team (no key yet), then the one whose model the Claude key runs gets it back.
+    const applied = calls(state, "imports.apply")
+      .map((c) => c.args[1] as ImportInput)
+      .filter((i) => !i.dryRun);
+    expect(applied[0]?.bundle.agents.map((a) => a.model)).toEqual(["auto", "auto"]);
+    expect(calls(state, "agents.update").map((c) => c.args[2])).toEqual([{ model: "claude-sonnet-5-5" }]);
   });
 
   test("this server's computer not connected yet: offered, but not picked for you", async () => {
@@ -539,24 +822,25 @@ describe("Onboarding", () => {
     await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
     expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
-    // Thinking on the computer is what spares the key: the question comes right away, saying whom they answer.
-    expect(document.body.textContent).toContain(
-      "Os agentes vão pensar com o seu plano do Claude e responder só a você.",
-    );
-    await click(button("Usar meu plano"), 2);
+    // Choosing a plan asks nothing: only letting others talk to an agent on it does (ADR 0059 §5).
+    expect(screen().queryByRole("dialog")).toBeNull();
     await next();
 
-    // The agents step: who thinks is already the computer's Claude Code, so no key screen.
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-    expect(screen().getByRole("heading", { name: "Quem pensa" })).toBeTruthy();
-    expect(button(/Claude Code no MacBook do Walter/).getAttribute("aria-pressed")).toBe("true");
-    expect(button(/Modelo pela API/).getAttribute("aria-pressed")).toBe("false");
+    expect(screen().queryByRole("heading", { name: "Quem pensa" })).toBeNull();
     await keepOnly("Theo · PM");
-    await click(button(/Criar 1 agente/), 6);
+    await click(button(/Criar 1 agente/), 8);
+    // Both agents use the connected computer.
+    expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
+    // The AI step: the account signed in on that computer, chosen, thinks for every agent; nothing to sign in.
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    const own = within(panel).getByRole("button", { name: /^A conta do Claude com login no MacBook do Walter/ });
+    expect(own.getAttribute("aria-pressed")).toBe("true");
+    expect(within(panel).queryByRole("combobox", { name: "Para qual agente" })).toBeNull();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
+    await next();
     await settle(4);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
-    // Both agents use the connected computer and think with its Claude Code.
-    expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
       { brain: "claude_code", fallback: true },
       { brain: "claude_code", fallback: true },
@@ -584,10 +868,15 @@ describe("Onboarding", () => {
     ]);
 
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Theo e Ada já estão no #general.");
-    expect(document.body.textContent).toContain("MacBook do Walter");
-    await click(button("Abrir o #general"), 8);
-    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+    expect(welcome()).toBe("Theo e Ada já estão no #general. Mandamos 1 convite por e-mail.");
+    // Their computer ends the row of faces, as it is.
+    expect(screen().getByRole("img", { name: "MacBook do Walter" }).getAttribute("data-state")).toBe("online");
+    // Lia, who'd browse on it, isn't on the team: Theo offers the first message, sent in one click.
+    expect(asker()).toBe("Theo");
+    await click(button("Enviar para Theo"), 8);
+    const posts = calls(state, "chat.post");
+    expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
+    expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
   });
 
   test("optional steps can be skipped: no computer, no invites", async () => {
@@ -603,9 +892,10 @@ describe("Onboarding", () => {
     await skip();
     expect(calls(state, "orgs.invite")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
-    const summary = document.querySelector(".onb__summary")?.textContent ?? "";
-    expect(summary).toContain("Depois");
-    expect(summary).toContain("Convites0");
+    // No cards repeating the rail and the faces, and nothing said of what was skipped: no invitations, no computer.
+    expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card")).toBeNull();
+    expect(welcome()).toBe("Theo e Ada já estão no #general.");
+    expect(document.querySelector(".onb__crew-computer")).toBeNull();
     // The rail marks the steps done and lets you go back.
     const steps = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(steps.querySelectorAll("li[data-done]")).toHaveLength(6);
@@ -620,8 +910,308 @@ describe("Onboarding", () => {
     await skip();
     expect(progress()).toBe("Tudo certo");
     expect(sessionStorage.getItem("agentes.confirmation.sent")).toBe("walter@acme.com.br");
-    await click(button("Abrir o #general"), 8);
+    // The quiet way out opens #general and sends nothing.
+    await click(button("Abrir o #general sem enviar"), 8);
+    expect(calls(state, "chat.post")).toHaveLength(0);
     expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
+  });
+
+  test("Done: with no computer to browse on, Theo offers the first message, having read the context; Send posts it once and opens #general", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM", "Lia · Pesquisa");
+    expect(document.querySelector(".onb__summary, .onb__stat")).toBeNull();
+    expect(welcome()).toBe("Theo, Ada e Lia já estão no #general.");
+    // Lia's research needs a computer's browser: with none, Theo asks.
+    expect(asker()).toBe("Theo");
+    expect(
+      screen().getByRole("region", { name: "Li o que você escreveu sobre a Acme Saúde. Posso começar por isto?" }),
+    ).toBeTruthy();
+    expect(askBox().value).toBe(THEO_ASKS);
+    // Not focused: Enter anywhere does what the big button's ↵ says.
+    expect(document.activeElement).not.toBe(askBox());
+    expect(askLine()).toBe("Theo começa na hora, no #general.");
+    expect(document.querySelector(".onb__first-line")?.getAttribute("role")).toBe("status");
+    expect(button("Abrir o #general sem enviar")).toBeTruthy();
+    await click(button("Enviar para Theo"), 8);
+    const posts = calls(state, "chat.post");
+    expect(posted(state)).toEqual([{ body: THEO_ASKS, clientId: expect.any(String) }]);
+    expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
+  });
+
+  test("who asks first: Lia once a ready computer gives the agents a browser, its portrait after the faces; Ada when she's alone", async () => {
+    const first = await start();
+    fakeMachinesOf.get(first.api)?.pair({ name: "srv-1", kind: "host" });
+    await throughImport(first.state);
+    await next();
+    await keepOnly("Theo · PM", "Lia · Pesquisa");
+    await click(button(/^Criar 2 agentes$/), 8);
+    await click(button("Conectar depois"), 8);
+    await skip();
+    expect(asker()).toBe("Lia");
+    expect(askBox().value).toBe(
+      "@lia Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?",
+    );
+    expect(button("Enviar para Lia")).toBeTruthy();
+    expect(screen().getByRole("img", { name: "Computador deste servidor" }).getAttribute("data-state")).toBe("online");
+    // Each face says who it is under the pointer; screen readers have the lead's names instead.
+    const faces = [...document.querySelectorAll(".onb__crew .ac-avatar")];
+    expect(faces.map((f) => [f.getAttribute("title"), f.getAttribute("aria-hidden")])).toEqual([
+      ["Theo · PM", "true"],
+      ["Ada · Dev", "true"],
+      ["Lia · Pesquisa", "true"],
+    ]);
+    cleanup();
+
+    const alone = await start();
+    await toDone(alone.state);
+    expect(asker()).toBe("Ada");
+    expect(askBox().value).toBe("@ada O que você poderia construir ou automatizar para a gente primeiro?");
+    expect(button("Enviar para Ada")).toBeTruthy();
+  });
+
+  test("the first message as it's edited: whoever it names speaks and gets it; naming nobody, #general; emptied, the agent asks for one and nothing goes", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM", "Lia · Pesquisa");
+    await type(ASK, "@Lia e os preços deles?");
+    expect(asker()).toBe("Lia");
+    expect(button("Enviar para Lia")).toBeTruthy();
+    expect(askLine()).toBe("Lia começa na hora, no #general.");
+    // Naming nobody: the router picks who answers, and every agent here has an AI.
+    await type(ASK, "Bom dia, time");
+    expect(asker()).toBe("Theo");
+    expect(button("Enviar no #general")).toBeTruthy();
+    expect(askLine()).toBeNull();
+    // Emptied: no offer of "this" over an empty box, only the way into #general, and nothing to open it "without
+    // sending".
+    await type(ASK, "  ");
+    expect(screen().getByRole("region", { name: "Por onde eu começo?" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Abrir o #general sem enviar" })).toBeNull();
+    expect(askLine()).toBeNull();
+    await click(button("Abrir o #general"), 8);
+    expect(calls(state, "chat.post")).toHaveLength(0);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("the first message's box: Enter sends; Shift+Enter, Enter ending an input method's word and a phone's return key don't; going Back keeps what was written", async () => {
+    const { state } = await start();
+    await toDone(state, "Theo · PM");
+    await type(ASK, "@theo o que fazemos hoje?");
+    await click(button("Voltar"), 4);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    await skip();
+    expect(askBox().value).toBe("@theo o que fazemos hoje?");
+    const enter = async (init: KeyboardEventInit = {}) => {
+      await act(async () => fireEvent.keyDown(askBox(), { key: "Enter", ...init }));
+      await settle(4);
+    };
+    await enter({ shiftKey: true });
+    await enter({ isComposing: true });
+    // A phone, touch first: its return key is a new line, as in the chat, and the big button sends.
+    const touches = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    const matchMedia = window.matchMedia;
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+    window.matchMedia = ((query: string) =>
+      query === "(pointer: coarse)"
+        ? ({ matches: true, media: query } as MediaQueryList)
+        : matchMedia.call(window, query)) as typeof window.matchMedia;
+    try {
+      await enter();
+    } finally {
+      window.matchMedia = matchMedia;
+      if (touches) Object.defineProperty(navigator, "maxTouchPoints", touches);
+      else delete (navigator as { maxTouchPoints?: number }).maxTouchPoints;
+    }
+    expect(calls(state, "chat.post")).toHaveLength(0);
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    await enter();
+    await settle(4);
+    expect(posted(state)).toEqual([{ body: "@theo o que fazemos hoje?", clientId: expect.any(String) }]);
+  });
+
+  test("the first message goes once: two presses at once are one message; while it's on its way, Enter and the button send nothing more", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM");
+    let land = () => {};
+    state.holdPosts = new Promise<void>((done) => {
+      land = done;
+    });
+    const send = button("Enviar para Theo");
+    // Two presses before the page shows it's sending: the same message twice, which the server writes once.
+    await act(async () => {
+      fireEvent.click(send);
+      fireEvent.click(send);
+    });
+    await settle(2);
+    await act(async () => fireEvent.keyDown(askBox(), { key: "Enter" }));
+    await act(async () => fireEvent.keyDown(document.querySelector(".onb__main") as HTMLElement, { key: "Enter" }));
+    await click(send, 2);
+    const [one, two, ...more] = posted(state);
+    expect(two).toEqual(one);
+    expect(more).toEqual([]);
+    state.holdPosts = undefined;
+    await act(async () => land());
+    await settle(8);
+    expect(state.messages.filter((m) => m.body === THEO_ASKS)).toHaveLength(1);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("sent again after its answer was lost on the way back, the first message is written once; changed, it's a new one", async () => {
+    const { state, api, router } = await start();
+    await toDone(state, "Theo · PM");
+    // Each post is written, but the first two answers never come back (a proxy's 502).
+    const post = api.chat.post;
+    let lost = 2;
+    api.chat.post = async (...args: Parameters<typeof post>) => {
+      const message = await post(...args);
+      if (lost-- > 0) throw new ApiError(502, "bad_gateway", "Bad gateway");
+      return message;
+    };
+    await click(button("Enviar para Theo"), 8);
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    await type(ASK, "@theo o que fazemos hoje?");
+    await click(button("Enviar para Theo"), 8);
+    await click(button("Enviar para Theo"), 8);
+    const [first, changed, again] = posted(state);
+    expect(changed?.clientId).not.toBe(first?.clientId);
+    expect(again).toEqual(changed);
+    const bodies = [THEO_ASKS, "@theo o que fazemos hoje?"];
+    expect(state.messages.filter((m) => bodies.includes(m.body)).map((m) => m.body)).toEqual(bodies);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("a first message that can't be posted stays on Done with its text, and says why", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM");
+    state.failPosts = true;
+    await click(button("Enviar para Theo"), 8);
+    expect(document.querySelector(".ac-toast")?.textContent).toContain("Try again");
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(askBox().value).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
+    state.failPosts = false;
+    await click(button("Enviar para Theo"), 8);
+    expect(calls(state, "chat.post")).toHaveLength(2);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("the welcome says what went out and came in: invitations once sent, the wiki while it arrives and once it's in", async () => {
+    const { api } = await start();
+    // The vault's notes take their time: Done opens before they're in.
+    let release = () => {};
+    const wikiImport = api.wiki.import;
+    api.wiki.import = async (...args: Parameters<typeof wikiImport>) => {
+      await new Promise<void>((done) => {
+        release = done;
+      });
+      return wikiImport(...args);
+    };
+    await pickVault();
+    await next();
+    await skip();
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    await click(button("Conectar depois"), 8);
+    const emails = screen().getByLabelText("E-mails");
+    await act(async () => fireEvent.change(emails, { target: { value: "marina@acme.com.br, bia@acme.com.br" } }));
+    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    await click(button(/Convidar 2 pessoas/), 8);
+    expect(welcome()).toBe(
+      "Theo e Ada já estão no #general. Mandamos 2 convites por e-mail. As notas do Obsidian ainda estão chegando na wiki.",
+    );
+    // Nothing was written about the company: the offer doesn't say it was read.
+    expect(
+      screen().getByRole("region", { name: "Posso começar por isto? Pergunto o que precisar saber." }),
+    ).toBeTruthy();
+    await act(async () => release());
+    await settle(8);
+    expect(welcome()).toBe(
+      "Theo e Ada já estão no #general. Mandamos 2 convites por e-mail. A wiki tem 2 páginas do Obsidian.",
+    );
+  });
+
+  test("notes that aren't coming aren't said to be arriving: Continue waits for the vault to be read, and a failed import says nothing on Done", async () => {
+    const { api } = await start();
+    let imports = 0;
+    api.wiki.import = async () => {
+      imports++;
+      throw new ApiError(500, "internal", "Internal error");
+    };
+    await pickVault({ read: false });
+    // Continue is what brings the vault in: it waits until the vault is read.
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+    await next();
+    await settle(4);
+    expect(imports).toBe(1);
+    await skip();
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    await click(button("Conectar depois"), 8);
+    await skip();
+    expect(welcome()).toBe("Theo e Ada já estão no #general.");
+  });
+
+  test("with no AI yet, the line says to send anyway, for the agent named or every agent; one connected on a way back counts", async () => {
+    const { state } = await start();
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    await click(button("Conectar depois"), 8);
+    state.aiStatus = {
+      any: false,
+      agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai" as const, reason: "no_key" as const })),
+    };
+    await skip();
+    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: Theo responde quando você conectar uma.");
+    expect(document.querySelector(".onb__first-line")?.getAttribute("data-state")).toBe("no_ai");
+    expect(button("Enviar para Theo")).toBeTruthy();
+    await type(ASK, "Bom dia, time");
+    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: os agentes respondem quando você conectar uma.");
+    // An AI connected after going back: Done says so as soon as it's open again.
+    await type(ASK, "@theo bom dia");
+    state.aiStatus = { any: true, agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })) };
+    await click(button("Voltar"), 4);
+    await skip();
+    expect(askLine()).toBe("Theo começa na hora, no #general.");
+  });
+
+  test("an agent whose computer is away: the line waits for it, asked about again every 5 s, until it can start", async () => {
+    const { state, api, services } = await start();
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    const mac = fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    // Its own sign-in thinks for them.
+    await next();
+    // The Mac went to sleep meanwhile.
+    const theo = agentId(state, "Theo");
+    state.aiStatus = { any: true, agents: [{ agentId: theo, state: "waiting" }] };
+    fakeMachinesOf.get(api)?.patch(mac?.id ?? "", { online: false });
+    await skip();
+    expect(screen().getByRole("img", { name: "MacBook do Walter" }).getAttribute("data-state")).toBe("offline");
+    expect(asker()).toBe("Theo");
+    expect(askLine()).toBe("Theo começa assim que o MacBook do Walter voltar.");
+    const interval = () => {
+      const query = services.queryClient
+        .getQueryCache()
+        .findAll()
+        .find((q) => q.queryKey.at(-1) === "ai-status" && q.getObserversCount() > 0);
+      const every = query?.observers[0]?.options.refetchInterval;
+      return typeof every === "function" && query ? every(query) : every;
+    };
+    expect(interval()).toBe(5000);
+    state.aiStatus = { any: true, agents: [{ agentId: theo, state: "ready" }] };
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    expect(askLine()).toBe("Theo começa na hora, no #general.");
+    expect(interval()).toBe(false);
   });
 
   test('import: Theo\'s "pular" is the way out, and each app is shown by its official logo', async () => {
@@ -703,10 +1293,11 @@ describe("Onboarding", () => {
     await act(async () => fireEvent.change(input));
     await settle(8);
   };
+  /** Keeps the team (`count`: its button), then saves a Claude key for it. */
   const keyAndCreate = async (count: RegExp) => {
-    await next();
-    await type("Chave da API da Claude", "sk-ant-api03-abcdefghijklmnop");
-    await click(button(count), 6);
+    await click(button(count), 8);
+    await type("Cole aqui", "sk-ant-api03-abcdefghijklmnop");
+    await click(button("Salvar e continuar"), 6);
     await settle(4);
   };
 
@@ -746,7 +1337,7 @@ describe("Onboarding", () => {
     expect(button(/Quill · Outreach writer/).getAttribute("aria-pressed")).toBe("false");
     // Only Ada (always on the team) joins them.
     await keepOnly();
-    await keyAndCreate(/Salvar e criar 2 agentes/);
+    await keyAndCreate(/Criar 2 agentes/);
 
     expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual(["Ada"]);
     const applied = calls(state, "imports.apply")
@@ -823,7 +1414,7 @@ describe("Onboarding", () => {
     await skip();
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: /Knowledge · Company Knowledge/ })).toBeNull();
-    await keyAndCreate(/Salvar e criar 3 agentes/);
+    await keyAndCreate(/Criar 3 agentes/);
     expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual([
       "Theo",
       "Ada",
