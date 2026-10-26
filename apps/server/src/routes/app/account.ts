@@ -27,6 +27,7 @@ import {
   setAvatar,
   setMyLocale,
   setOrgLogo,
+  settleJoinRequests,
   signInOptions,
   toldReason,
   USER_LOCALES,
@@ -205,7 +206,11 @@ export function accountRoutes(deps: AppDeps) {
                 request: z
                   .object({ status: z.enum(["pending", "approved", "denied"]), reason: z.string().nullable() })
                   .nullable()
-                  .openapi({ description: "Their latest request through a link, with its answer." }),
+                  .openapi({
+                    description:
+                      "The latest request for their address through a link, with its answer; always null while " +
+                      "the address isn't confirmed.",
+                  }),
               })
               .optional()
               .openapi({ description: "A link opened signed in: where they stand." }),
@@ -786,7 +791,12 @@ export function accountRoutes(deps: AppDeps) {
       request: { params: z.object({ token: z.string() }) },
       responses: { 200: json(z.object({ orgId: z.uuid() })), ...errors },
     }),
-    async (c) => c.json(await acceptInvitation(db, c.get("user"), c.req.valid("param").token), 200),
+    async (c) => {
+      const joined = await acceptInvitation(db, c.get("user"), c.req.valid("param").token);
+      // A request to join they had waiting closed as they joined: the admins' notice goes with the last one.
+      await settleJoinRequests({ db, pubsub: deps.adapters.pubsub }, joined.orgId);
+      return c.json(joined, 200);
+    },
   );
 
   return app;

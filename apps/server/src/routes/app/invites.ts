@@ -236,7 +236,8 @@ export function inviteRoutes(deps: AppDeps) {
       summary: "Ask to join through an invitation link",
       description:
         "Public. Signed out: a name, an email and an optional note, and no account is made. Signed in: the " +
-        "account asks. A typed request answers the same whatever the address. Limited per IP and per link.",
+        "account asks. A typed request, or one from an account whose address isn't confirmed, answers the same " +
+        "whatever the address. Limited per IP and per link.",
       request: {
         params: Token,
         body: body(
@@ -278,8 +279,7 @@ export function inviteRoutes(deps: AppDeps) {
       });
       deps.wakeWorkers?.();
       const reply = { status: asked.status, email: asked.email, emailed: adapters.email.delivers === true };
-      // Signed out, the same answer whatever the address: whoever holds a link never learns who works there.
-      return c.json(reply, !user || asked.created ? 201 : 200);
+      return c.json(reply, asked.created ? 201 : 200);
     },
   );
 

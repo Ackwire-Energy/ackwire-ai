@@ -60,6 +60,9 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
     expect(await res.json()).toEqual({ status: "pending", email: "ana@example.com", emailed: true });
   }
   expect((await ask(anon, token, { email: "x@example.com" })).status).toBe(400);
+  // A job files a typed request, apart from the reply.
+  expect(await requests(owner, orgId)).toEqual([]);
+  await t.drain();
   const [request] = await requests(owner, orgId);
   expect(request).toMatchObject({ name: "Ana Souza", email: "ana@example.com", note: "Paula's new designer" });
   expect(request?.confirmed).toBe(false);
@@ -148,6 +151,7 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
   const cris = browser(t);
   await signUp(cris, "cris@example.com");
   await ask(cris, token, {});
+  await t.drain();
   const [unconfirmed] = await requests(owner, orgId);
   expect(unconfirmed?.confirmed).toBe(false);
   const invited = await owner(`/api/app/organizations/${orgId}/join-requests/${unconfirmed?.id}/approve`, {
@@ -159,6 +163,7 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
 test("only admins see and answer requests; asks must come from our own pages", async () => {
   const { owner, orgId, link, token } = await start();
   await ask(browser(t), token, { name: "Ana", email: "ana@example.com" });
+  await t.drain();
   const [request] = await requests(owner, orgId);
   const member = await joinByInvitation(t, owner, orgId, "member@example.com");
   const calls = (b: Browser) => [
@@ -188,6 +193,38 @@ test("only admins see and answer requests; asks must come from our own pages", a
   const [toAna] = mailTo("ana@example.com");
   expect(toAna?.subject).toBe("Seu pedido para entrar não foi aprovado");
   expect(toAna?.html).toContain("We only take people from &lt;the studio&gt;");
+});
+
+test("an account that never confirmed its address reads no one else's answer, nor takes over their request", async () => {
+  const { owner, orgId, token } = await start({ ALLOW_SIGNUP: "true" });
+  await ask(browser(t), token, { name: "Otto", email: "otto@corp.com" });
+  await t.drain();
+  const [otto] = await requests(owner, orgId);
+  const denied = await owner(`/api/app/organizations/${orgId}/join-requests/${otto?.id}/deny`, {
+    json: { reason: "Not this team" },
+  });
+  expect(denied.status).toBe(204);
+  const notOtto = browser(t);
+  await signUp(notOtto, "otto@corp.com");
+  const preview = (await (await notOtto(`/api/app/invitations/${token}`)).json()) as { you?: unknown };
+  expect(preview.you).toEqual({ member: false, email: "otto@corp.com", request: null });
+  expect((await ask(notOtto, token, {})).status).toBe(201);
+  await t.drain();
+  expect(await requests(owner, orgId)).toEqual([]);
+});
+
+test("joining by an email invitation closes the person's request and the admins' notice", async () => {
+  const { owner, orgId, token } = await start();
+  await ask(browser(t), token, { name: "Rui", email: "rui@example.com" });
+  await t.drain();
+  const inbox = async () =>
+    ((await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as { items: { kind: string }[] })
+      .items;
+  expect(await requests(owner, orgId)).toHaveLength(1);
+  expect((await inbox()).map((n) => n.kind)).toEqual(["join_request"]);
+  await joinByInvitation(t, owner, orgId, "rui@example.com");
+  expect(await requests(owner, orgId)).toEqual([]);
+  expect(await inbox()).toEqual([]);
 });
 
 test("a link turned off: its requests close quietly, its page says it no longer works", async () => {
