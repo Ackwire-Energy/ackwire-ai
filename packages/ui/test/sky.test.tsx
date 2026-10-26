@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { setupDom } from "../testing/dom";
+import { canvasPage } from "../testing/frames";
 
 setupDom();
 
@@ -114,86 +115,25 @@ describe("EmptyState with sky", () => {
   });
 });
 
-/**
- * A sky on a page whose frames run by hand (`frames`), with a 2D context that counts what it draws, and the
- * intersection observer's answer in the test's hands (`onScreen`). The page's own frames asked for before (the
- * other tests' skies) run first: the loop is one for the whole page.
- */
-async function skyPage(reduced: boolean) {
-  await new Promise((r) => setTimeout(r, 100));
-  let clock = 0;
-  let queue: FrameRequestCallback[] = [];
-  const g = globalThis as unknown as Record<string, unknown>;
-  const saved = {
-    raf: g.requestAnimationFrame,
-    caf: g.cancelAnimationFrame,
-    io: g.IntersectionObserver,
-    ro: g.ResizeObserver,
-  };
-  let seen: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
-  g.requestAnimationFrame = (cb: FrameRequestCallback) => queue.push(cb);
-  g.cancelAnimationFrame = () => {};
-  g.IntersectionObserver = class {
-    constructor(cb: (entries: { isIntersecting: boolean }[]) => void) {
-      seen = cb;
-    }
-    observe() {}
-    disconnect() {}
-  };
-  g.ResizeObserver = class {
-    observe() {}
-    disconnect() {}
-  };
-  const now = spyOn(performance, "now").mockImplementation(() => clock);
-  const media = spyOn(window, "matchMedia").mockImplementation(
-    (q: string) => ({ matches: reduced && q.includes("reduce") }) as MediaQueryList,
-  );
-  const host = document.createElement("div");
-  const canvas = document.createElement("canvas");
-  host.append(canvas);
-  document.body.append(host);
-  host.getBoundingClientRect = () =>
-    ({ x: 0, y: 0, left: 0, top: 0, right: 40, bottom: 40, width: 40, height: 40 }) as DOMRect;
-  Object.defineProperty(canvas, "offsetParent", { get: () => host });
-  let draws = 0;
-  canvas.getContext = (() => ({
-    createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
-    putImageData: () => {
-      draws++;
-    },
-  })) as unknown as typeof canvas.getContext;
-  const stop = startSky(canvas, () => opts);
-  return {
-    draws: () => draws,
-    /** Frames still asked for. */
-    pending: () => queue.length,
-    /** `ms` of a 60 Hz screen. */
-    frames(ms: number) {
-      for (const end = clock + ms; clock < end; ) {
-        clock += 1000 / 60;
-        const due = queue;
-        queue = [];
-        for (const cb of due) cb(clock);
-      }
-    },
-    onScreen: (on: boolean) => seen?.([{ isIntersecting: on }]),
-    close() {
-      stop();
-      this.frames(100);
-      host.remove();
-      now.mockRestore();
-      media.mockRestore();
-      Object.assign(g, {
-        requestAnimationFrame: saved.raf,
-        cancelAnimationFrame: saved.caf,
-        IntersectionObserver: saved.io,
-        ResizeObserver: saved.ro,
-      });
-    },
-  };
-}
-
 describe("the sky's loop", () => {
+  /**
+   * A sky on a page whose frames run by hand. The page's own frames asked for before (the other tests' skies) run
+   * first: the loop is one for the whole page.
+   */
+  async function skyPage(reduced: boolean) {
+    await new Promise((r) => setTimeout(r, 100));
+    const page = canvasPage({ width: 40, height: 40, reduced });
+    const stop = startSky(page.canvas, () => opts);
+    const close = page.close;
+    return Object.assign(page, {
+      close() {
+        stop();
+        page.frames(100);
+        close();
+      },
+    });
+  }
+
   test("moving: about 30 frames a second while on screen, none and no loop off screen", async () => {
     const page = await skyPage(false);
     try {

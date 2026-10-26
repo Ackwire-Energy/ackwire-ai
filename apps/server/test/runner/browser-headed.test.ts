@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { createConnection } from "node:net";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -17,7 +16,7 @@ import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "../../runner/desktop
 import { RunnerError } from "../../runner/errors";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
-import { removeDirs, tempDir, waitFor } from "./helpers";
+import { removeDirs, socketAnswer, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
@@ -636,21 +635,6 @@ test.if(posix)(
   },
 );
 
-/** What the runner answers one connection that says `word` on a desktop's Browser socket. */
-function answers(socket: string, word: string): Promise<string> {
-  return new Promise((resolve) => {
-    let got = "";
-    const conn = createConnection(socket);
-    conn.setEncoding("utf8");
-    conn.on("connect", () => conn.write(word));
-    conn.on("data", (chunk: string) => {
-      got += chunk;
-    });
-    conn.on("error", () => resolve(got));
-    conn.on("close", () => resolve(got));
-  });
-}
-
 test.if(posix)(
   "Browser on its desktop: a second click while Chrome's window is still coming is told busy and starts nothing",
   async () => {
@@ -663,10 +647,10 @@ test.if(posix)(
     const socket = path.join(dir, BROWSER_SOCKET);
     const server = await serveBrowser(socket, (installing) => t.manager.show(dev, folder, installing));
     try {
-      const first = answers(socket, "open\n");
+      const first = socketAnswer(socket, "open\n");
       await waitFor(() => devtools.urls.length >= 1);
       // Chrome is up (its port open), its window not yet: the first click isn't answered.
-      expect(await answers(socket, "open\n")).toBe("busy\n");
+      expect(await socketAnswer(socket, "open\n")).toBe("busy\n");
       devtools.targets = [{ id: "P1", type: "page", url: "about:blank" }];
       expect(await first).toBe("ok\n");
       expect(t.chromes).toHaveLength(1);
