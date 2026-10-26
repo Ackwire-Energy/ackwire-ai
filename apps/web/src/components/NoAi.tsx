@@ -34,8 +34,8 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
     const name = dir.agentById.get(dmAgentId)?.name ?? t("channel.unknownAgent");
     return (
       <div className="noai-banner" role="status">
-        <Icon name="plug" size={16} />
-        <span className="noai-banner__text">
+        <span className="noai-banner__text ac-iconline">
+          <Icon name="plug" size={16} />
           <b>{t("noAi.agent", { name })}</b>
         </span>
         <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
@@ -47,9 +47,11 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
   if (status.data.any || agentIds.length === 0) return null;
   return (
     <div className="noai-banner" role="status">
-      <Icon name="plug" size={16} />
-      <span className="noai-banner__text">
-        <b>{t("noAi.banner.org")}</b> {t("noAi.banner.orgHint")}
+      <span className="noai-banner__text ac-iconline">
+        <Icon name="plug" size={16} />
+        <span>
+          <b>{t("noAi.banner.org")}</b> {t("noAi.banner.orgHint")}
+        </span>
       </span>
       <Button size="sm" onClick={() => connect.open({ agentId: agentIds.length === 1 ? agentIds[0] : undefined })}>
         {t("noAi.banner.orgAction")}
@@ -105,7 +107,7 @@ export function NoAiCard({ message }: { message: Message }) {
     );
   return (
     <div className="waitcard" data-done={ready || answering || undefined}>
-      <span className="waitcard__top">
+      <span className="waitcard__top ac-iconline">
         <Icon name={ready || answering ? "check" : "plug"} size={16} />
         <span>{title}</span>
       </span>

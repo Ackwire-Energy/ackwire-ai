@@ -223,7 +223,7 @@ export function VaultLines({ lines }: { lines: Line[] }) {
     <ul className="vault-lines">
       {lines.map((l, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list per report
-        <li key={i} data-tone={l.tone}>
+        <li key={i} className="ac-iconline" data-tone={l.tone}>
           <Icon name={l.icon} size={16} />
           <span>
             <b>{l.title}</b>
@@ -540,7 +540,7 @@ export function WikiImportDialog({
     body = (
       <>
         <VaultDropZone onFiles={(f, n) => void read(f, n)} />
-        <p className="vault-notice">
+        <p className="vault-notice ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("wiki.import.howTo")}</span>
         </p>

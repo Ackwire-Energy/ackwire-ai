@@ -59,7 +59,7 @@ import {
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, writePref } from "../hooks";
 import { BrandFace, CommandCopy } from "../ui/bits";
-import { CopyDiagnostics, ReachProblem, ReachRow } from "../ui/here";
+import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
 import { shortPath } from "../ui/time";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
@@ -273,7 +273,7 @@ function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: ()
         </Button>
         <span className="dk-help">
           {t("desktop.first.create")}{" "}
-          <button type="button" className="dk-link" onClick={() => onCloud("/signup")}>
+          <button type="button" className="ac-link dk-link" onClick={() => onCloud("/signup")}>
             {t("desktop.first.createLink")}
           </button>
         </span>
@@ -332,7 +332,7 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
 function ProblemLine({ problem, host }: { problem: ConnectProblem; host: string }) {
   const { t } = useTranslation();
   return (
-    <span className="dk-honest dk-fr__problem" role="alert">
+    <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
       <Icon name="alert" size={16} />
       <span>{t(PROBLEM_TEXT[problem], PROBLEM_HOSTLESS.has(problem) ? {} : { host })}</span>
     </span>
@@ -445,9 +445,7 @@ function Connect({
             <h2 className="dk-ctitle">{t("desktop.connect.found")}</h2>
             {found.map((f) => (
               <div key={f.server} className="dk-fr__foundrow">
-                <span className="dk-logo dk-logo--soft">
-                  <Icon name={f.where === "tailnet" ? "globe" : "computer"} size={16} />
-                </span>
+                <ServerTile kind={f.where} />
                 <span className="dk-fr__foundtext">
                   {/* This computer by its name; its address too when it answers at more than one. */}
                   <b>{f.where === "tailnet" ? serverName(f.server) : t("desktop.link.chipHere")}</b>
@@ -748,7 +746,7 @@ function HereSetup({
         {steps.map((step) => {
           const state = states[step];
           return (
-            <li key={step} data-state={state}>
+            <li key={step} className="ac-iconline" data-state={state}>
               <span className="dk-fr__stepmark" aria-hidden="true">
                 {state === "active" ? (
                   <PixelSpinner size={16} color="sky" />
@@ -773,7 +771,7 @@ function HereSetup({
                 </span>
                 {state === "failed" && (
                   <span className="dk-fr__stepfail">
-                    <span className="dk-honest">
+                    <span className="dk-honest ac-iconline">
                       <Icon name="alert" size={16} />
                       {step === "account" ? t("desktop.here.fail.account") : t("desktop.here.fail.start")}
                     </span>

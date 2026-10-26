@@ -194,4 +194,18 @@ describe("Missões", () => {
     // Somebody can: no empty state.
     expect(within(dialog).queryByText("Nenhum agente pode rodar uma missão para você ainda")).toBeNull();
   });
+
+  test("Nova missão: nobody can run one yet, said with its icon on the title's line", async () => {
+    const api = createFakeApi(seedState());
+    api.missions.eligibleAgents = async () => [];
+    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getAllByRole("button", { name: /Nova missão/ })[0] as HTMLElement));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Nova missão" });
+    const title = within(dialog).getByText("Nenhum agente pode rodar uma missão para você ainda");
+    const line = title.parentElement as HTMLElement;
+    expect(line.classList.contains("ac-iconline")).toBe(true);
+    expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
+  });
 });

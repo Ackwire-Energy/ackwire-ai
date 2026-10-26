@@ -130,6 +130,19 @@ describe("a mission's thread: the header is the mission's", () => {
     expect(header.querySelector(".mh__strip canvas.ac-pixspin")).toBeNull();
   });
 
+  test("no computer: the owner's note, its icon on the words' line and Escolher computador beside it", async () => {
+    await missionThread({ needsComputer: true, role: "owner" });
+    const header = theHeader();
+    const note = header.querySelector(".mh__note") as HTMLElement;
+    expect(note.textContent).toContain("A missão ficou sem computador");
+    // The button sits outside the words' line, so the note centres it on them.
+    const line = note.querySelector(".ac-iconline") as HTMLElement;
+    expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
+    expect(line.textContent).toContain("A missão ficou sem computador");
+    const choose = within(note).getByRole("button", { name: "Escolher computador" });
+    expect(line.contains(choose)).toBe(false);
+  });
+
   test("N sessões opens the sessions dialog: filters with counts, a session opens O que mudou and Ver saída", async () => {
     await missionThread();
     const header = theHeader();

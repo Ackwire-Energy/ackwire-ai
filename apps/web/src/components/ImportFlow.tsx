@@ -70,6 +70,7 @@ import {
   retryable,
 } from "@/lib/import-flow";
 import { hasFiles } from "@/lib/obsidian";
+import { useTheme } from "@/lib/theme";
 import "./import-flow.css";
 
 const KINDS: ImportItemKind[] = ["agent", "skill", "channel", "routine", "note"];
@@ -336,6 +337,8 @@ function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">
 }
 
 function SourceMark({ card }: { card: ImportCard }) {
+  // The app's own theme, which can differ from the system's: so not a `<picture>` with a media query.
+  const dark = useTheme().resolved === "dark";
   if (card === "other") {
     return (
       <span className="imp-mark" aria-hidden="true">
@@ -346,7 +349,7 @@ function SourceMark({ card }: { card: ImportCard }) {
   const mark = SOURCE_MARK[card];
   return (
     <span className="imp-mark" aria-hidden="true">
-      {"icon" in mark ? <img src={mark.icon} alt="" className="imp-mark__img" /> : mark.letters}
+      <img src={dark && mark.dark ? mark.dark : mark.icon} alt="" className="imp-mark__img" />
     </span>
   );
 }
@@ -420,7 +423,7 @@ function Picker({ flow }: { flow: ImportFlowState }) {
         <OtherApp />
       ) : (
         flow.card && (
-          <p className="imp-tip">
+          <p className="imp-tip ac-iconline">
             <Icon name="info" size={16} />
             <span>{t(`onboarding.import.where.${flow.card}`)}</span>
           </p>
@@ -514,7 +517,7 @@ function Picker({ flow }: { flow: ImportFlowState }) {
           )}
         </div>
       )}
-      <p className="imp-note">
+      <p className="imp-note ac-iconline">
         <Icon name="lock" size={16} />
         <span>{t("onboarding.import.privacy")}</span>
       </p>
@@ -698,7 +701,7 @@ function Preview({
           </ul>
         </section>
       )}
-      <p className="imp-note">
+      <p className="imp-note ac-iconline">
         <Icon name="lock" size={16} />
         <span>{t("onboarding.import.never")}</span>
       </p>
@@ -706,7 +709,7 @@ function Preview({
       {standalone ? (
         <ApplyBar flow={flow} count={picks.length} />
       ) : (
-        <p className="imp-note">
+        <p className="imp-note ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("onboarding.import.withTeam")}</span>
         </p>
@@ -739,7 +742,7 @@ function ApplyBar({ flow, count }: { flow: ImportFlowState; count: number }) {
           {t("onboarding.import.go", { count })}
         </Button>
       ) : (
-        <p className="imp-apply__none">
+        <p className="imp-apply__none ac-iconline">
           <Icon name={here ? "check" : "info"} size={16} />
           {here ? t("onboarding.import.nothingNew") : t("onboarding.import.nothingToBring")}
         </p>
@@ -1040,7 +1043,7 @@ function Todos({
       <p className="imp-block__help">{t("onboarding.import.todoHelp")}</p>
       <ul className="imp-todo">
         {todo.map((x) => (
-          <li key={`${x.kind}:${x.label}`}>
+          <li key={`${x.kind}:${x.label}`} className="ac-iconline">
             <Icon name={TODO_ICON[x.kind]} size={16} />
             <span className="imp-todo__text">
               <span>{t(`onboarding.import.todo.${x.kind}`, { label: x.label })}</span>
@@ -1200,7 +1203,7 @@ export function ImportReport({
           </Heading>
           <ul className="imp-missed">
             {missed.map((i) => (
-              <li key={itemId(i)}>
+              <li key={itemId(i)} className="ac-iconline">
                 <Icon name={KIND_ICON[i.kind]} size={16} />
                 <span>
                   {i.label}
@@ -1273,7 +1276,7 @@ export function ImportExportSection() {
             </h3>
             <ul>
               {(["agents", "skills", "channels", "routines", "memory"] as const).map((k) => (
-                <li key={k}>
+                <li key={k} className="ac-iconline">
                   <Icon name="check" size={14} />
                   {t(`settings.import.carry.${k}`)}
                 </li>
@@ -1286,7 +1289,7 @@ export function ImportExportSection() {
             </h3>
             <ul>
               {(["keys", "connections", "computers", "messages", "usage"] as const).map((k) => (
-                <li key={k}>
+                <li key={k} className="ac-iconline">
                   <Icon name="lock" size={14} />
                   {t(`settings.import.neverList.${k}`)}
                 </li>

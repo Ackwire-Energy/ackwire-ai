@@ -31,7 +31,7 @@ export function ActionCard({ message }: { message: Message }) {
     : t(`connectAi.title.${card.what ?? "any"}`);
   return (
     <div className="waitcard" data-done={done || undefined}>
-      <span className="waitcard__top">
+      <span className="waitcard__top ac-iconline">
         <Icon name={done ? "check" : "plug"} size={16} />
         <span>{title}</span>
       </span>

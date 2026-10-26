@@ -184,15 +184,16 @@ export function NewMissionDialog({
         </div>
         {none ? (
           <div className="mi-notes mi-agent-empty" role="status">
-            <span>
-              <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
+            <span className="ac-iconline">
+              <Icon name="computer" size={14} />
+              <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
             <span>{cloud ? waitWords : t("missions.new.noEligibleText")}</span>
             {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}
             {!cloud && <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />}
             {setupAgent && !cloud && (
               <Link
-                className="mi-lnk"
+                className="ac-link mi-lnk"
                 to="/org/$orgId/agents/$agentId"
                 params={{ orgId: org.id, agentId: setupAgent.id }}
                 search={{ tab: "settings", sec: "computer" }}
@@ -256,7 +257,7 @@ export function NewMissionDialog({
                   </span>
                   {!cloud && (
                     <Link
-                      className="mi-lnk"
+                      className="ac-link mi-lnk"
                       to="/org/$orgId/agents/$agentId"
                       params={{ orgId: org.id, agentId: a.id }}
                       search={{ tab: "settings", sec: "computer" }}
@@ -279,7 +280,7 @@ export function NewMissionDialog({
               options={executorOptions(t, agent.executors, agent.name, agent.id)}
             />
             {agent.codexTooOld && (
-              <span className="mi-hint">
+              <span className="mi-hint ac-iconline">
                 <Icon name="info" size={14} />
                 {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
               </span>
@@ -320,18 +321,18 @@ export function NewMissionDialog({
               <span className="mi-hint">{t("missions.new.dmWith", { name: agent?.name ?? "" })}</span>
             )}
           </div>
-          <span className="mi-hint">
+          <span className="mi-hint ac-iconline">
             <Icon name="thread" size={14} />
             {t("missions.new.homeHint", { name: agent?.name ?? "" })}
           </span>
         </div>
         {machine && !machine.online && (
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <MachineIcon machineId={machine.id} />
             <span>{t("missions.new.offline", { name: machine.name })}</span>
           </div>
         )}
-        <div className="mi-notes">
+        <div className="mi-notes ac-iconline">
           <Icon name="bolt" size={14} />
           <span>
             {t("missions.new.commandHint")} <code className="mi-mono">{MISSION_COMMAND}</code>
@@ -473,7 +474,7 @@ export function CloseMissionDialog({
           <Switch id={wikiId} checked={wiki} onCheckedChange={setWiki} />
         </div>
         {mission.runningTasks > 0 && (
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <Icon name="stop" size={14} />
             <span>
               {t("missions.close.running", {
@@ -708,7 +709,7 @@ export function ShareMissionDialog({
             ))}
           </ul>
           {list && list.participants.length === 0 && <p className="mi-hint">{t("missions.share.onlyOwner")}</p>}
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <Icon name="lock" size={14} />
             <span>{t("missions.share.seeing")}</span>
           </div>
@@ -740,7 +741,7 @@ export function ShareMissionDialog({
               <Switch id={lendId} checked={lend} onCheckedChange={setLend} />
             </div>
           )}
-          <div className="mi-notes">
+          <div className="mi-notes ac-iconline">
             <Icon name="info" size={14} />
             <span>{t("missions.share.handNote")}</span>
           </div>

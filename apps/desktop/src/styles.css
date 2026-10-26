@@ -111,25 +111,17 @@ p {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+/* An `.ac-link` that may carry an icon beside its words. */
 .dk-link {
-  all: unset;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-weight: 600;
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-}
-.dk-link:hover {
-  text-decoration-color: currentColor;
 }
 .dk-link:focus-visible {
   outline: 2px solid var(--agent2);
   outline-offset: 2px;
   border-radius: 4px;
+  box-shadow: none;
 }
 .dk-logo {
   width: 32px;
@@ -145,6 +137,20 @@ p {
 .dk-logo--soft {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+.dk-logo--lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px 14px 14px 4px;
+}
+/* Tailscale's icon in its own colors: its black file on light, its white file on dark (`ServerTile`). */
+.dk-tailscale {
+  width: 26px;
+  height: 26px;
+  fill: #1e1e1f;
+}
+[data-theme="dark"] .dk-tailscale {
+  fill: #fff;
 }
 .dk-org {
   flex: none;
@@ -182,32 +188,20 @@ p {
   gap: 4px;
 }
 .dk-note {
-  display: flex;
   gap: 10px;
-  align-items: flex-start;
   margin-top: 16px;
   padding: 11px 13px;
   border-radius: 14px;
   background: var(--plate);
   color: var(--muted);
   font-size: 12.5px;
-  max-width: 60ch;
-}
-.dk-note .ac-icon {
-  margin-top: 1px;
-  flex: none;
 }
 .dk-honest {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
   font-size: 12.5px;
   color: var(--ink2);
 }
 .dk-honest .ac-icon {
   color: var(--warn);
-  margin-top: 2px;
-  flex: none;
 }
 .dk-shimmer {
   background: linear-gradient(90deg, var(--faint) 0%, var(--ink2) 50%, var(--faint) 100%);
@@ -779,14 +773,12 @@ body[data-window="popover"] {
   margin-top: 24px;
   display: flex;
   gap: 8px;
-  max-width: 560px;
 }
 .dk-fr__form .ac-input {
   flex: 1;
 }
 .dk-fr__problem {
   margin-top: 12px;
-  max-width: 560px;
 }
 .dk-fr__looking {
   margin-top: 20px;
@@ -798,7 +790,6 @@ body[data-window="popover"] {
 }
 .dk-fr__found {
   margin-top: 20px;
-  max-width: 560px;
 }
 .dk-fr__foundrow {
   display: flex;
@@ -832,7 +823,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 560px;
 }
 .dk-fr__none h2 {
   font-size: 13.5px;
@@ -885,7 +875,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 600px;
 }
 .dk-fr__ways li {
   display: flex;
@@ -975,7 +964,6 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 600px;
 }
 .dk-fr__who {
   display: grid;
@@ -1002,9 +990,8 @@ body[data-window="popover"] {
 /* After a short screen's text, not at the window's bottom. */
 .dk-fr__end[data-near] {
   margin-top: 24px;
-  max-width: 600px;
 }
-/* Run here's steps as they run. */
+/* Run here's steps as they run, each mark an `.ac-iconline` lead on its name's line. */
 .dk-fr__steps {
   list-style: none;
   margin: 24px 0 0;
@@ -1012,23 +999,18 @@ body[data-window="popover"] {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 600px;
 }
 .dk-fr__steps li {
-  display: flex;
   gap: 12px;
-  align-items: flex-start;
 }
 .dk-fr__steps li[data-state="todo"] {
   color: var(--faint);
 }
 .dk-fr__stepmark {
-  flex: none;
   width: 20px;
   height: 20px;
   display: grid;
   place-items: center;
-  margin-top: 1px;
 }
 .dk-fr__steps li[data-state="done"] .dk-fr__stepmark {
   color: var(--ok);
@@ -1080,7 +1062,6 @@ body[data-window="popover"] {
 .dk-fr__bar {
   margin-top: 28px;
   height: 6px;
-  max-width: 600px;
   border-radius: 3px;
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -1250,6 +1231,7 @@ body[data-window="popover"] {
   color: var(--muted);
   font-weight: 500;
   font-size: 13.5px;
+  line-height: normal;
   white-space: nowrap;
 }
 .dk-pnav button:hover,

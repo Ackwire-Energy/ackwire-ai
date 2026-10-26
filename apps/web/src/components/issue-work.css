@@ -61,17 +61,10 @@
 }
 /* Where the issue came from: one quiet line, like the other automatic lines of a conversation. */
 .iw-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 4px 12px 4px var(--thread-indent, 56px);
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);
-}
-.iw-line > .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 .iw-line > span {
   min-width: 0;

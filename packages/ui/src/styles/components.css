@@ -77,6 +77,26 @@ samp {
   stroke-linejoin: round;
 }
 
+/*
+ * A line of text led by an icon (or a mark, a spinner, a stack of logos): the lead sits on the first line, centred
+ * where the eye reads it (a hair under the line's middle, 0.08em for Source Sans 3), whatever the text size, the
+ * line height or the lead's size, so it stays with the first line when the text wraps. The row sets the font size
+ * and the line height; the lead is its first child. `lh` and `em` are the lead's own, so a lead with a font size of
+ * its own (an avatar) needs the row's line height as a length. Mirrors the phone app's LineIcon (`readingMiddle`).
+ */
+.ac-iconline {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ac-iconline > :first-child {
+  flex: none;
+  /* Browsers without the lh unit: the page's 22px line. */
+  translate: 0 calc(11px + 0.08em - 50%);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
+  translate: 0 calc(0.5lh + 0.08em - 50%);
+}
+
 /* Button */
 .ac-btn {
   display: inline-flex;
@@ -89,7 +109,10 @@ samp {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  line-height: 20px;
+  /* The box sets the height and the line is the text's own. A 20 or 22px line around 14px Source Sans 3 (a 21px
+     text box) leaves one pixel that Chrome and Safari put under the text, so the capitals would sit 1px high. Every
+     single-line control takes `normal` for the same reason. */
+  line-height: normal;
   white-space: nowrap;
   text-decoration: none;
   border-radius: var(--radius-sm);
@@ -162,14 +185,44 @@ samp {
   width: 100%;
 }
 
-/* Text link */
+/* Any link, with or without a class of its own, reads as ours: never the browser's blue. Zero specificity, so
+   every class that styles a link still wins. */
+:where(a) {
+  color: inherit;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+:where(a:hover) {
+  text-decoration-color: currentColor;
+}
+/* A link that opens something here is a button: no box of its own, and the sentence's type. Every font setting
+   inherits, since the browser's own button font drops the page's size adjustment and figures. Before `.ac-link`, so
+   the link's weight and any class that sets a size still win. */
+:where(button).ac-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+}
+/* Text link: an action in a sentence; `--muted` for a help line's link. */
 .ac-link {
   color: var(--ink);
   font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ac-link:hover {
+  text-decoration-color: currentColor;
 }
 .ac-link--muted {
   color: var(--ink-muted);
   font-weight: 400;
+}
+.ac-link--muted:hover {
+  color: var(--ink);
 }
 .ac-link:focus-visible {
   outline: none;
@@ -230,6 +283,7 @@ samp {
   padding: 0 var(--control-px-md);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
@@ -274,6 +328,7 @@ textarea.ac-input {
   height: var(--control-h-md);
   box-sizing: border-box;
   font-size: var(--control-fs-md);
+  line-height: normal;
   border: 1px solid var(--field-line);
   border-radius: var(--control-r-md);
   background: var(--field-bg);
@@ -378,6 +433,13 @@ textarea.ac-input {
 .ac-brand svg {
   fill: currentColor;
 }
+/* A mark's second color (Kimi's dot, OpenCode's block), as its maker draws it on each theme. */
+.ac-brand__part {
+  fill: var(--part);
+}
+[data-theme="dark"] .ac-brand__part {
+  fill: var(--part-dark);
+}
 .ac-brand--tile {
   width: 48px;
   height: 48px;
@@ -396,15 +458,22 @@ textarea.ac-input {
   width: 16px;
   height: 16px;
 }
-/* Beside text: the bare mark; a one-color one takes the text's color. */
+.ac-brand--chip {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px 7px 7px 3px;
+}
+.ac-brand--chip svg {
+  width: 12px;
+  height: 12px;
+}
+/* Beside text: the bare mark. A one-color one stays in ink beside muted text too: OpenAI's, for one, may only be
+   black or white. */
 .ac-brand--xs {
   width: 14px;
   height: 14px;
   background: none;
   box-shadow: none;
-}
-.ac-brand--xs.ac-brand--mono {
-  color: inherit;
 }
 .ac-brand--xs svg {
   width: 14px;
@@ -423,12 +492,31 @@ textarea.ac-input {
 .ac-brand--sm .ac-brand__initial {
   font-size: 13px;
 }
+.ac-brand--chip .ac-brand__initial {
+  font-size: 10px;
+}
 .ac-brand--xs .ac-brand__initial {
   font-size: 9px;
 }
+/* Dimmed, never recolored: the makers' rules forbid changing a mark's colors. */
 .ac-brand--off {
-  filter: grayscale(1);
   opacity: 0.5;
+}
+/* ProviderStack: several makers' 20 px tiles overlapping, each ringed in the surface under it (`--stack-ring`
+   where that isn't the page's), like `.ac-avatar-stack`. The 2 px overlap and the 2 px ring stay inside the 4 px
+   around each 12 px mark, so no tile covers another's mark: the makers ask for clear space around theirs. */
+.ac-brand-stack {
+  display: inline-flex;
+  flex: none;
+}
+.ac-brand-stack > .ac-brand {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top),
+    0 0 0 2px var(--stack-ring, var(--surface));
+}
+.ac-brand-stack > .ac-brand + .ac-brand {
+  margin-left: -2px;
 }
 /* Engine line icons (BrainIcon, executor marks): each engine's accent; working writes / looks around. */
 .ac-icon .ac-brain-cc {
@@ -874,10 +962,10 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
-/* Asked while nobody watched: on the line of who asks, with its icon. */
+/* Asked while nobody watched: on the line of who asks, with its icon in the middle of the words' x-height. */
 .ac-approval__origin > svg {
   margin: 0 3px 0 1px;
-  vertical-align: -2px;
+  vertical-align: middle;
 }
 .ac-approval__action {
   min-width: 0;
@@ -1075,6 +1163,7 @@ textarea.ac-input {
   padding: 0 var(--space-3) 0 var(--control-px-md);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--ink);
   background: var(--field-bg);
   border: 1px solid var(--field-line);
@@ -1941,12 +2030,9 @@ a.ac-list__row:focus-visible {
   margin-top: var(--space-4);
 }
 
-/* Inline alert */
+/* Inline alert (an `.ac-iconline`) */
 .ac-alert {
   margin: 0;
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1958,7 +2044,6 @@ a.ac-list__row:focus-visible {
 .ac-alert .ac-icon {
   width: 18px;
   height: 18px;
-  margin-top: 1px;
 }
 .ac-alert--neutral {
   color: var(--ink);
@@ -3460,6 +3545,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: var(--control-fs-sm);
   font-weight: 600;
+  line-height: normal;
   height: calc(var(--seg-h) - 2 * var(--seg-in));
   padding: 0 12px;
   border: 0;
@@ -3724,12 +3810,18 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--card-shadow-hover);
   transform: translateY(-1px);
 }
-/* Head: a key with the icon, title and an optional quiet line, the action on the right. */
+/* Head: a key with the icon, title and an optional quiet line, the action on the right. The key (an
+   `.ac-iconline` lead) stays on the title's line when the quiet line wraps under it; the action stays centred. */
 .ac-card__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
+  line-height: 20px;
+}
+/* A title alone sits in the middle of a taller action. */
+.ac-card__head:not(:has(.ac-card__sub)) {
+  align-items: center;
 }
 .ac-card__key {
   display: grid;
@@ -3765,15 +3857,14 @@ a.ac-list__row:focus-visible {
 .ac-card__action {
   display: flex;
   flex-shrink: 0;
+  align-self: center;
   align-items: center;
   gap: 6px;
   margin-left: auto;
 }
-/* Foot: help text in a well pressed into the bottom of the card (8px from its edges). */
+/* Foot: help text in a well pressed into the bottom of the card (8px from its edges), its icon an `.ac-iconline`
+   lead. */
 .ac-card__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   /* A quiet line under a hairline, edge to edge of the card (no gray well). */
   margin: 0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px));
   padding: 12px var(--card-pad, 20px);
@@ -3783,7 +3874,6 @@ a.ac-list__row:focus-visible {
   line-height: 17px;
 }
 .ac-card__foot > .ac-icon {
-  flex: none;
   color: var(--faint);
 }
 .ac-list {
@@ -4143,6 +4233,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 13px;
   font-weight: 550;
+  line-height: normal;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -4239,6 +4330,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   background: var(--sunken);
   color: var(--ink2);
   border: 0;
@@ -4804,6 +4896,7 @@ a.ac-list__row:focus-visible {
   background: transparent;
   font: inherit;
   font-size: 16px;
+  line-height: normal;
   color: var(--ink);
 }
 .ac-palette__q input::placeholder {
@@ -4951,6 +5044,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     background-color 0.15s var(--out),
@@ -5383,6 +5477,7 @@ a.ac-list__row:focus-visible {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -6289,9 +6384,6 @@ a.ac-list__row:focus-visible {
   max-width: 62ch;
 }
 .ac-setnote {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 12px 0 0;
   font-size: 13px;
   color: var(--muted);
@@ -6301,8 +6393,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-setnote .ac-icon {
   color: var(--faint);
-  margin-top: 2px;
-  flex: none;
 }
 .ac-setnote--quiet {
   color: var(--faint);
@@ -6592,8 +6682,6 @@ label.ac-setrow__title {
   color: var(--muted);
 }
 .ac-consult__foot {
-  display: flex;
-  align-items: center;
   gap: 5px;
   margin: 10px 0 0;
   font-size: 12px;

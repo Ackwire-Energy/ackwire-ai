@@ -89,7 +89,7 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
         </p>
       )}
       {c.state === "pending" && c.rules.length > 0 && m.canAct && (
-        <p className="mi-hint">
+        <p className="mi-hint ac-iconline">
           <Icon name="info" size={14} />
           {t("missions.command.alwaysHint", { rules: c.rules.map(ruleText).join(", ") })}
         </p>

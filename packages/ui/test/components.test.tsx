@@ -213,6 +213,93 @@ describe("Card", () => {
     expect(container.querySelector(".ac-card__sub")).toBeNull();
     expect(container.querySelector(".ac-card__action")).toBeNull();
   });
+
+  test("the key and the foot's icon lead their first line; without an icon nothing is moved", async () => {
+    const { container } = render(
+      <>
+        <CardHeader
+          icon="wallet"
+          title="Limite de gastos por agente"
+          subtitle="Por mês"
+          action={<Button>US$</Button>}
+        />
+        <CardHeader title="Só título" />
+        <CardFooter>Ninguém gasta além disso</CardFooter>
+        <CardFooter icon={null}>Sem ícone</CardFooter>
+      </>,
+    );
+    const [withKey, plain] = [...container.querySelectorAll(".ac-card__head")];
+    expect(withKey?.className).toBe("ac-card__head ac-iconline");
+    expect(withKey?.firstElementChild?.className).toBe("ac-card__key");
+    expect(plain?.className).toBe("ac-card__head");
+    const [foot, bare] = [...container.querySelectorAll(".ac-card__foot")];
+    expect(foot?.className).toBe("ac-card__foot ac-iconline");
+    expect(foot?.firstElementChild?.tagName.toLowerCase()).toBe("svg");
+    expect(bare?.className).toBe("ac-card__foot");
+    // The key follows the title's 20px line, not the title and its quiet line; the action stays in the middle.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-card__head")).toContain("line-height: 20px");
+    expect(rule(".ac-card__head")).toContain("align-items: flex-start");
+    expect(rule(".ac-card__head:not(:has(.ac-card__sub))")).toContain("align-items: center");
+    expect(rule(".ac-card__action")).toContain("align-self: center");
+    for (const row of [".ac-card__foot", ".ac-setnote", ".ac-alert"]) {
+      expect(rule(row)).not.toContain("display:");
+      expect(rule(row)).not.toContain("align-items:");
+    }
+  });
+});
+
+describe("single-line controls", () => {
+  test("buttons, inputs and selects centre their text in the box: the line is the text's own", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    for (const selector of [
+      ".ac-btn",
+      ".ac-input",
+      ".ac-input-affix",
+      ".ac-select__trigger",
+      ".ac-palette__q input",
+      ".ac-seg__item",
+      ".ac-filtertoggle",
+      ".ac-composer__pill,\n.ac-composer__agent",
+      ".ac-recur__day",
+      ".ac-react",
+    ]) {
+      const body = rule(selector);
+      expect(body).toContain("line-height: normal");
+      // After `font: inherit`, which would reset it.
+      if (body.includes("font: inherit")) expect(body.indexOf("line-height")).toBeGreaterThan(body.indexOf("font:"));
+    }
+    // Text that wraps keeps its line.
+    expect(rule("textarea.ac-input")).toContain("line-height: 22px");
+  });
+});
+
+describe("links", () => {
+  test("any link reads as ours, never the browser's blue; .ac-link is underlined in the house hairline", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    // Zero specificity: a class that styles its link still wins.
+    expect(rule(":where(a)")).toContain("color: inherit");
+    expect(rule(":where(a)")).toContain("text-decoration-color: var(--line2)");
+    expect(rule(":where(a)")).toContain("text-underline-offset: 3px");
+    expect(rule(":where(a:hover)")).toContain("text-decoration-color: currentColor");
+    expect(rule(".ac-link")).toContain("text-decoration: underline");
+    expect(rule(".ac-link")).toContain("text-decoration-color: var(--line2)");
+    expect(rule(".ac-link")).toContain("text-underline-offset: 3px");
+    expect(rule(".ac-link:hover")).toContain("text-decoration-color: currentColor");
+    expect(rule(".ac-link--muted:hover")).toContain("color: var(--ink)");
+    // A link that is a button has no box of its own and the sentence's whole type (the browser's button font would
+    // drop the page's size adjustment and figures). It comes first, so `.ac-link`'s weight and size classes win.
+    const button = rule(":where(button).ac-link");
+    expect(button).toContain("border: 0");
+    expect(button).toContain("background: none");
+    expect(button).toContain("font: inherit");
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeGreaterThan(-1);
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeLessThan(css.indexOf("\n.ac-link {"));
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeLessThan(css.indexOf("\n.ac-link--muted {"));
+  });
 });
 
 describe("Composer", () => {

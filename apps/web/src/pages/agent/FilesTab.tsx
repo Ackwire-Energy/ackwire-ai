@@ -140,7 +140,7 @@ export function FilesTab() {
         </ul>
       )}
       {list.length > 0 && (
-        <p className="agp-files__note small muted">
+        <p className="agp-files__note small muted ac-iconline">
           <Icon name="info" size={14} />
           {t("agentPage.files.note")}
         </p>

@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, type IconName, ProviderLogo, SheetScreen, Text } from "@/ui";
+import { Button, Icon, type IconName, LineIcon, ProviderLogo, SheetScreen, Text } from "@/ui";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";
@@ -68,7 +68,7 @@ function Line({ icon, leading, text }: { icon?: IconName; leading?: ReactNode; t
   const c = useColors();
   return (
     <View style={styles.line}>
-      {leading ?? (icon ? <Icon name={icon} size={16} color={c.muted} /> : null)}
+      {leading ?? (icon ? <LineIcon variant="small" name={icon} size={16} color={c.muted} /> : null)}
       <Text variant="small" tone="muted" style={styles.grow}>
         {text}
       </Text>
@@ -130,7 +130,14 @@ export function SetupWait({
       {agentName && pending ? (
         <Line icon="clock" text={t("computerSetup.agentWaiting", agentGrammar(t, agentName))} />
       ) : null}
-      <Line leading={<ProviderLogo id="claude_code" size="xs" />} text={t("computerSetup.plans")} />
+      <Line
+        leading={
+          <LineIcon variant="small" size={14}>
+            <ProviderLogo id="claude_code" size="xs" />
+          </LineIcon>
+        }
+        text={t("computerSetup.plans")}
+      />
       {view.specs ? <Line icon="server" text={t("computerSetup.specs", view.specs)} /> : null}
       <Line icon="agent" text={t("computerSetup.users")} />
     </View>

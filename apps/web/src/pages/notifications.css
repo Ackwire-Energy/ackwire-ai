@@ -255,6 +255,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   cursor: pointer;
   transition:
@@ -451,7 +452,6 @@
 }
 .nt-replied {
   display: flex;
-  align-items: center;
   gap: 6px;
   margin-top: 9px;
   font-size: 12.5px;
@@ -460,7 +460,6 @@
 }
 .nt-replied .ac-icon {
   color: var(--ok);
-  flex: none;
 }
 .nt-replied span {
   min-width: 0;
@@ -514,6 +513,7 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink2);
   cursor: pointer;
 }
@@ -669,6 +669,7 @@
   justify-content: center;
   gap: 6px;
   font: inherit;
+  line-height: normal;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -875,10 +876,7 @@
   margin-bottom: 12px;
 }
 .nt-foot {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 8px;
   font-size: 12.5px;
   color: var(--faint);
   padding: 8px 0;

@@ -51,6 +51,10 @@ From https://github.com/NousResearch/hermes-agent, MIT License, Copyright (c) 20
 |---|---|
 | `hermes-SOUL.seed.md` | `SOUL.md` (the persona Hermes seeds into a new profile) |
 
+## Logos
+
+`LICENSE-Paperclip` (MIT License, Copyright (c) 2025 Paperclip AI) and `LICENSE-Lucide` (ISC License, from lucide-react 0.562.0, whose `paperclip` icon is the drawing) are the license texts of Paperclip's logo in `apps/web/public/brands/`. That folder's README lists every logo with its source and license.
+
 ## Written for these tests
 
 | Folder | Format |

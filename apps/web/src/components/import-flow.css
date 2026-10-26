@@ -41,23 +41,16 @@
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
-  /* A source's monogram, when it has no mark of its own: the connector catalog's letters. */
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1;
 }
+/* As the maker drew it: its own corners, never clipped to ours. */
 .imp-mark__img {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
   object-fit: contain;
 }
+/* `.ac-iconline` rows: the icon on the first line. */
 .imp-tip,
 .imp-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -68,11 +61,6 @@
   border-radius: 14px;
   background: var(--plate);
   color: var(--ink2);
-}
-.imp-tip .ac-icon,
-.imp-note .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 
 /* ── "Outro app": the request to paste there ────────────────────────────── */
@@ -384,18 +372,14 @@ label.imp-row__text {
   padding: 0;
   list-style: none;
 }
+/* `.ac-iconline` rows. */
 .imp-todo li,
 .imp-missed li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   font-size: 13.5px;
   overflow-wrap: anywhere;
 }
-.imp-todo .ac-icon,
-.imp-missed .ac-icon {
-  flex: none;
-  margin-top: 2px;
+.imp-todo li > .ac-icon,
+.imp-missed li > .ac-icon {
   color: var(--ink2);
 }
 .imp-todo__text {
@@ -436,9 +420,6 @@ label.imp-row__text {
 }
 .imp-apply__progress,
 .imp-apply__none {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -514,14 +495,8 @@ label.imp-row__text {
   list-style: none;
   font-size: 13.5px;
 }
-.imp-export li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.imp-export li .ac-icon {
-  flex: none;
-  margin-top: 3px;
+/* `.ac-iconline` rows. */
+.imp-export li > .ac-icon {
   color: var(--ink2);
 }
 

@@ -161,7 +161,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
               <p style={{ margin: 0 }}>{current.why}</p>
               <ul className="evidence">
                 {current.evidence.map((e) => (
-                  <li key={`${e.where}-${e.what}`}>
+                  <li key={`${e.where}-${e.what}`} className="ac-iconline">
                     <Icon name="message" size={16} />
                     <span>
                       {whereOf(e)} <span className="muted">· {e.what}</span>

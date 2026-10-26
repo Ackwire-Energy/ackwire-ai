@@ -28,7 +28,7 @@ export function CardHeader({
   id?: string;
 }) {
   return (
-    <div className="ac-card__head">
+    <div className={cx("ac-card__head", icon && "ac-iconline")}>
       {icon && (
         <span className="ac-card__key" aria-hidden="true">
           <Icon name={icon} size={16} />
@@ -46,7 +46,7 @@ export function CardHeader({
 /** Help text at the bottom of a card, in a well ("O contexto da org entra antes destas instruções"). */
 export function CardFooter({ children, icon = "info" }: { children: ReactNode; icon?: IconName | null }) {
   return (
-    <p className="ac-card__foot">
+    <p className={cx("ac-card__foot", icon && "ac-iconline")}>
       {icon && <Icon name={icon} size={14} />}
       <span>{children}</span>
     </p>
@@ -135,7 +135,7 @@ export function Alert({
   return (
     <p
       role={tone === "danger" ? "alert" : "status"}
-      className={cx("ac-alert", tone === "neutral" && "ac-alert--neutral", className)}
+      className={cx("ac-alert ac-iconline", tone === "neutral" && "ac-alert--neutral", className)}
     >
       <Icon name="alert" />
       <span>{children}</span>

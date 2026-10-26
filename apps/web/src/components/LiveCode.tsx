@@ -299,7 +299,7 @@ function SteerWell({ now, note }: { now: boolean; note: SteerNote | undefined })
       ? t("run.well.nowYours")
       : t("run.well.readYours");
   return (
-    <p className="live-work__steer">
+    <p className="live-work__steer ac-iconline">
       <Icon name={now ? "bolt" : "checks"} size={14} />
       <b>{title}</b>
       {note?.text && <q>{note.text}</q>}

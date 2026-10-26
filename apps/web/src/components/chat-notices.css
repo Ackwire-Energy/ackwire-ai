@@ -1,18 +1,12 @@
 /* What reached an agent's conversation (a notice) and a routine's background start: one quiet line,
    like the other automatic lines of a conversation (`.iw-line`, `.mi-evt`); the text on demand. */
 .cn-line {
-  display: flex;
-  align-items: flex-start;
   flex-wrap: wrap;
   gap: 4px 8px;
   margin: 4px 12px 4px var(--thread-indent, 56px);
   font-size: 12.5px;
   line-height: 18px;
   color: var(--faint);
-}
-.cn-line > .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 /* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
 .cn-line__text {

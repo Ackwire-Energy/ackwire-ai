@@ -393,7 +393,7 @@ function AddAccountDialog({
           waiting?.url ? (
             <span className="dk-help">
               {t("desktop.prefs.accounts.notOpened")}{" "}
-              <button type="button" className="dk-link" onClick={() => void openLink(waiting.url)}>
+              <button type="button" className="ac-link dk-link" onClick={() => void openLink(waiting.url)}>
                 {t("desktop.prefs.accounts.openLink")}
               </button>
             </span>
