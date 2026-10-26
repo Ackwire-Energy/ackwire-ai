@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
-import { eq, schema, sql } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import { createCredential, decryptCredential, ForbiddenError, listCredentials, revokeCredential } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -66,11 +66,8 @@ test('the label migration calls keys named after the provider "Claude" and leave
   const named = await add("anthropic", "Anthropic");
   const chosen = await add("anthropic", "Anthropic da Acme");
   const openai = await add("openai", "Anthropic");
-  const dir = new URL("../../db/migrations/", import.meta.url);
-  const file = readdirSync(dir).find((name) => name.endsWith("_claude_key_labels.sql")) ?? "";
-  const migration = await Bun.file(new URL(file, dir)).text();
-  await f.db.execute(sql.raw(migration));
-  await f.db.execute(sql.raw(migration));
+  await runMigration(f.db, "claude_chatgpt_labels");
+  await runMigration(f.db, "claude_chatgpt_labels");
   const rows = await f.db
     .select({ id: schema.providerCredentials.id, label: schema.providerCredentials.label })
     .from(schema.providerCredentials);

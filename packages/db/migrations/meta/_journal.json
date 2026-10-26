@@ -755,7 +755,7 @@
       "idx": 107,
       "version": "7",
       "when": 1792984793302,
-      "tag": "0107_claude_key_labels",
+      "tag": "0107_claude_chatgpt_labels",
       "breakpoints": true
     }
   ]
