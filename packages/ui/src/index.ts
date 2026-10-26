@@ -150,6 +150,7 @@ export {
   type TrackSize,
   trackItemAt,
 } from "./components/ForumPixels";
+export { InfoHint, type InfoHintProps } from "./components/InfoHint";
 export { isApple, Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { AgentReadingBook } from "./components/MemoryPixels";
@@ -295,7 +296,7 @@ export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./comp
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
-export { onScreenKeyboard } from "./device";
+export { hoverPointer, onScreenKeyboard } from "./device";
 export {
   EMOJI_CATEGORIES,
   EMOJIS,

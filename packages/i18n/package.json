@@ -10,7 +10,8 @@
     "./pt-BR": "./src/pt-BR.ts",
     "./en": "./src/en.ts",
     "./locale": "./src/locale.ts",
-    "./legal": "./src/legal/index.ts"
+    "./legal": "./src/legal/index.ts",
+    "./help": "./src/help/index.ts"
   },
   "sideEffects": false,
   "scripts": {

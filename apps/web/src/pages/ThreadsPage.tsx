@@ -724,7 +724,7 @@ function ThreadsEmpty({
         )
       }
     >
-      {t(`threads.empty.${tab}`)}
+      {tab === "all" ? t("threads.empty.all") : null}
     </EmptyState>
   );
 }

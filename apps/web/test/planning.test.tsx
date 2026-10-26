@@ -342,7 +342,11 @@ describe("Rotinas", () => {
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
     await click(within(dialog).getByRole("radio", { name: "Evento" }));
-    expect(dialog.textContent).toContain("Vem pelos conectores da Acme.");
+    // Where events come from: the Event field's ⓘ, which also describes the select.
+    const about = within(dialog).getByRole("button", { name: "Sobre Evento" });
+    expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Vem pelos conectores da Acme. O agente recebe o evento como contexto.",
+    );
     await pick(within(dialog).getByRole("combobox", { name: "Evento" }), "Deploy concluído");
     await type(within(dialog).getByLabelText("O que fazer"), "Confira os erros depois do deploy.");
     await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
@@ -408,7 +412,8 @@ describe("Calendário", () => {
     await settle(2);
     await openPanel();
     const side = screen().getByRole("complementary", { name: "Painel do calendário" });
-    expect(side.textContent).toContain("Agentes só propõem horários.");
+    // Who sends invitations is background (the approvals help page), not a note in the panel.
+    expect(side.textContent).not.toContain("Agentes só propõem horários.");
     const proposal = within(side).getByRole("group", { name: "Proposta de evento" });
     expect(proposal.textContent).toContain("Revisão do roadmap");
     expect(proposal.textContent).toContain("livre para todos");

@@ -1,4 +1,4 @@
-import { Checkbox, SearchField, Token, TokenList } from "@agenteschat/ui";
+import { Checkbox, InfoHint, SearchField, Token, TokenList } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -78,21 +78,20 @@ export const memberOf = (key: PickKey) =>
   key.startsWith("agent:") ? { agentId: key.slice(6) } : { userId: key.slice(7) };
 
 /**
- * Pick people and agents inside a form: the picked ones as tokens (with
- * remove), then the search box, then the matching rows right under it in
- * their own short scroll area.
+ * Pick people and agents inside a form: the label (with an optional ⓘ hint), the picked ones as tokens (with
+ * remove), then the search box, then the matching rows right under it in their own short scroll area.
  */
 export function PeoplePicker({
   label,
   searchLabel,
-  help,
+  hint,
   emptyText,
   selected,
   onChange,
 }: {
   label: string;
   searchLabel: string;
-  help?: string;
+  hint?: string;
   emptyText: string;
   selected: Set<PickKey>;
   onChange: (next: Set<PickKey>) => void;
@@ -108,10 +107,19 @@ export function PeoplePicker({
     else next.delete(key);
     onChange(next);
   };
-  const helpId = `${searchLabel.replace(/\W+/g, "-")}-help`;
+  const hintId = `${searchLabel.replace(/\W+/g, "-")}-hint`;
   return (
     <div className="people-picker">
-      <span className="ac-field__label">{label}</span>
+      {hint ? (
+        <span className="ac-hintline">
+          <span className="ac-field__label">{label}</span>
+          <InfoHint name={t("common.about", { label })} id={hintId}>
+            {hint}
+          </InfoHint>
+        </span>
+      ) : (
+        <span className="ac-field__label">{label}</span>
+      )}
       {picked.length > 0 && (
         <TokenList label={label}>
           {picked.map((r) => (
@@ -133,7 +141,7 @@ export function PeoplePicker({
         placeholder={searchLabel}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-describedby={help ? helpId : undefined}
+        aria-describedby={hint ? hintId : undefined}
         onClear={() => setQuery("")}
         clearLabel={t("filters.clearSearch")}
       />
@@ -145,11 +153,6 @@ export function PeoplePicker({
           <MemberPickerRows rows={rows} selected={selected} onToggle={toggle} />
         )}
       </div>
-      {help && (
-        <span id={helpId} className="ac-field__help">
-          {help}
-        </span>
-      )}
     </div>
   );
 }

@@ -547,7 +547,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
             {list.isSuccess && rows.length === 0 && !filtered && (
               <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
-                {t("drive.emptyText")} {t("files.emptyHint")}
+                {t("drive.emptyText")}
               </EmptyState>
             )}
             {list.isSuccess && rows.length === 0 && filtered && (

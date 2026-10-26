@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WikiGraphView } from "@/components/WikiGraph";
@@ -372,6 +373,9 @@ function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () 
       <div>
         <h1 className="wiki-home__title">{t("wiki.homeTitle", { org: org.name })}</h1>
         <p className="muted">{t("wiki.subtitle")}</p>
+        <p className="small">
+          <HelpLink slug="wiki">{t("wiki.how")}</HelpLink>
+        </p>
       </div>
       <div className="wiki-home__acts">
         <Button size="sm" variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>

@@ -195,7 +195,14 @@ describe("Calendário > Novo evento", () => {
       await click(within(picker).getByRole("button", { name: dayName }));
       await settle(2);
       expect(picker.isConnected).toBe(false);
-      // Participants: picked ones become tokens above the search.
+      // Participants: what agents taking part get is the label's ⓘ, which also describes the search.
+      const about = within(dialog).getByRole("button", { name: "Sobre Participantes" });
+      const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+      expect(hint?.textContent).toBe("Agentes participantes recebem a pauta e podem preparar um resumo antes.");
+      expect(
+        within(dialog).getByRole("searchbox", { name: "Buscar pessoas e agentes" }).getAttribute("aria-describedby"),
+      ).toBe(hint?.id ?? null);
+      // Picked ones become tokens above the search.
       await click(within(dialog).getByRole("checkbox", { name: /Ada/ }));
       expect(within(dialog).getByRole("button", { name: "Remover Ada" })).toBeTruthy();
       await click(within(dialog).getByRole("button", { name: "Criar evento" }));

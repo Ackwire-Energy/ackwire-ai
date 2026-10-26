@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
-import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED } from "./edition-words";
+import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED, TECHNICAL } from "./edition-words";
 import { leaves } from "./leaves";
 
 /**
@@ -122,7 +122,6 @@ const CLOUD_EXTRA = [
   "scopes.browser_use.description",
   "access.areaText.browser.write",
   "missions.subtitle",
-  "missions.empty.text",
   "threads.empty.missions",
   "missions.share.lendText",
   "missions.waitingCloud",
@@ -174,10 +173,6 @@ const SELFHOST_EXTRA = [
   "aiAccounts.connect.noComputer",
   "aiAccounts.connect.addComputer",
 ];
-
-/** Case-insensitive, so the Go language is left out: it would match English "Go to…". */
-const TECHNICAL =
-  /\bLinux\b|\bIP(v[46])?\b|\bvCPU|Chrome|\bgit\b|\bNode\b|Python|\bRust\b|Debian|Ubuntu|Docker|kernel/i;
 
 const LOCALES = [
   ["pt-BR", ptBR],
