@@ -93,7 +93,7 @@ describe("provider marks where a provider is named", () => {
   });
 
   test("several makers in one line: the API key row, by four marks, overlapped", () => {
-    const { container } = render(<AiPicker choice="claude" onPick={() => {}} />);
+    const { container } = render(<AiPicker choice="claude" onPick={() => {}} panel={null} />);
     const key = container.querySelector(".ac-brand-stack");
     expect(key && marks(key)).toEqual(["claude", "openai", "deepseek", "kimi"]);
     // The row says the makers in words: its marks are decorative.
