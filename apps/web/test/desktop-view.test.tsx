@@ -506,21 +506,24 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
-    // Two lines that wrap: a note stays in sight on a narrow screen, where one line scrolled its start away. A
-    // phone's keyboard shows its send key there.
+    // Two lines that wrap: a note stays in sight on a narrow screen, where one line scrolled its start away.
     const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
-    expect([note.tagName, note.getAttribute("rows"), note.getAttribute("enterkeyhint")]).toEqual([
-      "TEXTAREA",
-      "2",
-      "send",
-    ]);
+    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
     await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
-    // Enter hands it back, as the button does, and adds no line to the note.
-    let typed = true;
-    await act(async () => {
-      typed = fireEvent.keyDown(note, { key: "Enter" });
-    });
-    expect(typed).toBe(false);
+    /** Whether the key is left to the note (a new line), not taken to hand back. */
+    const enter = async (init: KeyboardEventInit = {}) => {
+      let typed = true;
+      await act(async () => {
+        typed = fireEvent.keyDown(note, { key: "Enter", ...init });
+      });
+      return typed;
+    };
+    // As in the chat, Shift+Enter and the Enter that ends an input method's word add to the note.
+    expect(await enter({ shiftKey: true })).toBe(true);
+    expect(await enter({ isComposing: true })).toBe(true);
+    expect(calls(t, "browser.done")).toEqual([]);
+    // Enter hands it back, as the button does, and adds no line to it.
+    expect(await enter()).toBe(false);
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
@@ -725,9 +728,15 @@ describe("the agent's screen in the computer dialog", () => {
     await act(async () => void field.dispatchEvent(new InputEvent("input", { inputType: "deleteContentBackward" })));
     expect(rfb().log.at(-1)).toBe("keydown Backspace");
 
-    // Handed back with its keyboard up, then taken again: the button starts unpressed.
+    // Handed back with its keyboard up, then taken again: the button starts unpressed. Its return key adds a line to
+    // the note, as in the chat; the button hands back.
     await click(view().getByRole("button", { name: "Devolver" }));
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    expect(fireEvent.keyDown(note, { key: "Enter" })).toBe(true);
+    await settle(2);
+    expect(calls(t, "browser.done")).toEqual([]);
     await click(view().getAllByRole("button", { name: "Devolver" }).at(-1) as HTMLElement);
+    expect(calls(t, "browser.done")).toHaveLength(1);
     await settle(4);
     await connected();
     await click(view().getByRole("button", { name: "Assumir o controle" }));

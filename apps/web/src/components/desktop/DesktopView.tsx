@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, modKey, Textarea } from "@agenteschat/ui";
+import { Button, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -458,13 +458,12 @@ export function DesktopView({
       {inControl &&
         (handingBack ? (
           // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. Two lines that
-          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away; Enter sends
-          // it, so a phone's keyboard shows its send key there.
+          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away. Enter hands
+          // back as in the chat: Shift+Enter, an input method's Enter and a phone's return key add a line instead.
           <div className="brw-ac__foot brw-ac__fail">
             <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
             <Textarea
               rows={2}
-              enterKeyHint="send"
               autoFocus
               value={backNote}
               onChange={(e) => setBackNote(e.target.value)}
@@ -472,10 +471,10 @@ export function DesktopView({
               aria-label={t("browser.inCard.backLabel", g)}
               maxLength={1000}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  finish();
-                } else if (e.key === "Escape") setHandingBack(false);
+                if (e.key === "Escape") setHandingBack(false);
+                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
+                e.preventDefault();
+                finish();
               }}
             />
             <div className="brw-ac__row">

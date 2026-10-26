@@ -93,14 +93,11 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(note);
-    // Two lines that wrap, like the note of a failure: all of it stays in sight. A phone's keyboard shows its send key.
-    expect([note.tagName, note.getAttribute("rows"), note.getAttribute("enterkeyhint")]).toEqual([
-      "TEXTAREA",
-      "2",
-      "send",
-    ]);
+    // Two lines that wrap, like the note of a failure: all of it stays in sight.
+    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
-    // Enter adds no line to the note: it sends it.
+    // Shift+Enter adds a line, as in the chat; Enter sends the note, and adds no line to it.
+    expect(fireEvent.keyDown(note, { key: "Enter", shiftKey: true })).toBe(true);
     let typed = true;
     await act(async () => {
       typed = fireEvent.keyDown(note, { key: "Enter" });

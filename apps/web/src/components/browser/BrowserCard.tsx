@@ -30,7 +30,16 @@ import {
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
-import { Button, FilterToggle, Icon, type IconName, PixelSpinner, SkyStrip, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  FilterToggle,
+  Icon,
+  type IconName,
+  onScreenKeyboard,
+  PixelSpinner,
+  SkyStrip,
+  Textarea,
+} from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import {
   type KeyboardEvent,
@@ -1059,13 +1068,12 @@ export function BrowserCard({
               </div>
             ) : handingBack ? (
               // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on two lines
-              // that wrap like the note of a failure above, so all of it stays in sight. Enter sends it, so a phone's
-              // keyboard shows its send key there.
+              // that wrap like the note of a failure above, so all of it stays in sight. Enter hands back as in the
+              // chat: Shift+Enter, an input method's Enter and a phone's return key add a line instead.
               <div className="brw-ac__foot brw-ac__fail">
                 <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
                 <Textarea
                   rows={2}
-                  enterKeyHint="send"
                   ref={backRef}
                   value={backNote}
                   onChange={(e) => setBackNote(e.target.value)}
@@ -1073,10 +1081,10 @@ export function BrowserCard({
                   aria-label={t("browser.inCard.backLabel", g)}
                   maxLength={1000}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      finish();
-                    } else if (e.key === "Escape") setHandingBack(false);
+                    if (e.key === "Escape") setHandingBack(false);
+                    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
+                    e.preventDefault();
+                    finish();
                   }}
                 />
                 <div className="brw-ac__row">
