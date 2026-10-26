@@ -585,14 +585,14 @@ export const ptBR = {
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
-      lead: "Para rodar código e mexer em arquivos, a gente precisa de um computador. Ações sensíveis continuam pedindo aprovação.",
+      lead: "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
       cloud: "Sandbox da Daytona",
       cloudDesc: "Um computador isolado para cada agente, na Daytona.",
       cloudReady: "Sandboxes da Daytona ligadas: cada agente ganha a sua.",
       mine: "Outro computador",
-      mineDesc: "Um Mac em casa ou outro servidor, conectado com um código. Nada para abrir na sua rede.",
+      mineDesc: "Um Mac ou outro servidor, conectado com um código.",
       thisMac: "Este {{device}}",
-      thisMacDesc: "Os agentes trabalham aqui, só nas pastas que você liberar. Conecta com um clique.",
+      thisMacDesc: "Só nas pastas que você liberar.",
       thisMacConnecting: "Conectando este {{device}}…",
       thisMacConnected: "{{name}} conectado. Os agentes escolhidos vão trabalhar neste {{device}}.",
       thisMacFolders: "Escolher pastas",
@@ -994,15 +994,12 @@ export const ptBR = {
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
     banner: {
-      org: "Os agentes ainda não têm uma IA para pensar.",
-      orgHint: "Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
-      orgHintPreparing:
-        "O seu plano entra no {{computer}} quando ele ficar pronto. Uma chave de API já funciona agora.",
+      org: "Os agentes ainda não têm uma IA.",
+      orgHint: "Você também pode pedir no chat, como “usar meu plano do Claude”.",
       orgAction: "Conectar uma IA",
     },
     agent: "{{name}} não vai responder porque não tem uma IA conectada.",
     card: {
-      line: "Depois de conectar, {{name}} responde a sua mensagem.",
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
       answering: "{{name}} está respondendo…",
@@ -1035,12 +1032,12 @@ export const ptBR = {
     key: {
       title: "Chave de API",
       makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
-      sub: "Você paga pelo uso, direto ao provedor",
+      sub: "Você paga pelo uso, direto ao provedor.",
       create: "Crie a sua chave de API {{of}} {{provider}}",
       paste: "Cole aqui",
       forAll: "Todo agente sem plano pensa com ela.",
       saved: "Salva. Todo agente sem plano pensa com ela.",
-      notPlan: "Use aqui uma chave de pagamento por uso. A chave de um plano de código vai na opção dele, acima.",
+      notPlan: "A chave de um plano de código vai na opção dele, acima.",
       platform: "agentes.chat",
     },
     wait: {
@@ -1052,20 +1049,21 @@ export const ptBR = {
     },
     own: {
       this: "A conta do {{brand}} com login no {{computer}}",
-      thisText: "Todos os agentes pensam com ela. Nada para entrar.",
+      thisText: "Todos os agentes pensam com ela.",
       other: "Outra conta do {{brand}}, para um agente",
-      otherText: "Você entra por aqui; ela fica no {{computer}}.",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
+    /** Under a plan's sign-in: it changes how the agent treats everyone else. */
+    onlyYou: "{{The}} {{name}} vai responder só a você.",
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
-      text: "No ChatGPT, abra Configurações\u00a0›\u00a0Segurança e permita o login com código de dispositivo para o Codex. Num plano Business ou Enterprise, quem administra o workspace permite.",
+      text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem administra liga.",
       open: "Abrir as configurações do ChatGPT",
     },
     zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
     who: {
       key: "Chave de API · {{provider}}",
-      line: "Cada plano pensa por um agente. Para os outros, escolha outro plano acima, ou uma chave de API para todos eles.",
+      line: "Cada plano pensa por um agente.",
       keyFor: "Chave de API para {{names}}",
     },
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -1831,8 +1829,9 @@ export const ptBR = {
         signInAgain: "Entrar de novo",
         keyLabel: "Chave da API",
         fallbackTitle: "Se o {{computer}} parar de responder, responder pela API",
-        fallbackOnNow: "Usa o modelo da organização e conta no orçamento {{of}} {{name}}.",
-        fallbackOffNow: "{{The}} {{name}} avisa quem chamou e espera ele voltar.",
+        /** The switch's ⓘ: the same in both states. */
+        fallbackHint:
+          "Usa o modelo da organização e conta no orçamento {{of}} {{name}}. Se não, {{article}} {{name}} avisa quem chamou e espera o computador voltar.",
         effort: "Esforço",
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortText: {
@@ -1848,10 +1847,9 @@ export const ptBR = {
             claude_code: "Entre no Claude com a conta que vai usar",
             codex: "Entre no ChatGPT com a conta que vai usar",
           },
-          stepOneText: {
-            claude_code: "Abre a página do próprio Claude. Se ela entrar na conta errada, saia de lá e tente de novo.",
-            codex: "Abre a página da própria OpenAI. Se ela entrar na conta errada, saia de lá e tente de novo.",
-          },
+          /** The sign-in step's ⓘ, for Claude and ChatGPT. */
+          stepOneHint:
+            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}: o agentes.chat nunca vê a senha nem o acesso.",
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT" },
           openAgain: "Abrir de novo",
           stepTwo: "Copie o código que o Claude mostrou e cole aqui",
@@ -1860,10 +1858,9 @@ export const ptBR = {
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",
           deviceCode: "Código para o ChatGPT",
-          deviceCodeText: "Digite este código na página que abrir. Foi você que pediu este login pelo agentes.chat.",
+          deviceCodeText: "Digite este código na página que abrir.",
           starting: "Pedindo ao {{computer}}…",
           waiting: "Esperando",
-          safe: "A conta fica guardada só no {{computer}}. O agentes.chat nunca vê a senha nem o acesso.",
           failed: "Não deu para entrar nessa conta. Tente de novo.",
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
@@ -4427,10 +4424,10 @@ export const ptBR = {
     share: {
       switch: "Só responde a você",
       switchOther: "Só responde a {{name}}",
-      on: "Usa o seu plano. Os outros veem que {{article}} {{name}} só responde a você.",
-      off: "Responde a outras pessoas com o seu plano.",
+      /** The switch's ⓘ, on your own plan: the same in both states. */
+      hint: "Os outros veem que {{article}} {{name}} só responde a você. Sem isso, {{article}} {{name}} responde também a outras pessoas, com o seu plano.",
+      /** The switch's ⓘ, on someone else's plan. */
       onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
-      offOther: "Responde a outras pessoas com o plano de {{owner}}.",
       title: "Agora {{article}} {{name}} responde a todos",
       titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
       body: {
@@ -4466,12 +4463,10 @@ export const ptBR = {
       paste: "Colar",
       pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
       email: "Qual conta? (opcional)",
-      emailHelp: "O email da conta do Claude que vai pensar. Vazio: você escolhe na página do Claude.",
       emailInvalid: "Use um email simples, como ana@exemplo.com.",
-      emailPlaceholder: "ana@exemplo.com",
+      emailPlaceholder: "Email da conta do Claude (opcional)",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
-      keySite: "Fica em {{site}}. Copie a chave inteira.",
       openKeys: "Abrir {{site}}",
       keyTitle: "Cole a chave aqui",
       keyLabel: "Chave do {{plan}}",
@@ -4500,8 +4495,8 @@ export const ptBR = {
     },
     page: {
       title: "Seus planos",
-      text: "Cada conta pensa por um agente. Ela fica no computador; o agentes.chat guarda só o nome, o email e o uso.",
-      empty: "Conecte o seu plano de IA, como o Claude ou o ChatGPT, e os agentes pensam com ele: sem chave de API.",
+      hint: "Cada conta pensa por um agente e fica no computador onde foi conectada; quem administra esse computador pode acessá-la. O agentes.chat guarda só o nome, o email e o uso.",
+      empty: "Nenhum plano ainda.",
       connect: "Conectar uma IA",
       keyEnds: "chave …{{hint}}",
       on: "no {{computer}}",
@@ -4521,8 +4516,6 @@ export const ptBR = {
         "{{agent}} deixa de pensar com ela e volta para a API. O {{computer}} sai da conta e apaga o que guardava.",
       disconnectNone: "O {{computer}} sai da conta e apaga o que guardava dela.",
       disconnected: "{{label}} desconectada.",
-      where:
-        "As contas ficam nos computadores onde foram conectadas. Quem administra um computador pode acessar as contas dele.",
     },
     usage: {
       window: {
@@ -6966,8 +6959,7 @@ export const ptBR = {
     execOff: "Comandos desligados",
     paused: "Pausado",
     pausedUntil: "Pausado até {{time}}",
-    pausedHint:
-      "Quem conectou pausou os agentes no próprio computador. Nada novo começa até retomar; o que já rodava termina.",
+    pausedHint: "Pausado no próprio computador por quem o conectou.",
     seenNow: "conectado agora",
     seen: "visto {{when}}",
     neverSeen: "ainda não conectou",
@@ -6994,7 +6986,7 @@ export const ptBR = {
     commandCopied: "Comando copiado. Cole no Terminal do computador.",
     // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
-      text: "Este {{device}} pode trabalhar com seus agentes. Eles só usam as pastas que você liberar, e você pausa quando quiser.",
+      text: "Os agentes só usam as pastas que você liberar neste {{device}}.",
       connect: "Usar este {{device}}",
       connected: "Este {{device}} está conectado. Escolha as pastas que os agentes podem usar.",
       failed: "Não deu para conectar este {{device}}. Tente de novo.",
@@ -7008,7 +7000,6 @@ export const ptBR = {
       reconnect: "Reconectar",
       reconnecting: "Reconectando este {{device}}…",
       seeRequest: "Ver no app",
-      emptyText: "Nenhum computador ainda. Este {{device}} conecta com um clique.",
       offline: "Este {{device}} está sem conexão agora.",
       outageTitle: "Este {{device}} perdeu a conexão {{ago}}",
       toolsOff: "Desligado neste {{device}}. Ligue nas Preferências do app, em Ferramentas.",
@@ -7020,8 +7011,8 @@ export const ptBR = {
     // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
     host: {
       label: "Computador deste servidor",
-      desc: "O computador onde o agentes.chat está instalado. Nada para instalar.",
-      descUsers: "O computador onde o agentes.chat está instalado, com um usuário para cada agente.",
+      desc: "Onde o agentes.chat está instalado.",
+      descUsers: "Onde o agentes.chat está instalado, um usuário por agente.",
       descShared: "O computador onde o agentes.chat está instalado. Os agentes trabalham como a pessoa que o instalou.",
       stop: "Parar de usar nesta organização",
       stopTitle: "Parar de usar o computador deste servidor?",
@@ -7034,7 +7025,7 @@ export const ptBR = {
     },
     download: {
       title: "Conectar outro computador",
-      text: "Baixe o app do agentes.chat no Mac. Ele abre este servidor numa janela própria e, com um clique, os agentes dele trabalham nesse Mac, em pastas só deles.",
+      text: "Instale o app do agentes.chat no Mac.",
       mac: "Baixar o app para Mac",
       version: "Versão {{version}}",
       versionSize: "Versão {{version}} · {{size}}",
@@ -7048,24 +7039,21 @@ export const ptBR = {
       step2:
         "Abra o app, clique em Usar o seu próprio servidor, depois em Conectar ao meu servidor, e digite o endereço desta página. Entre e clique em Usar este Mac em Configurações → Computadores.",
       other: "Outras formas: servidor ou Linux",
-      otherText:
-        "Rode no terminal do computador. Ele mostra um código e um link: abra o link, confira o código e confirme com a sua conta.",
-      otherNeeds: "Não precisa instalar nada antes: ele traz o que precisa para rodar.",
+      otherText: "Rode no terminal do computador e confirme o código que ele mostrar.",
       waiting: "Esperando o computador conectar…",
     },
     page: {
       back: "Computadores",
       notFound: "Computador não encontrado",
       notFoundText: "Ele pode ter sido removido.",
-      readOnly: "Só {{name}} e os admins mudam o que este computador libera. Daqui você vê o que está liberado.",
-      readOnlyNobody: "Só admins mudam o que este computador libera. Daqui você vê o que está liberado.",
+      readOnly: "Só {{name}} e os admins mudam o que este computador libera.",
+      readOnlyNobody: "Só admins mudam o que este computador libera.",
       agents: "Agentes que usam este computador",
       agentFolders: "Usa {{folders}} e a própria pasta",
       agentOwnFolder: "Só a própria pasta",
     },
     access: {
       folders: "Pastas liberadas",
-      foldersText: "Cada agente sempre tem a própria pasta. Estas são as pastas a mais que este computador libera.",
       ownFolder: "Pasta de cada agente",
       ownFolderText: "Sempre. Um agente não vê a do outro.",
       noFolders: "Nenhuma pasta a mais. Cada agente usa só a própria pasta.",
@@ -7084,11 +7072,11 @@ export const ptBR = {
       removed: "{{folder}} foi removida.",
       removedAgent: "{{name}} não usa mais {{folder}}.",
       tools: "Ferramentas",
-      toolsText: "O que os agentes podem rodar neste computador, sempre nas pastas liberadas.",
       tool: { claude: "Claude Code", codex: "Codex", commands: "Comandos", browser: "Navegador" },
+      /** Each tool's ⓘ. */
       toolText: {
         claude: "Escreve e muda arquivos, só nas pastas liberadas.",
-        codex: "Como o Claude Code, com a conta do ChatGPT. Também só nas pastas liberadas.",
+        codex: "Como o Claude Code, com uma conta do ChatGPT. Só nas pastas liberadas.",
         commands: "Roda comandos do Terminal, como testes e builds.",
       },
       commandsWarn: "Comandos podem chegar a outras partes do computador, não só às pastas liberadas.",
@@ -7119,7 +7107,6 @@ export const ptBR = {
     },
     agents: {
       title: "Qual computador cada agente usa",
-      text: "Um por agente. Também dá para trocar na página de cada agente.",
       empty: "Nenhum agente ainda.",
       pick: "Computador de {{name}}",
       ready: "pronto",
@@ -7128,17 +7115,17 @@ export const ptBR = {
     },
     lead: "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
     leadCloud: "Onde os agentes trabalham: um computador só deste workspace, sempre ligado.",
-    onIt: {
-      title: "Neste computador",
-      screens: "Uma tela para cada agente, com o navegador e os arquivos dele",
-    },
+    /** The workspace computer's page ends with its help page's link. */
+    about: "Sobre este computador",
+    /** Settings › Computers (self-host) ends with its help page's link. */
+    how: "Como os computadores funcionam",
     hostMissing:
       "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no <code>SELF_HOSTING.md</code>.",
     other: {
       title: "Outros computadores",
+      /** The title's ⓘ. */
       text: "Conectados com um código, como um Mac mini em casa ou outro servidor. O que cada um libera se ajusta nele mesmo.",
       emptyTitle: "Nenhum outro computador ainda",
-      emptyText: "Conecte um Mac pelo app agentes, ou qualquer servidor com um comando.",
     },
     daytona: {
       cardTitle: "Sandboxes da Daytona",
@@ -7219,7 +7206,8 @@ export const ptBR = {
       tip: "Esperando o {{name}}",
     },
     titleCloud: "O {{name}} parou de responder {{ago}}",
-    cloudSub: "Já estamos cuidando: nada a fazer do seu lado.",
+    /** One part of the notice's dotted line, so no period. */
+    cloudSub: "Já estamos cuidando",
   },
   connect: {
     title: "Conectar este computador?",
@@ -7420,17 +7408,15 @@ export const ptBR = {
     equivalent: "≈ {{amount}} pela API",
     paid: "{{amount}} pagos",
     budgetShare: "{{percent}} do orçamento",
+    /** The plan accounts' ⓘ. */
     estimate:
-      "O Claude e o Codex só dizem quanto a conta inteira usou. A parte de cada agente é uma estimativa, pelo que cada um gastou nela.",
+      "Os planos só dizem quanto a conta inteira usou. A parte de cada agente é uma estimativa, pelo que cada um gastou nela.",
     accounts: {
       title: "Contas dos planos",
-      subtitle: "Claude Code e Codex nos computadores, com a parte de cada agente.",
-      empty:
-        'Nenhum agente pensa com Claude Code ou Codex ainda. Dá para escolher em "Quem pensa", na página do agente.',
+      empty: "Nenhum agente pensa com um plano ainda.",
     },
     api: {
       title: "API da organização",
-      subtitle: "O que cada agente gastou pela API este mês, contra o orçamento dele.",
     },
     agent: {
       title: "Uso {{of}} {{name}}",
@@ -8091,7 +8077,6 @@ export const ptBR = {
       },
     },
     machine: {
-      description: "Os agentes deste computador podem usar um navegador próprio, cada um com o seu.",
       ready: "Pronto",
       off: "Desligado",
       offHelp: "Só quem está no computador liga: no app agentes, em Preferências → Ferramentas.",
@@ -8347,7 +8332,7 @@ export const ptBR = {
       ready: "O computador do seu workspace está pronto",
     },
     title: "Computador da {{org}}",
-    lead: "Um computador só de vocês, sempre ligado, onde os agentes trabalham.",
+    /** The ⓘ on the computer's name. */
     users: "Um usuário para cada agente: cada um tem a própria pasta.",
     specs: "{{cpus}} CPUs · {{memoryGb}} GB de memória · {{diskGb}} GB de disco",
     chip: {
@@ -8376,22 +8361,20 @@ export const ptBR = {
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
     status: {
       preparing: "Preparando o computador.",
-      capacity: "Está demorando mais que o normal. Nada se perde.",
-      problem: "Algo deu errado ao preparar o computador. Já estamos cuidando: nada a fazer do seu lado.",
-      ready: "Pronto. Os agentes trabalham nele.",
+      capacity: "Está demorando mais que o normal.",
+      problem: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
+      ready: "Pronto.",
       paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
     notice: {
       label: "O computador do workspace",
       title: "Preparando o computador da {{org}}",
-      waits_one: "{{names}} espera por ele",
-      waits_other: "{{names}} esperam por ele",
       see: "Ver",
       hide: "Ocultar",
     },
     agentWaiting: "{{The}} {{name}} começa a usar assim que ele ficar pronto.",
     managedHint: "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
-    continue: "Pode seguir: os agentes começam a usar assim que ele ficar pronto.",
+    continue: "Pode seguir enquanto isso.",
     plans:
       "Os agentes podem pensar com o seu próprio plano de IA, com login neste computador. Não precisa de chave de API.",
     plansMarks: "Claude, ChatGPT, GLM, Kimi e outros planos de IA",
@@ -8403,8 +8386,7 @@ export const ptBR = {
       late: "Levando um pouco mais que o previsto",
     },
     email: {
-      you: "Avisamos você em {{email}} quando ele ficar pronto. Pode fechar esta página.",
-      youStay: "Avisamos você em {{email}} quando ele ficar pronto.",
+      you: "Avisamos você em {{email}} quando ele ficar pronto.",
       here: "Aparece aqui assim que ficar pronto.",
     },
   },
@@ -8540,11 +8522,11 @@ export const ptBR = {
       opening: "Abrindo o computador {{of}} {{name}}…",
       ready: "Pronto",
       held: "{{The}} {{name}} está em pausa por enquanto",
-      heldHelp: "Dá para assistir. Ninguém assume o controle até a pausa acabar.",
+      heldHelp: "Ninguém assume o controle até a pausa acabar.",
       paused: "O {{computer}} está pausado até {{time}}",
       pausedPlain: "O {{computer}} está pausado",
       notAnswering: "O {{computer}} não está respondendo",
-      notAnsweringHelp: "Costuma voltar em poucos minutos. Já estamos cuidando: nada a fazer do seu lado.",
+      notAnsweringHelp: "Costuma voltar em poucos minutos. Já estamos cuidando.",
       offline: "O {{computer}} está offline",
       offlineHelp: "Desde {{time}}. {{The}} {{name}} espera o computador voltar.",
       offlineHelpPlain: "{{The}} {{name}} espera o computador voltar.",

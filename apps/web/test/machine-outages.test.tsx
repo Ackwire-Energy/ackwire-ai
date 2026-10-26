@@ -104,7 +104,9 @@ describe("an offline computer: the notice", () => {
     await settle(8);
     const notice = screen().getByRole("region", { name: "Computadores desconectados" });
     expect(notice.textContent).toContain("O Computador da Acme parou de responder há 12 min");
-    expect(notice.textContent).toContain("Já estamos cuidando: nada a fazer do seu lado.");
+    // That it is looked after, in one part of the dotted line.
+    expect(notice.textContent).toContain("Já estamos cuidando · Ada e Atlas esperam por ele");
+    expect(notice.textContent).not.toContain("nada a fazer");
     expect(notice.textContent).not.toContain("desconectou");
     expect(within(notice).queryByRole("button", { name: "Trocar computador" })).toBeNull();
   });

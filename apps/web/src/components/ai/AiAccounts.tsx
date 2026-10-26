@@ -8,6 +8,7 @@ import {
   DialogBody,
   DialogFooter,
   Field,
+  InfoHint,
   Input,
   List,
   PlanMeter,
@@ -77,12 +78,14 @@ export function AiAccountsSection() {
   return (
     <Card aria-labelledby="sec-plans">
       <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
+        <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-plans" className="ac-card__title">
             {t("aiAccounts.page.title")}
           </h2>
-          <span className="small muted">{t("aiAccounts.page.text")}</span>
-        </div>
+          <InfoHint name={t("common.about", { label: t("aiAccounts.page.title") })}>
+            {t("aiAccounts.page.hint")}
+          </InfoHint>
+        </span>
         {rows.length > 0 && connect}
       </div>
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
@@ -146,7 +149,6 @@ export function AiAccountsSection() {
           })}
         </List>
       )}
-      {rows.length > 0 && <p className="small muted">{t("aiAccounts.page.where")}</p>}
 
       {open?.type === "rename" && (
         <RenameDialog

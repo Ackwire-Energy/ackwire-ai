@@ -6122,16 +6122,22 @@ button.live-call__head:hover {
   font-size: 12.5px;
   word-break: break-all;
 }
-/* A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the corner. */
+/*
+ * A command or snippet to copy: small code that scrolls sideways (never breaks a word), copy as an icon in the
+ * corner, beside the code rather than over it, so a command wider than a phone never runs under it.
+ */
 .machine-command {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
   border-radius: var(--control-r-md);
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .machine-command__code {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  padding: 10px 44px 10px 12px;
+  padding: 10px 8px 10px 12px;
   overflow-x: auto;
   overflow-y: hidden;
   font-size: 12px;
@@ -6140,9 +6146,8 @@ button.live-call__head:hover {
   scrollbar-width: thin;
 }
 .machine-command__copy {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  flex: none;
+  margin: 4px 4px 0 0;
 }
 .machine-pair__steps {
   display: flex;
@@ -6247,6 +6252,10 @@ a.machine-row__name:hover {
   gap: 8px;
   min-width: 0;
 }
+/* "SHA-256" and its ⓘ keep their width: the hash gives way. */
+.machine-connect__sha > .ac-hintline {
+  flex: none;
+}
 .machine-connect__hash {
   flex: 1;
   min-width: 0;
@@ -6272,7 +6281,7 @@ a.machine-row__name:hover {
   gap: 2px;
   min-width: 0;
 }
-/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size and users. */
+/* The workspace's own computer (ADR 0056 §10): the steps on its way, or why it waits; its size. */
 .setup-progress {
   margin: 0;
 }
@@ -6280,20 +6289,7 @@ a.machine-row__name:hover {
   font-size: 13px;
   color: var(--ink-muted);
 }
-.setup-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  color: var(--ink-muted);
-}
-.setup-facts--stack {
-  flex-direction: column;
-}
-/* The wait in words: the time left, then who hears when it's ready, the plans. */
+/* The wait in words: the time left, then who hears when it's ready, the size. */
 .setup-wait {
   display: flex;
   flex-direction: column;
@@ -6309,11 +6305,6 @@ a.machine-row__name:hover {
   margin: 0;
   font-size: 13px;
   color: var(--ink-muted);
-}
-/* The plans the agents sign in with, under a hairline: its overlapped marks are wider than the facts' icons. */
-.setup-plans {
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
@@ -7939,24 +7930,22 @@ a.machine-row__name:hover {
 .agp-brainsel .newag__sel-value {
   gap: 10px;
 }
-/* The card's foot: "Se o … desligar, responder pela API" and what it does now, the switch at the end. */
+/*
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its first line), the switch
+ * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
+ */
 .agp-brainoff {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  min-width: 0;
+  font-size: 13.5px;
   line-height: 1.35;
+}
+.agp-brainoff label {
   cursor: pointer;
 }
 .agp-brainoff b {
-  font-size: 13.5px;
   font-weight: 600;
 }
-.agp-brainoff span {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-/* "Só responde a você", under the account: what it means now, the switch at the end. */
+/* "Só responde a você", under the account: its label and ⓘ, the switch at the end. */
 .agp-brainshare {
   display: flex;
   align-items: center;
@@ -8018,7 +8007,8 @@ a.machine-row__name:hover {
   font-size: 14px;
   font-weight: 600;
 }
-.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code) {
+/* The lines under a title; the title's own line (with its ⓘ) keeps the step's 14/20. */
+.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code):not(.ac-hintline) {
   font-size: 13px;
   line-height: 1.4;
   color: var(--muted);
