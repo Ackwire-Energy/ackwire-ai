@@ -60,7 +60,7 @@ export {
 } from "./navigation";
 export { OptionTile } from "./OptionTile";
 export { PressScale, type PressScaleProps } from "./PressScale";
-export { ProviderLogo, type ProviderLogoProps, ProviderStack } from "./ProviderLogo";
+export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";

@@ -1,14 +1,8 @@
 import { type ConnectIntent, keys, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { type AiChoice, aiStateOf, defaultChoice, firstAgent, gateDims } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, choiceOfIntent } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import {
-  keyLooksValid,
-  type ProviderId,
-  providerGuess,
-  providerLabel,
-  providerOf,
-} from "@agenteschat/client/lib/providers";
+import { keyLooksValid, type ProviderId, providerGuess, providerOf } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -17,9 +11,8 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, SheetScreen } from "@/ui";
-import { SheetHeader } from "../new/parts";
 import { useDirectory, useMeId } from "../shared/hooks";
-import { AiPicker, type KeyDraft, KeyPanel, PlanPanel, usePlanGates } from "./ConnectAiSteps";
+import { ConnectAiFlow, type FlowView, viewOf } from "./ConnectAiSteps";
 import { openPage } from "./parts";
 
 /**
@@ -65,10 +58,9 @@ export function useConnectKey(orgId: string, asked?: string) {
 export type ConnectKey = ReturnType<typeof useConnectKey>;
 
 /**
- * "Conectar uma IA" as a sheet, as the web's dialog (ADR 0061): the plans first (Claude chosen), each signing in
- * on the agent's computer, then the workspace's API key; a message that asked for one of them opens on it
- * (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>`). Once connected from a message, the
- * agent answers it by itself.
+ * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>`): the
+ * plans first, each signing in on the agent's computer, then the workspace's API key (ConnectAiFlow); a message
+ * that asked for one of them opens on its page. Once connected from a message, the agent answers it by itself.
  */
 export function ConnectAiSheet() {
   const { t } = useTranslation();
@@ -87,50 +79,12 @@ export function ConnectAiSheet() {
   // The agents a plan was connected for here: they think with it before the AI status says so.
   const [linked, setLinked] = useState<string[]>([]);
   const hasAi = (id: string) => linked.includes(id) || (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
-  const [pickedAgent, setPickedAgent] = useState<string>();
-  const agentId = pickedAgent ?? firstAgent(agents, hasAi, params.agentId)?.id;
-  const gates = usePlanGates(orgId, agentId);
-  const [picked, setPicked] = useState<AiChoice | null>(null);
-  const choice =
-    picked ??
-    defaultChoice({
-      intent: params.intent as ConnectIntent | undefined,
-      ownsAgents: agents.length > 0,
-      mayAddKey,
-      claudeGate: agentId ? gates.gateOf("claude") : { state: "loading" },
-    });
-  const [draft, setDraft] = useState<KeyDraft>(() => ({
-    provider: providerGuess(undefined, params.provider),
-    apiKey: "",
-  }));
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [view, setView] = useState<FlowView>(() => viewOf(choiceOfIntent(params.intent as ConnectIntent | undefined)));
+  const form = useConnectKey(orgId, params.provider);
   const [keySaved, setKeySaved] = useState(false);
-  const done = () => {
-    setConnected(true);
+  const answer = () => {
     void qc.invalidateQueries({ queryKey: keys.aiStatus(orgId) });
     if (params.from) void api.chat.answerNow(orgId, params.from).catch(() => undefined);
-  };
-  const saveKey = async () => {
-    if (saving) return;
-    setSaving(true);
-    setFailed(false);
-    try {
-      await api.agents.addCredential(orgId, {
-        provider: draft.provider,
-        label: providerLabel(draft.provider),
-        apiKey: draft.apiKey.trim(),
-      });
-      // `aiStatus` lives under `credentials`: both refresh.
-      await qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-      setKeySaved(true);
-      done();
-    } catch {
-      setFailed(true);
-    } finally {
-      setSaving(false);
-    }
   };
   // Opened for one agent: its name in the title.
   const one = named?.length === 1 ? dir.agentById.get(named[0] ?? "") : undefined;
@@ -144,72 +98,49 @@ export function ConnectAiSheet() {
         : one && owner
           ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
           : t("noAi.lockedAdmins");
+  const close = () => {
+    if (router.canGoBack()) router.back();
+  };
   return (
     <SheetScreen>
-      <SheetHeader title={one ? t("connectAi.titleFor", agentGrammar(t, one.name)) : t("connectAi.title.any")} />
       {dir.loading || status.isPending ? (
         <ActivityIndicator style={styles.loading} />
       ) : (
-        <View style={styles.body}>
-          <AiPicker
-            choice={choice}
-            onPick={(next) => {
-              setPicked(next);
-              // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
-              if (next !== "key" && next !== choice && agentId !== undefined && linked.includes(agentId))
-                setPickedAgent(firstAgent(agents, hasAi)?.id);
-            }}
-            dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
-          />
-          {choice === "key" ? (
-            <KeyPanel
-              draft={draft}
-              onDraft={(d) => {
-                setDraft(d);
-                setFailed(false);
-              }}
-              locked={!mayAddKey}
-              saved={keySaved}
-              saving={saving}
-              failed={failed}
-              onSave={() => void saveKey()}
-            />
-          ) : (
-            <PlanPanel
-              key={choice}
-              choice={choice}
-              gates={gates}
-              agents={agents}
-              agentId={agentId}
-              onAgent={setPickedAgent}
-              locked={locked}
-              onKey={() => setPicked("key")}
-              onComputer={() => openPage(`${serverUrl()}/org/${orgId}/settings/computers`)}
-              onDone={(id) => {
-                // The panel stays on that agent, saying it's done.
-                setPickedAgent(id);
-                setLinked((l) => [...l, id]);
-                done();
-              }}
-            />
-          )}
-          {connected ? (
-            <Button
-              variant="primary"
-              wide
-              label={t("connectAi.done")}
-              onPress={() => {
-                if (router.canGoBack()) router.back();
-              }}
-            />
-          ) : null}
-        </View>
+        <ConnectAiFlow
+          view={view}
+          onView={setView}
+          sheetTitle={one ? t("connectAi.titleFor", agentGrammar(t, one.name)) : t("connectAi.title.any")}
+          agents={agents}
+          hasAi={hasAi}
+          {...(params.agentId ? { startAgentId: params.agentId } : {})}
+          locked={locked}
+          mayAddKey={mayAddKey}
+          keyForm={form}
+          keySaved={keySaved}
+          onSaveKey={() =>
+            void form.save().then((ok) => {
+              if (!ok) return;
+              setKeySaved(true);
+              answer();
+            })
+          }
+          onComputer={() => openPage(`${serverUrl()}/org/${orgId}/settings/computers`)}
+          onPlanDone={(id) => {
+            setLinked((l) => [...l, id]);
+            answer();
+          }}
+        />
       )}
+      {keySaved || linked.length > 0 ? (
+        <View style={styles.done}>
+          <Button variant="primary" wide label={t("connectAi.done")} onPress={close} />
+        </View>
+      ) : null}
     </SheetScreen>
   );
 }
 
 const styles = StyleSheet.create({
   loading: { marginTop: 24 },
-  body: { gap: 16 },
+  done: { marginTop: 8 },
 });

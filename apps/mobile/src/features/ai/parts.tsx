@@ -1,7 +1,7 @@
 import { openBrowserAsync } from "expo-web-browser";
 import type { ReactNode } from "react";
 import { Linking, StyleSheet, View } from "react-native";
-import { Button, Icon, type IconName, Text } from "@/ui";
+import { Button, Icon, type IconName, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -21,31 +21,50 @@ export function Note({ icon, children, live = false }: { icon: IconName; childre
   );
 }
 
+/** The steps' white card (a grouped list of numbered rows). */
+export function StepsCard({ children }: { children: ReactNode }) {
+  const { colors: c, shadows } = useTheme();
+  return (
+    <View style={[styles.card, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
+      {children}
+    </View>
+  );
+}
+
 /**
- * A numbered step: its number on the title's line, the words under it, its button under them (the web at phone
- * width: the button goes in the words' column).
+ * A numbered step, one row of the steps' card: its number (a check once `done`, faint while it waits), the title,
+ * the words under it and its buttons under them. `divider`: a hairline above it, inset to the words.
  */
 export function Step({
   n,
   title,
   children,
   side,
+  divider = false,
+  state = "now",
 }: {
   n: number;
   title: string;
   children?: ReactNode;
   side?: ReactNode;
+  divider?: boolean;
+  state?: "now" | "done" | "later";
 }) {
   const c = useColors();
   return (
     <View style={styles.step}>
-      <View style={[styles.n, { backgroundColor: c.ink }]}>
-        <Text variant="caption" style={[styles.nText, { color: c.bg }]}>
-          {n}
-        </Text>
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
+      <View style={[styles.n, { backgroundColor: state === "done" ? c.ok : state === "later" ? c.plate : c.ink }]}>
+        {state === "done" ? (
+          <Icon name="check" size={12} color="#ffffff" />
+        ) : (
+          <Text variant="caption" style={[styles.nText, { color: state === "later" ? c.faint : c.bg }]}>
+            {n}
+          </Text>
+        )}
       </View>
       <View style={styles.text}>
-        <Text variant="subhead" tone="ink" style={styles.bold}>
+        <Text variant="callout" tone="ink" style={styles.bold}>
           {title}
         </Text>
         {children}
@@ -109,13 +128,15 @@ export function Waiting({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 4 },
   grow: { flex: 1, minWidth: 0 },
-  step: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  n: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", marginTop: 1 },
-  nText: { fontWeight: "700", fontSize: 11, lineHeight: 13 },
+  card: { borderRadius: 14, overflow: "hidden" },
+  step: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  divider: { position: "absolute", top: 0, left: 48, right: 0, height: StyleSheet.hairlineWidth },
+  n: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  nText: { fontWeight: "700", fontSize: 12, lineHeight: 14 },
   text: { flex: 1, minWidth: 0, gap: 4 },
   bold: { fontWeight: "600" },
-  side: { marginTop: 4, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  side: { marginTop: 6, flexDirection: "row", flexWrap: "wrap", gap: 8 },
   wait: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
 });

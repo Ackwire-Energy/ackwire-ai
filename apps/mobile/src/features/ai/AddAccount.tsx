@@ -13,7 +13,7 @@ import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { Button, fieldText, Text, useTheme } from "@/ui";
 import { useAiOrg } from "./org";
-import { Note, OpenPage, openPage, Step, StepText, Waiting } from "./parts";
+import { Note, OpenPage, openPage, Step, StepsCard, StepText, Waiting } from "./parts";
 
 /*
  * "Adicionar conta" as on the web (ADR 0041 §2, ADR 0059): the computer starts the provider's own sign-in and its
@@ -72,7 +72,7 @@ function AddAccountFlow({
   const { orgId } = useAiOrg();
   const api = useApi();
   const qc = useQueryClient();
-  const { colors: c, shadows } = useTheme();
+  const { colors: c } = useTheme();
   const plan = planOf(provider);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
@@ -90,7 +90,8 @@ function AddAccountFlow({
   const reported = useRef(false);
   const status = useAccountLogin(orgId, machineId, login?.loginId ?? null);
   const result = status.data;
-  const input = [styles.input, { color: c.ink, backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }];
+  // Inside the steps' white card a field sits sunken, as the paste row.
+  const input = [styles.input, { color: c.ink, backgroundColor: c.sunken, borderColor: c.line }];
 
   const begin = async (): Promise<AccountLoginStart | null> => {
     setStarting(true);
@@ -178,29 +179,29 @@ function AddAccountFlow({
   const waiting = <Waiting label={t("agentPage.work.brain.add.waiting")} />;
   const pasteRow = (label: string, placeholder: string, secret: boolean, valid: boolean) => (
     <>
-      <TextInput
-        value={code}
-        onChangeText={(v) => {
-          setCode(v);
-          setSendFailed(false);
-        }}
-        placeholder={placeholder}
-        placeholderTextColor={c.faint}
-        accessibilityLabel={label}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        spellCheck={false}
-        secureTextEntry={secret}
-        textContentType="none"
-        editable={!sent}
-        returnKeyType="send"
-        onSubmitEditing={() => {
-          if (valid) void send();
-        }}
-        style={input}
-      />
-      <View style={styles.buttons}>
+      <View style={[styles.inset, { backgroundColor: c.sunken, borderColor: c.line }]}>
+        <TextInput
+          value={code}
+          onChangeText={(v) => {
+            setCode(v);
+            setSendFailed(false);
+          }}
+          placeholder={placeholder}
+          placeholderTextColor={c.faint}
+          accessibilityLabel={label}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          spellCheck={false}
+          secureTextEntry={secret}
+          textContentType="none"
+          editable={!sent}
+          returnKeyType="send"
+          onSubmitEditing={() => {
+            if (valid) void send();
+          }}
+          style={[styles.insetInput, { color: c.ink }]}
+        />
         <Button
           size="sm"
           variant="secondary"
@@ -209,9 +210,11 @@ function AddAccountFlow({
           disabled={sent}
           onPress={() => void paste()}
         />
+      </View>
+      <View style={styles.send}>
         <Button
-          size="sm"
           variant="primary"
+          wide
           label={sending ? t("mobile.ai.saving") : t("agentPage.work.brain.add.send", { computer })}
           disabled={!valid || sent || !ready || sending}
           onPress={() => void send()}
@@ -266,6 +269,7 @@ function AddAccountFlow({
       <>
         <Step
           n={1}
+          state={opened ? "done" : "now"}
           title={t("aiAccounts.add.keyStep", { maker: plan.maker })}
           side={
             <OpenPage
@@ -279,7 +283,7 @@ function AddAccountFlow({
           <StepText>{t("aiAccounts.add.keySite", { site: site.host })}</StepText>
           {provider === "zai" ? <StepText>{t("connectAi.zaiTeam")}</StepText> : null}
         </Step>
-        <Step n={2} title={t("aiAccounts.add.keyTitle")} side={sent ? waiting : undefined}>
+        <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={sent ? waiting : undefined}>
           {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), "…", true, keyOk)}
           {key && !keyOk ? <Note icon="x">{t("aiAccounts.add.keyShape", { plan: plan.label })}</Note> : null}
           <StepText>{t("aiAccounts.add.keySafe", { computer })}</StepText>
@@ -298,6 +302,8 @@ function AddAccountFlow({
         </Step>
         <Step
           n={2}
+          divider
+          state={login ? "done" : "now"}
           title={t("agentPage.work.brain.add.stepOne.codex")}
           side={login ? openAgain(login.url) : startButton(t("agentPage.work.brain.add.open.codex"), !ready)}
         >
@@ -308,7 +314,7 @@ function AddAccountFlow({
           </StepText>
         </Step>
         {login?.userCode ? (
-          <Step n={3} title={t("agentPage.work.brain.add.deviceCode")} side={waiting}>
+          <Step n={3} divider title={t("agentPage.work.brain.add.deviceCode")} side={waiting}>
             <View style={styles.code}>
               <Text
                 variant="title2"
@@ -340,6 +346,7 @@ function AddAccountFlow({
       <>
         <Step
           n={1}
+          state={login && opened ? "done" : "now"}
           title={t("agentPage.work.brain.add.stepOne.claude_code")}
           side={
             login
@@ -378,7 +385,7 @@ function AddAccountFlow({
           ) : null}
         </Step>
         {login && opened ? (
-          <Step n={2} title={t("agentPage.work.brain.add.stepTwo")} side={waiting}>
+          <Step n={2} divider title={t("agentPage.work.brain.add.stepTwo")} side={sent ? waiting : undefined}>
             {pasteRow(
               t("agentPage.work.brain.add.codeLabel"),
               t("agentPage.work.brain.add.codeLabel"),
@@ -408,7 +415,7 @@ function AddAccountFlow({
           <Button size="sm" variant="secondary" icon="undo" label={t("common.retry")} onPress={onRetry} />
         </View>
       ) : (
-        steps
+        <StepsCard>{steps}</StepsCard>
       )}
       {starting ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
       {note}
@@ -418,17 +425,30 @@ function AddAccountFlow({
 }
 
 const styles = StyleSheet.create({
-  flow: { gap: 16 },
+  flow: { gap: 10 },
   ended: { gap: 10, alignItems: "flex-start" },
   input: {
     minHeight: 46,
-    borderRadius: 13,
-    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    marginTop: 4,
-    ...fieldText("body"),
+    marginTop: 6,
+    ...fieldText("callout"),
   },
-  buttons: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  inset: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 46,
+    marginTop: 6,
+    paddingLeft: 12,
+    paddingRight: 5,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  insetInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("callout") },
+  send: { marginTop: 10 },
   code: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginVertical: 4 },
   codeText: { fontWeight: "700", letterSpacing: 2 },
   spinner: { alignSelf: "flex-start" },

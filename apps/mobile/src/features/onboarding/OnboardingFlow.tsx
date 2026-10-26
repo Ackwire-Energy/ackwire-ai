@@ -75,7 +75,6 @@ export function OnboardingFlow() {
   // The AI step's key, for the workspace just created (no workspace is chosen yet: it gets the id).
   const ai = useConnectKey(created?.orgId ?? "");
   // The AI step's option (the plans first, as on the web) and the agents a plan was connected for there.
-  const [aiChoice, setAiChoice] = useState<AiChoice | null>(null);
   const [aiShown, setAiShown] = useState<AiChoice | null>(null);
   const [planned, setPlanned] = useState<string[]>([]);
   const [aiSaved, setAiSaved] = useState(false);
@@ -395,8 +394,6 @@ export function OnboardingFlow() {
             return id ? [{ id, name: t(`onboarding.presets.${p}.name`) }] : [];
           })}
           form={ai}
-          choice={aiChoice}
-          onChoice={setAiChoice}
           planned={planned}
           onPlanned={(id) => setPlanned((l) => (l.includes(id) ? l : [...l, id]))}
           onShown={setAiShown}
