@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { hintBack, hintClosed, hintOpened, hintTouched, hintTouches } from "../src/ui/hints";
+import { hintBack, hintBackOr, hintClosed, hintOpened, hintTouched, hintTouches } from "../src/ui/hints";
 
 const at = (x: number, y: number) => ({ nativeEvent: { pageX: x, pageY: y } });
 
@@ -81,6 +81,19 @@ describe("an ⓘ hint on the phone", () => {
     expect(hintBack()).toBe(true);
     expect(a.open).toBe(false);
     expect(hintBack()).toBe(false);
+  });
+
+  test("in a sheet, which takes Android's back before the hint can, back closes the hint and the next one the sheet", () => {
+    const a = hint("a");
+    let closed = 0;
+    const back = hintBackOr(() => {
+      closed++;
+    });
+    a.show();
+    back();
+    expect([a.open, closed]).toEqual([false, 0]);
+    back();
+    expect(closed).toBe(1);
   });
 
   test("closed by its own ⓘ, or gone from the screen, it is forgotten: back leaves the screen again", () => {

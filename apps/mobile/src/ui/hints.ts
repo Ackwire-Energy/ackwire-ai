@@ -62,3 +62,11 @@ export const hintTouches = {
 
 /** Android's back: closes the open hint, and only that (true: handled). */
 export const hintBack = (): boolean => closeOpen();
+
+/**
+ * Android's back for a view that takes it before `BackHandler` does (a `Modal`'s `onRequestClose`): the open hint
+ * closes first, and only a back with none open runs `close`.
+ */
+export const hintBackOr = (close: () => void) => () => {
+  if (!closeOpen()) close();
+};

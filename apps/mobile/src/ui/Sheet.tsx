@@ -15,6 +15,7 @@ import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { concentricRadius, displayCornerRadius } from "./display-corner";
 import { Glass } from "./Glass";
+import { hintBackOr } from "./hints";
 import { useTheme } from "./theme";
 
 export interface SheetProps {
@@ -97,7 +98,7 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
 
   if (!mounted) return null;
   return (
-    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={hintBackOr(onClose)}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }, scrimStyle]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("mobile.a11y.closeSheet")} />
       </Animated.View>
