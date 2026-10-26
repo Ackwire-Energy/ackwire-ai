@@ -15,6 +15,7 @@ import { createTestDatabase } from "@agenteschat/db/testing";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
+  type AgentRun,
   type ArtifactDeps,
   addChannelMember,
   type ContextDeps,
@@ -56,6 +57,7 @@ import {
   type ToolSource,
   zonedParts,
 } from "../src";
+import { listenLiveSteering } from "../src/live-steer";
 
 export const SECRET = "test-secret-".padEnd(48, "x");
 
@@ -342,3 +344,11 @@ export async function setup(
 }
 
 export type Fixture = Awaited<ReturnType<typeof setup>>;
+
+/**
+ * What the executor of a run set to `running` by hand would do: answer a message steered into the run at once
+ * (no turn takes it here, so it stays in the run's inbox). Unanswered, posting that message waits out
+ * `LIVE_STEER_WAIT_MS`, 3 s of real time.
+ */
+export const answerSteering = (f: Fixture, run: AgentRun) =>
+  listenLiveSteering(f, run, null, { take: async () => [], onRead: () => {} });

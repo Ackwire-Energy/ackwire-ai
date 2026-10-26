@@ -21,7 +21,7 @@ import {
   setThreadFollow,
   unpinMessage,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, answerSteering, type Fixture, setup } from "./fixtures";
 
 /**
  * What the phone app needed from the API: unread and last message per
@@ -285,18 +285,24 @@ describe("working now (any member)", () => {
   test("runs in progress where I am; never someone else's DM or a private channel I'm not in", async () => {
     f = await setup();
     const bia = await withBia();
-    const run = async (channelId: string, triggerMessageId: string, status: "running" | "done" = "running") =>
-      f.db.insert(schema.agentRuns).values({
-        orgId: f.org.id,
-        agentId: f.agent.id,
-        channelId,
-        threadRootId: triggerMessageId,
-        triggerMessageId,
-        trigger: "router",
-        hop: 1,
-        status,
-        startedAt: new Date(),
-      });
+    const run = async (channelId: string, triggerMessageId: string, status: "running" | "done" = "running") => {
+      const [row] = await f.db
+        .insert(schema.agentRuns)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          channelId,
+          threadRootId: triggerMessageId,
+          triggerMessageId,
+          trigger: "router",
+          hop: 1,
+          status,
+          startedAt: new Date(),
+        })
+        .returning();
+      // The same person's next message in the channel goes into a running one.
+      if (row?.status === "running") answerSteering(f, row);
+    };
     const ask = await post(f.owner.id, f.general.id, "Dev, can you check the deploy?");
     await run(f.general.id, ask.id);
     const old = await post(f.owner.id, f.general.id, "older");
