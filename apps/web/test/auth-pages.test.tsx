@@ -425,8 +425,10 @@ describe("Onboarding", () => {
     await skip();
 
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-    // Ada is already on the team: no card to leave her out. The others start picked.
+    // Ada is already on the team (her lead says so): no card to leave her out. The others start picked.
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Eu já estou no time: desmarque quem não quiser.");
     expect(screen().queryByRole("button", { name: /Ada · Dev/ })).toBeNull();
+    expect(button(/Theo · PM/).textContent).toContain("Organiza tarefas e cuida do fórum.");
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("true");
     await keepOnly("Theo · PM");
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("false");
@@ -459,8 +461,14 @@ describe("Onboarding", () => {
     expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
-    // New agents start on "Automático".
-    expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
+    // Who charges the API and what happens at the limit: behind the limit's ⓘ, with nothing under the card.
+    const budget = screen().getByRole("region", { name: "Limite de gasto por agente" });
+    expect(budget.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
+    const limit = within(budget).getByRole("button", { name: "Sobre Limite de gasto por agente" });
+    expect(document.getElementById(limit.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Vale só para o uso da API, cobrado pelo provedor da chave, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Planos não contam aqui.",
+    );
+    expect(document.body.textContent).not.toContain("Começa no Automático");
     await type("Cole aqui", "sk-errado");
     await act(async () => fireEvent.blur(screen().getByLabelText("Cole aqui")));
     expect(document.body.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
@@ -572,6 +580,32 @@ describe("Onboarding", () => {
     expect(screen().getByText("Falta 1 etapa")).toBeTruthy();
   });
 
+  test("team: each field's reason behind its ⓘ, the link's approval in view, a line only for emails to check", async () => {
+    const { state } = await start();
+    await throughAgents(state);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Convide por e-mail ou compartilhe o link.");
+    const hintOf = (name: string) =>
+      document.getElementById(button(name).getAttribute("aria-describedby") ?? "")?.textContent;
+    expect(hintOf("Sobre E-mails")).toBe("Cada pessoa recebe um convite por e-mail e entra direto.");
+    expect(hintOf("Sobre Link de convite")).toBe("Vale 30 dias. Dá para desativar em Membros.");
+    const emails = screen().getByLabelText("E-mails");
+    expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint");
+    // What makes sharing the link in a group safe stays in view, under it.
+    expect(screen().getByLabelText("Link de convite").getAttribute("aria-describedby")).toBe(
+      "invite-link-hint invite-link-help",
+    );
+    expect(document.getElementById("invite-link-help")?.textContent).toBe("Você aprova cada pessoa que pedir.");
+    // Nothing under the emails until one needs a look.
+    expect(document.getElementById("invite-emails-help")).toBeNull();
+    await act(async () => fireEvent.change(emails, { target: { value: "nao-e-email" } }));
+    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    expect(document.getElementById("invite-emails-help")?.textContent).toBe(
+      "Confira os e-mails marcados: eles não recebem convite.",
+    );
+    expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint invite-emails-help");
+  });
+
   test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
     const { state } = await start();
     await throughImport(state);
@@ -579,7 +613,8 @@ describe("Onboarding", () => {
     await keepOnly("Theo · PM");
     await click(button(/Criar 1 agente/), 8);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Os agentes começam a responder quando uma IA estiver conectada.");
+    // Nothing under "Conectar depois": Done says what it means for the first message.
+    expect(button("Conectar depois").nextElementSibling).toBeNull();
     // A key typed and then left for later isn't saved.
     await type("Cole aqui", "sk-ant-api03-abcdefghijklmnop");
     await click(button("Conectar depois"), 8);
@@ -630,9 +665,7 @@ describe("Onboarding", () => {
     ])
       expect(option(name)).toBeTruthy();
     expect(option(/^Claude$/).getAttribute("aria-pressed")).toBe("true");
-    expect(document.body.textContent).toContain(
-      "Entre com o seu plano de IA e eles pensam com ele: sem chave de API. Ou use uma chave de API, paga pelo uso.",
-    );
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Entre com o seu plano de IA: sem chave de API.");
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
@@ -933,7 +966,8 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.invite")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
     // No cards repeating the rail and the faces, and nothing said of what was skipped: no invitations, no computer.
-    expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card")).toBeNull();
+    // No line over the title either: the rail already reads "Tudo certo".
+    expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card, .onb__eyebrow")).toBeNull();
     expect(welcome()).toBe("Theo e Ada já estão no #general.");
     expect(document.querySelector(".onb__crew-computer")).toBeNull();
     // The rail marks the steps done and lets you go back.
@@ -1205,11 +1239,11 @@ describe("Onboarding", () => {
       agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai" as const, reason: "no_key" as const })),
     };
     await skip();
-    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: Theo responde quando você conectar uma.");
+    expect(askLine()).toBe("Ainda sem IA conectada: Theo responde quando você conectar uma.");
     expect(document.querySelector(".onb__first-line")?.getAttribute("data-state")).toBe("no_ai");
     expect(button("Enviar para Theo")).toBeTruthy();
     await type(ASK, "Bom dia, time");
-    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: os agentes respondem quando você conectar uma.");
+    expect(askLine()).toBe("Ainda sem IA conectada: os agentes respondem quando você conectar uma.");
     // An AI connected after going back: Done says so as soon as it's open again.
     await type(ASK, "@theo bom dia");
     state.aiStatus = { any: true, agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })) };

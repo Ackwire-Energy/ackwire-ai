@@ -55,12 +55,12 @@ import {
   Avatar,
   Button,
   Card,
-  CardFooter,
   CardHeader,
   ComputerPortrait,
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Logo,
   normalizeAppearance,
@@ -836,9 +836,6 @@ export function OnboardingPage() {
   };
 
   // The question: the step's, or the AI's on the agents' second screen.
-  const metNames = (["lia", "theo", "atlas"] as Preset[])
-    .filter((p) => metAt[p] && chosen.has(p))
-    .map((p) => presetInfo(p).name);
   const ask =
     step.id === "done"
       ? null
@@ -853,17 +850,13 @@ export function OnboardingPage() {
                 ? t("onboarding.agents.importedTitle")
                 : t(`onboarding.${step.id}.title`),
             lead:
-              step.id === "agents" && metNames.length
-                ? t("onboarding.agents.leadMet", { names: joinNames(metNames, t("newAgent.and")) })
-                : step.id === "computer" && workspaceComputer
-                  ? t(
-                      workspaceComputer.phase === "ready"
-                        ? "onboarding.computer.leadCloudReady"
-                        : workspaceComputer.phase === "paused"
-                          ? "onboarding.computer.leadCloudPaused"
-                          : "onboarding.computer.leadCloud",
-                    )
-                  : t(`onboarding.${step.id}.lead`),
+              step.id === "computer" && workspaceComputer
+                ? t(
+                    workspaceComputer.phase === "paused"
+                      ? "onboarding.computer.leadCloudPaused"
+                      : "onboarding.computer.leadCloud",
+                  )
+                : t(`onboarding.${step.id}.lead`),
           };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
@@ -1194,7 +1187,6 @@ export function OnboardingPage() {
                         platform={draft.provider === "platform"}
                         onChange={(v) => setBudget(v)}
                       />
-                      <p className="onb__help">{t("onboarding.suggestedAuto")}</p>
                     </>
                   ) : (
                     <PlanPanel
@@ -1287,15 +1279,10 @@ export function OnboardingPage() {
                 {step.id === "done" ? t("onboarding.done.first.skip") : t("onboarding.skip")}
               </Button>
             )}
-            {aiOpen && (
-              <>
-                {!aiDone && (
-                  <Button variant="ghost" onClick={() => void advance("keyLater").catch(() => {})} disabled={busy}>
-                    {t("connectAi.later")}
-                  </Button>
-                )}
-                <p className="onb__help">{t("connectAi.laterNote")}</p>
-              </>
+            {aiOpen && !aiDone && (
+              <Button variant="ghost" onClick={() => void advance("keyLater").catch(() => {})} disabled={busy}>
+                {t("connectAi.later")}
+              </Button>
             )}
             {step.id === "workspace" && confirmationSent && (
               <p className="onb__help onb__note ac-iconline" role="status">
@@ -1370,7 +1357,7 @@ function HostAsk({
   );
 }
 
-/** The monthly budget of every agent: what the API usage may cost, and who charges it. */
+/** The monthly budget of every agent: what the API usage may cost; who charges it is in the title's ⓘ. */
 function BudgetCard({
   value,
   invalid,
@@ -1389,7 +1376,10 @@ function BudgetCard({
         icon="wallet"
         id="budget-title"
         title={t("onboarding.budget.title")}
-        subtitle={t("onboarding.budget.sub")}
+        hint={{
+          name: t("common.about", { label: t("onboarding.budget.title") }),
+          text: platform ? t("onboarding.budget.notePlatform") : t("onboarding.budget.noteKey"),
+        }}
         action={
           <span className="onb__money" data-invalid={invalid || undefined}>
             <span aria-hidden="true">US$</span>
@@ -1403,7 +1393,6 @@ function BudgetCard({
           </span>
         }
       />
-      <CardFooter>{platform ? t("onboarding.budget.notePlatform") : t("onboarding.budget.noteKey")}</CardFooter>
     </Card>
   );
 }
@@ -1748,9 +1737,12 @@ function TeamStep({
   return (
     <>
       <Card as="div">
-        <label className="onb__label" htmlFor="invite-emails">
-          {t("onboarding.team.emails")}
-        </label>
+        <span className="ac-hintline onb__label">
+          <label htmlFor="invite-emails">{t("onboarding.team.emails")}</label>
+          <InfoHint id="invite-emails-hint" name={t("common.about", { label: t("onboarding.team.emails") })}>
+            {t("onboarding.team.emailsHint")}
+          </InfoHint>
+        </span>
         {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a click on the box focuses its input */}
         <div
           className="onb__emails"
@@ -1796,7 +1788,7 @@ function TeamStep({
             autoComplete="off"
             value={draft}
             placeholder={invites.length ? t("onboarding.team.more") : t("onboarding.team.placeholder")}
-            aria-describedby="invite-emails-help"
+            aria-describedby={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
             aria-invalid={invalid || undefined}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
@@ -1804,24 +1796,35 @@ function TeamStep({
             onBlur={() => commit(draft)}
           />
         </div>
-        <span id="invite-emails-help" className={invalid ? "small onb__error" : "small muted"}>
-          {invalid ? t("onboarding.team.invalidHelp") : t("onboarding.team.rolesHelp")}
-        </span>
+        {invalid && (
+          <span id="invite-emails-help" className="small onb__error">
+            {t("onboarding.team.invalidHelp")}
+          </span>
+        )}
       </Card>
       <Card as="div">
-        <span className="onb__label">{t("onboarding.team.link")}</span>
+        <span className="ac-hintline onb__label">
+          <span>{t("onboarding.team.link")}</span>
+          <InfoHint id="invite-link-hint" name={t("common.about", { label: t("onboarding.team.link") })}>
+            {t("onboarding.team.linkHint")}
+          </InfoHint>
+        </span>
         <div className="row" style={{ flexWrap: "nowrap" }}>
           <Input
             readOnly
             value={link.data?.url ?? ""}
             aria-label={t("onboarding.team.link")}
+            aria-describedby="invite-link-hint invite-link-help"
             style={{ flex: 1, minWidth: 0 }}
           />
           <Button icon="copy" onClick={() => void copy()} disabled={!link.data}>
             {copied ? t("common.copied") : t("common.copy")}
           </Button>
         </div>
-        <span className="small muted">{t("onboarding.team.linkHelp")}</span>
+        {/* Visible, not in the ⓘ: it is what makes sharing the link in a group safe. */}
+        <span id="invite-link-help" className="small muted">
+          {t("onboarding.team.linkHelp")}
+        </span>
       </Card>
       {agents.length > 0 && (
         <div className="row small muted" style={{ gap: 8 }}>
@@ -1874,7 +1877,6 @@ function DoneStep({
     <section className="onb__welcome" aria-labelledby="onb-welcome-title">
       <WelcomeSky calm={() => [text.current]} />
       <div className="onb__welcome-text" ref={text}>
-        <p className="onb__eyebrow onb__eyebrow--sky">{t("onboarding.done.eyebrow")}</p>
         <h1 id="onb-welcome-title" className="onb__welcome-title">
           {t("onboarding.done.title", { org: orgName })}
         </h1>

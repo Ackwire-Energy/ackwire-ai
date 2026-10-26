@@ -536,7 +536,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(lead.style.width).toBe("14px");
     }
     // The lead says where, and the rail says how far: never "opcional".
-    expect(document.body.textContent).toContain("Num computador só deste workspace, que está sendo preparado agora.");
+    expect(document.body.textContent).toContain("Num computador só deste workspace, sempre ligado.");
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Demorando mais");
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).not.toContain("opcional");
@@ -665,7 +665,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(step()).toContain("Quase pronto…");
 
     await r.reported({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
-    expect(document.body.textContent).toContain("Num computador só deste workspace, que já está pronto.");
+    expect(document.body.textContent).toContain("Num computador só deste workspace, sempre ligado.");
     expect(step()).toContain("Pronto. Os agentes trabalham nele.");
     expect(step()).toContain("Os agentes podem pensar com o seu próprio plano de IA");
     expect(step()).not.toMatch(/Quando ficar pronto|Pode seguir/);

@@ -503,8 +503,7 @@ export const ptBR = {
     },
     agents: {
       title: "Fica com esse time?",
-      lead: "Eu já estou aqui. Marque quem mais vem; dá para mudar depois.",
-      leadMet: "Eu já estou aqui, e {{names}} você já conheceu. Desmarque quem não quiser; dá para mudar depois.",
+      lead: "Eu já estou no time: desmarque quem não quiser.",
       listLabel: "Agentes prontos",
       importedTitle: "Seus agentes, e mais alguém?",
       importedLabel: "Agentes importados",
@@ -515,7 +514,7 @@ export const ptBR = {
         "Alguns agentes não conseguiram passar a usar a conta do {{brand}} no {{computer}}. Dá para trocar na página de cada um.",
     },
     presets: {
-      theo: { name: "Theo", role: "PM", desc: "Organiza tarefas, resume conversas e cuida do fórum." },
+      theo: { name: "Theo", role: "PM", desc: "Organiza tarefas e cuida do fórum." },
       ada: { name: "Ada", role: "Dev", desc: "Programa em branches, revisa PRs e investiga bugs." },
       lia: {
         name: "Lia",
@@ -528,19 +527,17 @@ export const ptBR = {
     },
     keyStep: {
       title: "Qual IA eles vão usar?",
-      lead: "Entre com o seu plano de IA e eles pensam com ele: sem chave de API. Ou use uma chave de API, paga pelo uso.",
+      lead: "Entre com o seu plano de IA: sem chave de API.",
       leadNoComputer:
         "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
     },
     budget: {
       title: "Limite de gasto por agente",
-      sub: "Vale só para o uso da API.",
       label: "Limite mensal por agente, em dólares",
       perMonth: "/mês",
       noteKey:
-        "Esse valor é cobrado pelo provedor da chave pelo uso da API, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Planos com login no computador não contam aqui.",
-      notePlatform:
-        "Com a chave do agentes.chat, o limite vale para o uso da API: quando um agente chega nele, ele para e te avisa.",
+        "Vale só para o uso da API, cobrado pelo provedor da chave, não pelo agentes.chat. Quando um agente chega no limite, ele para e te avisa. Planos não contam aqui.",
+      notePlatform: "Vale só para o uso da API. Quando um agente chega no limite, ele para e te avisa.",
     },
     keySite: "Crie a chave em {{site}}.",
     keyNotPlan:
@@ -558,7 +555,6 @@ export const ptBR = {
     anthropicWorkspace: "ID do workspace no Claude Console",
     anthropicWorkspaceHelp: "Só para uma chave que vale em mais de um workspace. O ID começa com wrkspc_.",
     platformKeyDesc: "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
-    suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
       title: "Onde a gente vai trabalhar?",
       lead: "Para rodar código e mexer em arquivos, a gente precisa de um computador. Ações sensíveis continuam pedindo aprovação.",
@@ -576,28 +572,27 @@ export const ptBR = {
       connected: "{{name}} conectado · {{os}}. Os agentes escolhidos vão usar este computador.",
       hostReady: "Os agentes escolhidos vão trabalhar no computador deste servidor.",
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
-      leadCloud: "Num computador só deste workspace, que está sendo preparado agora.",
-      leadCloudReady: "Num computador só deste workspace, que já está pronto.",
+      leadCloud: "Num computador só deste workspace, sempre ligado.",
       leadCloudPaused: "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
     },
     team: {
       title: "Quem mais trabalha com você?",
-      lead: "Cole os e-mails de uma vez: cada pessoa recebe um convite e entra direto. O link é para o WhatsApp ou o Slack: quem abrir pede, e você aprova.",
+      lead: "Convide por e-mail ou compartilhe o link.",
       emails: "E-mails",
       placeholder: "nome@empresa.com, outra@empresa.com",
       more: "Mais e-mails…",
-      rolesHelp: "Membro conversa e cria canais; admin também gerencia agentes, conectores e chaves.",
+      emailsHint: "Cada pessoa recebe um convite por e-mail e entra direto.",
       invalid: "confira",
-      invalidHelp: "Confira os e-mails marcados: falta algo como nome@empresa.com.br. Eles não recebem convite.",
+      invalidHelp: "Confira os e-mails marcados: eles não recebem convite.",
       sent: "convidado",
       roleOf: "Papel de {{email}}",
       link: "Link de convite",
-      linkHelp: "Quem abrir pede para entrar; você aprova cada pessoa · vale 30 dias · dá para desativar em Membros.",
+      linkHint: "Vale 30 dias. Dá para desativar em Membros.",
+      linkHelp: "Você aprova cada pessoa que pedir.",
       meet: "Vão encontrar no #general:",
     },
     removeInvite: "Remover {{email}}",
     done: {
-      eyebrow: "Tudo pronto",
       title: "Bem-vindo à {{org}}",
       /** The phone's last step, which has no first message to send: it also says how to start. */
       textOne: "{{names}} já está no #general. Diga oi com @ e peça a primeira tarefa.",
@@ -627,8 +622,8 @@ export const ptBR = {
         },
         ready: "{{name}} começa na hora, no #general.",
         waiting: "{{name}} começa assim que o {{computer}} voltar.",
-        noAi: "Ainda sem IA conectada. Envie mesmo assim: {{name}} responde quando você conectar uma.",
-        noAiAny: "Ainda sem IA conectada. Envie mesmo assim: os agentes respondem quando você conectar uma.",
+        noAi: "Ainda sem IA conectada: {{name}} responde quando você conectar uma.",
+        noAiAny: "Ainda sem IA conectada: os agentes respondem quando você conectar uma.",
         send: "Enviar para {{name}}",
         sendGeneral: "Enviar no #general",
         skip: "Abrir o #general sem enviar",
@@ -1053,7 +1048,6 @@ export const ptBR = {
     keyLocked: "Uma chave de API, só um admin adiciona.",
     accountsLocked: "Só {{name}} conecta um plano no {{computer}}.",
     later: "Conectar depois",
-    laterNote: "Os agentes começam a responder quando uma IA estiver conectada.",
   },
   /** An API key pasted in a message, before it goes out. */
   keyGuard: {
