@@ -13,7 +13,7 @@ export const Route = createFileRoute("/login")({
       context.queryClient.ensureQueryData(meQuery(context.api)),
       context.queryClient.ensureQueryData(authConfigQuery(context.api)),
     ]);
-    if (me) throw redirect({ to: search.redirect ?? "/" });
+    if (me) throw redirect({ href: search.redirect ?? "/" });
     // A brand-new instance has nobody to sign in: go straight to the first account.
     if (config.firstRun) throw redirect({ to: "/signup", search: { redirect: search.redirect } });
   },
