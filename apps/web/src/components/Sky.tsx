@@ -14,7 +14,6 @@ import {
   parseColor,
   pixelBurst,
   pixelOf,
-  prefersReducedMotion,
   SKY_TONES,
   type SkyOptions,
   softTones,
@@ -25,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
 import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
 
@@ -383,10 +383,11 @@ export function AgentGlow({ color }: { color: AgentColor }) {
 export function SidebarHorizon({ working, total }: { working: number; total: number }) {
   const share = total > 0 ? Math.min(1, working / Math.min(total, 3)) : 0;
   const target = 0.2 + 0.6 * share;
-  // Eases toward the new level frame by frame (at once with reduced motion).
+  // Eases toward the new level frame by frame (at once with reduced motion, followed as it changes, as the sky does).
+  const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
   level.current.target = target;
-  if (prefersReducedMotion()) level.current.now = target;
+  if (reduced) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
     surface: "--side",
@@ -449,9 +450,10 @@ export function MenuHorizon() {
  */
 export function OnboardingHorizon({ progress }: { progress: number }) {
   const target = 0.45 + 0.4 * Math.max(0, Math.min(1, progress));
+  const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
   level.current.target = target;
-  if (prefersReducedMotion()) level.current.now = target;
+  if (reduced) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
     surface: "--side",
@@ -488,9 +490,10 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
  */
 export function OnboardingProgress({ progress }: { progress: number }) {
   const target = Math.max(0, Math.min(1, progress));
+  const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
   level.current.target = target;
-  if (prefersReducedMotion()) level.current.now = target;
+  if (reduced) level.current.now = target;
   const body = pixelOf(spriteTone("sky"));
   const eye = pixelOf(EYE);
   const opts: SkyOptions = {

@@ -213,4 +213,28 @@ describe("the sky's loop", () => {
       page.close();
     }
   });
+
+  test("reduced motion switched while the page is open: a still sky starts moving, a moving one stops", async () => {
+    const page = await skyPage(true);
+    try {
+      page.frames(1000);
+      expect(page.draws()).toBe(1);
+      // Motion allowed again (the system's switch, a browser's emulated media): about 30 frames a second at once.
+      page.motion(false);
+      page.frames(1000);
+      expect(page.draws()).toBeGreaterThanOrEqual(29);
+      // Reduced again: one still frame with the setting, then no loop.
+      page.motion(true);
+      page.frames(100);
+      const drawn = page.draws();
+      page.frames(1000);
+      expect(page.draws()).toBe(drawn);
+      expect(page.pending()).toBe(0);
+      expect(page.listening()).toBe(1);
+    } finally {
+      page.close();
+    }
+    // Stopped, the sky no longer listens.
+    expect(page.listening()).toBe(0);
+  });
 });

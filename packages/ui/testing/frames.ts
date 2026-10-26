@@ -2,7 +2,8 @@
  * A canvas on a page whose animation frames run by hand, for tests of drawing loops: `frames(ms)` runs that long
  * of a 60 Hz screen (`performance.now()` follows), the canvas's 2D context counts what it draws, and the
  * intersection observer's answer is the test's (`onScreen`). With `reduced`, `matchMedia` says the person asked
- * for reduced motion. Needs the DOM (`setupDom`); `close` puts everything back.
+ * for reduced motion; `motion` switches that while the page is open. Needs the DOM (`setupDom`); `close` puts
+ * everything back.
  */
 import { spyOn } from "bun:test";
 
@@ -33,8 +34,17 @@ export function canvasPage({ width, height, reduced = false }: { width: number; 
     disconnect() {}
   };
   const now = spyOn(performance, "now").mockImplementation(() => clock);
+  let still = reduced;
+  const heard = new Set<() => void>();
   const media = spyOn(window, "matchMedia").mockImplementation(
-    (query: string) => ({ matches: reduced && query.includes("reduce") }) as MediaQueryList,
+    (query: string) =>
+      ({
+        get matches() {
+          return still && query.includes("reduce");
+        },
+        addEventListener: (_: string, cb: () => void) => heard.add(cb),
+        removeEventListener: (_: string, cb: () => void) => heard.delete(cb),
+      }) as unknown as MediaQueryList,
   );
   const host = document.createElement("div");
   const canvas = document.createElement("canvas");
@@ -67,6 +77,13 @@ export function canvasPage({ width, height, reduced = false }: { width: number; 
     },
     /** One intersection observer call: its answers, oldest first (a browser gives several when they pile up). */
     onScreen: (...on: boolean[]) => seen?.(on.map((isIntersecting) => ({ isIntersecting }))),
+    /** The person turns reduced motion on or off while the page is open: the query's listeners hear it. */
+    motion(on: boolean) {
+      still = on;
+      for (const cb of heard) cb();
+    },
+    /** How many listen to the reduced-motion query now. */
+    listening: () => heard.size,
     close() {
       host.remove();
       now.mockRestore();

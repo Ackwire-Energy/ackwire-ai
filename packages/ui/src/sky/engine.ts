@@ -97,10 +97,10 @@ function watchTheme() {
   themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
 }
 
+const REDUCE = "(prefers-reduced-motion: reduce)";
+
 export const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(REDUCE).matches;
 
 interface Sky {
   dirty: boolean;
@@ -152,7 +152,8 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
   const parent = canvas.parentElement;
   if (!ctx || !parent) return () => {};
   const host: HTMLElement = parent;
-  const reduced = prefersReducedMotion();
+  const motion = typeof window.matchMedia === "function" ? window.matchMedia(REDUCE) : null;
+  let reduced = motion?.matches === true;
   let w = 0;
   let h = 0;
   let px = 0;
@@ -310,6 +311,13 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
 
   const untrack = trackPointer();
   watchTheme();
+  // The setting can change while the page is open: a still sky starts moving, a moving one stops.
+  const onMotion = () => {
+    reduced = motion?.matches === true;
+    sky.dirty = true;
+    wake();
+  };
+  motion?.addEventListener?.("change", onMotion);
   resize();
   const observers: { disconnect(): void }[] = [];
   if (typeof ResizeObserver !== "undefined") {
@@ -334,6 +342,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
   return () => {
     live.delete(sky);
     untrack();
+    motion?.removeEventListener?.("change", onMotion);
     for (const o of observers) o.disconnect();
   };
 }
