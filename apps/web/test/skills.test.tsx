@@ -110,6 +110,8 @@ describe("Configurações → Skills", () => {
     await click(within(section()).getByRole("button", { name: "Instalar skill" }));
     dialog = screen().getByRole("dialog", { name: "Instalar skill" });
     await pickTab(within(dialog).getByRole("tab", { name: "Enviar .zip" }));
+    // What the .zip holds, nothing about its scripts: they can run on the agent's computer, as its sheet says.
+    expect(within(dialog).getByText(/^Um \.zip/).textContent).toBe("Um .zip com o SKILL.md na raiz.");
     expect(dialog.querySelector('input[type="file"]')?.className).toContain("ac-visually-hidden");
     const file = new File([new Uint8Array([80, 75, 3, 4])], "suporte.zip", { type: "application/zip" });
     await act(async () => {

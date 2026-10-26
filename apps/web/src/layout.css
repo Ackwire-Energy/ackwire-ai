@@ -6704,12 +6704,17 @@ a.machine-row__name:hover {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* The step title's type, also read by the line that sets its ⓘ (new-agent.css). */
+:root {
+  --onb-title-size: clamp(30px, 4vw, 42px);
+  --onb-title-leading: 1.08;
+}
 .onb__title {
   margin: 0;
   font-family: var(--font-display);
   font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 42px);
-  line-height: 1.08;
+  font-size: var(--onb-title-size);
+  line-height: var(--onb-title-leading);
   letter-spacing: -0.03em;
   text-wrap: balance;
 }

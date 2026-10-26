@@ -413,6 +413,21 @@ describe("agent page: memory and proposals", () => {
     expect(second.state.calls.find((c) => c.method === "proposals.refuse")?.args).toEqual([ORG_ID, "prop-1"]);
   });
 
+  test("a proposal someone else decides names who: the person, or an admin", async () => {
+    const state = seedState();
+    const prop = state.proposals.find((p) => p.id === "prop-1");
+    if (!prop) throw new Error("no prop-1");
+    prop.canDecide = false;
+    await go("?tab=memory", state);
+    const card = () => screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
+    expect(within(card()).queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
+    expect(within(card()).getByText("João decide.")).toBeTruthy();
+    cleanup();
+    prop.decider = { type: "admins" };
+    await go("?tab=memory", state);
+    expect(within(card()).getByText("Um admin decide.")).toBeTruthy();
+  });
+
   test("the side column is one link to how memory works", async () => {
     await go("?tab=memory");
     const link = screen().getByRole("link", { name: "Como a memória funciona" });

@@ -123,9 +123,9 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
       ) : (
         !proposal.canDecide && (
           <span className="small muted">
-            {t("agentPage.memory.decides", {
-              who: proposal.decider.type === "user" ? proposal.decider.name : t("roles.adminLower"),
-            })}
+            {proposal.decider.type === "user"
+              ? t("agentPage.memory.decides", { who: proposal.decider.name })
+              : t("agentPage.memory.adminDecides")}
           </span>
         )
       )}

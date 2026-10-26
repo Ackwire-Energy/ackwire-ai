@@ -60,7 +60,7 @@
  * type stays small, so the ⓘ's nudge under the middle stays a hair, as beside a label.
  */
 .ac-hintline:has(> .newag__title) {
-  line-height: calc(clamp(30px, 4vw, 42px) * 1.08);
+  line-height: calc(var(--onb-title-size) * var(--onb-title-leading));
 }
 .newag__cap {
   display: flex;

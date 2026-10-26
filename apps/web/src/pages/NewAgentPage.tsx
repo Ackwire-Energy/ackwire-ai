@@ -495,10 +495,10 @@ function NewAgentFlow() {
       <header className="onb__head">
         <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
         {hint ? (
-          <span className="ac-hintline">
+          <div className="ac-hintline">
             {h1}
             <InfoHint name={t("common.about", { label: title })}>{hint}</InfoHint>
-          </span>
+          </div>
         ) : (
           h1
         )}
@@ -962,7 +962,7 @@ function NewAgentFlow() {
           </div>
           <KeySelect value={key} onChange={setKey} options={keys} />
           <div className="newag__sect">
-            <span className="ac-hintline">
+            <div className="ac-hintline">
               <h2>
                 <Icon name="wallet" />
                 {t("newAgent.budgetTitle")}
@@ -970,7 +970,7 @@ function NewAgentFlow() {
               <InfoHint name={t("common.about", { label: t("newAgent.budgetTitle") })}>
                 {`${t("newAgent.budgetHelp", g)} ${ownerFirst ? t("newAgent.warnsOwner", { name: ownerFirst }) : t("newAgent.warnsAdmins")}`}
               </InfoHint>
-            </span>
+            </div>
           </div>
           <Card as="div" className="newag__card">
             <BudgetField

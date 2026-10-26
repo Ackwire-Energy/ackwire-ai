@@ -226,11 +226,15 @@ describe("Configurações da organização", () => {
     ).toEqual([true]);
     await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
     const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
-    // Claude: the key's line says where to create it; the workspace ID is explained by its ⓘ.
+    // Claude: the key's line says where to create it; the workspace ID is explained by its ⓘ, and its empty field
+    // says it can stay empty.
     expect(add.textContent).toContain("Crie a chave em platform.claude.com/settings/keys.");
     expect(add.textContent).not.toContain("ninguém vê depois");
     expect(hintOf("ID do workspace no Claude Console", add).text).toBe(
       "Só para uma chave que vale em mais de um workspace. O ID começa com wrkspc_.",
+    );
+    expect(within(add).getByLabelText("ID do workspace no Claude Console").getAttribute("placeholder")).toBe(
+      "Opcional",
     );
     const choose = async (name: string) => {
       const trigger = within(add).getByRole("combobox", { name: "Provedor" });

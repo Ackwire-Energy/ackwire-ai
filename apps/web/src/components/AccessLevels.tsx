@@ -227,6 +227,7 @@ export function AccessMatrixSection() {
   if (!admin) return null;
   const first = list.map((a) => access.byAgent.get(a.id)).find((x) => x !== undefined);
   const columns = first ? resourcesOf(first).filter((r) => r.kind === kind) : [];
+  const table = first !== undefined && columns.length > 0 && !access.loading;
   const busyAgents = new Set(Object.keys(pending).map((k) => k.split("|")[0]));
   const levelLabel = (l: LevelState) => t(`access.level.${l}`);
 
@@ -251,12 +252,12 @@ export function AccessMatrixSection() {
   return (
     <Card aria-labelledby="sec-access">
       <div className="row" style={{ gap: 12 }}>
-        <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
+        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-access" className="ac-card__title">
             {t("access.matrixTitle")}
           </h2>
           <InfoHint name={t("common.about", { label: t("access.matrixTitle") })}>{t("access.matrixHint")}</InfoHint>
-        </span>
+        </div>
         <Segmented
           size="sm"
           label={t("access.kindLabel")}
@@ -274,7 +275,7 @@ export function AccessMatrixSection() {
       )}
       {agents.isSuccess && list.length === 0 && <p className="small muted">{t("access.noAgents")}</p>}
       {first && columns.length === 0 && <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>}
-      {first && columns.length > 0 && !access.loading && (
+      {table && (
         <div className="level-matrix">
           <table>
             <thead>
@@ -350,18 +351,20 @@ export function AccessMatrixSection() {
           </table>
         </div>
       )}
-      <div className="level-legend small muted">
-        <span>{t("access.matrixHow")}</span>
-        {(["none", "read", "write"] as const).map((l) => (
-          <span key={l} className="level-pill level-pill--static" data-level={l}>
-            {levelLabel(l)}
+      {table && (
+        <div className="level-legend small muted">
+          <span>{t("access.matrixHow")}</span>
+          {(["none", "read", "write"] as const).map((l) => (
+            <span key={l} className="level-pill level-pill--static" data-level={l}>
+              {levelLabel(l)}
+            </span>
+          ))}
+          <span className="level-legend__asks">
+            <Icon name="lock" />
+            {t("access.asksLegend")}
           </span>
-        ))}
-        <span className="level-legend__asks">
-          <Icon name="lock" />
-          {t("access.asksLegend")}
-        </span>
-      </div>
+        </div>
+      )}
     </Card>
   );
 }

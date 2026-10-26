@@ -590,12 +590,12 @@ function KeysSection() {
   return (
     <Card aria-labelledby="sec-keys">
       <div className="row" style={{ gap: 12 }}>
-        <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
+        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-keys" className="ac-card__title">
             {t("settings.keysTitle")}
           </h2>
           <InfoHint name={t("common.about", { label: t("settings.keysTitle") })}>{t("settings.keysSubtitle")}</InfoHint>
-        </span>
+        </div>
         <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
           {t("settings.addKey")}
         </Button>
@@ -828,7 +828,12 @@ export function KeyDialog({
                 text: t("onboarding.anthropicWorkspaceHelp"),
               }}
             >
-              <Input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} autoComplete="off" />
+              <Input
+                value={workspaceId}
+                onChange={(e) => setWorkspaceId(e.target.value)}
+                placeholder={t("settings.workspaceIdPlaceholder")}
+                autoComplete="off"
+              />
             </Field>
           )}
         </DialogBody>

@@ -35,14 +35,14 @@ export function GitHubAppPanel() {
   return (
     <section className="stack-4" aria-labelledby="sec-github-app" style={{ marginTop: 16 }}>
       <div className="row" style={{ gap: 12 }}>
-        <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
+        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h3 id="sec-github-app" className="ac-card__title">
             {t("githubApp.title")}
           </h3>
           <InfoHint name={t("common.about", { label: t("githubApp.title") })}>
             {t("githubApp.text", { org: org.name })}
           </InfoHint>
-        </span>
+        </div>
         {admin && info.data.installable && (
           <Button
             size="sm"

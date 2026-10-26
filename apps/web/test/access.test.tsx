@@ -237,6 +237,20 @@ describe("Configurações → Agentes e acesso: the matrix", () => {
     expect(document.querySelector("#sec-access")?.closest(".ac-card")?.querySelector("p.small")).toBeNull();
   });
 
+  test("with no cells to click, no legend: only the line that says why", async () => {
+    const state = seedState();
+    state.connections = [];
+    const section = await goAccess(state);
+    expect(section.getByText("A Acme ainda não conectou nenhum serviço.")).toBeTruthy();
+    expect(document.querySelector(".level-legend")).toBeNull();
+    // The built-in areas are always there: their table brings the legend back.
+    await click(section.getByRole("radio", { name: "Nativos" }));
+    expect(section.getAllByRole("columnheader").length).toBeGreaterThan(1);
+    expect(document.querySelector(".level-legend")?.firstElementChild?.textContent).toBe(
+      "Clique numa célula para trocar:",
+    );
+  });
+
   test("members don't see it", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
