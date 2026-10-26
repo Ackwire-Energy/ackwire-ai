@@ -1,0 +1,55 @@
+/*
+ * An invitation link's page (ADR 0068): who works there, the ask, and each answer. Tokens only, so light and dark
+ * follow the theme; the card is the centered layout's, with its 16px gutter at phone width.
+ */
+.invite-ask__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+/* The agents who work there: their faces lead the line, centred on its first line when the names wrap. */
+.invite-ask__agents {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.invite-ask__agents > :first-child {
+  flex: none;
+  /* The 24px faces a hair under the middle of the 20px line, as every icon-led line. */
+  translate: 0 calc(10px + 0.08em - 50%);
+}
+/* "Not you? Sign out": a link in the sentence, without a button's box. */
+.invite-ask__switch {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.invite-ask__outcome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.invite-ask__outcome-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.invite-ask__outcome-text p {
+  margin: 0;
+}
+/* The admin's note to someone turned down, in their words. */
+.invite-ask__reason {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}

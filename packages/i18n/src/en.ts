@@ -2585,6 +2585,7 @@ export const en: Translations = {
       denied: "Request denied.",
       gone: "Someone already answered this request, or it expired.",
       empty: "Nobody is waiting.",
+      note: "“{{note}}”",
     },
     link: {
       title: "Invitation link",

@@ -32,6 +32,7 @@ import {
 } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import {
+  Avatar,
   Button,
   Chip,
   ComputerIcon,
@@ -142,8 +143,12 @@ function Face({
   );
 }
 
-/** Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. */
-function SystemFace({ n }: { n: AppNotification }) {
+/**
+ * Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. Someone
+ * asking to join isn't a member yet: their initials.
+ */
+function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
+  if (n.kind === "join_request") return <Avatar name={n.latest.title ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
       <span className="nt-sys" aria-hidden="true">
@@ -190,6 +195,7 @@ function SourceChip({ n, channelName }: { n: AppNotification; channelName: (id: 
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
+  else if (n.kind === "join_request") [icon, label] = ["members", t("notifications.source.members")];
   else if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||
@@ -240,6 +246,8 @@ type WhatKey =
   | "machineConnectedAny"
   | "browserHandoff"
   | "desktopHandoff"
+  | "joinRequest"
+  | "joinRequestMany"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -300,6 +308,9 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
         : k("machineConnectedAny", { name });
     case "browser_handoff":
       return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
+    case "join_request":
+      // Merged while unread: the newest name, "and others" for the rest of the burst.
+      return k(n.count > 1 ? "joinRequestMany" : "joinRequest", { name: n.latest.title ?? "" });
     case "reaction":
       return k("reaction", { names, count });
   }
@@ -1239,7 +1250,8 @@ function WaitCard({
           {leftChip}
         </>
       );
-      head = <h3>{l.title ?? l.text ?? ""}</h3>;
+      // A request to join: the line above says who; it is answered in Members.
+      head = n.kind === "join_request" ? null : <h3>{l.title ?? l.text ?? ""}</h3>;
       body = (
         <div className="nt-wacts">
           <Button
@@ -1275,7 +1287,11 @@ function WaitCard({
       onKeyDown={() => {}}
     >
       <span className="nt-face">
-        <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
+        {first ? (
+          <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
+        ) : (
+          <SystemFace n={n} className="nt-av40" />
+        )}
       </span>
       <div className="nt-meta">{meta}</div>
       <div>{head}</div>

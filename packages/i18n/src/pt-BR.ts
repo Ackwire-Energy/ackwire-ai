@@ -2600,6 +2600,7 @@ export const ptBR = {
       denied: "Pedido recusado.",
       gone: "Alguém já respondeu este pedido, ou ele expirou.",
       empty: "Ninguém esperando.",
+      note: "“{{note}}”",
     },
     link: {
       title: "Link de convite",

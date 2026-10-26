@@ -1,5 +1,12 @@
 import type { InvitationPreview } from "../api/types";
 
+/** The server's limits on what a person types (mirrors packages/engine/src/invite-requests.ts). */
+export const JOIN_NAME_MAX = 80;
+export const JOIN_NOTE_MAX = 200;
+export const JOIN_REASON_MAX = 300;
+/** A signed-in person's open link page asks for the answer this often (ADR 0068). */
+export const ANSWER_POLL_MS = 15_000;
+
 /** What an invitation link's page shows (ADR 0068), on the web and the phone alike. */
 export type AskView =
   | { state: "form" }

@@ -51,6 +51,7 @@ export const JOIN_REQUEST_TTL_DAYS = 14;
 export const MAX_PENDING_JOIN_REQUESTS = 50;
 /** Answered or expired requests are deleted after this; a denial blocks asking again through a link until then. */
 export const JOIN_REQUEST_KEEP_DAYS = 90;
+/** What a person types: mirrored in packages/client/src/lib/join-requests.ts for the apps' fields. */
 export const JOIN_NAME_MAX = 80;
 export const JOIN_NOTE_MAX = 200;
 export const JOIN_REASON_MAX = 300;
