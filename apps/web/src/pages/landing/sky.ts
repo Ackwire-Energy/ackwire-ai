@@ -3,10 +3,15 @@
  * with pixel-art agents drifting up and blinking, a light that follows the
  * pointer, and calm zones behind the text (the field settles on palette level
  * 6/7 there and the sprites pass behind). Every canvas call is guarded: without a 2D
- * context (tests, old browsers) nothing is drawn and the CSS background shows.
+ * context (tests, old browsers) nothing is drawn and the CSS background shows. A sky
+ * draws about 30 frames a second while on screen (none while the page is hidden: the
+ * browser holds its frames); with reduced motion, one frame (again when it resizes).
  */
 import { type AgentColor, SPRITE, spriteTone } from "@agenteschat/ui";
 import { GRAD } from "./data";
+
+/** About 30 frames a second, as the app's skies: the dither moves in whole cells, more frames only cost. */
+const FRAME_MS = 32;
 
 /** "#rrggbb" → a little-endian RGBA pixel for a Uint32Array over ImageData. */
 export const hex = (h: string) => {
@@ -150,8 +155,10 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
     const r = host.getBoundingClientRect();
     const tx = (pointer.x - r.left) / (r.width || 1);
     const ty = (pointer.y - r.top) / (r.height || 1);
-    light.x += (Math.min(1.3, Math.max(-0.3, tx)) - light.x) * 0.05;
-    light.y += (Math.min(1.3, Math.max(-0.3, ty)) - light.y) * 0.05;
+    // The light catches up with the pointer at the same pace at any frame rate: 5% of the way each 60th of a second.
+    const ease = 1 - 0.95 ** (dt * 60);
+    light.x += (Math.min(1.3, Math.max(-0.3, tx)) - light.x) * ease;
+    light.y += (Math.min(1.3, Math.max(-0.3, ty)) - light.y) * ease;
     const blobs = opts.blobs(t);
     const nb = blobs.length;
     const inv = 1 / h;
@@ -262,7 +269,12 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
       }
     }
     ctx?.putImageData(img, 0, 0);
-    if (visible && !reduced && raf$) raf = raf$(frame);
+    if (visible && !reduced && raf$) raf = raf$(tick);
+  }
+  /** The browser's frames, drawn about 30 times a second. */
+  function tick(now: number) {
+    if (now - last >= FRAME_MS) frame(now);
+    else if (visible && raf$) raf = raf$(tick);
   }
 
   resize();
@@ -282,7 +294,7 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
       raf = 0;
       if (visible && !reduced && raf$) {
         last = performance.now();
-        raf = raf$(frame);
+        raf = raf$(tick);
       }
     });
     io.observe(host);
