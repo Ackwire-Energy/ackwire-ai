@@ -53,6 +53,9 @@ describe("in the Mac app's window", () => {
       await settle(6);
       expect(calls.some((c) => c.method === "signInSocial")).toBe(false);
       expect(heading()).toBe("Continue no navegador");
+      expect(document.querySelector(".auth__lead")?.textContent).toBe(
+        "A gente volta para cá quando você entrar com GitHub.",
+      );
       const opened = new URL(assign.urls[0] ?? "", "https://agentes.chat");
       expect(opened.pathname).toBe("/desktop/sign-in");
       expect(opened.searchParams.get("provider")).toBe("github");

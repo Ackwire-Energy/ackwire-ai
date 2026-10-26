@@ -35,6 +35,8 @@ const press = async (name: string | RegExp, rounds = 6) => {
   await settle(rounds);
 };
 const heading = () => screen().getByRole("heading").textContent;
+/** The line under the question, or null where the step has none. */
+const lead = () => document.querySelector(".auth__lead")?.textContent ?? null;
 const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], canSignUp: false };
 const NEW: SignInOptions = { account: false, password: false, providers: [], canSignUp: true };
 
@@ -72,6 +74,8 @@ describe("Entrar (e-mail primeiro)", () => {
     await type("Senha", "senha-errada");
     await press(/^Entrar/);
     expect(heading()).toBe("Hmm, essa senha não bateu.");
+    // The field, Entrar and "Esqueci a senha" sit right under it: no line between.
+    expect(lead()).toBeNull();
     expect(screen().getByLabelText("Senha").getAttribute("aria-invalid")).toBe("true");
     expect(screen().getByRole("button", { name: "Esqueci a senha" })).toBeTruthy();
 
@@ -158,6 +162,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(calls[0]?.method).toBe("requestPasswordReset");
     expect((calls[0]?.args[0] as { email: string } | undefined)?.email).toBe("marina@gmail.com");
     expect(heading()).toBe("Pronto. Mandei o link para marina@gmail.com.");
+    expect(lead()).toBe("Não chegou em 1 minuto? Veja o spam.");
     expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
   });
 
@@ -195,12 +200,16 @@ describe("Criar conta (e-mail novo)", () => {
     const { auth, calls } = createFakeAuth();
     const { router } = await renderApp("/signup", { api, auth });
     expect(heading()).toBe("Vamos criar sua conta. Qual é o seu e-mail de trabalho?");
+    expect(lead()).toBeNull();
     await type("E-mail", "walter@acme.com.br");
     await press(/^Continuar(?! com)/);
     expect(heading()).toBe("Prazer. Esse e-mail é novo por aqui.");
     await type("Seu nome", "Walter Souza");
     await press(/^Continuar(?! com)/, 2);
     expect(heading()).toBe("Boa, Walter. Agora uma senha.");
+    // What a password needs is said once, under the field, and turns into the count as it's typed.
+    expect(lead()).toBeNull();
+    expect(screen().getByText("Pelo menos 8 caracteres.")).toBeTruthy();
     await type("Crie uma senha", "curta");
     expect(screen().getByText("Faltam 3 caracteres (mínimo de 8).")).toBeTruthy();
     expect(
@@ -265,10 +274,13 @@ describe("Senha nova (link do e-mail)", () => {
     const { auth, calls } = createFakeAuth();
     await renderApp("/reset-password?token=tok-1", { api: createFakeApi(seedState({ me: null })), auth });
     expect(heading()).toBe("Crie uma senha nova.");
+    expect(lead()).toBeNull();
+    expect(screen().getByText("Pelo menos 8 caracteres.")).toBeTruthy();
     await type("Crie uma senha nova.", "senha-nova-1");
     await press(/Salvar senha/);
     expect(calls[0]).toEqual({ method: "resetPassword", args: [{ token: "tok-1", newPassword: "senha-nova-1" }] });
     expect(heading()).toBe("Senha nova salva.");
+    expect(lead()).toBe("Saímos das suas outras sessões.");
   });
 
   test("an expired link (no token) asks for another", async () => {
@@ -277,6 +289,7 @@ describe("Senha nova (link do e-mail)", () => {
       auth: createFakeAuth().auth,
     });
     expect(heading()).toBe("Esse link expirou.");
+    expect(lead()).toBe("Os links valem por 1 hora.");
     expect(screen().getByRole("link", { name: "Pedir outro link" }).getAttribute("href")).toBe("/login");
   });
 });

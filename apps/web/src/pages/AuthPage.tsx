@@ -289,21 +289,14 @@ export function AuthPage({
 
   const first = name.trim().split(/\s+/)[0] ?? "";
   const providerNames = linkedProviders.map((p) => t(`auth.provider.${p}`)).join(" · ");
-  const bubble: Record<Step, [string, string]> = {
-    email:
-      start === "up"
-        ? [t("auth.flow.emailUp"), t("auth.flow.emailUpLead")]
-        : [t("auth.flow.email"), t("auth.flow.emailLead")],
-    password: wrong
-      ? [t("auth.flow.wrong"), canReset ? t("auth.flow.wrongLead") : t("auth.flow.wrongLeadNoReset")]
-      : [t("auth.flow.password"), t("auth.flow.passwordLead")],
+  // A step with nothing to add under its question has no lead: the field and its help line say the rest.
+  const bubble: Record<Step, [string, string?]> = {
+    email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), t("auth.flow.emailLead")],
+    password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
     noPassword: [t("auth.flow.noPassword"), local ? t("auth.desktopOwner.text") : t("auth.flow.noPasswordLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
-    newPassword: [
-      first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
-      t("auth.passwordHelp"),
-    ],
+    newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword")],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
@@ -391,7 +384,7 @@ export function AuthPage({
           />
           <div className="auth__bubble" key={`${shown}-${wrong}`} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
-            <p className="auth__lead">{lead}</p>
+            {lead && <p className="auth__lead">{lead}</p>}
           </div>
         </header>
 

@@ -66,7 +66,7 @@ describe("Entrar no servidor que o app roda neste computador", () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: /^Continuar(?! neste| com)/ })));
     await settle(6);
     expect(continueHere()).toBeTruthy();
-    expect(screen().queryByText(/Abra o app no computador/)).toBeNull();
+    expect(screen().queryByText(/abra o app e escolha Adicionar uma senha/)).toBeNull();
   });
 
   test("another server in the app, or a browser: the ordinary sign-in", async () => {
