@@ -1,9 +1,21 @@
 import { afterEach, expect, test } from "bun:test";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { eq, schema } from "@agenteschat/db";
+import { emailArtFor } from "@agenteschat/engine";
+import { createApp } from "../src/app";
 import { browser, createTestServer, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
 
+/** The web app's static files, where the emails' pictures live. */
+const WEB_PUBLIC = resolve(import.meta.dir, "../../web/public");
+
 let t: TestServer;
-afterEach(() => t.close());
+afterEach(async () => {
+  const current = t;
+  t = undefined as unknown as TestServer;
+  await current?.close();
+});
 
 test("emails go through the outbox: invitation (create, batch, resend) and password reset", async () => {
   t = await createTestServer();
@@ -20,7 +32,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   expect(t.email.sent).toEqual([]); // never inline in the request
   await t.drain();
   expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([
-    [["ana@example.com"], "owner convidou você para Acme no agentes"],
+    [["ana@example.com"], "Você recebeu um convite para um workspace no agentes.chat"],
   ]);
   expect(t.email.sent[0]?.text).toContain(url);
 
@@ -40,7 +52,10 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   });
   expect(reset.status).toBe(200);
   await t.drain();
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["owner@example.com"], subject: "Redefinir sua senha do agentes" });
+  expect(t.email.sent.at(-1)).toMatchObject({
+    to: ["owner@example.com"],
+    subject: "Redefina sua senha do agentes.chat",
+  });
 });
 
 test("password reset: the email links straight to the web's /reset-password with a token, good once", async () => {
@@ -94,10 +109,16 @@ test("the sign-up's own language: the confirmation email and the account follow 
 
   // The web app says its own language; a browser's list counts its most preferred language of ours.
   const bia = await signUpIn("bia@example.com", "en");
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["bia@example.com"], subject: "Confirm your email on agentes" });
+  expect(t.email.sent.at(-1)).toMatchObject({
+    to: ["bia@example.com"],
+    subject: "Confirm your email for agentes.chat",
+  });
   expect(await localeOf("bia@example.com")).toBe("en");
   const ana = await signUpIn("ana@example.com", "de-DE,pt-PT;q=0.9,en;q=0.8");
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes" });
+  expect(t.email.sent.at(-1)).toMatchObject({
+    to: ["ana@example.com"],
+    subject: "Confirme seu e-mail no agentes.chat",
+  });
   expect(await localeOf("ana@example.com")).toBe("pt-BR");
 
   // The link works for the hour the onboarding promises.
@@ -122,7 +143,7 @@ test("the sign-up's own language: the confirmation email and the account follow 
   expect(again.status).toBe(200);
   await t.drain();
   expect(t.email.sent.slice(sent)).toMatchObject([
-    { to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes" },
+    { to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes.chat" },
   ]);
   expect(linkTo("ana@example.com").searchParams.get("callbackURL")).toBe("/?email_confirmed=1");
   // A sign-up that names its own page keeps it.
@@ -138,5 +159,48 @@ test("the sign-up's own language: the confirmation email and the account follow 
     headers: { "accept-language": "en-US,en;q=0.9" },
   });
   await t.drain();
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["old@example.com"], subject: "Reset your agentes password" });
+  expect(t.email.sent.at(-1)).toMatchObject({ to: ["old@example.com"], subject: "Reset your agentes.chat password" });
+});
+
+test("a server people outside can't reach attaches the pictures to each email", async () => {
+  // localhost: recipients' clients and Gmail's image proxy can't fetch from it.
+  const emailArt = await emailArtFor(ORIGIN, WEB_PUBLIC, "auto");
+  t = await createTestServer({ emailArt });
+  await signUp(browser(t), "owner@example.com");
+  await t.drain();
+  const sent = t.email.sent.at(-1);
+  expect(sent?.subject).toBe("Confirme seu e-mail no agentes.chat");
+  expect(sent?.html).toContain('src="cid:logo-ink@agentes.chat"');
+  expect(sent?.html).not.toContain(`${ORIGIN}/email/`);
+  expect(sent?.inline?.map((p) => [p.cid, p.filename, p.contentType])).toEqual([
+    ["logo-ink@agentes.chat", "logo-ink.png", "image/png"],
+    ["logo-bone@agentes.chat", "logo-bone.png", "image/png"],
+    ["sky-band@agentes.chat", "sky-band.png", "image/png"],
+  ]);
+});
+
+test("/email/* serves the pictures to anyone, cached for good, and never the web app", async () => {
+  const web = mkdtempSync(join(tmpdir(), "agentes-web-"));
+  try {
+    writeFileSync(join(web, "index.html"), '<!doctype html><div id="root"></div>');
+    mkdirSync(join(web, "email"));
+    copyFileSync(join(WEB_PUBLIC, "email", "logo-ink.png"), join(web, "email", "logo-ink.png"));
+    const app = createApp({
+      edition: "selfhost",
+      version: "test",
+      modules: [],
+      pingDatabase: async () => {},
+      webDir: web,
+    });
+    const logo = await app.request("/email/logo-ink.png");
+    expect(logo.status).toBe(200);
+    expect(logo.headers.get("content-type")).toBe("image/png");
+    expect(logo.headers.get("access-control-allow-origin")).toBe("*");
+    expect(logo.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    const missing = await app.request("/email/missing.png");
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).not.toContain('<div id="root">');
+  } finally {
+    rmSync(web, { recursive: true, force: true });
+  }
 });

@@ -35,7 +35,7 @@ export function SharePlanDialog({
   const body = maker
     ? t("aiAccounts.share.body.other", { maker })
     : SEATS.has(plan?.toLowerCase() ?? "")
-      ? t("aiAccounts.share.body.seat", { maker: brain === "codex" ? "OpenAI" : "Anthropic" })
+      ? t(`aiAccounts.share.body.seat.${brain}`)
       : t(`aiAccounts.share.body.${brain}`);
   return (
     <Dialog

@@ -12,7 +12,7 @@ import {
   timeLeft,
   whenAt,
 } from "@agenteschat/client/lib/format";
-import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
 import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -136,6 +136,23 @@ describe("grammar", () => {
     expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
     expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
     expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toContain("entra no contexto dela");
+  });
+
+  test("providers in Portuguese: do Claude, da OpenAI; by id or by the label a run error carries", () => {
+    expect(t("newAgent.noKeyFor", providerGrammar(t, "anthropic"))).toBe("Sem chave do Claude");
+    expect(t("newAgent.modelNeedsKey", providerGrammar(t, "openai"))).toBe("Precisa de uma chave da OpenAI");
+    expect(providerGrammar(t, "Claude")).toEqual({ provider: "Claude", of: "do" });
+    // One this app doesn't know keeps its name, with the usual "da".
+    expect(providerGrammar(t, "mistral")).toEqual({ provider: "mistral", of: "da" });
+    expect(t("agentPage.activity.errors.missing_credential", runErrorGrammar(t, { provider: "Claude" }))).toBe(
+      "Falta uma chave do Claude no workspace.",
+    );
+    expect(
+      t(
+        "agentPage.activity.errors.credential_wrong_provider",
+        runErrorGrammar(t, { modelProvider: "Claude", keyProvider: "DeepSeek" }),
+      ),
+    ).toBe("O modelo é do Claude, mas a chave é da DeepSeek.");
   });
 });
 

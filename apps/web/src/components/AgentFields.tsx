@@ -1,4 +1,5 @@
 import type { Credential, Member, Model } from "@agenteschat/client";
+import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AffixInput,
@@ -367,9 +368,7 @@ function ModelCard({
       {/* Other models describe themselves by price: only for those who see money. */}
       {(money || !available || /sonnet|opus|haiku/i.test(model.id)) && (
         <span className="newag__model-desc">
-          {available
-            ? modelDescription(t, locale, model)
-            : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
+          {available ? modelDescription(t, locale, model) : t("newAgent.modelNeedsKey", providerGrammar(t, provider))}
         </span>
       )}
       {available ? (
@@ -389,7 +388,7 @@ function ModelCard({
       ) : (
         <span className="newag__cost">
           <Icon name="key" size={14} />
-          {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
+          {t("newAgent.noKeyFor", providerGrammar(t, provider))}
         </span>
       )}
     </>

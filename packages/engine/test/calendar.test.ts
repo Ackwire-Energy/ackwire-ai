@@ -97,6 +97,10 @@ describe("calendar", () => {
     expect(invited).toContain("calendar.invited");
     const emails = (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
     expect(JSON.stringify(emails.map((e) => e.payload))).toContain("calendar_invite");
+    // The button opens the event on its week.
+    expect(emails.find((e) => JSON.stringify(e.payload).includes("calendar_invite"))?.payload).toMatchObject({
+      template: { url: `https://chat.example.com/org/${f.org.id}/calendar?open=${event.id}&day=2026-10-20` },
+    });
     expect((await respondToEvent(f.db, bia.id, f.org.id, event.id, "accepted")).rsvp).toContainEqual({
       type: "person",
       id: bia.id,
@@ -123,6 +127,25 @@ describe("calendar", () => {
     expect(
       (await calendarRange(deps, outsider.id, f.org.id, "2026-10-19T00:00:00Z", "2026-10-23T00:00:00Z")).events,
     ).toEqual([]);
+  });
+
+  test("the invitation email's time names its zone: the reader's, or the event's when they have none", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub, publicUrl: "https://chat.example.com" };
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, bia.id));
+    await createCalendarEvent(deps, f.owner.id, f.org.id, {
+      title: "Retro",
+      start: "2026-10-28T12:00:00Z",
+      end: "2026-10-28T13:00:00Z",
+      timezone: "America/Sao_Paulo",
+      recurrence: "none",
+      participants: [{ type: "person", id: bia.id }],
+    });
+    const [email] = (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
+    const when = (email?.payload as { template?: { when?: string } } | undefined)?.template?.when;
+    expect(when).toContain("GMT-3");
+    expect(when).toContain("9:00");
   });
 
   test("free time: everyone's busy blocks, weekdays 9:00 to 18:00", async () => {

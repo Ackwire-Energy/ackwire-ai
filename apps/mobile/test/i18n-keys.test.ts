@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { join, relative } from "node:path";
+import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
 import { mobileEn } from "../src/i18n/keys.en";
 import { mobilePtBR } from "../src/i18n/keys.pt-BR";
 import { pickLocale, withMobileKeys } from "../src/i18n/merge";
@@ -19,6 +21,11 @@ test("placeholders match between locales", () => {
     path.split(".").reduce<unknown>((a, k) => (a as Record<string, unknown>)[k], o);
   for (const key of leaves(mobilePtBR))
     expect(vars(get(mobileEn, key) as string)).toEqual(vars(get(mobilePtBR, key) as string));
+});
+
+test("Claude and ChatGPT, not their makers, in what the phone shows", () => {
+  const app = join(import.meta.dir, "..");
+  expect(filesNamingMakers([join(app, "src"), join(app, "app")]).map((f) => relative(app, f))).toEqual([]);
 });
 
 test("the app's strings are added under `mobile` in every namespace", () => {

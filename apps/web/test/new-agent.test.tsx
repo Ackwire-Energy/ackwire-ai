@@ -123,7 +123,7 @@ describe("Criar agente: steps", () => {
     );
     const gpt = screen().getByRole("button", { name: /^GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
-    expect(gpt.textContent).toContain("Adicione uma chave da OpenAI para usar");
+    expect(gpt.textContent).toContain("Precisa de uma chave da OpenAI");
     await click(gpt);
     expect(gpt.getAttribute("aria-pressed")).toBe("false");
 

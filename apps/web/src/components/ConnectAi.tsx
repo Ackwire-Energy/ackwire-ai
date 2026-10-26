@@ -17,12 +17,13 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { useOrg } from "@/components/org-context";
 import { SetupWaitLines, useSetupView, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { KeyDialog } from "@/pages/SettingsPage";
 import "./no-ai.css";
@@ -82,6 +83,14 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
   const open = useCallback((next: ConnectAiRequest) => {
     setRequest((current) => (current && next.auto ? current : { ...next, step: stepFor(next.intent) }));
   }, []);
+  // A link that asks for it (the computer ready email's "Connect your AI"): open once, then drop it from the address.
+  const [asked, clearAsked] = useOpenParam("connect");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per link
+  useEffect(() => {
+    if (asked !== "ai") return;
+    open({});
+    clearAsked(null);
+  }, [asked]);
   const answer = useCallback(
     async (from: string) => {
       setAnswered((a) => ({ ...a, [from]: "pending" }));
