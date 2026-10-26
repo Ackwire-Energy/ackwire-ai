@@ -127,6 +127,13 @@ p {
 .grid-options--plans > .ac-option:not(.ai-picker__key)::after {
   top: calc(50% - 9px);
 }
+/* The API key row's two lines: its check sits on the first, its name's (the padding, then half the line). */
+.grid-options--plans > .ac-option.ai-picker__key::after {
+  /* Browsers without the lh unit: the page's 22px line. */
+  top: calc(var(--space-3) + 11px - 9px);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
+  top: calc(var(--space-3) + 0.5lh - 9px);
+}
 /* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
    nothing comes between an option and its steps. */
 .grid-options--plans > .ai-panel {
@@ -8031,10 +8038,11 @@ a.machine-row__name:hover {
   gap: 8px;
   margin: 4px 0;
 }
-/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel; a longer name wraps. */
+/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel, in English and in
+   Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 120px;
+  min-width: 112px;
 }
 .agp-addacct__code output {
   font-size: 24px;

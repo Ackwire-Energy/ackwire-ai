@@ -163,14 +163,19 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.querySelector(".ac-dialog__footer")).toBeNull();
   });
 
-  test("a one-line tile's check sits in its middle; the chosen plan's panel takes a row of its own, 12px under the plans", async () => {
+  test("a tile's check sits on its name's line; the chosen plan's panel takes a row of its own, 12px under the plans", async () => {
     const ui = await stylesheet("../../../packages/ui/src/styles/components.css");
     const check = ruleOf(ui, '.ac-option[aria-pressed="true"]::after,\n.ac-option[data-state="checked"]::after');
     expect(check).toContain("height: 18px");
     const layout = await stylesheet("../src/layout.css");
-    // The API key row's two lines keep the check in the corner, beside its name.
+    // A one-line tile's in its middle.
     expect(ruleOf(layout, ".grid-options--plans > .ac-option:not(.ai-picker__key)::after")).toContain(
       "top: calc(50% - 9px)",
+    );
+    // The API key row has two lines: its check goes on the first, its name's, past the tile's padding.
+    expect(ruleOf(ui, ".ac-option")).toContain("padding: var(--space-3)");
+    expect(ruleOf(layout, ".grid-options--plans > .ac-option.ai-picker__key::after")).toContain(
+      "top: calc(var(--space-3) + 0.5lh - 9px)",
     );
     const panel = ruleOf(layout, ".grid-options--plans > .ai-panel");
     expect(panel).toContain("grid-column: 1 / -1");
@@ -325,6 +330,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
     );
     expect(ruleOf(layout, ".ai-panel__row")).toContain("align-items: center");
     expect(ruleOf(layout, ".ai-panel__row > .ac-setnote")).toContain("margin: 0");
+    // A key's field can narrow to 112px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
+    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 112px");
   });
 
   test("a computer the person connected: its own sign-in, saved for the agent at once; or another account", async () => {
