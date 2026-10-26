@@ -56,6 +56,7 @@ import {
   installedCommands,
   isComposeFile,
   isTailnetUrl,
+  lastLine,
   MIN_COMPOSE,
   type Network,
   networkOf,
@@ -66,6 +67,7 @@ import {
   PROBLEMS,
   type Problem,
   parseOptions,
+  plainStep,
   planSteps,
   privateStart,
   qrCode,
@@ -147,7 +149,13 @@ export async function main(argv: string[], context: { image?: boolean } = {}): P
     if (argv.includes("--json") || /^(1|true|yes)$/i.test(process.env[envName("json")]?.trim() ?? "")) {
       const result = { ok: false, check: "options", error: parsed.error, fix: "Run with --help for the options." };
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    } else console.error(parsed.error);
+    } else {
+      // In the installer's frame too, which the setup closes.
+      const term = createTerm();
+      term.intro("setup", false);
+      term.refuse(parsed.error);
+      term.stop();
+    }
     return 2;
   }
   const opts = parsed.options;
@@ -175,9 +183,15 @@ export async function main(argv: string[], context: { image?: boolean } = {}): P
     ui.close();
   }
   // The setup speaks last, inside the installer's frame too: it closes the frame.
-  if (result.ok) ui.gap();
-  ui.end(result.ok ? ui.ending : "Stopped");
-  if (opts.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  if (!result.ok) ui.stop();
+  else {
+    ui.gap();
+    ui.end(ui.ending);
+  }
+  if (opts.json) {
+    const steps = Array.isArray(result.nextSteps) ? { nextSteps: result.nextSteps.map(plainStep) } : {};
+    process.stdout.write(`${JSON.stringify({ ...result, ...steps }, null, 2)}\n`);
+  }
   return result.ok ? 0 : 1;
 }
 
@@ -244,6 +258,7 @@ function createUi(opts: Options) {
     intro: () => term.intro("setup"),
     gap: () => term.gap(),
     end: (text: string) => term.end(text),
+    stop: () => term.stop(),
     note: (text: string) => term.text(text, true),
     /** A wait's spinner, or a new label on the one turning (a new label clears its detail). */
     wait(label: string, detail: string | null = null) {
@@ -470,8 +485,6 @@ function streamed(
     events.on("close", (code: number | null) => resolve({ code, output }));
   });
 }
-
-const lastLine = (output: string) => output.trim().split("\n").pop() ?? "";
 
 /** A failed command's last lines, quiet, above what failed. */
 function showTail(ui: Ui, output: string) {

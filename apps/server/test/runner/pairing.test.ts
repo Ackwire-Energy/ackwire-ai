@@ -201,7 +201,7 @@ async function enroll(answer: () => Response) {
       new Response(proc.stderr).text(),
       proc.exited,
     ]);
-    return { file, seen, exit, output: stdout + stderr, config: path.join(home, "config.json") };
+    return { file, seen, exit, stdout, stderr, output: stdout + stderr, config: path.join(home, "config.json") };
   } finally {
     server.stop(true);
   }
@@ -226,6 +226,14 @@ test("pair --enroll-file with an expired code: a clear error, the file gone, not
   expect(r.output).not.toContain(ISSUED);
   expect(existsSync(r.file)).toBe(false);
   expect(existsSync(r.config)).toBe(false);
+}, 20_000);
+
+test("pair --enroll-file refused: why is the last line of stderr, where a provisioner reads it", async () => {
+  const r = await enroll(() => json(400, { error: "access_denied" }));
+  expect(r.exit).toBe(1);
+  const last = r.stderr.trimEnd().split("\n").pop() ?? "";
+  expect(last).toStartWith("■  The enrollment code was withdrawn");
+  expect(r.stdout).toBe("agentes.chat connect this computer\n◒  Connecting with the code issued for this computer\n");
 }, 20_000);
 
 test("the code is shown as K7Q·4ZP; workspaces are named after the organization", () => {
@@ -314,8 +322,71 @@ test("service install's refusals keep their words as ■: a frame of its own by 
     "Usage: agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]";
   const byHand = install();
   expect(byHand.exitCode).toBe(1);
-  expect(byHand.stdout.toString()).toBe(`agentes.chat service install\n■  ${usage}\nStopped\n`);
+  // Without a terminal nothing follows the failure: it's the line a log ends on.
+  expect(byHand.stdout.toString()).toBe(`agentes.chat service install\n■  ${usage}\n`);
   const framed = install({ AGENTES_FRAME: "1" });
   expect(framed.exitCode).toBe(1);
   expect(framed.stdout.toString()).toBe(`■  ${usage}\n`);
 });
+
+test("desktop-check without an agent says how to run it in its frame", () => {
+  const home = tempDir("check-");
+  dirs.push(home);
+  const run = Bun.spawnSync([process.execPath, RUNNER, "desktop-check", "--home", home], {
+    env: { ...process.env, HOME: home },
+  });
+  expect(run.exitCode).toBe(1);
+  expect(run.stdout.toString()).toBe("agentes.chat desktop-check\n");
+  expect(run.stderr.toString()).toBe("■  Usage: agentes-runner desktop-check --agent <handle>\n");
+});
+
+test("update: the new runner is a step done, and a service that won't start is the failure", async () => {
+  const dir = tempDir("update-");
+  dirs.push(dir);
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: () => new Response("#!/usr/bin/env node\n// agentes-runner, a newer one\n"),
+  });
+  try {
+    const home = path.join(dir, "home");
+    mkdirSync(home);
+    writeFileSync(
+      path.join(home, "config.json"),
+      JSON.stringify({ server: server.url.origin, machineId: "m1", token: "agm_x", workspace: dir, name: "Notebook" }),
+    );
+    // Its service is installed, and the service manager fails to load it again.
+    const bin = path.join(dir, "bin");
+    mkdirSync(bin);
+    writeFileSync(
+      path.join(bin, "systemctl"),
+      '#!/bin/sh\ncase "$*" in *show-environment*) exit 0 ;; *is-active*) echo active ;; *) echo "Failed to connect to bus" >&2; exit 1 ;; esac\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(path.join(bin, "launchctl"), '#!/bin/sh\necho "Load failed: 5: Input/output error" >&2\nexit 5\n', {
+      mode: 0o755,
+    });
+    const unit =
+      process.platform === "darwin"
+        ? path.join(dir, "Library/LaunchAgents/chat.agentes.runner.plist")
+        : path.join(dir, ".config/systemd/user/agentes-runner.service");
+    mkdirSync(path.dirname(unit), { recursive: true });
+    writeFileSync(unit, "");
+    // The runner as a script of its own, the file update replaces.
+    const script = path.join(dir, "agentes-runner.mjs");
+    writeFileSync(script, `import ${JSON.stringify(RUNNER)};\n`);
+    const proc = Bun.spawn([process.execPath, script, "update", "--home", home], {
+      env: { ...process.env, HOME: dir, PATH: `${bin}:${process.env.PATH}` },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, exit] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    expect(exit).toBe(1);
+    expect(readFileSync(script, "utf8")).toContain("a newer one");
+    const lines = stdout.trimEnd().split("\n");
+    expect(lines.slice(0, 2)).toEqual(["agentes.chat update", `◇  Updated ${script}.`]);
+    expect(lines[2]).toMatch(/^■ {2}(systemctl --user daemon-reload failed|launchctl couldn't load)/);
+  } finally {
+    server.stop(true);
+  }
+}, 30_000);

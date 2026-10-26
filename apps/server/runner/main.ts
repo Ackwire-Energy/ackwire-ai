@@ -222,11 +222,10 @@ async function pair(p: Parsed): Promise<number> {
   term.intro("connect this computer");
   // Typed wide: the code's callback sets it, and TypeScript would keep it narrowed to null.
   let wait = null as Spinner | null;
-  /** A refusal in its own words, in place of the wait if one was turning. */
+  /** A refusal in its own words; without a terminal, the last line of stderr, where a provisioner reads why. */
   const refuse = (message: string) => {
-    if (wait) wait.fail(message);
-    else term.fail(message);
-    if (!term.inherited) term.end("Stopped");
+    term.refuse(message);
+    if (!term.inherited) term.stop();
     return 1;
   };
   let enrollCode: string | undefined;
@@ -590,9 +589,11 @@ function installHost(p: Parsed, print: (line: string) => void): number {
 /**
  * What the service functions print, drawn: the first line ◇ (■ when it failed), the rest quiet, and the lines
  * they indent as commands. Inside the installer's frame it draws on its line; by hand, in a frame of its own.
+ * `done` is a step that went well before `run`.
  */
-function printed(term: Term, title: string, run: (print: (line: string) => void) => number): number {
+function printed(term: Term, title: string, run: (print: (line: string) => void) => number, done?: string): number {
   term.intro(title, false);
+  if (done) term.step(done);
   const lines: string[] = [];
   const code = run((line) => lines.push(line));
   const [first, ...rest] = lines;
@@ -605,8 +606,11 @@ function printed(term: Term, title: string, run: (print: (line: string) => void)
     else term.text(line, true);
   }
   if (!term.inherited) {
-    if (code === 0) term.gap();
-    term.end(code === 0 ? "Done" : "Stopped");
+    if (code !== 0) term.stop();
+    else {
+      term.gap();
+      term.end("Done");
+    }
   }
   return code;
 }
@@ -614,11 +618,12 @@ function printed(term: Term, title: string, run: (print: (line: string) => void)
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
 async function update(): Promise<number> {
   const term = createTerm();
-  const refuse = (message: string) =>
-    printed(term, "update", (print) => {
-      print(message);
-      return 1;
-    });
+  const refuse = (message: string) => {
+    term.intro("update", false);
+    term.refuse(message);
+    if (!term.inherited) term.stop();
+    return 1;
+  };
   const stored = storedOrNull();
   if (stored?.managedBy === "desktop")
     return refuse(`${DESKTOP_MANAGED} To update, install the new version of the app.`);
@@ -653,10 +658,7 @@ async function update(): Promise<number> {
       return 0;
     });
   }
-  return printed(term, "update", (print) => {
-    print(`Updated ${script}.`);
-    return installService({ print });
-  });
+  return printed(term, "update", (print) => installService({ print }), `Updated ${script}.`);
 }
 
 function status(): number {
@@ -865,17 +867,14 @@ function tools(p: Parsed): number {
 async function desktopCheck(p: Parsed): Promise<number> {
   const home = runnerHome();
   const handle = flagString(p, "agent");
-  if (!handle) {
-    console.error("Usage: agentes-runner desktop-check --agent <handle>");
-    return 1;
-  }
   const term = createTerm();
-  term.intro(`desktop-check @${handle.replace(/^@/, "")}`, false);
+  term.intro(handle ? `desktop-check @${handle.replace(/^@/, "")}` : "desktop-check", false);
   const stopped = (message: string) => {
-    term.fail(message);
-    term.end("Stopped");
+    term.refuse(message);
+    term.stop();
     return 1;
   };
+  if (!handle) return stopped("Usage: agentes-runner desktop-check --agent <handle>");
   const agents = readAgents(home);
   const agent = resolveAgentHandle(agents, handle);
   const stored = storedOrNull(home);

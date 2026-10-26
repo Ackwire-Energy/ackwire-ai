@@ -28,6 +28,7 @@ import {
   installedCommands,
   isComposeFile,
   isTailnetUrl,
+  lastLine,
   networkOf,
   nextSteps,
   normalizeDomain,
@@ -35,6 +36,7 @@ import {
   type PlanInput,
   PROBLEMS,
   parseOptions,
+  plainStep,
   planSteps,
   privateStart,
   qrCode,
@@ -196,6 +198,41 @@ describe("output", () => {
     expect(outputLine("◇  Bun 1.4.4 (SHA-256 checked)")).toBe("Bun 1.4.4 (SHA-256 checked)");
     expect(outputLine("│  ")).toBe("");
     expect(outputLine("E: Unable to locate package docker-ce")).toBe("E: Unable to locate package docker-ce");
+    // The Linux console's marks (TERM=linux), two spaces after them as after the others.
+    expect(outputLine("o  The runner, from https://agents.example.com")).toBe(
+      "The runner, from https://agents.example.com",
+    );
+    expect(outputLine("-  Installing the packages for the agents' browser")).toBe(
+      "Installing the packages for the agents' browser",
+    );
+    expect(outputLine("x  download failed")).toBe("download failed");
+    expect(outputLine("o pacote foi instalado")).toBe("o pacote foi instalado");
+  });
+
+  test("a failed command's reason is its last line with words, without the mark before it", () => {
+    const installer = [
+      "agentes.chat connect this computer",
+      "◇  Bun 1.4.4 (SHA-256 checked)",
+      "◒  Downloading the runner from https://agents.example.com",
+      "curl: (22) The requested URL returned error: 404",
+      "■  download failed",
+      "",
+    ].join("\n");
+    expect(lastLine(installer)).toBe("download failed");
+    expect(lastLine("x  download failed\r\n")).toBe("download failed");
+    expect(lastLine("Error response from daemon: no space left on device\n")).toBe(
+      "Error response from daemon: no space left on device",
+    );
+    expect(lastLine("")).toBe("");
+  });
+
+  test("--json's steps are plain sentences: a command the frame puts on a line of its own follows its words", () => {
+    expect(plainStep("On a server, open it through an SSH tunnel:\n$ ssh -L 3000:localhost:3000 ana@203.0.113.7")).toBe(
+      "On a server, open it through an SSH tunnel: ssh -L 3000:localhost:3000 ana@203.0.113.7",
+    );
+    expect(plainStep("Open http://localhost:3000 and create your account.")).toBe(
+      "Open http://localhost:3000 and create your account.",
+    );
   });
 });
 

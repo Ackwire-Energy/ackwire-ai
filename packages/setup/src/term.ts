@@ -40,6 +40,8 @@ interface In {
 
 export interface TermOptions {
   out?: Out;
+  /** Where a refusal goes when `out` isn't a terminal (default stderr). */
+  err?: Out;
   input?: In;
   env?: Record<string, string | undefined>;
   platform?: string;
@@ -208,7 +210,50 @@ export const LOGO_WIDTH = 63;
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the colors' escapes are what it leaves out
 const SGR = /\x1b\[[0-9;]*m/g;
-export const visible = (text: string) => [...text.replace(SGR, "")].length;
+/** Two columns on a terminal: East Asian wide and fullwidth characters (wcwidth's ranges), and emoji. */
+const WIDE =
+  /[\u1100-\u115f\u2329\u232a\u2e80-\u303e\u3040-\ua4cf\ua960-\ua97f\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u{1f300}-\u{1f64f}\u{1f900}-\u{1f9ff}\u{20000}-\u{3fffd}]/u;
+/** No column of their own: combining marks (variation selectors among them), zero-width spaces and joiners. */
+const ZERO = /[\p{Mn}\p{Me}\p{Cf}]/u;
+
+const columnsOf = (ch: string) => (WIDE.test(ch) ? 2 : ZERO.test(ch) ? 0 : 1);
+
+/** The columns `text` takes on a terminal, its colors left out. */
+export function visible(text: string): number {
+  let columns = 0;
+  for (const ch of text.replace(SGR, "")) columns += columnsOf(ch);
+  return columns;
+}
+
+/** The rows `line` takes on a terminal `columns` wide: it folds, and a wide character that doesn't fit moves down. */
+export function rowsOf(line: string, columns: number): number {
+  let rows = 1;
+  let at = 0;
+  for (const ch of line.replace(SGR, "")) {
+    const w = columnsOf(ch);
+    if (at + w > columns) {
+      rows++;
+      at = 0;
+    }
+    at += w;
+  }
+  return rows;
+}
+
+/** `text` (colors left out) within `room` columns: cut at its end, or at its start to keep the end, with `more`. */
+function cut(text: string, room: number, more: string, keepEnd = false): string {
+  if (visible(text) <= room) return text;
+  const chars = [...text.replace(SGR, "")];
+  if (keepEnd) chars.reverse();
+  const kept: string[] = [];
+  let used = visible(more);
+  for (const ch of chars) {
+    used += columnsOf(ch);
+    if (used > room) break;
+    kept.push(ch);
+  }
+  return keepEnd ? `${more}${kept.reverse().join("")}` : `${kept.join("")}${more}`;
+}
 
 /** Words onto lines of `width` columns; a word longer than that (a URL) gets a line of its own, whole. */
 export function wrap(text: string, width: number): string[] {
@@ -263,6 +308,7 @@ export type ListStyle = "numbered" | "bullets" | "plain";
 
 export function createTerm(o: TermOptions = {}) {
   const out = o.out ?? process.stdout;
+  const err = o.err ?? process.stderr;
   const input = o.input ?? (process.stdin as unknown as In);
   const env = o.env ?? process.env;
   const tty = out.isTTY === true && env.TERM !== "dumb";
@@ -297,11 +343,13 @@ export function createTerm(o: TermOptions = {}) {
   /** The line, or nothing when the output isn't a terminal (logs keep the marks, not the frame). */
   const bar = (color = dim) => (tty ? color(S.bar) : " ");
   const lineOf = (lead: string, text: string) => `${lead}  ${text}`.trimEnd();
-  /** Erases the `n` lines just written (the cursor is on the line after them). */
+  /** Erases the `n` rows just written (the cursor is on the row after them). */
   const erase = (n: number) => (n > 0 ? `\x1b[${n}A\r\x1b[J` : "");
+  /** The rows `lines` take on the terminal, which can be narrower than `width`, or a word wider than it. */
+  const rows = (lines: string[]) => lines.reduce((n, l) => n + rowsOf(l, o.columns ?? (out.columns || 80)), 0);
 
   /** The spinner on the screen, if any: whatever is said meanwhile goes above it. */
-  let active: { lines: number; draw(): string } | null = null;
+  let active: { rows: number; draw(): string } | null = null;
   /** Whether the last line out is a gap (the intro's, or the parent's when the frame is inherited). */
   let gapped = true;
   const say = (lines: string[]) => {
@@ -309,7 +357,7 @@ export function createTerm(o: TermOptions = {}) {
     gapped = false;
     const text = lines.map((l) => `${l}\n`).join("");
     if (!active) return void write(text);
-    write(`${erase(active.lines)}${text}${active.draw()}`);
+    write(`${erase(active.rows)}${text}${active.draw()}`);
   };
 
   /** A mark and its text, wrapped under the line; `rest` are dim lines after it. */
@@ -406,7 +454,7 @@ export function createTerm(o: TermOptions = {}) {
       const draw = () => {
         const lines = render();
         write(`${erase(drawn)}${lines.map((l) => `${l}\n`).join("")}`);
-        drawn = lines.length;
+        drawn = rows(lines);
       };
       const onKey = (text: string | undefined, key: Key = {}) => {
         if (key.ctrl && key.name === "c") {
@@ -450,7 +498,7 @@ export function createTerm(o: TermOptions = {}) {
       if (!tty) return say([`agentes.chat ${title}`]);
       if (logo && unicode && width >= LOGO_WIDTH + 1) say(["", ...logoLines(depth), ""]);
       const badge = depth > 1 ? `\x1b[${BADGE[depth]}m agentes.chat \x1b[0m` : "agentes.chat";
-      say([`${dim(S.start)}  ${badge} ${title}`, bar()]);
+      say([...wrap(`${badge} ${title}`, width - 3).map((l, i) => lineOf(i === 0 ? dim(S.start) : bar(), l)), bar()]);
       gapped = true;
     },
     /** An empty line on the line, never two in a row. */
@@ -485,9 +533,26 @@ export function createTerm(o: TermOptions = {}) {
         ...wrap(error, width - 3).map((l, i) => lineOf(i === 0 ? red(S.fail) : bar(), bold(l))),
         ...(fix ? wrap(fix, width - 3).map((l) => lineOf(bar(), links(l))) : []),
       ]),
-    /** └ The end of the frame (a log gets the text alone). */
+    /**
+     * ■ Why the command stops, in place of a wait that was turning. Without a terminal it goes to stderr, as the
+     * installers' refusals do: a provisioner reads why there, on its last line.
+     */
+    refuse(error: string) {
+      stopActive();
+      if (tty) term.fail(error);
+      else err.write(`${lineOf(S.fail, error)}\n`);
+    },
+    /** └ The end of the frame, its text wrapped beside it (a log gets the text alone). */
     end(text = "") {
-      say([tty ? lineOf(dim(S.end), text) : text].filter(Boolean));
+      if (!tty) return say(text ? [text] : []);
+      say(wrap(text, width - 3).map((l, i) => lineOf(i === 0 ? dim(S.end) : " ", l)));
+    },
+    /**
+     * └ Stopped, after a failure. A log ends on the failure itself, so whatever reads its last line for the
+     * reason (the setup reading the runner's installer, a provisioner) finds it there.
+     */
+    stop() {
+      if (tty) term.end("Stopped");
     },
     /** A QR code's lines (light modules drawn): forced light on dark, so phones read it on any theme. */
     qr: (lines: string[]) => say(lines.map((l) => `${bar()}  ${depth > 1 ? `\x1b[97;40m${l}\x1b[0m` : l}`)),
@@ -497,30 +562,24 @@ export function createTerm(o: TermOptions = {}) {
       stopActive();
       const t0 = now();
       let frame = 0;
+      // One line each, cut to the terminal's columns, so a redraw erases exactly what it drew.
       const lines = () => {
         const s = Math.floor((now() - t0) / 1000);
         const time = s >= 3 ? `  ${elapsed(s)}` : "";
-        const room = width - 3 - time.length - 1;
-        const text = visible(label) > room ? `${[...label].slice(0, room - 1).join("")}${S.more}` : label;
-        const head = `${accent(S.spin[frame % S.spin.length] as string)}  ${text}${dim(time)}`;
-        const tail = detail
-          ? [
-              `${bar()}  ${dim(visible(detail) > width - 4 ? `${[...detail].slice(0, width - 5).join("")}${S.more}` : detail)}`,
-            ]
-          : [];
-        return [head, ...tail];
+        const head = `${accent(S.spin[frame % S.spin.length] as string)}  ${cut(label, width - 4 - time.length, S.more)}${dim(time)}`;
+        return detail ? [head, `${bar()}  ${dim(cut(detail, width - 4, S.more))}`] : [head];
       };
       let stop = () => {};
       if (tty) {
         const me = {
-          lines: 0,
+          rows: 0,
           draw() {
             const next = lines();
-            me.lines = next.length;
+            me.rows = rows(next);
             return next.map((l) => `${l}\n`).join("");
           },
         };
-        const redraw = () => write(`${erase(me.lines)}${me.draw()}`);
+        const redraw = () => write(`${erase(me.rows)}${me.draw()}`);
         // Hidden only while keys are raw: Ctrl-C then comes to cancel(), which shows it again.
         hideCursor();
         setRaw(true);
@@ -539,7 +598,7 @@ export function createTerm(o: TermOptions = {}) {
           if (raw) input.off("data", onData);
           setRaw(false);
           if (active === me) {
-            write(erase(me.lines));
+            write(erase(me.rows));
             active = null;
           }
           showCursor();
@@ -551,7 +610,7 @@ export function createTerm(o: TermOptions = {}) {
         update(next, nextDetail) {
           if (next !== null) label = next;
           if (nextDetail !== undefined) detail = nextDetail;
-          if (active) write(`${erase(active.lines)}${active.draw()}`);
+          if (active) write(`${erase(active.rows)}${active.draw()}`);
         },
         done(text, ...rest) {
           stop();
@@ -659,17 +718,17 @@ export function createTerm(o: TermOptions = {}) {
       let problem: string | null = null;
       const label = a.label ? `${a.label}: ` : "";
       // What's typed stays on one line, so the question redraws in place: a long answer shows its end.
-      const room = width - 3 - [...label].length - 2;
+      const room = width - 3 - visible(label) - 2;
       const render = () => {
-        const typed = [...(a.secret ? S.mask.repeat([...value].length) : value)];
-        const shown =
-          typed.length > room ? `${S.more}${typed.slice(-(room - S.more.length)).join("")}` : typed.join("");
+        const shown = cut(a.secret ? S.mask.repeat([...value].length) : value, room, S.more, true);
         const hint = value ? "" : dim(a.placeholder ?? a.initial ?? "");
         return [
           ...asking(title),
           ...described(a.description ?? []),
           lineOf(bar(accent), `${label}${shown}${depth > 1 ? "\x1b[7m \x1b[27m" : "_"}${hint}`),
-          problem ? lineOf(yellow(S.end), yellow(problem)) : accent(S.end),
+          ...(problem
+            ? wrap(problem, width - 3).map((l, i) => lineOf(i === 0 ? yellow(S.end) : " ", yellow(l)))
+            : [accent(S.end)]),
         ];
       };
       const answer = await keys<string>(render, (key, done, text) => {

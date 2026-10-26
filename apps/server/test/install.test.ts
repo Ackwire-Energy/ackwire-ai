@@ -76,6 +76,8 @@ interface RunOptions {
   tty?: boolean;
   /** A real run, not --plan: its setup is the bun stub, which notes AGENTES_FRAME. */
   real?: boolean;
+  /** Shell commands run just before the installer, in its terminal. */
+  before?: string;
 }
 
 async function plan(machine: Machine, args: string[] = [], o: RunOptions = {}) {
@@ -116,7 +118,8 @@ async function plan(machine: Machine, args: string[] = [], o: RunOptions = {}) {
     symlinkSync(Bun.which(tool) as string, join(bin, tool));
   }
   const argv = [...(o.real ? [] : ["--plan"]), ...args];
-  const cmd = o.piped === undefined ? ["/bin/sh", SCRIPT, ...argv] : ["/bin/sh", "-s", "--", ...argv];
+  const direct = o.piped === undefined ? ["/bin/sh", SCRIPT, ...argv] : ["/bin/sh", "-s", "--", ...argv];
+  const cmd = o.before ? ["/bin/sh", "-c", `${o.before} && exec "$@"`, "sh", ...direct] : direct;
   const env = { PATH: bin, HOME: home, STUB_LOG: log, ...o.env };
   let out = "";
   let err = "";
@@ -340,13 +343,22 @@ describe("install.sh", () => {
     );
     expect(screen).toContain("│\n└  Nothing ran. For the setup's own plan, run its command above with --dry-run.\n");
 
-    const user = await plan({ os: "Linux", arch: "x86_64", uid: 1000 }, ["--yes"], { tty: true });
-    expect(user.code).toBe(0);
-    expect(plain(user.out)).toStartWith(
-      "●  Docker needs root here: running this installer again as root\n   $ sudo sh ",
+    // Root first: a run that needs it draws nothing before sudo, so the logo shows once, in the root run.
+    const user: Machine = { os: "Linux", arch: "x86_64", uid: 1000 };
+    const real = await plan(user, ["--yes"], { tty: true, real: true });
+    expect(real.code).toBe(0);
+    expect(plain(real.out)).toBe(
+      `●  Docker needs root here: running this installer again as root\n   $ sudo sh ${SCRIPT} --yes\n`,
     );
-    expect(user.out).not.toContain("▀");
-    expect(user.out).not.toContain("┌");
+    expect(real.calls).toContain(`sudo sh ${SCRIPT} --yes`);
+
+    // Its plan draws the logo and the frame, then stops where the root run would start.
+    const planned = plain((await plan(user, ["--yes"], { tty: true })).out);
+    expect(planned).toContain("▀");
+    expect(planned).toContain("┌   agentes.chat  install plan (--plan: nothing runs)\n│\n◇  Linux on x64\n");
+    expect(planned).toEndWith(
+      `●  Docker needs root here: running this installer again as root\n│  $ sudo sh ${SCRIPT} --yes\n│\n└  With --plan it stops here; as root, --plan shows the rest.\n`,
+    );
   });
 
   test("a real run says what it found, echoes no command, and hands over to the setup in its own frame", async () => {
@@ -374,6 +386,26 @@ describe("install.sh", () => {
     );
     expect(run.calls.find((call) => call.startsWith("frame "))).toMatch(/^frame 1 stdin \/dev\/(pts\/\d+|ttys\d+)$/);
   });
+
+  // Root reads any device, so only another user sees the one that can't be opened by its name.
+  test.skipIf(process.getuid?.() === 0)(
+    "a terminal it can't open by its name (after su, it's still the first user's): the setup reads /dev/tty",
+    async () => {
+      const dir = tempDir("dir");
+      const device = join(tempDir("device"), "name");
+      const machine = { ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" };
+      // Its terminal as after su: /dev/tty opens, the device by its name doesn't.
+      const before = `d=$(${Bun.which("tty")}) && echo "$d" > ${device} && ${Bun.which("chmod")} u-r "$d"`;
+      try {
+        const run = await plan(machine, ["--dir", dir], { real: true, tty: true, before });
+        expect(run.code).toBe(0);
+        expect(run.out).not.toContain("Permission denied");
+        expect(run.calls).toContain("frame 1 stdin /dev/tty");
+      } finally {
+        Bun.spawnSync([Bun.which("chmod") as string, "u+r", readFileSync(device, "utf8").trim()]);
+      }
+    },
+  );
 
   test("hands over to the setup it ships with, on a Bun at least the repository's", () => {
     const setup = JSON.parse(readFileSync(join(import.meta.dir, "../../../packages/setup/package.json"), "utf8"));
@@ -427,12 +459,19 @@ describe("install.sh", () => {
     const user: Machine = { os: "Linux", arch: "x86_64", uid: 1000 };
     const file = await plan(user, ["--yes", "--dir", "/srv/agentes", "--network", "local"]);
     expect(file.code).toBe(0);
-    expect(file.out).toContain("●  Docker needs root here: running this installer again as root");
-    expect(file.out).toContain(`$ sudo sh ${SCRIPT} --yes --dir /srv/agentes --network local`);
-    expect(file.out).toContain("With --plan it stops here");
-    // Root first: nothing of the install itself shows before sudo, so the logo shows once, in the root run.
-    expect(file.out).not.toContain("agentes.chat install");
-    expect(file.out).not.toContain("Bun");
+    // --plan runs nothing again, so it starts as any plan does, then says where it stops.
+    expect(file.out).toBe(
+      [
+        "agentes.chat install plan (--plan: nothing runs)",
+        "◇  Linux on x64",
+        "◇  No terminal: the setup takes its defaults and the options given",
+        "●  Docker needs root here: running this installer again as root",
+        `   $ sudo sh ${SCRIPT} --yes --dir /srv/agentes --network local`,
+        "",
+        "With --plan it stops here; as root, --plan shows the rest.",
+        "",
+      ].join("\n"),
+    );
     expect(file.changes).toEqual([]);
 
     // Under curl | sh there's no file to run again: it downloads the published one.

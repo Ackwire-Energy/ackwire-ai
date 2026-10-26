@@ -183,13 +183,27 @@ function isOneOf<T extends string>(value: string, list: readonly T[]): value is 
 /** A problem said as a sentence of its own: the options' messages start lowercase, after `--flag: `. */
 export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** A command's output line as the line under a wait shows it: no colors, and no mark of the agentes.chat look. */
+/**
+ * A command's output line as the line under a wait shows it: no colors, and no mark of the agentes.chat look,
+ * in its ASCII form too (where the font lacks the marks, they are followed by two spaces).
+ */
 export const outputLine = (line: string) =>
   line
     // biome-ignore lint/suspicious/noControlCharactersInRegex: a terminal's escapes are what it leaves out
     .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
-    .replace(/^\s*(?:[◇◆●○▲■◒◐◓◑│]\s+)?/u, "")
+    .replace(/^\s*(?:[◇◆●○▲■◒◐◓◑│]\s+|[ox?*!-] {2})?/u, "")
     .trim();
+
+/** What a command said last: its last line with words, as `outputLine` shows it (a failure's reason). */
+export const lastLine = (output: string) =>
+  output
+    .split(/\r\n|\r|\n/)
+    .map(outputLine)
+    .filter(Boolean)
+    .pop() ?? "";
+
+/** A step whose command is on a line of its own (`\n$ `), as one plain sentence: `--json` returns it that way. */
+export const plainStep = (step: string) => step.replaceAll("\n$ ", " ");
 
 /** A typed answer to a numbered list: its number, or the value itself (`2` or `domain`). */
 export function resolveChoice<T extends string>(answer: string, values: readonly T[]): T | null {

@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { sentence, tailscaleKeyProblem } from "../src/lib";
 import {
   createTerm,
   type Depth,
   LOGO_WIDTH,
   logoLines,
+  rowsOf,
   type TermOptions,
   unicodeTerminal,
   visible,
@@ -35,9 +37,10 @@ class Keys extends EventEmitter {
   }
 }
 
-/** A term writing into a string, on a terminal of 80 columns unless `tty` is false. */
+/** A term writing into a string, on a terminal of 80 columns (or `columns`) unless `tty` is false. */
 function capture(o: TermOptions & { tty?: boolean } = {}) {
   let text = "";
+  let errors = "";
   const keys = new Keys();
   let now = 0;
   const ticks = new Set<() => void>();
@@ -55,13 +58,21 @@ function capture(o: TermOptions & { tty?: boolean } = {}) {
     },
     ...o,
     out: { isTTY: o.tty ?? true, columns: 80, write: (s: string) => (text += s) },
+    err: { write: (s: string) => (errors += s) },
   });
   /** `seconds` pass, and a spinner turns once. */
   const wait = (seconds: number) => {
     now += seconds * 1000;
     for (const tick of ticks) tick();
   };
-  return { term, keys, wait, text: () => text, screen: () => screen(text) };
+  return {
+    term,
+    keys,
+    wait,
+    text: () => text,
+    errors: () => errors,
+    screen: () => screen(text, o.columns ?? 80),
+  };
 }
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: a terminal's colors, which the screen leaves out
@@ -69,8 +80,11 @@ const COLORS = /\x1b\[[0-9;]*m/g;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the cursor's moves, which the screen applies
 const MOVES = /(\x1b\[\d*[AJ]|\x1b\[\?25[lh]|\n|\r)/;
 
-/** What the terminal shows in the end: the cursor moves (up, erase below) applied, colors and the cursor dropped. */
-function screen(text: string): string {
+/**
+ * What a terminal `columns` wide shows in the end: a line wider than it folds onto the next row (by Bun's measure of
+ * columns, not the one under test), the cursor moves (up, erase below) applied, colors and the cursor dropped.
+ */
+function screen(text: string, columns = 80): string {
   const rows = [""];
   let row = 0;
   for (const part of text.replace(COLORS, "").split(MOVES)) {
@@ -80,10 +94,17 @@ function screen(text: string): string {
     else if (part.endsWith("J")) {
       rows.length = row + 1;
       rows[row] = "";
-    } else rows[row] += part;
+    } else
+      for (const ch of part) {
+        if (Bun.stringWidth(`${rows[row]}${ch}`) > columns) rows[++row] = "";
+        rows[row] += ch;
+      }
   }
   return rows.join("\n");
 }
+
+/** How many times `text` shows on the screen. */
+const count = (shown: string, text: string) => shown.split(text).length - 1;
 
 describe("the look's pieces", () => {
   test("words wrap within the width; a word longer than it (a URL) keeps a line of its own, whole", () => {
@@ -124,6 +145,30 @@ describe("the look's pieces", () => {
     expect(text()).not.toContain("\x1b[38;2;43;116;230mhttps://agentes.");
   });
 
+  test("widths in a terminal's columns: wide characters take two, combining marks none", () => {
+    for (const text of ["agentes", "中文", "한국어", "ｆｕｌｌ", "e\u0301", "正在设置 fonts-noto-cjk"])
+      expect(visible(text)).toBe(Bun.stringWidth(text));
+    expect(visible("\x1b[2m│\x1b[22m")).toBe(1);
+    expect(rowsOf("x".repeat(80), 80)).toBe(1);
+    expect(rowsOf("x".repeat(81), 80)).toBe(2);
+    // The wide character doesn't fit in the last column, so it starts the next row.
+    expect(rowsOf(`${"x".repeat(79)}中${"x".repeat(78)}`, 80)).toBe(2);
+    expect(rowsOf(`${"x".repeat(79)}中${"x".repeat(79)}`, 80)).toBe(3);
+  });
+
+  test("the installers' end and title wrap beside their mark on a narrow terminal", () => {
+    const run = (call: string) =>
+      spawnSync("sh", ["-c", `${TERM_SH}\nt_init 1; T_FRAME=1 T_COLS=40 T_FOLD=1; ${call}`], { encoding: "utf8" });
+    const intro = run('t_intro "install plan (--plan: nothing runs)"');
+    expect(intro.stdout).toBe("┌  agentes.chat install plan (--plan:\n│  nothing runs)\n│\n");
+    const said = "Nothing ran. For the setup's own plan, run its command above with --dry-run.";
+    const end = run(`T_OPEN=1; t_style; t_end "${said}"`).stdout.trimEnd().split("\n");
+    expect(end[0]).toStartWith("└  Nothing ran.");
+    for (const line of end.slice(1)) expect(line).toStartWith("   ");
+    expect(end.map((line) => line.slice(3)).join(" ")).toBe(said);
+    for (const line of [...intro.stdout.split("\n"), ...end]) expect(visible(line)).toBeLessThanOrEqual(40);
+  });
+
   test("the installers' snippet is POSIX sh, and only defines functions", () => {
     expect(spawnSync("sh", ["-n"], { input: TERM_SH }).status).toBe(0);
     const run = spawnSync("sh", ["-c", TERM_SH], { encoding: "utf8" });
@@ -147,7 +192,7 @@ describe("what each terminal gets", () => {
     term.spin("Waiting for the account").done("Account created");
     term.warn("Agents' computer: set up, but it hasn't answered yet");
     term.fail("It failed.", "Fix it.");
-    term.end("Stopped");
+    term.stop();
   };
 
   test("24-bit color: the logo, the badge on the agent blue, the line and the marks", () => {
@@ -198,7 +243,7 @@ describe("what each terminal gets", () => {
     expect(screen()).toContain("x  It failed.\n|  Fix it.\n+  Stopped");
   });
 
-  test("not a terminal (a log, a pipe): the marks, no line, no logo, no escape, each wait once", () => {
+  test("not a terminal (a log, a pipe): the marks, no line, no logo, no escape, each wait once, a failure last", () => {
     const { term, text } = capture({ tty: false });
     steps(term);
     expect(text()).toBe(
@@ -216,10 +261,41 @@ describe("what each terminal gets", () => {
         "▲  Agents' computer: set up, but it hasn't answered yet",
         "■  It failed.",
         "   Fix it.",
-        "Stopped",
         "",
       ].join("\n"),
     );
+  });
+
+  test("a refusal: ■ and └ Stopped on a terminal; without one, the last line of stderr, nothing after it", () => {
+    const framed = capture({ depth: 24 });
+    framed.term.intro("update", false);
+    framed.term.spin("Downloading the runner");
+    framed.term.refuse("Download failed: 404 https://x.test/runner/agentes-runner.mjs");
+    framed.term.stop();
+    expect(framed.screen()).toBe(
+      "┌   agentes.chat  update\n│\n■  Download failed: 404 https://x.test/runner/agentes-runner.mjs\n└  Stopped\n",
+    );
+    expect(framed.keys.raw).toBe(false);
+    expect(framed.errors()).toBe("");
+
+    const log = capture({ tty: false });
+    log.term.intro("update", false);
+    log.term.spin("Downloading the runner");
+    log.term.refuse("Download failed: 404 https://x.test/runner/agentes-runner.mjs");
+    log.term.stop();
+    expect(log.text()).toBe("agentes.chat update\n◒  Downloading the runner\n");
+    expect(log.errors()).toBe("■  Download failed: 404 https://x.test/runner/agentes-runner.mjs\n");
+  });
+
+  test("a narrow terminal: the title and the end wrap beside their marks, every line within its columns", () => {
+    const { term, screen } = capture({ depth: 1, columns: 40 });
+    term.intro("install plan (--plan: nothing runs)", false);
+    term.end("Nothing ran. For the setup's own plan, run its command above with --dry-run.");
+    const lines = screen().trimEnd().split("\n");
+    expect(lines.slice(0, 3)).toEqual(["┌  agentes.chat install plan (--plan:", "│  nothing runs)", "│"]);
+    expect(lines[3]).toStartWith("└  Nothing ran.");
+    for (const line of lines.slice(4)) expect(line).toStartWith("   ");
+    for (const line of lines) expect(visible(line)).toBeLessThanOrEqual(40);
   });
 
   test("a log keeps each line whole, for grep", () => {
@@ -287,6 +363,27 @@ describe("waits", () => {
     const [line] = screen().split("\n");
     expect([...(line ?? "")].length).toBeLessThanOrEqual(80);
     expect(line).toEndWith("…");
+  });
+
+  test("a detail in Chinese or Japanese is cut by its columns, so each turn redraws over the last", () => {
+    const { term, wait, screen } = capture({ depth: 24 });
+    const s = term.spin("Setting up this machine for your agents");
+    s.update(null, "正在设置 fonts-noto-cjk (1:20201206-cjk+repack1-1) …… ".repeat(3));
+    for (let i = 0; i < 5; i++) wait(1);
+    const rows = screen().split("\n");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toStartWith("◐  Setting up this machine for your agents  5s");
+    expect(rows[1]).toStartWith("│  正在设置 fonts-noto-cjk");
+    expect(Bun.stringWidth(rows[1] as string)).toBeLessThanOrEqual(79);
+  });
+
+  test("a terminal narrower than the frame: a spinner's lines fold, and it still redraws over them", () => {
+    const { term, wait, screen } = capture({ depth: 1, columns: 15 });
+    term.spin("Waiting for the confirmation", "The code expires in 10 minutes.");
+    for (let i = 0; i < 5; i++) wait(1);
+    expect(screen().match(/[◒◐◓◑]/g)).toEqual(["◐"]);
+    expect(count(screen(), "The code")).toBe(1);
+    expect(screen()).toStartWith("◐  Waiting for");
   });
 
   test("a failed wait says what and how to fix it in its place", () => {
@@ -386,6 +483,51 @@ describe("questions", () => {
     expect(line).toEndWith("@smtp.example.com:465_");
     keys.press("return");
     expect(await answer).toStartWith("smtps://uuu");
+  });
+
+  test("a problem longer than a line wraps under └, so the question keeps its height at every key", async () => {
+    const { term, keys, screen } = capture({ depth: 24 });
+    const answer = term.ask("Paste the auth key", {
+      secret: true,
+      validate: (v) => {
+        const problem = tailscaleKeyProblem(v);
+        return problem ? sentence(problem) : null;
+      },
+    });
+    keys.type("tskey-api-abc");
+    keys.press("return");
+    expect(screen()).toContain("└  That's an API access token.");
+    expect(visible(`└  ${sentence(tailscaleKeyProblem("tskey-api-abc") ?? "")}`)).toBeGreaterThan(80);
+    const height = screen().split("\n").length;
+    keys.type("defgh");
+    keys.press("backspace");
+    expect(screen().split("\n")).toHaveLength(height);
+    expect(count(screen(), "Paste the auth key")).toBe(1);
+    keys.press("u", { ctrl: true });
+    keys.type("tskey-auth-kQ7xYp2CNTRL");
+    keys.press("return");
+    expect(await answer).toBe("tskey-auth-kQ7xYp2CNTRL");
+    expect(screen()).toBe("◇  Paste the auth key\n│  tskey-auth-k…\n");
+  });
+
+  test("a word wider than the terminal folds, and the question still redraws over itself", async () => {
+    const { term, keys, screen } = capture({ depth: 1 });
+    const answer = term.ask("Where is it?", { description: [`https://example.com/${"x".repeat(90)}`] });
+    for (const ch of "agents.example.com") keys.type(ch);
+    expect(count(screen(), "Where is it?")).toBe(1);
+    keys.press("return");
+    expect(await answer).toBe("agents.example.com");
+    expect(screen()).toBe("◇  Where is it?\n│  agents.example.com\n");
+  });
+
+  test("an answer typed in wide characters shows its end within the line", async () => {
+    const { term, keys, screen } = capture({ depth: 1 });
+    void term.ask("Organization", { label: "Name" });
+    keys.type("株式会社".repeat(20));
+    const [, line = ""] = screen().split("\n");
+    expect(line).toStartWith("│  Name: …");
+    expect(Bun.stringWidth(line)).toBeLessThanOrEqual(80);
+    expect(count(screen(), "Organization")).toBe(1);
   });
 
   test("piped answers show as the same two lines", () => {

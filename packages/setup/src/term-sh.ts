@@ -67,10 +67,11 @@ t_say() {
   done >&"$T_FD"
 }
 
-# Lines onto the width left beside the line (as they are, on a computer without fold).
+# t_fold [LEFT]: lines onto the width left beside the line, or beside LEFT columns (as they are, on a computer
+# without fold).
 t_fold() {
   if [ "$T_FOLD" = 1 ]; then
-    fold -s -w $((T_COLS - 3))
+    fold -s -w $((T_COLS - \${1:-3}))
   else
     while IFS= read -r t_l; do printf '%s\\n' "$t_l"; done
   fi
@@ -92,14 +93,19 @@ t_fail() {
   t_fd=$T_FD T_FD=2
   t_say "$C_FAIL$M_FAIL$C_OFF" "$C_BOLD" "$1"
   if [ $# -gt 1 ]; then t_say "$T_B" '' "$2"; fi
-  t_end Stopped
+  t_stop
   T_FD=$t_fd
 }
 
-# t_end [TEXT]: └ and TEXT once the frame is open; a log gets TEXT alone.
+# └ Stopped where the frame is drawn. A log ends on the failure itself, so whatever reads its last line for
+# the reason (the setup, a provisioner) finds it there.
+t_stop() { if [ "$T_OPEN" = 1 ]; then t_end Stopped; fi; }
+
+# t_end [TEXT]: └ and TEXT once the frame is open, which closes it; a log gets TEXT alone.
 t_end() {
   if [ "$T_OPEN" = 1 ]; then
-    printf '%s%s\\n' "$C_DIM$M_END$C_OFF" "\${1:+  $1}" >&"$T_FD"
+    T_OPEN=0 T_B=' '
+    t_say "$C_DIM$M_END$C_OFF" '' "\${1:-}"
   elif [ "$T_FRAME" = 0 ] && [ -n "\${1:-}" ]; then
     printf '%s\\n' "$1" >&"$T_FD"
   fi
@@ -116,7 +122,13 @@ t_intro() {
   if [ "$T_DEPTH" != 0 ]; then t_b="$C_BADGE agentes.chat $C_OFF"; fi
   T_OPEN=1
   t_style
-  printf '%s  %s %s\\n%s\\n' "$C_DIM$M_START$C_OFF" "$t_b" "$1" "$T_B" >&"$T_FD"
+  # The title beside the badge's columns, its wrap under the line.
+  t_m="$C_DIM$M_START$C_OFF  $t_b"
+  printf '%s\\n' "$1" | t_fold 18 | while IFS= read -r t_l; do
+    printf '%s %s\\n' "$t_m" "\${t_l% }"
+    t_m="$T_B "
+  done >&"$T_FD"
+  printf '%s\\n' "$T_B" >&"$T_FD"
 }
 
 # The logo. The mark: the agent of packages/ui/src/agent/engine.js on the 12×12 grid of the web's LogoMark,

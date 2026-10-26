@@ -263,12 +263,14 @@ connect() {
     if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
     if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
     t_gap
-    "$LAUNCHER" "$@" || {
-      PAIRED=$?
-      # Ctrl-C at the code: canceled, not failed.
-      if [ "$PAIRED" -eq 130 ]; then exit 130; fi
-      die "connecting this computer failed"
-    }
+    # Ctrl-C at the code reaches pair too, which says Canceled and exits 130. Caught here, so the installer waits
+    # for those last lines (dash would stop at once, under them), then ends as canceled, not failed.
+    trap : INT
+    PAIRED=0
+    "$LAUNCHER" "$@" || PAIRED=$?
+    trap - INT
+    if [ "$PAIRED" -eq 130 ]; then exit 130; fi
+    [ "$PAIRED" -eq 0 ] || die "connecting this computer failed"
   fi
 }
 
@@ -396,7 +398,7 @@ not_connected_for_host() {
 # The end of the frame: the command, by its name, then Done.
 finish() {
   t_gap
-  t_info "The agentes-runner command is $LAUNCHER, for example:"
+  t_info "The agentes-runner command is $LAUNCHER. To check this computer's connection:"
   t_cmd "$1 status"
   t_gap
   t_end Done
@@ -485,7 +487,7 @@ install_user() {
     t_cmd "curl -fsSL https://bun.sh/install | bash" "Bun:  "
     t_cmd "brew install node" "macOS:"
     t_cmd "https://nodejs.org/en/download (or: curl -fsSL https://fnm.vercel.app/install | bash && fnm install 22)" "Linux:"
-    t_end Stopped
+    t_stop
     exit 1
   fi
 
@@ -529,6 +531,9 @@ install_user() {
 
 main() {
   t_init 1
+  # The waits' output (t_run): kept for a failure's last lines, removed when the installer exits.
+  T_LOGS=$(mktemp -d 2>/dev/null) || T_LOGS=''
+  if [ -n "$T_LOGS" ]; then trap 'rm -rf "$T_LOGS"' EXIT; fi
   while [ $# -gt 0 ]; do
     case "$1" in
       --dir) need_value "$1" $#; DIR="$2"; shift 2 ;;
