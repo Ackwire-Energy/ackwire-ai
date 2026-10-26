@@ -911,7 +911,6 @@ export const ptBR = {
     runRefused: "{{agent}} não respondeu. {{reason}}",
     runFailedNoReason: "{{agent}} não conseguiu responder. Tente de novo.",
     waitingApproval: "esperando aprovação",
-    empty: "Nenhuma mensagem ainda. Escreva a primeira, ou mencione um agente com @.",
     notMemberTitle: "Você não está neste canal",
     notMemberText: "Entre para ler as mensagens e conversar com as pessoas e os agentes daqui.",
     join: "Entrar no #{{channel}}",
@@ -1102,9 +1101,7 @@ export const ptBR = {
     subtitle: "{{role}} · responde a {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
     profile: "Ver perfil",
-    emptyAgent:
-      "Converse direto com {{article}} {{name}}. Peça para lembrar ou esquecer algo, ou para mudar como {{pronoun}} trabalha.",
-    emptyPerson: "Converse direto com {{name}}.",
+    emptyAgent: "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
     opening: "Abrindo a conversa…",
     title: "Mensagem direta com {{name}}",
   },
@@ -2908,8 +2905,7 @@ export const ptBR = {
     agentRole: "Agente · {{role}}",
     pr: "PR #{{number}}",
     open: "#{{number}} {{title}}",
-    empty:
-      "Crie uma ou peça no chat: “Lia, cria uma tarefa para esse erro”. Quem pegar, pessoa ou agente, aparece aqui com o progresso.",
+    empty: "Crie uma, ou peça no chat: “Lia, cria uma tarefa para esse erro”.",
     noResults: "Nenhuma tarefa com esses filtros.",
     columnEmpty: "Nada aqui.",
     form: {
@@ -3319,8 +3315,7 @@ export const ptBR = {
       declined: "Pedido de {{name}} recusado.",
     },
     title: "Missões",
-    subtitle:
-      "Trabalho longo de um agente no computador dele: um plano que vai se ajustando, decisões, revisões e sessões rodando. Toda missão mora numa thread.",
+    subtitle: "Trabalho longo de um agente no computador dele, numa thread.",
     search: "Buscar missões",
     online: "online",
     offline: "offline",
@@ -3751,7 +3746,6 @@ export const ptBR = {
     },
     empty: {
       title: "Nenhuma missão ainda",
-      text: "Uma missão é trabalho longo de um agente no computador dele: um plano que vai se ajustando, decisões e revisões numa thread.",
     },
     new: {
       noEligibleTitle: "Nenhum agente pode rodar uma missão para você ainda",
@@ -3952,7 +3946,7 @@ export const ptBR = {
   },
   threads: {
     title: "Threads",
-    subtitle: "Os assuntos que saíram dos canais e das DMs. Feche o que se resolveu; arquive o que não importa mais.",
+    subtitle: "Assuntos que saíram dos canais e das DMs.",
     tabsLabel: "Filtro de threads",
     tabs: { all: "Todas", working: "Com trabalho", missions: "Missões", closed: "Fechadas", archived: "Arquivadas" },
     search: "Buscar threads",
@@ -4010,16 +4004,10 @@ export const ptBR = {
       missionsTitle: "Nenhuma missão ainda",
       missions: "Uma missão é uma thread com plano, decisões e o trabalho de um agente no computador dele.",
       allTitle: "Nenhuma thread ainda",
-      all: "Quando uma conversa vira assunto, responda a mensagem: a resposta abre uma thread ao lado do canal.",
+      all: "Responda a uma mensagem para abrir uma thread.",
       workingTitle: "Nenhum agente trabalhando agora",
-      working:
-        "Quando um agente roda uma tarefa numa thread, ela aparece aqui enquanto o trabalho estiver em andamento.",
       closedTitle: "Nada fechado por aqui",
-      closed:
-        "Quando um assunto se resolve, feche a thread. No canal ela vira uma linha, e reabre sozinha se alguém responder.",
       archivedTitle: "Nenhuma thread arquivada",
-      archived:
-        "Arquivar tira a thread das listas e da busca. Ela fica só para leitura e dá para desarquivar quando quiser.",
       seeAll: "Ver todas as threads",
       noResults: "Nada encontrado",
       noResultsText: "Tente outro termo ou limpe os filtros.",
@@ -5232,8 +5220,8 @@ export const ptBR = {
   },
   wiki: {
     title: "Wiki",
-    subtitle:
-      "O que a empresa sabe, em páginas ligadas por [[links]]. Os agentes leem daqui quando respondem; escrevem só quando alguém pede.",
+    subtitle: "O que a empresa sabe, em páginas ligadas.",
+    how: "Como a wiki funciona",
     nav: "Navegação da wiki",
     tree: "Páginas",
     new: "Nova página",
@@ -5859,8 +5847,7 @@ export const ptBR = {
   },
   drive: {
     title: "Drive",
-    subtitle:
-      "Tudo o que pessoas e agentes criaram ou enviaram: documentos, tabelas, diffs, diagramas, páginas e arquivos.",
+    subtitle: "Tudo o que pessoas e agentes criaram ou enviaram.",
     search: "Buscar arquivos",
     kind: "Tipo",
     filters: "Filtros",
@@ -5877,7 +5864,7 @@ export const ptBR = {
     where: "Onde",
     when: "Atualizado",
     emptyTitle: "Nenhum arquivo ainda",
-    emptyText: "Relatórios, tabelas, diffs, diagramas e páginas que os agentes criam aparecem aqui.",
+    emptyText: "Arraste arquivos para cá para enviar.",
     noResults: "Nenhum arquivo com esses filtros.",
     clear: "Limpar filtros",
     noResultsHint: "Tente outra busca ou limpe os filtros.",
@@ -6869,7 +6856,6 @@ export const ptBR = {
     uploadingVersion: "Enviando…",
     tooLarge: "“{{name}}” passa de {{max}} MB, o limite por arquivo.",
     dropHint: "Solte para enviar ao Drive",
-    emptyHint: "Você também pode enviar arquivos ou arrastá-los para cá.",
     previewLoading: "Carregando a prévia…",
     previewFailed: "Não deu para mostrar a prévia. Baixe o arquivo para abrir.",
     imageAlt: "Imagem: {{title}}",

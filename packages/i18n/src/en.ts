@@ -898,7 +898,6 @@ export const en: Translations = {
     runRefused: "{{agent}} didn't answer. {{reason}}",
     runFailedNoReason: "{{agent}} couldn't answer. Try again.",
     waitingApproval: "waiting for approval",
-    empty: "No messages yet. Write the first one, or mention an agent with @.",
     notMemberTitle: "You're not in this channel",
     notMemberText: "Join to read the messages and talk with the people and agents here.",
     join: "Join #{{channel}}",
@@ -1084,9 +1083,7 @@ export const en: Translations = {
     subtitle: "{{role}} · answers to {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
     profile: "View profile",
-    emptyAgent:
-      "Talk to {{name}} directly. Ask {{pronoun}} to remember or forget something, or to change how {{pronoun}} works.",
-    emptyPerson: "Talk to {{name}} directly.",
+    emptyAgent: "Ask {{pronoun}} to remember, forget or work differently.",
     opening: "Opening the conversation…",
     title: "Direct message with {{name}}",
   },
@@ -2880,8 +2877,7 @@ export const en: Translations = {
     agentRole: "Agent · {{role}}",
     pr: "PR #{{number}}",
     open: "#{{number}} {{title}}",
-    empty:
-      "Create one or ask in the chat: “Lia, create a task for this error”. Whoever takes it, a person or an agent, shows here with its progress.",
+    empty: "Create one, or ask in the chat: “Lia, create a task for this error”.",
     noResults: "No tasks match these filters.",
     columnEmpty: "Nothing here.",
     form: {
@@ -3292,8 +3288,7 @@ export const en: Translations = {
       declined: "Declined {{name}}'s request.",
     },
     title: "Missions",
-    subtitle:
-      "Long work by an agent on its computer: a plan that keeps adjusting, decisions, reviews and sessions running. Every mission lives in a thread.",
+    subtitle: "Long work by an agent on its computer, in a thread.",
     search: "Search missions",
     online: "online",
     offline: "offline",
@@ -3723,7 +3718,6 @@ export const en: Translations = {
     },
     empty: {
       title: "No missions yet",
-      text: "A mission is long work by an agent on its computer: a plan that keeps adjusting, decisions and reviews in a thread.",
     },
     new: {
       noEligibleTitle: "No agent can run a mission for you yet",
@@ -3923,7 +3917,7 @@ export const en: Translations = {
   },
   threads: {
     title: "Threads",
-    subtitle: "The subjects that left channels and DMs. Close what got resolved; archive what no longer matters.",
+    subtitle: "Subjects that left channels and DMs.",
     tabsLabel: "Thread filter",
     tabs: { all: "All", working: "With work", missions: "Missions", closed: "Closed", archived: "Archived" },
     search: "Search threads",
@@ -3981,14 +3975,10 @@ export const en: Translations = {
       missionsTitle: "No missions yet",
       missions: "A mission is a thread with a plan, decisions and an agent's work on its computer.",
       allTitle: "No threads yet",
-      all: "When a conversation turns into a subject, reply to the message: the reply opens a thread beside the channel.",
+      all: "Reply to a message to open a thread.",
       workingTitle: "No agent working right now",
-      working: "When an agent runs a task in a thread, it shows here while the work is going on.",
       closedTitle: "Nothing closed here",
-      closed:
-        "When a subject is resolved, close its thread. In the channel it becomes one line, and it reopens if someone replies.",
       archivedTitle: "No archived threads",
-      archived: "Archiving takes a thread out of lists and search. It stays read only and can be unarchived anytime.",
       seeAll: "See all threads",
       noResults: "Nothing found",
       noResultsText: "Try another term or clear the filters.",
@@ -5205,8 +5195,8 @@ export const en: Translations = {
   },
   wiki: {
     title: "Wiki",
-    subtitle:
-      "What the company knows, in pages linked by [[links]]. Agents read from here when they answer; they write only when someone asks.",
+    subtitle: "What the company knows, in linked pages.",
+    how: "How the wiki works",
     nav: "Wiki navigation",
     tree: "Pages",
     new: "New page",
@@ -5832,7 +5822,7 @@ export const en: Translations = {
   },
   drive: {
     title: "Drive",
-    subtitle: "Everything people and agents made or uploaded: documents, tables, diffs, diagrams, pages and files.",
+    subtitle: "Everything people and agents made or uploaded.",
     search: "Search files",
     kind: "Type",
     filters: "Filters",
@@ -5849,7 +5839,7 @@ export const en: Translations = {
     where: "Where",
     when: "Updated",
     emptyTitle: "No files yet",
-    emptyText: "Reports, tables, diffs, diagrams and pages that agents make show up here.",
+    emptyText: "Drag files here to upload them.",
     noResults: "No files match these filters.",
     clear: "Clear filters",
     noResultsHint: "Try another search or clear the filters.",
@@ -6838,7 +6828,6 @@ export const en: Translations = {
     uploadingVersion: "Uploading…",
     tooLarge: "“{{name}}” is over {{max}} MB, the limit per file.",
     dropHint: "Drop to upload to the Drive",
-    emptyHint: "You can also upload files or drag them here.",
     previewLoading: "Loading the preview…",
     previewFailed: "Couldn't show the preview. Download the file to open it.",
     imageAlt: "Image: {{title}}",
