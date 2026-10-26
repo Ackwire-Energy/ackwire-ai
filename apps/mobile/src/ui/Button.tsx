@@ -55,7 +55,6 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
       accessibilityState={{ disabled }}
       style={[
         {
-          minHeight: s.height,
           borderRadius: s.radius,
           alignSelf: wide ? "stretch" : "flex-start",
           opacity: disabled ? 0.5 : 1,
@@ -66,7 +65,7 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
       <View
         style={[
           styles.face,
-          { borderRadius: s.radius, paddingHorizontal: s.padding },
+          { minHeight: s.height, borderRadius: s.radius, paddingHorizontal: s.padding },
           variant === "secondary" ? { backgroundColor: colors.raised } : null,
         ]}
       >
@@ -98,8 +97,10 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
 }
 
 const styles = StyleSheet.create({
+  // Sized by its content and the minimum height, never grown: a growing face inside the press's growing
+  // Pressable fills whatever height Yoga offers when it measures to fit, so a button beside a row's text
+  // stood as tall as the screen.
   face: {
-    flexGrow: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
