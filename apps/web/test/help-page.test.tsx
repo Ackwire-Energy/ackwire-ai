@@ -4,10 +4,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { helpDocument } from "@agenteschat/i18n/help";
+import { legalDocument } from "@agenteschat/i18n/legal";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { Block } from "@/pages/help/HelpPage";
+import { LegalPage } from "@/pages/LegalPage";
 import { createFakeApi, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => {
   cleanup();
@@ -81,5 +83,31 @@ describe("help pages", () => {
     const { router } = await renderApp("/help/nope?lang=en", { api: signedOut() });
     await settle();
     expect(router.state.location.pathname).toBe("/");
+  });
+
+  test("the tab reads the page's title while it shows, and what it read before once it's left", async () => {
+    document.title = "agentes.chat";
+    const { router } = await renderApp("/help/memory?lang=en", { api: signedOut() });
+    expect(document.title).toBe("Memory · agentes.chat");
+    await act(async () => fireEvent.click(document.querySelector(".lp-help .lp-logo") as HTMLElement));
+    await settle();
+    expect(router.state.location.pathname).toBe("/");
+    expect(document.title).toBe("agentes.chat");
+    cleanup();
+    // The Terms and the Privacy Policy, the same way.
+    await renderPage(<LegalPage kind="terms" />, { api: signedOut() });
+    expect(document.title).toBe(`${legalDocument("terms", "en").title} · agentes.chat`);
+    cleanup();
+    expect(document.title).toBe("agentes.chat");
+  });
+
+  test("on a phone, the bar keeps the theme button the landing's bar drops there", async () => {
+    const css = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
+    const [landing, help] = await Promise.all([
+      css("../src/pages/landing/landing.css"),
+      css("../src/pages/help/help.css"),
+    ]);
+    expect(landing).toMatch(/@media \(max-width: 480px\) \{\s*\.lp \.lp-theme-btn \{\s*display: none;/);
+    expect(help).toMatch(/@media \(max-width: 480px\) \{\s*\.lp\.lp-help \.lp-theme-btn \{\s*display: inline-flex;/);
   });
 });

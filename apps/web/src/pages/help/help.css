@@ -7,6 +7,12 @@
 .lp-help .lp-lang {
   margin-left: auto;
 }
+/* With no waiting-list button, the bar keeps room for the theme button on a phone. */
+@media (max-width: 480px) {
+  .lp.lp-help .lp-theme-btn {
+    display: inline-flex;
+  }
+}
 .lp-help__main {
   flex: 1;
   padding: 56px 16px 72px;

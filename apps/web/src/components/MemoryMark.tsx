@@ -1,10 +1,10 @@
 import type { Message, MessageMemory } from "@agenteschat/client";
 import { cacheMessageMemories, keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
-import { AgentReadingBook, Button, Input, Popover } from "@agenteschat/ui";
+import { AgentReadingBook, Button, hoverPointer, Input, Popover } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type PointerEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -72,7 +72,6 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
       setMode(next);
     }, ms);
   };
-  const hoverable = (e: PointerEvent) => e.pointerType === "mouse" || e.pointerType === "pen";
 
   const setMarks = (next: MessageMemory[]) => cacheMessageMemories(qc, org.id, message.channelId, message.id, next);
   const current = () => message.memories ?? [];
@@ -140,8 +139,8 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
       label={t("memoryMark.title", { name })}
       side={mode === "tip" ? "top" : "bottom"}
       className={mode === "tip" ? "msg-mem__tip ac-glass" : "msg-mem__pop"}
-      onContentPointerEnter={(e) => hoverable(e) && clear()}
-      onContentPointerLeave={(e) => hoverable(e) && mode === "tip" && later(null, HOVER_CLOSE_MS)}
+      onContentPointerEnter={(e) => hoverPointer(e.pointerType) && clear()}
+      onContentPointerLeave={(e) => hoverPointer(e.pointerType) && mode === "tip" && later(null, HOVER_CLOSE_MS)}
       trigger={
         <button
           type="button"
@@ -150,11 +149,11 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
           aria-haspopup="dialog"
           onPointerEnter={(e) => {
             setActive(true);
-            if (hoverable(e) && mode === null) later("tip", HOVER_OPEN_MS);
+            if (hoverPointer(e.pointerType) && mode === null) later("tip", HOVER_OPEN_MS);
           }}
           onPointerLeave={(e) => {
             setActive(false);
-            if (!hoverable(e)) return;
+            if (!hoverPointer(e.pointerType)) return;
             if (mode === "tip") later(null, HOVER_CLOSE_MS);
             else if (mode === null) clear();
           }}

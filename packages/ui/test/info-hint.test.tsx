@@ -26,10 +26,10 @@ async function press(el: HTMLElement) {
   await wait(0);
 }
 
-/** Tab from wherever focus is to `next`, as the keyboard moves it. */
-async function tabTo(next: HTMLElement) {
+/** Tab from wherever focus is to `next`, as the keyboard moves it (`altKey`: ⌥Tab). */
+async function tabTo(next: HTMLElement, held: { altKey?: boolean } = {}) {
   await act(async () => {
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Tab" });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Tab", ...held });
     next.focus();
   });
   await wait(0);
@@ -96,6 +96,40 @@ describe("InfoHint", () => {
     expect(tip()).toBeNull();
   });
 
+  test("the pointer may cross onto the bubble: it stays open while over it and closes once it leaves", async () => {
+    render(<Hint />);
+    await act(async () => fireEvent.pointerEnter(hintButton(), { pointerType: "mouse" }));
+    await wait(320);
+    const bubble = tip();
+    expect(bubble).not.toBeNull();
+    await act(async () => fireEvent.pointerLeave(hintButton(), { pointerType: "mouse" }));
+    await wait(60);
+    await act(async () => fireEvent.pointerEnter(bubble as HTMLElement, { pointerType: "mouse" }));
+    await wait(400);
+    expect(tip()?.textContent).toBe(TEXT);
+    await act(async () => fireEvent.pointerLeave(bubble as HTMLElement, { pointerType: "mouse" }));
+    await wait(220);
+    expect(tip()).toBeNull();
+  });
+
+  test("a hint keyboard focus opened under a resting mouse stays closed once focus moves on", async () => {
+    render(<Hint />);
+    await tabTo(hintButton());
+    const bubble = tip();
+    expect(bubble).not.toBeNull();
+    // The bubble opens under the mouse, which never moves.
+    await act(async () => fireEvent.pointerEnter(bubble as HTMLElement, { pointerType: "mouse" }));
+    // Tab on: a browser commits the blur's update before the next element takes focus.
+    await act(async () => {
+      fireEvent.keyDown(hintButton(), { key: "Tab" });
+      hintButton().blur();
+    });
+    await act(async () => body().getByRole("button", { name: "Depois" }).focus());
+    expect(tip()).toBeNull();
+    await wait(320);
+    expect(tip()).toBeNull();
+  });
+
   test("a click on a hint that hover opened pins it: it stays open when the pointer leaves", async () => {
     render(<Hint />);
     await act(async () => fireEvent.pointerEnter(hintButton(), { pointerType: "mouse" }));
@@ -128,6 +162,22 @@ describe("InfoHint", () => {
     expect(tip()).toBeNull();
   });
 
+  test("⌥Tab, the way Safari reaches a button, opens it like Tab; the focus a shortcut brings opens nothing", async () => {
+    render(<Hint />);
+    const after = body().getByRole("button", { name: "Depois" });
+    await press(after);
+    await tabTo(hintButton(), { altKey: true });
+    expect(tip()?.textContent).toBe(TEXT);
+    await press(after);
+    expect(tip()).toBeNull();
+    await act(async () => {
+      fireEvent.keyDown(after, { key: "k", metaKey: true });
+      hintButton().focus();
+    });
+    await wait(0);
+    expect(tip()).toBeNull();
+  });
+
   test("inside a dialog, Escape closes the hint and leaves the dialog open", async () => {
     render(
       <Dialog open onOpenChange={() => {}} title="Novo agente" closeLabel="Fechar">
@@ -147,10 +197,32 @@ describe("InfoHint", () => {
     expect(body().getByRole("dialog", { name: "Novo agente" })).toBeTruthy();
   });
 
-  test("the bubble floats above dialogs", async () => {
+  test("the bubble floats above dialogs: its layer is above the dialog's", async () => {
+    const css = (file: string) => Bun.file(new URL(`../src/styles/${file}`, import.meta.url).pathname).text();
+    const [components, layers] = await Promise.all([css("components.css"), css("layers.css")]);
+    const layer = (selector: string) => {
+      const name = components
+        .split(`${selector} {`)[1]
+        ?.split("}")[0]
+        ?.match(/z-index: var\(--z-([\w-]+)\)/)?.[1];
+      return Number(layers.match(new RegExp(`--z-${name}:\\s*(\\d+)`))?.[1]);
+    };
+    expect(layer(".ac-hint__bubble")).toBeGreaterThan(layer(".ac-dialog"));
+  });
+
+  test("the keyboard focus ring stays clear of the label: inside the target, past the part that reaches into it", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    const rule = css.split(".ac-hint__bubble {")[1]?.split("}")[0] ?? "";
-    expect(rule).toContain("z-index: var(--z-floating)");
+    const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
+    const px = (text: string, prop: string) =>
+      Number(text.match(new RegExp(`(?:^|\\s)${prop}:\\s*(-?[\\d.]+)px`))?.[1]);
+    // The 24px target overhangs the glyph's box by its negative margin, and the line's gap takes back part of it.
+    const intoLabel = -px(rule(".ac-hint"), "margin") - px(rule(".ac-hintline"), "gap");
+    const ring = rule(".ac-hint:focus-visible");
+    expect(ring).not.toContain("box-shadow");
+    // An outline drawn inward: its outer edge sits this far inside the target's.
+    const inside = -(px(ring, "outline-offset") + px(ring, "outline"));
+    expect(intoLabel).toBeGreaterThan(0);
+    expect(inside).toBeGreaterThan(intoLabel);
   });
 });
 
