@@ -6,6 +6,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 /*
@@ -66,7 +67,13 @@ describe("Só responde a você (Quem pensa)", () => {
     const d = await brainDialog();
     const on = shareSwitch(d);
     expect(on.getAttribute("aria-checked")).toBe("true");
-    expect(d.textContent).toContain("Usa o seu plano. Os outros veem que a Ada só responde a você.");
+    // One line, its label and its ⓘ: what it means, the same on or off, describes the switch.
+    const meaning =
+      "Os outros veem que a Ada só responde a você. Sem isso, a Ada responde também a outras pessoas, com o seu plano.";
+    const hint = hintOf("Só responde a você", d);
+    expect(hint.text).toBe(meaning);
+    expect(on.getAttribute("aria-describedby")).toBe(hint.button.getAttribute("aria-describedby"));
+    expect(shownText(d)).not.toMatch(/Os outros veem|com o seu plano/);
 
     await click(on);
     let share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
@@ -82,7 +89,8 @@ describe("Só responde a você (Quem pensa)", () => {
     share = screen().getByRole("dialog", { name: "Agora a Ada responde a todos" });
     await click(within(share).getByRole("button", { name: "Responder a todos" }));
     expect(shareSwitch(d).getAttribute("aria-checked")).toBe("false");
-    expect(d.textContent).toContain("Responde a outras pessoas com o seu plano.");
+    expect(hintOf("Só responde a você", d).text).toBe(meaning);
+    expect(shownText(d)).not.toMatch(/Os outros veem|com o seu plano/);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([
@@ -155,7 +163,8 @@ describe("Só responde a você (Quem pensa)", () => {
     let d = await brainDialog();
     const locked = shareSwitch(d, /^Só responde a João/);
     expect(locked.hasAttribute("disabled")).toBe(true);
-    expect(d.textContent).toContain("Usa o plano de João: só João libera para outras pessoas.");
+    expect(hintOf("Só responde a João", d).text).toBe("Usa o plano de João: só João libera para outras pessoas.");
+    expect(shownText(d)).not.toContain("só João libera");
     cleanup();
     const state = await ada({ onlyOwner: false }, { mine: false });
     d = await brainDialog();

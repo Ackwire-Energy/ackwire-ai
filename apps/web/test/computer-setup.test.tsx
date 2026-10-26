@@ -8,6 +8,7 @@ import { keys } from "@agenteschat/client";
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -183,42 +184,18 @@ describe("the workspace's computer on its way: the notice on top of the work are
 });
 
 describe("no AI yet while the workspace's computer is on its way", () => {
-  test("the banner says a plan signs in there once it's ready, and that a key works now; ready, today's hint", async () => {
+  test("the banner is the one it always is: its line, its ⓘ and Connect, nothing about the computer", async () => {
     const state = seedState({
       aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
     });
     const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
-    const banner = () => document.querySelector(".noai-banner")?.textContent ?? "";
-    expect(banner()).toBe(
-      "Os agentes ainda não têm uma IA para pensar. O seu plano entra no Computador da Acme quando ele ficar pronto. Uma chave de API já funciona agora.Conectar uma IA",
-    );
+    const banner = () => document.querySelector(".noai-banner") as HTMLElement;
+    const ask = "Você também pode pedir no chat, como “usar meu plano do Claude”.";
+    expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(hintOf("Os agentes ainda não têm uma IA.", banner()).text).toBe(ask);
     await push({ state: "ready", machineId: "00000000-0000-4000-8000-000000000999" });
-    expect(banner()).toContain(
-      "Os agentes ainda não têm uma IA para pensar. Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
-    );
-  });
-
-  test("on hold meanwhile: nothing works now, so the banner says no more than its usual hint", async () => {
-    const state = seedState({
-      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
-    });
-    const { socket } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
-    const banner = () => document.querySelector(".noai-banner")?.textContent ?? "";
-    expect(banner()).toContain("Uma chave de API já funciona agora.");
-    await act(async () =>
-      socket?.push({
-        type: "event",
-        scope: "org",
-        event: { type: "org.standing", orgId: ORG_ID, state: "hold", reason: null },
-      }),
-    );
-    await settle(6);
-    expect(screen().getByRole("region", { name: "Status do workspace" }).textContent).toContain(
-      "os agentes não respondem nem trabalham enquanto ele estiver em espera.",
-    );
-    expect(banner()).toBe(
-      "Os agentes ainda não têm uma IA para pensar. Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.Conectar uma IA",
-    );
+    expect(shownText(banner())).toBe("Os agentes ainda não têm uma IA.Conectar uma IA");
+    expect(hintOf("Os agentes ainda não têm uma IA.", banner()).text).toBe(ask);
   });
 });
 

@@ -983,14 +983,12 @@ export const en: Translations = {
   },
   noAi: {
     banner: {
-      org: "Your agents don't have an AI to think with yet.",
-      orgHint: "Connect yours, or just type what you want, like “use my Claude plan”.",
-      orgHintPreparing: "Your plan signs in on {{computer}} once it's ready. An API key works now.",
+      org: "Your agents don't have an AI yet.",
+      orgHint: "You can also ask in the chat, like “use my Claude plan”.",
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because it has no AI connected.",
     card: {
-      line: "Once it's connected, {{name}} answers your message.",
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
       answering: "{{name}} is answering…",
@@ -1022,12 +1020,12 @@ export const en: Translations = {
     key: {
       title: "API key",
       makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax",
-      sub: "You pay per use, straight to the provider",
+      sub: "You pay per use, straight to the provider.",
       create: "Create your {{provider}} API key",
       paste: "Paste it here",
       forAll: "Every agent without a plan thinks with it.",
       saved: "Saved. Every agent without a plan thinks with it.",
-      notPlan: "Use a pay-as-you-go key here. A coding plan's key goes in its own option above.",
+      notPlan: "A coding plan's key goes in its own option above.",
       platform: "agentes.chat",
     },
     wait: {
@@ -1039,20 +1037,20 @@ export const en: Translations = {
     },
     own: {
       this: "The {{brand}} account signed in on {{computer}}",
-      thisText: "Every agent thinks with it. Nothing to sign in.",
+      thisText: "Every agent thinks with it.",
       other: "Another {{brand}} account, for one agent",
-      otherText: "You sign in from here; it stays on {{computer}}.",
       note: "They only reply to you while they think with your plan.",
     },
+    onlyYou: "{{name}} will only reply to you.",
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
-      text: "In ChatGPT, open Settings\u00a0›\u00a0Security and allow device code sign-in for Codex. On a Business or Enterprise plan, a workspace admin allows it.",
+      text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin does it.",
       open: "Open ChatGPT settings",
     },
     zaiTeam: "On a team plan, use the key from your Team Plan page.",
     who: {
       key: "API key · {{provider}}",
-      line: "Each plan thinks for one agent. For the others, pick another plan above, or one API key for all of them.",
+      line: "Each plan thinks for one agent.",
       keyFor: "API key for {{names}}",
     },
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
@@ -1824,8 +1822,8 @@ export const en: Translations = {
         signInAgain: "Sign in again",
         keyLabel: "API key",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
-        fallbackOnNow: "Uses the organization's model; counts in {{name}}'s budget.",
-        fallbackOffNow: "{{name}} tells whoever asked and waits for it to come back.",
+        fallbackHint:
+          "It uses the organization's model and counts in {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
         effort: "Effort",
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortText: {
@@ -1841,10 +1839,8 @@ export const en: Translations = {
             claude_code: "Sign in to Claude with the account to use",
             codex: "Sign in to ChatGPT with the account to use",
           },
-          stepOneText: {
-            claude_code: "Opens Claude's own page. If it signs in to the wrong account, sign out there and try again.",
-            codex: "Opens OpenAI's own page. If it signs in to the wrong account, sign out there and try again.",
-          },
+          stepOneHint:
+            "Wrong account? Sign out there and try again. The account stays only on {{computer}}: agentes.chat never sees the password or the access.",
           open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT" },
           openAgain: "Open again",
           stepTwo: "Copy the code Claude showed and paste it here",
@@ -1853,10 +1849,9 @@ export const en: Translations = {
           sent: "Code sent. {{computer}} is finishing the sign-in.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
-          deviceCodeText: "Type this code on the page that opens. You asked for this sign-in on agentes.chat.",
+          deviceCodeText: "Type this code on the page that opens.",
           starting: "Asking {{computer}}…",
           waiting: "Waiting",
-          safe: "The account stays only on {{computer}}. agentes.chat never sees the password or the access.",
           failed: "Couldn't sign in to that account. Try again.",
           expired: "The time to sign in ran out. Try again.",
           duplicate: {
@@ -4458,10 +4453,8 @@ export const en: Translations = {
     share: {
       switch: "Only replies to you",
       switchOther: "Only replies to {{name}}",
-      on: "It uses your plan. Others see that {{name}} only replies to you.",
-      off: "Replies to other people on your plan.",
+      hint: "Others see that {{name}} only replies to you. Without it, {{name}} replies to other people too, on your plan.",
       onOther: "It uses {{owner}}'s plan: only {{owner}} can let other people talk to it.",
-      offOther: "Replies to other people on {{owner}}'s plan.",
       title: "Now {{name}} replies to everyone",
       titlePeople: "Now {{name}} replies to other people",
       body: {
@@ -4497,12 +4490,10 @@ export const en: Translations = {
       paste: "Paste",
       pasteFailed: "The browser didn't let us paste. Use Ctrl+V (⌘V on a Mac).",
       email: "Which account? (optional)",
-      emailHelp: "The email of the Claude account that will think. Empty: you choose on Claude's page.",
       emailInvalid: "Use a plain email, like ana@example.com.",
-      emailPlaceholder: "ana@example.com",
+      emailPlaceholder: "Claude account email (optional)",
       titleKey: "Connect {{plan}}",
       keyStep: "Create your plan's key",
-      keySite: "It's at {{site}}. Copy the whole key.",
       openKeys: "Open {{site}}",
       keyTitle: "Paste the key here",
       keyLabel: "{{plan}} key",
@@ -4531,8 +4522,8 @@ export const en: Translations = {
     },
     page: {
       title: "Your plans",
-      text: "Each account thinks for one agent. It stays on the computer; agentes.chat keeps only its name, email and usage.",
-      empty: "Connect your AI plan, like Claude or ChatGPT, and your agents think with it: no API key needed.",
+      hint: "Each account thinks for one agent and stays on the computer it was connected on; whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage.",
+      empty: "No plans yet.",
       connect: "Connect an AI",
       keyEnds: "key …{{hint}}",
       on: "on {{computer}}",
@@ -4552,7 +4543,6 @@ export const en: Translations = {
         "{{agent}} stops thinking with it and goes back to the API. {{computer}} signs out and deletes what it kept.",
       disconnectNone: "{{computer}} signs out and deletes what it kept of it.",
       disconnected: "{{label}} disconnected.",
-      where: "Accounts stay on the computers they were connected on. Whoever runs a computer can reach its accounts.",
     },
     usage: {
       window: {
@@ -7464,15 +7454,13 @@ export const en: Translations = {
     paid: "{{amount}} paid",
     budgetShare: "{{percent}} of the budget",
     estimate:
-      "Claude and Codex only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it.",
+      "Plans only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it.",
     accounts: {
       title: "Plan accounts",
-      subtitle: "Claude Code and Codex on the computers, with each agent's part.",
-      empty: 'No agent thinks with Claude Code or Codex yet. Pick it in "Who thinks", on the agent\'s page.',
+      empty: "No agent thinks with a plan yet.",
     },
     api: {
       title: "Organization API",
-      subtitle: "What each agent spent through the API this month, against its budget.",
     },
     agent: {
       title: "{{name}}'s usage",

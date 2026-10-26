@@ -6,6 +6,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -75,9 +76,11 @@ describe("Contas de IA", () => {
   test("never blank: with no plan yet, one way to connect one, the same picker as everywhere", async () => {
     await page([]);
     const plans = screen().getByRole("region", { name: "Seus planos" });
-    expect(plans.textContent).toContain(
-      "Conecte o seu plano de IA, como o Claude ou o ChatGPT, e os agentes pensam com ele: sem chave de API.",
+    // Its title and ⓘ (what a plan is for and where it stays), the empty line, Connect: nothing else to read.
+    expect(hintOf("Seus planos", plans).text).toBe(
+      "Cada conta pensa por um agente e fica no computador onde foi conectada; quem administra esse computador pode acessá-la. O agentes.chat guarda só o nome, o email e o uso.",
     );
+    expect(shownText(plans)).toBe("Seus planosNenhum plano ainda.Conectar uma IA");
     await act(async () => fireEvent.click(within(plans).getByRole("button", { name: "Conectar uma IA" })));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
@@ -98,6 +101,8 @@ describe("Contas de IA", () => {
     expect(mm?.textContent).toContain("MiniMax não mostra o uso por aqui.");
     expect(mm?.querySelector('[data-mark="minimax"]')).not.toBeNull();
     expect(within(mm as HTMLElement).getByRole("button", { name: "Trocar a chave" })).toBeTruthy();
+    // Where the accounts stay is the title's ⓘ: no line under the list.
+    expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toMatch(/As contas ficam|guarda só/);
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     cleanup();
     await page([WORK]);

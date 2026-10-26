@@ -7931,24 +7931,22 @@ a.machine-row__name:hover {
 .agp-brainsel .newag__sel-value {
   gap: 10px;
 }
-/* The card's foot: "Se o … desligar, responder pela API" and what it does now, the switch at the end. */
+/*
+ * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its first line), the switch
+ * at the end: the card's foot ("Se o … parar de responder, responder pela API") and "Só responde a você".
+ */
 .agp-brainoff {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  min-width: 0;
+  font-size: 13.5px;
   line-height: 1.35;
+}
+.agp-brainoff label {
   cursor: pointer;
 }
 .agp-brainoff b {
-  font-size: 13.5px;
   font-weight: 600;
 }
-.agp-brainoff span {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-/* "Só responde a você", under the account: what it means now, the switch at the end. */
+/* "Só responde a você", under the account: its label and ⓘ, the switch at the end. */
 .agp-brainshare {
   display: flex;
   align-items: center;
@@ -8010,7 +8008,8 @@ a.machine-row__name:hover {
   font-size: 14px;
   font-weight: 600;
 }
-.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code) {
+/* The lines under a title; the title's own line (with its ⓘ) keeps the step's 14/20. */
+.agp-addacct__text > span:not(.agp-addacct__paste):not(.agp-addacct__code):not(.ac-hintline) {
   font-size: 13px;
   line-height: 1.4;
   color: var(--muted);

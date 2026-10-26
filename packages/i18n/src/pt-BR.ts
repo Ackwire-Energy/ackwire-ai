@@ -997,15 +997,12 @@ export const ptBR = {
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
     banner: {
-      org: "Os agentes ainda não têm uma IA para pensar.",
-      orgHint: "Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
-      orgHintPreparing:
-        "O seu plano entra no {{computer}} quando ele ficar pronto. Uma chave de API já funciona agora.",
+      org: "Os agentes ainda não têm uma IA.",
+      orgHint: "Você também pode pedir no chat, como “usar meu plano do Claude”.",
       orgAction: "Conectar uma IA",
     },
     agent: "{{name}} não vai responder porque não tem uma IA conectada.",
     card: {
-      line: "Depois de conectar, {{name}} responde a sua mensagem.",
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
       answering: "{{name}} está respondendo…",
@@ -1038,12 +1035,12 @@ export const ptBR = {
     key: {
       title: "Chave de API",
       makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
-      sub: "Você paga pelo uso, direto ao provedor",
+      sub: "Você paga pelo uso, direto ao provedor.",
       create: "Crie a sua chave de API {{of}} {{provider}}",
       paste: "Cole aqui",
       forAll: "Todo agente sem plano pensa com ela.",
       saved: "Salva. Todo agente sem plano pensa com ela.",
-      notPlan: "Use aqui uma chave de pagamento por uso. A chave de um plano de código vai na opção dele, acima.",
+      notPlan: "A chave de um plano de código vai na opção dele, acima.",
       platform: "agentes.chat",
     },
     wait: {
@@ -1055,20 +1052,21 @@ export const ptBR = {
     },
     own: {
       this: "A conta do {{brand}} com login no {{computer}}",
-      thisText: "Todos os agentes pensam com ela. Nada para entrar.",
+      thisText: "Todos os agentes pensam com ela.",
       other: "Outra conta do {{brand}}, para um agente",
-      otherText: "Você entra por aqui; ela fica no {{computer}}.",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
+    /** Under a plan's sign-in: it changes how the agent treats everyone else. */
+    onlyYou: "{{The}} {{name}} vai responder só a você.",
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
-      text: "No ChatGPT, abra Configurações\u00a0›\u00a0Segurança e permita o login com código de dispositivo para o Codex. Num plano Business ou Enterprise, quem administra o workspace permite.",
+      text: "Em Configurações\u00a0›\u00a0Segurança, ligue o login com código de dispositivo para o Codex. No Business ou Enterprise, quem administra liga.",
       open: "Abrir as configurações do ChatGPT",
     },
     zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
     who: {
       key: "Chave de API · {{provider}}",
-      line: "Cada plano pensa por um agente. Para os outros, escolha outro plano acima, ou uma chave de API para todos eles.",
+      line: "Cada plano pensa por um agente.",
       keyFor: "Chave de API para {{names}}",
     },
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -1842,8 +1840,9 @@ export const ptBR = {
         signInAgain: "Entrar de novo",
         keyLabel: "Chave da API",
         fallbackTitle: "Se o {{computer}} parar de responder, responder pela API",
-        fallbackOnNow: "Usa o modelo da organização e conta no orçamento {{of}} {{name}}.",
-        fallbackOffNow: "{{The}} {{name}} avisa quem chamou e espera ele voltar.",
+        /** The switch's ⓘ: the same in both states. */
+        fallbackHint:
+          "Usa o modelo da organização e conta no orçamento {{of}} {{name}}. Se não, {{article}} {{name}} avisa quem chamou e espera o computador voltar.",
         effort: "Esforço",
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortText: {
@@ -1859,10 +1858,9 @@ export const ptBR = {
             claude_code: "Entre no Claude com a conta que vai usar",
             codex: "Entre no ChatGPT com a conta que vai usar",
           },
-          stepOneText: {
-            claude_code: "Abre a página do próprio Claude. Se ela entrar na conta errada, saia de lá e tente de novo.",
-            codex: "Abre a página da própria OpenAI. Se ela entrar na conta errada, saia de lá e tente de novo.",
-          },
+          /** The sign-in step's ⓘ, for Claude and ChatGPT. */
+          stepOneHint:
+            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}: o agentes.chat nunca vê a senha nem o acesso.",
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT" },
           openAgain: "Abrir de novo",
           stepTwo: "Copie o código que o Claude mostrou e cole aqui",
@@ -1871,10 +1869,9 @@ export const ptBR = {
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",
           deviceCode: "Código para o ChatGPT",
-          deviceCodeText: "Digite este código na página que abrir. Foi você que pediu este login pelo agentes.chat.",
+          deviceCodeText: "Digite este código na página que abrir.",
           starting: "Pedindo ao {{computer}}…",
           waiting: "Esperando",
-          safe: "A conta fica guardada só no {{computer}}. O agentes.chat nunca vê a senha nem o acesso.",
           failed: "Não deu para entrar nessa conta. Tente de novo.",
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
@@ -4482,10 +4479,10 @@ export const ptBR = {
     share: {
       switch: "Só responde a você",
       switchOther: "Só responde a {{name}}",
-      on: "Usa o seu plano. Os outros veem que {{article}} {{name}} só responde a você.",
-      off: "Responde a outras pessoas com o seu plano.",
+      /** The switch's ⓘ, on your own plan: the same in both states. */
+      hint: "Os outros veem que {{article}} {{name}} só responde a você. Sem isso, {{article}} {{name}} responde também a outras pessoas, com o seu plano.",
+      /** The switch's ⓘ, on someone else's plan. */
       onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
-      offOther: "Responde a outras pessoas com o plano de {{owner}}.",
       title: "Agora {{article}} {{name}} responde a todos",
       titlePeople: "Agora {{article}} {{name}} responde a outras pessoas",
       body: {
@@ -4521,12 +4518,10 @@ export const ptBR = {
       paste: "Colar",
       pasteFailed: "O navegador não deixou colar. Cole com Ctrl+V (⌘V no Mac).",
       email: "Qual conta? (opcional)",
-      emailHelp: "O email da conta do Claude que vai pensar. Vazio: você escolhe na página do Claude.",
       emailInvalid: "Use um email simples, como ana@exemplo.com.",
-      emailPlaceholder: "ana@exemplo.com",
+      emailPlaceholder: "Email da conta do Claude (opcional)",
       titleKey: "Conectar {{plan}}",
       keyStep: "Crie a chave do seu plano",
-      keySite: "Fica em {{site}}. Copie a chave inteira.",
       openKeys: "Abrir {{site}}",
       keyTitle: "Cole a chave aqui",
       keyLabel: "Chave do {{plan}}",
@@ -4555,8 +4550,8 @@ export const ptBR = {
     },
     page: {
       title: "Seus planos",
-      text: "Cada conta pensa por um agente. Ela fica no computador; o agentes.chat guarda só o nome, o email e o uso.",
-      empty: "Conecte o seu plano de IA, como o Claude ou o ChatGPT, e os agentes pensam com ele: sem chave de API.",
+      hint: "Cada conta pensa por um agente e fica no computador onde foi conectada; quem administra esse computador pode acessá-la. O agentes.chat guarda só o nome, o email e o uso.",
+      empty: "Nenhum plano ainda.",
       connect: "Conectar uma IA",
       keyEnds: "chave …{{hint}}",
       on: "no {{computer}}",
@@ -4576,8 +4571,6 @@ export const ptBR = {
         "{{agent}} deixa de pensar com ela e volta para a API. O {{computer}} sai da conta e apaga o que guardava.",
       disconnectNone: "O {{computer}} sai da conta e apaga o que guardava dela.",
       disconnected: "{{label}} desconectada.",
-      where:
-        "As contas ficam nos computadores onde foram conectadas. Quem administra um computador pode acessar as contas dele.",
     },
     usage: {
       window: {
@@ -7495,17 +7488,15 @@ export const ptBR = {
     equivalent: "≈ {{amount}} pela API",
     paid: "{{amount}} pagos",
     budgetShare: "{{percent}} do orçamento",
+    /** The plan accounts' ⓘ. */
     estimate:
-      "O Claude e o Codex só dizem quanto a conta inteira usou. A parte de cada agente é uma estimativa, pelo que cada um gastou nela.",
+      "Os planos só dizem quanto a conta inteira usou. A parte de cada agente é uma estimativa, pelo que cada um gastou nela.",
     accounts: {
       title: "Contas dos planos",
-      subtitle: "Claude Code e Codex nos computadores, com a parte de cada agente.",
-      empty:
-        'Nenhum agente pensa com Claude Code ou Codex ainda. Dá para escolher em "Quem pensa", na página do agente.',
+      empty: "Nenhum agente pensa com um plano ainda.",
     },
     api: {
       title: "API da organização",
-      subtitle: "O que cada agente gastou pela API este mês, contra o orçamento dele.",
     },
     agent: {
       title: "Uso {{of}} {{name}}",
