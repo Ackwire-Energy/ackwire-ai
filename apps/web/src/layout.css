@@ -2589,12 +2589,10 @@ p {
   display: flex;
   align-items: center;
 }
-.level-note,
 .level-legend__asks {
   gap: 6px;
   margin: 0;
 }
-.level-note .ac-icon,
 .level-legend__asks .ac-icon {
   flex: none;
   width: 15px;

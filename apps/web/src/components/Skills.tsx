@@ -111,13 +111,10 @@ export function SkillsSection() {
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   return (
     <Card aria-labelledby="sec-skills">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-skills" className="ac-card__title">
-            {t("skills.title")}
-          </h2>
-          <span className="small muted">{t("skills.subtitle")}</span>
-        </div>
+      <div className="row" style={{ gap: 12 }}>
+        <h2 id="sec-skills" className="ac-card__title" style={{ flex: "1 1 280px" }}>
+          {t("skills.title")}
+        </h2>
         {!unavailable && (
           <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
             {t("skills.install")}

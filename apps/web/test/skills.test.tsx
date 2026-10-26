@@ -35,6 +35,8 @@ const settings = async (state = seedState(), api = createFakeApi(state)) => {
 describe("Configurações → Skills", () => {
   test("the library: name, description, source, version and how many agents use it", async () => {
     const { section } = await settings();
+    // The card's head is its title and Install: what a skill is lives in Settings' own line above it.
+    expect(section().querySelector("#sec-skills")?.parentElement?.textContent).toBe("SkillsInstalar skill");
     const rows = within(section()).getAllByRole("button", { name: /Revisão de PR|Relatório semanal|Atendimento/ });
     expect(rows.map((r) => r.textContent)).toEqual(["Revisão de PR", "Relatório semanal", "Atendimento"]);
     const review = rows[0]?.closest(".skill-row") as HTMLElement;

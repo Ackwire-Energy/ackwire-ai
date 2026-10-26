@@ -94,6 +94,9 @@ describe("Adicionar conector: one catalog", () => {
     expect(notion.textContent).toContain("O que os agentes poderão fazer");
     expect(notion.textContent).toContain("Buscar e ler páginas");
     expect(notion.textContent).toContain("Um clique: você autoriza na página do serviço");
+    // What connecting changes, as one line under what it can do (no heading of its own).
+    expect(notion.textContent).toContain("Nenhum agente usa até você escolher.");
+    expect(within(notion).queryByRole("heading", { level: 4, name: "Depois de conectar" })).toBeNull();
     // The same tile again closes it; another tile swaps it.
     await click(within(dialog).getByRole("button", { name: "Notion" }));
     expect(within(dialog).queryByRole("complementary")).toBeNull();

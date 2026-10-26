@@ -223,6 +223,20 @@ describe("Configurações → Agentes e acesso: the matrix", () => {
     expect(section.getByRole("button", { name: "Atlas em Drive: Ler e escrever" })).toBeTruthy();
   });
 
+  test("how to use it opens the legend; the approval rule is the title's ⓘ", async () => {
+    const section = await goAccess();
+    const legend = document.querySelector(".level-legend") as HTMLElement;
+    expect(legend.firstElementChild?.textContent).toBe("Clique numa célula para trocar:");
+    expect(legend.textContent).toBe("Clique numa célula para trocar:Sem acessoLerLer e escreverpede aprovação");
+    const about = section.getByRole("button", { name: "Sobre Acesso dos agentes" });
+    expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Ações sensíveis (merge, deploy, compartilhar, pagar) sempre pedem aprovação, em qualquer nível. Para ajustar ferramenta por ferramenta, abra Ferramentas no conector.",
+    );
+    // The heading keeps its own name; nothing else is said above the table.
+    expect(section.getByRole("heading", { level: 2 }).textContent).toBe("Acesso dos agentes");
+    expect(document.querySelector("#sec-access")?.closest(".ac-card")?.querySelector("p.small")).toBeNull();
+  });
+
   test("members don't see it", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";

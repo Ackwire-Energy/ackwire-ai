@@ -1,6 +1,6 @@
 import { useGitHubApp, useInstallGitHubApp, useRemoveGitHubApp } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, List } from "@agenteschat/ui";
+import { Button, Chip, InfoHint, List } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -34,13 +34,15 @@ export function GitHubAppPanel() {
   if (!info.data || (!info.data.installable && installations.length === 0)) return null;
   return (
     <section className="stack-4" aria-labelledby="sec-github-app" style={{ marginTop: 16 }}>
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
+      <div className="row" style={{ gap: 12 }}>
+        <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h3 id="sec-github-app" className="ac-card__title">
             {t("githubApp.title")}
           </h3>
-          <span className="small muted">{t("githubApp.text", { org: org.name })}</span>
-        </div>
+          <InfoHint name={t("common.about", { label: t("githubApp.title") })}>
+            {t("githubApp.text", { org: org.name })}
+          </InfoHint>
+        </span>
         {admin && info.data.installable && (
           <Button
             size="sm"
