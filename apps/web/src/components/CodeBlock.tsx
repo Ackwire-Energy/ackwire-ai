@@ -2,6 +2,7 @@ import { type CodeToken, codeLabel, highlightCode } from "@agenteschat/client/li
 import { Button, Dialog, DialogBody } from "@agenteschat/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useGrowFrom } from "@/lib/grow";
 
 /**
  * Fenced code in a message or document (telas/Polimento.html, A · Cartão): the language on top, copy
@@ -16,36 +17,9 @@ export function CodeBlock({ lang, text }: { lang: string; text: string }) {
   const [open, setOpen] = useState(false);
   const [wrap, setWrap] = useState(false);
   const card = useRef<HTMLDivElement>(null);
-  const from = useRef<DOMRect | null>(null);
-
-  // Grows out of the card: the dialog starts on the card's box and settles in the middle.
-  useEffect(() => {
-    const start = from.current;
-    if (!open || !start) return;
-    from.current = null;
-    if (matchMedia("(prefers-reduced-motion: reduce), (max-width: 640px)").matches) return;
-    const frame = requestAnimationFrame(() => {
-      const dialog = document.querySelector<HTMLElement>(".code-viewer");
-      if (!dialog) return;
-      const end = dialog.getBoundingClientRect();
-      if (!end.width || !end.height) return;
-      const x = start.left - innerWidth / 2;
-      const y = start.top - innerHeight / 2;
-      dialog.animate(
-        [
-          { transformOrigin: "0 0", transform: `translate(${x}px, ${y}px) scale(${start.width / end.width}, ${start.height / end.height})` },
-          { transformOrigin: "0 0", transform: "translate(-50%, -50%)" },
-        ],
-        { duration: 420, easing: "cubic-bezier(0.32, 0.72, 0, 1)" },
-      );
-      for (const part of Array.from(dialog.children))
-        part.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 140, easing: "ease-out", fill: "backwards" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
-
+  const remember = useGrowFrom(open, card, ".code-viewer");
   const expand = () => {
-    from.current = card.current?.getBoundingClientRect() ?? null;
+    remember();
     setOpen(true);
   };
 

@@ -1,5 +1,6 @@
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { type ReactNode, useMemo } from "react";
+import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
 
 /**
@@ -184,7 +185,11 @@ export function Markdown({
         return <p key={k}>{inline(b.text, k)}</p>;
       case "code":
         return (
-          <CodeBlock key={k} lang={b.lang} text={b.text} />
+          b.lang.toLowerCase() === "chart" ? (
+            <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />
+          ) : (
+            <CodeBlock key={k} lang={b.lang} text={b.text} />
+          )
         );
       case "list": {
         const L = b.ordered ? "ol" : "ul";

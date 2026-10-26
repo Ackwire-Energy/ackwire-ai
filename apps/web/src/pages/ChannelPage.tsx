@@ -3103,7 +3103,12 @@ export const TimelineMessage = memo(function TimelineMessage({
           <RunBrowserCard run={live} name={name} />
           {!liveFailed && revealed && (
             <MessageText>
-              <MessageBody body={revealed} resolveMention={dir.mentionName} live={!liveStopped} />
+              <MessageBody
+                body={revealed}
+                resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
+              />
             </MessageText>
           )}
           {liveStopped ? (
@@ -3147,6 +3152,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   resolveMention={dir.mentionName}
                   renderMention={renderMention}
                   wikiLink={wikiLink}
+                  accent={colorOf(agent)}
                 />
               </MessageText>
             )}
