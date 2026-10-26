@@ -205,6 +205,11 @@
   translate: none;
   pointer-events: auto;
 }
+/* What the clipboard just did shows its line for a moment, without the bar over the computer's own top. */
+.cmp-dialog:has(.dsk-said) .dsk-line {
+  opacity: 1;
+  translate: none;
+}
 .cmp-dialog .ac-dialog__head {
   padding-bottom: 8px;
 }

@@ -59,6 +59,13 @@
 .dsk-line > .ac-btn ~ * {
   margin-top: calc((var(--control-h-md) - 22px) / 2);
 }
+/* What the clipboard just did, for a moment in the line's words' place, as a toast would say it. */
+.dsk-said {
+  color: var(--ink);
+}
+.dsk-said.is-error > .ac-icon {
+  color: var(--danger);
+}
 /* What the computer copied when the browser kept it out of the person's clipboard, with Copy: one line, cut to fit. */
 .dsk-got {
   display: flex;

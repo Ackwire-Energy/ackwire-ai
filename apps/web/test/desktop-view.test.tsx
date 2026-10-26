@@ -194,6 +194,8 @@ async function controlled() {
 }
 /** The line under the screen in control: its words. */
 const line = () => document.querySelector(".dsk-line > .muted")?.textContent;
+/** What the clipboard just did, said in that line in its words' place. */
+const said = () => document.querySelector(".dsk-line > .dsk-said")?.textContent;
 const pasteOn = (el: Element, text: string) =>
   act(
     async () =>
@@ -582,12 +584,17 @@ describe("the agent's screen in the computer dialog", () => {
   test("a paste over 256 KB as it is sent, or with no text, sends nothing and says why", async () => {
     const t = await controlled();
     await pasteOn(t.field(), "");
-    expect(screen().getByText("No computador da Ada só dá para colar texto.")).toBeTruthy();
+    // In the line under the screen, where copy and paste are told, not a toast over the window's corner.
+    expect(said()).toBe("No computador da Ada só dá para colar texto.");
+    expect(document.querySelector(".dsk-said")?.getAttribute("role")).toBe("alert");
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(line()).toBeUndefined();
     // The limit is the computer's, in what noVNC sends: UTF-8, each line break as CRLF, and a NUL at the end.
     for (const text of ["x".repeat(262_144), "ã".repeat(131_072), "linha\n".repeat(40_000)]) {
       await pasteOn(t.field(), text);
     }
-    expect(screen().getByText("Grande demais para colar no computador da Ada. No máximo 256 KB.")).toBeTruthy();
+    expect(said()).toBe("Grande demais para colar no computador da Ada. No máximo 256 KB.");
+    expect(document.querySelector(".ac-toast")).toBeNull();
     expect(rfb().pasted).toEqual([]);
     expect(rfb().log).toEqual([]);
     // Up to the limit goes, a CRLF counted as the two bytes it is.
@@ -637,15 +644,10 @@ describe("the agent's screen in the computer dialog", () => {
     await act(async () => rfb().emit("clipboard", { text: "ls -la /tmp" }));
     await settle(2);
     expect(board.written).toEqual(["ls -la /tmp"]);
-    expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
-    // The toast's × is the toast's own, though the dialog is modal: the dialog stays, and control with it.
-    const dismiss = document.querySelector(".ac-toast button[aria-label='Fechar']") as HTMLElement;
-    await act(async () => {
-      fireEvent.pointerDown(dismiss);
-      fireEvent.click(dismiss);
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    await settle(2);
+    // Said in the line under the screen, in its words' place: the window fills the page, and a toast would land on
+    // its corner.
+    expect(said()).toBe("Copiado do computador da Ada.");
+    expect(document.querySelector(".dsk-said")?.getAttribute("role")).toBe("status");
     expect(document.querySelector(".ac-toast")).toBeNull();
     expect(t.closed()).toBe(0);
     expect(calls(t, "browser.done")).toEqual([]);
@@ -696,10 +698,35 @@ describe("the agent's screen in the computer dialog", () => {
     expect(line()).toBeUndefined();
     await click(view().getByRole("button", { name: "Copiar" }));
     expect(board.texts).toEqual(["ls -la /tmp"]);
-    expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
+    expect(said()).toBe("Copiado do computador da Ada.");
     expect(document.querySelector(".dsk-got")).toBeNull();
-    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+    expect(document.querySelector(".ac-toast")).toBeNull();
     expect(t.closed()).toBe(0);
+    // Handed back and taken again: the line starts with its own words, nothing said from before.
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    expect(said()).toBeUndefined();
+    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+  });
+
+  test("the newest copy speaks: one kept out right after a Copiado is offered at once, not under the older word", async () => {
+    clipboard();
+    const t = await controlled();
+    fireEvent.keyDown(t.field(), { key: "c", code: "KeyC", ctrlKey: true });
+    await act(async () => rfb().emit("clipboard", { text: "primeiro" }));
+    await settle(2);
+    expect(said()).toBe("Copiado do computador da Ada.");
+    clipboard({ refuses: true });
+    fireEvent.keyDown(t.field(), { key: "c", code: "KeyC", ctrlKey: true });
+    await act(async () => rfb().emit("clipboard", { text: "segundo" }));
+    await settle(2);
+    expect(said()).toBeUndefined();
+    expect(document.querySelector(".dsk-got q")?.textContent).toBe("segundo");
   });
 
   test("watching: no field, nothing pasted, nothing copied", async () => {
@@ -1048,6 +1075,15 @@ describe("the dialog's size (computer.css)", () => {
     expect(keep).toContain("opacity: 1");
     expect(keep).toContain("translate: none");
     expect(keep).toContain("pointer-events: auto");
+    // What the clipboard just did shows the line alone for a moment, after the rule that hides it at the same weight.
+    const said = rule(text, ".cmp-dialog:has(.dsk-said) .dsk-line");
+    expect(said).toContain("opacity: 1");
+    expect(said).not.toContain("pointer-events");
+    expect(text.indexOf("\n.cmp-dialog:has(.dsk-said) .dsk-line {")).toBeGreaterThan(
+      text.indexOf(
+        "\n.cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-line-hidden :is(.cmp-asked, .dsk-line) {",
+      ),
+    );
     expect(text).not.toContain(":focus-within");
     // A cover over the screen (z-index 5) stays in the screen's own layer, under the bar.
     expect(rule(text, ".cmp-dialog.is-screen-only .dsk-stage")).toContain("isolation: isolate");

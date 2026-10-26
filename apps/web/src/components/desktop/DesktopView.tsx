@@ -11,14 +11,14 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
 import { showsPicture } from "@/lib/canvas";
-import { useToast } from "@/lib/toast";
+import { TOAST_MS, useToast } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
 import { CantShowCover } from "../computer/covers";
@@ -112,25 +112,37 @@ export function DesktopView({
   const connect = blocked === null && !gaveUp;
   const { refetch } = status;
   const failedToast = () => toast.show(t("browser.live.actionFailed"), "error");
-  const copiedToast = () => toast.show(t("desktop.clipboard.copied", g));
+  // What the clipboard just did, in the line under the screen in place of its words for as long as a toast would
+  // stay: the window fills the page, and a toast would land on its corner. `at` makes the same words said again new.
+  const [said, setSaid] = useState<{ text: string; error: boolean; at: number } | null>(null);
+  useEffect(() => {
+    if (!said) return;
+    const id = setTimeout(() => setSaid(null), TOAST_MS);
+    return () => clearTimeout(id);
+  }, [said]);
+  const say = (text: string, error = false) => setSaid({ text, error, at: Date.now() });
+  const copied = () => say(t("desktop.clipboard.copied", g));
+  const copyFailed = () => say(t("browser.live.actionFailed"), true);
   // What the computer copied when the browser kept it out of the person's clipboard: the line under the screen
   // offers it until they copy it, copy again or hand back.
   const [got, setGot] = useState<string | null>(null);
   const copyGot = (text: string) =>
     navigator.clipboard?.writeText(text).then(() => {
       setGot(null);
-      copiedToast();
-    }, failedToast) ?? failedToast();
+      copied();
+    }, copyFailed) ?? copyFailed();
   const copiedThere = useScreenKeys({
     field: keysRef,
     screen: screenRef,
     rfb: rfbRef,
     active: inControl,
     onRefused: (why) =>
-      toast.show(why === "tooLong" ? t("desktop.clipboard.tooLong", g) : t("desktop.clipboard.textOnly", g), "error"),
+      say(why === "tooLong" ? t("desktop.clipboard.tooLong", g) : t("desktop.clipboard.textOnly", g), true),
     onCopied: (text, written) => {
       setGot(written ? null : text);
-      if (written) copiedToast();
+      // The newest copy speaks: what is offered to copy isn't hidden behind an older word.
+      if (written) copied();
+      else setSaid(null);
     },
   });
   // Leaving the page in control asks first: outside full screen Ctrl+W closes the tab, which in a terminal there
@@ -250,6 +262,7 @@ export function DesktopView({
     if (inControl) return;
     setHandingBack(false);
     setGot(null);
+    setSaid(null);
     // Its field goes with control, and a field removed while focused may get no blur.
     setTyping(false);
   }, [inControl]);
@@ -503,7 +516,16 @@ export function DesktopView({
                 {t("desktop.keyboard.label")}
               </Button>
             )}
-            {got === null ? (
+            {said ? (
+              <span
+                key={said.at}
+                className={cx("dsk-said ac-iconline", said.error && "is-error")}
+                role={said.error ? "alert" : "status"}
+              >
+                <Icon name={said.error ? "alert" : "check"} size={14} />
+                <span>{said.text}</span>
+              </span>
+            ) : got === null ? (
               <span className="muted">
                 {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
                 {t("desktop.control.notice", g)}

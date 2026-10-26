@@ -27,6 +27,9 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
 
+/** How long a toast stays; a word said in a toast's place (a line of the computer's window) stays as long. */
+export const TOAST_MS = 6000;
+
 let nextId = 1;
 
 /** A tiny store so non-React code (the QueryClient) can raise toasts. */
@@ -52,7 +55,7 @@ export function createToastStore() {
       setTimeout(() => {
         toasts = toasts.filter((t) => t.id !== toast.id);
         emit();
-      }, 6000);
+      }, TOAST_MS);
     },
     dismiss(id: number) {
       toasts = toasts.filter((t) => t.id !== id);
