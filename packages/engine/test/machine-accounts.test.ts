@@ -281,6 +281,37 @@ test("hello.accounts: new accounts are added as the pairer's, known ones refresh
   expect((await accountRows(machineId)).length).toBe(1);
 });
 
+test("hello.accounts: what the runner found since hello, sent the moment welcome arrives, lands over hello's list", async () => {
+  f = await setup();
+  const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+  hubs.push(hub);
+  const { machineId, token } = await ownedMachine();
+  const newer: RunnerAccountInfo[] = [
+    { id: CLAUDE_ID, kind: "claude_code", loggedIn: true, email: "ana@example.com" },
+    { id: CODEX_ID, kind: "codex", loggedIn: true },
+  ];
+  let changed: Promise<unknown> = Promise.resolve();
+  const conn = hub.open({
+    send(text: string) {
+      if ((JSON.parse(text) as ServerFrame).type !== "welcome") return;
+      queueMicrotask(() => {
+        changed = hub.message(conn, JSON.stringify({ type: "accounts.changed", accounts: newer }));
+      });
+    },
+    close() {},
+  });
+  const older: RunnerAccountInfo[] = [{ id: CLAUDE_ID, kind: "claude_code", loggedIn: false }];
+  await hub.message(
+    conn,
+    JSON.stringify({ type: "hello", token, ...RUNNER, protocol: ACCOUNTS_PROTOCOL, exec: true, accounts: older }),
+  );
+  await changed;
+  expect((await accountRows(machineId)).map((r) => [r.id, r.status])).toEqual([
+    [CLAUDE_ID, "active"],
+    [CODEX_ID, "active"],
+  ]);
+});
+
 test("signing in: the person who connected the computer; the code is sealed to it; done stores the account once", async () => {
   f = await setup();
   const { machineId } = await ownedMachine();
