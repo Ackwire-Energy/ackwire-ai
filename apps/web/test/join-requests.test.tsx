@@ -37,8 +37,15 @@ const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
 });
 
 /** The link's page, signed out (`me: null`) or as the fake's Walter. */
-async function openLink(preview: InvitationPreview, options: { signedIn?: boolean; askError?: ApiError } = {}) {
-  const state = seedState({ previews: { lnk: preview }, askError: options.askError });
+async function openLink(
+  preview: InvitationPreview,
+  options: { signedIn?: boolean; askError?: ApiError; emails?: boolean } = {},
+) {
+  const state = seedState({
+    previews: { lnk: preview },
+    askError: options.askError,
+    authConfig: { passwordReset: options.emails ?? true },
+  });
   if (!options.signedIn) state.me = null;
   else if (state.me) state.me.user.emailVerified = true;
   const r = await renderApp("/invite/lnk", { api: createFakeApi(state) });
@@ -113,6 +120,16 @@ describe("an invitation link asks to join", () => {
     expect(text()).toContain("Para terminar, abra o convite que mandamos para walter@acme.com.br.");
     cleanup();
 
+    // A server that sends no email: the admin hands them the link.
+    await openLink(
+      { ...LINK, you: you({ request: { status: "approved", reason: null } }) },
+      { signedIn: true, emails: false },
+    );
+    expect(heading()).toBe("Aprovado");
+    expect(text()).toContain("Um admin vai mandar um link para você terminar.");
+    expect(text()).not.toContain("convite que mandamos");
+    cleanup();
+
     await openLink({ ...LINK, you: you({ member: true, orgId: ORG_ID }) }, { signedIn: true });
     expect(heading()).toBe("Você já está na Acme");
     cleanup();
@@ -166,13 +183,13 @@ async function members(query = "", patch: Parameters<typeof seedState>[0] = {}) 
   await settle(6);
   return { ...r, state };
 }
-const card = (name: string) => screen().getByRole("group", { name });
+const card = (name: string) => screen().getByRole("group", { name: `${name} pede para entrar` });
 
 describe("Members › Requests to join", () => {
   test("each request says what approving does; approve with a role, or an invitation goes out", async () => {
     const { state } = await members();
     const section = screen().getByRole("region", { name: "Pedidos para entrar 2" });
-    const ana = within(section).getByRole("group", { name: "Ana Souza" });
+    const ana = within(section).getByRole("group", { name: "Ana Souza pede para entrar" });
     expect(ana.textContent).toContain("Ana Souza pede para entrar");
     expect(ana.textContent).toContain("ana@estudio.com");
     expect(ana.textContent).toContain("E-mail confirmado: a pessoa entra quando você aprovar.");
@@ -226,7 +243,7 @@ describe("Members › Requests to join", () => {
       "Só a equipe do estúdio",
     ]);
     expect(text()).toContain("Pedido recusado.");
-    expect(screen().queryByRole("group", { name: "Ana Souza" })).toBeNull();
+    expect(screen().queryByRole("group", { name: "Ana Souza pede para entrar" })).toBeNull();
 
     state.answerError = new ApiError(409, "join.answered", "answered");
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
@@ -246,6 +263,35 @@ describe("Members › Requests to join", () => {
     await members("?request=r9&do=approve");
     expect(screen().getByRole("status").textContent).toContain("Alguém já respondeu este pedido, ou ele expirou.");
   });
+});
+
+test("a name typed with markup reads as typed, in Members and in the inbox", async () => {
+  const name = "Ana <strong>CEO</strong><br/>x";
+  await members("", { joinRequests: [{ ...(REQUESTS[0] as JoinRequest), name }] });
+  const who = card(name).querySelector(".ac-approval__who b");
+  expect(who?.textContent).toBe(name);
+  expect(who?.children.length).toBe(0);
+  cleanup();
+
+  const state = seedState({
+    notifications: [
+      notification({
+        id: "n-join",
+        kind: "join_request",
+        waiting: true,
+        count: 1,
+        source: { label: "Acme" },
+        latest: { title: name },
+      }),
+    ],
+  });
+  await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+  await settle(6);
+  const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
+  expect(notice.getAttribute("aria-label")).toBe(`${name} pede para entrar`);
+  const headline = notice.querySelector(".nt-meta b");
+  expect(headline?.textContent).toBe(name);
+  expect(headline?.children.length).toBe(0);
 });
 
 describe("Members › Invitation link", () => {
@@ -316,7 +362,7 @@ test("the admins' notice: who asks, a Members chip, and it opens Members", async
   const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
   await settle(6);
   const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
-  expect(notice.getAttribute("aria-label")).toBe("Bruno Lima");
+  expect(notice.getAttribute("aria-label")).toBe("Bruno Lima e outras pessoas pedem para entrar");
   expect(notice.textContent).toContain("Bruno Lima e outras pessoas pedem para entrar");
   expect(notice.querySelector(".ac-chip")?.textContent).toBe("Membros");
   await click(within(notice).getByRole("button", { name: "Abrir" }));

@@ -205,6 +205,7 @@ export const en: Translations = {
       open: "Open {{org}}",
       approvedTitle: "Approved",
       approvedEmail: "To finish, open the invitation we sent to {{email}}.",
+      approvedNoEmail: "An admin will send you a link to finish.",
       deniedTitle: "Your request wasn't approved",
       deniedText: "If you think it's a mistake, ask someone at {{org}} to invite you by email.",
       reason: "Their note: {{reason}}",
@@ -1408,6 +1409,8 @@ export const en: Translations = {
       why: "Why?",
       hideWhy: "Hide why",
       openApprovals: "Open in Approvals",
+      joinRequest_one: "{{name}} asks to join",
+      joinRequest_other: "{{name}} and others ask to join",
       doing: {
         merge: "merge",
         deploy: "deploy",
@@ -2567,6 +2570,7 @@ export const en: Translations = {
     requests: {
       title: "Requests to join",
       asks: "<b>{{name}}</b> asks to join",
+      label: "{{name}} asks to join",
       asked: "Asked {{ago}}",
       confirmed: "Email confirmed: they get in when you approve.",
       unconfirmed: "Email not confirmed: approving sends an invitation to it.",

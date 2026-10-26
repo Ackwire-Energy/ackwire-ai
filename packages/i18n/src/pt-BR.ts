@@ -212,6 +212,7 @@ export const ptBR = {
       open: "Abrir {{org}}",
       approvedTitle: "Aprovado",
       approvedEmail: "Para terminar, abra o convite que mandamos para {{email}}.",
+      approvedNoEmail: "Um admin vai mandar um link para você terminar.",
       deniedTitle: "Seu pedido não foi aprovado",
       deniedText: "Se acha que foi engano, peça a alguém da {{org}} para convidar você por e-mail.",
       reason: "Recado: {{reason}}",
@@ -1422,6 +1423,8 @@ export const ptBR = {
       why: "Por quê?",
       hideWhy: "Esconder o porquê",
       openApprovals: "Abrir em Aprovações",
+      joinRequest_one: "{{name}} pede para entrar",
+      joinRequest_other: "{{name}} e outras pessoas pedem para entrar",
       doing: {
         merge: "fazer um merge",
         deploy: "fazer um deploy",
@@ -2583,6 +2586,7 @@ export const ptBR = {
     requests: {
       title: "Pedidos para entrar",
       asks: "<b>{{name}}</b> pede para entrar",
+      label: "{{name}} pede para entrar",
       asked: "Pediu {{ago}}",
       confirmed: "E-mail confirmado: a pessoa entra quando você aprovar.",
       unconfirmed: "E-mail não confirmado: aprovar manda um convite para ele.",

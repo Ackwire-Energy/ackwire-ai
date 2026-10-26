@@ -44,6 +44,7 @@ import { useFilterCopy } from "@/components/filters";
 import { LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TYPED_VALUES } from "@/i18n";
 import { copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import "./members.css";
@@ -439,9 +440,16 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
                   id={`join-request-${r.id}`}
                   status="waiting"
                   wide
-                  aria-label={r.name}
+                  aria-label={t("members.requests.label", { name: r.name })}
                   avatar={<Avatar size="sm" name={r.name} />}
-                  who={<Trans i18nKey="members.requests.asks" values={{ name: r.name }} components={{ b: <b /> }} />}
+                  who={
+                    <Trans
+                      i18nKey="members.requests.asks"
+                      values={{ name: r.name }}
+                      components={{ b: <b /> }}
+                      {...TYPED_VALUES}
+                    />
+                  }
                   statusLabel={t("members.requests.asked", { ago: relativeTime(t, i18n.language, r.createdAt) })}
                   title={r.email}
                   detail={

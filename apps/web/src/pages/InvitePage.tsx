@@ -315,7 +315,9 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
     case "approvedEmail":
       body = (
         <Outcome expression="happy" title={t("invite.ask.approvedTitle")}>
-          <p className="page-sub">{t("invite.ask.approvedEmail", { email: address })}</p>
+          <p className="page-sub">
+            {emailsGoOut ? t("invite.ask.approvedEmail", { email: address }) : t("invite.ask.approvedNoEmail")}
+          </p>
         </Outcome>
       );
       break;

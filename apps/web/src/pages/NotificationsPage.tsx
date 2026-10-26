@@ -64,6 +64,7 @@ import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
 import { ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
@@ -263,8 +264,9 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
   const channel = channelOf(n);
   const label =
     n.source.label && channel && n.source.label === channelName(channel) ? `#${n.source.label}` : n.source.label;
+  // Names and titles are typed by people (someone asking to join is not even a member): text, never markup.
   const k = (key: WhatKey, values: Record<string, unknown>) => (
-    <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} />
+    <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} {...TYPED_VALUES} />
   );
   const own = workspaceHeadline(n);
   if (own) return t(own);
@@ -1279,7 +1281,11 @@ function WaitCard({
       data-n={n.id}
       data-wait=""
       data-burst=""
-      aria-label={[name, l.title ?? l.text].filter(Boolean).join(": ")}
+      aria-label={
+        n.kind === "join_request"
+          ? t("notifications.wait.joinRequest", { count: n.count, name: l.title ?? "" })
+          : [name, l.title ?? l.text].filter(Boolean).join(": ")
+      }
       onClick={(e) => {
         if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
         h.onSelect(n);
