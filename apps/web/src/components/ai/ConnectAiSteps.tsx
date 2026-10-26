@@ -24,6 +24,7 @@ import {
   Card,
   Icon,
   Input,
+  LogoMark,
   OptionCard,
   ProviderLogo,
   ProviderStack,
@@ -69,7 +70,8 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
       brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
       computer: row,
     });
-  return { gateOf, view, failed: brain.isError, edition };
+  // A poll that fails once keeps the last view: a sign-in in progress goes on.
+  return { gateOf, view, failed: brain.isError && !view, edition };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -481,7 +483,10 @@ export function KeyPanel({
               </OptionCard>
             ))}
             {platform && (
-              <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")}>
+              <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
+                <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
+                  <LogoMark />
+                </span>
                 <span className="ac-option__title">{t("connectAi.key.platform")}</span>
               </OptionCard>
             )}
@@ -579,6 +584,7 @@ export function WhoThinks({ rows, onKey }: { rows: WhoRow[]; onKey: () => void }
           <p className="small muted">{t("connectAi.who.line")}</p>
           <span>
             <Button size="sm" onClick={onKey}>
+              <ProviderStack ids={KEY_MARKS.slice(0, 2)} />
               {t("connectAi.who.keyFor", {
                 names: joinNames(
                   missing.map((r) => r.name),

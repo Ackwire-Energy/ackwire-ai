@@ -5,7 +5,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type AiChoice, aiStateOf, defaultChoice, firstAgent, gateDims } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
-import { Button, Dialog, DialogBody, DialogFooter } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -132,8 +132,12 @@ function ConnectAiDialog({
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
   const named = request.agentIds?.length ? request.agentIds : request.agentId ? [request.agentId] : null;
   const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({ id: a.id, name: a.name }));
-  const hasAi = (id: string) => (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
-  const [agentId, setAgentId] = useState(() => firstAgent(agents, hasAi, request.agentId)?.id);
+  // The agents a plan was connected for here: they think with it before the AI status says so.
+  const [linked, setLinked] = useState<string[]>([]);
+  const hasAi = (id: string) => linked.includes(id) || (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
+  // Only a pick is kept; else the first agent is worked out on each render (a link opens this before the agents load).
+  const [pickedAgent, setPickedAgent] = useState<string>();
+  const agentId = pickedAgent ?? firstAgent(agents, hasAi, request.agentId)?.id;
   const gates = usePlanGates(org.id, agentId);
   const [picked, setPicked] = useState<AiChoice | null>(null);
   const choice =
@@ -148,7 +152,9 @@ function ConnectAiDialog({
     provider: providerGuess(request.apiKey, request.provider),
     apiKey: request.apiKey ?? "",
   }));
+  // Anything connected shows Done; only a saved key closes the key's field (after a plan, it's for the other agents).
   const [connected, setConnected] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
   const done = () => {
     setConnected(true);
     void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
@@ -158,7 +164,12 @@ function ConnectAiDialog({
     if (draft.provider === "platform") return;
     add.mutate(
       { provider: draft.provider, label: providerLabel(draft.provider), apiKey: draft.apiKey.trim() },
-      { onSuccess: done },
+      {
+        onSuccess: () => {
+          setKeySaved(true);
+          done();
+        },
+      },
     );
   };
 
@@ -184,40 +195,56 @@ function ConnectAiDialog({
       width={600}
     >
       <DialogBody>
-        <AiPicker
-          choice={choice}
-          onPick={(next) => {
-            setPicked(next);
-            // Another plan starts on the next agent with no AI.
-            if (next !== "key" && next !== choice) setAgentId(firstAgent(agents, hasAi)?.id);
-          }}
-          dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
-        />
-        {choice === "key" ? (
-          <KeyPanel
-            draft={draft}
-            onDraft={setDraft}
-            locked={!mayAddKey}
-            saved={connected}
-            saving={add.isPending}
-            onSave={saveKey}
-          />
+        {/* A link opens this before the agents and their AI load, and what it opens on follows them. */}
+        {dir.loading || status.isPending ? (
+          <Spinner />
         ) : (
-          <PlanPanel
-            key={choice}
-            choice={choice}
-            gates={gates}
-            agents={agents}
-            agentId={agentId}
-            onAgent={setAgentId}
-            locked={locked}
-            onKey={() => setPicked("key")}
-            onComputer={() => {
-              onClose();
-              void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "computers" } });
-            }}
-            onDone={done}
-          />
+          <>
+            <AiPicker
+              choice={choice}
+              onPick={(next) => {
+                setPicked(next);
+                // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
+                if (next !== "key" && next !== choice && agentId !== undefined && linked.includes(agentId))
+                  setPickedAgent(firstAgent(agents, hasAi)?.id);
+              }}
+              dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
+            />
+            {choice === "key" ? (
+              <KeyPanel
+                draft={draft}
+                onDraft={setDraft}
+                locked={!mayAddKey}
+                saved={keySaved}
+                saving={add.isPending}
+                onSave={saveKey}
+              />
+            ) : (
+              <PlanPanel
+                key={choice}
+                choice={choice}
+                gates={gates}
+                agents={agents}
+                agentId={agentId}
+                onAgent={setPickedAgent}
+                locked={locked}
+                onKey={() => setPicked("key")}
+                onComputer={() => {
+                  onClose();
+                  void navigate({
+                    to: "/org/$orgId/settings/$section",
+                    params: { orgId: org.id, section: "computers" },
+                  });
+                }}
+                onDone={(id) => {
+                  // The panel stays on that agent, saying it's done.
+                  setPickedAgent(id);
+                  setLinked((l) => [...l, id]);
+                  done();
+                }}
+              />
+            )}
+          </>
         )}
       </DialogBody>
       {connected && (
