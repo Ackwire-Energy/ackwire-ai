@@ -352,15 +352,16 @@ export interface DesktopSystem {
   processes(): ProcessStat[];
 }
 
-/** A process as `/proc/<pid>/stat` has it: `start` in seconds since the computer booted. */
+/** A process as `/proc/<pid>/stat` has it: `start` in seconds since the computer booted, `cpu` in seconds it ran. */
 export interface ProcessStat {
   pid: number;
   ppid: number;
   name: string;
   start: number;
+  cpu: number;
 }
 
-/** USER_HZ, what `/proc/<pid>/stat` counts a process's start in: 100 on every Linux the runner runs on. */
+/** USER_HZ, what `/proc/<pid>/stat` counts a process's start and CPU time in: 100 on every Linux the runner runs on. */
 const TICKS_PER_SECOND = 100;
 
 /** One `/proc/<pid>/stat` line; null when it isn't one. Its name can hold spaces and parentheses: it ends at the last ")". */
@@ -368,11 +369,12 @@ export function procStat(line: string): ProcessStat | null {
   const open = line.indexOf("(");
   const close = line.lastIndexOf(")");
   if (open < 0 || close < open) return null;
-  // From the field after the name: state, ppid, … starttime (the stat's 22nd field).
+  // From the field after the name: state, ppid, … utime and stime (the stat's 14th and 15th), starttime (its 22nd).
   const fields = line.slice(close + 2).split(" ");
   const [pid, ppid, start] = [Number(line.slice(0, open)), Number(fields[1]), Number(fields[19])];
-  if (!isPid(pid) || !Number.isInteger(ppid) || !Number.isFinite(start)) return null;
-  return { pid, ppid, name: line.slice(open + 1, close), start: start / TICKS_PER_SECOND };
+  const cpu = Number(fields[11]) + Number(fields[12]);
+  if (!isPid(pid) || !Number.isInteger(ppid) || !Number.isFinite(start) || !Number.isFinite(cpu)) return null;
+  return { pid, ppid, name: line.slice(open + 1, close), start: start / TICKS_PER_SECOND, cpu: cpu / TICKS_PER_SECOND };
 }
 
 function spawnProcess(argv: string[], opts: DesktopSpawnOptions): DesktopProcess {
@@ -775,8 +777,9 @@ export class DesktopSessions {
   }
 
   /**
-   * When each of XFCE's programs (`SESSION_PROGRAMS`) started, from its session's own start: the processes under
-   * the one this runner started, as `/proc` has them. Once per desktop it started.
+   * When each of XFCE's programs (`SESSION_PROGRAMS`) started, from its session's own start, and the CPU time its
+   * processes used so far (a program building a cache shows seconds; one waiting on another, none): the processes
+   * under the one this runner started, as `/proc` has them. Once per desktop it started.
    */
   private sessionStart(d: Desktop) {
     d.untold = false;
@@ -786,8 +789,12 @@ export class DesktopSessions {
     const base = tree.find((p) => p.name === "xfce4-session")?.start;
     if (base === undefined) return;
     const parts = SESSION_PROGRAMS.map((name) => {
-      const at = Math.min(...tree.filter((p) => p.name === name).map((p) => p.start));
-      return Number.isFinite(at) ? `${name} at ${seconds((at - base) * 1000)}` : `${name} not yet`;
+      const own = tree.filter((p) => p.name === name);
+      const at = Math.min(...own.map((p) => p.start));
+      const cpu = own.reduce((sum, p) => sum + p.cpu, 0);
+      return Number.isFinite(at)
+        ? `${name} at ${seconds((at - base) * 1000)} (${seconds(cpu * 1000)} of CPU)`
+        : `${name} not yet`;
     });
     this.opts.log(`the desktop of ${d.agent.handle}: its session started ${parts.join(", ")}`);
   }
@@ -884,16 +891,17 @@ export class DesktopSessions {
         const looking = this.step(
           this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
         ).then((code) => ({ code, ms: this.now() - preparedAt }));
-        this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
         const env = { ...user.env, HOME: user.home };
-        const x = this.sys.spawn([...user.prefix, xvnc, `:${display}`, ...xvncArgs(files, desktopName(agent))], {
-          cwd: user.home,
-          env,
-          detached: true,
-          log,
-        });
+        let x: DesktopProcess;
         let pid: number;
         try {
+          this.writePasswords(files.passwd, vncPasswordFile(passwords.full, passwords.view), user.ids);
+          x = this.sys.spawn([...user.prefix, xvnc, `:${display}`, ...xvncArgs(files, desktopName(agent))], {
+            cwd: user.home,
+            env,
+            detached: true,
+            log,
+          });
           pid = await this.waitForXvnc(x, display, files.socket, logFile);
         } catch (err) {
           // Its next start's prepare renames files the look still writes (xfwm4's settings among them).

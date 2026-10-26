@@ -577,6 +577,25 @@ test("the screen server starts while the look is written; the session waits for 
   t.desktops.close();
 });
 
+test("a start that fails before its screen server is up, its password file unwritable, ends after the look too", async () => {
+  const t = setup();
+  t.fake.hangs.add("agentes-look");
+  // A folder where the password file goes: writing it fails.
+  mkdirSync(path.join((await t.opts.user(dev)).dir, "passwd"), { recursive: true });
+  let failed = false;
+  const failing = t.desktops.ensure(dev).catch(() => {
+    failed = true;
+  });
+  await waitFor(() => t.fake.of("agentes-look").length === 1);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(failed).toBe(false);
+  expect(t.fake.of("Xtigervnc")).toHaveLength(0);
+  t.fake.of("agentes-look")[0]?.exit(0);
+  await failing;
+  expect(failed).toBe(true);
+  t.desktops.close();
+});
+
 test("each start's line says where its time went; its session's programs follow once it settled, from /proc", async () => {
   const t = setup();
   await t.desktops.ensure(dev);
@@ -587,13 +606,15 @@ test("each start's line says where its time went; its session's programs follow 
   if (!launched) throw new Error("not started");
   // dbus-launch became the session (system mode: runuser's child); another desktop's programs aren't its own.
   t.fake.stats.push(
-    { pid: launched.pid, ppid: 1, name: "xfce4-session", start: 5000 },
-    { pid: 9001, ppid: launched.pid, name: "xfwm4", start: 5000.31 },
-    { pid: 9002, ppid: launched.pid, name: "xfsettingsd", start: 5000.88 },
-    { pid: 9003, ppid: launched.pid, name: "xfce4-panel", start: 5003.9 },
-    { pid: 9004, ppid: 9003, name: "wrapper-2.0", start: 5004.1 },
-    { pid: 9005, ppid: launched.pid, name: "Thunar", start: 5003.95 },
-    { pid: 9100, ppid: 4242, name: "xfdesktop", start: 4000 },
+    { pid: launched.pid, ppid: 1, name: "xfce4-session", start: 5000, cpu: 0.2 },
+    { pid: 9001, ppid: launched.pid, name: "xfwm4", start: 5000.31, cpu: 0.4 },
+    { pid: 9002, ppid: launched.pid, name: "xfsettingsd", start: 5000.88, cpu: 3.1 },
+    { pid: 9003, ppid: launched.pid, name: "xfce4-panel", start: 5003.9, cpu: 0.5 },
+    // docklike's and another plugin's: one program, their CPU time together.
+    { pid: 9004, ppid: 9003, name: "wrapper-2.0", start: 5004.1, cpu: 0.3 },
+    { pid: 9006, ppid: 9003, name: "wrapper-2.0", start: 5004.2, cpu: 0.05 },
+    { pid: 9005, ppid: launched.pid, name: "Thunar", start: 5003.95, cpu: 0.1 },
+    { pid: 9100, ppid: 4242, name: "xfdesktop", start: 4000, cpu: 9 },
   );
   const told = () => t.logs.filter((l) => l.startsWith("the desktop of dev: its session started"));
   t.clock.now += 14_000;
@@ -602,7 +623,7 @@ test("each start's line says where its time went; its session's programs follow 
   t.clock.now += 1000;
   await t.desktops.sweep();
   expect(told()).toEqual([
-    "the desktop of dev: its session started xfwm4 at 0.31 s, xfsettingsd at 0.88 s, xfce4-panel at 3.90 s, wrapper-2.0 at 4.10 s, Thunar at 3.95 s, xfdesktop not yet",
+    "the desktop of dev: its session started xfwm4 at 0.31 s (0.40 s of CPU), xfsettingsd at 0.88 s (3.10 s of CPU), xfce4-panel at 3.90 s (0.50 s of CPU), wrapper-2.0 at 4.10 s (0.35 s of CPU), Thunar at 3.95 s (0.10 s of CPU), xfdesktop not yet",
   ]);
   // Once.
   t.clock.now += 60_000;
@@ -619,14 +640,17 @@ test("each start's line says where its time went; its session's programs follow 
   t.desktops.close();
 });
 
-test("a process in /proc: its parent, its name with spaces and parentheses, and its start in seconds since boot", () => {
-  // The 52 fields of /proc/<pid>/stat: the start is the 22nd, in hundredths of a second.
-  const rest = (start: number) => `S 4321 ${Array(17).fill(0).join(" ")} ${start} ${Array(30).fill(0).join(" ")}`;
-  expect(procStat(`1234 (xfce4-panel) ${rest(503390)}`)).toEqual({
+test("a process in /proc: its parent, its name with spaces and parentheses, its start since boot and its CPU time", () => {
+  // The 52 fields of /proc/<pid>/stat, in hundredths of a second: its time in user and kernel mode the 14th and 15th,
+  // its start the 22nd.
+  const rest = (start: number, user = 0, kernel = 0) =>
+    `S 4321 ${[...Array(9).fill(0), user, kernel, ...Array(6).fill(0)].join(" ")} ${start} ${Array(30).fill(0).join(" ")}`;
+  expect(procStat(`1234 (xfce4-panel) ${rest(503390, 250, 61)}`)).toEqual({
     pid: 1234,
     ppid: 4321,
     name: "xfce4-panel",
     start: 5033.9,
+    cpu: 3.11,
   });
   expect(procStat(`77 (Web Content (x) y) ${rest(10)}`)).toMatchObject({ name: "Web Content (x) y", start: 0.1 });
   expect(procStat("not a stat line")).toBeNull();
