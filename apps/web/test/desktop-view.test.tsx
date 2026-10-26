@@ -949,7 +949,7 @@ describe("the dialog's size (computer.css)", () => {
     expect(full).toContain("height: 100%");
   });
 
-  test("one frame for the screen, its covers and the agent's page, its steps' line kept while there are none", async () => {
+  test("one frame for the screen, its covers and the agent's page; with no line under the screen it ends 16 px under it and keeps its top", async () => {
     const text = await css();
     // The wait for the workspace's computer is as wide, so its screen opens in place.
     expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
@@ -958,6 +958,14 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
       "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
     );
+    // The same screen with nothing under it (no steps, no keys' line, no note, no tools of the page): 30 px shorter,
+    // its top where it was (the dialog is centred on 50%), so a line coming adds it below and the screen never moves.
+    const bare = rule(
+      text,
+      ".ac-dialog.cmp-dialog:where(\n  :has(.dsk, .cmp-stage, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))\n)",
+    );
+    expect(bare).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 100px)");
+    expect(bare).toContain("top: calc(50% - 15px)");
     expect(rule(text, ".cmp-steps-row")).toContain("height: 22px");
     // The page at 16:10 takes the most of its stage in the same frame, never a size of its own.
     expect(rule(text, ".cmp-body .brw-ac__page")).toContain("width: min(100cqw, 100cqh * 16 / 10)");

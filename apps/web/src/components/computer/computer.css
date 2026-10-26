@@ -65,8 +65,8 @@
  * One frame for whatever takes the screen's place (the screen, a cover, the agent's page), so the dialog keeps
  * its size from one to the next: as large as 96vw × 94vh allow and no larger than the screen itself (1280×900),
  * keeping its shape. Around the screen: the head (70 px), the sky strip (6), the body's padding (8 + 16) and the
- * line of the run's steps (22 + 8). The wait for the workspace's computer is as wide, so the screen that follows
- * it opens in place.
+ * line under the screen (22 + 8): the run's steps, or in control the line of the keys. The wait for the workspace's
+ * computer is as wide, so the screen that follows it opens in place.
  */
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
   --cmp-screen: min(96vw - 32px, 1280px, (94dvh - 130px) * 1280 / 900);
@@ -75,12 +75,22 @@
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface)) {
   height: calc(var(--cmp-screen) * 900 / 1280 + 130px);
 }
-/* The steps' line stays while there are none: the screen never changes size as the agent starts or stops. */
+/*
+ * Nothing under the screen (watching while the agent rests, a cover): the dialog ends 16 px under it, as on its
+ * sides, and keeps its top, so a line that comes (the steps, the keys, a note, the page's tools) adds its 30 px
+ * below and the screen stays where it is.
+ */
+.ac-dialog.cmp-dialog:where(
+  :has(.dsk, .cmp-stage, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))
+) {
+  top: calc(50% - 15px);
+  height: calc(var(--cmp-screen) * 900 / 1280 + 100px);
+}
 .cmp-steps-row {
   flex: none;
   height: 22px;
 }
-/* In control the line under the screen (`.dsk-line`, 22px) takes the steps' line's place: one size watching or in control. */
+/* In control the line under the screen is the keys' (`.dsk-line`, 22px), and the steps don't show. */
 .cmp-body:has(> .dsk.is-control) > .cmp-steps-row {
   display: none;
 }

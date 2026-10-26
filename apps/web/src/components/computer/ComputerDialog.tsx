@@ -301,8 +301,6 @@ function ComputerStage({
 
   let body: ReactNode;
   let steps: ReactNode = null;
-  // Everything but the wait for the workspace's computer takes the screen's frame, the steps' line included.
-  let framed = true;
   if (!f || !view.ready) {
     body = (
       <>
@@ -345,7 +343,6 @@ function ComputerStage({
       </>
     );
   } else if (surface === "preparing" && f.setup) {
-    framed = false;
     body = (
       <>
         <DialogHead sub={t("agentComputer.sub.preparing")} />
@@ -558,7 +555,7 @@ function ComputerStage({
     <DialogHeadContext.Provider value={head}>
       <div className="cmp-body">
         {body}
-        {framed && <div className="cmp-steps-row">{steps}</div>}
+        {steps && <div className="cmp-steps-row">{steps}</div>}
       </div>
     </DialogHeadContext.Provider>
   );
