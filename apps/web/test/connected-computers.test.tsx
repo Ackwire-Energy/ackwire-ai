@@ -14,6 +14,7 @@ import { fileSaver } from "@/components/artifacts/ArtifactViewer";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { createI18n } from "@/i18n";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 const saved: { url: string; name: string }[] = [];
@@ -255,8 +256,9 @@ describe("Configurações → Computadores", () => {
     expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
     expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);
     expect(screen().getByRole("region", { name: "Outros computadores" })).toBeTruthy();
+    // The empty state is its title: how to connect one is the card right under it.
     expect(screen().getByText("Nenhum outro computador ainda")).toBeTruthy();
-    expect(body.textContent).toContain("Conecte um Mac pelo app agentes, ou qualquer servidor com um comando.");
+    expect(body.textContent).not.toContain("Conecte um Mac pelo app agentes");
     expect(screen().getByRole("region", { name: "Conectar outro computador" })).toBeTruthy();
     // Never internal names in the UI.
     expect(body.textContent).not.toMatch(/runner|MCP/i);
@@ -289,6 +291,17 @@ describe("Configurações → Computadores", () => {
     expect(document.querySelector(".machine-row canvas.ac-computer")?.getAttribute("data-kind")).toBe("mac");
   });
 
+  test("which computer each agent uses: this server's computer, before its runner names it, by what it is", async () => {
+    const api = createFakeApi(seedState());
+    const agents = [{ id: ADA_ID, name: "Ada", handle: "ada" }];
+    fakeMachinesOf.get(api)?.pair({ name: "", kind: "host", agents });
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+    await settle(8);
+    const card = screen().getByRole("region", { name: "Qual computador cada agente usa" });
+    const trigger = within(card).getByRole("combobox", { name: "Computador de Ada" });
+    expect(trigger.textContent).toContain("Computador deste servidor");
+  });
+
   test("members see each agent's computer but don't pick for agents they don't own", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
@@ -318,6 +331,8 @@ describe("Configurações → Computadores", () => {
     await settle(8);
     expect(state.calls.find((c) => c.method === "machines.desktopLatest")?.args).toEqual(["darwin", "aarch64"]);
     const card = screen().getByRole("region", { name: "Conectar outro computador" });
+    expect(shownText(card)).toContain("Instale o app do agentes.chat no Mac.");
+    expect(card.textContent).not.toContain("numa janela própria");
     const download = within(card).getByRole("link", { name: "Baixar o app para Mac" });
     expect(download.getAttribute("href")).toBe(
       "http://localhost:3000/api/desktop/download/0.2.0/agentes_0.2.0_aarch64.dmg",
@@ -325,6 +340,11 @@ describe("Configurações → Computadores", () => {
     expect(card.textContent).toMatch(/Versão 0\.2\.0 · 12\sMB/);
     expect(card.querySelector(".machine-connect__hash")?.textContent).toBe(sha);
     expect(within(card).getByRole("button", { name: "Copiar SHA-256" })).toBeTruthy();
+    // What to do with the hash is its ⓘ, not a line under it.
+    expect(hintOf("SHA-256", card).text).toBe("Confira se é o mesmo do arquivo baixado: o app só é publicado aqui.");
+    expect(shownText(card)).not.toContain("Confira se é o mesmo");
+    // The first time's steps stay on the card: they are how to connect it.
+    expect(card.textContent).toContain("Na primeira vez");
     expect(card.textContent).toContain("arraste o agentes.chat para Aplicativos");
     // Signed and notarized: no Terminal unlock on first run.
     expect(card.textContent).not.toContain("xattr");
@@ -339,16 +359,23 @@ describe("Configurações → Computadores", () => {
     const command = commands().at(-1) ?? "";
     expect(command).toBe("curl -fsSL http://localhost:3000/api/machines/install.sh | sh");
     expect(command).not.toContain("--code");
-    expect(card.textContent).toContain("Ele mostra um código e um link");
+    // A command wider than a phone scrolls beside its copy button, never under it.
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".machine-command")).toContain("display: flex");
+    expect(rule(".machine-command__copy")).not.toContain("position: absolute");
+    expect(shownText(card)).toContain("Rode no terminal do computador e confirme o código que ele mostrar.");
+    expect(card.textContent).not.toContain("Não precisa instalar nada antes");
   });
 
-  test("no build published (404): a calm note instead of the button; the terminal stays", async () => {
+  test("no build published (404): a calm note instead of the button, and nothing to install; the terminal stays", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
     const card = screen().getByRole("region", { name: "Conectar outro computador" });
     expect(within(card).queryByRole("link", { name: "Baixar o app para Mac" })).toBeNull();
     expect(card.textContent).toContain("O app para Mac ainda não está disponível.");
+    expect(card.textContent).not.toContain("Instale o app do agentes.chat no Mac.");
     expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
   });
 
@@ -553,7 +580,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     // "Pausado até 16:24" (past midnight the date comes first).
     expect(head.textContent).toContain("Pausado até ");
     expect(head.textContent).toContain(time);
-    expect(head.textContent).toContain("Nada novo começa até retomar");
+    expect(head.textContent).toContain("Pausado no próprio computador por quem o conectou.");
     // The server says "not paused" with null.
     await act(async () => socket.push(orgEvent({ type: "machine.updated", machineId: m.id, paused: null })));
     await settle(2);
@@ -562,6 +589,8 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
 
   test("owner: folders with the agents that use them; Remover (one agent, everyone) calls reduce", async () => {
     const { state, m } = await open();
+    // The card is its title and its rows: no line under the title.
+    expect(shownText(screen().getByRole("region", { name: "Pastas liberadas" }))).not.toContain("pastas a mais");
     const loja = folderRow(LOJA);
     expect(loja.textContent).toContain("loja-v5");
     expect(loja.querySelector("code")?.textContent).toBe(LOJA);
@@ -594,8 +623,15 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     const codex = tools.querySelector('[data-tool="codex"]') as HTMLElement;
     expect(claude.textContent).toContain("Ligado");
     expect(codex.textContent).toContain("Desligado");
-    expect(within(codex).queryByRole("button")).toBeNull();
-    expect(tools.textContent).toContain("Comandos podem chegar a outras partes do computador");
+    expect(within(codex).queryByRole("button", { name: /^Desligar/ })).toBeNull();
+    // Each tool is its name and its ⓘ; that Commands reach past the allowed folders stays in view while it's on.
+    expect(hintOf("Claude Code", tools).text).toBe("Escreve e muda arquivos, só nas pastas liberadas.");
+    expect(hintOf("Codex", tools).text).toBe("Como o Claude Code, com uma conta do ChatGPT. Só nas pastas liberadas.");
+    expect(hintOf("Comandos", tools).text).toBe("Roda comandos do Terminal, como testes e builds.");
+    expect(shownText(tools)).not.toMatch(
+      /O que os agentes podem rodar|Escreve e muda|Como o Claude Code|Roda comandos/,
+    );
+    expect(shownText(tools)).toContain("Comandos podem chegar a outras partes do computador");
 
     await click(within(claude).getByRole("button", { name: "Desligar Claude Code" }));
     const dialog = screen().getByRole("dialog", { name: "Desligar Claude Code?" });
@@ -616,6 +652,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
   test("read-only for someone who is neither an admin nor who connected it", async () => {
     const { state } = await open({ canManage: false, workspace: null, pairedBy: { id: "u-joao", name: "João" } });
     expect(document.body.textContent).toContain("Só João e os admins mudam o que este computador libera.");
+    expect(document.body.textContent).not.toContain("Daqui você vê");
     expect(screen().queryByRole("button", { name: "Ações de loja-v5" })).toBeNull();
     expect(screen().queryByRole("button", { name: /^Desligar/ })).toBeNull();
     expect(screen().queryByRole("button", { name: /^Ações de MacBook/ })).toBeNull();
@@ -672,7 +709,19 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(section.querySelector("code")?.textContent).toBe(LOJA);
     // Allowed on the machine but not for Ada.
     expect(section.textContent).not.toContain(DOCS);
-    expect(section.textContent).toContain("Liberar outra pasta é no próprio computador");
+    // Where more is allowed is the label's ⓘ.
+    expect(hintOf("Pastas no computador", section).text).toBe(
+      "Liberar outra pasta é no próprio computador, por quem o conectou.",
+    );
+    expect(shownText(section)).not.toContain("Liberar outra pasta");
+    // Who runs the computer is its name's ⓘ; the name shows once, with no read-only row naming it again.
+    const pc = document.querySelector(".agp-pc") as HTMLElement;
+    expect(hintOf("MacBook do Walter", pc).text).toBe(
+      "Quem conectou este computador liga, desliga e pausa nele mesmo.",
+    );
+    expect(shownText(pc)).not.toContain("Quem conectou este computador");
+    expect(pc.querySelector(".agp-ro")).toBeNull();
+    expect(within(pc).getByRole("button", { name: "Mudar onde trabalha" })).toBeTruthy();
   });
 
   test("browser: an agent at work in its browser stays in use between its calls (ADR 0040)", async () => {
@@ -710,6 +759,8 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     );
     await settle(8);
     const card = document.querySelector('[aria-labelledby="sec-machine-browser"]') as HTMLElement;
+    // Its title, then its state: no line under the title.
+    expect(card.querySelector(".ac-card__sub")).toBeNull();
     expect(card.textContent).toContain("Em uso agora");
     expect(card.textContent).not.toContain("Ninguém usa o navegador agora.");
     expect(card.querySelector(".brw-use")?.textContent).toContain("No navegador");

@@ -259,4 +259,13 @@ describe("hints on fields and cards", () => {
     expect(heading.contains(button)).toBe(false);
     expect(heading.parentElement?.contains(button)).toBe(true);
   });
+
+  test("beside a card's big title (`.ac-card__title`), the line takes the title's type: the ⓘ is on its first line", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    const type = (text: string) =>
+      [/font-size:\s*([\d.]+px)/, /line-height:\s*([\d.]+px)/].map((re) => text.match(re)?.[1]);
+    expect(type(rule(".ac-card__title"))).toEqual(["18px", "24px"]);
+    expect(type(rule(".ac-hintline:has(> .ac-card__title)"))).toEqual(type(rule(".ac-card__title")));
+  });
 });

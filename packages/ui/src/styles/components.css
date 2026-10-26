@@ -3893,8 +3893,8 @@ a.ac-list__row:focus-visible {
  * A hint (InfoHint): a label and its ⓘ in one `.ac-hintline`, the setting's explanation in a glass bubble. The ⓘ
  * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before, and
  * sits on the label's first line where an `.ac-iconline` lead would (the glyph's middle a hair under the line's),
- * so it stays there when the label wraps. The line sets the label's font size and line height (a field's below)
- * and the ⓘ inherits them, so its `lh` and `em` are the label's.
+ * so it stays there when the label wraps. The line sets the label's font size and line height (a field's and a
+ * card title's below) and the ⓘ inherits them, so its `lh` and `em` are the label's.
  */
 .ac-hintline {
   display: inline-flex;
@@ -3906,6 +3906,10 @@ a.ac-list__row:focus-visible {
 .ac-field__label-row > .ac-hintline {
   font-size: 13px;
   line-height: 18px;
+}
+.ac-hintline:has(> .ac-card__title) {
+  font-size: 18px;
+  line-height: 24px;
 }
 .ac-hint {
   display: inline-grid;

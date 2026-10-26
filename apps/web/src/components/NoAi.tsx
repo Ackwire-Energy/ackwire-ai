@@ -1,15 +1,13 @@
 import type { Message } from "@agenteschat/client";
 import { useAiStatus } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
-import { setupPending } from "@agenteschat/client/lib/computer";
 import { aiStateOf, NO_AI, noAiCardOf, opensByItself } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, Dialog, DialogFooter, Icon } from "@agenteschat/ui";
+import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
-import { useSetupView, useWaitReader } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useChannelEvents } from "@/realtime/context";
@@ -21,10 +19,8 @@ import "./no-ai.css";
  */
 
 /**
- * Above the composer: this DM's agent has no AI, or (anywhere with agents) the organization has none.
- * Everyone sees it; the dialog says what each person may connect. While the workspace's computer is on its way,
- * the organization's says a plan signs in there once it's ready, and a key works now; not on hold, when nothing works
- * now and the hold banner says so.
+ * Above the composer: this DM's agent has no AI, or (anywhere with agents) the organization has none, its ⓘ saying
+ * it can also be asked for in the chat. Everyone sees it; the dialog says what each person may connect.
  */
 export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgentId?: string }) {
   const { t } = useTranslation();
@@ -32,8 +28,6 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
-  const { held } = useWaitReader();
-  const preparing = setupPending(useSetupView(org.id)) && !held;
   if (!status.data || !connect) return null;
   if (dmAgentId) {
     if (aiStateOf(status.data, dmAgentId) !== "no_ai") return null;
@@ -51,19 +45,19 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
     );
   }
   if (status.data.any || agentIds.length === 0) return null;
+  const action = t("noAi.banner.orgAction");
   return (
     <div className="noai-banner" role="status">
       <span className="noai-banner__text ac-iconline">
         <Icon name="plug" size={16} />
-        <span>
-          <b>{t("noAi.banner.org")}</b>{" "}
-          {preparing
-            ? t("noAi.banner.orgHintPreparing", { computer: t("computerSetup.title", { org: org.name }) })
-            : t("noAi.banner.orgHint")}
+        <span className="ac-hintline">
+          <b>{t("noAi.banner.org")}</b>
+          {/* Named by its topic, the button's: the line beside it is a whole sentence. */}
+          <InfoHint name={t("common.about", { label: action })}>{t("noAi.banner.orgHint")}</InfoHint>
         </span>
       </span>
       <Button size="sm" onClick={() => connect.open({ agentId: agentIds.length === 1 ? agentIds[0] : undefined })}>
-        {t("noAi.banner.orgAction")}
+        {action}
       </Button>
     </div>
   );
@@ -120,7 +114,6 @@ export function NoAiCard({ message }: { message: Message }) {
         <Icon name={ready || answering ? "check" : "plug"} size={16} />
         <span>{title}</span>
       </span>
-      {!ready && !answer && card.forUserId === me.user.id && <p>{t("noAi.card.line", { name })}</p>}
       {action && <span className="waitcard__acts">{action}</span>}
     </div>
   );

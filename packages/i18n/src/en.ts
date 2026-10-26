@@ -574,14 +574,14 @@ export const en: Translations = {
     suggestedAuto: "Starts on Automatic: it picks the model and effort for each task. You can change it later.",
     computer: {
       title: "Where will we work?",
-      lead: "To run code and work with files, we need a computer. Sensitive actions still ask for approval.",
+      lead: "Agents work on a computer, and sensitive actions still ask for your approval.",
       cloud: "Daytona sandbox",
       cloudDesc: "An isolated computer for each agent, on Daytona.",
       cloudReady: "Daytona sandboxes on: each agent gets its own.",
       mine: "Another computer",
-      mineDesc: "A Mac at home or another server, connected with a code. Nothing to open on your network.",
+      mineDesc: "A Mac or another server, connected with a code.",
       thisMac: "This {{device}}",
-      thisMacDesc: "Agents work here, only in the folders you allow. Connects in one click.",
+      thisMacDesc: "Only in the folders you allow.",
       thisMacConnecting: "Connecting this {{device}}…",
       thisMacConnected: "{{name}} connected. The chosen agents will work on this {{device}}.",
       thisMacFolders: "Choose folders",
@@ -980,14 +980,12 @@ export const en: Translations = {
   },
   noAi: {
     banner: {
-      org: "Your agents don't have an AI to think with yet.",
-      orgHint: "Connect yours, or just type what you want, like “use my Claude plan”.",
-      orgHintPreparing: "Your plan signs in on {{computer}} once it's ready. An API key works now.",
+      org: "Your agents don't have an AI yet.",
+      orgHint: "You can also ask in the chat, like “use my Claude plan”.",
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because it has no AI connected.",
     card: {
-      line: "Once it's connected, {{name}} answers your message.",
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
       answering: "{{name}} is answering…",
@@ -1019,12 +1017,12 @@ export const en: Translations = {
     key: {
       title: "API key",
       makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax",
-      sub: "You pay per use, straight to the provider",
+      sub: "You pay per use, straight to the provider.",
       create: "Create your {{provider}} API key",
       paste: "Paste it here",
       forAll: "Every agent without a plan thinks with it.",
       saved: "Saved. Every agent without a plan thinks with it.",
-      notPlan: "Use a pay-as-you-go key here. A coding plan's key goes in its own option above.",
+      notPlan: "A coding plan's key goes in its own option above.",
       platform: "agentes.chat",
     },
     wait: {
@@ -1036,20 +1034,20 @@ export const en: Translations = {
     },
     own: {
       this: "The {{brand}} account signed in on {{computer}}",
-      thisText: "Every agent thinks with it. Nothing to sign in.",
+      thisText: "Every agent thinks with it.",
       other: "Another {{brand}} account, for one agent",
-      otherText: "You sign in from here; it stays on {{computer}}.",
       note: "They only reply to you while they think with your plan.",
     },
+    onlyYou: "{{name}} will only reply to you.",
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
-      text: "In ChatGPT, open Settings\u00a0›\u00a0Security and allow device code sign-in for Codex. On a Business or Enterprise plan, a workspace admin allows it.",
+      text: "In Settings\u00a0›\u00a0Security, turn on device code sign-in for Codex. On Business or Enterprise, an admin does it.",
       open: "Open ChatGPT settings",
     },
     zaiTeam: "On a team plan, use the key from your Team Plan page.",
     who: {
       key: "API key · {{provider}}",
-      line: "Each plan thinks for one agent. For the others, pick another plan above, or one API key for all of them.",
+      line: "Each plan thinks for one agent.",
       keyFor: "API key for {{names}}",
     },
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
@@ -1813,8 +1811,8 @@ export const en: Translations = {
         signInAgain: "Sign in again",
         keyLabel: "API key",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
-        fallbackOnNow: "Uses the organization's model; counts in {{name}}'s budget.",
-        fallbackOffNow: "{{name}} tells whoever asked and waits for it to come back.",
+        fallbackHint:
+          "It uses the organization's model and counts in {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
         effort: "Effort",
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortText: {
@@ -1830,10 +1828,8 @@ export const en: Translations = {
             claude_code: "Sign in to Claude with the account to use",
             codex: "Sign in to ChatGPT with the account to use",
           },
-          stepOneText: {
-            claude_code: "Opens Claude's own page. If it signs in to the wrong account, sign out there and try again.",
-            codex: "Opens OpenAI's own page. If it signs in to the wrong account, sign out there and try again.",
-          },
+          stepOneHint:
+            "Wrong account? Sign out there and try again. The account stays only on {{computer}}: agentes.chat never sees the password or the access.",
           open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT" },
           openAgain: "Open again",
           stepTwo: "Copy the code Claude showed and paste it here",
@@ -1842,10 +1838,9 @@ export const en: Translations = {
           sent: "Code sent. {{computer}} is finishing the sign-in.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
-          deviceCodeText: "Type this code on the page that opens. You asked for this sign-in on agentes.chat.",
+          deviceCodeText: "Type this code on the page that opens.",
           starting: "Asking {{computer}}…",
           waiting: "Waiting",
-          safe: "The account stays only on {{computer}}. agentes.chat never sees the password or the access.",
           failed: "Couldn't sign in to that account. Try again.",
           expired: "The time to sign in ran out. Try again.",
           duplicate: {
@@ -4402,10 +4397,8 @@ export const en: Translations = {
     share: {
       switch: "Only replies to you",
       switchOther: "Only replies to {{name}}",
-      on: "It uses your plan. Others see that {{name}} only replies to you.",
-      off: "Replies to other people on your plan.",
+      hint: "Others see that {{name}} only replies to you. Without it, {{name}} replies to other people too, on your plan.",
       onOther: "It uses {{owner}}'s plan: only {{owner}} can let other people talk to it.",
-      offOther: "Replies to other people on {{owner}}'s plan.",
       title: "Now {{name}} replies to everyone",
       titlePeople: "Now {{name}} replies to other people",
       body: {
@@ -4441,12 +4434,10 @@ export const en: Translations = {
       paste: "Paste",
       pasteFailed: "The browser didn't let us paste. Use Ctrl+V (⌘V on a Mac).",
       email: "Which account? (optional)",
-      emailHelp: "The email of the Claude account that will think. Empty: you choose on Claude's page.",
       emailInvalid: "Use a plain email, like ana@example.com.",
-      emailPlaceholder: "ana@example.com",
+      emailPlaceholder: "Claude account email (optional)",
       titleKey: "Connect {{plan}}",
       keyStep: "Create your plan's key",
-      keySite: "It's at {{site}}. Copy the whole key.",
       openKeys: "Open {{site}}",
       keyTitle: "Paste the key here",
       keyLabel: "{{plan}} key",
@@ -4475,8 +4466,8 @@ export const en: Translations = {
     },
     page: {
       title: "Your plans",
-      text: "Each account thinks for one agent. It stays on the computer; agentes.chat keeps only its name, email and usage.",
-      empty: "Connect your AI plan, like Claude or ChatGPT, and your agents think with it: no API key needed.",
+      hint: "Each account thinks for one agent and stays on the computer it was connected on; whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage.",
+      empty: "No plans yet.",
       connect: "Connect an AI",
       keyEnds: "key …{{hint}}",
       on: "on {{computer}}",
@@ -4496,7 +4487,6 @@ export const en: Translations = {
         "{{agent}} stops thinking with it and goes back to the API. {{computer}} signs out and deletes what it kept.",
       disconnectNone: "{{computer}} signs out and deletes what it kept of it.",
       disconnected: "{{label}} disconnected.",
-      where: "Accounts stay on the computers they were connected on. Whoever runs a computer can reach its accounts.",
     },
     usage: {
       window: {
@@ -6939,8 +6929,7 @@ export const en: Translations = {
     execOff: "Commands off",
     paused: "Paused",
     pausedUntil: "Paused until {{time}}",
-    pausedHint:
-      "Whoever connected it paused the agents on the computer itself. Nothing new starts until they resume; what was running finishes.",
+    pausedHint: "Paused on the computer itself by whoever connected it.",
     seenNow: "connected now",
     seen: "seen {{when}}",
     neverSeen: "hasn't connected yet",
@@ -6966,7 +6955,7 @@ export const en: Translations = {
     commandCopied: "Command copied. Paste it in the computer's Terminal.",
     // agentes for Mac (ADR 0036): this Mac, from the site inside the app.
     thisMac: {
-      text: "This {{device}} can work with your agents. They only use the folders you allow, and you can pause anytime.",
+      text: "Agents only use the folders you allow on this {{device}}.",
       connect: "Use this {{device}}",
       connected: "This {{device}} is connected. Choose the folders agents may use.",
       failed: "Couldn't connect this {{device}}. Try again.",
@@ -6980,7 +6969,6 @@ export const en: Translations = {
       reconnect: "Reconnect",
       reconnecting: "Reconnecting this {{device}}…",
       seeRequest: "See in the app",
-      emptyText: "No computers yet. This {{device}} connects in one click.",
       offline: "This {{device}} is offline right now.",
       outageTitle: "This {{device}} lost its connection {{ago}}",
       toolsOff: "Off on this {{device}}. Turn it on in the app's Preferences, under Tools.",
@@ -6992,8 +6980,8 @@ export const en: Translations = {
     // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
     host: {
       label: "This server's computer",
-      desc: "The computer agentes.chat is installed on. Nothing to install.",
-      descUsers: "The computer agentes.chat is installed on, with one user for each agent.",
+      desc: "Where agentes.chat is installed.",
+      descUsers: "Where agentes.chat is installed, one user per agent.",
       descShared: "The computer agentes.chat is installed on. Agents work as the person who installed it.",
       stop: "Stop using it in this organization",
       stopTitle: "Stop using this server's computer?",
@@ -7005,7 +6993,7 @@ export const en: Translations = {
     },
     download: {
       title: "Connect another computer",
-      text: "Download the agentes.chat app on your Mac. It opens this server in a window of its own, and with one click its agents work on that Mac, in folders of their own.",
+      text: "Install the agentes.chat app on the Mac.",
       mac: "Download the app for Mac",
       version: "Version {{version}}",
       versionSize: "Version {{version}} · {{size}}",
@@ -7019,24 +7007,21 @@ export const en: Translations = {
       step2:
         "Open it, click Use your own server, then Connect to my server, and type this page's address. Sign in, then click Use this Mac in Settings → Computers.",
       other: "Other ways: server or Linux",
-      otherText:
-        "Run this in the computer's terminal. It shows a code and a link: open the link, check the code and confirm with your account.",
-      otherNeeds: "Nothing to install first: it brings what it runs on.",
+      otherText: "Run this in the computer's terminal, then confirm the code it shows.",
       waiting: "Waiting for the computer to connect…",
     },
     page: {
       back: "Computers",
       notFound: "Computer not found",
       notFoundText: "It may have been removed.",
-      readOnly: "Only {{name}} and admins change what this computer allows. Here you see what is allowed.",
-      readOnlyNobody: "Only admins change what this computer allows. Here you see what is allowed.",
+      readOnly: "Only {{name}} and admins change what this computer allows.",
+      readOnlyNobody: "Only admins change what this computer allows.",
       agents: "Agents that use this computer",
       agentFolders: "Uses {{folders}} and its own folder",
       agentOwnFolder: "Only its own folder",
     },
     access: {
       folders: "Allowed folders",
-      foldersText: "Each agent always has its own folder. These are the extra folders this computer allows.",
       ownFolder: "Each agent's folder",
       ownFolderText: "Always. An agent doesn't see another's.",
       noFolders: "No extra folders. Each agent only uses its own folder.",
@@ -7055,11 +7040,10 @@ export const en: Translations = {
       removed: "{{folder}} was removed.",
       removedAgent: "{{name}} no longer uses {{folder}}.",
       tools: "Tools",
-      toolsText: "What agents can run on this computer, always in the allowed folders.",
       tool: { claude: "Claude Code", codex: "Codex", commands: "Commands", browser: "Browser" },
       toolText: {
         claude: "Writes and changes files, only in the allowed folders.",
-        codex: "Like Claude Code, with the ChatGPT account. Also only in the allowed folders.",
+        codex: "Like Claude Code, with a ChatGPT account. Only in the allowed folders.",
         commands: "Runs Terminal commands, like tests and builds.",
       },
       commandsWarn: "Commands can reach other parts of the computer, not only the allowed folders.",
@@ -7090,7 +7074,6 @@ export const en: Translations = {
     },
     agents: {
       title: "Which computer each agent uses",
-      text: "One per agent. You can also change it on each agent's page.",
       empty: "No agents yet.",
       pick: "{{name}}'s computer",
       ready: "ready",
@@ -7099,17 +7082,14 @@ export const en: Translations = {
     },
     lead: "Where your agents work: this server's computer and any other computer you connect.",
     leadCloud: "Where your agents work: a computer just for this workspace, always on.",
-    onIt: {
-      title: "On this computer",
-      screens: "Each agent's own screen, with its browser and its files",
-    },
+    about: "About this computer",
+    how: "How computers work",
     hostMissing:
       "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>.",
     other: {
       title: "Other computers",
       text: "Connected with a code, like a Mac mini at home or another server. What each one allows is set on that computer.",
       emptyTitle: "No other computer yet",
-      emptyText: "Connect a Mac with the agentes app, or any server with one command.",
     },
     daytona: {
       cardTitle: "Daytona sandboxes",
@@ -7190,7 +7170,7 @@ export const en: Translations = {
       tip: "Waiting for {{name}}",
     },
     titleCloud: "{{name}} stopped answering {{ago}}",
-    cloudSub: "We're on it: nothing to do on your side.",
+    cloudSub: "We're on it",
   },
   connect: {
     title: "Connect this computer?",
@@ -7390,15 +7370,13 @@ export const en: Translations = {
     paid: "{{amount}} paid",
     budgetShare: "{{percent}} of the budget",
     estimate:
-      "Claude and Codex only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it.",
+      "Plans only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it.",
     accounts: {
       title: "Plan accounts",
-      subtitle: "Claude Code and Codex on the computers, with each agent's part.",
-      empty: 'No agent thinks with Claude Code or Codex yet. Pick it in "Who thinks", on the agent\'s page.',
+      empty: "No agent thinks with a plan yet.",
     },
     api: {
       title: "Organization API",
-      subtitle: "What each agent spent through the API this month, against its budget.",
     },
     agent: {
       title: "{{name}}'s usage",
@@ -8056,7 +8034,6 @@ export const en: Translations = {
       },
     },
     machine: {
-      description: "Agents on this computer can use a browser of their own, each with theirs.",
       ready: "Ready",
       off: "Off",
       offHelp: "Only someone at the computer turns it on: in the agentes app, Preferences → Tools.",
@@ -8311,7 +8288,6 @@ export const en: Translations = {
       ready: "Your workspace's computer is ready",
     },
     title: "{{org}}'s computer",
-    lead: "A computer just for this workspace, always on, where your agents work.",
     users: "One user per agent: each one has its own folder.",
     specs: "{{cpus}} CPUs · {{memoryGb}} GB of memory · {{diskGb}} GB of disk",
     chip: {
@@ -8340,22 +8316,20 @@ export const en: Translations = {
     stepOf: "Step {{n}} of {{total}} · {{step}}",
     status: {
       preparing: "Getting the computer ready.",
-      capacity: "This is taking longer than usual. Nothing is lost.",
-      problem: "Something went wrong while preparing it. We're on it: nothing to do on your side.",
-      ready: "Ready. Your agents work on it.",
+      capacity: "This is taking longer than usual.",
+      problem: "Something went wrong while preparing it. We're on it.",
+      ready: "Ready.",
       paused: "Not being prepared while the workspace is on hold.",
     },
     notice: {
       label: "The workspace's computer",
       title: "Setting up {{org}}'s computer",
-      waits_one: "{{names}} waits for it",
-      waits_other: "{{names}} wait for it",
       see: "See",
       hide: "Hide",
     },
     agentWaiting: "{{name}} starts using it as soon as it's ready.",
     managedHint: "The workspace's own computer: always on, with a user of its own for each agent.",
-    continue: "You can go on: your agents start using it as soon as it's ready.",
+    continue: "You can go on meanwhile.",
     plans: "Your agents can think with your own AI plan, signed in on this computer. No API key needed.",
     plansMarks: "Claude, ChatGPT, GLM, Kimi and other AI plans",
     eta: {
@@ -8366,8 +8340,7 @@ export const en: Translations = {
       late: "Taking a little longer than expected",
     },
     email: {
-      you: "We'll email you at {{email}} when it's ready. You can close this page.",
-      youStay: "We'll email you at {{email}} when it's ready.",
+      you: "We'll email you at {{email}} when it's ready.",
       here: "It shows here as soon as it's ready.",
     },
   },
@@ -8503,11 +8476,11 @@ export const en: Translations = {
       opening: "Opening {{name}}'s computer…",
       ready: "Ready",
       held: "{{name}} is paused for now",
-      heldHelp: "You can watch. Nobody takes control until the pause ends.",
+      heldHelp: "Nobody takes control until the pause ends.",
       paused: "{{computer}} is paused until {{time}}",
       pausedPlain: "{{computer}} is paused",
       notAnswering: "{{computer}} isn't answering",
-      notAnsweringHelp: "It usually comes back within a few minutes. We're on it: nothing to do on your side.",
+      notAnsweringHelp: "It usually comes back within a few minutes. We're on it.",
       offline: "{{computer}} is offline",
       offlineHelp: "Since {{time}}. {{name}} waits for the computer to come back.",
       offlineHelpPlain: "{{name}} waits for the computer to come back.",

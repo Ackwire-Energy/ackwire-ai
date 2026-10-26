@@ -5,7 +5,7 @@ import { isSignInCode } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { isEmail } from "@agenteschat/client/lib/text";
-import { Button, Icon, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { Button, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -44,7 +44,7 @@ export interface AddAccountProps {
   local?: boolean;
   /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
   ready?: boolean;
-  /** Under the steps, before where the account stays. */
+  /** Under the steps. */
   note?: ReactNode;
   /** Its own head, with Back; without it, the place that shows it says what it is. */
   onBack?: () => void;
@@ -65,6 +65,35 @@ export function Step({ n, children, side }: { n: number; children: ReactNode; si
       <span className="agp-addacct__text">{children}</span>
       {side}
     </div>
+  );
+}
+
+/**
+ * A step's title, its ⓘ right after it when it has one (outside the label, so pressing it never reaches the field);
+ * `htmlFor`: the title names that field, which the hint (`hintId`) then also describes.
+ */
+export function StepTitle({
+  title,
+  hint,
+  htmlFor,
+  hintId,
+}: {
+  title: string;
+  hint?: ReactNode;
+  htmlFor?: string;
+  hintId?: string;
+}) {
+  const { t } = useTranslation();
+  const b = <b>{title}</b>;
+  const label = htmlFor ? <label htmlFor={htmlFor}>{b}</label> : b;
+  if (!hint) return label;
+  return (
+    <span className="ac-hintline">
+      {label}
+      <InfoHint name={t("common.about", { label: title })} id={hintId}>
+        {hint}
+      </InfoHint>
+    </span>
   );
 }
 
@@ -248,6 +277,7 @@ function AddAccountFlow({
       {t("agentPage.work.brain.add.waiting")}
     </span>
   );
+  const keyHintId = `${codeId}-hint`;
   const pasteRow = (label: string, placeholder: string, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
@@ -259,6 +289,7 @@ function AddAccountFlow({
           spellCheck={false}
           placeholder={placeholder}
           aria-label={label}
+          aria-describedby={plan ? keyHintId : undefined}
           disabled={sent}
           onChange={(e) => {
             setCode(e.target.value);
@@ -320,6 +351,7 @@ function AddAccountFlow({
     </OpenPage>
   );
 
+  const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer });
   let steps: ReactNode;
   if (plan) {
     const site = new URL(plan.site);
@@ -333,19 +365,22 @@ function AddAccountFlow({
             </OpenPage>
           }
         >
-          <b>{t("aiAccounts.add.keyStep", { maker: plan.maker })}</b>
-          <span>{t("aiAccounts.add.keySite", { site: site.host })}</span>
-          {provider === "zai" && <span>{t("connectAi.zaiTeam")}</span>}
+          <StepTitle
+            title={t("aiAccounts.add.keyStep", { maker: plan.maker })}
+            hint={provider === "zai" ? t("connectAi.zaiTeam") : undefined}
+          />
         </Step>
         <Step n={2} side={sent ? waiting : undefined}>
-          <label htmlFor={codeId}>
-            <b>{t("aiAccounts.add.keyTitle")}</b>
-          </label>
+          <StepTitle
+            title={t("aiAccounts.add.keyTitle")}
+            hint={t("aiAccounts.add.keySafe", { computer })}
+            htmlFor={codeId}
+            hintId={keyHintId}
+          />
           {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), "…", true, keyOk)}
           {key && !keyOk && (
             <SettingNote icon="alert">{t("aiAccounts.add.keyShape", { plan: plan.label })}</SettingNote>
           )}
-          <span>{t("aiAccounts.add.keySafe", { computer })}</span>
         </Step>
       </>
     );
@@ -368,12 +403,8 @@ function AddAccountFlow({
             )
           }
         >
-          <b>{t("agentPage.work.brain.add.stepOne.codex")}</b>
-          <span>
-            {starting
-              ? t("agentPage.work.brain.add.starting", { computer })
-              : t("agentPage.work.brain.add.stepOneText.codex")}
-          </span>
+          <StepTitle title={t("agentPage.work.brain.add.stepOne.codex")} hint={signInHint} />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
         </Step>
         {login?.userCode && (
           <Step n={3} side={waiting}>
@@ -415,12 +446,8 @@ function AddAccountFlow({
             )
           }
         >
-          <b>{t("agentPage.work.brain.add.stepOne.claude_code")}</b>
-          <span>
-            {starting
-              ? t("agentPage.work.brain.add.starting", { computer })
-              : t("agentPage.work.brain.add.stepOneText.claude_code")}
-          </span>
+          <StepTitle title={t("agentPage.work.brain.add.stepOne.claude_code")} hint={signInHint} />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
           {asks && (
             <span className="agp-addacct__paste">
               <Input
@@ -439,11 +466,7 @@ function AddAccountFlow({
               />
             </span>
           )}
-          {asks && (
-            <span>
-              {startFailed === "email" || !emailOk ? t("aiAccounts.add.emailInvalid") : t("aiAccounts.add.emailHelp")}
-            </span>
-          )}
+          {asks && (startFailed === "email" || !emailOk) && <span>{t("aiAccounts.add.emailInvalid")}</span>}
         </Step>
         {login && opened && (
           <Step n={2} side={waiting}>
@@ -495,7 +518,6 @@ function AddAccountFlow({
         steps
       )}
       {note}
-      {!plan && <SettingNote icon="lock">{t("agentPage.work.brain.add.safe", { computer })}</SettingNote>}
     </section>
   );
 }

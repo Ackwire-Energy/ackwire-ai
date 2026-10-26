@@ -7,6 +7,7 @@ setupDom();
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
 import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -132,8 +133,16 @@ describe("Quem pensa (its dialog)", () => {
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
     await model(d, /^Opus$/);
     expect(offSwitch(d).getAttribute("aria-checked")).toBe("true");
+    // One line, its label and its ⓘ: what it does, the same on or off, describes the switch.
+    const fallback = hintOf("Se o MacBook parar de responder, responder pela API", d);
+    expect(fallback.text).toBe(
+      "Usa o modelo da organização e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
+    );
+    expect(offSwitch(d).getAttribute("aria-describedby")).toBe(fallback.button.getAttribute("aria-describedby"));
     await click(offSwitch(d));
-    expect(d.textContent).toContain("A Ada avisa quem chamou e espera ele voltar.");
+    expect(offSwitch(d).getAttribute("aria-checked")).toBe("false");
+    expect(hintOf("Se o MacBook parar de responder, responder pela API", d).text).toBe(fallback.text);
+    expect(shownText(d)).not.toContain("avisa quem chamou");
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(callOrder(state)).toEqual(["sandbox.setTarget", "agents.setBrain"]);
@@ -372,7 +381,11 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
       // Nothing runs on the computer before the person goes on.
       expect(fakeMachinesOf.get(api)?.lastLogin()).toBeUndefined();
-      expect(block.textContent).toContain("O agentes.chat nunca vê a senha nem o acesso.");
+      // Where the account stays is the sign-in step's ⓘ.
+      expect(hintOf("Entre no Claude com a conta que vai usar", block).text).toContain(
+        "o agentes.chat nunca vê a senha nem o acesso.",
+      );
+      expect(shownText(block)).not.toContain("nunca vê a senha");
       fireEvent.change(within(block).getByRole("textbox", { name: "Qual conta? (opcional)" }), {
         target: { value: "walt@acme.com" },
       });
