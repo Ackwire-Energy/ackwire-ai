@@ -276,7 +276,13 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
   expect(flagValue(xvnc.argv, "-nolisten")).toBe("tcp");
   expect(flagValue(xvnc.argv, "-geometry")).toBe("1280x900");
   expect(flagValue(xvnc.argv, "-desktop")).toBe("Dev");
-  for (const flag of ["-AcceptSetDesktopSize=0", "-FrameRate=30", "-UseBlacklist=0", "-AlwaysShared"]) {
+  for (const flag of [
+    "-AcceptSetDesktopSize=0",
+    "-SendPrimary=0",
+    "-FrameRate=30",
+    "-UseBlacklist=0",
+    "-AlwaysShared",
+  ]) {
     expect(xvnc.argv).toContain(flag);
   }
   for (const flag of ["-ac", "-nopw", "-localhost", "-interface", "-rfbauth"]) expect(xvnc.argv).not.toContain(flag);

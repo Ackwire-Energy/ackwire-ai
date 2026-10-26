@@ -1002,7 +1002,9 @@ export class DesktopSessions {
 /**
  * Xtigervnc's flags (after `:N`): its fixed size; VNC only on the Unix
  * socket, 0600; VncAuth with the password file (never `-ac` or `-nopw`);
- * viewers never resize it; no blacklist (TigerVNC counts attempts, not
+ * viewers never resize it; only a copy reaches the person in control, never
+ * a selection (PRIMARY is still set from what they paste, for Shift+Insert
+ * in a terminal); no blacklist (TigerVNC counts attempts, not
  * failures, so a burst of reconnects after a deploy would lock everyone out,
  * and behind a 0600 socket it protects nothing); X only through the cookie
  * file, no TCP; no screen saver.
@@ -1025,6 +1027,7 @@ function xvncArgs(files: { socket: string; xauthority: string; passwd: string },
     files.passwd,
     "-AlwaysShared",
     "-AcceptSetDesktopSize=0",
+    "-SendPrimary=0",
     "-FrameRate=30",
     "-UseBlacklist=0",
     "-auth",
