@@ -111,25 +111,17 @@ p {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+/* An `.ac-link` that may carry an icon beside its words. */
 .dk-link {
-  all: unset;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-weight: 600;
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-}
-.dk-link:hover {
-  text-decoration-color: currentColor;
 }
 .dk-link:focus-visible {
   outline: 2px solid var(--agent2);
   outline-offset: 2px;
   border-radius: 4px;
+  box-shadow: none;
 }
 .dk-logo {
   width: 32px;

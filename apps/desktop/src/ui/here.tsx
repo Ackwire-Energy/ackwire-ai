@@ -51,7 +51,7 @@ export function ReachRow({
                 {" "}
                 <button
                   type="button"
-                  className="dk-link"
+                  className="ac-link dk-link"
                   onClick={() =>
                     void host.openTailscale(tailnet.state === "missing" ? "download" : "app").catch(() => {})
                   }
@@ -92,7 +92,11 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
         {problem.reason === "https" && (
           <>
             {" "}
-            <button type="button" className="dk-link" onClick={() => void host.openTailscale("https").catch(() => {})}>
+            <button
+              type="button"
+              className="ac-link dk-link"
+              onClick={() => void host.openTailscale("https").catch(() => {})}
+            >
               {t("desktop.here.turnOn")}
             </button>
           </>

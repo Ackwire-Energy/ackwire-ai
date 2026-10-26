@@ -168,28 +168,16 @@ textarea.onb__big.ac-input {
   font-size: 13px;
   color: var(--faint);
 }
-/* The one link look here, a field's help links too ("Create the key at…"). */
-.onb__link,
-.onb__body .ac-field__help a {
-  padding: 0;
-  border: 0;
-  background: none;
+/* An `.ac-link` in the host's sentence ("Change", "skip"): muted until hovered. */
+.onb__link {
   color: var(--muted);
-  font: inherit;
-  font-weight: 600;
-  text-align: start;
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-  cursor: pointer;
 }
-.onb__link:hover:not(:disabled),
-.onb__body .ac-field__help a:hover {
+.onb__link:hover:not(:disabled) {
   color: var(--ink);
-  text-decoration-color: currentColor;
 }
 .onb__link:disabled {
   cursor: default;
+  text-decoration-color: var(--line2);
 }
 .onb__starters {
   display: flex;

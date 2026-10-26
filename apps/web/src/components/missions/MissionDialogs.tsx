@@ -192,7 +192,7 @@ export function NewMissionDialog({
             {!cloud && <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} folders={false} />}
             {setupAgent && !cloud && (
               <Link
-                className="mi-lnk"
+                className="ac-link mi-lnk"
                 to="/org/$orgId/agents/$agentId"
                 params={{ orgId: org.id, agentId: setupAgent.id }}
                 search={{ tab: "settings", sec: "computer" }}
@@ -256,7 +256,7 @@ export function NewMissionDialog({
                   </span>
                   {!cloud && (
                     <Link
-                      className="mi-lnk"
+                      className="ac-link mi-lnk"
                       to="/org/$orgId/agents/$agentId"
                       params={{ orgId: org.id, agentId: a.id }}
                       search={{ tab: "settings", sec: "computer" }}

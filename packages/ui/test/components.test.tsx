@@ -276,6 +276,30 @@ describe("single-line controls", () => {
   });
 });
 
+describe("links", () => {
+  test("any link reads as ours, never the browser's blue; .ac-link is underlined in the house hairline", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    // Zero specificity: a class that styles its link still wins.
+    expect(rule(":where(a)")).toContain("color: inherit");
+    expect(rule(":where(a)")).toContain("text-decoration-color: var(--line2)");
+    expect(rule(":where(a)")).toContain("text-underline-offset: 3px");
+    expect(rule(":where(a:hover)")).toContain("text-decoration-color: currentColor");
+    expect(rule(".ac-link")).toContain("text-decoration: underline");
+    expect(rule(".ac-link")).toContain("text-decoration-color: var(--line2)");
+    expect(rule(".ac-link")).toContain("text-underline-offset: 3px");
+    expect(rule(".ac-link:hover")).toContain("text-decoration-color: currentColor");
+    expect(rule(".ac-link--muted:hover")).toContain("color: var(--ink)");
+    // A link that is a button has no box of its own and keeps the link's weight.
+    const button = rule(":where(button).ac-link");
+    expect(button).toContain("border: 0");
+    expect(button).toContain("background: none");
+    expect(button).toContain("font-size: inherit");
+    expect(button).not.toContain("font-weight");
+    expect(button).not.toMatch(/font:\s/);
+  });
+});
+
 describe("Composer", () => {
   function Harness({ onSend }: { onSend: (t: string) => void }) {
     const [v, setV] = useState("");

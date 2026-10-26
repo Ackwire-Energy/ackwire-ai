@@ -1313,13 +1313,6 @@ a.mi-pr:hover {
   gap: 5px;
   border-radius: 4px;
   color: var(--ink2);
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.mi-lnk:hover {
-  text-decoration-color: var(--ink);
 }
 .mi-mc__strip {
   display: flex;

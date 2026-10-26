@@ -185,14 +185,45 @@ samp {
   width: 100%;
 }
 
-/* Text link */
+/* Any link, with or without a class of its own, reads as ours: never the browser's blue. Zero specificity, so
+   every class that styles a link still wins. */
+:where(a) {
+  color: inherit;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+:where(a:hover) {
+  text-decoration-color: currentColor;
+}
+/* Text link: an action in a sentence; `--muted` for a help line's link. */
 .ac-link {
   color: var(--ink);
   font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ac-link:hover {
+  text-decoration-color: currentColor;
 }
 .ac-link--muted {
   color: var(--ink-muted);
   font-weight: 400;
+}
+.ac-link--muted:hover {
+  color: var(--ink);
+}
+/* A link that opens something here is a button: no box of its own. The weight stays the link's, and a class that
+   sets a size still wins. */
+:where(button).ac-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: start;
 }
 .ac-link:focus-visible {
   outline: none;

@@ -216,7 +216,7 @@ export function ForumSuggestionCard({ message, suggestion }: { message: Message;
         {t("forum.suggestion.dismissedMe")}{" "}
         <button
           type="button"
-          className="forum-vlink"
+          className="ac-link forum-vlink"
           onClick={() => {
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;

@@ -48,11 +48,7 @@ export function CallAgentMenu() {
     <Menu
       label={t("channel.callAgentMenu")}
       trigger={
-        <button
-          type="button"
-          className="ac-link ac-link--muted"
-          style={{ ...inlineButton, textDecoration: "underline" }}
-        >
+        <button type="button" className="ac-link ac-link--muted" style={inlineButton}>
           {t("channel.callAgent")}
         </button>
       }

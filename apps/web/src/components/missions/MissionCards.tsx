@@ -475,14 +475,14 @@ export function AutoApprovedLine({ messages }: { messages: Message[] }) {
         {reason} · {formatTime(i18n.language, first.at)}
       </span>
       {items.length > 1 && (
-        <button type="button" className="mi-lnk" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <button type="button" className="ac-link mi-lnk" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {open ? t("missions.auto.hide") : t("missions.auto.show")}
         </button>
       )}
       {canRevoke && (
         <button
           type="button"
-          className="mi-lnk"
+          className="ac-link mi-lnk"
           title={t("missions.auto.revokeHint")}
           disabled={set.isPending}
           onClick={revoke}
@@ -1224,7 +1224,11 @@ export function MissionStartLink({ message }: { message: Message }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
-    <Link to="/org/$orgId/threads/$threadId" params={{ orgId: org.id, threadId: message.id }} className="mi-tag mi-lnk">
+    <Link
+      to="/org/$orgId/threads/$threadId"
+      params={{ orgId: org.id, threadId: message.id }}
+      className="ac-link mi-tag mi-lnk"
+    >
       <Icon name="flag" size={14} />
       {t("missions.openThread")}
     </Link>

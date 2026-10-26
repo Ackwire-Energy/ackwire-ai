@@ -273,7 +273,7 @@ function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: ()
         </Button>
         <span className="dk-help">
           {t("desktop.first.create")}{" "}
-          <button type="button" className="dk-link" onClick={() => onCloud("/signup")}>
+          <button type="button" className="ac-link dk-link" onClick={() => onCloud("/signup")}>
             {t("desktop.first.createLink")}
           </button>
         </span>

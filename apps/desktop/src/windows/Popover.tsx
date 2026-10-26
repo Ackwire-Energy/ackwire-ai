@@ -588,7 +588,7 @@ export function Popover() {
               {t("desktop.tray.now")} <Count n={jobs.length} />
               {jobs.length > 0 && (
                 <span className="dk-pcap__end">
-                  <button type="button" className="dk-link" onClick={openMain}>
+                  <button type="button" className="ac-link dk-link" onClick={openMain}>
                     {t("desktop.tray.seeAll")} <Icon name="external" size={14} />
                   </button>
                 </span>

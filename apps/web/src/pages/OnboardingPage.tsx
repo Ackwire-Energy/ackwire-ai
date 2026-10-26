@@ -634,7 +634,9 @@ export function OnboardingPage() {
                 // Its answer is long: the "skip" Theo says is the way out, right where it's said.
                 <Trans
                   i18nKey="onboarding.import.leadWithSkip"
-                  components={{ skip: <button type="button" className="onb__link" onClick={skip} disabled={busy} /> }}
+                  components={{
+                    skip: <button type="button" className="ac-link onb__link" onClick={skip} disabled={busy} />,
+                  }}
                 />
               ) : (
                 t(`onboarding.${step.id}.lead`)
@@ -775,7 +777,7 @@ export function OnboardingPage() {
               ) : (
                 <p className="onb__help">
                   {t("onboarding.workspace.zone", { zone })} ·{" "}
-                  <button type="button" className="onb__link" onClick={() => setZoneOpen(true)}>
+                  <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
                     {t("onboarding.workspace.zoneChange")}
                   </button>
                 </p>
@@ -1096,7 +1098,7 @@ export function OnboardingPage() {
                     {" "}
                     <button
                       type="button"
-                      className="onb__link"
+                      className="ac-link onb__link"
                       onClick={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
                     >
                       {t("onboarding.keyStep.useComputer", { computer: machine?.name ?? t("outage.someComputer") })}
@@ -1192,7 +1194,7 @@ export function OnboardingPage() {
                       <br />
                       <button
                         type="button"
-                        className="onb__link"
+                        className="ac-link onb__link"
                         onClick={() => resend.mutate()}
                         disabled={resend.isPending}
                       >

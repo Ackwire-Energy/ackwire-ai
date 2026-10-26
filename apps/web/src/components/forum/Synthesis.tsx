@@ -398,7 +398,7 @@ export function SynthesisCard({ topic }: { topic: ForumTopicDetail }) {
             <div>
               <button
                 type="button"
-                className="forum-vlink"
+                className="ac-link forum-vlink"
                 aria-expanded={showPrev}
                 onClick={() => setShowPrev((x) => !x)}
               >

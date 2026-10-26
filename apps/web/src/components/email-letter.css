@@ -55,23 +55,12 @@
   mask-image: linear-gradient(#000 55%, transparent);
 }
 .email-letter__more {
-  all: unset;
   align-self: flex-start;
   margin: 0 14px 11px;
-  cursor: pointer;
   border-radius: 4px;
   font-size: 13px;
   font-weight: 650;
   color: var(--ink2);
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-}
-.email-letter__more:hover {
-  text-decoration-color: currentColor;
-}
-.email-letter__more:focus-visible {
-  box-shadow: var(--focus-ring);
 }
 .email-letter__original {
   gap: 6px;
