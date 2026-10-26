@@ -138,6 +138,7 @@ export const ptBR = {
       browserLead: "A gente volta para cá quando você entrar com {{provider}}.",
       reopen: "Abrir o navegador de novo",
       otherWay: "Usar outro jeito de entrar",
+      otherServer: "Usar outro servidor",
       opening: "Abrindo {{provider}}…",
       done: "Tudo certo.",
       doneLead: "Você entrou no app agentes. Pode fechar esta aba.",
