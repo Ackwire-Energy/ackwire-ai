@@ -167,6 +167,10 @@ function fullScreen() {
 }
 /** The dialog's classes. */
 const classes = () => [...(document.querySelector(".cmp-dialog")?.classList ?? [])];
+/** Past the time the full-screen bar stays once nothing asks for it (2.5 s). */
+const barTime = () => act(() => new Promise((r) => setTimeout(r, 2_600)));
+/** The pointer moves over the page at this height. */
+const pointerAt = (clientY: number) => act(async () => void fireEvent.pointerMove(document.body, { clientY }));
 
 /** Ada's screen in this person's control, live: the field over it has the person's keys. */
 async function controlled() {
@@ -612,7 +616,7 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(2);
     expect(board.writes).toBe(1);
     expect(document.querySelector(".ac-toast")).toBeNull();
-  });
+  }, 10_000);
 
   test("what the computer copies by itself never reaches the person's clipboard", async () => {
     const board = clipboard();
@@ -726,41 +730,42 @@ describe("the agent's screen in the computer dialog", () => {
     expect(view().queryByRole("button", { name: "Tela cheia" })).toBeNull();
   });
 
-  test("the full-screen bar hides itself; in control only the display's top edge brings it back", async () => {
+  // Real time past the bar's 2.5 s: these tests say how long they may take, as the run's later files get 5 s.
+  test("the full-screen bar hides itself; in control only the display's top edge, or a tap, brings it back", async () => {
     fullScreen();
     await controlled();
     await click(view().getByRole("button", { name: "Tela cheia" }));
-    const move = (clientY: number) => act(async () => void fireEvent.pointerMove(document.body, { clientY }));
-    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    await barTime();
     expect(classes()).toContain("is-bar-hidden");
     // The pointer is the computer's: a move over the screen leaves it hidden.
-    await move(400);
+    await pointerAt(400);
     expect(classes()).toContain("is-bar-hidden");
-    await move(4);
+    await pointerAt(4);
     expect(classes()).not.toContain("is-bar-hidden");
     // On the bar it stays.
     await act(
       async () => void fireEvent.pointerMove(document.querySelector(".ac-dialog__head") as Element, { clientY: 30 }),
     );
-    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    await barTime();
     expect(classes()).not.toContain("is-bar-hidden");
     // A phone has no pointer to bring to the edge: a tap anywhere brings it back.
-    await move(400);
-    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    await pointerAt(400);
+    await barTime();
     expect(classes()).toContain("is-bar-hidden");
     await act(async () => void fireEvent.pointerDown(document.body, { clientY: 400, pointerType: "touch" }));
     expect(classes()).not.toContain("is-bar-hidden");
-    cleanup();
+  }, 20_000);
 
-    // Watching, any move brings it back.
+  test("watching in full screen, any move brings the bar back", async () => {
+    fullScreen();
     await dialog();
     await connected();
     await click(view().getByRole("button", { name: "Tela cheia" }));
-    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    await barTime();
     expect(classes()).toContain("is-bar-hidden");
-    await move(400);
+    await pointerAt(400);
     expect(classes()).not.toContain("is-bar-hidden");
-  });
+  }, 10_000);
 
   test("Keyboard Lock in control: Esc goes to the computer, and the lock goes with full screen", async () => {
     fullScreen();
