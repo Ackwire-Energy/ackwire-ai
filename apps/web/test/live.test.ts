@@ -124,6 +124,52 @@ describe("receipts", () => {
     s = step(s, { type: "question.answered", threadId: null, question } as never);
     expect(receiptView(s.m1).status?.kind).toBe("claimed");
   });
+
+  /** A read of m1, as over HTTP: new objects each time. */
+  const read = (handled: NonNullable<Message["receipts"]>["handled"]) =>
+    ({ ...person(["ada"]), receipts: { seenBy: ["ada"], pickedBy: ["ada"], handled, blocked: [] } }) as Message;
+  const running = () => read([{ agentId: "ada", runId: "r1", status: "running" }]);
+
+  test("a later read shows how her run ended when its events were missed; an older one moves nothing, not even sideways", () => {
+    // Read as her run started; it ended for want of an AI before the channel's events reached us.
+    let s = seedReceipt({}, running());
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = seedReceipt(s, read([{ agentId: "ada", runId: "r1", status: "failed", reason: "no_ai" }]));
+    expect(receiptView(s.m1).status).toEqual({ kind: "no_ai", agents: ["ada"] });
+    s = seedReceipt(s, running());
+    expect(receiptView(s.m1).status).toEqual({ kind: "no_ai", agents: ["ada"] });
+    // She asks live; a read made before that lands after it.
+    s = seedReceipt({}, running());
+    s = step(s, {
+      type: "question.asked",
+      threadId: null,
+      question: { id: "q", agentId: "ada", runId: "r1" },
+    } as never);
+    s = seedReceipt(s, running());
+    expect(receiptView(s.m1).status).toEqual({ kind: "asking", agents: ["ada"] });
+  });
+
+  test("after 'Responder agora', a read of her old run's end never covers the new run", () => {
+    const noAi = read([{ agentId: "ada", runId: "r1", status: "failed", reason: "no_ai" }]);
+    let s = seedReceipt({}, noAi);
+    s = step(s, { type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r2" });
+    s = step(s, { type: "agent.run", runId: "r2", agentId: "ada", status: "running" });
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    // The list seeding that read again, and a copy of it made before she started again (a refetch on its way).
+    s = seedReceipt(s, noAi);
+    s = seedReceipt(s, structuredClone(noAi));
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = step(s, { type: "message.handled", messageId: "m1", agentId: "ada", runId: "r2", status: "done" });
+    s = seedReceipt(s, structuredClone(noAi));
+    expect(receiptView(s.m1)).toMatchObject({ status: { kind: "handled", agents: ["ada"] }, done: true });
+  });
+
+  test("a read nothing changed the receipt since it was asked for is taken as it is", () => {
+    let s = seedReceipt({}, running());
+    // She asked before the channel's events reached us.
+    s = seedReceipt(s, read([{ agentId: "ada", runId: "r1", status: "waiting_input" }]), true);
+    expect(receiptView(s.m1).status).toEqual({ kind: "asking", agents: ["ada"] });
+  });
 });
 
 describe("server confirmation and the safety timeout", () => {
