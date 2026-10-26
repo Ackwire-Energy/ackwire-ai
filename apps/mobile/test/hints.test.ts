@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { hintBack, hintBackOr, hintClosed, hintOpened, hintTouched, hintTouches } from "../src/ui/hints";
 
 const at = (x: number, y: number) => ({ nativeEvent: { pageX: x, pageY: y } });
@@ -101,5 +103,49 @@ describe("an ⓘ hint on the phone", () => {
     a.show();
     hintClosed("a");
     expect(hintBack()).toBe(false);
+  });
+});
+
+/** A file of the app, as text: what wires the hint in lives in components the tests can't render. */
+const SRC = join(import.meta.dir, "../src");
+const source = (path: string) => readFileSync(join(SRC, path), "utf8");
+
+describe("where the ⓘ is plugged in", () => {
+  test("every tap reaches the app's outermost view, and a bottom sheet's back closes the hint first", () => {
+    expect(source("providers/AppProviders.tsx")).toMatch(/<GestureHandlerRootView[^>]*\{\.\.\.hintTouches\}/);
+    expect(source("ui/Sheet.tsx")).toContain("onRequestClose={hintBackOr(onClose)}");
+  });
+
+  test("the ⓘ is a button named by the hint, says whether it's open, and its text is announced", () => {
+    const hint = source("ui/InfoHint.tsx");
+    for (const prop of [
+      'accessibilityRole="button"',
+      "accessibilityLabel={name}",
+      "accessibilityState={{ expanded: open }}",
+      'accessibilityLiveRegion="polite"',
+      "AccessibilityInfo.announceForAccessibility(text)",
+    ])
+      expect(hint).toContain(prop);
+  });
+
+  test('every ⓘ in the app is named "About …"', () => {
+    const files = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".tsx"));
+    const names = files.flatMap((f) =>
+      [...source(f).matchAll(/<InfoHint\b[\s\S]*?\bname=\{([^}]*)\}/g)].map((m) => m[1]),
+    );
+    const fields = files.flatMap((f) => [...source(f).matchAll(/\bhint=\{\{\s*name:\s*([^,]*),/g)].map((m) => m[1]));
+    expect(names.length).toBeGreaterThanOrEqual(5);
+    expect(fields.length).toBeGreaterThanOrEqual(1);
+    for (const name of [...names, ...fields]) expect(name).toStartWith('t("common.about"');
+  });
+
+  test("the first run's import sources are plain rows: no button, so VoiceOver doesn't read them as dimmed", () => {
+    const flow = source("features/onboarding/OnboardingFlow.tsx");
+    const importStep = flow.match(/function ImportStep\(\)[\s\S]*?\n}\n/)?.[0] ?? "";
+    const line = flow.match(/function Line\([\s\S]*?\n}\n/)?.[0] ?? "";
+    expect(importStep).toContain("<Line");
+    expect(importStep).not.toContain("onPress");
+    expect(line).toContain("if (!onPress) return <View");
+    expect(line).not.toContain("disabled=");
   });
 });
