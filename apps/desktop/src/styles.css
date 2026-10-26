@@ -181,7 +181,6 @@ p {
   background: var(--plate);
   color: var(--muted);
   font-size: 12.5px;
-  max-width: 60ch;
 }
 .dk-honest {
   font-size: 12.5px;
