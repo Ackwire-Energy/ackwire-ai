@@ -891,8 +891,9 @@ What a person changes on a desktop (its theme, its panel) stays until the runner
 for a new version of the look, once Orchis, the SVG loader or the dock's plugin is installed or removed
 (running the installer again with `--desktop` installs them), when the agent is renamed, or when the
 agent's folder moves (without `--system`, it is renamed with the agent's handle). The runner writes it
-as a desktop starts, so a desktop that is running keeps its look until its next start (after a reboot,
-say): desktops stay on, and a new look doesn't close what is open on them.
+as a desktop starts, and into a desktop that is running once nobody watches it and its agent isn't using
+it: its settings change in place and its dock starts over, so nothing open on it closes. A desktop whose
+agent's folder moved keeps its look until its next start (after a reboot, say).
 
 Admins, the agent's owner and whoever its current work is for can watch. Taking control and the
 terminal are for the person who connected the computer, since they act as its user: by default every

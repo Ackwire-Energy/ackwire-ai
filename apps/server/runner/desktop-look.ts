@@ -4,7 +4,7 @@ import { type AgentScope, DESKTOP_SIZE } from "@agenteschat/adapters/machine-pro
 import MARK_BASE64 from "./assets/desktop-mark.png.b64" with { type: "text" };
 import WALLPAPER_BASE64 from "./assets/desktop-wallpaper.png.b64" with { type: "text" };
 import { shQuote } from "./install-script";
-import { xmlEscape } from "./xml";
+import { xmlEscape, xmlUnescape } from "./xml";
 
 /**
  * The agents' desktops' own look (ADR 0058 §15): the agentes.chat wallpaper and a dock floating at the bottom
@@ -16,7 +16,8 @@ import { xmlEscape } from "./xml";
  *   computer's settings, so a self-hosted computer's own desktop stays as it is.
  * - Versioned: the HOME's marker names the look written there. A desktop gets it at its first start, and again
  *   once when anything it writes changes (its version, the theme or dock the computer has, the HOME's own path,
- *   the agent's name, how Browser reaches the runner); what a person changes in between stays until then.
+ *   the agent's name, how Browser reaches the runner); what a person changes in between stays until then. One
+ *   already running gets it in place (`lookCommand`'s live mode, from desktop-session.ts), its windows untouched.
  * - The dock is xfce4-docklike-plugin where it is installed, so an app's windows show on its own launcher; else
  *   the panel's own launchers, then a button for each window. Desktop use (ADR 0062) reads the panel's own
  *   plugins only: docklike runs in a process of its own, outside what the agent reads of the screen.
@@ -75,6 +76,8 @@ export const desktopName = (agent: Pick<AgentScope, "name" | "handle">) =>
 /** The look's own files and its marker, under HOME. */
 export const LOOK_DIR = ".local/share/agentes";
 export const LOOK_MARKER = `${LOOK_DIR}/look`;
+/** XFCE's settings files (xfconf's channels), under HOME. */
+const XFCONF = ".config/xfce4/xfconf/xfce-perchannel-xml";
 
 /** The agent's Chrome on its desktop has this window class (`browser.ts`), so the dock shows it on Browser. */
 export const BROWSER_WM_CLASS = "agentes-browser";
@@ -527,7 +530,6 @@ interface LookFile {
 
 /** Every file of the look, by its path under HOME. */
 export function lookFiles(home: string, o: LookOptions): LookFile[] {
-  const xfconf = ".config/xfce4/xfconf/xfce-perchannel-xml";
   const apps = dockApps(o.browser);
   const bash = path.basename(o.shell) === "bash" ? o.shell : null;
   const dock: [string, string][] =
@@ -538,11 +540,11 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
           desktopEntry(apps[i] as DockApp),
         ]);
   const files: [string, string | Buffer][] = [
-    [`${xfconf}/xfce4-panel.xml`, panel(home, o.dock)],
-    [`${xfconf}/xfce4-desktop.xml`, backdrop(home)],
-    [`${xfconf}/xfwm4.xml`, windowManager(o.theme)],
-    [`${xfconf}/xsettings.xml`, settings(o.theme)],
-    [`${xfconf}/xfce4-terminal.xml`, terminal(home, bash)],
+    [`${XFCONF}/xfce4-panel.xml`, panel(home, o.dock)],
+    [`${XFCONF}/xfce4-desktop.xml`, backdrop(home)],
+    [`${XFCONF}/xfwm4.xml`, windowManager(o.theme)],
+    [`${XFCONF}/xsettings.xml`, settings(o.theme)],
+    [`${XFCONF}/xfce4-terminal.xml`, terminal(home, bash)],
     ...dock,
     [".config/gtk-3.0/gtk.css", GTK_CSS],
     [".config/menus/xfce-applications.menu", menu(apps)],
@@ -569,28 +571,129 @@ const idOf = (o: LookOptions, files: LookFile[]) => {
 
 export const lookId = (home: string, o: LookOptions) => idOf(o, lookFiles(home, o));
 
+const TAG = /<(\/?)(property|value)((?:\s+[\w-]+="[^"]*")*)\s*(\/?)>/g;
+const ATTR = /([\w-]+)="([^"]*)"/g;
+
+/** One channel's settings (`lookSettings`), read from the file the look writes for it. */
+function channelSettings(xml: string): string[][] {
+  const channel = /<channel name="([^"]+)"/.exec(xml)?.[1] ?? "";
+  const out: string[][] = [];
+  const open: { path: string; type: string; value: string; items: string[] }[] = [];
+  const close = () => {
+    const p = open.pop();
+    if (p?.type === "array") out.push(["-c", channel, "-p", p.path, "-n", "-a", ...p.items]);
+    else if (p && p.type !== "empty") out.push(["-c", channel, "-p", p.path, "-n", "-t", p.type, "-s", p.value]);
+  };
+  for (const [, ending, tag, attrs = "", selfClosing] of xml.matchAll(TAG)) {
+    const a = Object.fromEntries([...attrs.matchAll(ATTR)].map(([, k, v]) => [k, xmlUnescape(v ?? "")]));
+    if (tag === "value") open.at(-1)?.items.push("-t", a.type ?? "", "-s", a.value ?? "");
+    else if (ending) close();
+    else {
+      open.push({
+        path: `${open.at(-1)?.path ?? ""}/${a.name}`,
+        type: a.type ?? "empty",
+        value: a.value ?? "",
+        items: [],
+      });
+      if (selfClosing) close();
+    }
+  }
+  return out;
+}
+
+/** The wallpaper's setting (`backdrop`): the screen's one monitor and workspace. */
+const WALLPAPER_SETTING = "/backdrop/screen0/monitorVNC-0/workspace0/last-image";
+
+const settingsOf = (files: LookFile[]) =>
+  files
+    .flatMap((f) => (f.path.startsWith(`${XFCONF}/`) ? channelSettings(f.data.toString()) : []))
+    .flatMap((args) =>
+      args[1] === "xfce4-desktop" && args[3] === WALLPAPER_SETTING
+        ? [["-c", "xfce4-desktop", "-p", WALLPAPER_SETTING, "-r"], args]
+        : [args],
+    );
+
+/**
+ * The look's xfconf settings for a running session, each as the arguments of the `xfconf-query` call that sets it
+ * (made where it isn't there): every property of its channels' files that has a value, an array with each item's
+ * type. A running session's xfconfd holds its channels in memory and writes them over their files, and the
+ * session's programs (xfwm4, xfsettingsd, xfdesktop, the terminal) follow what it says changed: set through it,
+ * they show at once. xfconfd says nothing of a value set again as it was, and xfdesktop loads the wallpaper's
+ * image again only when it hears its setting change, where a new look's image keeps its path: that setting is
+ * unset right before it is set, so a run stopped part-way doesn't leave the screen without its wallpaper.
+ */
+export const lookSettings = (home: string, o: LookOptions) => settingsOf(lookFiles(home, o));
+
 /**
  * Run as the agent (`lookCommand`), the files on its stdin, a `<path under HOME> <base64>` line each: unless the
- * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, then the
- * marker once all of them are. As the agent's own process it writes nothing the agent couldn't itself: a link the
- * agent made in its home leads only to the agent's own files. What sits at a temporary name goes first and only a
- * plain file is read as the marker, so a pipe left in the home can't hold the desktop's start.
+ * marker already names this look, each file is written (0600, its folders 0700) and renamed into place, and the
+ * marker last. As the agent's own process it writes nothing the agent couldn't itself: a link the agent made in its
+ * home leads only to the agent's own files. What sits at a temporary name goes first and only a plain file is read
+ * as the marker, so a pipe left in the home can't hold the desktop's start.
+ *
+ * Live (`$5`, where the processes are listed: `/proc`), on a desktop that runs, with its `DISPLAY`: between the
+ * files and the marker, the settings (`lookSettings`, a line each after the files: the arguments, each ended by a
+ * NUL, in base64) go through the session's own xfconfd, on the bus of its session or panel on exactly that display
+ * (in single-user mode one user runs every agent's desktop: the display tells them apart), then the panel starts
+ * over to read its new settings, gtk.css and docklike's file, which a panel reads only as it starts. That is the
+ * panel's D-Bus Terminate, the call `xfce4-panel --restart` makes, which runs the restart from the panel's main
+ * loop: its SIGUSR1 runs it inside a plain signal handler (XFCE 4.16 to 4.20), and `--restart` itself opens a
+ * dialog on the agent's screen when it fails. The agent's apps and their windows stay as they are. A marker that
+ * names this look already means the session shows it (it started with it, or took it here), and nothing is set
+ * again. A run stopped part-way leaves the marker as it was, so the desktop's next start writes every file again,
+ * over what xfconfd wrote back. Exits 1: a file wasn't written; 2: no session on that display; 3: a setting wasn't
+ * taken; 4: the panel didn't start over.
  */
 export const LOOK_SCRIPT = [
   'h=$1 v=$2 m="$1/$3" n=$4 && umask 077',
   '[ -f "$m" ] && [ "$(cat "$m")" = "$v" ] && exit 0',
   'while [ "$n" -gt 0 ] && read -r p b; do f="$h/$p" && mkdir -p "$(dirname "$f")" && rm -f "$f.new" && printf %s "$b" | base64 -d > "$f.new" && mv -f "$f.new" "$f" || exit 1; n=$((n - 1)); done',
-  '[ "$n" -eq 0 ] && mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
+  '[ "$n" -eq 0 ] || exit 1',
+  'if [ -n "$5" ]; then',
+  "  s= q=",
+  '  for d in "$5"/[0-9]*; do',
+  '    read -r c 2>/dev/null < "$d/comm" || continue',
+  "    case $c in xfce4-session|xfce4-panel) ;; *) continue ;; esac",
+  String.raw`    e=$(tr '\0' '\n' 2>/dev/null < "$d/environ") || continue`,
+  String.raw`    printf '%s\n' "$e" | grep -qxF "DISPLAY=$DISPLAY" || continue`,
+  '    [ "$c" = xfce4-panel ] && q=1',
+  String.raw`    [ -n "$s" ] || s=$(printf '%s\n' "$e" | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p')`,
+  "  done",
+  '  [ -n "$DISPLAY" ] && [ -n "$s" ] || exit 2',
+  '  export DBUS_SESSION_BUS_ADDRESS="$s"',
+  '  while read -r l; do printf %s "$l" | base64 -d | xargs -0 xfconf-query || exit 3; done',
+  '  [ -z "$q" ] || dbus-send --session --print-reply --dest=org.xfce.Panel /org/xfce/Panel org.xfce.Panel.Terminate boolean:true > /dev/null || exit 4',
+  "fi",
+  'mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
 ].join("\n");
 
 /**
- * `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> <file count>`, the files as its input. Not as
- * arguments: in system mode systemd-run names the agent's scope after its command line, and the journal logs it.
+ * `sh -c LOOK_SCRIPT agentes-look <HOME> <look id> <marker> <file count> [/proc]`, the files (live, then the
+ * settings) as its input, and the look's id. Not as arguments: in system mode systemd-run names the agent's scope
+ * after its command line, and the journal logs it.
  */
-export function lookCommand(home: string, o: LookOptions): { argv: string[]; input: string } {
+export function lookCommand(home: string, o: LookOptions, live = false): { argv: string[]; input: string; id: string } {
   const files = lookFiles(home, o);
+  const id = idOf(o, files);
+  const lines = files.map((f) => `${f.path} ${f.data.toString("base64")}\n`);
+  if (live) {
+    for (const args of settingsOf(files)) {
+      lines.push(`${Buffer.from(args.map((a) => `${a}\0`).join("")).toString("base64")}\n`);
+    }
+  }
   return {
-    argv: ["/bin/sh", "-c", LOOK_SCRIPT, "agentes-look", home, idOf(o, files), LOOK_MARKER, String(files.length)],
-    input: files.map((f) => `${f.path} ${f.data.toString("base64")}\n`).join(""),
+    argv: [
+      "/bin/sh",
+      "-c",
+      LOOK_SCRIPT,
+      "agentes-look",
+      home,
+      id,
+      LOOK_MARKER,
+      String(files.length),
+      ...(live ? ["/proc"] : []),
+    ],
+    input: lines.join(""),
+    id,
   };
 }

@@ -91,10 +91,18 @@ describe("a help request opens the agent's browser in its card", () => {
     // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
-    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(note);
+    // Two lines that wrap, like the note of a failure: all of it stays in sight.
+    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
-    await act(async () => fireEvent.keyDown(note, { key: "Enter" }));
+    // Shift+Enter adds a line, as in the chat; Enter sends the note, and adds no line to it.
+    expect(fireEvent.keyDown(note, { key: "Enter", shiftKey: true })).toBe(true);
+    let typed = true;
+    await act(async () => {
+      typed = fireEvent.keyDown(note, { key: "Enter" });
+    });
+    expect(typed).toBe(false);
     await settle(4);
     expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([
       [ORG_ID, HANDOFF_ID, "Entrei com a conta de teste"],

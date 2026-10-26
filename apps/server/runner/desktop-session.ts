@@ -26,7 +26,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { Launcher } from "./agent-users";
 import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "./desktop-browser";
-import { desktopName, lookCommand, lookDock, lookTheme } from "./desktop-look";
+import { desktopName, type LookOptions, lookCommand, lookDock, lookTheme } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
@@ -53,6 +53,10 @@ import { KeyedQueue } from "./queue";
  *   as the agent before a start when the HOME's marker names another look.
  *   Its Browser reaches the runner on a socket next to the password file
  *   (`desktop-browser.ts`), open while the desktop runs.
+ * - One that runs on gets what changed since it started without a restart
+ *   (`refresh`, from the sweep): Xtigervnc's flags a running server takes
+ *   (`LIVE_PARAMS`), and the look, once nobody watches it and its agent
+ *   isn't using it. Each records what it has, so it happens once.
  * - Started the first time it is needed (`ensure`: the agent's screen or
  *   browser, a person opening it), then left on: none stops for being idle,
  *   so what a person left open on it is still there later. Started again (at
@@ -81,6 +85,41 @@ const XVNC_START_MS = 5000;
  */
 const STEP_MS = 10_000;
 const KILL_WAIT_MS = 3000;
+/** A running desktop takes a new look only after a minute without a request (its agent's steps come closer). */
+const REFRESH_IDLE_MS = 60_000;
+/**
+ * The look written into a running session (`refresh`) also sets some 70 settings, an `xfconf-query` each through
+ * the session's bus, and restarts its dock: seconds on a busy computer, so it gets this many steps' time.
+ */
+const LIVE_LOOK_STEPS = 6;
+/**
+ * Xtigervnc's flags that a running server takes from `tigervncconfig -set` (through its VNC extension), as
+ * `<param>=<value>`: TigerVNC 1.12 to 1.15 let it set only desktop, AcceptPointerEvents, SendCutText,
+ * AcceptCutText, SendPrimary and SetPrimary (`AllowOverride`'s default, which the runner keeps). A desktop
+ * started before one of these changed gets it while it runs; any other flag waits for the desktop's next start.
+ */
+const LIVE_PARAMS = ["SendPrimary=0"];
+/**
+ * Run as the agent with the desktop's DISPLAY and cookie: sets each of its arguments (`LIVE_PARAMS`) and reads it
+ * back, since tigervncconfig exits 0 even when the server refuses a set. tigervncconfig comes with
+ * tigervnc-common, which tigervnc-standalone-server depends on; TigerVNC 1.15 says a flag is on or off where 1.12
+ * and 1.13 say 1 or 0.
+ */
+const PARAMS_SCRIPT = [
+  'for a in "$@"; do',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameters, not a template literal
+  "  n=${a%%=*} want=${a#*=}",
+  '  got=$(tigervncconfig -set "$a" && tigervncconfig -get "$n") || exit 1',
+  '  case "$want:$got" in "$got:$got" | 0:off | 1:on) ;; *) exit 2 ;; esac',
+  "done",
+].join("\n");
+/** Why a running desktop keeps its earlier look (`LOOK_SCRIPT`'s exit codes). */
+const LOOK_FAILED: Record<number, string> = {
+  1: "its files couldn't be written",
+  2: "its session wasn't found",
+  3: "its settings weren't taken",
+  4: "its dock didn't start over",
+};
 /** A desktop that ended by itself starts again this many times within the window, then stays off. */
 const RESTARTS = { max: 3, windowMs: 10 * 60_000 };
 /** Agents' displays are :20 to :69, one slot each. */
@@ -388,6 +427,10 @@ interface Saved {
   passwd: string;
   passwords: { full: string; view: string };
   startedAt: number;
+  /** The look its session shows (`lookId`), from its start or a `refresh`; none from an earlier runner. */
+  look?: string;
+  /** Its Xtigervnc has these `LIVE_PARAMS`, from its flags or a `refresh`; none from an earlier runner. */
+  params?: string[];
 }
 
 interface Desktop extends Saved {
@@ -400,6 +443,11 @@ interface Desktop extends Saved {
   ending?: boolean;
   /** Its Browser's socket, while it listens. */
   browser?: Server;
+  /**
+   * Its `refresh`: whether its agent is known as it is now (`current`), one waits for its turn, and what of it this
+   * runner has settled, its `LIVE_PARAMS` and its look (done, or failed and left to the next runner).
+   */
+  refresh: { current: boolean; queued: boolean; params: boolean; look: boolean };
 }
 
 /** Browser's socket: in the password file's folder, root's for the agent in system mode. */
@@ -417,8 +465,26 @@ function parseSaved(v: unknown): Saved | null {
   if (!isPid(v.pid) || !isPid(v.sessionPid) || !Number.isInteger(v.display) || !Number.isFinite(v.startedAt)) {
     return null;
   }
-  return v as unknown as Saved;
+  // A look or flags that can't be read are taken as not there: a refresh sets them again.
+  const params = Array.isArray(v.params) && v.params.every((p) => typeof p === "string") ? v.params : undefined;
+  return { ...(v as unknown as Saved), look: typeof v.look === "string" ? v.look : undefined, params };
 }
+
+/** What `<id8>.json` keeps of a desktop: its `Saved` part alone. */
+const savedOf = (d: Desktop): Saved => ({
+  agent: d.agent,
+  display: d.display,
+  pid: d.pid,
+  sessionPid: d.sessionPid,
+  home: d.home,
+  socket: d.socket,
+  xauthority: d.xauthority,
+  passwd: d.passwd,
+  passwords: d.passwords,
+  startedAt: d.startedAt,
+  look: d.look,
+  params: d.params,
+});
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -431,6 +497,8 @@ export class DesktopSessions {
   private readonly restarts = new Map<string, number[]>();
   /** Displays of desktops being started. */
   private readonly claimed = new Set<number>();
+  /** Refreshes run one after another: each starts dozens of short processes on the computer. */
+  private refreshes: Promise<void> = Promise.resolve();
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
   private readonly sys: DesktopSystem;
   private readonly dir: string;
@@ -474,7 +542,7 @@ export class DesktopSessions {
       let d = this.desktops.get(agent.id);
       const running = d !== undefined && this.alive(d);
       if (d && running) {
-        d.agent = agent;
+        this.current(d, agent);
         d.lastUsed = this.now();
       } else {
         if (d) await this.end(d);
@@ -580,6 +648,18 @@ export class DesktopSessions {
   }
 
   /**
+   * The agents this computer serves now (the server's list, at each connection and change): the desktops of the
+   * others stop (`stopAll`), and each running one takes its agent's current name and handle.
+   */
+  serve(agents: readonly AgentScope[]) {
+    for (const { id, handle, name } of agents) {
+      const d = this.desktops.get(id);
+      if (d) this.current(d, { id, handle, ...(name === undefined ? {} : { name }) });
+    }
+    return this.stopAll(new Set(agents.map((a) => a.id)));
+  }
+
+  /**
    * Desktops a previous run of the runner left running are taken back when
    * the pid it saved is still that display's Xtigervnc (a pid can be
    * reused); the others' files go.
@@ -596,7 +676,13 @@ export class DesktopSessions {
       const file = path.join(this.dir, name);
       const saved = parseSaved(readJson(file));
       if (saved && !this.desktops.has(saved.agent.id) && this.isXvnc(saved.pid, saved.display)) {
-        const d: Desktop = { ...saved, file, lastUsed: this.now(), streams: 0 };
+        const d: Desktop = {
+          ...saved,
+          file,
+          lastUsed: this.now(),
+          streams: 0,
+          refresh: { current: false, queued: false, params: false, look: false },
+        };
         this.add(d);
         void this.listenBrowser(d);
         this.opts.log(`the desktop of ${saved.agent.handle} on :${saved.display} is running; taken back`);
@@ -608,13 +694,24 @@ export class DesktopSessions {
 
   /**
    * Desktops that ended by themselves start again (one taken back from an earlier runner has no exit to wait
-   * on). The agent's Chrome in use on one touches it, so it isn't parked as soon as that Chrome closes.
+   * on). The agent's Chrome in use on one touches it, so it isn't parked as soon as that Chrome closes. A running
+   * one gets what changed since it started (`refresh`); the promise settles once those refreshes are over.
    */
-  sweep() {
+  sweep(): Promise<void> {
     for (const d of [...this.desktops.values()]) {
-      if (!this.alive(d)) this.ended(d);
-      else if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
+      if (!this.alive(d)) {
+        this.ended(d);
+        continue;
+      }
+      if (this.opts.inUse?.(d.agent.id)) d.lastUsed = this.now();
+      if (d.refresh.current && !d.refresh.queued && !(d.refresh.params && d.refresh.look)) {
+        d.refresh.queued = true;
+        // One that throws (its agent's user isn't known while the runner isn't connected) is tried again at the next
+        // sweep.
+        this.refreshes = this.refreshes.then(() => this.serial(d.agent.id, () => this.refresh(d)).catch(() => {}));
+      }
     }
+    return this.refreshes;
   }
 
   /** The runner stops: desktops go on running (the next runner takes them back). */
@@ -633,7 +730,7 @@ export class DesktopSessions {
 
   private add(d: Desktop) {
     this.desktops.set(d.agent.id, d);
-    this.sweepTimer ??= setInterval(() => this.sweep(), SWEEP_MS);
+    this.sweepTimer ??= setInterval(() => void this.sweep(), SWEEP_MS);
     (this.sweepTimer as { unref?: () => void }).unref?.();
   }
 
@@ -647,7 +744,7 @@ export class DesktopSessions {
     let display: number | null = null;
     try {
       const user = await this.opts.user(agent);
-      if (this.sys.uid === 0 && user.prefix.length === 0) throw new RunnerError("desktop_unavailable", NOT_AS_ROOT);
+      if (this.asRoot(user)) throw new RunnerError("desktop_unavailable", NOT_AS_ROOT);
       const xvnc = this.sys.which("Xtigervnc", user.env.PATH);
       const dbus = this.sys.which("dbus-launch", user.env.PATH);
       if (!xvnc || !dbus) {
@@ -701,14 +798,7 @@ export class DesktopSessions {
           );
         }
         // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
-        const exists = (file: string) => this.sys.exists(file);
-        const look = lookCommand(user.home, {
-          theme: lookTheme(exists),
-          dock: lookDock(exists),
-          agent,
-          shell: user.env.SHELL ?? "",
-          browser: [...this.runner, "desktop-browser", browserSocket(files.passwd)],
-        });
+        const look = lookCommand(user.home, this.lookOptions(agent, user, files.passwd));
         const looked = await this.step(
           this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
         );
@@ -752,12 +842,15 @@ export class DesktopSessions {
           ...files,
           passwords,
           startedAt: this.now(),
+          ...(looked === 0 ? { look: look.id } : {}),
+          params: LIVE_PARAMS,
         };
         const d: Desktop = {
           ...saved,
           file: path.join(this.dir, `${id8(agent)}.json`),
           lastUsed: saved.startedAt,
           streams: 0,
+          refresh: { current: true, queued: false, params: true, look: looked === 0 },
         };
         writeJson(d.file, saved);
         this.add(d);
@@ -800,16 +893,117 @@ export class DesktopSessions {
     }
   }
 
-  /** A step before X: its exit code, or "late" once it has run `STEP_MS` (then it is stopped). */
-  private async step(p: DesktopProcess): Promise<number | null | "late"> {
+  /** A step before X: its exit code, or "late" once it has run `ms` (`STEP_MS`; then it is stopped). */
+  private async step(p: DesktopProcess, ms = this.stepMs): Promise<number | null | "late"> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<"late">((resolve) => {
-      timer = setTimeout(() => resolve("late"), this.stepMs);
+      timer = setTimeout(() => resolve("late"), ms);
     });
     const code = await Promise.race([p.exited, late]);
     clearTimeout(timer);
     if (code === "late" && p.pid) this.sys.kill(p.pid, "SIGTERM");
     return code;
+  }
+
+  /**
+   * The agent of a running desktop as it is now (a request, the server's list). Renamed, its look is due again: the
+   * terminal's prompt names it. A refresh waits for this: a single-user agent's user (`opts.user`) is found by its
+   * handle, and one taken back from an earlier runner may be stale, its folder since moved to a new handle.
+   */
+  private current(d: Desktop, agent: AgentScope) {
+    if (desktopName(agent) !== desktopName(d.agent)) d.refresh.look = false;
+    d.agent = agent;
+    d.refresh.current = true;
+  }
+
+  /** What its look depends on besides its HOME (desktop-look.ts), on this computer, from this runner. */
+  private lookOptions(agent: AgentScope, user: DesktopUser, passwd: string): LookOptions {
+    const exists = (file: string) => this.sys.exists(file);
+    return {
+      theme: lookTheme(exists),
+      dock: lookDock(exists),
+      agent,
+      shell: user.env.SHELL ?? "",
+      browser: [...this.runner, "desktop-browser", browserSocket(passwd)],
+    };
+  }
+
+  /**
+   * A running desktop gets what changed since it started, without a restart, so nothing open on it closes: the
+   * `LIVE_PARAMS` its Xtigervnc lacks (as soon as it can), and a newer look (`lookCommand` live), once nobody
+   * watches it and its agent hasn't used it for a minute, since its dock starts over. Each is recorded in its
+   * `<id8>.json`, so it happens once; what fails is said in the log, and the next runner tries again.
+   */
+  private async refresh(d: Desktop) {
+    try {
+      if (this.desktops.get(d.agent.id) !== d || !this.alive(d)) return;
+      const has = d.params ?? this.sys.cmdline(d.pid)?.map((arg) => arg.slice(1)) ?? [];
+      const missing = d.refresh.params ? [] : LIVE_PARAMS.filter((p) => !has.includes(p));
+      if (missing.length === 0) d.refresh.params = true;
+      const idle = () =>
+        d.streams === 0 && !this.opts.inUse?.(d.agent.id) && this.now() - d.lastUsed >= REFRESH_IDLE_MS;
+      if (missing.length === 0 && (d.refresh.look || !idle())) return;
+      const user = await this.opts.user(d.agent);
+      const who = `the desktop of ${d.agent.handle}`;
+      if (this.asRoot(user)) {
+        d.refresh.params = d.refresh.look = true;
+        this.opts.log(`${who} stays as it is: the runner runs as root, and nothing on a desktop does`);
+        return;
+      }
+      const log = openSync(path.join(this.dir, `${id8(d.agent)}.log`), "a", 0o600);
+      try {
+        const env = { ...user.env, HOME: d.home, DISPLAY: `:${d.display}`, XAUTHORITY: d.xauthority };
+        const run = (argv: string[], input?: string, ms = this.stepMs) =>
+          this.step(this.sys.spawn([...user.prefix, ...argv], { cwd: "/", env, log, ...(input ? { input } : {}) }), ms);
+        const why = (code: number | null | "late", ms = this.stepMs) =>
+          code === "late" ? `was stopped after ${ms / 1000} s` : `failed (exit ${code})`;
+        if (missing.length > 0) {
+          const set = await run(["/bin/sh", "-c", PARAMS_SCRIPT, "agentes-xvnc", ...missing]);
+          if (set === 0) {
+            d.params = LIVE_PARAMS;
+            this.persist(d);
+            this.opts.log(`${who} took ${missing.join(" ")} while running`);
+          } else {
+            const names = missing.map((p) => p.split("=")[0]).join(", ");
+            this.opts.log(`${who} keeps its earlier ${names} until it starts again: setting it ${why(set)}`);
+          }
+          d.refresh.params = true;
+        }
+        // Asked again: a viewer who came while the flags were set would see the dock start over.
+        if (d.refresh.look || !idle()) return;
+        const look = lookCommand(d.home, this.lookOptions(d.agent, user, d.passwd), true);
+        if (d.look !== look.id) {
+          const ms = this.stepMs * LIVE_LOOK_STEPS;
+          // Single-user mode moves an agent's folder with its handle: its session still has the old HOME.
+          const looked = user.home === d.home ? await run(look.argv, look.input, ms) : "moved";
+          if (looked === 0) {
+            d.look = look.id;
+            this.persist(d);
+            this.opts.log(`${who} has this runner's look`);
+          } else {
+            const reason =
+              looked === "moved"
+                ? "its home moved while it ran"
+                : (typeof looked === "number" && LOOK_FAILED[looked]) || `writing it ${why(looked, ms)}`;
+            this.opts.log(`${who} keeps its earlier look until it starts again: ${reason}`);
+          }
+        }
+        d.refresh.look = true;
+      } finally {
+        closeSync(log);
+      }
+    } finally {
+      d.refresh.queued = false;
+    }
+  }
+
+  private persist(d: Desktop) {
+    writeJson(d.file, savedOf(d));
+  }
+
+  /** What runs as `user` would run as root: the runner is root, with no launcher for the agent (`NOT_AS_ROOT`). */
+  private asRoot(user: DesktopUser) {
+    return this.sys.uid === 0 && user.prefix.length === 0;
   }
 
   /** Xvnc's own pid once it holds the display and its socket is there; its output says why when it doesn't. */
@@ -1004,7 +1198,7 @@ function xvncArgs(files: { socket: string; xauthority: string; passwd: string },
     files.passwd,
     "-AlwaysShared",
     "-AcceptSetDesktopSize=0",
-    "-SendPrimary=0",
+    ...LIVE_PARAMS.map((p) => `-${p}`),
     "-FrameRate=30",
     "-UseBlacklist=0",
     "-auth",

@@ -263,11 +263,11 @@ afterEach(() => {
 
 /**
  * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
- * `picture()`. The DOM here draws nothing, so that copy's context is this stand-in while it's on; the canvases
- * on the page keep their own.
+ * `dock()` (its dock on that black, two pixels of the copy) or `picture()` (the wallpaper drawn). The DOM here
+ * draws nothing, so that copy's context is this stand-in while it's on; the canvases on the page keep their own.
  */
 function screenPixels() {
-  let shows = false;
+  let shows: "black" | "dock" | "picture" = "black";
   const proto = Object.getPrototypeOf(document.createElement("canvas")) as HTMLCanvasElement;
   const getContext = proto.getContext;
   const copy = {
@@ -275,8 +275,12 @@ function screenPixels() {
     getImageData: (_x: number, _y: number, w: number, h: number) => {
       const data = new Uint8ClampedArray(w * h * 4);
       for (let i = 3; i < data.length; i += 4) data[i] = 255;
-      // One spot of the desktop's sky is enough to tell a picture from a black screen.
-      if (shows) data.set([75, 147, 255, 255], 4 * (w + 1));
+      const bottom = 4 * w * (h - 1);
+      if (shows === "dock") for (const x of [w / 2 - 1, w / 2]) data.set([240, 244, 250, 255], bottom + 4 * x);
+      // The wallpaper: the sky, its pale band at the bottom.
+      if (shows === "picture") {
+        for (let i = 0; i < data.length; i += 4) data.set(i < bottom ? [75, 147, 255, 255] : [207, 230, 255, 255], i);
+      }
       return { data };
     },
   };
@@ -284,8 +288,11 @@ function screenPixels() {
     return this.isConnected ? getContext.apply(this, args) : copy;
   } as unknown as typeof proto.getContext;
   return {
+    dock: () => {
+      shows = "dock";
+    },
     picture: () => {
-      shows = true;
+      shows = "picture";
     },
     restore: () => {
       proto.getContext = getContext;
@@ -336,6 +343,11 @@ describe("the agent's screen in the computer dialog", () => {
       expect(sub()).toBe("Abrindo…");
       expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
       expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+      // Its dock drawn on the black, the wallpaper not yet: still opening.
+      pixels.dock();
+      await waitLooks();
+      expect(sub()).toBe("Abrindo…");
+      expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
       pixels.picture();
       await waitLooks();
       expect(sub()).toBe("Ao vivo · você está assistindo");
@@ -494,9 +506,24 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
-    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    // Two lines that wrap: a note stays in sight on a narrow screen, where one line scrolled its start away.
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
     await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
-    await click(view().getAllByRole("button", { name: "Devolver" }).at(-1) as HTMLElement);
+    /** Whether the key is left to the note (a new line), not taken to hand back. */
+    const enter = async (init: KeyboardEventInit = {}) => {
+      let typed = true;
+      await act(async () => {
+        typed = fireEvent.keyDown(note, { key: "Enter", ...init });
+      });
+      return typed;
+    };
+    // As in the chat, Shift+Enter and the Enter that ends an input method's word add to the note.
+    expect(await enter({ shiftKey: true })).toBe(true);
+    expect(await enter({ isComposing: true })).toBe(true);
+    expect(calls(t, "browser.done")).toEqual([]);
+    // Enter hands it back, as the button does, and adds no line to it.
+    expect(await enter()).toBe(false);
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
@@ -701,9 +728,15 @@ describe("the agent's screen in the computer dialog", () => {
     await act(async () => void field.dispatchEvent(new InputEvent("input", { inputType: "deleteContentBackward" })));
     expect(rfb().log.at(-1)).toBe("keydown Backspace");
 
-    // Handed back with its keyboard up, then taken again: the button starts unpressed.
+    // Handed back with its keyboard up, then taken again: the button starts unpressed. Its return key adds a line to
+    // the note, as in the chat; the button hands back.
     await click(view().getByRole("button", { name: "Devolver" }));
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    expect(fireEvent.keyDown(note, { key: "Enter" })).toBe(true);
+    await settle(2);
+    expect(calls(t, "browser.done")).toEqual([]);
     await click(view().getAllByRole("button", { name: "Devolver" }).at(-1) as HTMLElement);
+    expect(calls(t, "browser.done")).toHaveLength(1);
     await settle(4);
     await connected();
     await click(view().getByRole("button", { name: "Assumir o controle" }));
