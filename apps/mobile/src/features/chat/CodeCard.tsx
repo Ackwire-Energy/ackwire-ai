@@ -26,7 +26,7 @@ function openFull(lang: string, text: string) {
 }
 
 /**
- * Fenced code in a message (telas/Polimento.html, A · Cartão): the language on top, copy (the icon turns
+ * Fenced code in a message: the language on top, copy (the icon turns
  * into a check and "Copiado") and full screen, a native form sheet: the system
  * shrinks and dims the conversation behind it and closes it with a drag. Long code shows its first lines
  * and "Ver as N linhas". Colors from the shared highlighter (`@agenteschat/client/lib/code`).
@@ -161,7 +161,7 @@ export function CodeSheet() {
   const insets = useSafeAreaInsets();
   const [wrap, setWrap] = useState(false);
   const code = opened;
-  const lines = useMemo(() => (code ? highlightCode(code.text, code.lang) : []), [code]);
+  const lines = code ? highlightCode(code.text, code.lang) : [];
   if (!code) {
     return (
       <View style={[styles.sheet, styles.gone]}>

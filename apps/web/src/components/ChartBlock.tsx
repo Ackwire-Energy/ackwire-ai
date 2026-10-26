@@ -62,7 +62,7 @@ function ChartPending() {
 }
 
 /**
- * A chart in a message (telas/GraficosChat.html, C · Traço + trama): clean shapes filled with a fine dither
+ * A chart in a message: clean shapes filled with a fine dither
  * in the agent's tones. Hover shows a value; "Tabela" flips the card to the same data as a table; full screen
  * grows out of the card with the chart big and its table under it.
  */

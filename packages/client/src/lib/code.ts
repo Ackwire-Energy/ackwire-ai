@@ -1,5 +1,5 @@
 /**
- * Fenced code in messages (telas/Polimento.html, A · Cartão): the language's display name and a small
+ * Fenced code in messages: the language's display name and a small
  * highlighter (keywords, strings, numbers, comments, function calls, diff lines), shared by the web and
  * the phone app. Not a parser: one pass per line, with block comments carried across lines. A block with
  * no language stays plain (it is often prose or output); an unknown language gets the common keywords.

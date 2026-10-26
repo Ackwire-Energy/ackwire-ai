@@ -14,7 +14,7 @@ import {
   ringCells,
   smoothPath,
 } from "@agenteschat/ui/sky/chart";
-import { Canvas, Circle, FillType, Group, Path, Skia } from "@shopify/react-native-skia";
+import { Canvas, Circle, Group, Path, Skia } from "@shopify/react-native-skia";
 import { router } from "expo-router";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,7 +39,7 @@ let opened: { spec: ChartSpec; accent: AgentColorName } | null = null;
 const EASE = Easing.out(Easing.cubic);
 
 /**
- * A chart in a message (telas/GraficosChat.html, C · Traço + trama): clean shapes (rounded bars, a smooth
+ * A chart in a message: clean shapes (rounded bars, a smooth
  * line, a round ring) with a fine dither inside in the agent's tones, drawn on Skia from the same cells as
  * the web (`@agenteschat/ui/sky/chart`). Tap a bar, a point or a slice for its value; "Tabela" flips the card
  * to the same data as a table; full screen is a native form sheet with the chart big and its table under it.
@@ -444,22 +444,27 @@ function Pie({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; b
   const cells = Math.round(size / CHART_CELL);
   const paths = useMemo(() => cellPaths(ringCells(cells, shares), cells, cells), [cells, shares]);
   const tone = useMemo(() => (v: number) => slices[v % slices.length], [slices]);
-  // The ring's clean edges: an even-odd ring (outer circle minus inner) as the clip.
+  // The ring's clean edges as the clip: the outer circle clockwise, the inner one the other way (a hole).
   const ring = useMemo(() => {
-    const p = Skia.Path.Make();
-    p.addCircle(size / 2, size / 2, size / 2);
-    p.addCircle(size / 2, size / 2, (size / 2) * 0.575);
-    p.setFillType(FillType.EvenOdd);
-    return p;
+    const c = size / 2;
+    const r = c * 0.575;
+    return Skia.Path.MakeFromSVGString(
+      `M0,${c} a${c},${c} 0 1,1 ${2 * c},0 a${c},${c} 0 1,1 ${-2 * c},0 Z` +
+        `M${c - r},${c} a${r},${r} 0 1,0 ${2 * r},0 a${r},${r} 0 1,0 ${-2 * r},0 Z`,
+    );
   }, [size]);
   return (
     <View>
       <View style={styles.pie}>
         <View style={{ width: size, height: size }}>
           <Canvas style={{ width: size, height: size }}>
-            <Group clip={ring}>
+            {ring ? (
+              <Group clip={ring}>
+                <Cells paths={paths} tone={tone} />
+              </Group>
+            ) : (
               <Cells paths={paths} tone={tone} />
-            </Group>
+            )}
           </Canvas>
           <View style={[StyleSheet.absoluteFill, styles.pieCenter]} pointerEvents="none">
             <Text variant="title" tone="ink" style={styles.num}>

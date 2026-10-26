@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useGrowFrom } from "@/lib/grow";
 
 /**
- * Fenced code in a message or document (telas/Polimento.html, A · Cartão): the language on top, copy
+ * Fenced code in a message or document: the language on top, copy
  * (the icon turns into "Copiado" for a moment) and full screen. Full screen grows out of the card itself
  * into a dialog with line numbers and an optional wrap; Esc closes. Colors from the shared highlighter
  * (`@agenteschat/client/lib/code`, the phone app uses the same one).
@@ -85,7 +85,7 @@ function CodeLines({ lines, numbered = false }: { lines: CodeToken[][]; numbered
           </span>
         ),
       )}
-      {"\n"}
+      {i < lines.length - 1 ? "\n" : null}
     </span>
   ));
 }

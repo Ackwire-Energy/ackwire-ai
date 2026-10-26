@@ -1,5 +1,5 @@
 /**
- * Charts in messages (telas/GraficosChat.html, C · Traço + trama): an agent writes a ```chart block with a
+ * Charts in messages: an agent writes a ```chart block with a
  * small JSON of data; the web and the phone app draw it. This is the shared half: reading and checking the
  * block (data only, never code: anything off and the block shows as plain code), formatting values, and the
  * same data as a table (the card's "Tabela" and the full screen).

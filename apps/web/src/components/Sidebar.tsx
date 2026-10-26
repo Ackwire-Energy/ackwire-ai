@@ -93,7 +93,7 @@ import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
 
-/** The chosen item's sky (telas/SelecaoPixel.html, B): both themes, the CSS picks one. */
+/** The chosen item's sky: both themes, the CSS picks one. */
 const selectionSky = (color: AgentColor = "sky") =>
   ({ "--sel-sky": selectionSkyUrl(color), "--sel-sky-dark": selectionSkyUrl(color, true) }) as CSSProperties;
 

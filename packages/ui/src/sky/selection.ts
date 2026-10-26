@@ -1,5 +1,5 @@
 /**
- * The chosen sidebar item's sky (telas/SelecaoPixel.html, B · Horizonte): a dithered sky that rises
+ * The chosen sidebar item's sky: a dithered sky that rises
  * from the item's right edge and fades out before the label. An SVG of crisp cells, transparent
  * where the item's own background shows (so it sits on any surface and keeps the item's radius);
  * cached per color and theme. An agent's row uses the agent's color.

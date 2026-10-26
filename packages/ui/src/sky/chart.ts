@@ -1,5 +1,5 @@
 /**
- * Charts in messages, C · Traço + trama (telas/GraficosChat.html): clean shapes (rounded bars, a smooth line,
+ * Charts in messages, C · Traço + trama: clean shapes (rounded bars, a smooth line,
  * a round ring) filled with a fine dither in the agent's tones. DOM-free: these return which tone each cell
  * takes; the web paints them on a canvas, the phone app on Skia. Cells are 2 points.
  */
@@ -99,7 +99,10 @@ export function ringCells(size: number, shares: readonly number[], sweep = 1): I
   const out = new Int8Array(size * size).fill(-1);
   const ends: number[] = [];
   let acc = 0;
-  for (const s of shares) ends.push((acc += s));
+  for (const s of shares) {
+    acc += s;
+    ends.push(acc);
+  }
   const c = size / 2;
   const outer = size / 2;
   const inner = outer * 0.57;

@@ -1530,7 +1530,7 @@ p {
   border-bottom: 0;
 }
 
-/* Fenced code (telas/Polimento.html, A · Cartão): the language, copy and full screen on top; colors from
+/* Fenced code: the language, copy and full screen on top; colors from
    the shared highlighter. The full screen viewer grows out of the card (CodeBlock.tsx). */
 .code-card {
   margin: 2px 0;
@@ -1667,7 +1667,7 @@ p {
 .code-tok--deleted {
   color: var(--danger);
 }
-/* Charts in messages (telas/GraficosChat.html, C · Traço + trama): the code card's box; clean shapes with a
+/* Charts in messages: the code card's box; clean shapes with a
    fine dither inside (ChartBlock.tsx paints the cells). */
 .chart-card {
   position: relative;
@@ -4491,7 +4491,7 @@ p {
   background: var(--plate);
 }
 /* The chosen item: its own white with a hairline, and a small dithered sky rising from the right
-   (telas/SelecaoPixel.html, B · Horizonte; an agent's row in its color). Rounded like any item. */
+   (an agent's row in its color). Rounded like any item. */
 .sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
   background-color: var(--side-active);
