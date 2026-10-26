@@ -44,7 +44,8 @@ const keyText = (e: KeyboardEvent) =>
 
 /**
  * noVNC's RFB as the screen drives it: how it was set and what it pasted; `log` holds, in order, the key events
- * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events.
+ * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events. Like noVNC, it drops
+ * keys and pastes until its connection opens (`emit("connect")`).
  */
 class FakeRfb {
   static all: FakeRfb[] = [];
@@ -57,6 +58,7 @@ class FakeRfb {
   background = "";
   pasted: string[] = [];
   log: string[] = [];
+  connected = false;
   /** It took its socket in the tick the socket was made, before anything could arrive on it. */
   readonly onTime: boolean;
   /** Like noVNC, it draws into a canvas of its own inside the screen, and takes its keys there. */
@@ -72,7 +74,9 @@ class FakeRfb {
     this.canvas.width = 1280;
     this.canvas.height = 900;
     for (const type of ["keydown", "keyup"]) {
-      this.canvas.addEventListener(type, (e) => this.log.push(keyText(e as KeyboardEvent)));
+      this.canvas.addEventListener(type, (e) => {
+        if (this.connected) this.log.push(keyText(e as KeyboardEvent));
+      });
     }
     el.appendChild(this.canvas);
   }
@@ -80,13 +84,14 @@ class FakeRfb {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
   }
   emit(type: string, detail?: unknown) {
+    if (type === "connect") this.connected = true;
     for (const fn of this.listeners.get(type) ?? []) fn(new CustomEvent(type, { detail }));
   }
   clipboardPasteFrom(text: string) {
-    this.pasted.push(text);
+    if (this.connected) this.pasted.push(text);
   }
   sendKey(_keysym: number, code: string | null, down?: boolean) {
-    this.log.push(`send ${code} ${down ? "down" : "up"}`);
+    if (this.connected) this.log.push(`send ${code} ${down ? "down" : "up"}`);
   }
   focus() {}
   disconnect() {
@@ -540,31 +545,33 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
   });
 
-  test("taking control and handing it back keep the last picture over the new connection: the head says the new mode at once, never Abrindo", async () => {
+  test("taking control opens behind Abrindo, over no old picture: the keys reach the computer once it is connected", async () => {
     const t = await dialog();
     await connected();
-    expect(still()).toBeNull();
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
-    // The watching connection is gone; its picture stays over the control one until that one draws.
-    expect(still()).not.toBeNull();
-    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
     expect(sub()).toBe("Você no controle · a Ada espera");
-    // Keys go to noVNC's own canvas under it, not to the picture.
-    fireEvent.keyDown(view().getByRole("textbox", { name: "Digitar no computador da Ada" }), {
-      key: "a",
-      code: "KeyA",
-    });
-    expect(rfb().log).toEqual(["keydown a KeyA"]);
-    await connected();
+    // noVNC drops keys until its connection opens: nothing that looks ready meanwhile.
     expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    const field = view().getByRole("textbox", { name: "Digitar no computador da Ada" });
+    fireEvent.keyDown(field, { key: "a", code: "KeyA" });
+    expect(rfb().log).toEqual([]);
+    await connected();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    fireEvent.keyDown(field, { key: "b", code: "KeyB" });
+    expect(rfb().log).toEqual(["keydown b KeyB"]);
+  });
 
+  test("handing back keeps the last picture over the watching connection: the head says watching at once, never Abrindo", async () => {
+    const t = await controlled();
+    expect(still()).toBeNull();
     await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
-    // Watching as soon as the server says so, as taking control says it: no wait for the new connection's picture.
+    // Watching as soon as the server says so: no wait for the new connection's picture.
     expect(sub()).toBe("Ao vivo · você está assistindo");
     expect(still()).not.toBeNull();
     expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
@@ -572,6 +579,19 @@ describe("the agent's screen in the computer dialog", () => {
     await connected();
     expect(still()).toBeNull();
     expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("control taken again while a hand back's picture is still held: that picture goes, and control opens behind Abrindo", async () => {
+    const t = await controlled();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    expect(still()).not.toBeNull();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
   });
 
   test("control ended on the server first (4410): it opens again as a watcher over the same picture; a drop then says so", async () => {
@@ -1113,6 +1133,11 @@ describe("the dialog's size (computer.css)", () => {
     expect(phone.split(".cmp-dialog:not(.is-screen-only) .cmp-acts {")[1]?.split("}")[0]).toContain(
       "grid-area: 2 / 2 / 3 / 4",
     );
+  });
+
+  test("the picture held over a hand back is only a picture: the pointer goes through it", async () => {
+    const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
+    expect(rule(desk, ".dsk-screen > .dsk-still")).toContain("pointer-events: none");
   });
 
   test("a note to the agent: one line in the middle of its field, growing up to four, with no grip", async () => {

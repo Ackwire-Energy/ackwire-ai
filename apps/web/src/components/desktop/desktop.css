@@ -23,13 +23,14 @@
 .dsk-screen.is-control canvas {
   cursor: auto;
 }
-/* The last picture, held over the next connection while the screen opens again in the other mode (`holdPicture`). */
+/* The last picture, held over the watching connection while a hand back opens it (`holdPicture`): only a picture. */
 .dsk-screen > .dsk-still {
   position: absolute;
   inset: 0;
   z-index: 1;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 /*
  * In control the person's keys and pastes go here, a text field nobody sees, not to noVNC's canvas

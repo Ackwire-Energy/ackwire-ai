@@ -40,9 +40,10 @@ const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdat
 const PICTURE_POLL_MS = 200;
 const PICTURE_WAIT_MS = 10_000;
 /**
- * Taking control or handing it back opens the screen again in the other mode, on a new socket. Its last picture
- * stays over the new connection until that one draws (`holdPicture`), so the switch shows no "Abrindo…" and the head
- * says the new mode as soon as the server does. A connection that hasn't drawn by this long is said to be opening.
+ * Handing back opens the screen again as a watcher, on a new socket. Its last picture stays over the new connection
+ * until that one draws (`holdPicture`), so the hand back shows no "Abrindo…" and the head says watching as soon as
+ * the server does. A connection that hasn't drawn by this long is said to be opening. Taking control holds nothing:
+ * noVNC drops keys and pastes until its connection opens, and a held picture would look ready meanwhile.
  */
 const HOLD_MS = 3_000;
 
@@ -115,7 +116,7 @@ export function DesktopView({
         ? "unavailable"
         : "connecting";
   const mode = s ? desktopMode(s, me.user.id) : "watch";
-  // The mode as a connection ends: a switch keeps its picture (`holdPicture`).
+  // The mode as a connection ends: a hand back keeps its picture (`holdPicture`).
   const modeNow = useRef(mode);
   modeNow.current = mode;
   const inControl = mode === "control";
@@ -172,11 +173,10 @@ export function DesktopView({
   useEffect(() => {
     const el = screenRef.current;
     if (!el) return;
-    if (!connect) {
-      heldPicture(el)?.remove();
-      return;
-    }
-    // While it retries, the cover keeps saying why; a picture held over a switch stays live; anything else is a
+    // Control opens behind "Abrindo…", never over a held picture (`HOLD_MS`).
+    if (!connect || inControl) heldPicture(el)?.remove();
+    if (!connect) return;
+    // While it retries, the cover keeps saying why; a picture held over a hand back stays live; anything else is a
     // fresh start.
     const holding = heldPicture(el) !== null;
     setView((v) => (holding || v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
@@ -267,8 +267,8 @@ export function DesktopView({
       if (rfbRef.current === rfb) rfbRef.current = null;
       if (closed) return;
       closed = true;
-      // A switch of mode: the picture stays over the connection that replaces this one.
-      if (modeNow.current !== mode) holdPicture(el);
+      // Handed back: the picture stays over the watching connection that replaces this one.
+      if (inControl && modeNow.current === "watch") holdPicture(el);
       if (rfb) rfb.disconnect();
       else ws?.close();
     };
