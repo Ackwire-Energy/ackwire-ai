@@ -530,7 +530,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(lead.style.width).toBe("14px");
     }
     // The lead says where, and the rail says how far: never "opcional".
-    expect(document.body.textContent).toContain("Num computador só deste workspace, que está sendo preparado agora.");
+    expect(document.body.textContent).toContain("Num computador só deste workspace, sempre ligado.");
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Demorando mais");
     expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).not.toContain("opcional");
@@ -659,7 +659,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(step()).toContain("Quase pronto…");
 
     await r.reported({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
-    expect(document.body.textContent).toContain("Num computador só deste workspace, que já está pronto.");
+    expect(document.body.textContent).toContain("Num computador só deste workspace, sempre ligado.");
     expect(step()).toContain("Pronto.");
     expect(step()).not.toMatch(/Os agentes trabalham nele|plano de IA/);
     expect(step()).not.toMatch(/Quando ficar pronto|Pode seguir/);
@@ -704,6 +704,15 @@ describe("the onboarding where the workspace gets its own computer", () => {
       (screen().getByRole("textbox", { name: "Sua primeira mensagem no #general" }) as HTMLTextAreaElement).value,
     ).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
     expect(screen().getByRole("button", { name: "Enviar para Theo" })).toBeTruthy();
+  });
+
+  test("on hold before its computer is made: the lead says when it gets prepared, not that it's always on", async () => {
+    // The server gives no state for a workspace on hold whose computer isn't ready.
+    await toComputerStep({ state: null });
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
+    );
   });
 
   test("its first time shows at once: asked every 2 s until the provisioner says one, with the email line", async () => {

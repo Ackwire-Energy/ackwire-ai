@@ -17,16 +17,13 @@ export const PER_APPLY = 200;
 export type ImportCard = ImportSource | "other";
 export const IMPORT_CARDS: ImportCard[] = [...IMPORT_SOURCES, "other"];
 
-/**
- * Apps that answer `EXPORT_PROMPT`: the brand, the key of its step, and the
- * `source.app` the prompt suggests it writes.
- */
+/** Apps that answer `EXPORT_PROMPT`: the brand, and the `source.app` the prompt suggests it writes. */
 export const EXPORT_PROMPT_APPS = [
-  { name: "Grok Bot", step: "grokBot", app: "grok-bot" },
-  { name: "ChatGPT dots", step: "chatgptDots", app: "chatgpt-dots" },
-  { name: "Claude", step: "claude", app: "claude" },
-  { name: "Manus", step: "manus", app: "manus" },
-  { name: "Rakazo", step: "rakazo", app: "rakazo" },
+  { name: "Grok Bot", app: "grok-bot" },
+  { name: "ChatGPT dots", app: "chatgpt-dots" },
+  { name: "Claude", app: "claude" },
+  { name: "Manus", app: "manus" },
+  { name: "Rakazo", app: "rakazo" },
 ] as const;
 
 /**
