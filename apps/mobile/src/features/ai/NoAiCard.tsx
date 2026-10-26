@@ -11,13 +11,16 @@ import { useDirectory, useMeId } from "../shared/hooks";
 
 type Answer = "pending" | "answering" | "still_missing";
 
-/** Opens "Conectar uma IA"; with `from`, that message is answered once a key is saved. */
-export const openConnectAi = (from?: string, provider?: string) => {
-  const query = [
-    from ? `from=${encodeURIComponent(from)}` : "",
-    provider ? `provider=${encodeURIComponent(provider)}` : "",
-  ]
-    .filter(Boolean)
+/**
+ * Opens "Conectar uma IA" (the web's `connect.open`): `from`, the message answered once the agent has an AI;
+ * `intent`, the step it asked for; `provider`, the key's maker it named; `agentId`, the agent to connect.
+ */
+export const openConnectAi = (
+  request: { from?: string; intent?: string; provider?: string; agentId?: string } = {},
+) => {
+  const query = Object.entries(request)
+    .filter(([, v]) => Boolean(v))
+    .map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`)
     .join("&");
   router.push((query ? `/connect-ai?${query}` : "/connect-ai") as never);
 };
@@ -89,7 +92,9 @@ export function NoAiCard({ message: m }: { message: Message }) {
           variant="secondary"
           size="sm"
           label={t("noAi.action")}
-          onPress={() => openConnectAi(m.id, card.provider)}
+          onPress={() =>
+            openConnectAi({ from: m.id, intent: card.intent, provider: card.provider, agentId: card.agentId })
+          }
         />
       )}
     </View>

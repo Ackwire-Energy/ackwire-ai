@@ -14,10 +14,12 @@ export interface RowProps {
   onPress?: () => void;
   /** A hairline above (Card adds it between rows). */
   divider?: boolean;
+  /** Under the text, in its column (a plan's meter, a note). */
+  below?: ReactNode;
 }
 
 /** A list row: leading avatar or tile, title in ink, a muted line, meta on the right. */
-export function Row({ leading, title, subtitle, meta, chevron = false, onPress, divider = false }: RowProps) {
+export function Row({ leading, title, subtitle, meta, chevron = false, onPress, divider = false, below }: RowProps) {
   const { colors } = useTheme();
   const body = (pressed: boolean) => (
     <View
@@ -53,6 +55,7 @@ export function Row({ leading, title, subtitle, meta, chevron = false, onPress, 
             {subtitle}
           </Text>
         ) : null}
+        {below}
       </View>
       {meta ? <View style={{ alignItems: "flex-end", gap: 5 }}>{meta}</View> : null}
       {chevron ? <Icon name="right" size={16} color={colors.faint} /> : null}

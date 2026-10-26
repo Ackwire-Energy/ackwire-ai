@@ -81,7 +81,8 @@ export function NewAgentForm({ initialWhat = "" }: { initialWhat?: string }) {
         ))}
       </View>
       <View style={[styles.field, surface]}>
-        <Text variant="subhead" tone="faint" style={styles.bold}>
+        {/* The field's size: a smaller label centered beside it sat higher than the name typed. */}
+        <Text variant="body" tone="faint" style={styles.bold}>
           {t("mobile.new.name")}
         </Text>
         <TextInput

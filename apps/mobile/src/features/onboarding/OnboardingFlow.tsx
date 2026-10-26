@@ -1,4 +1,5 @@
 import { keys, useApi } from "@agenteschat/client";
+import type { AiChoice } from "@agenteschat/client/lib/no-ai";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,7 +12,7 @@ import { Pressable, ScrollView, Share, StyleSheet, TextInput, View } from "react
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyFields, useConnectKey } from "@/features/ai/ConnectAi";
+import { useConnectKey } from "@/features/ai/ConnectAi";
 import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
@@ -21,6 +22,7 @@ import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { joinNames } from "../shared/logic";
 import { TextArea } from "../shared/TextArea";
+import { AiStep } from "./AiStep";
 import {
   emailsFrom,
   GUIDE,
@@ -72,6 +74,10 @@ export function OnboardingFlow() {
   const orgName = name.trim();
   // The AI step's key, for the workspace just created (no workspace is chosen yet: it gets the id).
   const ai = useConnectKey(created?.orgId ?? "");
+  // The AI step's option (the plans first, as on the web) and the agents a plan was connected for there.
+  const [aiChoice, setAiChoice] = useState<AiChoice | null>(null);
+  const [aiShown, setAiShown] = useState<AiChoice | null>(null);
+  const [planned, setPlanned] = useState<string[]>([]);
   const [aiSaved, setAiSaved] = useState(false);
 
   const run = async (work: () => Promise<void>, then: StepId | (() => StepId)) => {
@@ -228,7 +234,7 @@ export function OnboardingFlow() {
     context: [t("onboarding.context.title"), t("onboarding.context.lead")],
     import: [t("onboarding.import.title"), t("mobile.onb.importLead")],
     agents: [t("onboarding.agents.title"), t("onboarding.agents.lead")],
-    ai: [t("connectAi.title.any"), aiSaved ? t("connectAi.key.saved") : t("mobile.ai.lead")],
+    ai: [t("onboarding.keyStep.title"), aiSaved ? t("connectAi.key.saved") : t("onboarding.keyStep.lead")],
     team: [t("onboarding.team.title"), t("onboarding.team.lead")],
     done: [t("onboarding.done.title", { org: orgName }), doneText(t, chosen)],
   };
@@ -246,11 +252,18 @@ export function OnboardingFlow() {
       onPress: () => void saveAgents(),
       ready: true,
     },
-    ai: {
-      label: ai.saving ? t("mobile.ai.saving") : t("mobile.ai.save"),
-      onPress: () => void saveAi(),
-      ready: ai.ready && ai.looksRight && !ai.saving,
-    },
+    // A key is saved by the step's button; a plan is connected in its panel, then the step goes on.
+    ...(aiShown === "key"
+      ? {
+          ai: {
+            label: ai.saving ? t("mobile.ai.saving") : t("mobile.ai.save"),
+            onPress: () => void saveAi(),
+            ready: ai.ready && ai.looksRight && !ai.saving,
+          },
+        }
+      : planned.length > 0
+        ? { ai: { label: t("onboarding.actions.continue"), onPress: () => setStep("team"), ready: true } }
+        : {}),
     // With no e-mails the step has no main action: "Agora não" is the quiet way on, below.
     ...(emails.length
       ? {
@@ -373,7 +386,22 @@ export function OnboardingFlow() {
         />
       ) : null}
 
-      {step === "ai" ? <KeyFields form={ai} gutter={24} /> : null}
+      {step === "ai" && created ? (
+        <AiStep
+          orgId={created.orgId}
+          orgName={orgName}
+          agents={PRESETS.flatMap((p) => {
+            const id = agentIds[p];
+            return id ? [{ id, name: t(`onboarding.presets.${p}.name`) }] : [];
+          })}
+          form={ai}
+          choice={aiChoice}
+          onChoice={setAiChoice}
+          planned={planned}
+          onPlanned={(id) => setPlanned((l) => (l.includes(id) ? l : [...l, id]))}
+          onShown={setAiShown}
+        />
+      ) : null}
 
       {step === "team" ? (
         <>

@@ -239,6 +239,12 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
               onPress={() => closeThenPush(onClose, "/connectors")}
             />
             <GroupedRow
+              icon="chart"
+              label={t("mobile.me.usage")}
+              chevron
+              onPress={() => closeThenPush(onClose, "/usage")}
+            />
+            <GroupedRow
               icon="brain"
               label={t("mobile.ai.row")}
               value={
@@ -249,7 +255,7 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
                   : undefined
               }
               chevron
-              onPress={() => closeThenPush(onClose, "/connect-ai")}
+              onPress={() => closeThenPush(onClose, "/ai-accounts")}
             />
           </GroupedList>
           <GroupedHeader>{t("mobile.me.preferences")}</GroupedHeader>

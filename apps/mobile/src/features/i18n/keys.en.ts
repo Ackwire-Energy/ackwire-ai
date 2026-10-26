@@ -773,6 +773,7 @@ export const featureKeysEn: FeatureTranslations = {
     issuesWithMe_other: "{{count}} with you",
     drive: "Drive",
     connectors: "Connectors",
+    usage: "Usage",
     preferences: "Preferences",
     on: "On",
     off: "Off",
@@ -1395,15 +1396,7 @@ export const featureKeysEn: FeatureTranslations = {
     failed: "Couldn't save. Try again.",
   },
   ai: {
-    field: "API key",
-    lead: "Agents need an AI to answer. Paste an API key and all of them think with it.",
     failed: "Couldn't save this key. Check that it's right and try again.",
-    doesntLook: "This doesn't look like a {{provider}} API key.",
-    plans:
-      "Have a Claude or ChatGPT plan? It connects through a computer: on agentes.chat in the browser, in Settings › AI accounts.",
-    saved: "Saved keys",
-    another: "Add another",
-    endsIn: "Ends in {{hint}}",
     save: "Save the key",
     saving: "Saving…",
     row: "AI accounts",

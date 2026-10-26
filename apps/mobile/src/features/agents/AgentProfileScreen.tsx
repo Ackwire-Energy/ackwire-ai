@@ -11,6 +11,7 @@ import {
   useUsage,
 } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -47,6 +48,7 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { openAgentUsage } from "../usage/UsageScreen";
 import {
   canEditMemories,
   type DidLine,
@@ -264,7 +266,7 @@ function Profile({ id }: { id: string }) {
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
               label={t("noAi.agent", { name: agent?.name ?? "" })}
-              onPress={() => openConnectAi()}
+              onPress={() => openConnectAi({ agentId: id })}
             />
           ) : null}
           {work.map((w) => (
@@ -447,44 +449,55 @@ function Profile({ id }: { id: string }) {
           </Section>
         ) : null}
 
-        {spend ? (
-          <Section title={t("mobile.agent.month")}>
-            <Card>
-              <View style={styles.spend}>
-                <View style={styles.spendHead}>
-                  {spend.kind === "money" ? (
-                    <>
-                      <Text variant="body" tone="ink2">
-                        {money(spend.spentUsd)}
-                      </Text>
-                      <Text variant="small" tone="muted">
-                        {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text variant="body" tone="ink2">
-                        {t("mobile.agent.percent", { percent: spend.percent })}
-                      </Text>
-                      <Text variant="small" tone="muted">
-                        {t("mobile.agent.ofLimit")}
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <SpendBar color={look.color} value={spend.fraction} />
-                {spend.fraction >= 1 ? (
-                  <View style={styles.warn}>
-                    <Icon name="clock" size={14} color={c.muted} />
-                    <Text variant="caption" tone="muted">
-                      {t(`mobile.agent.exhausted${g}`, { name })}
-                    </Text>
+        <Section title={t("mobile.agent.month")}>
+          <View style={styles.monthCards}>
+            {spend ? (
+              <Card>
+                <View style={styles.spend}>
+                  <View style={styles.spendHead}>
+                    {spend.kind === "money" ? (
+                      <>
+                        <Text variant="body" tone="ink2">
+                          {money(spend.spentUsd)}
+                        </Text>
+                        <Text variant="small" tone="muted">
+                          {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text variant="body" tone="ink2">
+                          {t("mobile.agent.percent", { percent: spend.percent })}
+                        </Text>
+                        <Text variant="small" tone="muted">
+                          {t("mobile.agent.ofLimit")}
+                        </Text>
+                      </>
+                    )}
                   </View>
-                ) : null}
-              </View>
+                  <SpendBar color={look.color} value={spend.fraction} />
+                  {spend.fraction >= 1 ? (
+                    <View style={styles.warn}>
+                      <Icon name="clock" size={14} color={c.muted} />
+                      <Text variant="caption" tone="muted">
+                        {t(`mobile.agent.exhausted${g}`, { name })}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Card>
+            ) : null}
+            {/* Uso: the month by account and the plan it thinks with now, as the web's Uso tab. */}
+            <Card>
+              <Row
+                leading={<Tile icon="chart" />}
+                title={t("usageViews.agent.title", agentGrammar(t, name))}
+                chevron
+                onPress={() => openAgentUsage(id)}
+              />
             </Card>
-          </Section>
-        ) : null}
+          </View>
+        </Section>
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
         <PushedHeader plate solid={false} />
@@ -629,6 +642,7 @@ const styles = StyleSheet.create({
   },
   nowText: { flexShrink: 1, fontWeight: "500" },
   lead: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },
+  monthCards: { gap: 10 },
   foot: { paddingHorizontal: 4, marginTop: 8 },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
   spend: { padding: 14, gap: 10 },

@@ -777,6 +777,7 @@ export const featureKeysPtBR = {
     issuesWithMe_other: "{{count}} com você",
     drive: "Drive",
     connectors: "Conectores",
+    usage: "Uso",
     preferences: "Preferências",
     on: "Ligadas",
     off: "Desligadas",
@@ -1399,15 +1400,7 @@ export const featureKeysPtBR = {
     failed: "Não deu para salvar. Tente de novo.",
   },
   ai: {
-    field: "Chave de API",
-    lead: "Os agentes precisam de uma IA para responder. Cole uma chave de API e todos eles pensam com ela.",
     failed: "Não deu para salvar essa chave. Confira se ela está certa e tente de novo.",
-    doesntLook: "Isso não parece uma chave de API {{of}} {{provider}}.",
-    plans:
-      "Tem um plano do Claude ou do ChatGPT? Ele entra por um computador: no agentes.chat pelo navegador, em Configurações › Contas de IA.",
-    saved: "Chaves salvas",
-    another: "Adicionar outra",
-    endsIn: "Termina em {{hint}}",
     save: "Salvar a chave",
     saving: "Salvando…",
     row: "Contas de IA",

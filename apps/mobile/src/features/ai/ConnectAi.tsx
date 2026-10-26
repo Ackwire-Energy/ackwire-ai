@@ -1,40 +1,31 @@
-import { keys, useApi, useCredentials } from "@agenteschat/client";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
+import { type ConnectIntent, keys, useAiStatus, useApi } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { type AiChoice, aiStateOf, defaultChoice, firstAgent, gateDims } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   keyLooksValid,
-  PROVIDERS,
   type ProviderId,
   providerGuess,
+  providerLabel,
   providerOf,
 } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { openBrowserAsync } from "expo-web-browser";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import {
-  Button,
-  fieldText,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  Icon,
-  SheetScreen,
-  Text,
-  useTheme,
-  useToast,
-} from "@/ui";
-import { ProviderLogo } from "@/ui/ProviderLogo";
+import { Button, SheetScreen } from "@/ui";
 import { SheetHeader } from "../new/parts";
+import { useDirectory, useMeId } from "../shared/hooks";
+import { AiPicker, type KeyDraft, KeyPanel, PlanPanel, usePlanGates } from "./ConnectAiSteps";
+import { openPage } from "./parts";
 
 /**
- * Connecting an AI from the phone (the web's "Chave de API" in Connect, ADR 0061): a pay-as-you-go key
- * for the workspace. Agents without a key of their own think with the newest one of their provider, so
- * nothing else needs pointing. Plans (Claude, ChatGPT, coding plans) sign in on a computer, so the phone
- * only says where. `orgId` is passed in: the onboarding runs before a workspace is chosen.
+ * The first run's API key (the web's key panel, saved by the step's button): a pay-as-you-go key for the
+ * workspace. Agents without a key of their own think with the newest one of their provider, so nothing else needs
+ * pointing. `orgId` is passed in: the first run goes before a workspace is chosen.
  */
 export function useConnectKey(orgId: string, asked?: string) {
   const api = useApi();
@@ -73,172 +64,152 @@ export function useConnectKey(orgId: string, asked?: string) {
 
 export type ConnectKey = ReturnType<typeof useConnectKey>;
 
-/** The provider, where to create its key, the field and what it does: the same order as the web's panel. */
-export function KeyFields({
-  form,
-  gutter = 18,
-}: {
-  form: ConnectKey;
-  /** The screen's side margin: the providers' row scrolls to the screen's edges past it. */
-  gutter?: number;
-}) {
-  const { t } = useTranslation();
-  const { colors: c, shadows } = useTheme();
-  const entry = providerOf(form.provider);
-  const grammar = providerGrammar(t, form.provider);
-  return (
-    <View style={styles.fields}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginHorizontal: -gutter }}
-        contentContainerStyle={[styles.providers, { paddingHorizontal: gutter }]}
-      >
-        {PROVIDERS.map((p) => {
-          const on = p.id === form.provider;
-          return (
-            <Pressable
-              key={p.id}
-              onPress={() => form.setProvider(p.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={p.label}
-              style={[
-                styles.provider,
-                { backgroundColor: on ? c.ink : c.chip, borderColor: on ? c.ink : "transparent" },
-              ]}
-            >
-              <ProviderLogo id={p.id} size="xs" />
-              <Text variant="subhead" style={{ color: on ? c.bg : c.ink, fontWeight: "600" }}>
-                {p.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      {entry ? (
-        <Pressable
-          onPress={() => void openBrowserAsync(`https://${entry.site}`).catch(() => undefined)}
-          accessibilityRole="link"
-          style={styles.create}
-          hitSlop={6}
-        >
-          <Text variant="subhead" style={{ fontWeight: "600" }}>
-            {t("connectAi.key.create", grammar)}
-          </Text>
-          <Icon name="out" size={15} color={c.muted} />
-        </Pressable>
-      ) : null}
-      <TextInput
-        value={form.key}
-        onChangeText={form.setKey}
-        placeholder={entry?.placeholder ?? t("connectAi.key.paste")}
-        placeholderTextColor={c.faint}
-        accessibilityLabel={t("mobile.ai.field")}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        spellCheck={false}
-        secureTextEntry
-        textContentType="none"
-        style={[styles.input, { color: c.ink, backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
-      />
-      {form.failed ? (
-        <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-          {t("mobile.ai.failed")}
-        </Text>
-      ) : !form.looksRight ? (
-        <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-          {t("mobile.ai.doesntLook", grammar)}
-        </Text>
-      ) : (
-        <Text variant="small" tone="muted">
-          {entry && "plans" in entry && entry.plans ? t("connectAi.key.notPlan") : t("connectAi.key.forAll")}
-        </Text>
-      )}
-      <Text variant="small" tone="faint">
-        {t("mobile.ai.plans")}
-      </Text>
-    </View>
-  );
-}
-
 /**
- * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&provider=<id>`): the workspace's keys and a
- * new one. With `from`, the agent that couldn't answer that message answers it once the key is saved.
+ * "Conectar uma IA" as a sheet, as the web's dialog (ADR 0061): the plans first (Claude chosen), each signing in
+ * on the agent's computer, then the workspace's API key; a message that asked for one of them opens on it
+ * (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>`). Once connected from a message, the
+ * agent answers it by itself.
  */
 export function ConnectAiSheet() {
   const { t } = useTranslation();
   const api = useApi();
-  const toast = useToast();
+  const qc = useQueryClient();
   const { orgId, org } = useOrg();
-  const { from, provider } = useLocalSearchParams<{ from?: string; provider?: string }>();
-  const admin = can(org?.role, "manage_credentials");
-  const credentials = useCredentials(orgId, admin);
-  const form = useConnectKey(orgId, provider);
-  const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
-  const submit = async () => {
-    if (!(await form.save())) return;
-    toast({ title: t("connectAi.key.saved"), icon: "check" });
-    if (from) await api.chat.answerNow(orgId, from).catch(() => undefined);
-    if (router.canGoBack()) router.back();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const status = useAiStatus(orgId);
+  const params = useLocalSearchParams<{ from?: string; provider?: string; agentId?: string; intent?: string }>();
+  // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
+  const mayAddKey = can(org?.role, "manage_credentials");
+  const mine = dir.agents.filter((a) => a.ownerUserId === meId);
+  const named = params.agentId ? [params.agentId] : null;
+  const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({ id: a.id, name: a.name }));
+  // The agents a plan was connected for here: they think with it before the AI status says so.
+  const [linked, setLinked] = useState<string[]>([]);
+  const hasAi = (id: string) => linked.includes(id) || (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
+  const [pickedAgent, setPickedAgent] = useState<string>();
+  const agentId = pickedAgent ?? firstAgent(agents, hasAi, params.agentId)?.id;
+  const gates = usePlanGates(orgId, agentId);
+  const [picked, setPicked] = useState<AiChoice | null>(null);
+  const choice =
+    picked ??
+    defaultChoice({
+      intent: params.intent as ConnectIntent | undefined,
+      ownsAgents: agents.length > 0,
+      mayAddKey,
+      claudeGate: agentId ? gates.gateOf("claude") : { state: "loading" },
+    });
+  const [draft, setDraft] = useState<KeyDraft>(() => ({
+    provider: providerGuess(undefined, params.provider),
+    apiKey: "",
+  }));
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+  const done = () => {
+    setConnected(true);
+    void qc.invalidateQueries({ queryKey: keys.aiStatus(orgId) });
+    if (params.from) void api.chat.answerNow(orgId, params.from).catch(() => undefined);
   };
+  const saveKey = async () => {
+    if (saving) return;
+    setSaving(true);
+    setFailed(false);
+    try {
+      await api.agents.addCredential(orgId, {
+        provider: draft.provider,
+        label: providerLabel(draft.provider),
+        apiKey: draft.apiKey.trim(),
+      });
+      // `aiStatus` lives under `credentials`: both refresh.
+      await qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
+      setKeySaved(true);
+      done();
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+  // Opened for one agent: its name in the title.
+  const one = named?.length === 1 ? dir.agentById.get(named[0] ?? "") : undefined;
+  // No agent of theirs among those: who connects a plan instead.
+  const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
+  const locked =
+    agents.length > 0
+      ? undefined
+      : !named
+        ? t("connectAi.noAgents")
+        : one && owner
+          ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+          : t("noAi.lockedAdmins");
   return (
     <SheetScreen>
-      <SheetHeader title={t("connectAi.title.any")} />
-      {admin ? (
-        <>
-          {live.length > 0 ? (
-            <>
-              <GroupedHeader>{t("mobile.ai.saved")}</GroupedHeader>
-              <GroupedList>
-                {live.map((k) => (
-                  <GroupedRow
-                    key={k.id}
-                    leading={<ProviderLogo id={k.provider} size="sm" />}
-                    label={k.label}
-                    sub={t("mobile.ai.endsIn", { hint: k.keyHint })}
-                  />
-                ))}
-              </GroupedList>
-              <GroupedHeader>{t("mobile.ai.another")}</GroupedHeader>
-            </>
-          ) : (
-            <Text variant="callout" tone="muted" style={styles.lead}>
-              {t("mobile.ai.lead")}
-            </Text>
-          )}
-          <KeyFields form={form} />
-          <Button
-            variant="primary"
-            wide
-            label={form.saving ? t("mobile.ai.saving") : t("mobile.ai.save")}
-            disabled={!form.ready || !form.looksRight || form.saving}
-            onPress={() => void submit()}
-          />
-        </>
+      <SheetHeader title={one ? t("connectAi.titleFor", agentGrammar(t, one.name)) : t("connectAi.title.any")} />
+      {dir.loading || status.isPending ? (
+        <ActivityIndicator style={styles.loading} />
       ) : (
-        <Text variant="callout" tone="muted" style={styles.lead}>
-          {t("noAi.lockedAdmins")}
-        </Text>
+        <View style={styles.body}>
+          <AiPicker
+            choice={choice}
+            onPick={(next) => {
+              setPicked(next);
+              // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
+              if (next !== "key" && next !== choice && agentId !== undefined && linked.includes(agentId))
+                setPickedAgent(firstAgent(agents, hasAi)?.id);
+            }}
+            dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
+          />
+          {choice === "key" ? (
+            <KeyPanel
+              draft={draft}
+              onDraft={(d) => {
+                setDraft(d);
+                setFailed(false);
+              }}
+              locked={!mayAddKey}
+              saved={keySaved}
+              saving={saving}
+              failed={failed}
+              onSave={() => void saveKey()}
+            />
+          ) : (
+            <PlanPanel
+              key={choice}
+              choice={choice}
+              gates={gates}
+              agents={agents}
+              agentId={agentId}
+              onAgent={setPickedAgent}
+              locked={locked}
+              onKey={() => setPicked("key")}
+              onComputer={() => openPage(`${serverUrl()}/org/${orgId}/settings/computers`)}
+              onDone={(id) => {
+                // The panel stays on that agent, saying it's done.
+                setPickedAgent(id);
+                setLinked((l) => [...l, id]);
+                done();
+              }}
+            />
+          )}
+          {connected ? (
+            <Button
+              variant="primary"
+              wide
+              label={t("connectAi.done")}
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+              }}
+            />
+          ) : null}
+        </View>
       )}
     </SheetScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  fields: { gap: 12 },
-  providers: { gap: 8 },
-  provider: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 36,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  create: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
-  input: { minHeight: 52, borderRadius: 15, paddingHorizontal: 16, paddingVertical: 12, ...fieldText("body") },
-  lead: { marginHorizontal: 4 },
+  loading: { marginTop: 24 },
+  body: { gap: 16 },
 });

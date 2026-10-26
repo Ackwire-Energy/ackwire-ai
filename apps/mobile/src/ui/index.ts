@@ -58,6 +58,7 @@ export {
   usePushedOptions,
   useScrollUnderPushedOptions,
 } from "./navigation";
+export { OptionTile } from "./OptionTile";
 export { PressScale, type PressScaleProps } from "./PressScale";
 export { ProviderLogo, type ProviderLogoProps, ProviderStack } from "./ProviderLogo";
 export { Row, type RowProps } from "./Row";

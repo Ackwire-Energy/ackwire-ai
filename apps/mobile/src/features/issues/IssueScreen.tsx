@@ -232,7 +232,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
                 size="sm"
                 icon="brain"
                 label={t("mobile.ai.connect")}
-                onPress={() => openConnectAi()}
+                onPress={() => openConnectAi({ agentId: w.agentId })}
               />
             ) : (
               <Button
