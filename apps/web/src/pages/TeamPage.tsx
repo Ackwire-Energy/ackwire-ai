@@ -1,5 +1,5 @@
 import type { Team, TeamAgent, TeamConsultation } from "@agenteschat/client";
-import { useAiStatus, useTeam } from "@agenteschat/client";
+import { useAiStatus, useCatalog, useTeam } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -24,6 +24,7 @@ import { Link } from "@tanstack/react-router";
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
@@ -59,6 +60,13 @@ const CAPS = {
   custom: "plug",
 } as const satisfies Record<string, IconName>;
 type CapKey = keyof typeof CAPS;
+/** Abilities that are another company's service, by its connector: drawn with the service's own mark. */
+const CAP_CONNECTOR: Partial<Record<CapKey, string>> = {
+  github: "github",
+  sentry: "sentry",
+  linear: "linear",
+  gdrive: "drive",
+};
 const HIDDEN_CAPS = new Set(["context", "memory", "skills", "setup"]);
 /** "What it does" on its card: the first line of its instructions, in whole sentences while they fit. */
 const SUMMARY_MAX = 160;
@@ -163,8 +171,9 @@ export function TeamPage() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const team = useTeam(org.id);
-  // Asked with the page, so an agent's card opens already saying whether it can work.
+  // Asked with the page, so an agent's card opens already saying whether it can work, with its services' marks.
   useAiStatus(org.id);
+  useCatalog();
   const data = team.data;
   const working = data?.agents.filter((a) => a.busy).length ?? 0;
   return (
@@ -426,6 +435,11 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
   const summary = excerpt(dir.agentById.get(agent.id)?.instructions ?? "", SUMMARY_MAX, 1);
   const owner = team.people.find((p) => p.id === agent.ownerUserId);
   const caps = agent.capabilities.filter((k) => !HIDDEN_CAPS.has(k));
+  const catalog = useCatalog();
+  const serviceOf = (k: CapKey) => {
+    const def = catalog.data?.connectors.find((c) => c.id === CAP_CONNECTOR[k]);
+    return def?.iconUrl ? def : null;
+  };
   return (
     <div className="team-card" role="dialog" aria-label={t("team.details", { name: agent.name })}>
       <Button
@@ -474,17 +488,20 @@ function AgentCard({ agent, team, onClose }: { agent: TeamAgent; team: Team; onC
         <span className="team-card__eyebrow">{t("team.canDo")}</span>
         <div className="team-card__chips">
           {caps.length === 0 && <Chip icon="message">{t("team.onlyChat")}</Chip>}
-          {caps.map((k) =>
-            isCap(k) ? (
-              <Chip key={k} icon={CAPS[k]}>
+          {caps.map((k) => {
+            if (!isCap(k))
+              return (
+                <Chip key={k} icon="plug">
+                  {k.charAt(0).toUpperCase() + k.slice(1)}
+                </Chip>
+              );
+            const service = serviceOf(k);
+            return (
+              <Chip key={k} icon={CAPS[k]} lead={service && <ConnectorIcon def={service} label={t(`team.cap.${k}`)} />}>
                 {t(`team.cap.${k}`)}
               </Chip>
-            ) : (
-              <Chip key={k} icon="plug">
-                {k.charAt(0).toUpperCase() + k.slice(1)}
-              </Chip>
-            ),
-          )}
+            );
+          })}
         </div>
       </div>
       <div className="team-card__acts">

@@ -46,3 +46,16 @@ test("the time zone reads as its city; invitation tokens only url-safe", () => {
   expect(isInviteToken("../etc")).toBe(false);
   expect(isInviteToken(undefined)).toBe(false);
 });
+
+test("the import step shows each app's official logo: the files the web app ships", async () => {
+  const phone = (name: string) => Bun.file(new URL(`../../assets/images/brands/${name}`, import.meta.url).pathname);
+  const web = (name: string) => Bun.file(new URL(`../../../web/public/brands/${name}`, import.meta.url).pathname);
+  // OpenBot has no vector logo: its raster, byte for byte.
+  expect(Buffer.from(await phone("openbot.png").arrayBuffer())).toEqual(
+    Buffer.from(await web("openbot.png").arrayBuffer()),
+  );
+  // OpenMausBot's SVG, rendered for the phone at 96 px (the PNG header's width and height).
+  expect(await web("openmausbot.svg").exists()).toBe(true);
+  const png = new DataView(await phone("openmausbot.png").arrayBuffer());
+  expect([png.getUint32(16), png.getUint32(20)]).toEqual([96, 96]);
+});

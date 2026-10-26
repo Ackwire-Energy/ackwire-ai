@@ -59,7 +59,7 @@ import {
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, writePref } from "../hooks";
 import { BrandFace, CommandCopy } from "../ui/bits";
-import { CopyDiagnostics, ReachProblem, ReachRow } from "../ui/here";
+import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
 import { shortPath } from "../ui/time";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
@@ -445,9 +445,7 @@ function Connect({
             <h2 className="dk-ctitle">{t("desktop.connect.found")}</h2>
             {found.map((f) => (
               <div key={f.server} className="dk-fr__foundrow">
-                <span className="dk-logo dk-logo--soft">
-                  <Icon name={f.where === "tailnet" ? "globe" : "computer"} size={16} />
-                </span>
+                <ServerTile kind={f.where} />
                 <span className="dk-fr__foundtext">
                   {/* This computer by its name; its address too when it answers at more than one. */}
                   <b>{f.where === "tailnet" ? serverName(f.server) : t("desktop.link.chipHere")}</b>
