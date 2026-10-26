@@ -77,10 +77,11 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
+    // Room on both sides: the name ran up to the pill's edge, under the agent's dither.
+    gap: 10,
     height: 44,
-    paddingLeft: 9,
-    paddingRight: 18,
+    paddingLeft: 12,
+    paddingRight: 24,
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",

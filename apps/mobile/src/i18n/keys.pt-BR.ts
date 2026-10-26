@@ -45,8 +45,9 @@ export const mobilePtBR = {
       appTooOld: "Atualize o app agentes para usar {{host}}.",
     },
     connect: {
-      question: "Conectar o app a este servidor?",
-      questionSignIn: "Entrar neste servidor com a sua conta do computador?",
+      title: "Conectar a este servidor?",
+      titleSignIn: "Entrar com a conta do computador?",
+      on: "Servidor: {{host}}",
       leave: "Você sai da conta atual neste celular.",
       confirm: "Conectar",
       checking: "Conferindo o servidor…",

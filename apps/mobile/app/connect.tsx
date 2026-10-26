@@ -6,7 +6,7 @@ import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 import { useSession } from "@/providers/session";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Text } from "@/ui/Text";
@@ -74,17 +74,18 @@ export default function Connect() {
   const problem = check && !check.ok ? t(problemText(check.problem, target), { host: serverHost(target) }) : null;
   return (
     <AuthScaffold
-      title={serverHost(target)}
-      subtitle={t(token ? "mobile.auth.connect.questionSignIn" : "mobile.auth.connect.question")}
+      // The question is the title; the address a line under it (a long host broke mid-word in large type).
+      title={t(token ? "mobile.auth.connect.titleSignIn" : "mobile.auth.connect.title")}
+      subtitle={t("mobile.auth.connect.on", { host: serverHost(target) })}
       onBack={leave}
     >
       {plan.signOut && !refused ? (
-        <Text tone="muted" variant="small">
+        <Text tone="muted" variant="small" style={CENTER}>
           {t("mobile.auth.connect.leave")}
         </Text>
       ) : null}
       {refused || problem ? (
-        <Text tone="danger" variant="small">
+        <Text tone="danger" variant="small" style={CENTER}>
           {refused ? t("mobile.auth.connect.tokenFailed") : problem}
         </Text>
       ) : null}

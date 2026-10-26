@@ -43,8 +43,9 @@ export const mobileEn: MobileTranslations = {
       appTooOld: "Update the agentes app to use {{host}}.",
     },
     connect: {
-      question: "Connect the app to this server?",
-      questionSignIn: "Sign in to this server with your account from the computer?",
+      title: "Connect to this server?",
+      titleSignIn: "Sign in with the computer's account?",
+      on: "Server: {{host}}",
       leave: "You'll be signed out of the current account on this phone.",
       confirm: "Connect",
       checking: "Checking the server…",

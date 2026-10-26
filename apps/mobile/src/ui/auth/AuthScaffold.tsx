@@ -14,6 +14,9 @@ import { useTheme } from "../theme";
 /** The sky's height under the status bar while the keyboard is up: the agent and its margin. */
 const SKY_WITH_KEYBOARD = 100;
 
+/** The text of the screens before the app: centered under the agent (fields and buttons keep the width). */
+export const CENTER = { textAlign: "center" } as const;
+
 /** A word joiner after each hyphen inside a word: the large title never breaks "e-mail" across two lines. */
 const unbrokenHyphens = (text: string) => text.replace(/([A-Za-zÀ-ÿ])-([A-Za-zÀ-ÿ])/g, "$1-\u2060$2");
 
@@ -84,11 +87,12 @@ export function AuthScaffold({
           entering={FadeIn.duration(220)}
           style={{ paddingHorizontal: 24, paddingTop: 8, flex: 1 }}
         >
-          <Text variant="display" accessibilityRole="header" accessibilityLiveRegion="polite">
+          {/* Centered, like the agent above it: the screens before the app are one question each. */}
+          <Text variant="display" accessibilityRole="header" accessibilityLiveRegion="polite" style={CENTER}>
             {unbrokenHyphens(title)}
           </Text>
           {subtitle ? (
-            <Text variant="callout" tone="muted" style={{ marginTop: 6 }}>
+            <Text variant="callout" tone="muted" style={[CENTER, { marginTop: 6 }]}>
               {subtitle}
             </Text>
           ) : null}

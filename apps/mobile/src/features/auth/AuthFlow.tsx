@@ -11,7 +11,7 @@ import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { ServerLine } from "@/ui/auth/ServerLine";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
@@ -303,7 +303,12 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
             autoFocus={!initialEmail && launched}
           />
           {fix ? (
-            <Pressable onPress={() => setEmail(fix)} accessibilityRole="button" hitSlop={6}>
+            <Pressable
+              onPress={() => setEmail(fix)}
+              accessibilityRole="button"
+              hitSlop={6}
+              style={{ alignSelf: "center" }}
+            >
               <Text variant="subhead" style={{ fontWeight: "600" }}>
                 {t("auth.flow.didYouMean", { email: fix })}
               </Text>
@@ -342,7 +347,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       ) : null}
 
       {error ? (
-        <Text tone="danger" variant="small" accessibilityLiveRegion="polite">
+        <Text tone="danger" variant="small" accessibilityLiveRegion="polite" style={CENTER}>
           {error}
         </Text>
       ) : null}
@@ -403,7 +408,7 @@ function Who({ email, onChange }: { email: string; onChange?: () => void }) {
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
-        alignSelf: "flex-start",
+        alignSelf: "center",
         maxWidth: "100%",
         minHeight: 32,
         paddingLeft: 10,

@@ -8,7 +8,7 @@ import { ALLOW_HTTP, serverUrl } from "@/lib/server";
 import { useSession } from "@/providers/session";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Text } from "@/ui/Text";
@@ -74,7 +74,7 @@ export default function Server() {
         accessibilityLabel={t("mobile.auth.server.label")}
       />
       {error ? (
-        <Text tone="danger" variant="small">
+        <Text tone="danger" variant="small" style={CENTER}>
           {error}
         </Text>
       ) : null}

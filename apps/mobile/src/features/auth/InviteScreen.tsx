@@ -22,7 +22,7 @@ import { useSession } from "@/providers/session";
 import { AgentAvatar, Button, haptics, LineIcon, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
 import { forgetInvite, rememberInvite } from "./invite";
 
@@ -119,12 +119,12 @@ export function InviteScreen({ token }: { token: string }) {
         <Text variant="body" numberOfLines={1} style={styles.grow}>
           {invitation.email}
         </Text>
-        <Text variant="small" tone="muted">
+        <Text variant="small" tone="muted" style={CENTER}>
           {t("mobile.invite.onlyEmail")}
         </Text>
       </View>
       {error ? (
-        <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+        <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
           {error}
         </Text>
       ) : null}
@@ -139,7 +139,7 @@ export function InviteScreen({ token }: { token: string }) {
           />
         ) : (
           <>
-            <Text variant="small" tone="muted">
+            <Text variant="small" tone="muted" style={CENTER}>
               {t("mobile.invite.wrongAccount", { email: invitation.email })}
             </Text>
             <Button
@@ -334,7 +334,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
         body = (
           <>
             <Said text={t("invite.ask.reason", { reason: view.reason })} />
-            <Text variant="callout" tone="muted">
+            <Text variant="callout" tone="muted" style={CENTER}>
               {t("invite.ask.deniedText", { org })}
             </Text>
           </>
@@ -350,7 +350,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
           : t("invite.ask.sentNoEmail", { org });
       expression = "happy";
       body = (
-        <Text variant="small" tone="muted">
+        <Text variant="small" tone="muted" style={CENTER}>
           {t("mobile.invite.sentLeave")}
         </Text>
       );
@@ -409,7 +409,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
                     </Text>
                   </Pressable>
                 ) : null}
-                <Text variant="small" tone="muted">
+                <Text variant="small" tone="muted" style={CENTER}>
                   {t("invite.ask.emailHelp")}
                 </Text>
               </View>
@@ -426,12 +426,12 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               textAlignVertical="top"
               minHeight={84}
             />
-            <Text variant="small" tone="muted">
+            <Text variant="small" tone="muted" style={CENTER}>
               {t("invite.ask.noteHelp")}
             </Text>
           </View>
           {error ? (
-            <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+            <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
               {error}
             </Text>
           ) : null}
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   locked: { gap: 2, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
   field: { gap: 6 },
-  as: { flexDirection: "row", flexWrap: "wrap", columnGap: 6, rowGap: 2 },
+  as: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", columnGap: 6, rowGap: 2 },
   link: { fontWeight: "600" },
   said: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
 });
