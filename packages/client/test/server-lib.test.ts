@@ -4,6 +4,7 @@ import {
   APP_API,
   checkServer,
   connectLink,
+  helpUrl,
   isLoopback,
   isTailnet,
   normalizeServer,
@@ -78,6 +79,15 @@ describe("server addresses", () => {
     expect(serverHost("https://chat.example.com:8443")).toBe("chat.example.com:8443");
     expect(isTailnet("https://box.tail1234.ts.net")).toBe(true);
     expect(isTailnet("https://agentes.chat")).toBe(false);
+  });
+});
+
+describe("help links", () => {
+  test("a page on agentes.chat in the reader's language, with only the section after it", () => {
+    expect(helpUrl("memory", "en")).toBe("https://agentes.chat/help/memory?lang=en");
+    expect(helpUrl("computers", "pt-BR", "folders")).toBe("https://agentes.chat/help/computers?lang=pt-BR#folders");
+    expect(helpUrl("wiki", "en-GB")).toBe("https://agentes.chat/help/wiki?lang=en");
+    expect(helpUrl("wiki", "fr")).toBe("https://agentes.chat/help/wiki?lang=pt-BR");
   });
 });
 
