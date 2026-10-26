@@ -434,6 +434,13 @@ textarea.ac-input {
 .ac-brand svg {
   fill: currentColor;
 }
+/* A mark's second color (Kimi's dot, OpenCode's block), as its maker draws it on each theme. */
+.ac-brand__part {
+  fill: var(--part);
+}
+[data-theme="dark"] .ac-brand__part {
+  fill: var(--part-dark);
+}
 .ac-brand--tile {
   width: 48px;
   height: 48px;
@@ -451,6 +458,15 @@ textarea.ac-input {
 .ac-brand--sm svg {
   width: 16px;
   height: 16px;
+}
+.ac-brand--chip {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px 7px 7px 3px;
+}
+.ac-brand--chip svg {
+  width: 12px;
+  height: 12px;
 }
 /* Beside text: the bare mark; a one-color one takes the text's color. */
 .ac-brand--xs {
@@ -479,12 +495,30 @@ textarea.ac-input {
 .ac-brand--sm .ac-brand__initial {
   font-size: 13px;
 }
+.ac-brand--chip .ac-brand__initial {
+  font-size: 10px;
+}
 .ac-brand--xs .ac-brand__initial {
   font-size: 9px;
 }
+/* Dimmed, never recolored: the makers' rules forbid changing a mark's colors. */
 .ac-brand--off {
-  filter: grayscale(1);
   opacity: 0.5;
+}
+/* ProviderStack: several makers' 20 px tiles overlapping, each ringed in the surface under it (`--stack-ring`
+   where that isn't the page's), like `.ac-avatar-stack`. */
+.ac-brand-stack {
+  display: inline-flex;
+  flex: none;
+}
+.ac-brand-stack > .ac-brand {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top),
+    0 0 0 2px var(--stack-ring, var(--surface));
+}
+.ac-brand-stack > .ac-brand + .ac-brand {
+  margin-left: -6px;
 }
 /* Engine line icons (BrainIcon, executor marks): each engine's accent; working writes / looks around. */
 .ac-icon .ac-brain-cc {

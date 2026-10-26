@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { cleanup, render } from "@testing-library/react";
-import { BrainLogo, ProviderLogo } from "../src";
+import { BrainLogo, ProviderLogo, ProviderStack } from "../src";
 import { type MarkId, markOf, PROVIDER_MARKS } from "../src/brand/marks";
 
 afterEach(() => cleanup());
@@ -32,11 +32,102 @@ describe("provider marks", () => {
     expect(markOf("claude_code")).toBe("claude");
     expect(markOf("claude")).toBe("claude");
     expect(markOf("codex")).toBe("openai");
-    expect(markOf("anthropic")).toBe("anthropic");
+    // People know the provider as Claude: its API key draws the Claude spark, never Anthropic's own symbol.
+    expect(markOf("anthropic")).toBe("claude");
     expect(markOf("moonshot")).toBe("kimi");
     expect(markOf("zai")).toBe("zai");
     for (const id of ["model", "agent", "mistral", "", null, undefined, "constructor", "__proto__", "toString"])
       expect(markOf(id)).toBeNull();
+  });
+
+  test("the anthropic provider is drawn as Claude, in Claude's color", () => {
+    const el = logo(render(<ProviderLogo id="anthropic" size="sm" />).container);
+    expect(el.dataset.mark).toBe("claude");
+    expect(el.style.getPropertyValue("--brand")).toBe("#D97757");
+    expect(el.querySelector("path")?.getAttribute("d")).toBe(PROVIDER_MARKS.claude.path);
+  });
+
+  test("a mark's second color is its own part, with the maker's dark color where it has one", () => {
+    const kimi = logo(render(<ProviderLogo id="moonshot" size="sm" />).container);
+    const [k, dot] = [...kimi.querySelectorAll("path")];
+    // The K follows the theme; the dot is always Kimi's blue, drawn over it.
+    expect(k?.getAttribute("d")).toBe(PROVIDER_MARKS.kimi.path);
+    expect(k?.getAttribute("class")).toBeNull();
+    expect(dot?.getAttribute("class")).toBe("ac-brand__part");
+    expect(dot?.getAttribute("d")).toBe(PROVIDER_MARKS.kimi.parts?.[0]?.path ?? "");
+    expect(dot?.style.getPropertyValue("--part")).toBe("#1783FF");
+    expect(dot?.style.getPropertyValue("--part-dark")).toBe("#1783FF");
+    cleanup();
+    const block = logo(render(<ProviderLogo id="opencode" />).container).querySelector(".ac-brand__part") as SVGElement;
+    expect(block.style.getPropertyValue("--part")).toBe("#CFCECD");
+    expect(block.style.getPropertyValue("--part-dark")).toBe("#4B4646");
+  });
+
+  test("MiniMax fills its mark with its gradient, under an id of its own on every logo", () => {
+    const { container } = render(
+      <>
+        <ProviderLogo id="minimax" size="sm" />
+        <ProviderLogo id="minimax" size="xs" />
+      </>,
+    );
+    const ids = [...container.querySelectorAll(".ac-brand")].map((el) => {
+      const gradient = el.querySelector("linearGradient") as SVGElement;
+      expect([...gradient.querySelectorAll("stop")].map((s) => s.getAttribute("stop-color"))).toEqual([
+        "#E21680",
+        "#FF633A",
+      ]);
+      // Left to right across the whole grid.
+      expect(gradient.getAttribute("gradientUnits")).toBe("userSpaceOnUse");
+      expect([gradient.getAttribute("x1"), gradient.getAttribute("x2")]).toEqual(["0", "24"]);
+      expect(el.querySelector("path")?.getAttribute("fill")).toBe(`url(#${gradient.id})`);
+      // Its brand color still tints the tile.
+      expect((el as HTMLElement).style.getPropertyValue("--brand")).toBe("#E73562");
+      return gradient.id;
+    });
+    expect(new Set(ids).size).toBe(2);
+    cleanup();
+    // A mark without a gradient keeps the tile's color.
+    expect(
+      logo(render(<ProviderLogo id="claude" />).container)
+        .querySelector("path")
+        ?.hasAttribute("fill"),
+    ).toBe(false);
+  });
+
+  test("off only dims a mark, in its own colors; the chip is a 20 px tile with a 12 px mark", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-brand--off")).toContain("opacity: 0.5");
+    expect(rule(".ac-brand--off")).not.toContain("filter");
+    expect(rule(".ac-brand--chip")).toContain("width: 20px");
+    expect(rule(".ac-brand--chip")).toContain("height: 20px");
+    expect(rule(".ac-brand--chip")).toContain("border-radius: 7px 7px 7px 3px");
+    expect(rule(".ac-brand--chip svg")).toContain("width: 12px");
+    expect(rule('[data-theme="dark"] .ac-brand__part')).toContain("fill: var(--part-dark)");
+    const chip = logo(render(<ProviderLogo id="zai" size="chip" off />).container);
+    expect(chip.className).toBe("ac-brand ac-brand--chip ac-brand--mono ac-brand--off");
+  });
+
+  test("a stack draws its makers in order, overlapping, and is decorative unless labeled", async () => {
+    const quiet = render(<ProviderStack ids={["claude_code", "codex", "zai", "kimi"]} />).container.firstElementChild;
+    expect(quiet?.className).toBe("ac-brand-stack");
+    expect(quiet?.getAttribute("aria-hidden")).toBe("true");
+    expect([...(quiet?.children ?? [])].map((c) => [(c as HTMLElement).dataset.mark, c.className])).toEqual([
+      ["claude", "ac-brand ac-brand--chip"],
+      ["openai", "ac-brand ac-brand--chip ac-brand--mono"],
+      ["zai", "ac-brand ac-brand--chip ac-brand--mono"],
+      ["kimi", "ac-brand ac-brand--chip ac-brand--mono"],
+    ]);
+    cleanup();
+    const named = render(<ProviderStack ids={["anthropic", "openai"]} label="Claude e OpenAI" />).container
+      .firstElementChild as HTMLElement;
+    expect(named.getAttribute("role")).toBe("img");
+    expect(named.getAttribute("aria-label")).toBe("Claude e OpenAI");
+    expect(named.hasAttribute("aria-hidden")).toBe(false);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-brand-stack > .ac-brand + .ac-brand")).toContain("margin-left: -6px");
+    expect(rule(".ac-brand-stack > .ac-brand")).toContain("0 0 0 2px var(--stack-ring, var(--surface))");
   });
 
   test("decorative unless labeled", () => {
@@ -58,6 +149,8 @@ describe("provider marks", () => {
     expect(el.dataset.mark).toBeUndefined();
     expect(el.className).toContain("ac-brand--mono");
     expect(el.className).toContain("ac-brand--off");
+    cleanup();
+    expect(logo(render(<ProviderLogo id="mistral" size="chip" />).container).textContent).toBe("M");
   });
 
   test("BrainLogo still draws Claude for Claude Code and OpenAI for Codex, at its sizes", () => {
