@@ -71,7 +71,7 @@ export async function requestNewInvitation(
         locale,
         orgName: org.name,
         email: target.email,
-        url: `${publicUrl.replace(/\/$/, "")}/org/${target.orgId}/members`,
+        url: `${publicUrl.replace(/\/$/, "")}/org/${target.orgId}/settings/members`,
       },
     });
   }

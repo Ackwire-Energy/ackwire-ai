@@ -20,7 +20,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   expect(t.email.sent).toEqual([]); // never inline in the request
   await t.drain();
   expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([
-    [["ana@example.com"], "owner convidou você para Acme no agentes"],
+    [["ana@example.com"], "Você recebeu um convite para um workspace no agentes.chat"],
   ]);
   expect(t.email.sent[0]?.text).toContain(url);
 
@@ -40,7 +40,10 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   });
   expect(reset.status).toBe(200);
   await t.drain();
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["owner@example.com"], subject: "Redefinir sua senha do agentes" });
+  expect(t.email.sent.at(-1)).toMatchObject({
+    to: ["owner@example.com"],
+    subject: "Redefina sua senha do agentes.chat",
+  });
 });
 
 test("password reset: the email links straight to the web's /reset-password with a token, good once", async () => {
@@ -94,10 +97,16 @@ test("the sign-up's own language: the confirmation email and the account follow 
 
   // The web app says its own language; a browser's list counts its most preferred language of ours.
   const bia = await signUpIn("bia@example.com", "en");
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["bia@example.com"], subject: "Confirm your email on agentes" });
+  expect(t.email.sent.at(-1)).toMatchObject({
+    to: ["bia@example.com"],
+    subject: "Confirm your email for agentes.chat",
+  });
   expect(await localeOf("bia@example.com")).toBe("en");
   const ana = await signUpIn("ana@example.com", "de-DE,pt-PT;q=0.9,en;q=0.8");
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes" });
+  expect(t.email.sent.at(-1)).toMatchObject({
+    to: ["ana@example.com"],
+    subject: "Confirme seu e-mail no agentes.chat",
+  });
   expect(await localeOf("ana@example.com")).toBe("pt-BR");
 
   // The link works for the hour the onboarding promises.
@@ -122,7 +131,7 @@ test("the sign-up's own language: the confirmation email and the account follow 
   expect(again.status).toBe(200);
   await t.drain();
   expect(t.email.sent.slice(sent)).toMatchObject([
-    { to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes" },
+    { to: ["ana@example.com"], subject: "Confirme seu e-mail no agentes.chat" },
   ]);
   expect(linkTo("ana@example.com").searchParams.get("callbackURL")).toBe("/?email_confirmed=1");
   // A sign-up that names its own page keeps it.
@@ -138,5 +147,5 @@ test("the sign-up's own language: the confirmation email and the account follow 
     headers: { "accept-language": "en-US,en;q=0.9" },
   });
   await t.drain();
-  expect(t.email.sent.at(-1)).toMatchObject({ to: ["old@example.com"], subject: "Reset your agentes password" });
+  expect(t.email.sent.at(-1)).toMatchObject({ to: ["old@example.com"], subject: "Reset your agentes.chat password" });
 });

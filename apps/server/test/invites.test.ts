@@ -60,9 +60,8 @@ test("request a new invitation: the inviter is emailed once; valid or unknown to
   expect((await anon(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(204);
   expect((await anon(`/api/app/invitations/${token}/request-new`, { json: {} })).status).toBe(204);
   await t.drain();
-  expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([
-    [["owner@example.com"], "Pedido de novo convite para Acme"],
-  ]);
-  expect(t.email.sent[0]?.text).toContain("ana@example.com");
-  expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/members`);
+  expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([[["owner@example.com"], "Pediram um novo convite"]]);
+  // The address as typed, with the hair spaces that keep mail clients from linking it.
+  expect(t.email.sent[0]?.text).toContain("ana@\u200aexample.\u200acom abriu um convite vencido da Acme");
+  expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/settings/members`);
 });
