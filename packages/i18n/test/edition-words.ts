@@ -47,6 +47,13 @@ export const CLOUD_BANNED = {
 
 export const SELFHOST_BANNED = ["in the cloud", "cloud computer", "na nuvem", "computador na nuvem"] as const;
 
+/**
+ * System names, addresses and tool lists that the computer's screens never show to people who aren't developers.
+ * Case-insensitive, so the Go language is left out: it would match English "Go to…".
+ */
+export const TECHNICAL =
+  /\bLinux\b|\bIP(v[46])?\b|\bvCPU|Chrome|\bgit\b|\bNode\b|Python|\bRust\b|Debian|Ubuntu|Docker|kernel/i;
+
 /** The banned phrases a text holds, ignoring case. */
 export const bannedIn = (text: string, phrases: readonly string[]) =>
   phrases.filter((p) => text.toLowerCase().includes(p));

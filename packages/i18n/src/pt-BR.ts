@@ -13,6 +13,8 @@ export const ptBR = {
   common: {
     close: "Fechar",
     removeName: "Remover {{name}}",
+    /** The ⓘ hint's name beside a label: "Sobre Fuso horário". */
+    about: "Sobre {{label}}",
     previousMonth: "Mês anterior",
     nextMonth: "Próximo mês",
     chooseDate: "Escolher data",
