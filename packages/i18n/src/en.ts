@@ -7,6 +7,7 @@ export const en: Translations = {
   common: {
     close: "Close",
     removeName: "Remove {{name}}",
+    about: "About {{label}}",
     previousMonth: "Previous month",
     nextMonth: "Next month",
     chooseDate: "Choose a date",

@@ -12,6 +12,7 @@ import {
   useRef,
 } from "react";
 import { cx } from "../cx";
+import { InfoHint } from "./InfoHint";
 import { SearchField } from "./Toolbar";
 
 interface FieldContextValue {
@@ -39,27 +40,40 @@ export interface FieldProps {
   error?: ReactNode;
   /** Something next to the label (e.g. "Esqueci minha senha"). */
   labelAside?: ReactNode;
+  /** An ⓘ right after the label with what the field is for (plain sentences); it also describes the control. */
+  hint?: { name: string; text: ReactNode };
   className?: string;
   style?: React.CSSProperties;
   children: ReactNode;
 }
 
-/** A form field: always-visible label, optional help or error, wired to its control. */
-export function Field({ label, id, help, error, labelAside, className, style, children }: FieldProps) {
+/** A form field: always-visible label, optional ⓘ hint, help or error, wired to its control. */
+export function Field({ label, id, help, error, labelAside, hint, className, style, children }: FieldProps) {
   const generated = useId();
   const controlId = id ?? `f${generated.replace(/:/g, "")}`;
   const helpId = `${controlId}-help`;
+  const hintId = `${controlId}-hint`;
   const showError = error !== undefined && error !== null && error !== false;
   const showHelp = !showError && help !== undefined && help !== null && help !== false;
-  const labelEl = (
+  const describedBy = [showError || showHelp ? helpId : "", hint ? hintId : ""].filter(Boolean).join(" ");
+  const labelOnly = (
     <label className="ac-field__label" htmlFor={controlId}>
       {label}
     </label>
   );
+  // The ⓘ sits outside the <label>: the label stays the control's name, and pressing the ⓘ never reaches the control.
+  const labelEl = hint ? (
+    <span className="ac-hintline">
+      {labelOnly}
+      <InfoHint name={hint.name} id={hintId}>
+        {hint.text}
+      </InfoHint>
+    </span>
+  ) : (
+    labelOnly
+  );
   return (
-    <FieldContext.Provider
-      value={{ id: controlId, describedBy: showError || showHelp ? helpId : undefined, invalid: showError }}
-    >
+    <FieldContext.Provider value={{ id: controlId, describedBy: describedBy || undefined, invalid: showError }}>
       <div className={cx("ac-field", className)} style={style}>
         {labelAside ? (
           <div className="ac-field__label-row">
