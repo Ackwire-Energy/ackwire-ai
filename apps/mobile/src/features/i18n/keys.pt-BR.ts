@@ -1081,6 +1081,8 @@ export const featureKeysPtBR = {
         schedule: "Rotinas",
         forum: "Fórum",
         sandbox: "Computador próprio",
+        browser: "Navegador",
+        desktop: "Tela do computador",
       },
       asksYou: "Merge e publicar sempre pedem sua aprovação, em qualquer nível.",
       asksOwner: "Merge e publicar sempre pedem a aprovação de {{name}}, em qualquer nível.",

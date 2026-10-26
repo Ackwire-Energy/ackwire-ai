@@ -74,6 +74,8 @@ const AREA_ICON: Record<string, IconName> = {
   schedule: "clock",
   forum: "chat",
   sandbox: "laptop",
+  browser: "globe",
+  desktop: "laptop",
 };
 
 /**
