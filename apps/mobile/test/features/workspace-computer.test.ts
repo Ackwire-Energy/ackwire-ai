@@ -1,23 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { type OutageTargetLike, targetOptions } from "@agenteschat/client/lib/machine-outages";
-import { resources } from "@agenteschat/i18n";
-import i18next, { type TFunction } from "i18next";
-import { featureKeysEn } from "../../src/features/i18n/keys.en";
-import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
-import { withMobileKeys } from "../../src/i18n/merge";
 import { suspendedOf } from "../../src/lib/org-choice";
-
-async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
-  const i18n = i18next.createInstance();
-  await i18n.init({
-    lng,
-    fallbackLng: "pt-BR",
-    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
-    interpolation: { escapeValue: false },
-  });
-  return i18n.t;
-}
+import { translator } from "./fixtures";
 
 /** The workspace's own computer (ADR 0056 §10): the server names it ("Computador da Acme"), its system never said. */
 const managed: OutageTargetLike = {

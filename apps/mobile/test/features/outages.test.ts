@@ -1,12 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent } from "@agenteschat/client";
 import { type OutageTargetLike, targetOptions, waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
-import { resources } from "@agenteschat/i18n";
-import i18next, { type TFunction } from "i18next";
 import { teamLines, type WorkItem } from "../../src/features/agents/logic";
 import { agentRowState } from "../../src/features/chats/now";
-import { featureKeysEn } from "../../src/features/i18n/keys.en";
-import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import {
   computerIcon,
   type MachineOutage,
@@ -18,18 +14,7 @@ import {
   waitCardText,
   waitingText,
 } from "../../src/features/outages/logic";
-import { withMobileKeys } from "../../src/i18n/merge";
-
-async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
-  const i18n = i18next.createInstance();
-  await i18n.init({
-    lng,
-    fallbackLng: "pt-BR",
-    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
-    interpolation: { escapeValue: false },
-  });
-  return i18n.t;
-}
+import { translator } from "./fixtures";
 
 const air: MachineOutage = {
   machineId: "air",
@@ -73,7 +58,7 @@ describe("Computador desconectado (phone)", () => {
     expect(noticeText(t, { ...air, name: "Computador da Acme" }, true)).toEqual({
       title: "O Computador da Acme não está respondendo",
       a11y: "Computador sem resposta",
-      sub: "Já estamos cuidando: nada a fazer do seu lado. · Ada e Theo esperam por ele · 3 tarefas",
+      sub: "Já estamos cuidando · Ada e Theo esperam por ele · 3 tarefas",
     });
     const one = { ...air, waitingRuns: 1, agents: [air.agents[0]] } as MachineOutage;
     expect(noticeText(t, one).sub).toBe("Ada espera por ele · 1 tarefa");
@@ -84,18 +69,18 @@ describe("Computador desconectado (phone)", () => {
       a11y: "Computer disconnected",
       sub: "Ada and Theo are waiting for it · 3 tasks",
     });
+    expect(noticeText(en, { ...air, name: "Acme's computer" }, true).sub).toBe(
+      "We're on it · Ada and Theo are waiting for it · 3 tasks",
+    );
   });
 
-  test("the sheet: who waits for what, the targets' lines, the line under the title", async () => {
+  test("the sheet: who waits for what, the targets' lines, the line under the title (who, not the computer again)", async () => {
     const t = await translator("pt-BR");
     expect(waitingText(t, air.agents[0] as MachineOutage["agents"][number])).toBe("2 rotinas esperando");
     expect(waitingText(t, air.agents[1] as MachineOutage["agents"][number])).toBe("1 conversa esperando");
-    expect(sheetDesc(t, air, new Set(["ada", "theo"]))).toBe(
-      "O MacBook Air está desconectado. Escolha onde Ada e Theo passam a trabalhar.",
-    );
-    expect(sheetDesc(t, air, new Set(["ada"]))).toBe(
-      "O MacBook Air está desconectado. Escolha onde Ada passa a trabalhar.",
-    );
+    expect(sheetDesc(t, air, new Set(["ada", "theo"]))).toBe("Escolha onde Ada e Theo passam a trabalhar.");
+    expect(sheetDesc(t, air, new Set(["ada"]))).toBe("Escolha onde Ada passa a trabalhar.");
+    expect(sheetDesc(await translator("en"), air, new Set(["ada"]))).toBe("Choose where Ada works from now on.");
     const [on, off, cloud] = targetOptions(air, [office, pro, { kind: "cloud", available: true, brains: [] }], ["ada"]);
     expect(on && targetText(t, on)).toEqual({
       title: "MacBook Pro do Walter",
