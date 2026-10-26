@@ -23,6 +23,14 @@
 .dsk-screen.is-control canvas {
   cursor: auto;
 }
+/* The last picture, held over the next connection while the screen opens again in the other mode (`holdPicture`). */
+.dsk-screen > .dsk-still {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
 /*
  * In control the person's keys and pastes go here, a text field nobody sees, not to noVNC's canvas
  * (`useScreenKeys`). 16px: iOS zooms into a smaller field when it takes focus.

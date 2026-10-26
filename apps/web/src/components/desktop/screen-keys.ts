@@ -1,6 +1,7 @@
 import { isApple } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type RefObject, useCallback, useEffect, useRef } from "react";
+import { liveCanvas } from "@/lib/canvas";
 import { composes, copies, isModifier, keyInit, locksOf, macCopy, pastes } from "@/lib/keys";
 
 /**
@@ -54,9 +55,12 @@ export function useScreenKeys({
     /** Caps Lock and Num Lock as the last key had them: noVNC syncs the computer's to what each key it gets says. */
     let locks: KeyboardEventInit = {};
     let tick: ReturnType<typeof setTimeout> | undefined;
-    // Cancelable: the dialog's own Esc listener sees a replayed Esc too, and must be able to keep the dialog open.
-    const replay = (type: "keydown" | "keyup", init: KeyboardEventInit) =>
-      screen.current?.querySelector("canvas")?.dispatchEvent(new KeyboardEvent(type, { ...init, cancelable: true }));
+    // On noVNC's own canvas, not a picture held over it while the mode switches (`holdPicture`). Cancelable: the
+    // dialog's own Esc listener sees a replayed Esc too, and must be able to keep the dialog open.
+    const replay = (type: "keydown" | "keyup", init: KeyboardEventInit) => {
+      const canvas = screen.current && liveCanvas(screen.current);
+      canvas?.dispatchEvent(new KeyboardEvent(type, { ...init, cancelable: true }));
+    };
     /** Presses `keys` there with none of the person's held modifiers on (⌘ is Alt there), then holds those again. */
     const press = (keys: (typeof SHIFT)[]) => {
       const held = [...down.values()].filter((k) => isModifier(k.code ?? ""));

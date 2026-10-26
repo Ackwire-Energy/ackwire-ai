@@ -196,6 +196,8 @@ async function controlled() {
 const line = () => document.querySelector(".dsk-line > .muted")?.textContent;
 /** What the clipboard just did, said in that line in its words' place. */
 const said = () => document.querySelector(".dsk-line > .dsk-said")?.textContent;
+/** The last picture the screen holds over its next connection. */
+const still = () => document.querySelector(".dsk-screen > .dsk-still");
 const pasteOn = (el: Element, text: string) =>
   act(
     async () =>
@@ -536,6 +538,86 @@ describe("the agent's screen in the computer dialog", () => {
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
+  });
+
+  test("taking control and handing it back keep the last picture over the new connection: the head says the new mode at once, never Abrindo", async () => {
+    const t = await dialog();
+    await connected();
+    expect(still()).toBeNull();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
+    // The watching connection is gone; its picture stays over the control one until that one draws.
+    expect(still()).not.toBeNull();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(sub()).toBe("Você no controle · a Ada espera");
+    // Keys go to noVNC's own canvas under it, not to the picture.
+    fireEvent.keyDown(view().getByRole("textbox", { name: "Digitar no computador da Ada" }), {
+      key: "a",
+      code: "KeyA",
+    });
+    expect(rfb().log).toEqual(["keydown a KeyA"]);
+    await connected();
+    expect(still()).toBeNull();
+
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
+    // Watching as soon as the server says so, as taking control says it: no wait for the new connection's picture.
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    expect(still()).not.toBeNull();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(view().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    await connected();
+    expect(still()).toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("control ended on the server first (4410): it opens again as a watcher over the same picture; a drop then says so", async () => {
+    const t = await controlled();
+    const done = { ...(t.fake.handoffs.get("takeover-1") as BrowserHandoff), status: "done" as const };
+    t.fake.handoffs.set(done.id, done);
+    await act(async () => t.sockets.desktops.at(-1)?.serverClose(4410, "control_ended"));
+    await settle(6);
+    expect(still()).not.toBeNull();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
+    // The new connection drops before it draws: the cover says why, over no old picture.
+    await act(async () => t.sockets.desktops.at(-1)?.serverClose(4503, "offline"));
+    await settle(4);
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(screen().getByText("Tentando de novo…")).toBeTruthy();
+  });
+
+  test("a switch whose new connection hasn't drawn in 3 s lets go of the old picture and says it is opening", async () => {
+    const t = await controlled();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
+    expect(still()).not.toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    await act(() => new Promise((r) => setTimeout(r, 3_100)));
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(sub()).toBe("Abrindo…");
+    await connected();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("control taken over by someone else: their screen hidden at once, nothing of it kept under the cover", async () => {
+    const t = await controlled();
+    const mine = t.fake.handoffs.get("takeover-1") as BrowserHandoff;
+    t.fake.handoffs.set(mine.id, { ...mine, status: "done" });
+    const joao = controlOf(ADA_ID, "u-joao");
+    t.fake.handoffs.set(joao.id, joao);
+    await act(async () => t.sockets.desktops.at(-1)?.serverClose(4410, "control_ended"));
+    await settle(6);
+    expect(screen().getByText("João está no controle")).toBeTruthy();
+    expect(still()).toBeNull();
   });
 
   test("in control each key is replayed on noVNC's canvas, never seen by the page; a blur lets go of what is held", async () => {

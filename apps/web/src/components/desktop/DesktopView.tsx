@@ -1,6 +1,7 @@
 import type { DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
+  DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
@@ -17,7 +18,7 @@ import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
-import { showsPicture } from "@/lib/canvas";
+import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas";
 import { TOAST_MS, useToast } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
@@ -38,6 +39,12 @@ const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdat
  */
 const PICTURE_POLL_MS = 200;
 const PICTURE_WAIT_MS = 10_000;
+/**
+ * Taking control or handing it back opens the screen again in the other mode, on a new socket. Its last picture
+ * stays over the new connection until that one draws (`holdPicture`), so the switch shows no "Abrindo…" and the head
+ * says the new mode as soon as the server does. A connection that hasn't drawn by this long is said to be opening.
+ */
+const HOLD_MS = 3_000;
 
 /** A phone or tablet: no keys hint, and a Keyboard button raises its keyboard. */
 const TOUCH = "(pointer: coarse)";
@@ -108,6 +115,9 @@ export function DesktopView({
         ? "unavailable"
         : "connecting";
   const mode = s ? desktopMode(s, me.user.id) : "watch";
+  // The mode as a connection ends: a switch keeps its picture (`holdPicture`).
+  const modeNow = useRef(mode);
+  modeNow.current = mode;
   const inControl = mode === "control";
   const connect = blocked === null && !gaveUp;
   const { refetch } = status;
@@ -161,13 +171,25 @@ export function DesktopView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new `round` opens the screen again
   useEffect(() => {
     const el = screenRef.current;
-    if (!connect || !el) return;
-    // While it retries, the cover keeps saying why; anything else is a fresh start.
-    setView((v) => (v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
+    if (!el) return;
+    if (!connect) {
+      heldPicture(el)?.remove();
+      return;
+    }
+    // While it retries, the cover keeps saying why; a picture held over a switch stays live; anything else is a
+    // fresh start.
+    const holding = heldPicture(el) !== null;
+    setView((v) => (holding || v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let looking: ReturnType<typeof setInterval> | undefined;
+    const stale = holding
+      ? setTimeout(() => {
+          heldPicture(el)?.remove();
+          setView("connecting");
+        }, HOLD_MS)
+      : undefined;
     let ws: WebSocket | null = null;
     let rfb: RFB | null = null;
     void import("@novnc/novnc").then(
@@ -184,11 +206,16 @@ export function DesktopView({
         socket.addEventListener("close", (e: CloseEvent) => {
           closed = true;
           clearInterval(looking);
+          clearTimeout(stale);
           // A close that arrives after the next connection took over (watching turned control) leaves that one be.
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
           const next = desktopCloseState(e.code, e.reason);
-          setView(next.state);
+          // Control ended (handed back): it opens again as a watcher over the picture it had; any other close says why.
+          if (e.code !== DESKTOP_CLOSE.controlEnded || !holdPicture(el)) {
+            heldPicture(el)?.remove();
+            setView(next.state);
+          }
           // What changed shows at once (someone took control); a state that blocks it stops the retry.
           void refetch();
           if (next.retry === "never") return setGaveUp(true);
@@ -212,9 +239,11 @@ export function DesktopView({
           if (inControl && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
           const since = Date.now();
           const look = () => {
-            const canvas = el.querySelector("canvas");
+            const canvas = liveCanvas(el);
             if (canvas && !showsPicture(canvas) && Date.now() - since < PICTURE_WAIT_MS) return;
             clearInterval(looking);
+            clearTimeout(stale);
+            heldPicture(el)?.remove();
             if (!cancelled) setView("live");
           };
           looking = setInterval(look, PICTURE_POLL_MS);
@@ -234,9 +263,12 @@ export function DesktopView({
       cancelled = true;
       clearTimeout(timer);
       clearInterval(looking);
+      clearTimeout(stale);
       if (rfbRef.current === rfb) rfbRef.current = null;
       if (closed) return;
       closed = true;
+      // A switch of mode: the picture stays over the connection that replaces this one.
+      if (modeNow.current !== mode) holdPicture(el);
       if (rfb) rfb.disconnect();
       else ws?.close();
     };
