@@ -98,6 +98,9 @@ describe("signing in", () => {
     await click(screen().getByRole("button", { name: /^Continuar(?! com)/ }));
     await settle(4);
     expect(heading()).toBe("Esta conta entra pelo app do agentes.chat.");
+    expect(document.querySelector(".auth__lead")?.textContent).toBe(
+      "No computador onde este servidor roda, abra o app e escolha Adicionar uma senha no menu da sua conta.",
+    );
     expect(screen().getByRole("button", { name: "Usar outro e-mail" })).toBeTruthy();
   });
 });

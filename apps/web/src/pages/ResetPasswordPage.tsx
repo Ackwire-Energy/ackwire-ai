@@ -32,11 +32,12 @@ export function ResetPasswordPage({ token }: { token?: string }) {
     setError(result.message || t("common.unknownError"));
   };
 
-  const [title, lead] = expired
+  // Before saving, no lead: the line under the field says what a password needs.
+  const [title, lead]: [string, string?] = expired
     ? [t("auth.reset.expired"), t("auth.reset.expiredLead")]
     : done
       ? [t("auth.reset.done"), t("auth.reset.doneLead")]
-      : [t("auth.reset.title"), t("auth.passwordHelp")];
+      : [t("auth.reset.title")];
   const expression = done ? "happy" : focus && !show ? "closed" : undefined;
 
   return (
@@ -46,7 +47,7 @@ export function ResetPasswordPage({ token }: { token?: string }) {
           <AgentAvatar name="agentes.chat" size="lg" state={pending ? "writing" : undefined} expression={expression} />
           <div className="auth__bubble" key={`${expired}-${done}`} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
-            <p className="auth__lead">{lead}</p>
+            {lead && <p className="auth__lead">{lead}</p>}
           </div>
         </header>
         <div className="auth__step">
