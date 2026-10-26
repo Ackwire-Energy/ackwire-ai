@@ -676,6 +676,7 @@ describe("artifact helpers", () => {
       type: "table",
       header: ["a", "b"],
       rows: [["1", "2"]],
+      align: ["right", "right"],
     });
   });
 });
