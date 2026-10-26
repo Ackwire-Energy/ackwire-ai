@@ -83,7 +83,13 @@ const GENERIC = new Set([
 ]);
 const JSON_WORDS = words("true false null");
 
-type Syntax = { keywords: Set<string>; caseless?: boolean; line: string[]; block: boolean; hashOnlyAfterSpace?: boolean };
+type Syntax = {
+  keywords: Set<string>;
+  caseless?: boolean;
+  line: string[];
+  block: boolean;
+  hashOnlyAfterSpace?: boolean;
+};
 
 const C_LIKE: Syntax = { keywords: GENERIC, line: ["//"], block: true };
 const SYNTAX: Record<string, Syntax> = {

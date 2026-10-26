@@ -24,7 +24,11 @@ describe("parseChart", () => {
       { ...BAR, series: [{ name: "Taxa", values: [15, 6.7] }] },
       { ...BAR, series: [{ name: "Taxa", values: [15, "6,7", 5] }] },
       { ...BAR, series: [] },
-      { ...BAR, labels: Array.from({ length: 30 }, (_, i) => `d${i}`), series: [{ name: "x", values: Array(30).fill(1) }] },
+      {
+        ...BAR,
+        labels: Array.from({ length: 30 }, (_, i) => `d${i}`),
+        series: [{ name: "x", values: Array(30).fill(1) }],
+      },
       { ...BAR, type: "pie", series: [{ name: "x", values: [1, -2, 3] }] },
       { type: "number", title: "Taxa geral", labels: [], series: [] },
     ];
@@ -32,7 +36,17 @@ describe("parseChart", () => {
   });
 
   test("a number needs a value; its line under it is optional; kpi is an alias", () => {
-    const spec = parseChart(JSON.stringify({ type: "kpi", title: "Conversão", unit: "%", value: 5.1, delta: "+0,8 pp", labels: [], series: [] }));
+    const spec = parseChart(
+      JSON.stringify({
+        type: "kpi",
+        title: "Conversão",
+        unit: "%",
+        value: 5.1,
+        delta: "+0,8 pp",
+        labels: [],
+        series: [],
+      }),
+    );
     expect(spec).toMatchObject({ type: "number", value: 5.1, delta: "+0,8 pp" });
   });
 });
@@ -46,7 +60,14 @@ describe("formatting and the table", () => {
   });
 
   test("a pie's table adds the share", () => {
-    const pie = parseChart(JSON.stringify({ type: "pie", title: "Compras", labels: ["a", "b"], series: [{ name: "Compras", values: [3, 1] }] }));
+    const pie = parseChart(
+      JSON.stringify({
+        type: "pie",
+        title: "Compras",
+        labels: ["a", "b"],
+        series: [{ name: "Compras", values: [3, 1] }],
+      }),
+    );
     if (!pie) throw new Error("expected a chart");
     expect(chartShares(pie)).toEqual([0.75, 0.25]);
     expect(chartTable(pie, "pt-BR", { item: "Item", share: "Parte" })).toEqual({

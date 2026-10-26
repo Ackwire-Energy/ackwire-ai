@@ -49,7 +49,16 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -264,13 +273,7 @@ export function Sidebar() {
   }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 
   return (
-    <nav
-      className="sidebar"
-      aria-label={t("shell.nav")}
-      data-rail={rail}
-      style={selectionSky()}
-      {...drawer?.navProps}
-    >
+    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
       <div className="sidebar__top">
         <div className="sidebar__org">
           <WorkspaceMenu

@@ -285,7 +285,9 @@ export const MessageRow = memo(function MessageRow({
         {brainWait ? (
           <BrainWait
             message={m}
-            fallback={body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} /> : null}
+            fallback={
+              body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} /> : null
+            }
           />
         ) : body ? (
           <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />

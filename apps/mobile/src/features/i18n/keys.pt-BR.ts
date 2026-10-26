@@ -11,6 +11,7 @@ export const featureKeysPtBR = {
     send: "Enviar",
   },
   chart: {
+    pending: "Montando o gráfico…",
     table: "Tabela",
     item: "Item",
     share: "Parte",

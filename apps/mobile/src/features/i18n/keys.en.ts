@@ -7,6 +7,7 @@ export const featureKeysEn: FeatureTranslations = {
     send: "Send",
   },
   chart: {
+    pending: "Building the chart…",
     table: "Table",
     item: "Item",
     share: "Share",

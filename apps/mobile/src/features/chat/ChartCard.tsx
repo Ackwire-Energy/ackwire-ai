@@ -21,10 +21,17 @@ import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, IconButton, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
+import { Icon, IconButton, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 import type { Inline } from "./logic";
 import { Table } from "./MessageSpans";
+
+/**
+ * Charts already drawn once (by their data): when an answer stops streaming, its live row gives way to the
+ * message row and the chart mounts again; it shouldn't grow in twice.
+ */
+const drawn = new Set<string>();
+const keyOf = (spec: ChartSpec) => JSON.stringify([spec.type, spec.title, spec.labels, spec.series, spec.value]);
 
 /** The chart open in full screen (a route can't carry the data in its URL). */
 let opened: { spec: ChartSpec; accent: AgentColorName } | null = null;
@@ -37,10 +44,22 @@ const EASE = Easing.out(Easing.cubic);
  * the web (`@agenteschat/ui/sky/chart`). Tap a bar, a point or a slice for its value; "Tabela" flips the card
  * to the same data as a table; full screen is a native form sheet with the chart big and its table under it.
  */
-export const ChartCard = memo(function ChartCard({ spec, accent = "sky" }: { spec: ChartSpec; accent?: AgentColorName }) {
+export const ChartCard = memo(function ChartCard({
+  spec,
+  accent = "sky",
+}: {
+  spec: ChartSpec;
+  accent?: AgentColorName;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const [table, setTable] = useState(false);
+  const [still] = useState(() => {
+    const key = keyOf(spec);
+    const seen = drawn.has(key);
+    drawn.add(key);
+    return seen;
+  });
   return (
     <View style={[styles.card, { backgroundColor: c.sunken, borderColor: c.line }]}>
       <View style={styles.top}>
@@ -80,11 +99,29 @@ export const ChartCard = memo(function ChartCard({ spec, accent = "sky" }: { spe
         </PressScale>
       </View>
       <View style={styles.body}>
-        {table ? <ChartTable spec={spec} /> : <ChartView spec={spec} accent={accent} />}
+        {table ? <ChartTable spec={spec} /> : <ChartView spec={spec} accent={accent} still={still} />}
       </View>
     </View>
   );
 });
+
+/** A ```chart block still being written: a quiet card until its data is complete. */
+export function ChartPending({ accent = "sky" }: { accent?: AgentColorName }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
+    <View
+      style={[styles.card, styles.pending, { backgroundColor: c.sunken, borderColor: c.line }]}
+      accessibilityRole="progressbar"
+      accessibilityLabel={t("mobile.chart.pending")}
+    >
+      <PixelOrbit color={accent} size={14} />
+      <Text variant="footnote" tone="faint">
+        {t("mobile.chart.pending")}
+      </Text>
+    </View>
+  );
+}
 
 /** The full screen chart (`/chart`, a native form sheet): the chart big, its table under it. */
 export function ChartSheet() {
@@ -122,22 +159,36 @@ export function ChartSheet() {
   );
 }
 
-function ChartView({ spec, accent, big = false }: { spec: ChartSpec; accent: AgentColorName; big?: boolean }) {
+function ChartView({
+  spec,
+  accent,
+  big = false,
+  still = false,
+}: {
+  spec: ChartSpec;
+  accent: AgentColorName;
+  big?: boolean;
+  /** Drawn at once, without growing in (already seen). */
+  still?: boolean;
+}) {
   switch (spec.type) {
     case "bar":
-      return <Bars spec={spec} accent={accent} big={big} />;
+      return <Bars spec={spec} accent={accent} big={big} still={still} />;
     case "line":
-      return <Line spec={spec} accent={accent} big={big} />;
+      return <Line spec={spec} accent={accent} big={big} still={still} />;
     case "pie":
       return <Pie spec={spec} accent={accent} big={big} />;
     default:
-      return <BigNumber spec={spec} accent={accent} big={big} />;
+      return <BigNumber spec={spec} accent={accent} big={big} still={still} />;
   }
 }
 
 function ChartTable({ spec }: { spec: ChartSpec }) {
   const { t, i18n } = useTranslation();
-  const { header, rows } = chartTable(spec, i18n.language, { item: t("mobile.chart.item"), share: t("mobile.chart.share") });
+  const { header, rows } = chartTable(spec, i18n.language, {
+    item: t("mobile.chart.item"),
+    share: t("mobile.chart.share"),
+  });
   const cell = (text: string): Inline[] => [{ kind: "text", text }];
   return (
     <Table
@@ -186,7 +237,7 @@ function Picked({ text }: { text: string | null }) {
 
 /* ---------- bars ---------- */
 
-function Bars({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; big: boolean }) {
+function Bars({ spec, accent, big, still }: { spec: ChartSpec; accent: AgentColorName; big: boolean; still: boolean }) {
   const { i18n } = useTranslation();
   const values = spec.series[0]?.values ?? [];
   const max = Math.max(0, ...values) || 1;
@@ -215,6 +266,7 @@ function Bars({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; 
                 height={height}
                 accent={accent}
                 lead={value === max}
+                still={still}
               />
             </View>
             <Text variant="footnote" tone="ink" style={styles.barValue}>
@@ -234,9 +286,21 @@ function Bars({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; 
   );
 }
 
-function Bar({ width, height, accent, lead }: { width: number; height: number; accent: AgentColorName; lead: boolean }) {
+function Bar({
+  width,
+  height,
+  accent,
+  lead,
+  still,
+}: {
+  width: number;
+  height: number;
+  accent: AgentColorName;
+  lead: boolean;
+  still: boolean;
+}) {
   const c = useColors();
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion() || still;
   const grown = useSharedValue(reduced ? width : 0);
   useEffect(() => {
     grown.value = reduced ? width : withTiming(width, { duration: 600, easing: EASE });
@@ -268,28 +332,35 @@ function Line({
   big,
   spark = false,
   height,
+  still = false,
 }: {
   spec: ChartSpec;
   accent: AgentColorName;
   big: boolean;
   spark?: boolean;
   height?: number;
+  still?: boolean;
 }) {
   const { i18n } = useTranslation();
   const { scheme } = useTheme();
   const c = useColors();
   const dark = scheme === "dark";
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion() || still;
   const [width, onLayout] = useWidth();
   const h = height ?? (big ? 240 : 150);
   const values = spec.series[0]?.values ?? [];
   const [picked, setPicked] = useState<number | null>(null);
-  const points = useMemo(() => (width > 10 && values.length > 1 ? linePoints(values, width, h) : []), [width, h, values]);
+  const points = useMemo(
+    () => (width > 10 && values.length > 1 ? linePoints(values, width, h) : []),
+    [width, h, values],
+  );
   const stroke = useMemo(() => (points.length ? Skia.Path.MakeFromSVGString(smoothPath(points)) : null), [points]);
   const area = useMemo(() => {
     const cols = Math.round(width / CHART_CELL);
     const rows = Math.round(h / CHART_CELL);
-    return points.length ? cellPaths(areaCells(cols, rows, lineTops(points, cols)), cols, rows, CHART_CELL, true) : new Map();
+    return points.length
+      ? cellPaths(areaCells(cols, rows, lineTops(points, cols)), cols, rows, CHART_CELL, true)
+      : new Map();
   }, [points, width, h]);
   const [near, far] = chartAreaTones(accent, dark);
   const tone = useMemo(() => (v: number) => (v === 1 ? near : far), [near, far]);
@@ -309,7 +380,11 @@ function Line({
   };
   return (
     <View>
-      <Pressable onLayout={onLayout} onPress={spark ? undefined : (e) => pick(e.nativeEvent.locationX)} style={{ height: h }}>
+      <Pressable
+        onLayout={onLayout}
+        onPress={spark ? undefined : (e) => pick(e.nativeEvent.locationX)}
+        style={{ height: h }}
+      >
         {width > 0 && stroke ? (
           <Canvas style={{ width, height: h }}>
             <Cells paths={area} tone={tone} />
@@ -319,7 +394,14 @@ function Line({
                 // biome-ignore lint/suspicious/noArrayIndexKey: the points, in order
                 <Group key={i}>
                   <Circle cx={x} cy={y} r={i === peak || i === picked ? 4.5 : 3} color={i === peak ? ink : c.sunken} />
-                  <Circle cx={x} cy={y} r={i === peak || i === picked ? 4.5 : 3} color={ink} style="stroke" strokeWidth={2} />
+                  <Circle
+                    cx={x}
+                    cy={y}
+                    r={i === peak || i === picked ? 4.5 : 3}
+                    color={ink}
+                    style="stroke"
+                    strokeWidth={2}
+                  />
                 </Group>
               ))}
           </Canvas>
@@ -420,7 +502,17 @@ function Pie({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; b
 
 /* ---------- number ---------- */
 
-function BigNumber({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; big: boolean }) {
+function BigNumber({
+  spec,
+  accent,
+  big,
+  still,
+}: {
+  spec: ChartSpec;
+  accent: AgentColorName;
+  big: boolean;
+  still: boolean;
+}) {
   const { i18n } = useTranslation();
   const c = useColors();
   const hasLine = spec.labels.length > 1 && (spec.series[0]?.values.length ?? 0) > 1;
@@ -438,7 +530,7 @@ function BigNumber({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorN
       </View>
       {hasLine ? (
         <View style={styles.flex}>
-          <Line spec={spec} accent={accent} big={big} spark height={big ? 100 : 52} />
+          <Line spec={spec} accent={accent} big={big} spark height={big ? 100 : 52} still={still} />
         </View>
       ) : null}
     </View>
@@ -447,6 +539,7 @@ function BigNumber({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorN
 
 const styles = StyleSheet.create({
   card: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  pending: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 14 },
   top: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 10 },
   titles: { flex: 1, gap: 1, paddingTop: 4 },
   pill: { height: 30, paddingHorizontal: 10, borderRadius: 15, alignItems: "center", justifyContent: "center" },

@@ -4,7 +4,7 @@ import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
-import { ChartCard } from "./ChartCard";
+import { ChartCard, ChartPending } from "./ChartCard";
 import { CodeCard } from "./CodeCard";
 import { parseBlocks } from "./logic";
 import { Spans, Table } from "./MessageSpans";
@@ -55,8 +55,9 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i}>
-                <Fenced lang={b.lang} text={b.text} accent={accent} />
-                {end ? <Text variant="body">{end}</Text> : null}
+                <Fenced lang={b.lang} text={b.text} accent={accent} open={b.open === true} />
+                {/* A block still being written takes no fading tail or caret: its card grows instead. */}
+                {end && !b.open ? <Text variant="body">{end}</Text> : null}
               </View>
             );
           case "table":
@@ -113,11 +114,16 @@ export const MessageText = memo(function MessageText({
   );
 });
 
-/** A fenced block: a ```chart that reads as one is drawn; anything else is a code card. */
-function Fenced({ lang, text, accent }: { lang: string; text: string; accent?: AgentColorName }) {
-  const chart = useMemo(() => (lang.toLowerCase() === "chart" ? parseChart(text) : null), [lang, text]);
+/**
+ * A fenced block: a ```chart that reads as one is drawn; one still being written shows "Montando o
+ * gráfico…"; anything else is a code card (growing while it is written).
+ */
+function Fenced({ lang, text, accent, open }: { lang: string; text: string; accent?: AgentColorName; open: boolean }) {
+  const isChart = lang.toLowerCase() === "chart";
+  const chart = useMemo(() => (isChart && !open ? parseChart(text) : null), [isChart, open, text]);
   if (chart) return <ChartCard spec={chart} {...(accent ? { accent } : {})} />;
-  return <CodeCard lang={lang.toLowerCase() === "chart" ? "json" : lang} text={text} />;
+  if (isChart && open) return <ChartPending {...(accent ? { accent } : {})} />;
+  return <CodeCard lang={isChart ? "json" : lang} text={text} />;
 }
 
 /** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */

@@ -184,12 +184,10 @@ export function Markdown({
       case "paragraph":
         return <p key={k}>{inline(b.text, k)}</p>;
       case "code":
-        return (
-          b.lang.toLowerCase() === "chart" ? (
-            <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />
-          ) : (
-            <CodeBlock key={k} lang={b.lang} text={b.text} />
-          )
+        return b.lang.toLowerCase() === "chart" ? (
+          <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />
+        ) : (
+          <CodeBlock key={k} lang={b.lang} text={b.text} />
         );
       case "list": {
         const L = b.ordered ? "ol" : "ul";

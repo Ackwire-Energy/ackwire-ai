@@ -72,7 +72,15 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
   );
 });
 
-function CodeText({ lines, numbered = false, wrap = false }: { lines: CodeToken[][]; numbered?: boolean; wrap?: boolean }) {
+function CodeText({
+  lines,
+  numbered = false,
+  wrap = false,
+}: {
+  lines: CodeToken[][];
+  numbered?: boolean;
+  wrap?: boolean;
+}) {
   const c = useColors();
   const { scheme } = useTheme();
   const colors = TOKEN[scheme];
@@ -97,7 +105,10 @@ function CodeText({ lines, numbered = false, wrap = false }: { lines: CodeToken[
             <RNText
               // biome-ignore lint/suspicious/noArrayIndexKey: the tokens of one line, in order
               key={j}
-              style={[color(tok.kind) ? { color: color(tok.kind) } : null, tok.kind === "comment" ? styles.italic : null]}
+              style={[
+                color(tok.kind) ? { color: color(tok.kind) } : null,
+                tok.kind === "comment" ? styles.italic : null,
+              ]}
             >
               {tok.text}
             </RNText>

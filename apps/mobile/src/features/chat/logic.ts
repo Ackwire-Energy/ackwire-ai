@@ -458,7 +458,7 @@ export type Block =
   | { kind: "heading"; inline: Inline[] }
   | { kind: "bullet"; inline: Inline[]; ordinal: string | null }
   | { kind: "quote"; inline: Inline[] }
-  | { kind: "code"; lang: string; text: string }
+  | { kind: "code"; lang: string; text: string; open?: boolean }
   | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] };
 
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
@@ -508,7 +508,16 @@ export function parseBlocks(body: string): Block[] {
   const out: Block[] = [];
   const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
   for (let i = 0; i < parts.length; i += 3) {
-    textBlocks(parts[i] ?? "", out);
+    const text = parts[i] ?? "";
+    // The last part may hold a block still being written (no closing fence yet): the web's rule, so an
+    // answer that is still streaming shows its code (or "Montando o gráfico…") instead of the raw text.
+    const last = i + 3 >= parts.length;
+    const open = last ? /```([a-zA-Z0-9_+-]*)\n([\s\S]*)$/.exec(text) : null;
+    if (open) {
+      textBlocks(text.slice(0, open.index), out);
+      const code = (open[2] ?? "").replace(/`{1,2}$/, "").replace(/\n$/, "");
+      out.push({ kind: "code", lang: open[1] ?? "", text: code, open: true });
+    } else textBlocks(last ? text.replace(/```[a-zA-Z0-9_+-]*$/, "") : text, out); // a fence still opening
     if (i + 2 < parts.length)
       out.push({ kind: "code", lang: parts[i + 1] ?? "", text: (parts[i + 2] ?? "").replace(/\n$/, "") });
   }

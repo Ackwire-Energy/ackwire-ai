@@ -34,7 +34,10 @@ const NUMERIC = /^[~≈<>+-]?\s*(R\$|US\$|\$|€)?\s*[+-]?\d[\d.,\s]*(%|k|mil|mi
  * A GFM table starting at `lines[i]` (a row with pipes, then the `|---|` rule), or null. Shared by the
  * web and the phone app, so a table is a table anywhere in a message (also right under a sentence).
  */
-export function tableAt(lines: readonly string[], i: number): { table: Extract<MdBlock, { type: "table" }>; next: number } | null {
+export function tableAt(
+  lines: readonly string[],
+  i: number,
+): { table: Extract<MdBlock, { type: "table" }>; next: number } | null {
   const line = lines[i] ?? "";
   const rule = lines[i + 1] ?? "";
   if (!line.includes("|") || !TABLE_RULE.test(rule)) return null;
@@ -42,7 +45,8 @@ export function tableAt(lines: readonly string[], i: number): { table: Extract<M
   const marks = splitRow(rule);
   const rows: string[][] = [];
   let j = i + 2;
-  while (j < lines.length && (lines[j] as string).includes("|") && (lines[j] as string).trim()) rows.push(splitRow(lines[j++] as string));
+  while (j < lines.length && (lines[j] as string).includes("|") && (lines[j] as string).trim())
+    rows.push(splitRow(lines[j++] as string));
   const align = header.map((_, c): TableAlign => {
     const m = marks[c] ?? "";
     if (m.startsWith(":") && m.endsWith(":")) return "center";

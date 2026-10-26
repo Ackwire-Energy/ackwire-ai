@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { areaCells, barCells, cellPaths, chartRamp, linePoints, lineTops, ringCells, smoothPath } from "../src/sky/chart";
+import {
+  areaCells,
+  barCells,
+  cellPaths,
+  chartRamp,
+  linePoints,
+  lineTops,
+  ringCells,
+  smoothPath,
+} from "../src/sky/chart";
 
 describe("chart cells (C · Traço + trama)", () => {
   test("a bar is light at its start and deeper at its tip; the lead bar runs deeper", () => {

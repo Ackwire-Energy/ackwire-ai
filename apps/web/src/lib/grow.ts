@@ -30,7 +30,12 @@ export function useGrowFrom(open: boolean, card: RefObject<HTMLElement | null>, 
         { duration: 420, easing: "cubic-bezier(0.32, 0.72, 0, 1)" },
       );
       for (const part of Array.from(dialog.children))
-        part.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 140, easing: "ease-out", fill: "backwards" });
+        part.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 200,
+          delay: 140,
+          easing: "ease-out",
+          fill: "backwards",
+        });
     });
     return () => cancelAnimationFrame(frame);
   }, [open, selector]);

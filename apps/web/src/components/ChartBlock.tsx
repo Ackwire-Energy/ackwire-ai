@@ -31,6 +31,13 @@ import { useDarkTheme, useGrowFrom } from "@/lib/grow";
 /** The color of the agent who wrote the message (its charts take its tones); sky elsewhere. */
 export const ChartAccent = createContext<AgentColor>("sky");
 
+/**
+ * Charts already drawn once (by their data): when an answer stops streaming, the live row gives way to the
+ * message and the chart mounts again; it shouldn't grow in twice.
+ */
+const drawn = new Set<string>();
+const ChartStill = createContext(false);
+
 const reduceMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
@@ -62,6 +69,12 @@ function ChartPending() {
 export function ChartBlock({ spec }: { spec: ChartSpec }) {
   const { t } = useTranslation();
   const [table, setTable] = useState(false);
+  const [still] = useState(() => {
+    const key = JSON.stringify([spec.type, spec.title, spec.labels, spec.series, spec.value]);
+    const seen = drawn.has(key);
+    drawn.add(key);
+    return seen;
+  });
   const [open, setOpen] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const remember = useGrowFrom(open, card, ".chart-viewer");
@@ -88,7 +101,11 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
           }}
         />
       </figcaption>
-      <div className="chart-card__body">{table ? <ChartTable spec={spec} /> : <ChartView spec={spec} />}</div>
+      <div className="chart-card__body">
+        <ChartStill.Provider value={still}>
+          {table ? <ChartTable spec={spec} /> : <ChartView spec={spec} />}
+        </ChartStill.Provider>
+      </div>
       <Dialog
         open={open}
         onOpenChange={setOpen}
@@ -122,7 +139,10 @@ function ChartView({ spec, big = false }: { spec: ChartSpec; big?: boolean }) {
 
 function ChartTable({ spec }: { spec: ChartSpec }) {
   const { t, i18n } = useTranslation();
-  const { header, rows } = chartTable(spec, i18n.language, { item: t("common.chartItem"), share: t("common.chartShare") });
+  const { header, rows } = chartTable(spec, i18n.language, {
+    item: t("common.chartItem"),
+    share: t("common.chartShare"),
+  });
   return (
     <div className="md__table chart-table">
       <table>
@@ -158,7 +178,8 @@ function ChartTable({ spec }: { spec: ChartSpec }) {
 
 /** True a frame after mount (so a width or a stroke can transition from zero); at once with reduced motion. */
 function useShown() {
-  const [shown, setShown] = useState(reduceMotion);
+  const still = useContext(ChartStill);
+  const [shown, setShown] = useState(() => still || reduceMotion());
   useEffect(() => {
     if (shown) return;
     const frame = requestAnimationFrame(() => setShown(true));
@@ -263,7 +284,9 @@ function BarChart({ spec, big }: { spec: ChartSpec; big: boolean }) {
             data-dim={hot !== null && hot !== i}
             onPointerEnter={(e) => {
               const b = box.current?.getBoundingClientRect();
-              const r = (e.currentTarget.querySelector(".chart-bar__rail") as HTMLElement | null)?.getBoundingClientRect();
+              const r = (
+                e.currentTarget.querySelector(".chart-bar__rail") as HTMLElement | null
+              )?.getBoundingClientRect();
               setHot(i);
               if (b && r)
                 setTip({
@@ -473,6 +496,7 @@ function PieChart({ spec, big }: { spec: ChartSpec; big: boolean }) {
   const total = values.reduce((a, b) => a + b, 0);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [tip, setTip] = useState<Tip>(null);
+  const still = useContext(ChartStill);
 
   // The ring sweeps in clockwise once; then it stays drawn.
   useEffect(() => {
@@ -481,7 +505,7 @@ function PieChart({ spec, big }: { spec: ChartSpec; big: boolean }) {
       paintCells(canvas.current, cells, cells, ringCells(cells, shares, sweep), (v) =>
         v < 0 ? null : (slices[v % slices.length] ?? null),
       );
-    if (reduceMotion()) return draw(1);
+    if (still || reduceMotion()) return draw(1);
     const start = performance.now();
     let frame = 0;
     const tick = (now: number) => {
@@ -491,7 +515,7 @@ function PieChart({ spec, big }: { spec: ChartSpec; big: boolean }) {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [size, shares, slices]);
+  }, [size, shares, slices, still]);
 
   return (
     <div className="chart-pie">

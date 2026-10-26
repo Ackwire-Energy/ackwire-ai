@@ -12,7 +12,14 @@ export const CHART_CELL = 2;
 /** The fill ramp, light to deep (6 tones). */
 export function chartRamp(color: AgentColorName = "sky"): string[] {
   const [top, bottom] = AGENT_GRADIENTS[color];
-  return [mix(top, "#ffffff", 0.55), mix(top, "#ffffff", 0.25), top, mix(top, bottom, 0.5), bottom, mix(bottom, "#000000", 0.35)];
+  return [
+    mix(top, "#ffffff", 0.55),
+    mix(top, "#ffffff", 0.25),
+    top,
+    mix(top, bottom, 0.5),
+    bottom,
+    mix(bottom, "#000000", 0.35),
+  ];
 }
 
 /** The line's stroke and its points. */
@@ -31,8 +38,22 @@ export function chartAreaTones(color: AgentColorName = "sky", dark = false): [st
 export function chartSlices(color: AgentColorName = "sky", dark = false): string[] {
   const [top, bottom] = AGENT_GRADIENTS[color];
   return dark
-    ? [top, mix(top, bottom, 0.5), bottom, mix(bottom, "#000000", 0.25), mix(bottom, "#000000", 0.45), mix(bottom, "#000000", 0.6)]
-    : [bottom, mix(bottom, top, 0.5), top, mix(top, "#ffffff", 0.35), mix(top, "#ffffff", 0.55), mix(top, "#ffffff", 0.72)];
+    ? [
+        top,
+        mix(top, bottom, 0.5),
+        bottom,
+        mix(bottom, "#000000", 0.25),
+        mix(bottom, "#000000", 0.45),
+        mix(bottom, "#000000", 0.6),
+      ]
+    : [
+        bottom,
+        mix(bottom, top, 0.5),
+        top,
+        mix(top, "#ffffff", 0.35),
+        mix(top, "#ffffff", 0.55),
+        mix(top, "#ffffff", 0.72),
+      ];
 }
 
 /**
