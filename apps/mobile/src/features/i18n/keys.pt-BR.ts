@@ -10,6 +10,15 @@ export const featureKeysPtBR = {
     failed: "Não deu certo. Tente de novo.",
     send: "Enviar",
   },
+  code: {
+    label: "Código",
+    copy: "Copiar o código",
+    copied: "Copiado",
+    fullScreen: "Tela cheia",
+    wrap: "Quebrar linhas",
+    more: "Ver as {{count}} linhas",
+    gone: "Esse código não está mais aberto.",
+  },
   time: {
     today: "Hoje",
     yesterday: "Ontem",

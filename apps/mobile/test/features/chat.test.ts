@@ -330,7 +330,19 @@ describe("markdown", () => {
     expect(blocks.map((b) => b.kind)).toEqual(["heading", "paragraph", "bullet", "bullet", "quote", "code"]);
     expect(blocks[1]).toEqual({ kind: "paragraph", inline: [{ kind: "text", text: "Linha um\nlinha dois" }] });
     expect(blocks[3]).toMatchObject({ kind: "bullet", ordinal: "2" });
-    expect(blocks[5]).toEqual({ kind: "code", text: "const a = 1;" });
+    expect(blocks[5]).toEqual({ kind: "code", lang: "ts", text: "const a = 1;" });
+  });
+  test("blocks: a table right under a sentence, with inline marks in cells and numbers aligned right", () => {
+    const blocks = parseBlocks(
+      "Usei a semana desde 18/10:\n| Gatilho | Exibições | Taxa |\n|---|---|---|\n| `generic` | 435 | ~6,7% |\nDepois.",
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "table", "paragraph"]);
+    expect(blocks[1]).toEqual({
+      kind: "table",
+      header: [[{ kind: "text", text: "Gatilho" }], [{ kind: "text", text: "Exibições" }], [{ kind: "text", text: "Taxa" }]],
+      rows: [[[{ kind: "code", text: "generic" }], [{ kind: "text", text: "435" }], [{ kind: "text", text: "~6,7%" }]]],
+      align: ["left", "right", "right"],
+    });
   });
 });
 

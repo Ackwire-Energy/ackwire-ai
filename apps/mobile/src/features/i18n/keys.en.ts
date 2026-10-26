@@ -6,6 +6,15 @@ export const featureKeysEn: FeatureTranslations = {
     failed: "That didn't work. Try again.",
     send: "Send",
   },
+  code: {
+    label: "Code",
+    copy: "Copy the code",
+    copied: "Copied",
+    fullScreen: "Full screen",
+    wrap: "Wrap lines",
+    more: "See all {{count}} lines",
+    gone: "This code is no longer open.",
+  },
   time: {
     today: "Today",
     yesterday: "Yesterday",

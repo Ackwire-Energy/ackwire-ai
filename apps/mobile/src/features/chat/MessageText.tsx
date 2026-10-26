@@ -1,9 +1,10 @@
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Text as RNText, StyleSheet, View } from "react-native";
+import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { MONO } from "../shared/parts";
-import { type Inline, parseBlocks } from "./logic";
+import { CodeCard } from "./CodeCard";
+import { type Block, type Inline, parseBlocks } from "./logic";
 
 /**
  * A message's text: paragraphs, lists, quotes, headings, bold, italic,
@@ -47,11 +48,17 @@ export const MessageText = memo(function MessageText({
           case "code":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i} style={[styles.code, { backgroundColor: c.sunken }]}>
-                <RNText selectable={selectable} style={[styles.mono, { color: c.ink2 }]}>
-                  {b.text}
-                </RNText>
-                {end}
+              <View key={i}>
+                <CodeCard lang={b.lang} text={b.text} />
+                {end ? <Text variant="body">{end}</Text> : null}
+              </View>
+            );
+          case "table":
+            return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
+              <View key={i}>
+                <Table header={b.header} rows={b.rows} align={b.align} />
+                {end ? <Text variant="body">{end}</Text> : null}
               </View>
             );
           case "heading":
@@ -139,6 +146,52 @@ function Spans({ inline }: { inline: Inline[] }) {
   );
 }
 
+type TableBlock = Extract<Block, { kind: "table" }>;
+
+/** A cell's text length, for its column's width (the app has no table layout). */
+const cellLength = (cell: Inline[]) => cell.reduce((n, s) => n + s.text.length, 0);
+
+/**
+ * A table (the web's `md__table`): a quiet box with a hairline, the header on a soft band, rows split by
+ * hairlines, numbers on the right in tabular figures. Columns are as wide as their longest cell (within
+ * bounds); a wide table scrolls sideways inside its box.
+ */
+function Table({ header, rows, align }: Pick<TableBlock, "header" | "rows" | "align">) {
+  const c = useColors();
+  const widths = header.map((h, col) => {
+    const longest = Math.max(cellLength(h), ...rows.map((r) => cellLength(r[col] ?? [])));
+    return Math.min(240, Math.max(56, longest * 8.6 + 24));
+  });
+  const cell = (inline: Inline[], col: number, head: boolean) => (
+    <View key={col} style={[styles.cell, { width: widths[col] }]}>
+      <Text
+        variant={head ? "label" : "subhead"}
+        tone={head ? "muted" : "ink"}
+        style={[styles.cellText, { textAlign: align[col] ?? "left" }]}
+      >
+        <Spans inline={inline} />
+      </Text>
+    </View>
+  );
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={[styles.table, { borderColor: c.line2 ?? c.line }]}
+    >
+      <View>
+        <View style={[styles.tr, { backgroundColor: c.plate }]}>{header.map((h, col) => cell(h, col, true))}</View>
+        {rows.map((r, j) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the rows of one table, in order
+          <View key={j} style={[styles.tr, { borderTopColor: c.line }, styles.trLine]}>
+            {header.map((_, col) => cell(r[col] ?? [], col, false))}
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 /** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */
 function Caret() {
   const c = useColors();
@@ -164,8 +217,11 @@ const styles = StyleSheet.create({
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },
   mark: { minWidth: 14 },
   quote: { borderLeftWidth: 3, paddingLeft: 10 },
-  code: { borderRadius: 10, padding: 10 },
-  mono: { fontFamily: MONO, fontSize: 14, lineHeight: 20 },
+  table: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+  tr: { flexDirection: "row" },
+  trLine: { borderTopWidth: StyleSheet.hairlineWidth },
+  cell: { paddingHorizontal: 12, paddingVertical: 8 },
+  cellText: { fontVariant: ["tabular-nums"] },
   bold: { fontWeight: "700" },
   italic: { fontStyle: "italic" },
   inlineCode: { fontFamily: MONO, fontSize: 15 },

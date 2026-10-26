@@ -65,6 +65,7 @@ function AppStack() {
       <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
+      <Stack.Screen name="code" options={formSheet} />
       <Stack.Screen
         name="images"
         options={{
