@@ -178,6 +178,8 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
   let first = true;
   // A new size: the agents it leaves outside the sky make way on the next frame.
   let refit = false;
+  // With reduced motion, the sky has no room for one more at this size: a redraw adds no one until a new size.
+  let full = false;
   const light = { x: 0.5, y: 0.5 };
   let surfaceAt = -1;
   let surface = "";
@@ -315,6 +317,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     const top = o.ceil ? h * o.ceil : 0;
     if (refit) {
       refit = false;
+      full = false;
       // Those still wholly inside stay put; the rest give way to new ones, placed (or rising) as below.
       const inside = flock.filter((p) => {
         const [x0, y0, x1, y1] = at(p);
@@ -324,7 +327,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     }
     const want = wanted(o);
     if (flock.length > want) flock.length = want;
-    if (flock.length < want) {
+    if (flock.length < want && !full) {
       // Standing: off the faces, apart from each other, and out of the text's calm (where they'd show cut).
       const fade = Math.ceil(PAD * 0.6);
       const avoid =
@@ -337,8 +340,11 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
           : null;
       while (flock.length < want) {
         const p = spawn(o, avoid, clear, pad, mx);
-        // Nothing rises with reduced motion: one with no room to stand is left out, and a later frame looks again.
-        if (reduced && p.y > h) break;
+        // Nothing rises with reduced motion: one with no room to stand is left out.
+        if (reduced && p.y > h) {
+          full = true;
+          break;
+        }
         flock.push(p);
         avoid?.push(at(p));
       }

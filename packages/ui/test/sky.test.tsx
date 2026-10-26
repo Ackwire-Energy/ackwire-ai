@@ -311,6 +311,27 @@ describe("pixel agents and what stands on the sky", () => {
     }
   });
 
+  test("with reduced motion a redraw brings no one: one that found no room waits for a new size", async () => {
+    // At first the whole sky is taken: no room for anyone.
+    const wall = document.createElement("span");
+    wall.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 240, width: 400, height: 240 }) as DOMRect;
+    let walled = true;
+    const page = await faceSky(true, { clear: () => (walled ? [wall] : []) });
+    try {
+      expect(agentPixels(page)).toEqual([]);
+      walled = false;
+      redrawSkies();
+      page.frames(200);
+      expect(agentPixels(page)).toEqual([]);
+      page.resize(396, 240);
+      page.frames(200);
+      expect(agentPixels(page).length).toBeGreaterThan(0);
+    } finally {
+      page.done();
+    }
+  });
+
   test("narrowed with reduced motion, those it leaves outside give way to new ones standing inside", async () => {
     for (let run = 0; run < 12; run++) {
       await new Promise((r) => setTimeout(r, 50));
