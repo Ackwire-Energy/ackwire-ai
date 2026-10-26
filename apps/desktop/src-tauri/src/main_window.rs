@@ -29,6 +29,8 @@ pub const LABEL: &str = "main";
 const BROWSER_SIGN_IN: &str = "/desktop/sign-in";
 /// The site comes here once the browser handed the session over: the window comes to the front.
 const SIGNED_IN: &str = "/desktop/signed-in";
+/// The help pages: background reading opens in the browser, never in place of the conversation.
+const HELP: &str = "/help/";
 
 /// The server the window loads: the one open now (`servers.json`); None before the first run chose one.
 pub fn site(app: &AppHandle) -> Option<Url> {
@@ -74,6 +76,7 @@ fn route(url: &Url, site: &Url) -> Route {
         "http" | "https" if same_site(url, site) => match url.path() {
             BROWSER_SIGN_IN => Route::Outside,
             SIGNED_IN => Route::Front,
+            path if path.starts_with(HELP) => Route::Outside,
             _ => Route::Stay,
         },
         "http" | "https" => Route::Outside,
@@ -751,6 +754,9 @@ mod tests {
         assert_eq!(r("https://agentes.tail1234.ts.net.evil.com/", own), Route::Outside);
         assert_eq!(r("http://127.0.0.1:4311/", "http://127.0.0.1:4310"), Route::Outside);
         assert_eq!(r("mailto:a@b.c", own), Route::Outside);
+        let cloud = "https://agentes.chat";
+        assert_eq!(r("https://agentes.chat/help/memory?lang=en#learns", cloud), Route::Outside);
+        assert_eq!(r("https://agentes.chat/org/x", cloud), Route::Stay);
     }
 
     #[test]
