@@ -156,11 +156,17 @@ describe("Calendário > Novo evento", () => {
     async () => {
       await go("calendar");
       const label = () => document.querySelector(".cal-page__range")?.textContent;
+      // The week grid only: Próximos lists this week's daily until it ends, whatever week is shown.
+      const daily = () =>
+        within(screen().getByRole("region", { name: "Grade do calendário" })).queryByRole("button", {
+          name: /^Daily de produto/,
+        });
       const now = label();
+      expect(daily()).not.toBeNull();
       await click(screen().getByRole("button", { name: "Próxima semana" }));
       await settle(4);
       expect(label()).not.toBe(now);
-      expect(screen().queryByRole("button", { name: /^Daily de produto/ })).toBeNull();
+      expect(daily()).toBeNull();
       await click(screen().getByRole("button", { name: "Hoje" }));
       await settle(4);
       expect(label()).toBe(now);
