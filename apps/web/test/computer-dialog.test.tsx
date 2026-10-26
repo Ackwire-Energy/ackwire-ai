@@ -330,6 +330,21 @@ describe("the computer dialog, live", () => {
     expect(view().getByRole("button", { name: "Não consegui" })).toBeTruthy();
   });
 
+  test("full screen on the agent's page keeps the dialog's layout: only its screen goes alone", async () => {
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: () => Promise.resolve(),
+    });
+    try {
+      await dialog({ desktop: { available: false, reason: "no_desktop" }, browser: true });
+      await click(view().getByRole("button", { name: "Tela cheia" }));
+      expect(box().classList.contains("is-full")).toBe(true);
+      expect(box().classList.contains("is-screen-only")).toBe(false);
+    } finally {
+      delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
+    }
+  });
+
   test("whoever may take over the browser but not the screen takes the browser: the page shows", async () => {
     const t = await dialog({ desktop: { ...RUNNING, canControl: false }, browser: true });
     // Watching the screen; not connected yet: no take control until it's live.

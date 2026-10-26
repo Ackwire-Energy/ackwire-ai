@@ -16,6 +16,7 @@ import {
   SYSTEM_RUNNER_HOME,
   TELEMETRY_TEXT,
 } from "../../../packages/setup/src/lib";
+import { TERM_SH } from "../../../packages/setup/src/term-sh";
 import { SYSTEM_RUNNER_HOME as RUNNER_SYSTEM_HOME } from "../runner/config";
 import { HostComputer } from "../runner/host";
 import { installScript, SYSTEM_LAUNCHER, SYSTEM_RUNNER_DIR } from "../runner/install-script";
@@ -68,7 +69,18 @@ interface Machine {
 const PROBES =
   /^(uname -[sm]|id -u|docker info --format \{\{\.ServerVersion\}\}|docker compose version --short|bun --version)$/;
 
-async function plan(machine: Machine, args: string[] = [], o: { piped?: string; env?: Record<string, string> } = {}) {
+interface RunOptions {
+  piped?: string;
+  env?: Record<string, string>;
+  /** On a pseudo-terminal (100 columns): stdout and stderr come back together, in `out`. */
+  tty?: boolean;
+  /** A real run, not --plan: its setup is the bun stub, which notes AGENTES_FRAME. */
+  real?: boolean;
+  /** Shell commands run just before the installer, in its terminal. */
+  before?: string;
+}
+
+async function plan(machine: Machine, args: string[] = [], o: RunOptions = {}) {
   const bin = tempDir("bin");
   const home = tempDir("home");
   const log = join(bin, "calls.log");
@@ -83,7 +95,11 @@ async function plan(machine: Machine, args: string[] = [], o: { piped?: string; 
     const compose = machine.compose ? `echo ${machine.compose}` : `echo "unknown flag: --short" >&2; exit 125`;
     stub("docker", `case "$1" in info) ${info} ;; compose) ${compose} ;; esac`);
   }
-  if (machine.bun) stub("bun", `echo ${machine.bun}`);
+  if (machine.bun) {
+    // As the setup: whether it draws in the installer's frame, and the terminal it reads.
+    const setup = `echo "frame \${AGENTES_FRAME:-none} stdin $(tty -s && tty || echo none)" >> "$STUB_LOG"`;
+    stub("bun", `case "$1" in --version) echo ${machine.bun} ;; *) ${setup} ;; esac`);
+  }
   if (machine.musl) stub("ldd", `echo "musl libc (x86_64)" >&2; exit 1`);
   for (const name of [
     "curl",
@@ -97,27 +113,59 @@ async function plan(machine: Machine, args: string[] = [], o: { piped?: string; 
   ]) {
     stub(name);
   }
-  symlinkSync(Bun.which("sleep") as string, join(bin, "sleep"));
-  const proc = Bun.spawn(
-    o.piped === undefined ? ["/bin/sh", SCRIPT, "--plan", ...args] : ["/bin/sh", "-s", "--", "--plan", ...args],
-    {
+  // A real run keeps its work in a folder of its own.
+  for (const tool of ["sleep", ...(o.real ? ["mktemp", "rm", "tty"] : [])]) {
+    symlinkSync(Bun.which(tool) as string, join(bin, tool));
+  }
+  const argv = [...(o.real ? [] : ["--plan"]), ...args];
+  const direct = o.piped === undefined ? ["/bin/sh", SCRIPT, ...argv] : ["/bin/sh", "-s", "--", ...argv];
+  const cmd = o.before ? ["/bin/sh", "-c", `${o.before} && exec "$@"`, "sh", ...direct] : direct;
+  const env = { PATH: bin, HOME: home, STUB_LOG: log, ...o.env };
+  let out = "";
+  let err = "";
+  let code: number;
+  if (o.tty) {
+    const decoder = new TextDecoder();
+    let eof = () => {};
+    const drained = new Promise<void>((resolve) => {
+      eof = resolve;
+    });
+    const proc = Bun.spawn(cmd, {
       cwd: home,
-      env: { PATH: bin, HOME: home, STUB_LOG: log, ...o.env },
+      env: { TERM: "xterm-256color", ...env },
+      terminal: {
+        cols: 100,
+        rows: 40,
+        data: (_t, bytes) => {
+          out += decoder.decode(bytes);
+        },
+        exit: () => eof(),
+      },
+    });
+    [code] = await Promise.all([proc.exited, drained]);
+  } else {
+    const proc = Bun.spawn(cmd, {
+      cwd: home,
+      env,
       stdin: o.piped === undefined ? "ignore" : new Blob([o.piped]),
       stdout: "pipe",
       stderr: "pipe",
       // A session of its own, so no controlling terminal, as under cloud-init or CI.
       detached: true,
-    },
-  );
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+    });
+    [out, err, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+  }
   const calls = readFileSync(log, "utf8").split("\n").filter(Boolean);
   return { code, out, err, calls, bin, home, changes: calls.filter((call) => !PROBES.test(call)) };
 }
+
+/** What a terminal shows, without the colors. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: a terminal's escapes are what it leaves out
+const plain = (text: string) => text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replaceAll("\r", "");
 
 const linuxRoot: Machine = { os: "Linux", arch: "x86_64", uid: 0 };
 const mac: Machine = { os: "Darwin", arch: "arm64", uid: 501 };
@@ -278,6 +326,87 @@ describe("install.sh", () => {
     }
   });
 
+  test("draws as the runner's installer does: its term.sh is packages/setup/src/term-sh.ts", () => {
+    const start = "# --- term.sh: packages/setup/src/term-sh.ts, kept equal by a test ---\n";
+    const end = "# --- end of term.sh ---\n";
+    expect(text).toContain(start);
+    expect(text.slice(text.indexOf(start) + start.length, text.indexOf(end))).toBe(TERM_SH);
+  });
+
+  test("on a terminal: the logo, the badge and the line; a run that needs root draws none of it before sudo", async () => {
+    const root = await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" }, [], { tty: true });
+    expect(root.code).toBe(0);
+    const screen = plain(root.out);
+    expect(screen).toContain("▀");
+    expect(screen).toContain(
+      "┌   agentes.chat  install plan (--plan: nothing runs)\n│\n◇  Linux on x64, as root\n◇  A terminal: the setup asks its questions there\n",
+    );
+    expect(screen).toContain("│\n└  Nothing ran. For the setup's own plan, run its command above with --dry-run.\n");
+
+    // Root first: a run that needs it draws nothing before sudo, so the logo shows once, in the root run.
+    const user: Machine = { os: "Linux", arch: "x86_64", uid: 1000 };
+    const real = await plan(user, ["--yes"], { tty: true, real: true });
+    expect(real.code).toBe(0);
+    expect(plain(real.out)).toBe(
+      `●  Docker needs root here: running this installer again as root\n   $ sudo sh ${SCRIPT} --yes\n`,
+    );
+    expect(real.calls).toContain(`sudo sh ${SCRIPT} --yes`);
+
+    // Its plan draws the logo and the frame, then stops where the root run would start.
+    const planned = plain((await plan(user, ["--yes"], { tty: true })).out);
+    expect(planned).toContain("▀");
+    expect(planned).toContain("┌   agentes.chat  install plan (--plan: nothing runs)\n│\n◇  Linux on x64\n");
+    expect(planned).toEndWith(
+      `●  Docker needs root here: running this installer again as root\n│  $ sudo sh ${SCRIPT} --yes\n│\n└  With --plan it stops here; as root, --plan shows the rest.\n`,
+    );
+  });
+
+  test("a real run says what it found, echoes no command, and hands over to the setup in its own frame", async () => {
+    const dir = tempDir("dir");
+    const machine = { ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" };
+    const run = await plan(machine, ["--dir", dir, "--network", "local"], { real: true });
+    expect(run.code).toBe(0);
+    expect(run.out).toContain("◇  Docker 26.1.5\n◇  Compose 2.26.1\n");
+    expect(run.out).not.toContain("$ ");
+    expect(run.out).toEndWith(
+      `\n◇  The setup, in ${dir}:\n     ${run.bin}/bun x --bun @agenteschat/setup@0.1.0 --network local\n\n`,
+    );
+    // The setup draws in the installer's frame: no logo or badge of its own.
+    expect(run.calls).toContain("bun x --bun @agenteschat/setup@0.1.0 --network local");
+    expect(run.calls).toContain("frame 1 stdin none");
+  });
+
+  test("on a terminal, the setup reads it by its own name: Bun on macOS can't wait for keys on /dev/tty", async () => {
+    const dir = tempDir("dir");
+    const machine = { ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" };
+    const run = await plan(machine, ["--dir", dir], { real: true, tty: true });
+    expect(run.code).toBe(0);
+    expect(plain(run.out)).toContain(
+      `◇  The setup, in ${dir}:\n│    ${run.bin}/bun x --bun @agenteschat/setup@0.1.0\n│\n`,
+    );
+    expect(run.calls.find((call) => call.startsWith("frame "))).toMatch(/^frame 1 stdin \/dev\/(pts\/\d+|ttys\d+)$/);
+  });
+
+  // Root reads any device, so only another user sees the one that can't be opened by its name.
+  test.skipIf(process.getuid?.() === 0)(
+    "a terminal it can't open by its name (after su, it's still the first user's): the setup reads /dev/tty",
+    async () => {
+      const dir = tempDir("dir");
+      const device = join(tempDir("device"), "name");
+      const machine = { ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" };
+      // Its terminal as after su: /dev/tty opens, the device by its name doesn't.
+      const before = `d=$(${Bun.which("tty")}) && echo "$d" > ${device} && ${Bun.which("chmod")} u-r "$d"`;
+      try {
+        const run = await plan(machine, ["--dir", dir], { real: true, tty: true, before });
+        expect(run.code).toBe(0);
+        expect(run.out).not.toContain("Permission denied");
+        expect(run.calls).toContain("frame 1 stdin /dev/tty");
+      } finally {
+        Bun.spawnSync([Bun.which("chmod") as string, "u+r", readFileSync(device, "utf8").trim()]);
+      }
+    },
+  );
+
   test("hands over to the setup it ships with, on a Bun at least the repository's", () => {
     const setup = JSON.parse(readFileSync(join(import.meta.dir, "../../../packages/setup/package.json"), "utf8"));
     expect(text).toContain(`\n  SETUP_VERSION=${setup.version}\n`);
@@ -291,11 +420,11 @@ describe("install.sh", () => {
   test("Linux as root without Docker: Docker's own script with --yes, then Bun and the setup", async () => {
     const run = await plan(linuxRoot, ["--yes", "--network", "local"]);
     expect(run.code).toBe(0);
-    expect(run.out).toContain("· Linux on x64, as root");
-    expect(run.out).toContain("· Docker isn't installed: installing it with Docker's own script (--yes)");
+    expect(run.out).toContain("◇  Linux on x64, as root");
+    expect(run.out).toContain("◇  Docker isn't installed: installing it with Docker's own script (--yes)");
     expect(run.out).toContain("$ curl -fsSL --proto =https --retry 3 -o <tmp>/get-docker.sh https://get.docker.com");
     expect(run.out).toContain("$ sh <tmp>/get-docker.sh");
-    expect(run.out).toContain("· Compose comes with it");
+    expect(run.out).toContain("◇  Compose comes with it");
     expect(run.out).toContain(bunZip("linux-x64-baseline"));
     expect(run.out).toContain("$ mv <tmp>/bun-linux-x64-baseline/bun /opt/agentes/.runtime/bun");
     expect(run.out).toContain("$ cd /opt/agentes");
@@ -307,9 +436,9 @@ describe("install.sh", () => {
 
   test("docker.io without Compose, or with an old one: the pinned plugin for every user", async () => {
     const none = await plan({ ...linuxRoot, docker: "26.1.5+dfsg1" });
-    expect(none.out).toContain("· Docker 26.1.5+dfsg1");
+    expect(none.out).toContain("◇  Docker 26.1.5+dfsg1");
     expect(none.out).toContain(
-      "· Docker has no Compose plugin: installing Compose 5.5.1 (SHA-256 checked) in /usr/local/lib/docker/cli-plugins",
+      "◇  Docker has no Compose plugin: installing Compose 5.5.1 (SHA-256 checked) in /usr/local/lib/docker/cli-plugins",
     );
     expect(none.out).toContain(composeDownload("docker-compose-linux-x86_64"));
     expect(none.out).toContain("$ mv <tmp>/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose");
@@ -317,10 +446,10 @@ describe("install.sh", () => {
     expect(none.changes).toEqual([]);
 
     const old = await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.20.2" });
-    expect(old.out).toContain("· Compose 2.20.2 is older than 2.23.1: installing Compose 5.5.1");
+    expect(old.out).toContain("◇  Compose 2.20.2 is older than 2.23.1: installing Compose 5.5.1");
 
     const fine = await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.3.1" });
-    expect(fine.out).toContain("· Compose 2.26.1");
+    expect(fine.out).toContain("◇  Compose 2.26.1");
     expect(fine.out).not.toContain("docker-compose");
     // A bun older than the pinned one isn't used.
     expect(fine.out).toContain(bunZip("linux-x64-baseline"));
@@ -330,15 +459,24 @@ describe("install.sh", () => {
     const user: Machine = { os: "Linux", arch: "x86_64", uid: 1000 };
     const file = await plan(user, ["--yes", "--dir", "/srv/agentes", "--network", "local"]);
     expect(file.code).toBe(0);
-    expect(file.out).toContain("· Docker needs root here: running this installer again as root");
-    expect(file.out).toContain(`$ sudo sh ${SCRIPT} --yes --dir /srv/agentes --network local`);
-    expect(file.out).toContain("With --plan it stops here");
-    expect(file.out).not.toContain("Bun");
+    // --plan runs nothing again, so it starts as any plan does, then says where it stops.
+    expect(file.out).toBe(
+      [
+        "agentes.chat install plan (--plan: nothing runs)",
+        "◇  Linux on x64",
+        "◇  No terminal: the setup takes its defaults and the options given",
+        "●  Docker needs root here: running this installer again as root",
+        `   $ sudo sh ${SCRIPT} --yes --dir /srv/agentes --network local`,
+        "",
+        "With --plan it stops here; as root, --plan shows the rest.",
+        "",
+      ].join("\n"),
+    );
     expect(file.changes).toEqual([]);
 
     // Under curl | sh there's no file to run again: it downloads the published one.
     const piped = await plan({ ...user, docker: "down" }, [], { piped: text });
-    expect(piped.out).toContain("· Docker needs root here: downloading this installer to run it again as root");
+    expect(piped.out).toContain("●  Docker needs root here: downloading this installer to run it again as root");
     expect(piped.out).toContain(
       "$ curl -fsSL --proto =https --retry 3 -o <tmp>/install.sh https://agentes.chat/install",
     );
@@ -361,9 +499,9 @@ describe("install.sh", () => {
   test("a Mac with Docker running: Docker, and the bun it already has", async () => {
     const run = await plan({ ...mac, docker: "28.5.1", bun: "1.4.4" }, ["--network", "local"]);
     expect(run.code).toBe(0);
-    expect(run.out).toContain("· macOS on Apple silicon");
-    expect(run.out).toContain("· Docker 28.5.1");
-    expect(run.out).toContain(`· Bun 1.4.4 (${run.bin}/bun)`);
+    expect(run.out).toContain("◇  macOS on Apple silicon");
+    expect(run.out).toContain("◇  Docker 28.5.1");
+    expect(run.out).toContain(`◇  Bun 1.4.4 (${run.bin}/bun)`);
     expect(run.out).toContain(`$ cd ${run.home}/agentes`);
     expect(run.out).toContain(`$ ${run.bin}/bun x --bun @agenteschat/setup@0.1.0 --network local </dev/null`);
     expect(run.out).not.toContain("--native");
@@ -410,7 +548,7 @@ describe("install.sh", () => {
 
   test("arm64 Linux gets the arm64 Bun and Compose", async () => {
     const run = await plan({ os: "Linux", arch: "aarch64", uid: 0, docker: "26.1.5" });
-    expect(run.out).toContain("· Linux on arm64, as root");
+    expect(run.out).toContain("◇  Linux on arm64, as root");
     expect(run.out).toContain(composeDownload("docker-compose-linux-aarch64"));
     expect(run.out).toContain(bunZip("linux-aarch64"));
   });
@@ -433,7 +571,7 @@ describe("install.sh", () => {
 
   test("no terminal: Docker only with --yes, and the setup reads nothing, not the piped script", async () => {
     const run = await plan(linuxRoot);
-    expect(run.out).toContain("· No terminal: the setup takes its defaults and the options given");
+    expect(run.out).toContain("◇  No terminal: the setup takes its defaults and the options given");
     expect(run.code).toBe(1);
     expect(run.err).toContain("with no terminal to ask");
     expect(run.err).toContain("Pass --yes");
