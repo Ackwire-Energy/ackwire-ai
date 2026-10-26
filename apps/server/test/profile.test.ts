@@ -3,16 +3,14 @@ import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./h
 
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }), env: { ALLOW_SIGNUP: "true" } });
 });
 afterEach(() => t.close());
 
-/** A signed-up person outside the organization (the invite link lets them register; they never accept it). */
-async function outsider(owner: ReturnType<typeof browser>, orgId: string, email: string) {
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+/** A signed-up person outside the organization (sign-up is open on this server). */
+async function outsider(email: string) {
   const b = browser(t);
-  await signUp(b, email, { inviteToken: token });
+  await signUp(b, email);
   return b;
 }
 
@@ -52,7 +50,7 @@ test("photo: upload, serve to org members only, on the members list, remove", as
   expect(Buffer.from(body).includes(Buffer.from("Exif"))).toBe(false);
 
   // Someone in no shared organization can't fetch it; signed-out people neither.
-  const stranger = await outsider(owner, orgId, "stranger@example.com");
+  const stranger = await outsider("stranger@example.com");
   expect((await stranger(avatarUrl)).status).toBe(404);
   expect((await t.app.request(avatarUrl)).status).toBe(401);
   // Nor can they set a photo through an organization they're not in.

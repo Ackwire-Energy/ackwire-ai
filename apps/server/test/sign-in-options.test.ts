@@ -8,8 +8,7 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-const options = (b = browser(t), email: string, inviteToken?: string) =>
-  b("/api/app/sign-in-options", { json: { email, ...(inviteToken ? { inviteToken } : {}) } });
+const options = (b = browser(t), email: string) => b("/api/app/sign-in-options", { json: { email } });
 
 test("an e-mail with a password account: sign in with the password", async () => {
   await signUp(browser(t), "owner@example.com");

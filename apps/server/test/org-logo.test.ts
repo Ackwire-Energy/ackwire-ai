@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -13,15 +13,9 @@ const JPEG = new Uint8Array([
 ]);
 const image = { imageBase64: Buffer.from(JPEG).toString("base64"), contentType: "image/jpeg" };
 
-/** Someone who joins the organization through an invite link (a plain member). */
-async function member(owner: ReturnType<typeof browser>, orgId: string, email: string) {
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
-  const b = browser(t);
-  await signUp(b, email, { inviteToken: token });
-  expect((await b(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
-  return b;
-}
+/** Someone who joins the organization through an email invitation (a plain member). */
+const member = (owner: ReturnType<typeof browser>, orgId: string, email: string) =>
+  joinByInvitation(t, owner, orgId, email);
 
 test("workspace logo: admins upload and remove it; members see it; strangers don't", async () => {
   const owner = browser(t);
@@ -59,10 +53,13 @@ test("workspace logo: admins upload and remove it; members see it; strangers don
 
   // Signed-out people and people outside the organization can't fetch it.
   expect((await t.app.request(logo)).status).toBe(401);
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  // Invited, never accepted: signed up but not in the organization.
+  const invited = await owner(`/api/app/organizations/${orgId}/invitations`, {
+    json: { email: "stranger@example.com", role: "member" },
+  });
+  expect(invited.status).toBe(201);
   const stranger = browser(t);
-  await signUp(stranger, "stranger@example.com", { inviteToken: token });
+  await signUp(stranger, "stranger@example.com");
   expect((await stranger(logo)).status).toBe(404);
 
   // Removed: back to the agent mark.

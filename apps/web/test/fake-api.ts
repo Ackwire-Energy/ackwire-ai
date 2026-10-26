@@ -20,7 +20,11 @@ import type {
   HttpApi,
   ImportItemKind,
   ImportItemResult,
+  InvitationPreview,
   InvitationWithStatus,
+  InviteLink,
+  JoinApproval,
+  JoinRequest,
   Me,
   Member,
   Memory,
@@ -182,6 +186,18 @@ export interface FakeState {
   answerNowError?: ApiError;
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
+  /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
+  previews?: Record<string, InvitationPreview>;
+  /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
+  askError?: ApiError;
+  /** The workspace's invitation links (`invites.links`); `invites.createLink` makes one when none has a URL. */
+  inviteLinks?: InviteLink[];
+  /** Requests to join waiting (`joinRequests.list`). */
+  joinRequests?: JoinRequest[];
+  /** What `joinRequests.approve` answers; unset: in at once when confirmed, else an emailed invitation. */
+  approval?: JoinApproval;
+  /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
+  answerError?: ApiError;
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
@@ -672,6 +688,7 @@ type FakedParts =
   | "skills"
   | "access"
   | "invites"
+  | "joinRequests"
   | "storage"
   | "artifacts"
   | "issues"
@@ -843,7 +860,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.invitations = state.invitations.filter((i) => i.id !== invitationId);
       },
       previewInvitation: async (token) =>
-        token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null,
+        state.previews?.[token] ??
+        (token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null),
       acceptInvitation: async (token) => {
         log("orgs.acceptInvitation", token);
         return { orgId: ORG_ID };
@@ -1833,15 +1851,63 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       (orgId) => customConnectors.list(orgId),
     ),
     invites: {
+      // The same link every time, like the server: a new one only when none can be shown.
       createLink: async (orgId) => {
         state.calls.push({ method: "invites.createLink", args: [orgId] });
-        return {
-          url: `http://localhost:3000/invite/link-${state.calls.length}`,
-          expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
-        };
+        state.inviteLinks ??= [];
+        let link = state.inviteLinks.find((l) => l.url !== null);
+        if (!link) {
+          const id = `link-${state.inviteLinks.length + 1}`;
+          link = {
+            id,
+            url: `http://localhost:3000/invite/${id}`,
+            expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+            createdAt: new Date().toISOString(),
+            createdBy: "Walter",
+            waiting: 0,
+          };
+          state.inviteLinks.unshift(link);
+        }
+        return { id: link.id, url: link.url ?? "", expiresAt: link.expiresAt };
+      },
+      links: async (orgId) => {
+        state.calls.push({ method: "invites.links", args: [orgId] });
+        return structuredClone(state.inviteLinks ?? []);
+      },
+      turnOff: async (orgId, linkId) => {
+        state.calls.push({ method: "invites.turnOff", args: [orgId, linkId] });
+        state.inviteLinks = (state.inviteLinks ?? []).filter((l) => l.id !== linkId);
+      },
+      ask: async (token, input) => {
+        state.calls.push({ method: "invites.ask", args: [token, input] });
+        if (state.askError) throw state.askError;
+        return { status: "pending", email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), emailed: true };
       },
       requestNew: async (token) => {
         state.calls.push({ method: "invites.requestNew", args: [token] });
+      },
+    },
+    joinRequests: {
+      list: async (orgId) => {
+        state.calls.push({ method: "joinRequests.list", args: [orgId] });
+        return structuredClone(state.joinRequests ?? []);
+      },
+      approve: async (orgId, requestId, role) => {
+        state.calls.push({ method: "joinRequests.approve", args: [orgId, requestId, role] });
+        if (state.answerError) throw state.answerError;
+        const request = state.joinRequests?.find((r) => r.id === requestId);
+        state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
+        return (
+          state.approval ??
+          (request?.confirmed
+            ? { outcome: "joined" }
+            : { outcome: "invited", url: `http://localhost:3000/invite/tok-${requestId}`, emailed: true })
+        );
+      },
+      deny: async (orgId, requestId, reason) => {
+        state.calls.push({ method: "joinRequests.deny", args: [orgId, requestId, reason] });
+        if (state.answerError) throw state.answerError;
+        state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
       },
     },
     storage: createMockStorage(),

@@ -879,6 +879,74 @@ export function useResendInvitation(orgId: string) {
   });
 }
 
+/** The workspace's invitation links (admins, ADR 0068). */
+export const useInviteLinks = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.inviteLinks(orgId), queryFn: () => api.invites.links(orgId), enabled });
+};
+
+/** "Make a link": the active one, or a new one. */
+export function useMakeInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.invites.createLink(orgId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.inviteLinks(orgId) }),
+  });
+}
+
+/** Turning a link off closes its requests too: the links, the requests and the pending list refresh. */
+export function useTurnOffInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => api.invites.turnOff(orgId, linkId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/**
+ * Requests to join waiting for an answer (admins, ADR 0068). Refreshed on focus, after each answer and when a
+ * `join_request` notice arrives (`applyNotificationEvent`).
+ */
+export const useJoinRequests = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.joinRequests(orgId),
+    queryFn: () => api.joinRequests.list(orgId),
+    enabled,
+    refetchOnWindowFocus: true,
+  });
+};
+
+/** Whoever got in shows in the people; an invitation, in the pending list. Refetched after a refusal too. */
+function refreshAnswered(qc: QC, orgId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.people(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+  ]);
+}
+
+export function useApproveJoinRequest(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; role: "member" | "admin" }) =>
+      api.joinRequests.approve(orgId, input.id, input.role),
+    onSettled: () => refreshAnswered(qc, orgId),
+  });
+}
+
+export function useDenyJoinRequest(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; reason?: string }) => api.joinRequests.deny(orgId, input.id, input.reason),
+    onSettled: () => refreshAnswered(qc, orgId),
+  });
+}
+
 export const useUsageReport = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
@@ -2408,6 +2476,8 @@ export function dropNotification(qc: QC, orgId: string, id: string) {
 
 /** `notification.upserted` / `removed` / `counts` (user scope). */
 export function applyNotificationEvent(qc: QC, orgId: string, event: NotificationEvent) {
+  if (event.type === "notification.upserted" && event.notification.kind === "join_request")
+    void qc.invalidateQueries({ queryKey: keys.joinRequests(orgId) });
   if (event.type === "notification.upserted") cacheNotification(qc, orgId, event.notification);
   else if (event.type === "notification.removed") dropNotification(qc, orgId, event.id);
   else {
