@@ -147,6 +147,7 @@ export const featureKeysEn: FeatureTranslations = {
       proposed: "Proposed",
     },
     empty: "No chats yet.",
+    sayHi: "Say hi to {{name}}.",
     closed: "Closed",
     working: "working…",
     missionProgress: "{{done}} of {{total}} items",

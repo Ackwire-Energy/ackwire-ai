@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
+import { agentIntro } from "../chat/intent";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
@@ -49,6 +50,18 @@ export const ConversationRowView = memo(function ConversationRowView({
     return { who, text: previewBody(t, last.text, last.meta ?? null) };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
+  /** A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. */
+  const introLine = (): string => {
+    if (r.kind !== "dm") return "";
+    const a = agentDm ? dir.agentById.get(r.with.id) : undefined;
+    if (!a) return t("mobile.chats.sayHi", { name: r.with.name });
+    const intro = agentIntro(a);
+    return intro.kind === "what"
+      ? intro.text
+      : intro.kind === "role"
+        ? t("mobile.chat.intent.roleIntro", { role: intro.role })
+        : t("mobile.chat.intent.noIntro");
+  };
   const agentState = agentDm ? (agent ?? null) : null;
   // Waiting for its offline computer: dozing, no working orbit (its run only waits).
   const away = agentState?.kind === "computer";
@@ -142,7 +155,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     );
   } else {
     const last = lastText(r.last);
-    const text = r.kind === "channel" ? last.text || r.topic : last.text;
+    const text = r.kind === "channel" ? last.text || r.topic : r.last ? last.text : introLine();
     // In a DM the other side's own words need no "Ada:" before them (the row is already Ada's).
     const theirs = r.kind === "dm" && r.last?.author?.type === r.with.type && r.last.author.id === r.with.id;
     const lead = theirs ? "" : last.who;
