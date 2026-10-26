@@ -295,12 +295,12 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         await act(async () => add?.click());
         await until(() => document.querySelector('[role="dialog"]'));
         const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
-        const description = dialog.querySelector(".ac-dialog__desc");
-        expect(description?.firstChild?.textContent).toBe(
-          "Sign in with the account you want to add, then click Authorize.",
-        );
-        const info = description?.querySelector("button.ac-hint");
-        expect(info?.getAttribute("aria-label")).toBe("About Sign in to Claude in your browser");
+        // The dialog is described by the sentence alone; its ⓘ ends the sentence's line, outside the description.
+        expect(describedBy(dialog)).toBe("Sign in with the account you want to add, then click Authorize.");
+        const info = dialog.querySelector(".ac-dialog__desc > button.ac-hint");
+        expect(info).toBeTruthy();
+        expect(document.getElementById(dialog.getAttribute("aria-describedby") ?? "")?.contains(info)).toBe(false);
+        expect(info?.getAttribute("aria-label")).toBe("About the wrong account");
         expect(describedBy(info)).toBe(
           "Signed in to the wrong account by itself? Sign out of Claude there and try again.",
         );

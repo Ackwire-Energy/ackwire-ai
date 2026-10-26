@@ -10,6 +10,11 @@ export interface DialogProps {
   title: ReactNode;
   /** Optional sentence under the title (also the accessible description). */
   description?: ReactNode;
+  /**
+   * At the end of the description's line but outside it (an ⓘ): the dialog stays described by the sentence alone,
+   * without the ⓘ's name.
+   */
+  descriptionAside?: ReactNode;
   /** Accessible name of the close button, e.g. "Fechar". */
   closeLabel: string;
   /** 440 (short forms) or 600 (lists, the default). */
@@ -35,6 +40,7 @@ export function Dialog({
   onOpenChange,
   title,
   description,
+  descriptionAside,
   closeLabel,
   width = 600,
   children,
@@ -101,7 +107,17 @@ export function Dialog({
               <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} />
             </RDialog.Close>
           </div>
-          {description && <RDialog.Description className="ac-dialog__desc">{description}</RDialog.Description>}
+          {description &&
+            (descriptionAside ? (
+              <p className="ac-dialog__desc">
+                <RDialog.Description asChild>
+                  <span>{description}</span>
+                </RDialog.Description>{" "}
+                {descriptionAside}
+              </p>
+            ) : (
+              <RDialog.Description className="ac-dialog__desc">{description}</RDialog.Description>
+            ))}
           {children}
         </RDialog.Content>
       </RDialog.Portal>

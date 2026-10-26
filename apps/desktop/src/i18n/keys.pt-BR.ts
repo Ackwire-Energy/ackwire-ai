@@ -459,6 +459,7 @@ export const desktopPtBR = {
       codeHint: "Digite este código na página que abrir.",
       codeAria: "Código {{code}}",
       wrongAccount: "Entrou sozinho na conta errada? Saia do {{product}} lá e tente de novo.",
+      wrongAccountAbout: "Sobre a conta errada",
       opening: "Abrindo o navegador…",
       waiting: "Esperando você entrar…",
       notOpened: "O navegador não abriu?",

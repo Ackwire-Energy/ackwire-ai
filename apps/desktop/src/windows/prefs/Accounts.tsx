@@ -369,16 +369,16 @@ function AddAccountDialog({
   }
 
   const waiting = view.phase === "waiting" ? view : null;
-  const wrong = hintFor(t, t(k.signIn), t("desktop.prefs.accounts.wrongAccount", { product: k.product }));
   return (
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
       title={t(k.signIn)}
-      description={
-        <>
-          {t(k.signInLead)} <InfoHint name={wrong.name}>{wrong.text}</InfoHint>
-        </>
+      description={t(k.signInLead)}
+      descriptionAside={
+        <InfoHint name={t("desktop.prefs.accounts.wrongAccountAbout")}>
+          {t("desktop.prefs.accounts.wrongAccount", { product: k.product })}
+        </InfoHint>
       }
       closeLabel={t("desktop.common.close")}
       width={440}

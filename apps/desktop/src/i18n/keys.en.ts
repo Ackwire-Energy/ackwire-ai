@@ -445,6 +445,7 @@ export const desktopEn: DesktopTranslations = {
       codeHint: "Type this code on the page that opens.",
       codeAria: "Code {{code}}",
       wrongAccount: "Signed in to the wrong account by itself? Sign out of {{product}} there and try again.",
+      wrongAccountAbout: "About the wrong account",
       opening: "Opening your browser…",
       waiting: "Waiting for you to sign in…",
       notOpened: "Browser didn't open?",
