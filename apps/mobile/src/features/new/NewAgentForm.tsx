@@ -3,7 +3,7 @@ import { handleFrom } from "@agenteschat/client/lib/text";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { AgentAvatar, Button, Icon, SheetScreen, Sky, systemText, Text, useToast } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, SheetScreen, Sky, Text, useToast } from "@/ui";
 import { FIRST_AGENT_EXAMPLES } from "../chats/examples";
 import { NEWBORN } from "../chats/Greeting";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -141,6 +141,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 4,
   },
-  input: { flex: 1, paddingVertical: 12, ...systemText("body") },
+  input: { flex: 1, paddingVertical: 12, ...fieldText("body") },
   fine: { marginHorizontal: 6 },
 });

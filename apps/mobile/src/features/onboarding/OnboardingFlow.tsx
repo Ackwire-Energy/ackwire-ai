@@ -16,7 +16,7 @@ import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Sky } from "@/sky/Sky";
-import { AgentAvatar, Button, Icon, IconButton, type IconName, LineIcon, systemText, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, IconButton, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { joinNames } from "../shared/logic";
@@ -373,7 +373,7 @@ export function OnboardingFlow() {
         />
       ) : null}
 
-      {step === "ai" ? <KeyFields form={ai} /> : null}
+      {step === "ai" ? <KeyFields form={ai} gutter={24} /> : null}
 
       {step === "team" ? (
         <>
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    ...systemText("body"),
+    ...fieldText("body"),
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

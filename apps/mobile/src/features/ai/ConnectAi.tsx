@@ -17,12 +17,12 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native
 import { useOrg } from "@/providers/org";
 import {
   Button,
+  fieldText,
   GroupedHeader,
   GroupedList,
   GroupedRow,
   Icon,
   SheetScreen,
-  systemText,
   Text,
   useTheme,
   useToast,
@@ -74,14 +74,26 @@ export function useConnectKey(orgId: string, asked?: string) {
 export type ConnectKey = ReturnType<typeof useConnectKey>;
 
 /** The provider, where to create its key, the field and what it does: the same order as the web's panel. */
-export function KeyFields({ form }: { form: ConnectKey }) {
+export function KeyFields({
+  form,
+  gutter = 18,
+}: {
+  form: ConnectKey;
+  /** The screen's side margin: the providers' row scrolls to the screen's edges past it. */
+  gutter?: number;
+}) {
   const { t } = useTranslation();
   const { colors: c, shadows } = useTheme();
   const entry = providerOf(form.provider);
   const grammar = providerGrammar(t, form.provider);
   return (
     <View style={styles.fields}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providers}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -gutter }}
+        contentContainerStyle={[styles.providers, { paddingHorizontal: gutter }]}
+      >
         {PROVIDERS.map((p) => {
           const on = p.id === form.provider;
           return (
@@ -216,7 +228,7 @@ export function ConnectAiSheet() {
 
 const styles = StyleSheet.create({
   fields: { gap: 12 },
-  providers: { gap: 8, paddingRight: 8 },
+  providers: { gap: 8 },
   provider: {
     flexDirection: "row",
     alignItems: "center",
@@ -227,6 +239,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   create: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
-  input: { minHeight: 52, borderRadius: 15, paddingHorizontal: 16, paddingVertical: 12, ...systemText("body") },
+  input: { minHeight: 52, borderRadius: 15, paddingHorizontal: 16, paddingVertical: 12, ...fieldText("body") },
   lead: { marginHorizontal: 4 },
 });

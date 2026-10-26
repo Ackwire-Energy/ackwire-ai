@@ -194,7 +194,8 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
 
 const styles = StyleSheet.create({
   l1: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
-  name: { flexShrink: 0, maxWidth: "70%" },
+  // The name stays whole; a long role gives way (a share of an unsized box measured as almost nothing: "Re…").
+  name: { flexShrink: 0 },
   role: { flexShrink: 1, minWidth: 0 },
   work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0, marginTop: 2 },
   medium: { fontWeight: "500" },

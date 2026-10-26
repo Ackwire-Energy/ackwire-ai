@@ -1,5 +1,6 @@
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
+import type { ReactNode } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
@@ -13,6 +14,8 @@ export interface ButtonProps {
   variant: ButtonVariant;
   size?: "md" | "sm";
   icon?: IconName;
+  /** Drawn before the label instead of an icon (a brand's mark), given the label's color. */
+  leading?: (color: string) => ReactNode;
   label: string;
   onPress: () => void;
   /** Full width. */
@@ -38,7 +41,16 @@ export function primaryLook(theme: Pick<Theme, "colors">) {
 }
 
 /** The tactile button: tonal gradient, a lit top edge, a spring press and a light haptic. */
-export function Button({ variant, size = "md", icon, label, onPress, wide = false, disabled = false }: ButtonProps) {
+export function Button({
+  variant,
+  size = "md",
+  icon,
+  leading,
+  label,
+  onPress,
+  wide = false,
+  disabled = false,
+}: ButtonProps) {
   const theme = useTheme();
   const { colors, shadows } = theme;
   const s = BUTTON_SIZES[size];
@@ -84,7 +96,7 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
             ]}
           />
         ) : null}
-        {icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
+        {leading ? leading(textColor) : icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
