@@ -65,15 +65,19 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     const active = runs.find((r) => r.id === runId);
     if (!active) continue;
     const threadId = replyThreadOf(active);
-    await publishChannelEvent(deps.pubsub, {
-      type: "agent.run.steered",
-      channelId,
-      threadId,
-      runId,
-      agentId: active.agentId,
-      messageId: message.id,
-      ...(now ? { now: true as const } : {}),
-    });
+    // Gone from its inbox already, the app heard where it went (`agent.run.read`, `agent.run.redispatched`):
+    // a late "steered" would move the receipt back onto this run.
+    if (active.pendingMessageIds.includes(message.id)) {
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.run.steered",
+        channelId,
+        threadId,
+        runId,
+        agentId: active.agentId,
+        messageId: message.id,
+        ...(now ? { now: true as const } : {}),
+      });
+    }
     let live = false;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
     // A computer brain (Claude Code, Codex) can't drop its turn halfway: one whose turn takes messages

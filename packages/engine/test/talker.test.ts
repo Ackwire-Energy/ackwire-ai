@@ -278,35 +278,54 @@ describe("talker: fast replies while the task waits", () => {
     );
     await stopChecksSettled();
 
-    // Nothing speaks for the held run: no fast reply, no "held" receipt for a message another run has.
+    // Nothing speaks for the held run: no fast reply, and no receipt (steered, held) that would point the
+    // message back at it after it went to a run of its own.
     expect(decisions).toEqual([]);
     expect(talkerCalls()).toHaveLength(0);
-    expect(events.filter((e) => (e as { type: string }).type === "agent.run.wait_message")).toEqual([]);
+    const types = events.map((e) => (e as { type: string }).type);
+    expect(types.filter((t) => t === "agent.run.steered" || t === "agent.run.wait_message")).toEqual([]);
     await drainOutbox(f.db, f.handlers);
     const said = await saidAfter(message);
     expect(said.map((m) => [m.body, m.agentRunId])).toEqual([[ANSWER, taken?.runId ?? ""]]);
   });
 
-  test("paused on an approval while the talker thought, handing the message on: no fast reply", async () => {
-    let pause = async () => {};
-    const { held, trigger } = await waitingOnApproval(() => ({ ...replyJson(REPLY), hold: pause() }));
-    // Working again, deep in a long step by the talker's clock: a message to it gets the talker.
-    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, held.id));
-    const message = await askedWhileWorking(held, trigger);
-    let taken = null as Awaited<ReturnType<typeof releaseHeldInbox>>;
-    // While the talker thinks, the run pauses on the approval again and hands the message on.
-    pause = async () => {
-      await f.db.update(schema.agentRuns).set({ status: "waiting_approval" }).where(eq(schema.agentRuns.id, held.id));
-      taken = await releaseHeldInbox(f.db, f.pubsub, held.id);
-    };
-    const { talker, decisions } = talkerOn(trigger, { now: () => new Date(Date.now() + TALKER_QUIET_MS + 1000) });
-    await talker.consider({ run: { ...held, status: "running" }, message, live: false, waited: null });
+  for (const approved of [false, true]) {
+    test(`paused on an approval while the talker thought, handing the message on${approved ? ", then approved" : ""}: no fast reply`, async () => {
+      let pause = async () => {};
+      const { held, trigger } = await waitingOnApproval(() => ({ ...replyJson(REPLY), hold: pause() }));
+      const setStatus = (status: "running" | "waiting_approval") =>
+        f.db.update(schema.agentRuns).set({ status }).where(eq(schema.agentRuns.id, held.id));
+      // Working again, deep in a long step by the talker's clock: a message to it gets the talker.
+      await setStatus("running");
+      const message = await askedWhileWorking(held, trigger);
+      let taken = null as Awaited<ReturnType<typeof releaseHeldInbox>>;
+      // While the talker thinks, the run pauses on the approval again and hands the message on.
+      pause = async () => {
+        await setStatus("waiting_approval");
+        taken = await releaseHeldInbox(f.db, f.pubsub, held.id);
+        // Approved before the talker posts: the run works again, the message is still the other run's.
+        if (approved) await setStatus("running");
+      };
+      const { talker, decisions } = talkerOn(trigger, { now: () => new Date(Date.now() + TALKER_QUIET_MS + 1000) });
+      await talker.consider({ run: { ...held, status: "running" }, message, live: false, waited: null });
 
+      expect(decisions).toEqual(["held"]);
+      expect(taken).toMatchObject({ messageIds: [message.id] });
+      await drainOutbox(f.db, f.handlers);
+      const said = await saidAfter(message);
+      expect(said.map((m) => [m.body, m.agentRunId])).toEqual([[ANSWER, taken?.runId ?? ""]]);
+    });
+  }
+
+  test("paused and handed the message on before the talker looked at the run again: no model call", async () => {
+    const { held, trigger } = await waitingOnApproval();
+    const message = await askedWhileWorking(held, trigger);
+    expect(await releaseHeldInbox(f.db, f.pubsub, held.id)).toMatchObject({ messageIds: [message.id] });
+    const { talker, decisions } = talkerOn(trigger, { now: () => new Date(Date.now() + TALKER_QUIET_MS + 1000) });
+    // The steering read the run while it still worked.
+    await talker.consider({ run: { ...held, status: "running" }, message, live: false, waited: null });
     expect(decisions).toEqual(["held"]);
-    expect(taken).toMatchObject({ messageIds: [message.id] });
-    await drainOutbox(f.db, f.handlers);
-    const said = await saidAfter(message);
-    expect(said.map((m) => [m.body, m.agentRunId])).toEqual([[ANSWER, taken?.runId ?? ""]]);
+    expect(talkerCalls()).toHaveLength(0);
   });
 });
 
