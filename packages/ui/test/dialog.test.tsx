@@ -5,7 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Button, Dialog, DialogBody, DialogFooter, DialogSearchList, Input } from "../src";
+import { Button, Dialog, DialogBody, DialogFooter, DialogSearchList, InfoHint, Input } from "../src";
 
 function Harness() {
   const [open, setOpen] = useState(false);
@@ -53,6 +53,29 @@ describe("Dialog", () => {
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Ajustar orçamento" })));
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Fechar" })));
     expect(body().queryByRole("dialog")).toBeNull();
+  });
+
+  test("an ⓘ at the end of the description's line stays out of it: the dialog is described by the sentence alone", () => {
+    render(
+      <Dialog
+        open
+        onOpenChange={() => {}}
+        title="Entre no Claude pelo navegador"
+        description="Entre com a conta que quer adicionar."
+        descriptionAside={<InfoHint name="Sobre a conta errada">Saia do Claude lá e tente de novo.</InfoHint>}
+        closeLabel="Fechar"
+      >
+        <DialogBody>Esperando você entrar…</DialogBody>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { description: "Entre com a conta que quer adicionar." });
+    const info = within(dialog).getByRole("button", { name: "Sobre a conta errada" });
+    // Outside the description element, since a browser reads a button's name inside it as part of the description
+    // (the test library's own description leaves it out, so it can't tell), but on the sentence's line, after it.
+    const description = document.getElementById(dialog.getAttribute("aria-describedby") ?? "");
+    expect(description?.textContent).toBe("Entre com a conta que quer adicionar.");
+    expect(description?.contains(info)).toBe(false);
+    expect(info.closest(".ac-dialog__desc")?.textContent).toStartWith("Entre com a conta que quer adicionar.");
   });
 
   test("a toast over it takes its own clicks, even one that removes it; a press on the scrim still closes it", async () => {

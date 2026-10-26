@@ -16,9 +16,9 @@ import {
 import { orgName, pairedHomes } from "../../control/store";
 import { agentOf } from "../../hooks";
 import { AgentFace, OrgTile } from "../../ui/bits";
+import { PrefHead } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { clock, dayLabel } from "../../ui/time";
-import { PrefHead } from "./shared";
 
 const PAGE = 40;
 

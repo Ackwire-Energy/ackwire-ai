@@ -11,9 +11,9 @@ import { type Home, orgName, pairedHomes } from "../../control/store";
 import { macStateOf } from "../../control/tray";
 import { useLocalServer, usePref } from "../../hooks";
 import { AgentFace, ConnectionChip, MacPortrait, OrgTile } from "../../ui/bits";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
-import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
 
 export function General() {
   const { t } = useTranslation();
@@ -100,10 +100,12 @@ export function General() {
     setMenuBar(on);
     if (!on && !dock) showDock(true);
   };
+  // Open at login has an ⓘ only where it changes something: agentes.chat running here, or agents working here.
+  const launchHint = local.run ? "desktop.prefs.general.launchHere" : works ? "desktop.prefs.general.launchDesc" : null;
 
   return (
     <>
-      <PrefHead title={t("desktop.prefs.general.title")} lead={t("desktop.prefs.general.lead")} />
+      <PrefHead title={t("desktop.prefs.general.title")} />
 
       {works && (
         <>
@@ -112,7 +114,6 @@ export function General() {
             <PrefRow
               lead={<MacPortrait state={macStateOf(homes)} />}
               title={t("desktop.prefs.general.name")}
-              desc={t("desktop.prefs.general.nameDesc")}
               htmlFor="machine-name"
               end={
                 <form
@@ -196,7 +197,6 @@ export function General() {
                 />
               );
             })}
-            <PrefRow desc={t("desktop.prefs.general.orgsHint")} />
           </PrefCard>
         </>
       )}
@@ -205,17 +205,12 @@ export function General() {
       <PrefCard>
         <PrefRow
           title={t("desktop.prefs.general.launchTitle")}
-          desc={
-            local.run
-              ? t("desktop.prefs.general.launchHere")
-              : works
-                ? t("desktop.prefs.general.launchDesc")
-                : undefined
-          }
+          hint={launchHint ? hintFor(t, t("desktop.prefs.general.launchTitle"), t(launchHint)) : undefined}
           htmlFor="launch"
           end={
             <Switch
               id="launch"
+              aria-describedby={launchHint ? "launch-hint" : undefined}
               checked={launch === true}
               disabled={launch === null}
               onCheckedChange={(on) => {
@@ -230,11 +225,12 @@ export function General() {
         />
         <PrefRow
           title={t("desktop.prefs.general.notifySiteTitle")}
-          desc={t("desktop.prefs.general.notifySiteDesc")}
+          hint={hintFor(t, t("desktop.prefs.general.notifySiteTitle"), t("desktop.prefs.general.notifySiteDesc"))}
           htmlFor="notify-site"
           end={
             <Switch
               id="notify-site"
+              aria-describedby="notify-site-hint"
               checked={notifySite}
               onCheckedChange={(on) => {
                 setNotifySite(on);
@@ -247,15 +243,25 @@ export function General() {
           <>
             <PrefRow
               title={t("desktop.prefs.general.notifyTitle")}
-              desc={t("desktop.prefs.general.notifyDesc")}
               htmlFor="notify"
               end={<Switch id="notify" checked={notify} onCheckedChange={setNotify} />}
             />
             <PrefRow
               title={t("desktop.prefs.general.notifyBrowserTitle")}
-              desc={t("desktop.prefs.general.notifyBrowserDesc")}
+              hint={hintFor(
+                t,
+                t("desktop.prefs.general.notifyBrowserTitle"),
+                t("desktop.prefs.general.notifyBrowserDesc"),
+              )}
               htmlFor="notify-browser"
-              end={<Switch id="notify-browser" checked={notifyBrowser} onCheckedChange={setNotifyBrowser} />}
+              end={
+                <Switch
+                  id="notify-browser"
+                  aria-describedby="notify-browser-hint"
+                  checked={notifyBrowser}
+                  onCheckedChange={setNotifyBrowser}
+                />
+              }
             />
           </>
         )}
@@ -263,13 +269,12 @@ export function General() {
           <>
             <PrefRow
               title={t("desktop.prefs.general.dockTitle")}
-              desc={t("desktop.prefs.general.dockDesc")}
+              hint={hintFor(t, t("desktop.prefs.general.dockTitle"), t("desktop.prefs.general.dockDesc"))}
               htmlFor="dock"
-              end={<Switch id="dock" checked={dock} onCheckedChange={showDock} />}
+              end={<Switch id="dock" aria-describedby="dock-hint" checked={dock} onCheckedChange={showDock} />}
             />
             <PrefRow
               title={t("desktop.prefs.general.menuBarTitle")}
-              desc={t("desktop.prefs.general.menuBarDesc")}
               htmlFor="menu-bar"
               end={<Switch id="menu-bar" checked={iconShown} onCheckedChange={showMenuBar} />}
             />
@@ -278,11 +283,12 @@ export function General() {
         {mac && works && (
           <PrefRow
             title={t("desktop.prefs.general.notchTitle")}
-            desc={t("desktop.prefs.general.notchDesc")}
+            hint={hintFor(t, t("desktop.prefs.general.notchTitle"), t("desktop.prefs.general.notchDesc"))}
             htmlFor="notch"
             end={
               <Switch
                 id="notch"
+                aria-describedby="notch-hint"
                 checked={notch}
                 onCheckedChange={(on) => {
                   setNotch(on);
