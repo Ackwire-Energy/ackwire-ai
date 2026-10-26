@@ -127,7 +127,7 @@ export const PRESET_LOOK: Record<Preset, Required<AgentAppearance>> = {
   lia: { color: "rose", eyes: "dots", accessory: "flower" },
   atlas: { color: "amber", eyes: "round", accessory: "antenna" },
 };
-/** The agent guiding the onboarding (always on the team: "Eu já estou aqui"). */
+/** The agent guiding the onboarding: always on the team, so it has no card to uncheck. */
 const GUIDE: Preset = "ada";
 /** Who hosts each step: the agent asking its question (introducing itself the first time). */
 const HOST: Record<OnboardingStepId, Preset> = {

@@ -712,6 +712,15 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(screen().getByRole("button", { name: "Enviar para Theo" })).toBeTruthy();
   });
 
+  test("on hold before its computer is made: the lead says when it gets prepared, not that it's always on", async () => {
+    // The server gives no state for a workspace on hold whose computer isn't ready.
+    await toComputerStep({ state: null });
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
+    );
+  });
+
   test("its first time shows at once: asked every 2 s until the provisioner says one, with the email line", async () => {
     const r = await toComputerStep({ state: "preparing", specs: SPECS, notifyByEmail: true });
     const step = () => (document.querySelector(".onb__workspace-computer") as HTMLElement).textContent ?? "";

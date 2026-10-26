@@ -105,6 +105,7 @@ const CLOUD_EXTRA = [
   "missions.settings.recovery.title",
   "onboarding.budget.noteKey",
   "onboarding.computer.leadCloud",
+  "onboarding.computer.leadCloudPaused",
   "onboarding.keyStep.lead",
   ...["ready", "waiting", "noAi", "noAiAny"].map((k) => `onboarding.done.first.${k}`),
   ...["signIn", "key", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),

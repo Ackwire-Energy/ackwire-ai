@@ -974,7 +974,7 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.invite")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
     // No cards repeating the rail and the faces, and nothing said of what was skipped: no invitations, no computer.
-    // No line over the title either: the rail already reads "Tudo certo".
+    // No line over the title either: the welcome says it, and so does the rail's "Tudo certo" where it shows.
     expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card, .onb__eyebrow")).toBeNull();
     expect(welcome()).toBe("Theo e Ada já estão no #general.");
     expect(document.querySelector(".onb__crew-computer")).toBeNull();
