@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, countQueries, eq, schema } from "@agenteschat/db";
 import {
   acceptInvitation,
   approveJoinRequest,
@@ -7,6 +7,8 @@ import {
   createInvitation,
   denyJoinRequest,
   type EmailTemplate,
+  FILE_JOIN_REQUEST_JOB,
+  fileJoinRequest,
   findInviteLink,
   inviteLink,
   isSignupAllowed,
@@ -17,8 +19,12 @@ import {
   MAX_PENDING_JOIN_REQUESTS,
   pruneJoinRequests,
   randomToken,
+  removeMember,
   renderEmail,
   renderPush,
+  resendInvitation,
+  revokeInvitation,
+  settleJoinRequests,
   sha256,
   turnOffInviteLink,
 } from "../src";
@@ -59,10 +65,32 @@ async function person(email: string, options: { verified?: boolean; locale?: str
   return { id, name, email };
 }
 
-const typed = (token: string, name: string, email: string, extra: { note?: string; locale?: string } = {}) =>
-  askToJoin(deps(), PUBLIC, { token, user: null, name, email, ...extra }, NOW);
-const signedIn = (token: string, user: { id: string; name: string; email: string }, note?: string, now = NOW) =>
-  askToJoin(deps(), PUBLIC, { token, user, note }, now);
+/** Files the asks queued so far, as the worker's job does. */
+async function fileQueued(now = NOW) {
+  const jobs = await f.db
+    .select()
+    .from(schema.outbox)
+    .where(and(eq(schema.outbox.kind, FILE_JOIN_REQUEST_JOB), eq(schema.outbox.status, "pending")))
+    .orderBy(schema.outbox.id);
+  for (const job of jobs) {
+    await fileJoinRequest(deps(), job.payload, now);
+    await f.db.update(schema.outbox).set({ status: "done" }).where(eq(schema.outbox.id, job.id));
+  }
+}
+const ask = (input: Omit<Parameters<typeof askToJoin>[2], "token">, token: string, now = NOW) =>
+  askToJoin(deps(), PUBLIC, { token, ...input }, now);
+/** Asked signed out, then filed. */
+async function typed(token: string, name: string, email: string, extra: { note?: string; locale?: string } = {}) {
+  const asked = await ask({ user: null, name, email, ...extra }, token);
+  await fileQueued();
+  return asked;
+}
+/** Asked by a signed-in account; an unconfirmed one's request is filed by the job, as a typed one's. */
+async function signedIn(token: string, user: { id: string }, note?: string, now = NOW) {
+  const asked = await ask({ user, note }, token, now);
+  await fileQueued(now);
+  return asked;
+}
 
 const rows = () => f.db.select().from(schema.organizationJoinRequests);
 const notices = () => f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "join_request"));
@@ -136,11 +164,11 @@ describe("asking to join through a link", () => {
       (await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "push.send"))).length;
     expect(await pushes()).toBe(1);
 
-    // The same address again: nothing changes, nothing is sent.
+    // The same address again: the same answer, and nothing changes or goes out.
     expect(await typed(token, "Someone Else", "ana@example.com")).toEqual({
       status: "pending",
       email: "ana@example.com",
-      created: false,
+      created: true,
     });
     expect(await rows()).toHaveLength(1);
     expect((await notices()).map((n) => n.count)).toEqual([1, 1]);
@@ -154,19 +182,32 @@ describe("asking to join through a link", () => {
     expect(await pushes()).toBe(1);
   });
 
-  test("a typed request answers the same for a member's, a waiting or a denied address, and does nothing", async () => {
+  test("a typed request gets the same answer after the same work whatever the address, and files only a new one", async () => {
     const { token } = await start();
     await typed(token, "Ana", "ana@example.com");
     const [ana] = await rows();
     await denyJoinRequest(deps(), f.owner.id, f.org.id, ana?.id ?? "", null, NOW);
     await typed(token, "Bia", "bia@example.com");
-    const before = { rows: (await rows()).length, notices: await notices(), emails: (await emails()).length };
-    for (const email of [f.owner.email, "ana@example.com", "BIA@example.com"]) {
-      expect(await typed(token, "Eve", email)).toMatchObject({ status: "pending", created: false });
+    const sent = (await emails()).length;
+    // A new address, a member's, a waiting and a denied one: the same reply after the same statements, so how
+    // long it takes tells nothing either. Only the job that files it looks at the address.
+    const work = new Set<number>();
+    for (const email of ["new@example.com", f.owner.email, "BIA@example.com", "ana@example.com"]) {
+      const { result, queries } = await countQueries(() => ask({ user: null, name: "Eve", email }, token));
+      expect(result).toEqual({ status: "pending", email: email.toLowerCase(), created: true });
+      work.add(queries);
     }
-    expect((await rows()).length).toBe(before.rows);
-    expect(await notices()).toEqual(before.notices);
-    expect((await emails()).length).toBe(before.emails);
+    expect(work.size).toBe(1);
+    expect([...work][0]).toBeGreaterThan(0);
+    expect((await rows()).length).toBe(2);
+    await fileQueued();
+    expect((await rows()).map((r) => [r.email, r.name, r.status]).sort()).toEqual([
+      ["ana@example.com", "Ana", "denied"],
+      ["bia@example.com", "Bia", "pending"],
+      ["new@example.com", "Eve", "pending"],
+    ]);
+    // The hour's email to the admins already went out.
+    expect((await emails()).length).toBe(sent);
   });
 
   test("at most 50 wait in a workspace; requests that ran out don't count", async () => {
@@ -202,14 +243,14 @@ describe("asking to join through a link", () => {
     ]);
   });
 
-  test("signed in: a member, a denied address; a typed waiting row takes the account, its name and note", async () => {
+  test("signed in and confirmed: a member; a denied address hears it; a typed waiting request becomes theirs", async () => {
     const { token } = await start();
     await expect(signedIn(token, f.owner)).rejects.toMatchObject({ code: "join.member" });
 
     await typed(token, "Carl", "carl@example.com");
     const [carlRow] = await rows();
     await denyJoinRequest(deps(), f.owner.id, f.org.id, carlRow?.id ?? "", "Not now", NOW);
-    const carl = await person("carl@example.com");
+    const carl = await person("carl@example.com", { verified: true });
     await expect(signedIn(token, carl)).rejects.toMatchObject({ code: "join.denied" });
     expect(await joinStatus(f.db, carl, token, NOW)).toEqual({
       member: false,
@@ -218,11 +259,52 @@ describe("asking to join through a link", () => {
     });
 
     await typed(token, "Impostor", "dora@example.com", { note: "let me in" });
-    const dora = await person("dora@example.com");
+    const dora = await person("dora@example.com", { verified: true });
     expect(await signedIn(token, dora, "Dora from sales")).toMatchObject({ created: false });
     const [doraRow] = (await rows()).filter((r) => r.email === "dora@example.com");
     expect(doraRow).toMatchObject({ userId: dora.id, name: dora.name, note: "Dora from sales", status: "pending" });
     expect(await joinStatus(f.db, dora, token, NOW)).toMatchObject({ request: { status: "pending" } });
+  });
+
+  test("an unconfirmed account asks like a typed address: no one else's denial, no one else's request", async () => {
+    const { token } = await start();
+    await typed(token, "Otto", "otto@corp.com");
+    const [otto] = await rows();
+    await denyJoinRequest(deps(), f.owner.id, f.org.id, otto?.id ?? "", "Not this team", NOW);
+    await typed(token, "Paula Real", "paula@corp.com", { note: "Marina's new designer" });
+
+    // Accounts with those addresses, never confirmed: anyone can sign up with an address that isn't theirs.
+    const notOtto = await person("otto@corp.com");
+    expect(await joinStatus(f.db, notOtto, token, NOW)).toEqual({
+      member: false,
+      email: "otto@corp.com",
+      request: null,
+    });
+    expect(await signedIn(token, notOtto)).toEqual({ status: "pending", email: "otto@corp.com", created: true });
+    expect(await joinStatus(f.db, notOtto, token, NOW)).toMatchObject({ request: null });
+    const notPaula = await person("paula@corp.com");
+    expect(await signedIn(token, notPaula, "please approve me quickly")).toMatchObject({ created: true });
+    expect((await rows()).find((r) => r.email === "paula@corp.com")).toMatchObject({
+      userId: null,
+      name: "Paula Real",
+      note: "Marina's new designer",
+    });
+    expect(await joinStatus(f.db, notPaula, token, NOW)).toMatchObject({ request: null });
+
+    // What it asks itself is filed as its own, and its page still says nothing: that it was filed would tell, by
+    // the difference with the two above, that an address already waited or was turned down.
+    const gil = await person("gil@corp.com");
+    await signedIn(token, gil, "Gil from ops");
+    expect((await rows()).find((r) => r.email === "gil@corp.com")).toMatchObject({
+      userId: gil.id,
+      note: "Gil from ops",
+      status: "pending",
+    });
+    expect(await joinStatus(f.db, gil, token, NOW)).toEqual({ member: false, email: "gil@corp.com", request: null });
+    const [gilRow] = (await listWaitingJoinRequests(f.db, f.owner.id, f.org.id, NOW)).filter(
+      (r) => r.email === "gil@corp.com",
+    );
+    expect(gilRow?.confirmed).toBe(false);
   });
 
   test("a link turned off, run out, or of a workspace on hold no longer works, and never says why", async () => {
@@ -247,6 +329,13 @@ describe("asking to join through a link", () => {
     await turnOffInviteLink(deps(), f.owner.id, f.org.id, fresh.link.id, NOW);
     await expect(typed(fresh.token, "Ana", "ana@example.com")).rejects.toMatchObject({ code: "join.link_closed" });
     await expect(typed("not-a-link", "Ana", "ana@example.com")).rejects.toMatchObject({ code: "join.link_closed" });
+
+    // Turned off while an ask waited to be filed: it is filed under the same lock, and nothing outlives the link.
+    const third = await inviteLink(f.db, SECRET, f.owner.id, f.org.id, NOW);
+    await ask({ user: null, name: "Late", email: "late@example.com" }, third.token);
+    await turnOffInviteLink(deps(), f.owner.id, f.org.id, third.link.id, NOW);
+    await fileQueued();
+    expect(await rows()).toEqual([]);
   });
 });
 
@@ -311,8 +400,9 @@ describe("answering", () => {
       .select()
       .from(schema.organizationInvitations)
       .where(eq(schema.organizationInvitations.email, "fay@example.com"));
+    // Still out as admin, it stays admin: approving never demotes it.
     expect(invitations.map((i) => [i.id, i.role, i.expiresAt, i.tokenHash])).toEqual([
-      [waiting.invitation.id, "member", later(7), sha256(url.split("/invite/")[1] ?? "")],
+      [waiting.invitation.id, "admin", later(7), sha256(url.split("/invite/")[1] ?? "")],
     ]);
     const [, invitedEmail] = await joinEmails("join_answer");
     expect(invitedEmail?.template).toMatchObject({ outcome: "invited", url, role: "member", locale: "pt-BR" });
@@ -333,6 +423,85 @@ describe("answering", () => {
     await expect(
       approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, gusRow?.id ?? "", "member", later(15)),
     ).rejects.toMatchObject({ code: "join.expired" });
+  });
+
+  test("an owner's invitation still out goes out again only from an owner, through approval or the invite form", async () => {
+    const { token } = await start();
+    const admin = await addMember(f.db, f.org.id, "admin", "adm");
+    const first = await createInvitation(f.db, f.owner.id, f.org.id, { email: "co@example.com", role: "owner" }, NOW);
+    await typed(token, "Co", "co@example.com");
+    const [row] = await rows();
+    await expect(
+      approveJoinRequest(deps(), PUBLIC, admin.id, f.org.id, row?.id ?? "", "member", NOW),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      createInvitation(f.db, admin.id, f.org.id, { email: "co@example.com", role: "member" }, NOW),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(resendInvitation(f.db, admin.id, f.org.id, first.invitation.id, NOW)).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    const invitation = async () => (await f.db.select().from(schema.organizationInvitations))[0];
+    expect(await invitation()).toMatchObject({ role: "owner", tokenHash: first.invitation.tokenHash });
+    expect((await rows())[0]?.status).toBe("pending");
+
+    expect(await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, row?.id ?? "", "member", NOW)).toMatchObject({
+      outcome: "invited",
+    });
+    expect(await invitation()).toMatchObject({ id: first.invitation.id, role: "owner" });
+    // Run out, an invitation is sent again with the role asked.
+    await createInvitation(f.db, admin.id, f.org.id, { email: "co@example.com", role: "member" }, later(8));
+    expect(await invitation()).toMatchObject({ id: first.invitation.id, role: "member" });
+  });
+
+  test("an approval shows on the link's page while it means something: they're in, or its invitation is out", async () => {
+    const { token } = await start();
+    const ana = await person("ana@example.com", { verified: true });
+    await signedIn(token, ana);
+    const [anaRow] = await rows();
+    await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, anaRow?.id ?? "", "member", NOW);
+    expect(await joinStatus(f.db, ana, token, NOW)).toMatchObject({ member: true, request: { status: "approved" } });
+    // Removed later: the page asks again, and asking files a new request.
+    await removeMember(f.db, f.owner.id, f.org.id, ana.id);
+    expect(await joinStatus(f.db, ana, token, NOW)).toEqual({ member: false, email: "ana@example.com", request: null });
+    expect(await signedIn(token, ana)).toMatchObject({ created: true });
+
+    // Asked signed out, approved, then signed in with the address confirmed: the invitation finishes it.
+    await typed(token, "Bo", "bo@example.com");
+    const boRow = (await rows()).find((r) => r.email === "bo@example.com");
+    const invited = await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, boRow?.id ?? "", "member", NOW);
+    expect(invited.outcome).toBe("invited");
+    const bo = await person("bo@example.com", { verified: true });
+    expect(await joinStatus(f.db, bo, token, NOW)).toMatchObject({ request: { status: "approved" } });
+    expect(await joinStatus(f.db, bo, token, later(8))).toMatchObject({ request: null });
+    const [sent] = await f.db
+      .select()
+      .from(schema.organizationInvitations)
+      .where(eq(schema.organizationInvitations.email, "bo@example.com"));
+    await revokeInvitation(f.db, f.owner.id, f.org.id, sent?.id ?? "");
+    expect(await joinStatus(f.db, bo, token, NOW)).toMatchObject({ request: null });
+  });
+
+  test("a request closes when its address joins another way, so nobody answers it and its notice goes", async () => {
+    const { token } = await start();
+    await typed(token, "Rui", "rui@example.com");
+    const [row] = await rows();
+    const invitation = await createInvitation(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { email: "rui@example.com", role: "member" },
+      NOW,
+    );
+    const rui = await person("rui@example.com");
+    await acceptInvitation(f.db, rui, invitation.token, NOW);
+    expect(await rows()).toEqual([expect.objectContaining({ id: row?.id, status: "closed" })]);
+    expect(await listWaitingJoinRequests(f.db, f.owner.id, f.org.id, NOW)).toEqual([]);
+    await expect(denyJoinRequest(deps(), f.owner.id, f.org.id, row?.id ?? "", null, NOW)).rejects.toMatchObject({
+      code: "join.answered",
+    });
+    expect(await joinEmails("join_answer")).toEqual([]);
+    await settleJoinRequests(deps(), f.org.id, NOW);
+    expect((await notices()).every((n) => n.doneAt !== null)).toBe(true);
   });
 
   test("deny: the reason goes to the person, escaped; the notice closes", async () => {

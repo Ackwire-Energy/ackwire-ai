@@ -10,6 +10,7 @@ import {
   inArray,
   isNull,
   ne,
+  or,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -28,6 +29,7 @@ const {
   organizationMembers,
   organizationInvitations,
   organizationInviteLinks,
+  organizationJoinRequests,
   channels,
   channelMembers,
   users,
@@ -644,10 +646,14 @@ export const INVITATION_TTL_DAYS = 7;
 /** How long an invitation link works (ADR 0068): nobody gets in through it without an admin's approval. */
 export const INVITE_LINK_TTL_DAYS = 30;
 
+const ROLE_RANK: Record<MemberRole, number> = { member: 0, admin: 1, owner: 2 };
+
 /**
  * Sends an invitation to an address with a role: the one named (`invitationId`), else the newest one for that
  * address not accepted yet, gets a new token and 7 more days (its old link stops working); with none, a new one
- * is made. Records `invitation.created`. The caller checks who may invite.
+ * is made. One still working keeps the higher of its role and this one, so sending it again never demotes
+ * whoever it was meant for, and an owner's invitation goes out again only from an owner (`ownersOk`). Records
+ * `invitation.created`. The caller checks who may invite.
  */
 export async function sendInvitation(
   db: Executor,
@@ -656,6 +662,8 @@ export async function sendInvitation(
     email: string;
     role: MemberRole;
     invitedBy: string;
+    /** The sender may invite owners (`manage_owners`). */
+    ownersOk: boolean;
     now?: Date;
     invitationId?: string;
     /** Resent from the pending list. */
@@ -667,7 +675,11 @@ export async function sendInvitation(
   const now = input.now ?? new Date();
   const email = input.email.trim().toLowerCase();
   const [existing] = await db
-    .select({ id: organizationInvitations.id })
+    .select({
+      id: organizationInvitations.id,
+      role: organizationInvitations.role,
+      expiresAt: organizationInvitations.expiresAt,
+    })
     .from(organizationInvitations)
     .where(
       and(
@@ -680,9 +692,14 @@ export async function sendInvitation(
     )
     .orderBy(desc(organizationInvitations.createdAt))
     .limit(1);
+  const role =
+    existing && existing.expiresAt > now && ROLE_RANK[existing.role] > ROLE_RANK[input.role]
+      ? existing.role
+      : input.role;
+  if (role === "owner" && !input.ownersOk) throw new ForbiddenError("Only owners can invite owners");
   const token = randomToken(32);
   const fresh = {
-    role: input.role,
+    role,
     tokenHash: sha256(token),
     invitedByUserId: input.invitedBy,
     expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
@@ -718,8 +735,6 @@ export async function createInvitation(
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
   assertInviting(actor);
-  if (input.role === "owner" && !can(actor.role, "manage_owners"))
-    throw new ForbiddenError("Only owners can invite owners");
   const email = input.email.trim().toLowerCase();
 
   const [alreadyMember] = await db
@@ -728,7 +743,8 @@ export async function createInvitation(
     .innerJoin(organizationMembers, eq(organizationMembers.userId, users.id))
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
-  return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, now });
+  const ownersOk = can(actor.role, "manage_owners");
+  return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, ownersOk, now });
 }
 
 export async function listInvitations(db: Database, orgId: string, now = new Date()) {
@@ -802,13 +818,17 @@ export async function inviteLink(db: Database, secret: string, actorId: string, 
   });
 }
 
-/** An invitation link by its token, with its workspace's name and standing; null when there is none. */
-export async function findInviteLink(db: Executor, token: string) {
+/** An invitation link by its token (or its id), with its workspace's name and standing; null when there is none. */
+export async function findInviteLink(db: Executor, by: string | { id: string }) {
   const [row] = await db
     .select({ link: organizationInviteLinks, orgName: organizations.name, standing: STANDING_COLUMNS })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
-    .where(eq(organizationInviteLinks.tokenHash, sha256(token)));
+    .where(
+      typeof by === "string"
+        ? eq(organizationInviteLinks.tokenHash, sha256(by))
+        : eq(organizationInviteLinks.id, by.id),
+    );
   return row ?? null;
 }
 
@@ -929,9 +949,25 @@ export async function acceptInvitation(
   });
 }
 
-/** Adds a person to an organization (keeping an existing role) and to `general`. */
+/**
+ * Adds a person to an organization (keeping an existing role) and to `general`. A request to join that they or
+ * their address had waiting closes: whoever answers it next finds it answered.
+ */
 export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
+  await tx
+    .update(organizationJoinRequests)
+    .set({ status: "closed", decidedAt: new Date() })
+    .where(
+      and(
+        eq(organizationJoinRequests.orgId, orgId),
+        eq(organizationJoinRequests.status, "pending"),
+        or(
+          eq(organizationJoinRequests.userId, userId),
+          eq(organizationJoinRequests.email, sql`(select ${users.email} from ${users} where ${users.id} = ${userId})`),
+        ),
+      ),
+    );
   await assignHandle(tx, orgId, userId);
   const [general] = await tx
     .select({ id: channels.id })
@@ -1017,13 +1053,12 @@ export async function resendInvitation(
     .from(organizationInvitations)
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
-  if (existing.role === "owner" && !can(actor.role, "manage_owners"))
-    throw new ForbiddenError("Only owners can invite owners");
   return sendInvitation(db, {
     orgId,
     email: existing.email,
     role: existing.role,
     invitedBy: actorId,
+    ownersOk: can(actor.role, "manage_owners"),
     now,
     invitationId,
     resent: true,

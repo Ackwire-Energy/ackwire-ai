@@ -33,7 +33,7 @@ import {
   requirePermission,
   sendInvitation,
 } from "./organizations";
-import { isUserBlocked } from "./standing";
+import { enqueue } from "./outbox";
 
 const {
   organizationInvitations,
@@ -56,9 +56,13 @@ export const JOIN_NAME_MAX = 80;
 export const JOIN_NOTE_MAX = 200;
 export const JOIN_REASON_MAX = 300;
 
+/** The outbox job that files a request whose address isn't proven (`fileJoinRequest`). */
+export const FILE_JOIN_REQUEST_JOB = "join_request.file";
+
 const DAY_MS = 86_400_000;
 const group = (orgId: string) => `join_requests:${orgId}`;
 const closedLink = () => new NotFoundError("This link no longer works", "join.link_closed");
+const fullError = () => new ConflictError("This workspace has many requests waiting", "join.full");
 
 type Deps = { db: Database; pubsub?: PubSub };
 type RequestRow = typeof requests.$inferSelect;
@@ -100,16 +104,29 @@ async function waitingCount(db: Executor, orgId: string, now: Date) {
   return Number(row?.n ?? 0);
 }
 
-/** The admins' notices close once nothing is left waiting (answered, turned off or run out). */
-async function settle(deps: Deps, orgId: string, now: Date) {
+/** The admins' notices close once nothing is left waiting (answered, turned off, run out, or joined). */
+export async function settleJoinRequests(deps: Deps, orgId: string, now = new Date()) {
   if ((await waitingCount(deps.db, orgId, now)) > 0) return;
   await resolveNotifications({ ...deps, now: () => now }, orgId, { groupKey: group(orgId) });
 }
 
+/** Requests are filed, answered and closed one at a time per workspace, and so is turning its link off. */
+const lockRequests = (tx: Executor, orgId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`join-requests:${orgId}`}))`);
+
+/** The account's own address and whether it opened the link that confirms it, read here: a session's copy lags. */
+async function accountOf(db: Executor, userId: string) {
+  const [row] = await db
+    .select({ name: users.name, email: users.email, verified: users.emailVerified, blockedAt: users.blockedAt })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row ?? null;
+}
+
 export interface AskToJoinInput {
   token: string;
-  /** The account asking, when signed in: its own name and address. */
-  user: { id: string; name: string; email: string } | null;
+  /** The account asking, when signed in: it asks with its own name and address. */
+  user: { id: string } | null;
   /** Typed when signed out. */
   name?: string;
   email?: string;
@@ -118,60 +135,118 @@ export interface AskToJoinInput {
   locale?: string | null;
 }
 
+/** A request as filed: the workspace and link it came through, and who asks. */
+interface Ask {
+  orgId: string;
+  linkId: string;
+  email: string;
+  name: string;
+  note: string | null;
+  locale: string | null;
+  /** The account that asked, when signed in. */
+  userId: string | null;
+}
+
 /**
  * Someone who opened an invitation link asks to join (ADR 0068). Signed out, they typed a name and an address;
- * signed in, their account asks. Admins are told by an in-app notice (merged while unread, which pushes once per
- * burst) and an email at most once an hour per workspace. A typed request answers the same whatever the address:
- * already a member, already waiting or denied, nothing new happens, so a link never tells who works there.
+ * signed in, their account asks. A typed address, or an account's that isn't confirmed (anyone can sign up with
+ * an address that isn't theirs), gets the same answer after the same work whatever it is: nothing here depends on
+ * the address, so a link never tells who works there, who waits or who was turned down, not even by how long the
+ * answer takes. A job files it (`fileJoinRequest`). A confirmed account asks for its own address, so it hears
+ * where it stands, and its request is filed at once. `created` is false only when that account's request already
+ * waited.
  */
 export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinInput, now = new Date()) {
   const { db } = deps;
   const found = await findInviteLink(db, input.token);
   if (!found || !inviteLinkOpen(found, now)) throw closedLink();
-  const { link, orgName } = found;
-  const orgId = link.orgId;
-  const user = input.user;
-  if (user) {
-    if (await isUserBlocked(db, user.id)) throw new ForbiddenError();
-    if (await isMember(db, orgId, user.id)) throw new ConflictError("You're already in this workspace", "join.member");
+  const orgId = found.link.orgId;
+  const account = input.user ? await accountOf(db, input.user.id) : null;
+  if (input.user) {
+    if (!account || account.blockedAt) throw new ForbiddenError();
+    if (await isMember(db, orgId, input.user.id))
+      throw new ConflictError("You're already in this workspace", "join.member");
   }
-  const email = (user?.email ?? input.email ?? "").trim().toLowerCase();
+  const email = (account?.email ?? input.email ?? "").trim().toLowerCase();
   const name =
-    oneLine(user?.name ?? input.name ?? "", JOIN_NAME_MAX) || oneLine(email.split("@")[0] ?? "", JOIN_NAME_MAX);
+    oneLine(account?.name ?? input.name ?? "", JOIN_NAME_MAX) || oneLine(email.split("@")[0] ?? "", JOIN_NAME_MAX);
   if (!email.includes("@") || !name) throw new ValidationError("A name and an email are needed");
-  const note = oneLine(input.note ?? "", JOIN_NOTE_MAX) || null;
-  const admins = await adminIds(db, orgId);
+  const ask: Ask = {
+    orgId,
+    linkId: found.link.id,
+    email,
+    name,
+    note: oneLine(input.note ?? "", JOIN_NOTE_MAX) || null,
+    locale: input.locale ?? null,
+    userId: input.user?.id ?? null,
+  };
+  if (account?.verified) {
+    const created = await file(deps, publicUrl, ask, true, now);
+    return { status: "pending" as const, email, created };
+  }
+  if ((await waitingCount(db, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
+  await enqueue(db, { orgId, kind: FILE_JOIN_REQUEST_JOB, payload: { ...ask, publicUrl } });
+  return { status: "pending" as const, email, created: true };
+}
 
-  const created = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`join-requests:${orgId}`}))`);
+/** Job `join_request.file`: files a request `askToJoin` queued (an unproven address); never tells anyone why not. */
+export async function fileJoinRequest(deps: Deps, payload: Record<string, unknown>, now = new Date()) {
+  const text = (key: string) => (typeof payload[key] === "string" ? (payload[key] as string) : null);
+  const [orgId, linkId, email, name] = [text("orgId"), text("linkId"), text("email"), text("name")];
+  if (!orgId || !linkId || !email || !name) return;
+  const ask = { orgId, linkId, email, name, note: text("note"), locale: text("locale"), userId: text("userId") };
+  await file(deps, text("publicUrl") ?? "", ask, false, now);
+}
+
+/**
+ * Files a request under the workspace's lock, the link read again under it. `proven`: a confirmed account asking
+ * for its own address, which hears where it stands (`join.link_closed`, `join.denied`, `join.full`) and takes
+ * over a typed request still waiting for that address. An unproven ask changes nothing that exists: a member's,
+ * a waiting or a denied address files nothing. Admins are told of a new request by an email at most once an hour
+ * per workspace and a notice merged while unread (one push per burst). Returns whether a new request waits.
+ */
+async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, now: Date) {
+  const { db } = deps;
+  const { orgId } = ask;
+  const admins = await adminIds(db, orgId);
+  const filed = await db.transaction(async (tx) => {
+    await lockRequests(tx, orgId);
+    const link = await findInviteLink(tx, { id: ask.linkId });
+    if (!link || !inviteLinkOpen(link, now)) {
+      if (proven) throw closedLink();
+      return null;
+    }
     const [latest] = await tx
       .select()
       .from(requests)
-      .where(and(eq(requests.orgId, orgId), eq(requests.email, email)))
+      .where(and(eq(requests.orgId, orgId), eq(requests.email, ask.email)))
       .orderBy(desc(requests.createdAt))
       .limit(1);
     const waiting = latest && isWaiting(latest, now) ? latest : null;
-    const full = async () => (await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS;
-    const fullError = () => new ConflictError("This workspace has many requests waiting", "join.full");
-    if (!user) {
-      // A full workspace answers the same for every address too, before anything about the address is read.
-      if (await full()) throw fullError();
-      if (waiting || (latest && isKeptDenial(latest, now)) || (await addressIsMember(tx, orgId, email))) return null;
-    } else {
-      if (latest && isKeptDenial(latest, now)) throw new ConflictError("Your request wasn't approved", "join.denied");
+    const denied = latest !== undefined && isKeptDenial(latest, now);
+    if (proven) {
+      if (denied) throw new ConflictError("Your request wasn't approved", "join.denied");
       if (waiting) {
-        await tx.update(requests).set({ userId: user.id, name, note }).where(eq(requests.id, waiting.id));
+        await tx
+          .update(requests)
+          .set({ userId: ask.userId, name: ask.name, note: ask.note })
+          .where(eq(requests.id, waiting.id));
         return null;
       }
-      if (await full()) throw fullError();
+    } else if (waiting || denied || (await addressIsMember(tx, orgId, ask.email))) {
+      return null;
+    }
+    if ((await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) {
+      if (proven) throw fullError();
+      return null;
     }
     const values = {
-      linkId: link.id,
-      userId: user?.id ?? null,
-      email,
-      name,
-      note,
-      locale: input.locale ?? null,
+      linkId: ask.linkId,
+      userId: ask.userId,
+      email: ask.email,
+      name: ask.name,
+      note: ask.note,
+      locale: ask.locale,
       status: "pending" as const,
       role: null,
       reason: null,
@@ -208,58 +283,67 @@ export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinI
         template: {
           kind: "join_request",
           locale: g.locale,
-          orgName,
-          name,
-          email,
+          orgName: link.orgName,
+          name: ask.name,
+          email: ask.email,
           url: answerUrl(publicUrl, orgId, row.id, "approve"),
           denyUrl: answerUrl(publicUrl, orgId, row.id, "deny"),
         },
       });
     }
-    return row;
+    return { orgName: link.orgName };
   });
-
-  if (created) {
-    await notify(
-      { ...deps, now: () => now },
-      {
-        orgId,
-        userIds: admins,
-        kind: "join_request",
-        groupKey: group(orgId),
-        waiting: true,
-        source: { label: orgName },
-        latest: { title: name },
-      },
-    ).catch(() => []);
-  }
-  return { status: "pending" as const, email, created: created !== null };
+  if (!filed) return false;
+  await notify(
+    { ...deps, now: () => now },
+    {
+      orgId,
+      userIds: admins,
+      kind: "join_request",
+      groupKey: group(orgId),
+      waiting: true,
+      source: { label: filed.orgName },
+      latest: { title: ask.name },
+    },
+  ).catch(() => []);
+  return true;
 }
 
 /**
  * What the link's page tells a signed-in person (ADR 0068): whether they are in the workspace (its id only then),
- * and their latest request with its answer. Null for a token that isn't a link.
+ * and, once they confirmed their address, the latest request for it with its answer. An unconfirmed account hears
+ * nothing about requests, as a typed ask: anyone can sign up with an address that isn't theirs, and even whether
+ * its own ask was filed would tell that the address already waited or was turned down. An approval counts while
+ * it still means something: they are in, or the invitation it sent still waits for them. Null for a token that
+ * isn't a link.
  */
-export async function joinStatus(db: Database, user: { id: string; email: string }, token: string, now = new Date()) {
+export async function joinStatus(db: Database, user: { id: string }, token: string, now = new Date()) {
   const found = await findInviteLink(db, token);
-  if (!found) return null;
+  const account = found ? await accountOf(db, user.id) : null;
+  if (!found || !account) return null;
   const orgId = found.link.orgId;
   const member = (await getMembership(db, user.id, orgId)) !== null;
-  const email = user.email.toLowerCase();
-  const [latest] = await db
-    .select()
-    .from(requests)
-    .where(and(eq(requests.orgId, orgId), or(eq(requests.userId, user.id), eq(requests.email, email))))
-    .orderBy(desc(requests.createdAt))
-    .limit(1);
-  const request = !latest
+  const email = account.email.toLowerCase();
+  const [latest] = account.verified
+    ? await db
+        .select({ request: requests, invitation: organizationInvitations })
+        .from(requests)
+        .leftJoin(organizationInvitations, eq(organizationInvitations.id, requests.invitationId))
+        .where(and(eq(requests.orgId, orgId), or(eq(requests.userId, user.id), eq(requests.email, email))))
+        .orderBy(desc(requests.createdAt))
+        .limit(1)
+    : [];
+  const row = latest?.request;
+  const invitation = latest?.invitation;
+  const invited = !!invitation && !invitation.acceptedAt && invitation.expiresAt > now;
+  const request = !row
     ? null
-    : isWaiting(latest, now)
+    : isWaiting(row, now)
       ? { status: "pending" as const, reason: null }
-      : latest.status === "approved"
+      : row.status === "approved" && (member || invited)
         ? { status: "approved" as const, reason: null }
-        : isKeptDenial(latest, now)
-          ? { status: "denied" as const, reason: latest.reason }
+        : isKeptDenial(row, now)
+          ? { status: "denied" as const, reason: row.reason }
           : null;
   return { member, ...(member ? { orgId } : {}), email, request };
 }
@@ -334,7 +418,8 @@ export async function approveJoinRequest(
   role: MemberRole,
   now = new Date(),
 ): Promise<JoinApproval> {
-  assertInviting(await requirePermission(deps.db, actorId, orgId, "manage_members"));
+  const actor = await requirePermission(deps.db, actorId, orgId, "manage_members");
+  assertInviting(actor);
   if (role !== "member" && role !== "admin") throw new ValidationError("role must be member or admin");
   const result = await deps.db.transaction(async (tx): Promise<JoinApproval> => {
     const row = await waitingRequest(tx, orgId, id, now);
@@ -351,6 +436,7 @@ export async function approveJoinRequest(
         email: row.email,
         role,
         invitedBy: actorId,
+        ownersOk: can(actor.role, "manage_owners"),
         now,
         fromRequest: true,
       });
@@ -392,7 +478,7 @@ export async function approveJoinRequest(
     }
     return approval;
   });
-  await settle(deps, orgId, now);
+  await settleJoinRequests(deps, orgId, now);
   return result;
 }
 
@@ -438,7 +524,7 @@ export async function denyJoinRequest(
       },
     });
   });
-  await settle(deps, orgId, now);
+  await settleJoinRequests(deps, orgId, now);
 }
 
 /**
@@ -496,6 +582,8 @@ export async function listInviteLinks(db: Database, secret: string, actorId: str
 export async function turnOffInviteLink(deps: Deps, actorId: string, orgId: string, linkId: string, now = new Date()) {
   await requirePermission(deps.db, actorId, orgId, "manage_members");
   const closed = await deps.db.transaction(async (tx) => {
+    // The lock a request is filed under: one filed meanwhile either sees the link off or is closed here.
+    await lockRequests(tx, orgId);
     const [link] = await tx
       .select({ id: organizationInviteLinks.id, revokedAt: organizationInviteLinks.revokedAt })
       .from(organizationInviteLinks)
@@ -518,7 +606,7 @@ export async function turnOffInviteLink(deps: Deps, actorId: string, orgId: stri
     });
     return rows.length;
   });
-  await settle(deps, orgId, now);
+  await settleJoinRequests(deps, orgId, now);
   return { closed };
 }
 
@@ -541,7 +629,7 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
     .selectDistinct({ orgId: notifications.orgId })
     .from(notifications)
     .where(and(eq(notifications.kind, "join_request"), isNull(notifications.doneAt)));
-  for (const { orgId } of open) await settle(deps, orgId, now);
+  for (const { orgId } of open) await settleJoinRequests(deps, orgId, now);
   return gone.length;
 }
 
