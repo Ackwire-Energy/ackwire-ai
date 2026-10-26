@@ -215,7 +215,16 @@ test("only Chrome for Testing is driven: the newest installed one, never the per
   mkdirSync(mac, { recursive: true });
   writeFileSync(path.join(mac, "Google Chrome for Testing"), "");
   expect(findChrome(home, "darwin")).toBe(path.join(mac, "Google Chrome for Testing"));
-  expect(CHROME_ARGS).toContain("--disable-component-update");
+  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), and no
+  // chip asking to sign in to Chrome itself.
+  expect(CHROME_ARGS).toEqual([
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-component-update",
+    "--force-prefers-reduced-motion",
+    "--disable-features=SigninPromoOnAvatarPill",
+  ]);
 });
 
 test("site allowlist: exact hosts, *. wildcards with the bare domain, blank pages always", () => {

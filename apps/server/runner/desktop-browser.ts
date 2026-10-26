@@ -19,8 +19,9 @@ import { toMachineError } from "./errors";
  *   only the agent's group may enter, so only the agent's own user reaches it (and it may already run anything as
  *   itself). It takes one word, `open`: no address, no flag, nothing that widens what the browser reaches. The
  *   agent's own code can connect too: it answers one click at a time and holds a few connections at most.
- * - When the answer takes more than a moment, a small window on the desktop says the browser is opening (or, before
- *   the agent's first browser, that Chrome for Testing installs); when the browser can't open, one says why.
+ * - The runner answers once Chrome's window is on the desktop. When that takes more than a moment, a small window
+ *   on the desktop says the browser is opening (or, before the agent's first browser, that Chrome for Testing
+ *   installs) until then; when the browser can't open, one says why.
  */
 
 /** The socket's name, in the folder of the desktop's password file. */
@@ -33,14 +34,17 @@ const ASK_MS = 5000;
 const CONNECTIONS_MAX = 4;
 /** Chrome for Testing's download and install, then Chrome's start: a click is given up after this. */
 export const SHOW_MS = 16 * 60_000;
-/** A click answered sooner shows no window of its own: Chrome's is the answer. */
-const QUIET_MS = 1000;
+/**
+ * A click answered sooner (Chrome already open, brought to the front) shows no window of its own: Chrome's is the
+ * answer. A Chrome that starts takes seconds, and the note itself most of a second to show on a small computer.
+ */
+const QUIET_MS = 300;
 
 /**
  * Answers the Browser of one agent's desktop on `socket`: `open` in; `installing` while Chrome for Testing
- * installs first, then `ok` or `error <code>`. One click at a time: one that comes meanwhile is told `busy`, and
- * the first one's launcher shows what happens. The socket takes its folder's group (the agent's, in system mode),
- * and only that group may write to it.
+ * installs first, then `ok` (its window is on the desktop) or `error <code>`. One click at a time, until its
+ * answer: one that comes meanwhile is told `busy` and starts nothing, and the first one's launcher shows what
+ * happens. The socket takes its folder's group (the agent's, in system mode), and only that group may write to it.
  */
 export async function serveBrowser(socket: string, open: (installing: () => void) => Promise<void>): Promise<Server> {
   let busy = false;

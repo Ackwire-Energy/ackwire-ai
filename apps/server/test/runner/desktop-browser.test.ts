@@ -80,6 +80,21 @@ test.if(posix)(
   },
 );
 
+test.if(posix)(
+  "a click that starts Chrome: the note says it is opening within a third of a second, and stays until the runner answers",
+  async () => {
+    const socket = socketIn();
+    // The runner answers once Chrome's window is on the desktop, seconds after a click that starts it.
+    await serve(socket, () => new Promise((r) => setTimeout(r, 700)));
+    const n = notes();
+    const run = runDesktopBrowser(socket, { note: n.note });
+    await new Promise((r) => setTimeout(r, 450));
+    expect(n.shown).toEqual([{ kind: "wait", text: "Opening the browser…", closed: false }]);
+    expect(await run).toBe(0);
+    expect(n.shown).toEqual([{ kind: "wait", text: "Opening the browser…", closed: true }]);
+  },
+);
+
 test.if(posix)("Chrome for Testing installing first: a wait note, closed once the browser is open", async () => {
   const socket = socketIn();
   let release = () => {};

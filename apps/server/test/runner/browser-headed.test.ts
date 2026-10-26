@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createConnection } from "node:net";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -9,13 +10,14 @@ import {
   chromeEnv,
   chromeLaunchArgs,
   type OwnChrome,
+  prepareProfile,
   type StreamSocket,
-  useOwnFrame,
 } from "../../runner/browser";
+import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "../../runner/desktop-browser";
 import { RunnerError } from "../../runner/errors";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
-import { removeDirs, tempDir } from "./helpers";
+import { removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
@@ -30,6 +32,8 @@ interface FakeChrome {
   args: string[];
   env: Record<string, string> | undefined;
   killed: boolean;
+  /** It exits by itself (the person closed it, it crashed). */
+  quit: () => void;
 }
 
 /** The agent's desktop as the browser sees it: `log` keeps the order of its starts and Chrome's. */
@@ -60,6 +64,8 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   process.env.FAKE_AB_LOG = path.join(home, "ab.log");
   process.env.FAKE_AB_STATE = path.join(home, "ab-state.json");
   const log: string[] = [];
+  /** Every line the runner logged. */
+  const lines: string[] = [];
   const chromes: FakeChrome[] = [];
   const desk = fakeDesktops(log);
   /**
@@ -71,6 +77,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const manager = new BrowserManager({
     home,
     log: (line) => {
+      lines.push(line);
       if (line.includes("didn't start")) log.push(line);
     },
     send: () => true,
@@ -81,6 +88,9 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
     desktops: desk.desktops,
     now: () => clock,
     idleMs: 60_000,
+    // A started Chrome lists its window's page at once.
+    fetch: fakeDevTools().fetchFn,
+    windowDrawMs: 0,
     async startChrome(_exe, args, _profile, env): Promise<OwnChrome> {
       if (fails.libraries) {
         log.push("chrome failed");
@@ -95,12 +105,11 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
         log.push("chrome failed");
         throw new Error("Chrome closed while starting");
       }
-      const c: FakeChrome = { args, env, killed: false };
+      const c: FakeChrome = { args, env, killed: false, quit: () => {} };
       chromes.push(c);
       log.push("chrome");
-      let quit = () => {};
       const exited = new Promise<void>((resolve) => {
-        quit = resolve;
+        c.quit = resolve;
       });
       return {
         pid: 40_000 + chromes.length,
@@ -108,7 +117,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
         exited,
         kill: () => {
           c.killed = true;
-          quit();
+          c.quit();
         },
       };
     },
@@ -134,7 +143,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}) {
   const tick = (ms: number) => {
     clock += ms;
   };
-  return { ws, home, manager, log, chromes, desk, fails, act, pids, tick };
+  return { ws, home, manager, log, lines, chromes, desk, fails, act, pids, tick };
 }
 
 const last = (t: { chromes: FakeChrome[] }) => t.chromes.at(-1) as FakeChrome;
@@ -146,6 +155,10 @@ test("headed: maximized on the agent's display, no automation bars, the debuggin
     expect(args).toContain(flag);
   }
   expect(args).toContain("--disable-blink-features=AutomationControlled");
+  // Pages hold still (an animated one would keep the computer's cores busy whether anyone watches or not), and the
+  // chip asking to sign in to Chrome itself stays off (Chrome 150 to 155; later ones read the profile's switch).
+  expect(args).toContain("--force-prefers-reduced-motion");
+  expect(args).toContain("--disable-features=SigninPromoOnAvatarPill");
   expect(args).not.toContain("--headless=new");
   expect(args.some((a) => a.startsWith("--window-size"))).toBe(false);
   // Its windows' class is the dock's Browser's, so the dock shows them on Browser.
@@ -174,21 +187,34 @@ test("headless as before: its own window size, none of the headed flags", () => 
   expect(args.at(-1)).toBe("about:blank");
 });
 
-test("Chrome's own frame, whenever its window manager came up: the profile's other settings stay", () => {
+test("the profile: Chrome's own frame, whenever its window manager came up, and no sign-in to Chrome itself; its other settings stay", () => {
   const profile = tempDir("profile-");
   dirs.push(profile);
   const prefs = path.join(profile, "Default", "Preferences");
-  useOwnFrame(profile);
-  expect(JSON.parse(readFileSync(prefs, "utf8"))).toEqual({ browser: { custom_chrome_frame: true } });
-  writeFileSync(prefs, JSON.stringify({ browser: { window_placement: { maximized: true } }, intl: { a: 1 } }));
-  useOwnFrame(profile);
+  prepareProfile(profile);
+  expect(JSON.parse(readFileSync(prefs, "utf8"))).toEqual({
+    browser: { custom_chrome_frame: true },
+    signin: { allowed_on_next_startup: false },
+  });
+  // A profile Chrome already ran with its sign-in allowed: Chrome sets `signin.allowed` from the next-startup switch
+  // as it starts.
+  writeFileSync(
+    prefs,
+    JSON.stringify({
+      browser: { window_placement: { maximized: true } },
+      signin: { allowed: true, allowed_on_next_startup: true },
+      intl: { a: 1 },
+    }),
+  );
+  prepareProfile(profile);
   expect(JSON.parse(readFileSync(prefs, "utf8"))).toEqual({
     browser: { window_placement: { maximized: true }, custom_chrome_frame: true },
+    signin: { allowed: true, allowed_on_next_startup: false },
     intl: { a: 1 },
   });
   // Not JSON: Chrome's own business.
   writeFileSync(prefs, "{broken");
-  useOwnFrame(profile);
+  prepareProfile(profile);
   expect(readFileSync(prefs, "utf8")).toBe("{broken");
 });
 
@@ -407,6 +433,7 @@ function fakeDevTools() {
     const url = String(input);
     d.urls.push(`${init?.method ?? "GET"} ${url}`);
     if (url.endsWith("/json/list")) return new Response(JSON.stringify(d.targets));
+    if (url.includes("/json/new?")) d.targets = [...d.targets, { id: "N1", type: "page", url: "about:blank" }];
     return new Response("Target activated");
   }) as typeof fetch;
   return Object.assign(d, { fetchFn });
@@ -422,12 +449,14 @@ test.if(posix)(
     const installing = () => void installs++;
 
     // Not running: started on the desktop, with the agent's profile; Chrome for Testing is here, nothing installs.
+    // Answered once Chrome lists its window's page.
     await t.manager.show(dev, folder, installing);
     expect(t.log).toEqual(["desktop dev", "chrome"]);
     expect(headed(last(t))).toBe(true);
     expect(last(t).args).toContain(`--user-data-dir=${path.join(folder, ".agentes", "browser")}`);
     expect(installs).toBe(0);
-    expect(devtools.urls).toEqual([]);
+    expect(devtools.urls).toEqual(["GET http://127.0.0.1:9301/json/list"]);
+    devtools.urls = [];
 
     // Already there: no other Chrome, its window to the front on its most recent page.
     await t.manager.show(dev, folder, installing);
@@ -530,5 +559,120 @@ test.if(posix)(
     // Installed: the next click says nothing of it.
     await t.manager.show(dev, folder, () => said.push(installs()));
     expect(said).toEqual([0]);
+  },
+);
+
+test.if(posix)(
+  "Browser on its desktop: answered once Chrome's window shows (its page listed, then drawn); each click's outcome in the log",
+  async () => {
+    const devtools = fakeDevTools();
+    // Still starting: Chrome lists no page until its first window is up.
+    devtools.targets = [];
+    const t = setup({ fetch: devtools.fetchFn, windowDrawMs: 150 });
+    const folder = await agentWorkspace(t.ws, dev);
+    let answered = false;
+    const shown = t.manager
+      .show(dev, folder, () => {})
+      .then(() => {
+        answered = true;
+      });
+    await waitFor(() => devtools.urls.length >= 2);
+    expect(t.chromes).toHaveLength(1);
+    expect(answered).toBe(false);
+    devtools.targets = [{ id: "P1", type: "page", url: "about:blank" }];
+    const listedAt = Date.now();
+    await shown;
+    // Drawn before the launcher's note closes under it.
+    expect(Date.now() - listedAt).toBeGreaterThanOrEqual(140);
+    const outcomes = () => t.lines.filter((l) => l.startsWith("Browser on the desktop"));
+    expect(outcomes()).toEqual(["Browser on the desktop of dev: opened in 0.0 s"]);
+    // Already there: to the front at once, without waiting for a window.
+    devtools.urls = [];
+    await t.manager.show(dev, folder, () => {});
+    expect(devtools.urls).toEqual([
+      "GET http://127.0.0.1:9301/json/list",
+      "GET http://127.0.0.1:9301/json/activate/P1",
+    ]);
+    expect(outcomes()).toEqual([
+      "Browser on the desktop of dev: opened in 0.0 s",
+      "Browser on the desktop of dev: brought to the front",
+    ]);
+    // Closed by the person: the next click starts it again, and waits for its window again.
+    last(t).quit();
+    await waitFor(() => t.manager.chromePid(dev.id) === null);
+    await t.manager.show(dev, folder, () => {});
+    expect(t.chromes).toHaveLength(2);
+    expect(outcomes().at(-1)).toBe("Browser on the desktop of dev: opened in 0.0 s");
+  },
+);
+
+test.if(posix)(
+  "Browser on its desktop: a Chrome whose window never shows is stopped and the click fails; one that closes meanwhile fails too",
+  async () => {
+    const failure = (p: Promise<void>) =>
+      p.then(
+        () => null,
+        (err: unknown) => [(err as RunnerError).code, (err as RunnerError).message],
+      );
+    const devtools = fakeDevTools();
+    devtools.targets = [];
+    const t = setup({ fetch: devtools.fetchFn, windowMs: 300 });
+    const folder = await agentWorkspace(t.ws, dev);
+    expect(await failure(t.manager.show(dev, folder, () => {}))).toEqual([
+      "internal",
+      "Chrome's window didn't show in time",
+    ]);
+    expect(last(t).killed).toBe(true);
+    expect(t.manager.chromePid(dev.id)).toBeNull();
+    // The caller logs a failure with its reason: no outcome of the runner's own.
+    expect(t.lines.filter((l) => l.startsWith("Browser on the desktop"))).toEqual([]);
+
+    const other = setup({ fetch: devtools.fetchFn });
+    const shown = failure(other.manager.show(dev, await agentWorkspace(other.ws, dev), () => {}));
+    await waitFor(() => other.chromes.length === 1);
+    last(other).quit();
+    expect(await shown).toEqual(["internal", "Chrome closed before its window showed"]);
+    expect(last(other).killed).toBe(false);
+  },
+);
+
+/** What the runner answers one connection that says `word` on a desktop's Browser socket. */
+function answers(socket: string, word: string): Promise<string> {
+  return new Promise((resolve) => {
+    let got = "";
+    const conn = createConnection(socket);
+    conn.setEncoding("utf8");
+    conn.on("connect", () => conn.write(word));
+    conn.on("data", (chunk: string) => {
+      got += chunk;
+    });
+    conn.on("error", () => resolve(got));
+    conn.on("close", () => resolve(got));
+  });
+}
+
+test.if(posix)(
+  "Browser on its desktop: a second click while Chrome's window is still coming is told busy and starts nothing",
+  async () => {
+    const devtools = fakeDevTools();
+    devtools.targets = [];
+    const t = setup({ fetch: devtools.fetchFn });
+    const folder = await agentWorkspace(t.ws, dev);
+    const dir = tempDir("dbs-");
+    dirs.push(dir);
+    const socket = path.join(dir, BROWSER_SOCKET);
+    const server = await serveBrowser(socket, (installing) => t.manager.show(dev, folder, installing));
+    try {
+      const first = answers(socket, "open\n");
+      await waitFor(() => devtools.urls.length >= 1);
+      // Chrome is up (its port open), its window not yet: the first click isn't answered.
+      expect(await answers(socket, "open\n")).toBe("busy\n");
+      devtools.targets = [{ id: "P1", type: "page", url: "about:blank" }];
+      expect(await first).toBe("ok\n");
+      expect(t.chromes).toHaveLength(1);
+      expect(devtools.urls.every((u) => u.endsWith("/json/list"))).toBe(true);
+    } finally {
+      closeBrowser(server, socket);
+    }
   },
 );
