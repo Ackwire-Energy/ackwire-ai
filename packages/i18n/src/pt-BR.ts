@@ -996,6 +996,8 @@ export const ptBR = {
     banner: {
       org: "Os agentes ainda não têm uma IA para pensar.",
       orgHint: "Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
+      orgHintPreparing:
+        "O seu plano entra no {{computer}} quando ele ficar pronto. Uma chave de API já funciona agora.",
       orgAction: "Conectar uma IA",
     },
     agent: "{{name}} não vai responder porque não tem uma IA conectada.",
@@ -8430,6 +8432,16 @@ export const ptBR = {
       starting: "Iniciando",
       installing: "Instalando os programas",
       connecting: "Conectando ao seu workspace",
+    },
+    stage: {
+      ordering: "Separando um computador novo",
+      wiping: "Limpando para começar do zero",
+      booting: "Carregando o sistema",
+      updating: "Atualizando o sistema",
+      restarting: "Reiniciando depois da atualização",
+      network: "Configurando a rede",
+      firewall: "Configurando a proteção",
+      finishing: "Fazendo as últimas verificações",
     },
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
     status: {

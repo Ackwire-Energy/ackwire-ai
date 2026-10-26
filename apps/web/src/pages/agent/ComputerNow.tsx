@@ -45,9 +45,9 @@ export function ComputerNow() {
   const reader = useWaitReader();
   const setupWait = useSetupWait(view.setup, reader.held);
   const waiting = Boolean(f?.handoff && isWaitingHandoff(f.handoff));
-  // A request's minutes left move on too.
+  // A request's minutes left move on too. While the computer is on its way, the time every other line reads.
   const requestNow = useNow(waiting ? 15_000 : false);
-  const now = Math.max(requestNow, setupWait.now);
+  const now = setupWait.now ?? requestNow;
   // Only for whoever may watch it; nothing while that loads, never one edition's words before the other's.
   if (view.forbidden || !view.ready || !f) return null;
   const state = entryState(f, now);

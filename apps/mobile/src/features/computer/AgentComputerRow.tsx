@@ -30,11 +30,11 @@ export function AgentComputerRow({ agentId }: { agentId: string }) {
   const view = useAgentComputer(agentId);
   const wait = useSetupWait(view.setup);
   const f = view.facts;
-  // A request's minutes left move on too.
+  // A request's minutes left move on too. While the computer is on its way, the time every other line reads.
   const requestNow = useNow(f?.handoff && isWaitingHandoff(f.handoff) ? 15_000 : 60_000);
   // Only for whoever may watch it; nothing while that loads, never one edition's words before the other's.
   if (view.forbidden || !view.ready || !f) return null;
-  const now = Math.max(requestNow, wait.now);
+  const now = wait.now ?? requestNow;
   const state = entryState(f, now);
   const name = dir.agentById.get(agentId)?.name ?? "";
   const g = agentGrammar(t, name);

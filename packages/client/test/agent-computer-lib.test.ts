@@ -19,7 +19,6 @@ import {
 import {
   computerEdition,
   etaLine,
-  etaTickMs,
   etaView,
   promisesEmail,
   setupEta,
@@ -123,6 +122,20 @@ describe("the time left", () => {
     expect(etaView(null, NOW, NOW)).toBeNull();
   });
 
+  test("a part running long: an answer's first steady seconds don't count, so the minute holds between answers", () => {
+    // Still for its first minute, then counted down.
+    expect(etaView(257, NOW, NOW + 60_000, 60)).toEqual({ kind: "minutes", count: 5 });
+    expect(etaView(257, NOW, NOW + 120_000, 60)).toEqual({ kind: "minutes", count: 4 });
+    // The server answers the same 257 s again about every 35 s while the part runs long: every 5 s tick in between
+    // still says 5 min.
+    const running = setupView(external({ secondsLeft: 257, secondsSteady: 60 }), NOW) as never;
+    for (let s = 0; s <= 35; s += 5) expect(setupEta(running, NOW + s * 1000)).toEqual({ kind: "minutes", count: 5 });
+    // An older server doesn't say: counted down at once.
+    const older = setupView(external({ secondsLeft: 257 }), NOW);
+    expect(older?.steady).toBe(0);
+    expect(setupEta(older as never, NOW + 20_000)).toEqual({ kind: "minutes", count: 4 });
+  });
+
   test("only while it is being prepared, and its words", () => {
     expect(setupEta(setupView(external({ secondsLeft: 330 }), NOW) as never, NOW)).toEqual({
       kind: "minutes",
@@ -134,13 +147,6 @@ describe("the time left", () => {
     expect(etaLine(t, { kind: "underMinute" })).toBe("computerSetup.eta.underMinute");
     expect(etaLine(t, { kind: "almost" })).toBe("computerSetup.eta.almost");
     expect(etaLine(t, { kind: "late" })).toBe("computerSetup.eta.late");
-  });
-
-  test("repaints every 15 s, every 5 s under a minute", () => {
-    expect(etaTickMs({ kind: "minutes", count: 3 })).toBe(15_000);
-    expect(etaTickMs({ kind: "underMinute" })).toBe(5_000);
-    expect(etaTickMs({ kind: "almost" })).toBe(5_000);
-    expect(etaTickMs(null)).toBe(5_000);
   });
 });
 

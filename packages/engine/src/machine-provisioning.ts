@@ -58,6 +58,8 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
   return {
     state: (row?.state ?? "preparing") as ProvisioningState,
     step: (row?.step ?? null) as ProvisioningStep | null,
+    /** With `preparing`: what the computer is doing within its step, as the provisioner said it. */
+    stage: row?.stage ?? null,
     reason: currentReason(row?.reason),
     /** When this state (and step or reason) began; null before anything was reported. */
     since: row?.since.toISOString() ?? null,
@@ -70,15 +72,27 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
 }
 
 /**
+ * How long the time left holds still after a report that moved the ready time later within a stage. A part running
+ * past its time moves the provisioner's ready time later with the clock, one report at a time: counted down in
+ * between, the time left would come back up at every report. A provisioner whose time keeps moving reports again
+ * within this, so the time left stays as it said; one whose time stopped moving is counted down from then on.
+ */
+const STEADY_MS = 60_000;
+
+/**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
  * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
- * whether the owners get the ready email.
+ * whether the owners get the ready email. After a report that moved the ready time later within a stage, the
+ * seconds left are the ones it gave, still for `secondsSteady` of them, and counted down after that.
  */
 function setupStatus(row: ProvisioningRow | null, orgCreatedAt: Date, emails: boolean, now = Date.now()) {
   const readyAt = row?.expectedReadyAt ?? null;
+  const given = row?.delayedAt?.getTime() ?? now;
+  const countsFrom = row?.delayedAt ? given + STEADY_MS : now;
   return {
     ...provisioningStatus(row, orgCreatedAt),
-    secondsLeft: readyAt ? Math.round((readyAt.getTime() - now) / 1000) : null,
+    secondsLeft: readyAt ? Math.round((readyAt.getTime() - given - Math.max(0, now - countsFrom)) / 1000) : null,
+    secondsSteady: readyAt ? Math.round(Math.max(0, countsFrom - now) / 1000) : null,
     secondsWaited: Math.round((now - (row?.requestedAt ?? orgCreatedAt).getTime()) / 1000),
     notifyByEmail: emails,
   };
@@ -173,6 +187,11 @@ export interface ProvisioningInput {
   state: Exclude<ProvisioningState, "ready">;
   /** Kept with `preparing` only. */
   step?: ProvisioningStep | null;
+  /**
+   * Kept with `preparing` only: what the computer is doing within its step (`updating`, `apps`…). Any word is kept:
+   * the apps read one they don't know as its step.
+   */
+  stage?: string | null;
   /** Kept with `waiting` only; `approval` reads as `capacity`. */
   reason?: ProvisioningReason | "approval" | null;
   /** Kept with `preparing` only: when it should be ready. A time already past means any moment now. */
@@ -217,17 +236,26 @@ export async function setProvisioning(
   const [before] = await db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   const now = new Date();
   const step = input.state === "preparing" ? (input.step ?? null) : null;
+  const stage = input.state === "preparing" ? (input.stage ?? null) : null;
   const reason = input.state === "waiting" ? currentReason(input.reason) : null;
   const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
   const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
+  // Within one step and stage, a ready time moved later is a part running long (STEADY_MS); one left where it was
+  // keeps counting down as it did.
+  const was = same && before?.stage === stage ? before.expectedReadyAt?.getTime() : undefined;
+  const at = expectedReadyAt?.getTime();
+  const delayedAt =
+    was === undefined || at === undefined || at < was ? null : at > was ? now : (before?.delayedAt ?? null);
   const long =
     input.state !== "preparing" ||
     (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
   const next = {
     state: input.state,
     step,
+    stage,
     reason,
     expectedReadyAt,
+    delayedAt,
     emailWhenReady: long || before?.emailWhenReady === true,
     specs: input.specs ?? before?.specs ?? null,
     since: same && before ? before.since : now,
@@ -245,7 +273,8 @@ export async function setProvisioning(
     );
   }
   const moved = before?.expectedReadyAt?.getTime() !== row.expectedReadyAt?.getTime();
-  if (!same || moved || !Bun.deepEquals(before?.specs ?? null, row.specs)) {
+  // A new stage is told without restarting `since`: the step is still the same one.
+  if (!same || before?.stage !== row.stage || moved || !Bun.deepEquals(before?.specs ?? null, row.specs)) {
     const [managed] = await db
       .select({ id: machines.id })
       .from(machines)
@@ -402,8 +431,10 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   const waiting = {
     state: "preparing",
     step: null,
+    stage: null,
     reason: null,
     expectedReadyAt: null,
+    delayedAt: null,
     requestedAt: now,
     emailWhenReady: false,
     specs: null,
@@ -513,7 +544,16 @@ export async function onManagedMachineHello(
   const { orgId } = machine;
   const draft = deps.readyEmail ? await readyEmailDraft(deps.db, deps.readyEmail, orgId) : null;
   const now = new Date();
-  const ready = { state: "ready", step: null, reason: null, expectedReadyAt: null, since: now, updatedAt: now };
+  const ready = {
+    state: "ready",
+    step: null,
+    stage: null,
+    reason: null,
+    expectedReadyAt: null,
+    delayedAt: null,
+    since: now,
+    updatedAt: now,
+  };
   const done = await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .insert(machineProvisioning)
@@ -575,12 +615,14 @@ export async function computerSetup(
       mode: "pair" as const,
       state: null,
       step: null,
+      stage: null,
       reason: null,
       since: null,
       requestedAt: null,
       expectedReadyAt: null,
       specs: null,
       secondsLeft: null,
+      secondsSteady: null,
       secondsWaited: null,
       notifyByEmail: false,
       machineId: null,

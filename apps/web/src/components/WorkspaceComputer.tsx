@@ -5,7 +5,6 @@ import {
   computerEdition,
   computerName,
   etaLine,
-  etaTickMs,
   promisesEmail,
   SETUP_STEPS,
   type SetupView,
@@ -14,6 +13,7 @@ import {
   setupPending,
   setupPortrait,
   setupView,
+  useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
@@ -36,7 +36,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { useNow } from "@/hooks/useNow";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
@@ -70,13 +69,16 @@ export function useWaitReader(): WaitReader {
 }
 
 /**
- * The time left now, repainted every 15 s (every 5 s under a minute), and whether "we'll email you" holds.
- * A workspace on hold shows neither: its hold banner speaks, and its provisioner waits too.
+ * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds; `now`:
+ * that clock's time, while it waits. A workspace on hold shows neither: its hold banner speaks, and its provisioner
+ * waits too.
  */
 export function useSetupWait(view: SetupView | null, held: boolean) {
   const live = view && setupPending(view) && !held ? view : null;
-  const now = useNow((at) => (live ? etaTickMs(setupEta(live, at)) : false));
-  return live ? { eta: setupEta(live, now), email: promisesEmail(live, now), now } : { eta: null, email: false, now };
+  const now = useEtaNow(live !== null);
+  return live
+    ? { eta: setupEta(live, now), email: promisesEmail(live, now), now }
+    : { eta: null, email: false, now: null };
 }
 
 const PHASE_ICON: Record<SetupView["phase"], IconName> = {

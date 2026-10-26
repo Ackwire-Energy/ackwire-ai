@@ -5,7 +5,7 @@ setupDom();
 
 import type { AgentQuestion, AppNotification } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
 
@@ -391,6 +391,47 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     const css = await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text();
     expect(css).toMatch(/\.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 600/);
     expect(css).toMatch(/\.nt-item:not\(\.is-unread\) \.nt-what:not\(:has\(b\)\) \{[^}]*font-weight: 500/);
+  });
+});
+
+describe("its computer is ready: what comes next", () => {
+  test("no agent has an AI yet: Abrir opens Connect an AI, saying it's ready; with one, the computer's page", async () => {
+    const ready = notification({
+      id: "n-ready",
+      kind: "computer_ready",
+      source: { machineId: "m-9" },
+      updatedAt: ago(3),
+    });
+    const noAi = { any: false, agents: [{ agentId: ADA_ID, state: "no_ai" as const, reason: "no_key" as const }] };
+    const state = seedState({ notifications: [ready], aiStatus: noAi });
+    // Ada is Walter's: a plan of his thinks for her.
+    for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = "u-walter";
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "m-9" });
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await brain(orgId, agentId)), ownSignIn: false });
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api });
+    await settle(8);
+    const row = () => document.querySelector('[data-n="n-ready"]') as HTMLElement;
+    await click(within(row()).getByRole("button", { name: "Abrir" }));
+    await settle(8);
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
+    expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
+      [ORG_ID, "n-ready", true],
+    ]);
+    cleanup();
+
+    // An agent thinks already: the computer's page, as before.
+    const other = await go(seedState({ notifications: [ready] }));
+    await click(within(row()).getByRole("button", { name: "Abrir" }));
+    await settle(4);
+    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 });
 

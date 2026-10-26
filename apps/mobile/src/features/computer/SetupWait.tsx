@@ -1,7 +1,6 @@
 import { useComputerSetup, useMachines, useMe } from "@agenteschat/client";
 import {
   etaLine,
-  etaTickMs,
   promisesEmail,
   SETUP_STEPS,
   type SetupView,
@@ -9,6 +8,7 @@ import {
   setupPending,
   setupPortrait,
   setupView,
+  useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -20,7 +20,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, type IconName, LineIcon, ProviderStack, SheetScreen, Text } from "@/ui";
-import { useColors, useNow, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";
 
@@ -31,16 +31,17 @@ export function useSetupView(): SetupView | null {
 }
 
 /**
- * The time left now, repainted every 15 s (every 5 s under a minute), and whether "we'll email you" holds for
- * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too.
+ * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds for
+ * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too. `now`:
+ * that clock's time, while it waits.
  */
 export function useSetupWait(view: SetupView | null) {
   const { org } = useOrg();
   const email = useMe().data?.user.email ?? "";
   const live = view && setupPending(view) && org?.standing?.state !== "hold" ? view : null;
-  const now = useNow(live ? etaTickMs(setupEta(live, Date.now())) : 60_000);
+  const now = useEtaNow(live !== null);
   return {
-    now,
+    now: live ? now : null,
     /** Lines about the wait show (not ready, not on hold). */
     live: live !== null,
     eta: live ? setupEta(live, now) : null,
