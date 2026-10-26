@@ -183,6 +183,25 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().querySelector(".cmp-steps-row")).toBeNull();
   });
 
+  test("its header says where the wait is, as the chip does: being prepared, in line, a problem", async () => {
+    const heads: (string | null)[] = [];
+    for (const setup of [
+      { step: "installing" },
+      { state: "waiting", reason: "capacity", notifyByEmail: true },
+      { state: "problem" },
+    ] as const) {
+      await dialog({ setup, machine: null, desktop: { available: false, reason: "no_computer" } });
+      heads.push(sub());
+      // Waiting for a computer: the line, and the owner's email in place of a time.
+      if (setup.state === "waiting") {
+        expect(box().textContent).toContain("Esperando um computador disponível");
+        expect(box().textContent).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+      }
+      cleanup();
+    }
+    expect(heads).toEqual(["Sendo preparado", "Na fila", "Com problema"]);
+  });
+
   test("ready: it flashes Pronto, then opens with nothing to click", async () => {
     const t = await dialog({
       setup: { step: "connecting" },

@@ -108,32 +108,32 @@ describe("the time left", () => {
     // Six minutes, rounded up, when it came; the person's clock is whatever it is.
     expect(etaView(330, NOW, NOW)).toEqual({ kind: "minutes", count: 6 });
     expect(etaView(330, NOW, NOW + 30_000)).toEqual({ kind: "minutes", count: 5 });
+    expect(etaView(61, NOW, NOW)).toEqual({ kind: "minutes", count: 2 });
     expect(etaView(60, NOW, NOW)).toEqual({ kind: "minutes", count: 1 });
     expect(etaView(59, NOW, NOW)).toEqual({ kind: "underMinute" });
-    expect(etaView(15, NOW, NOW)).toEqual({ kind: "underMinute" });
-    expect(etaView(14, NOW, NOW)).toEqual({ kind: "almost" });
-    // Up to a minute past the time it is still almost ready; past that, a little longer.
-    expect(etaView(-60, NOW, NOW)).toEqual({ kind: "almost" });
-    expect(etaView(30, NOW, NOW + 91_000)).toEqual({ kind: "late" });
-    expect(etaView(-61, NOW, NOW)).toEqual({ kind: "late" });
+    expect(etaView(1, NOW, NOW)).toEqual({ kind: "underMinute" });
     // A device clock behind the answer counts no time back.
     expect(etaView(120, NOW, NOW - 600_000)).toEqual({ kind: "minutes", count: 2 });
     // No time said: no line.
     expect(etaView(null, NOW, NOW)).toBeNull();
   });
 
-  test("a part running long: an answer's first steady seconds don't count, so the minute holds between answers", () => {
-    // Still for its first minute, then counted down.
-    expect(etaView(257, NOW, NOW + 60_000, 60)).toEqual({ kind: "minutes", count: 5 });
-    expect(etaView(257, NOW, NOW + 120_000, 60)).toEqual({ kind: "minutes", count: 4 });
-    // The server answers the same 257 s again about every 35 s while the part runs long: every 5 s tick in between
-    // still says 5 min.
-    const running = setupView(external({ secondsLeft: 257, secondsSteady: 60 }), NOW) as never;
-    for (let s = 0; s <= 35; s += 5) expect(setupEta(running, NOW + s * 1000)).toEqual({ kind: "minutes", count: 5 });
-    // An older server doesn't say: counted down at once.
-    const older = setupView(external({ secondsLeft: 257 }), NOW);
-    expect(older?.steady).toBe(0);
-    expect(setupEta(older as never, NOW + 20_000)).toEqual({ kind: "minutes", count: 4 });
+  test("almost ready only in the last step; once the time runs out, a little longer than expected in any step", () => {
+    expect(etaView(59, NOW, NOW, true)).toEqual({ kind: "almost" });
+    expect(etaView(1, NOW, NOW, true)).toEqual({ kind: "almost" });
+    for (const last of [false, true]) {
+      expect(etaView(0, NOW, NOW, last)).toEqual({ kind: "late" });
+      expect(etaView(-30, NOW, NOW, last)).toEqual({ kind: "late" });
+      expect(etaView(30, NOW, NOW + 30_000, last)).toEqual({ kind: "late" });
+    }
+    for (let s = 1; s <= 900; s++) expect(etaView(s, NOW, NOW)?.kind).not.toBe("almost");
+    // The last step is connecting it to the workspace.
+    const at = (step: ComputerSetup["step"], secondsLeft: number) =>
+      setupEta(setupView(external({ step, secondsLeft }), NOW) as never, NOW);
+    expect(at("installing", 50)).toEqual({ kind: "underMinute" });
+    expect(at("connecting", 50)).toEqual({ kind: "almost" });
+    expect(at("connecting", 0)).toEqual({ kind: "late" });
+    expect(setupView(external({ secondsLeft: 50 }), NOW)).not.toHaveProperty("steady");
   });
 
   test("only while it is being prepared, and its words", () => {
@@ -215,14 +215,21 @@ describe("the entry's status line, first match wins", () => {
     expect(entryState(facts({ held: true, handoff: request() }), NOW)).toEqual({ kind: "held" });
   });
 
-  test("the Cloud's wait: the time left, almost ready, or no time; longer than usual; a problem", () => {
+  test("the Cloud's wait: the time left, almost ready, or no time; waiting for a computer; a problem", () => {
     expect(entryState(preparing({ secondsLeft: 330 }), NOW)).toEqual({
       kind: "preparing",
       eta: { kind: "minutes", count: 6 },
     });
-    expect(entryState(preparing({ secondsLeft: 10 }), NOW)).toEqual({ kind: "preparing", eta: { kind: "almost" } });
+    expect(entryState(preparing({ secondsLeft: 10 }), NOW)).toEqual({
+      kind: "preparing",
+      eta: { kind: "underMinute" },
+    });
+    expect(entryState(preparing({ step: "connecting", secondsLeft: 10 }), NOW)).toEqual({
+      kind: "preparing",
+      eta: { kind: "almost" },
+    });
     expect(entryState(preparing({}), NOW)).toEqual({ kind: "preparing", eta: null });
-    expect(entryState(preparing({ state: "waiting", reason: "capacity" }), NOW)).toEqual({ kind: "slow" });
+    expect(entryState(preparing({ state: "waiting", reason: "capacity" }), NOW)).toEqual({ kind: "waiting" });
     expect(entryState(preparing({ state: "problem" }), NOW)).toEqual({ kind: "problem" });
     // Ready, and the agent on it: no wait any more.
     const ready = { ...preparing({ state: "ready" }), machine: MAC, desktop: { available: true, reason: null } };
@@ -305,15 +312,20 @@ describe("the entry's status line, first match wins", () => {
     const line = (s: Parameters<typeof entryLine>[1], over: Partial<EntryWords> = {}) =>
       entryLine(t, s, { ...w, ...over });
     expect(line({ kind: "held" })).toBe("agentComputer.status.held");
+    // Being prepared, then the time line every other screen says.
     expect(line({ kind: "preparing", eta: { kind: "minutes", count: 6 } })).toBe(
-      'agentComputer.status.preparing {"count":6}',
+      'agentComputer.status.preparingPlain · computerSetup.eta.minutes {"count":6}',
     );
-    expect(line({ kind: "preparing", eta: { kind: "underMinute" } })).toBe("agentComputer.status.preparingSoon");
-    expect(line({ kind: "preparing", eta: { kind: "late" } })).toBe("agentComputer.status.preparingPlain");
+    for (const kind of ["underMinute", "almost", "late"] as const)
+      expect(line({ kind: "preparing", eta: { kind } })).toBe(
+        `agentComputer.status.preparingPlain · computerSetup.eta.${kind}`,
+      );
     expect(line({ kind: "preparing", eta: null })).toBe("agentComputer.status.preparingPlain");
-    // "We'll email you" only where it was promised (owners).
-    expect(line({ kind: "slow" })).toBe("agentComputer.status.slowPlain");
-    expect(line({ kind: "slow" }, { emailPromised: true })).toBe("agentComputer.status.slow");
+    // Waiting for a computer, in the words every screen says it; "we'll email you" only where it was promised (owners).
+    expect(line({ kind: "waiting" })).toBe("computerSetup.status.capacity");
+    expect(line({ kind: "waiting" }, { emailPromised: true })).toBe(
+      "computerSetup.status.capacity · computerSetup.email.short",
+    );
     expect(line({ kind: "problem" })).toBe("agentComputer.status.problem");
     // The Cloud's computer isn't answering; a self-hoster's is offline since a time.
     expect(line({ kind: "offline" })).toBe("agentComputer.status.notAnswering");
@@ -357,6 +369,7 @@ describe("the entry's status line, first match wins", () => {
     expect(entryKind("selfhost", { kind: "connected", os: "darwin" })).toBe("mac");
     expect(entryPortrait({ kind: "preparing", eta: null }, null)).toBe("paused");
     expect(entryPortrait({ kind: "problem" }, setupView(external({ state: "problem" }), NOW))).toBe("offline");
+    expect(entryPortrait({ kind: "waiting" }, setupView(external({ state: "waiting" }), NOW))).toBe("paused");
     expect(entryPortrait({ kind: "offline" }, null)).toBe("offline");
     expect(entryPortrait({ kind: "held" }, null)).toBe("paused");
     expect(entryPortrait({ kind: "paused", until: null }, null)).toBe("paused");

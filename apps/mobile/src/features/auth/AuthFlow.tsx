@@ -31,13 +31,14 @@ import { useTheme } from "@/ui/theme";
 /** The e-mail this phone last signed in with: the next sign-in starts with it (kept on signing out). */
 const LAST_EMAIL = "last-email";
 
-type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent";
+type Step = "email" | "password" | "social" | "noPassword" | "name" | "newPassword" | "closed" | "forgot" | "sent";
 
 /** Where the back button goes from each step (`null`: leave the screen, if there is somewhere to go). */
 const BACK: Record<Step, Step | null> = {
   email: null,
   password: "email",
   social: "email",
+  noPassword: "email",
   name: "email",
   newPassword: "name",
   closed: "email",
@@ -84,7 +85,11 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       const found = await api.account.signInOptions({ email: value.trim() });
       setOptions(found);
       setPassword("");
-      if (found.account) go(found.password ? "password" : "social");
+      // No password and no provider this server signs in with (the owner's account made by the desktop
+      // app): the web's "noPassword" step says where to add one, instead of an empty provider list.
+      const on = config.data?.socialProviders as Partial<Record<string, boolean>> | undefined;
+      const usable = found.providers.some((p) => on?.[p] === true);
+      if (found.account) go(found.password ? "password" : usable ? "social" : "noPassword");
       else go(found.canSignUp ? "name" : "closed");
     } catch (e) {
       setError(
@@ -226,6 +231,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), t("auth.flow.emailLead")],
     password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
+    noPassword: [t("auth.flow.noPassword"), t("auth.flow.noPasswordLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
     newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword")],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
@@ -274,7 +280,10 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     >
       {step !== "email" && step !== "forgot" && step !== "sent" ? (
         // Where the e-mail can't sign up, "Usar outro e-mail" below already changes it: the chip only says which.
-        <Who email={email.trim()} onChange={step === "closed" ? undefined : () => go("email")} />
+        <Who
+          email={email.trim()}
+          onChange={step === "closed" || step === "noPassword" ? undefined : () => go("email")}
+        />
       ) : null}
 
       {step === "email" || step === "forgot" ? (
@@ -362,8 +371,12 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
         </>
       ) : null}
 
-      {step === "closed" ? (
+      {step === "closed" || step === "noPassword" ? (
         <Button variant="secondary" wide label={t("auth.flow.otherEmail")} onPress={() => go("email")} />
+      ) : null}
+
+      {step === "noPassword" && canReset ? (
+        <Quiet label={t("auth.flow.createPassword")} onPress={() => go("forgot")} />
       ) : null}
 
       {step === "forgot" ? (
