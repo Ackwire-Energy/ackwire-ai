@@ -349,11 +349,6 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
           ? t("invite.ask.sentEmail", { org, email: address })
           : t("invite.ask.sentNoEmail", { org });
       expression = "happy";
-      body = (
-        <Text variant="small" tone="muted">
-          {t("mobile.invite.sentLeave")}
-        </Text>
-      );
       break;
     case "form":
       title = t("invite.ask.title", { org });
@@ -409,27 +404,19 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
                     </Text>
                   </Pressable>
                 ) : null}
-                <Text variant="small" tone="muted">
-                  {t("invite.ask.emailHelp")}
-                </Text>
               </View>
             </>
           )}
-          <View style={styles.field}>
-            <AuthField
-              value={note}
-              onChangeText={setNote}
-              placeholder={t("invite.ask.note")}
-              accessibilityLabel={t("invite.ask.note")}
-              maxLength={JOIN_NOTE_MAX}
-              multiline
-              textAlignVertical="top"
-              minHeight={84}
-            />
-            <Text variant="small" tone="muted">
-              {t("invite.ask.noteHelp")}
-            </Text>
-          </View>
+          <AuthField
+            value={note}
+            onChangeText={setNote}
+            placeholder={t("invite.ask.note")}
+            accessibilityLabel={t("invite.ask.note")}
+            maxLength={JOIN_NOTE_MAX}
+            multiline
+            textAlignVertical="top"
+            minHeight={84}
+          />
           {error ? (
             <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
               {error}

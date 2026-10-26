@@ -35,6 +35,7 @@ import {
   progressAt,
   STEPS,
   type StepId,
+  stepText,
   zoneCity,
 } from "./logic";
 
@@ -42,10 +43,9 @@ import {
  * The first run on the phone: signed in with no workspace yet, one
  * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
- * (optional; on the computer for now) → Agentes (they think with the workspace's key or a subscription, set on the
- * computer; nothing to pay or paste on the phone) →
- * Pessoas (optional: share a link or type e-mails) → Pronto, which opens the DM with Ada. The computer step
- * stays for the computer ("Depois, no computador").
+ * (optional; brought from the web) → Agentes (they think with an AI plan or a key, connected on the web; nothing
+ * to pay or paste on the phone) → Pessoas (optional: share a link or type e-mails) → Pronto, which opens the DM
+ * with Ada. No computer step.
  */
 export function OnboardingFlow() {
   const { t, i18n } = useTranslation();
@@ -64,7 +64,6 @@ export function OnboardingFlow() {
   const [emails, setEmails] = useState<string[]>([]);
   const [typing, setTyping] = useState("");
   const [bad, setBad] = useState<string[]>([]);
-  const [sent, setSent] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const zone = phoneTimezone();
@@ -135,16 +134,8 @@ export function OnboardingFlow() {
   const sendInvites = () =>
     run(async () => {
       if (!created) return;
-      let ok = 0;
-      for (const email of emails) {
-        await api.orgs
-          .invite(created.orgId, { email, role: "member" })
-          .then(() => {
-            ok++;
-          })
-          .catch(() => undefined);
-      }
-      setSent(ok);
+      for (const email of emails)
+        await api.orgs.invite(created.orgId, { email, role: "member" }).catch(() => undefined);
     }, "done");
 
   const shareLink = async () => {
@@ -196,15 +187,7 @@ export function OnboardingFlow() {
 
   const host = HOST[step];
   const count = [...chosen].filter((p) => !agentIds[p]).length;
-  const titles: Record<StepId, [string, string]> = {
-    workspace: [t("onboarding.workspace.title"), t("onboarding.workspace.lead")],
-    context: [t("onboarding.context.title"), t("onboarding.context.lead")],
-    import: [t("onboarding.import.title"), t("onboarding.import.lead")],
-    agents: [t("onboarding.agents.title"), t("onboarding.agents.lead")],
-    team: [t("onboarding.team.title"), t("onboarding.team.lead")],
-    done: [t("onboarding.done.title", { org: orgName }), doneText(t, chosen)],
-  };
-  const [title, lead] = titles[step];
+  const [title, lead] = stepText(t, step, orgName, chosen);
 
   const primary: Partial<Record<StepId, { label: string; onPress: () => void; ready: boolean }>> = {
     workspace: {
@@ -371,43 +354,8 @@ export function OnboardingFlow() {
           <Note icon="agent" text={t("mobile.onb.membersNote")} />
         </>
       ) : null}
-
-      {step === "done" ? (
-        <>
-          <Line
-            lead={<Faces presets={PRESETS.filter((p) => agentIds[p])} />}
-            title={t("onboarding.done.agents")}
-            sub={t("mobile.onb.doneAgents", {
-              names: names(
-                t,
-                PRESETS.filter((p) => agentIds[p]),
-              ),
-            })}
-          />
-          <Line
-            lead={<Icon name="mail" size={18} />}
-            title={t("onboarding.done.invites")}
-            sub={t("mobile.onb.doneInvites", { count: sent })}
-          />
-          <Line
-            lead={<Icon name="laptop" size={18} />}
-            title={t("mobile.onb.computer")}
-            sub={t("mobile.onb.computerLater")}
-            end={t("mobile.onb.laterTag")}
-          />
-        </>
-      ) : null}
     </StepFrame>
   );
-}
-
-const names = (t: (k: string) => string, presets: Preset[]) =>
-  presets.map((p) => t(`onboarding.presets.${p}.name`)).join(", ");
-
-function doneText(t: ReturnType<typeof useTranslation>["t"], chosen: ReadonlySet<Preset>) {
-  const list = PRESETS.filter((p) => chosen.has(p)).map((p) => t(`onboarding.presets.${p}.name`));
-  if (list.length === 0) return t("onboarding.done.textNone");
-  return t(list.length === 1 ? "onboarding.done.textOne" : "onboarding.done.textMany", { names: list.join(", ") });
 }
 
 /** Each source's official logo (assets/images/brands/README.md). */
@@ -416,11 +364,10 @@ const IMPORT_LOGO = {
   OpenBot: require("../../../assets/images/brands/openbot.png"),
 } as const;
 
-/** Trazer agentes: the two sources, and how to bring them (on the computer, for now). */
+/** Trazer agentes: the two sources it brings from (on the web: the lead says where). */
 function ImportStep() {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
-  const [open, setOpen] = useState(false);
   return (
     <>
       {(["OpenMausBot", "OpenBot"] as const).map((source) => (
@@ -432,17 +379,13 @@ function ImportStep() {
             </View>
           }
           title={t(`mobile.onb.import${source}`)}
-          sub={t(`mobile.onb.import${source}Desc`)}
-          onPress={() => setOpen(true)}
         />
       ))}
-      {open ? <Note icon="laptop" text={t("mobile.onb.importLater")} /> : null}
-      <Note icon="lock" text={t("mobile.onb.importNever")} />
     </>
   );
 }
 
-/** Agentes: the ready team (Ada always), and how they think (the workspace's key or a subscription, on the computer). */
+/** Agentes: the ready team (Ada always), and how they think (an AI plan or a key, connected on the web). */
 function AgentsStep({
   chosen,
   created,
@@ -506,7 +449,7 @@ function StepFrame({
 }: {
   step: StepId;
   title: string;
-  lead: string;
+  lead?: string | undefined;
   host: Preset;
   onBack?: (() => void) | undefined;
   onSkip?: (() => void) | undefined;
@@ -608,18 +551,6 @@ function Host({ host, intro, happy }: { host: Preset; intro: boolean; happy: boo
           </Text>
         </View>
       )}
-    </View>
-  );
-}
-
-function Faces({ presets }: { presets: Preset[] }) {
-  return (
-    <View style={styles.faces}>
-      {presets.slice(0, 3).map((p, i) => (
-        <View key={p} style={i > 0 ? styles.overlap : undefined}>
-          <AgentAvatar agent={{ ...PRESET_LOOK[p], id: p }} size={26} live={false} />
-        </View>
-      ))}
     </View>
   );
 }
@@ -756,7 +687,5 @@ const styles = StyleSheet.create({
   },
   logo: { width: 22, height: 22 },
   box: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-  faces: { flexDirection: "row" },
-  overlap: { marginLeft: -8 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
 });
