@@ -1,6 +1,7 @@
 import { Dialog as RDialog } from "radix-ui";
 import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
 import { cx } from "../cx";
+import { lastTabbable } from "../device";
 import { Button } from "./Button";
 import { SearchField } from "./Toolbar";
 
@@ -83,6 +84,15 @@ export function Dialog({
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             (e.target as HTMLElement).focus();
+          }}
+          // From there, Shift+Tab goes round to the last control, as Tab from the last goes to the first (Radix wraps
+          // only from its first and last controls).
+          onKeyDown={(e) => {
+            if (e.key !== "Tab" || !e.shiftKey || e.target !== e.currentTarget) return;
+            const last = lastTabbable(e.currentTarget);
+            if (!last) return;
+            e.preventDefault();
+            last.focus();
           }}
           onPointerDownOutside={(e) => {
             if (onToast.current) e.preventDefault();

@@ -45,6 +45,21 @@ describe("Dialog", () => {
     expect(document.activeElement).toBe(dialog);
   });
 
+  test("from the dialog itself, Shift+Tab goes round to its last control that takes the focus", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar">
+        <Input aria-label="Chave" />
+        <DialogFooter>
+          <Button>Salvar chave</Button>
+          <Button disabled>Remover</Button>
+        </DialogFooter>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    await act(async () => fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true }));
+    expect(document.activeElement).toBe(body().getByRole("button", { name: "Salvar chave" }));
+  });
+
   test("a field that takes the focus on its own keeps it", () => {
     render(
       <Dialog open onOpenChange={() => {}} title="Renomear" closeLabel="Fechar">

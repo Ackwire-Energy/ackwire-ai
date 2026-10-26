@@ -14,3 +14,15 @@ export const hoverPointer = (pointerType: string) => pointerType === "mouse" || 
  * a phone's width and back) gives [off, on], and only the last one says where it is.
  */
 export const onScreenNow = (entries: readonly { isIntersecting: boolean }[]) => entries.at(-1)?.isIntersecting;
+
+/** The last control in `root` that Tab reaches, counted as Radix's focus scope does: tab index 0 or more, enabled, shown. */
+export const lastTabbable = (root: Element) =>
+  [...root.querySelectorAll<HTMLElement>("*")]
+    .filter(
+      (el) =>
+        el.tabIndex >= 0 &&
+        !(el as HTMLButtonElement).disabled &&
+        !el.hidden &&
+        el.checkVisibility?.({ checkVisibilityCSS: true }) !== false,
+    )
+    .at(-1);
