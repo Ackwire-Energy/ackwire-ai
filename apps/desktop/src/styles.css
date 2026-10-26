@@ -976,12 +976,14 @@ body[data-window="popover"] {
 .dk-fr__body .dk-fr__wide {
   max-width: 66ch;
 }
-/* Start stays in view when the form is taller than the window: it sticks to the bottom edge. */
+/* Start sits at the window's bottom (the form grows to fill it), and stays in view when the form is taller than
+   the window: it sticks to the bottom edge. */
 .dk-fr__here .dk-fr__end {
   position: sticky;
   /* The scroller's own bottom padding (28px) counts: the bar meets the window's edge. */
   bottom: -28px;
-  margin: 0 -48px -28px;
+  /* Top `auto`, as on `.dk-fr__end`: a 0 here would leave Start right under the card. */
+  margin: auto -48px -28px;
   padding: 10px 48px 28px;
   background: linear-gradient(to bottom, transparent, var(--bg) 10px);
 }
