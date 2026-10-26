@@ -77,6 +77,14 @@ const KNOWN = {
   "org.create_refused": "standing.createRefused",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
+  "join.link_closed": "errors.join.linkClosed",
+  "join.full": "errors.join.full",
+  "join.rate_limited": "errors.join.rateLimited",
+  "join.member": "errors.join.member",
+  "join.denied": "errors.join.denied",
+  "join.answered": "errors.join.answered",
+  "join.expired": "errors.join.expired",
+  "invitation.ask_to_join": "errors.invitation.askToJoin",
 } as const;
 
 /** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */

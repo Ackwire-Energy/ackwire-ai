@@ -21,6 +21,9 @@ describe("deep links", () => {
     expect(hrefFromUrl("agenteschat://chat")).toBeNull();
     expect(hrefFromUrl("agenteschat://settings/x")).toBeNull();
     expect(hrefFromUrl("agenteschat://chat/abc?thread=<script>")).toBe("/chat/abc");
+    expect(hrefFromUrl("agenteschat://join-requests")).toBe("/join-requests");
+    expect(hrefFromUrl("/join-requests/")).toBe("/join-requests");
+    expect(hrefFromUrl("agenteschat://join")).toBeNull();
   });
 });
 
@@ -34,6 +37,9 @@ describe("push payloads", () => {
   test("messages open their conversation and thread", () => {
     expect(hrefForPush({ kind: "mention", channelId: "c1", threadId: "t1" })).toBe("/chat/c1?thread=t1");
     expect(hrefForPush({ kind: "dm", channelId: "d1" })).toBe("/chat/d1");
+  });
+  test("someone asking to join opens the requests (never answered from the push)", () => {
+    expect(hrefForPush({ kind: "join_request", orgId: "o1", notificationId: "n1" })).toBe("/join-requests");
   });
   test("anything else opens Atividade", () => {
     expect(hrefForPush({ kind: "forum_turn" })).toBe("/activity");
@@ -53,6 +59,10 @@ describe("inbox items", () => {
       notificationHref(notification({ id: "n", kind: "thread_reply", source: { channelId: "c1", threadId: "t1" } })),
     ).toBe("/chat/c1?thread=t1");
     expect(notificationHref(notification({ id: "n", kind: "dm", source: { dmId: "d1" } }))).toBe("/chat/d1");
+  });
+  test("a request to join opens the requests, whoever asked", () => {
+    const n = notification({ id: "n", kind: "join_request", actors: [], count: 3, source: { label: "Alves Studio" } });
+    expect(notificationHref({ ...n, latest: { title: "Ana Souza" } })).toBe("/join-requests");
   });
   test("issues and the forum have no screen in the app", () => {
     expect(

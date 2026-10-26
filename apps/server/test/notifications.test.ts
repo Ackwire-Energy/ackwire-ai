@@ -181,10 +181,10 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
   // Without a session.
   expect((await browser(t)(`/api/app/organizations/${orgId}/notifications`)).status).toBe(401);
   // Another person: not a member here; and a member can't touch someone else's notification.
-  const res = await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} });
-  const token = ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  // Invited, never accepted: signed up but not a member.
+  await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "other@example.com", role: "member" } });
   const other = browser(t);
-  await signUp(other, "other@example.com", { inviteToken: token });
+  await signUp(other, "other@example.com");
   expect((await other(`/api/app/organizations/${orgId}/notifications`)).status).toBe(403);
   expect(
     (await other(`/api/app/organizations/${orgId}/notifications/${id}/done`, { json: { done: true } })).status,

@@ -664,11 +664,13 @@ MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage
 
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
 it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
-email from **Settings → Members and invitations**, or through an invite link, which works without
-email. Keep sign-up closed on an instance reachable from the internet. To keep the first account for
-its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex) of a one-time token (the setup doesn't make
-one yet); then only `<PUBLIC_URL>/owner#claim=<token>` creates it, with a password, and every other
-sign-up waits until it has. In the folder with `.env`:
+email from **Settings → Members and invitations**. A workspace's invitation link lets nobody in by
+itself, nor opens sign-up: whoever opens it asks to join, and an owner or admin approves each person.
+A signed-in account with that address confirmed joins at once; anyone else gets an email invitation
+(without email, the admin gets its link to send). Keep sign-up closed on an instance reachable from
+the internet. To keep the first account for its owner, set `OWNER_CLAIM_SHA256` to the SHA-256 (hex)
+of a one-time token (the setup doesn't make one yet); then only `<PUBLIC_URL>/owner#claim=<token>`
+creates it, with a password, and every other sign-up waits until it has. In the folder with `.env`:
 
 ```sh
 token=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')

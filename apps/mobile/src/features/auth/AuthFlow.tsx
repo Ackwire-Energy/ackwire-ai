@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, Pressable, View } from "react-native";
-import { inviteHeaders } from "@/features/auth/invite";
 import { authClient } from "@/lib/auth";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
@@ -130,12 +129,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setPending(true);
     setError(null);
     try {
-      const res = await authClient().signUp.email({
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        fetchOptions: { headers: inviteHeaders() },
-      });
+      const res = await authClient().signUp.email({ name: name.trim(), email: email.trim(), password });
       if (res.error) {
         haptics.warning();
         if (res.error.status === 403) go("closed");

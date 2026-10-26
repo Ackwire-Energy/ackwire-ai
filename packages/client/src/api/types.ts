@@ -147,7 +147,57 @@ export interface InvitationPreview {
   invitedBy?: string | null;
   /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
+  /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
+  closed?: true;
+  /** A link opened signed in: where that person stands. */
+  you?: JoinStatus;
 }
+
+/** A signed-in person and a workspace's invitation link: in or not, and their latest request with its answer. */
+export interface JoinStatus {
+  member: boolean;
+  /** Only when they are a member. */
+  orgId?: string;
+  email: string;
+  request: { status: "pending" | "approved" | "denied"; reason: string | null } | null;
+}
+
+/** `invites.ask`: asking is all a link does; the admins answer. `emailed`: this server sends email. */
+export interface AskToJoinResult {
+  status: "pending";
+  email: string;
+  emailed: boolean;
+}
+
+/** A workspace's invitation link people can still ask with (admins). */
+export interface InviteLink {
+  id: string;
+  /** Null for a link made before links could be shown again: it can only be turned off. */
+  url: string | null;
+  expiresAt: string;
+  createdAt: string;
+  /** Who made it (their name). */
+  createdBy: string | null;
+  /** Requests made through it, still waiting. */
+  waiting: number;
+}
+
+/** Someone who asked to join through a link, waiting for an admin (ADR 0068). */
+export interface JoinRequest {
+  id: string;
+  name: string;
+  email: string;
+  /** Their words: shown here only, never in an email or a push. */
+  note: string | null;
+  /** Asked signed in with this address confirmed: approving lets them in at once; else it sends an invitation. */
+  confirmed: boolean;
+  createdAt: string;
+  /** Closes unanswered after this. */
+  expiresAt: string;
+}
+
+/** An approval: in at once, or an invitation to the address (`emailed: false`: hand them `url` yourself). */
+export type JoinApproval = { outcome: "joined" } | { outcome: "invited"; url: string; emailed: boolean };
 
 export interface Credential {
   id: string;
@@ -3804,7 +3854,12 @@ export type NotificationKind =
   /** ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`: why. */
   | "org_standing"
   /** ADR 0056 §10: the workspace's own computer is ready (owners). `source.machineId`; `source.label` = its name. */
-  | "computer_ready";
+  | "computer_ready"
+  /**
+   * ADR 0068: someone asks to join through the invitation link (owners and admins). Waiting; no actor;
+   * `latest.title` the newest name, `count` how many asked while it was unread. Opens Members.
+   */
+  | "join_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
