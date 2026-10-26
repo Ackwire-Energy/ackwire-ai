@@ -20,6 +20,7 @@ import {
   spriteTone,
   startSky,
 } from "../src";
+import { opaque } from "../src/sky/math";
 
 afterEach(() => cleanup());
 
@@ -39,6 +40,13 @@ describe("sky tones", () => {
     expect(mix("#123456", "#abcdef", 0)).toBe("#123456");
     expect(mix("#123456", "#abcdef", 1)).toBe("#abcdef");
     expect(pixelOf("#0063d1")).toBe(0xffd16300);
+  });
+
+  test("an rgba token as the solid color it shows over a surface (the email palette's hairlines)", () => {
+    expect(opaque("rgba(23, 23, 22, 0.12)", "#ffffff")).toBe("#e3e3e3");
+    expect(opaque("rgba(255, 255, 255, 0.15)", "#1c1c1b")).toBe("#3e3e3d");
+    expect(opaque("rgba(23 23 22 / 0.07)", "#f3f3f0")).toBe("#e4e4e1");
+    expect(opaque("#151514", "#ffffff")).toBe("#151514");
   });
 
   test("an agent's sky goes from deep to light; sky is the landing's tones", () => {

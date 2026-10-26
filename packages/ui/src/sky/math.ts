@@ -35,6 +35,10 @@ export function mix(a: string, b: string, k: number): string {
   ).join("")}`;
 }
 
+/** An `rgba()` color as the solid "#rrggbb" it shows over `over`, for places with no alpha (classic Outlook). */
+export const opaque = (color: string, over: string) =>
+  mix(over, color, Number(/^rgba\(.*[,/]\s*([\d.]+)\s*\)$/.exec(color.trim())?.[1] ?? 1));
+
 /** A color as a little-endian RGBA pixel (for a Uint32Array over ImageData). */
 export function pixelOf(color: string): number {
   const [r, g, b] = parseColor(color);

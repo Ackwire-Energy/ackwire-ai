@@ -27,6 +27,7 @@
     "./sky/math": "./src/sky/math.ts",
     "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
+    "./names": "./src/names.ts",
     "./timezones": "./src/timezones.ts"
   },
   "scripts": {

@@ -11,7 +11,7 @@ own machine). The setup writes it for you. Sign-in cookies, the only browser ori
 anything, and every link the app sends come from it. Opened at any other address, sign-in fails with
 "Invalid origin" and saving fails with `bad_origin`.
 
-The server needs no model key of its own. Each organization adds its own keys (Anthropic, OpenAI,
+The server needs no model key of its own. Each organization adds its own keys (Claude, OpenAI,
 DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
@@ -651,14 +651,15 @@ ones a self-hosted instance usually touches:
 | `LANDING_PAGE` | `false` | The agentes.chat marketing page at `/`, with its waiting list and analytics. Leave it off. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
-| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes <ola@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
+| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
+| `EMAIL_ART` | `auto` | Where emails get their pictures (the logo, agents' faces): from this server's `/email/` when its address is public, else attached to each message. `attach` always attaches them, for a public address people outside still can't open (an access proxy, a VPN, an IP allowlist). |
 | `FILES_DIR` | `/data/files`, set by the compose file | Folder for uploaded files, on the `files` volume. |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | Files in an S3-compatible bucket instead, when all four are set. `S3_REGION` (default `auto`); `S3_PATH_STYLE=true` for MinIO and Garage. |
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 
-**Model keys.** Each organization adds its own keys (Anthropic, OpenAI, DeepSeek, Kimi, Z.ai or
+**Model keys.** Each organization adds its own keys (Claude, OpenAI, DeepSeek, Kimi, Z.ai or
 MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
@@ -773,7 +774,7 @@ party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Anthropic, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Claude (Anthropic), OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
 | TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |

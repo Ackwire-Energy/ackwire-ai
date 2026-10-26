@@ -1,4 +1,5 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
+import { PROVIDERS } from "@agenteschat/providers";
 import { recordRunFinished } from "./operator-events";
 import { standingErrorDetail } from "./standing";
 
@@ -39,6 +40,9 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
 
+/** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
+const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
+
 /**
  * The stable code (and params) of a run's stored `error`, for the app to
  * word it in the person's language; the stored text stays as the fallback.
@@ -66,7 +70,7 @@ export function runErrorDetail(error: string | null | undefined): {
   const none =
     /^Add an API key for (.+) in the workspace settings$/.exec(error) ??
     /^Configure uma chave da API da (.+) nas configurações do workspace$/.exec(error);
-  if (none) return { errorCode: "run.missing_credential", errorParams: { provider: none[1] as string } };
+  if (none) return { errorCode: "run.missing_credential", errorParams: { provider: providerNow(none[1] as string) } };
   if (
     error.startsWith("This agent's API key was revoked") ||
     error.startsWith("A chave da API deste agente foi revogada")
@@ -78,7 +82,7 @@ export function runErrorDetail(error: string | null | undefined): {
   if (wrong) {
     return {
       errorCode: "run.credential_wrong_provider",
-      errorParams: { modelProvider: wrong[1] as string, keyProvider: wrong[2] as string },
+      errorParams: { modelProvider: providerNow(wrong[1] as string), keyProvider: providerNow(wrong[2] as string) },
     };
   }
   const unregistered = /^No provider registered for (.+)$/.exec(error);
