@@ -506,9 +506,13 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
-    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    // Two lines that wrap: a note stays in sight on a narrow screen, where one line scrolled its start away.
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
     await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
-    await click(view().getAllByRole("button", { name: "Devolver" }).at(-1) as HTMLElement);
+    // Enter hands it back, as the button does.
+    await act(async () => fireEvent.keyDown(note, { key: "Enter" }));
+    expect(note.value).toBe("Deixei o arquivo na mesa");
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");

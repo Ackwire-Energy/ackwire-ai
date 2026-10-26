@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, Input, modKey } from "@agenteschat/ui";
+import { Button, modKey, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -457,10 +457,12 @@ export function DesktopView({
       </div>
       {inControl &&
         (handingBack ? (
-          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own.
+          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. Two lines that
+          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away.
           <div className="brw-ac__foot brw-ac__fail">
             <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
-            <Input
+            <Textarea
+              rows={2}
               autoFocus
               value={backNote}
               onChange={(e) => setBackNote(e.target.value)}
