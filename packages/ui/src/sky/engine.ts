@@ -12,6 +12,7 @@
  * Without a 2D context (tests, old browsers) nothing is drawn and the
  * element's CSS background shows.
  */
+import { onScreenNow } from "../device";
 import {
   blobsAt,
   type CalmZone,
@@ -320,8 +321,8 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     observers.push(ro);
   }
   if (typeof IntersectionObserver !== "undefined") {
-    const io = new IntersectionObserver(([e]) => {
-      visible = e?.isIntersecting ?? true;
+    const io = new IntersectionObserver((entries) => {
+      visible = onScreenNow(entries) ?? true;
       if (visible) wake();
     });
     io.observe(host);

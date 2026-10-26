@@ -65,7 +65,8 @@ export function canvasPage({ width, height, reduced = false }: { width: number; 
         for (const cb of due) cb(clock);
       }
     },
-    onScreen: (on: boolean) => seen?.([{ isIntersecting: on }]),
+    /** One intersection observer call: its answers, oldest first (a browser gives several when they pile up). */
+    onScreen: (...on: boolean[]) => seen?.(on.map((isIntersecting) => ({ isIntersecting }))),
     close() {
       host.remove();
       now.mockRestore();

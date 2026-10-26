@@ -191,4 +191,26 @@ describe("the sky's loop", () => {
       page.close();
     }
   });
+
+  test("hidden and shown again before the observer called (a phone's width and back): on screen, so new options still draw", async () => {
+    const page = await skyPage(true);
+    try {
+      page.onScreen(false, true);
+      page.frames(100);
+      // The onboarding's progress bar: a step done is new options, drawn once more.
+      redrawSkies();
+      page.frames(1000);
+      expect(page.draws()).toBe(2);
+      // The other way round, it is off screen: nothing more until it shows again.
+      page.onScreen(true, false);
+      redrawSkies();
+      page.frames(1000);
+      expect(page.draws()).toBe(2);
+      page.onScreen(true);
+      page.frames(1000);
+      expect(page.draws()).toBe(3);
+    } finally {
+      page.close();
+    }
+  });
 });

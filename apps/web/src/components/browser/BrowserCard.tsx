@@ -36,6 +36,7 @@ import {
   Icon,
   type IconName,
   onScreenKeyboard,
+  onScreenNow,
   PixelSpinner,
   SkyStrip,
   Textarea,
@@ -370,7 +371,7 @@ export function BrowserCard({
   useEffect(() => {
     const el = root.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setVisible(Boolean(e?.isIntersecting)));
+    const io = new IntersectionObserver((entries) => setVisible(onScreenNow(entries) === true));
     io.observe(el);
     return () => io.disconnect();
   }, []);
