@@ -72,15 +72,27 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
 }
 
 /**
+ * How long the time left holds still after a report that moved the ready time later within a stage. A part running
+ * past its time moves the provisioner's ready time later with the clock, one report at a time: counted down in
+ * between, the time left would come back up at every report. A provisioner whose time keeps moving reports again
+ * within this, so the time left stays as it said; one whose time stopped moving is counted down from then on.
+ */
+const STEADY_MS = 60_000;
+
+/**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
  * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
- * whether the owners get the ready email.
+ * whether the owners get the ready email. After a report that moved the ready time later within a stage, the
+ * seconds left are the ones it gave, still for `secondsSteady` of them, and counted down after that.
  */
 function setupStatus(row: ProvisioningRow | null, orgCreatedAt: Date, emails: boolean, now = Date.now()) {
   const readyAt = row?.expectedReadyAt ?? null;
+  const given = row?.delayedAt?.getTime() ?? now;
+  const countsFrom = row?.delayedAt ? given + STEADY_MS : now;
   return {
     ...provisioningStatus(row, orgCreatedAt),
-    secondsLeft: readyAt ? Math.round((readyAt.getTime() - now) / 1000) : null,
+    secondsLeft: readyAt ? Math.round((readyAt.getTime() - given - Math.max(0, now - countsFrom)) / 1000) : null,
+    secondsSteady: readyAt ? Math.round(Math.max(0, countsFrom - now) / 1000) : null,
     secondsWaited: Math.round((now - (row?.requestedAt ?? orgCreatedAt).getTime()) / 1000),
     notifyByEmail: emails,
   };
@@ -228,6 +240,12 @@ export async function setProvisioning(
   const reason = input.state === "waiting" ? currentReason(input.reason) : null;
   const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
   const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
+  // Within one step and stage, a ready time moved later is a part running long (STEADY_MS); one left where it was
+  // keeps counting down as it did.
+  const was = same && before?.stage === stage ? before.expectedReadyAt?.getTime() : undefined;
+  const at = expectedReadyAt?.getTime();
+  const delayedAt =
+    was === undefined || at === undefined || at < was ? null : at > was ? now : (before?.delayedAt ?? null);
   const long =
     input.state !== "preparing" ||
     (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
@@ -237,6 +255,7 @@ export async function setProvisioning(
     stage,
     reason,
     expectedReadyAt,
+    delayedAt,
     emailWhenReady: long || before?.emailWhenReady === true,
     specs: input.specs ?? before?.specs ?? null,
     since: same && before ? before.since : now,
@@ -415,6 +434,7 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
     stage: null,
     reason: null,
     expectedReadyAt: null,
+    delayedAt: null,
     requestedAt: now,
     emailWhenReady: false,
     specs: null,
@@ -530,6 +550,7 @@ export async function onManagedMachineHello(
     stage: null,
     reason: null,
     expectedReadyAt: null,
+    delayedAt: null,
     since: now,
     updatedAt: now,
   };
@@ -601,6 +622,7 @@ export async function computerSetup(
       expectedReadyAt: null,
       specs: null,
       secondsLeft: null,
+      secondsSteady: null,
       secondsWaited: null,
       notifyByEmail: false,
       machineId: null,

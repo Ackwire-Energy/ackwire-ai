@@ -189,7 +189,11 @@ const ComputerSetup = z
       .openapi({ description: "While `preparing`, when known: when it should be ready (already past: any moment)." }),
     secondsLeft: z.number().int().nullable().openapi({
       description:
-        "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter.",
+        "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter. After a report that moved `expectedReadyAt` later within the same step and stage (a part running long, so the time moves with the clock), the seconds that report gave, held still for a minute, then counted down.",
+    }),
+    secondsSteady: z.number().int().nullable().openapi({
+      description:
+        "With `secondsLeft`: how many seconds from this answer it stays as it is before counting down (0: it counts down at once).",
     }),
     secondsWaited: z.number().int().nullable().openapi({
       description: "This server's clock when it answered minus `requestedAt`, for the same reason.",

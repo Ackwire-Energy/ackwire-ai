@@ -1,5 +1,5 @@
 {
-  "id": "8db9225b-ae5c-4567-85f3-8727c5929a39",
+  "id": "e28c7318-9f63-4662-b89e-dca23832739f",
   "prevId": "30dbfc72-fa2d-4239-9b6b-d676dd61daf6",
   "version": "7",
   "dialect": "postgresql",
@@ -5904,6 +5904,12 @@
         },
         "expected_ready_at": {
           "name": "expected_ready_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delayed_at": {
+          "name": "delayed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

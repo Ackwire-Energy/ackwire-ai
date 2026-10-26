@@ -197,6 +197,8 @@ export const machineProvisioning = pgTable("machine_provisioning", {
   reason: text(),
   /** With `preparing`: when the provisioner expects it ready (already past: any moment now). */
   expectedReadyAt: timestamp({ withTimezone: true }),
+  /** When a report last moved `expectedReadyAt` later within the same step and stage: a part running long. */
+  delayedAt: timestamp({ withTimezone: true }),
   /** When people started waiting: set when the computer is taken away; null: since the workspace was created. */
   requestedAt: timestamp({ withTimezone: true }),
   /** The wait was said to take over a minute: the owners were told they'd get the ready email. */
