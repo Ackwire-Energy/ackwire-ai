@@ -19,6 +19,7 @@ import {
   BROWSER_APT_PACKAGES,
   DESKTOP_APT_PACKAGES,
   DESKTOP_CJK_APT_PACKAGES,
+  DESKTOP_DOCK_APT_PACKAGES,
   DESKTOP_LOOK_APT_PACKAGES,
   installScript,
   RUNNER_BUN_SHA256,
@@ -468,25 +469,33 @@ test.if(posix)(
     // With --desktop: one install with the screens' packages too.
     r = step(true, { known: t64 });
     expect(r.out).toBe("Installing the packages for the agents' browser and screens ...\n");
-    // Then the screens' theme and their CJK fonts, each where apt has it: a failure only says so.
-    expect(r.calls).toBe(
-      update +
-        install([...t64, ...DESKTOP_APT_PACKAGES]) +
-        install(DESKTOP_LOOK_APT_PACKAGES) +
-        install(DESKTOP_CJK_APT_PACKAGES),
-    );
+    // Then the screens' theme, their CJK fonts and their dock, each in its own call where apt has it: a failure
+    // only says so.
+    const look = install(DESKTOP_LOOK_APT_PACKAGES);
+    const cjk = install(DESKTOP_CJK_APT_PACKAGES);
+    const dock = install(DESKTOP_DOCK_APT_PACKAGES);
     expect(DESKTOP_CJK_APT_PACKAGES).toEqual(["fonts-noto-cjk"]);
-    // No Orchis (Ubuntu 22.04): the fonts still go in.
+    expect(DESKTOP_DOCK_APT_PACKAGES).toEqual(["xfce4-docklike-plugin"]);
+    expect(r.calls).toBe(update + install([...t64, ...DESKTOP_APT_PACKAGES]) + look + cjk + dock);
+    // No Orchis (Ubuntu 22.04): the fonts and the dock are still asked for, each on its own.
     r = step(true, { known: t64, missing: ["orchis-gtk-theme"] });
     expect(r.status).toBe(0);
     expect(r.out).toContain(
       "The agents' screens keep the stock theme: apt has no orchis-gtk-theme librsvg2-common here",
     );
-    expect(r.calls.endsWith(install(DESKTOP_CJK_APT_PACKAGES))).toBe(true);
+    expect(r.calls.endsWith(look + cjk + dock)).toBe(true);
     r = step(true, { known: t64, missing: ["fonts-noto-cjk"] });
     expect(r.status).toBe(0);
     expect(r.out).toContain(
       "The agents' screens show Chinese, Japanese and Korean text as boxes: apt has no fonts-noto-cjk here",
+    );
+    expect(r.calls.endsWith(cjk + dock)).toBe(true);
+    // Debian 12, Ubuntu 24.04: the theme and the fonts, and the panel's own dock.
+    r = step(true, { known: t64, missing: ["xfce4-docklike-plugin"] });
+    expect(r.status).toBe(0);
+    expect(r.out).toBe(
+      "Installing the packages for the agents' browser and screens ...\n" +
+        "The agents' screens keep the panel's own dock: apt has no xfce4-docklike-plugin here\n",
     );
 
     // No apt: what to install, by name.
