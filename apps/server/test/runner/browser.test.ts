@@ -892,7 +892,8 @@ test.if(posix)(
       "--screenshot-quality",
       "70",
     ]);
-    expect(existsSync(path.join(t.home, "browser", "agent-01a142cb-frame.jpg"))).toBe(false);
+    // The screenshot is removed after the frame goes out, not before.
+    await waitFor(() => !existsSync(path.join(t.home, "browser", "agent-01a142cb-frame.jpg")));
     // Another page: frames carry its address; its title comes with the next tab list.
     socket.push({ type: "url", url: "https://shop.example.com/cart" });
     socket.push({ type: "frame", seq: 3, data: "/9j/B", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
