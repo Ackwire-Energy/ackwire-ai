@@ -1,6 +1,7 @@
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
+import { useInfoHint } from "./InfoHint";
 import { Text } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { useTheme } from "./theme";
@@ -127,20 +128,26 @@ export function GroupedRow({
   );
 }
 
+interface GroupedFieldProps {
+  label: string;
+  /** An ⓘ right after the label, with the field's explanation. */
+  hint?: { name: string; text: string };
+  children: ReactNode;
+  onPress?: () => void;
+}
+
 /**
  * A labeled field row ("Nome", "Seu @"): the label in a fixed column, the value or an input after it;
  * with `onPress`, the whole row opens a screen (a chevron on the right).
  */
-export function GroupedField({
-  label,
-  children,
-  onPress,
-}: {
-  label: string;
-  children: ReactNode;
-  onPress?: () => void;
-}) {
+export function GroupedField({ label, hint, children, onPress }: GroupedFieldProps) {
   const { colors: c } = useTheme();
+  if (hint)
+    return (
+      <HintedField label={label} hint={hint} onPress={onPress}>
+        {children}
+      </HintedField>
+    );
   const body = (
     <>
       <Text variant="callout" tone="muted" style={styles.key}>
@@ -163,6 +170,52 @@ export function GroupedField({
   );
 }
 
+/**
+ * A field whose label has an ⓘ. With `onPress` the row's button lies under the label and the value rather than
+ * around them: inside another button the ⓘ would be part of it to VoiceOver, never a button of its own.
+ */
+function HintedField({ label, hint, children, onPress }: GroupedFieldProps & { hint: { name: string; text: string } }) {
+  const { colors: c } = useTheme();
+  const info = useInfoHint({ ...hint, variant: "callout" });
+  const passive = onPress ? "none" : "auto";
+  return (
+    <View>
+      <View style={styles.field}>
+        {onPress ? (
+          <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            style={({ pressed }) => [StyleSheet.absoluteFill, pressed ? { backgroundColor: c.sunken } : null]}
+          />
+        ) : null}
+        <View style={[styles.key, styles.keyLine]} pointerEvents="box-none">
+          <View
+            pointerEvents={passive}
+            style={styles.shrink}
+            accessibilityElementsHidden={Boolean(onPress)}
+            importantForAccessibility={onPress ? "no-hide-descendants" : "auto"}
+          >
+            <Text variant="callout" tone="muted">
+              {label}
+            </Text>
+          </View>
+          {info.button}
+        </View>
+        <View style={styles.grow} pointerEvents={passive}>
+          {children}
+        </View>
+        {onPress ? (
+          <View pointerEvents="none">
+            <Icon name="right" size={15} color={c.faint} />
+          </View>
+        ) : null}
+      </View>
+      <View style={[styles.hint, info.open ? styles.hintOpen : null]}>{info.text}</View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
@@ -181,4 +234,8 @@ const styles = StyleSheet.create({
   value: { flexShrink: 1, maxWidth: "50%" },
   field: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 50, paddingHorizontal: 14 },
   key: { width: 96 },
+  keyLine: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
+  shrink: { flexShrink: 1, minWidth: 0 },
+  hint: { paddingHorizontal: 14 },
+  hintOpen: { paddingBottom: 12 },
 });
