@@ -10,7 +10,7 @@ import {
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
 import { excerpt } from "@agenteschat/client/lib/text";
-import { Avatar, Button, Card, CardFooter, Chip, Icon, Meter } from "@agenteschat/ui";
+import { Avatar, Button, Card, Chip, Icon, Meter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
@@ -117,6 +117,10 @@ export function OverviewTab() {
               id="ov-does"
               icon="document"
               title={t("agentPage.overview.does", g)}
+              hint={{
+                name: t("common.about", { label: t("agentPage.overview.does", g) }),
+                text: t("agent.instructionsHelp", { ...g, org: org.name }),
+              }}
               action={
                 <Button
                   size="sm"
@@ -133,7 +137,6 @@ export function OverviewTab() {
             ) : (
               <p className="muted">{t("agent.noInstructions", g)}</p>
             )}
-            <CardFooter>{t("agent.instructionsHelp", { org: org.name })}</CardFooter>
           </Card>
 
           <Card as="section" className="agp-card" aria-labelledby="ov-recent">

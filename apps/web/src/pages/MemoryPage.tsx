@@ -22,6 +22,7 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { HelpLink } from "@/components/HelpLink";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -223,7 +224,9 @@ function MemoryView({ agent }: { agent: Agent }) {
           </p>
         )}
       </List>
-      <p className="page__note">{t("memory.footer", g)}</p>
+      <p className="page__note">
+        <HelpLink slug="memory">{t("memory.how")}</HelpLink>
+      </p>
 
       <EditMemoryDialog
         memory={editing}

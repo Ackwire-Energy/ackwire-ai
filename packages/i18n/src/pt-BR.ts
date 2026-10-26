@@ -1745,7 +1745,8 @@ export const ptBR = {
     saved: "Salvo",
     instructions: "Instruções",
     howWorks: "Como {{article}} {{name}} trabalha",
-    instructionsHelp: "O contexto da {{org}} entra antes destas instruções em toda conversa.",
+    instructionsHelp:
+      "O contexto da {{org}} (o que a empresa faz, regras da casa) entra antes destas instruções em toda conversa: escreva aqui só o que é {{of}} {{name}}.",
     budgetUsed: "Orçamento usado",
     runsCount_one: "{{count}} execução",
     runsCount_other: "{{count}} execuções",
@@ -2089,9 +2090,7 @@ export const ptBR = {
       full: "Abrir a memória completa",
       accepted: "Mudança aceita. As instruções foram atualizadas.",
       refused: "Proposta recusada. {{The}} {{name}} guardou o motivo.",
-      decides: "{{who}} decide. Nada muda sem alguém aceitar.",
-      noPermission:
-        "Nada aqui dá permissão. O que {{article}} {{name}} pode fazer continua em Ferramentas e acesso, e ações sensíveis sempre pedem aprovação.",
+      decides: "{{who}} decide.",
     },
     activity: {
       title: "Execuções",
@@ -2217,8 +2216,7 @@ export const ptBR = {
   memory: {
     back: "{{name}}",
     title: "O que {{article}} {{name}} sabe",
-    subtitle:
-      "{{The}} {{name}} aprende com as conversas e com as correções do time. Tudo aqui entra no contexto {{hers}} quando for relevante. Edite, fixe ou arquive o que estiver errado ou velho.",
+    subtitle: "O que {{article}} {{name}} aprendeu com as conversas e as correções do time.",
     proposals_one: "{{count}} proposta de melhoria",
     proposals_other: "{{count}} propostas de melhoria",
     tabsLabel: "Tipo",
@@ -2246,8 +2244,7 @@ export const ptBR = {
     restore: "Restaurar",
     emptySearch: "Nada encontrado com “{{q}}”.",
     empty: "Nada por aqui ainda. {{The}} {{name}} vai aprendendo conforme o time conversa com {{pronoun}}.",
-    footer:
-      "Nada aqui dá permissão {{to}} {{name}}. O que {{pronoun}} pode fazer continua definido em “O que {{article}} {{name}} pode fazer”, e ações sensíveis sempre pedem aprovação.",
+    how: "Como a memória funciona",
     editTitle: "Editar {{kind}}",
     text: "Texto",
     editHelp: "A versão anterior fica no histórico. {{source}}",
@@ -2286,11 +2283,10 @@ export const ptBR = {
     viewDiff: "Ver diferenças",
     finalText: "Texto final das instruções",
     finalTextContext: "Texto final do contexto",
-    finalHelp: "Você pode ajustar antes de aceitar. A versão anterior fica no histórico.",
     accept: "Aceitar mudança",
     acceptEdited: "Aceitar com ajustes",
     refuse: "Recusar",
-    refuseNote: "Ao recusar, {{article}} {{name}} guarda o motivo como lição e não propõe isso de novo.",
+    refuseNote: "Recusar ensina {{article}} {{name}} a não propor isso de novo.",
     added: "Adicionado: ",
     removed: "Removido: ",
     empty: "Nenhuma proposta ainda. Quando uma lição se repetir, o agente propõe uma mudança aqui.",
@@ -2313,12 +2309,12 @@ export const ptBR = {
       role: {
         name: "Papel",
         title: "Qual vai ser o papel?",
-        lead: "Um colega novo para o time. Escolha um ponto de partida: preenchemos nome, jeito, instruções e acessos. Você ajusta tudo nos próximos passos.",
+        lead: "Escolha um ponto de partida: o resto a gente preenche.",
       },
       identity: {
         name: "Identidade",
         title: "Quem é",
-        lead: "Como o time vai chamar e reconhecer no chat. O jeito aparece no avatar, nos canais e no perfil.",
+        lead: "Como o time chama e reconhece no chat.",
       },
       instructions: {
         name: "Instruções",
@@ -2328,7 +2324,7 @@ export const ptBR = {
       tools: {
         name: "Ferramentas e acesso",
         title: "Ferramentas e acesso",
-        lead: "Os apps que a {{org}} já conectou. Escolha, em cada um, até onde {{article}} {{name}} vai.",
+        lead: "Escolha até onde {{article}} {{name}} vai em cada app.",
       },
       where: {
         name: "Onde e quem",
@@ -2338,12 +2334,11 @@ export const ptBR = {
       model: {
         name: "Modelo e orçamento",
         title: "Modelo e orçamento",
-        lead: "Quem pensa por trás e quanto pode gastar por mês. A chave fica cifrada no servidor; ninguém vê.",
+        lead: "Quem pensa por trás e quanto pode gastar por mês.",
       },
       review: {
         name: "Revisar e criar",
         title: "Tudo certo com {{article}} {{name}}?",
-        lead: "Confira antes de criar. Depois, tudo isto fica no perfil do agente.",
       },
     },
     roles: {
@@ -2479,8 +2474,6 @@ export const ptBR = {
         text: "Quando travar, pergunte a {{name}} no canal.",
       },
     },
-    contextNote:
-      "O contexto da {{org}} (o que a empresa faz, regras da casa) já entra em toda conversa. Aqui vai só o que é {{of}} {{name}}.",
     noInstructions: "Sem instruções, {{article}} {{name}} segue só o contexto do workspace.",
     connectedCount_one: "{{count}} conectado pela organização",
     connectedCount_other: "{{count}} conectados pela organização",
@@ -2488,7 +2481,7 @@ export const ptBR = {
     connectorsLabel: "Conectores e níveis",
     connectOther: "Conectar outro app",
     opensConnectors: "abre Conectores",
-    approvalsNote: "Merge, deploy e rollback sempre viram pedido de aprovação no chat, mesmo com o conector liberado.",
+    approvalsNote: "Merge, deploy e rollback sempre pedem aprovação no chat.",
     approverOwner: "Quem aprova é {{name}}.",
     approverAdmins: "Quem aprova é um admin.",
     skillsHelp: "Manuais que {{article}} {{name}} abre quando precisa.",
@@ -2533,10 +2526,6 @@ export const ptBR = {
     talksTo: "fala com {{who}}",
     noOwnerAdmins: "Sem responsável (admins)",
     editSection: "Editar {{section}}",
-    reviewNoteOwner:
-      "Ações sensíveis sempre pedem aprovação no chat. {{name}} recebe os pedidos e os avisos de orçamento.",
-    reviewNoteAdmins:
-      "Ações sensíveis sempre pedem aprovação no chat. Os admins recebem os pedidos e os avisos de orçamento.",
     hints: {
       role: "Escolha um ponto de partida",
       identity: "Chamado por @{{handle}}",
@@ -2552,7 +2541,6 @@ export const ptBR = {
     preview: {
       label: "Prévia do agente",
       title: "Prévia",
-      hint: "Atualiza enquanto você preenche",
       draft: "Rascunho",
       show: "Ver detalhes",
       hide: "Esconder detalhes",
@@ -2573,19 +2561,6 @@ export const ptBR = {
     goTo: "Ir para o #{{channel}}",
     openProfile: "Abrir perfil",
     createAnother: "Criar outro agente",
-    next: {
-      hello: {
-        title: "Diga oi",
-        text: "Peça a primeira tarefa com @{{handle}}.",
-        inChannel: "Peça a primeira tarefa com @{{handle}} no #{{channel}}.",
-      },
-      alerts: {
-        owner: "Avisos com {{name}}",
-        admins: "Avisos com os admins",
-        text: "Orçamento aos 80% e pedidos de aprovação chegam no chat.",
-      },
-      profile: { title: "Acessos no perfil", text: "Mude níveis, canais e modelo quando quiser." },
-    },
     adminsOnly: "Só admins e donos criam agentes. Peça a um admin da {{org}}.",
     and: " e ",
   },

@@ -154,6 +154,13 @@ describe("Memória e propostas", () => {
   test("tabs, search, pin, archive and edit with history", async () => {
     await go(`agents/${ADA_ID}/memory`);
     expect(screen().getByRole("heading", { level: 1, name: "O que a Ada sabe" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe(
+      "O que a Ada aprendeu com as conversas e as correções do time.",
+    );
+    // How memory works is a page on the site, linked once under the list.
+    const how = screen().getByRole("link", { name: "Como a memória funciona" });
+    expectHelpLink(how, "memory");
+    expect(how.closest(".page__note")?.textContent).toBe("Como a memória funciona");
     const tabs = screen().getByRole("tablist", { name: "Tipo" });
     expect(
       within(tabs)
@@ -195,8 +202,10 @@ describe("Memória e propostas", () => {
     expect(added.length).toBe(2);
     expect(removed.length).toBe(1);
     expect(removed[0]?.textContent).toBe("−Removido: Pede ajuda ao João quando a mudança tocar em pagamentos.");
+    expect(detail.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
     await click(within(detail).getByRole("button", { name: "Editar antes de aceitar" }));
     const text = within(detail).getByLabelText("Texto final das instruções");
+    expect(text.getAttribute("aria-describedby")).toBeNull();
     await type(text, "Programa em branches, nunca direto na main.");
     await click(within(detail).getByRole("button", { name: "Aceitar com ajustes" }));
     await settle(4);

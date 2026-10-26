@@ -1727,7 +1727,8 @@ export const en: Translations = {
     saved: "Saved",
     instructions: "Instructions",
     howWorks: "How {{name}} works",
-    instructionsHelp: "The {{org}} context goes before these instructions in every conversation.",
+    instructionsHelp:
+      "{{org}}'s context (what the company does, house rules) goes before these instructions in every conversation: write here only what's {{name}}'s.",
     budgetUsed: "Budget used",
     runsCount_one: "{{count}} run",
     runsCount_other: "{{count}} runs",
@@ -2069,9 +2070,7 @@ export const en: Translations = {
       full: "Open the full memory",
       accepted: "Change accepted. The instructions were updated.",
       refused: "Proposal declined. {{name}} kept the reason.",
-      decides: "{{who}} decides. Nothing changes until someone accepts.",
-      noPermission:
-        "Nothing here grants permissions. What {{name}} can do stays in Tools and access, and sensitive actions always ask for approval.",
+      decides: "{{who}} decides.",
     },
     activity: {
       title: "Runs",
@@ -2197,8 +2196,7 @@ export const en: Translations = {
   memory: {
     back: "{{name}}",
     title: "What {{name}} knows",
-    subtitle:
-      "{{name}} learns from conversations and from the team's corrections. Everything here enters {{hers}} context when relevant. Edit, pin or archive what's wrong or stale.",
+    subtitle: "What {{name}} learned from conversations and the team's corrections.",
     proposals_one: "{{count}} improvement proposal",
     proposals_other: "{{count}} improvement proposals",
     tabsLabel: "Type",
@@ -2226,8 +2224,7 @@ export const en: Translations = {
     restore: "Restore",
     emptySearch: "Nothing found for “{{q}}”.",
     empty: "Nothing here yet. {{name}} learns as the team talks with {{pronoun}}.",
-    footer:
-      "Nothing here grants {{name}} any permission. Permissions are still set in “What {{name}} can do”, and sensitive actions always ask for approval.",
+    how: "How memory works",
     editTitle: "Edit {{kind}}",
     text: "Text",
     editHelp: "The previous version stays in the history. {{source}}",
@@ -2266,11 +2263,10 @@ export const en: Translations = {
     viewDiff: "View differences",
     finalText: "Final instructions text",
     finalTextContext: "Final context text",
-    finalHelp: "You can adjust it before accepting. The previous version stays in the history.",
     accept: "Accept change",
     acceptEdited: "Accept with edits",
     refuse: "Refuse",
-    refuseNote: "When you refuse, {{name}} stores the reason as a lesson and won't propose this again.",
+    refuseNote: "Refusing teaches {{name}} not to propose this again.",
     added: "Added: ",
     removed: "Removed: ",
     empty: "No proposals yet. When a lesson repeats, the agent proposes a change here.",
@@ -2293,12 +2289,12 @@ export const en: Translations = {
       role: {
         name: "Role",
         title: "What role will it have?",
-        lead: "A new teammate. Pick a starting point: we fill in name, look, instructions and access. You adjust everything in the next steps.",
+        lead: "Pick a starting point: we fill in the rest.",
       },
       identity: {
         name: "Identity",
         title: "Who it is",
-        lead: "How the team will call and recognize it in chat. The look shows on the avatar, in channels and on the profile.",
+        lead: "How the team calls and recognizes it in chat.",
       },
       instructions: {
         name: "Instructions",
@@ -2308,7 +2304,7 @@ export const en: Translations = {
       tools: {
         name: "Tools and access",
         title: "Tools and access",
-        lead: "The apps {{org}} already connected. For each one, choose how far {{name}} can go.",
+        lead: "Choose how far {{name}} can go in each app.",
       },
       where: {
         name: "Where and who",
@@ -2318,12 +2314,11 @@ export const en: Translations = {
       model: {
         name: "Model and budget",
         title: "Model and budget",
-        lead: "Who thinks behind it and how much it can spend per month. The key stays encrypted on the server; nobody sees it.",
+        lead: "Who thinks behind it and how much it can spend per month.",
       },
       review: {
         name: "Review and create",
         title: "All good with {{name}}?",
-        lead: "Check before creating. Afterwards, all of this is on the agent's profile.",
       },
     },
     roles: {
@@ -2455,8 +2450,6 @@ export const en: Translations = {
       avoid: { title: "What to avoid", desc: "Clear limits", text: "Avoid: " },
       help: { title: "Who to ask for help", desc: "When stuck", text: "When stuck, ask {{name}} in the channel." },
     },
-    contextNote:
-      "{{org}}'s context (what the company does, house rules) is already in every conversation. Here goes only what is {{name}}'s.",
     noInstructions: "Without instructions, {{name}} follows only the workspace context.",
     connectedCount_one: "{{count}} connected by the organization",
     connectedCount_other: "{{count}} connected by the organization",
@@ -2464,8 +2457,7 @@ export const en: Translations = {
     connectorsLabel: "Connectors and levels",
     connectOther: "Connect another app",
     opensConnectors: "opens Connectors",
-    approvalsNote:
-      "Merge, deploy and rollback always become approval requests in chat, even with the connector granted.",
+    approvalsNote: "Merge, deploy and rollback always ask for approval in chat.",
     approverOwner: "{{name}} approves.",
     approverAdmins: "An admin approves.",
     skillsHelp: "Manuals {{name}} opens when needed.",
@@ -2510,10 +2502,6 @@ export const en: Translations = {
     talksTo: "talks with {{who}}",
     noOwnerAdmins: "No owner (admins)",
     editSection: "Edit {{section}}",
-    reviewNoteOwner:
-      "Sensitive actions always ask for approval in chat. {{name}} gets the requests and the budget alerts.",
-    reviewNoteAdmins:
-      "Sensitive actions always ask for approval in chat. The admins get the requests and the budget alerts.",
     hints: {
       role: "Pick a starting point",
       identity: "Called @{{handle}}",
@@ -2529,7 +2517,6 @@ export const en: Translations = {
     preview: {
       label: "Agent preview",
       title: "Preview",
-      hint: "Updates as you fill it in",
       draft: "Draft",
       show: "Show details",
       hide: "Hide details",
@@ -2550,19 +2537,6 @@ export const en: Translations = {
     goTo: "Go to #{{channel}}",
     openProfile: "Open profile",
     createAnother: "Create another agent",
-    next: {
-      hello: {
-        title: "Say hi",
-        text: "Ask for the first task with @{{handle}}.",
-        inChannel: "Ask for the first task with @{{handle}} in #{{channel}}.",
-      },
-      alerts: {
-        owner: "Alerts go to {{name}}",
-        admins: "Alerts go to the admins",
-        text: "Budget at 80% and approval requests arrive in chat.",
-      },
-      profile: { title: "Access on the profile", text: "Change levels, channels and model whenever you want." },
-    },
     adminsOnly: "Only admins and owners create agents. Ask a {{org}} admin.",
     and: " and ",
   },

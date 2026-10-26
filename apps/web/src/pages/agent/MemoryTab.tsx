@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { HelpLink } from "@/components/HelpLink";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
@@ -86,7 +87,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         <b>{t("proposals.why")}:</b> {proposal.why}
       </p>
       {editing ? (
-        <Field label={t("proposals.finalText")} id={`prop-edit-${proposal.id}`} help={t("proposals.finalHelp")}>
+        <Field label={t("proposals.finalText")} id={`prop-edit-${proposal.id}`}>
           <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>
       ) : (
@@ -257,13 +258,8 @@ export function MemoryTab() {
           </Card>
         </div>
         <div className="agp-col">
-          <p className="newag__note ac-iconline">
-            <Icon name="info" size={16} />
-            <span>{t("memory.subtitle", g)}</span>
-          </p>
-          <p className="newag__note ac-iconline">
-            <Icon name="shield" size={16} />
-            <span>{t("agentPage.memory.noPermission", g)}</span>
+          <p className="page__note">
+            <HelpLink slug="memory">{t("memory.how")}</HelpLink>
           </p>
         </div>
       </div>
