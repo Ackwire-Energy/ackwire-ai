@@ -277,7 +277,7 @@ test("the note: a small terminal window, its text wrapped and indented with a ro
   // The wait has Browser's icon and a class of its own: with Browser's, docklike would show it on Browser, and a
   // second click there would hide it instead of reaching the runner (told `busy`).
   expect(noteArgs("wait", "Opening the browser…")).toEqual([
-    ...head("agentes-wait", "org.xfce.webbrowser"),
+    ...head("agentes-wait", "applications-internet"),
     "--geometry=60x3",
     "-x",
     "/bin/sh",

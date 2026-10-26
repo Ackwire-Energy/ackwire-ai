@@ -362,6 +362,94 @@ describe("receipts and the live block", () => {
     expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
     expect(receipt.textContent).not.toContain("Tentar de novo");
   });
+
+  /** Walter's message to Ada, read with her run at `handled`. */
+  const asked = (handled: NonNullable<Message["receipts"]>["handled"]): Message => ({
+    id: "m-asked",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "person", id: "u-walter" },
+    body: "@ada quem são os nossos concorrentes?",
+    mentionedAgentIds: [ADA_ID],
+    agentRunId: null,
+    createdAt: new Date(NOW.getTime() - 1000).toISOString(),
+    receipts: { seenBy: [ADA_ID], pickedBy: [ADA_ID], handled, blocked: [] },
+  });
+  const check = () => receiptOf("quem são os nossos concorrentes?").querySelector(".ac-receipt__check") as HTMLElement;
+
+  test("her card and her run's end, posted while the socket still opened after a page change: they show once the channel's subscription is confirmed", async () => {
+    const state = seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) });
+    state.messages.push(asked([{ agentId: ADA_ID, runId: "r-noai", status: "running" }]));
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    // Read as her run started.
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    // She has no AI: her card and her run's end come before the socket is even open, so no event carries them.
+    state.messages = state.messages.map((m) =>
+      m.id === "m-asked" ? asked([{ agentId: ADA_ID, runId: "r-noai", status: "failed", reason: "no_ai" }]) : m,
+    );
+    state.messages.push(card());
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    expect(socket.sent).toContainEqual({ type: "subscribe", channelId: ENG_ID });
+    expect(cardRow()).toBeUndefined();
+    // The server confirms the subscription: the channel is read again.
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
+      "Ninguém vai responder: falta uma IA ·",
+    );
+  });
+
+  test("opened after her no-AI failure, then 'Responder agora': she answers, and her receipt stays answered", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    state.messages.push(asked([{ agentId: ADA_ID, runId: "r-noai", status: "failed", reason: "no_ai" }]), card());
+    const { socket } = await open(state);
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    await click(within(cardRow()).getByRole("button", { name: "Responder agora" }));
+    expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
+    // The server starts her again on Walter's message, in a new run.
+    const run = { threadId: null, runId: "r-again", agentId: ADA_ID };
+    const frame = (event: Record<string, unknown>) => ({
+      type: "event",
+      channelId: ENG_ID,
+      event: { channelId: ENG_ID, ...event },
+    });
+    await act(async () => {
+      socket.push(frame({ type: "message.claimed", messageId: "m-asked", agentId: ADA_ID, runId: "r-again" }));
+      socket.push(frame({ type: "agent.run", ...run, status: "running" }));
+    });
+    await settle(2);
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    // Her answer and her run's end arrive together, before the page draws the answer.
+    const answer: Message = {
+      id: "m-answer",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "Os três maiores são a Orbe, a Lumen e a Quadra.",
+      mentionedAgentIds: [],
+      agentRunId: "r-again",
+      createdAt: new Date().toISOString(),
+    };
+    await act(async () => {
+      socket.push(frame({ type: "message.created", messageId: answer.id, message: answer }));
+      socket.push(frame({ type: "agent.run", ...run, status: "done" }));
+      socket.push(frame({ type: "run.finished", ...run, status: "done" }));
+      socket.push(frame({ type: "message.handled", messageId: "m-asked", ...run, status: "done" }));
+    });
+    await settle(4);
+    const shown = screen()
+      .getAllByRole("article")
+      .some((a) => a.textContent?.includes("Os três maiores são a Orbe, a Lumen e a Quadra."));
+    expect(shown).toBe(true);
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+  });
 });
 
 describe("the dialog opens by itself only when Jev is sure, for the author, once", () => {
