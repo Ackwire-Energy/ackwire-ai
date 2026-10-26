@@ -33,7 +33,7 @@ export function DialogHead({ sub, actions }: { sub?: ReactNode; actions?: ReactN
   );
 }
 
-/** Full screen: the whole dialog fills the screen; Esc only leaves it. */
+/** Full screen: the agent's screen alone, or the whole dialog over its page or a cover. */
 export function FullButton() {
   const { t } = useTranslation();
   const head = useDialogHead();

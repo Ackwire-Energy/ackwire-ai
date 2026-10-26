@@ -4,7 +4,6 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  --screen-bg: #1f2128;
 }
 /* The desktop's own shape (1280×900, `DESKTOP_SIZE`): noVNC scales it inside, the panel never jumps. */
 .dsk-screen {

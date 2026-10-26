@@ -149,6 +149,25 @@ const connected = async () => {
   await act(async () => rfb().emit("connect"));
   await settle(2);
 };
+/** The browser's full screen: which element asked for it; `document.fullscreenElement` follows. */
+function fullScreen() {
+  const page = { requested: [] as Element[] };
+  const doc = document as { fullscreenElement: Element | null };
+  replaceOn(document, "fullscreenElement", null);
+  replaceOn(document.documentElement, "requestFullscreen", function (this: Element) {
+    page.requested.push(this);
+    doc.fullscreenElement = this;
+    return Promise.resolve();
+  });
+  replaceOn(document, "exitFullscreen", () => {
+    doc.fullscreenElement = null;
+    return Promise.resolve();
+  });
+  return page;
+}
+/** The dialog's classes. */
+const classes = () => [...(document.querySelector(".cmp-dialog")?.classList ?? [])];
+
 /** Ada's screen in this person's control, live: the field over it has the person's keys. */
 async function controlled() {
   const t = await dialog();
@@ -673,32 +692,93 @@ describe("the agent's screen in the computer dialog", () => {
     expect(leaving()).toBe(true);
   });
 
-  test("full screen is the page's, so leaving it with Esc lets the first click on Devolver work", async () => {
-    let requested = null as Element | null;
-    Object.defineProperty(document.documentElement, "requestFullscreen", {
-      configurable: true,
-      value: function (this: Element) {
-        requested = this;
-        return Promise.resolve();
-      },
-    });
-    const t = await dialog();
-    await connected();
-    await click(view().getByRole("button", { name: "Assumir o controle" }));
-    await settle(4);
-    await connected();
+  test("full screen is the page's and shows the computer alone; Esc leaves it, and Devolver works on its first click", async () => {
+    const page = fullScreen();
+    const t = await controlled();
     await click(view().getByRole("button", { name: "Tela cheia" }));
     // The page goes full screen, not the dialog: noVNC's capture layer on the page stays inside it.
-    expect(requested).toBe(document.documentElement);
-    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(true);
-    // In full screen Esc only leaves full screen, even in control.
-    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    expect(page.requested).toEqual([document.documentElement]);
+    expect(classes()).toEqual(expect.arrayContaining(["is-full", "is-screen-only"]));
+    expect(classes()).not.toContain("is-bar-hidden");
+    // Without Keyboard Lock, Esc leaves full screen, even in control.
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" }));
     await settle(2);
-    expect(document.querySelector(".cmp-dialog")?.classList.contains("is-full")).toBe(false);
+    expect(classes()).not.toContain("is-full");
+    expect(document.fullscreenElement).toBeNull();
     expect(t.closed()).toBe(0);
     await click(view().getByRole("button", { name: "Devolver" }));
     expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
-    delete (document.documentElement as { requestFullscreen?: unknown }).requestFullscreen;
+  });
+
+  test("Devolver from full screen leaves it first: the note is the dialog's, never over the screen", async () => {
+    fullScreen();
+    await controlled();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(classes()).toContain("is-screen-only");
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(classes()).not.toContain("is-full");
+    expect(document.fullscreenElement).toBeNull();
+    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    // No full screen while the note is open.
+    expect(view().queryByRole("button", { name: "Tela cheia" })).toBeNull();
+  });
+
+  test("the full-screen bar hides itself; in control only the display's top edge brings it back", async () => {
+    fullScreen();
+    await controlled();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    const move = (clientY: number) => act(async () => void fireEvent.pointerMove(document.body, { clientY }));
+    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    expect(classes()).toContain("is-bar-hidden");
+    // The pointer is the computer's: a move over the screen leaves it hidden.
+    await move(400);
+    expect(classes()).toContain("is-bar-hidden");
+    await move(4);
+    expect(classes()).not.toContain("is-bar-hidden");
+    // On the bar it stays.
+    await act(
+      async () => void fireEvent.pointerMove(document.querySelector(".ac-dialog__head") as Element, { clientY: 30 }),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    expect(classes()).not.toContain("is-bar-hidden");
+    // A phone has no pointer to bring to the edge: a tap anywhere brings it back.
+    await move(400);
+    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    expect(classes()).toContain("is-bar-hidden");
+    await act(async () => void fireEvent.pointerDown(document.body, { clientY: 400, pointerType: "touch" }));
+    expect(classes()).not.toContain("is-bar-hidden");
+    cleanup();
+
+    // Watching, any move brings it back.
+    await dialog();
+    await connected();
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    await act(() => new Promise((r) => setTimeout(r, 2_600)));
+    expect(classes()).toContain("is-bar-hidden");
+    await move(400);
+    expect(classes()).not.toContain("is-bar-hidden");
+  });
+
+  test("Keyboard Lock in control: Esc goes to the computer, and the lock goes with full screen", async () => {
+    fullScreen();
+    const lock = { locked: 0, unlocked: 0 };
+    replaceOn(navigator, "keyboard", {
+      lock: async () => void lock.locked++,
+      unlock: () => void lock.unlocked++,
+    });
+    const t = await controlled();
+    // Only full screen locks it.
+    expect(lock.locked).toBe(0);
+    await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(lock.locked).toBe(1);
+    t.field().focus();
+    await act(async () => fireEvent.keyDown(t.field(), { key: "Escape", code: "Escape" }));
+    await settle(2);
+    expect(classes()).toContain("is-full");
+    expect(t.closed()).toBe(0);
+    expect(rfb().log).toContain("keydown Escape Escape");
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(lock.unlocked).toBe(1);
   });
 
   test("a page kept for the Back button lets its screen go, and opens it again when the person comes back", async () => {
@@ -782,6 +862,21 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(text, ".cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
     const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
     expect(rule(desk, ".dsk-line")).toContain("min-height: 22px");
+  });
+
+  test("full screen on the agent's screen: the screen alone on its ground, what floats over it hidden after a while", async () => {
+    const text = await css();
+    const dialog = rule(text, ".ac-dialog.cmp-dialog.is-screen-only");
+    expect(dialog).toContain("display: grid");
+    expect(dialog).toContain("background: var(--screen-bg)");
+    const stage = rule(text, ".cmp-dialog.is-screen-only .dsk-stage");
+    expect(stage).toContain("grid-area: 1 / 1 / -1 / -1");
+    expect(stage).toContain("container-type: size");
+    expect(rule(text, ".cmp-dialog.is-screen-only .dsk-screen")).toContain("width: min(100cqw, 100cqh * 1280 / 900)");
+    // A banner waiting for the person keeps the bar.
+    expect(text).toContain(".is-bar-hidden:not(:has(.cmp-banner");
+    // The ground is the screen's own in both themes, so the dialog has it, not only the screen.
+    expect(rule(text, ".ac-dialog.cmp-dialog")).toContain("--screen-bg: #1f2128");
   });
 });
 

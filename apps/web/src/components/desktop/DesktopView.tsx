@@ -427,7 +427,16 @@ export function DesktopView({
         </Button>
       )}
       {!handingBack && (
-        <Button size="sm" variant="primary" icon="check" onClick={() => setHandingBack(true)}>
+        <Button
+          size="sm"
+          variant="primary"
+          icon="check"
+          onClick={() => {
+            // The note opens in the dialog, never over the full-screen screen.
+            head?.setFull(false);
+            setHandingBack(true);
+          }}
+        >
           {handBackLabel}
         </Button>
       )}
@@ -441,7 +450,7 @@ export function DesktopView({
         actions={
           <>
             {inControl ? controlActs : watchActs}
-            {(live || inControl || shown === "hidden") && <FullButton />}
+            {(live || inControl || shown === "hidden") && !handingBack && <FullButton />}
           </>
         }
       />

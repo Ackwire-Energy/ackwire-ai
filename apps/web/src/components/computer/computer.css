@@ -54,6 +54,8 @@
 
 /* The dialog: up to 96vw × 94vh. */
 .ac-dialog.cmp-dialog {
+  /* The agent's screen's own ground, around it in full screen too. */
+  --screen-bg: #1f2128;
   width: min(96vw, 1280px);
   max-height: 94vh;
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
@@ -89,6 +91,100 @@
   height: 100%;
   max-height: none;
   border-radius: 0;
+}
+/*
+ * Full screen on the agent's screen: its screen alone, as large as the display allows, on its own ground. The page
+ * stays the full-screen element (useFullScreen); only the layout changes. The body's boxes step aside, so the screen
+ * and what floats over it share one grid: the screen spans it; the head (a bar), a banner, the request being helped
+ * with and the line under the screen float at the top, centred, in that order. The stage and the screen restate
+ * their size container, which the phone's sheet turns off.
+ */
+.ac-dialog.cmp-dialog.is-screen-only {
+  display: grid;
+  grid-template: auto auto auto auto 1fr / minmax(0, 1fr);
+  background: var(--screen-bg);
+  box-shadow: none;
+}
+.cmp-dialog.is-screen-only > .cmp-body,
+.cmp-dialog.is-screen-only .cmp-body > .dsk {
+  display: contents;
+}
+.cmp-dialog.is-screen-only > .ac-run-strip,
+.cmp-dialog.is-screen-only .cmp-steps-row {
+  display: none;
+}
+.cmp-dialog.is-screen-only .dsk-stage {
+  grid-area: 1 / 1 / -1 / -1;
+  container-type: size;
+  border-radius: 0;
+}
+.cmp-dialog.is-screen-only .dsk-stage > .brw-dim {
+  border-radius: 0;
+}
+.cmp-dialog.is-screen-only .dsk-screen {
+  width: min(100cqw, 100cqh * 1280 / 900);
+  border-radius: 0;
+  box-shadow: none;
+}
+.cmp-dialog.is-screen-only > .ac-dialog__head,
+.cmp-dialog.is-screen-only .cmp-banner,
+.cmp-dialog.is-screen-only .cmp-asked,
+.cmp-dialog.is-screen-only .dsk-line {
+  z-index: 1;
+  grid-column: 1;
+  align-self: start;
+  justify-self: center;
+  box-sizing: border-box;
+  /* Clear of a phone's notch, which a page that covers the whole display reaches. */
+  width: min(760px, 100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  margin-top: 8px;
+  transition:
+    opacity 0.2s,
+    translate 0.2s;
+}
+.cmp-dialog.is-screen-only > .ac-dialog__head {
+  grid-row: 1;
+  margin-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--surface-raised);
+  box-shadow: var(--e3), var(--top);
+}
+.cmp-dialog.is-screen-only .ac-dialog__titles > * {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cmp-dialog.is-screen-only .cmp-banner {
+  grid-row: 2;
+  box-shadow: var(--e3);
+}
+.cmp-dialog.is-screen-only .cmp-asked,
+.cmp-dialog.is-screen-only .dsk-line {
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--e2);
+}
+.cmp-dialog.is-screen-only .cmp-asked {
+  grid-row: 3;
+}
+.cmp-dialog.is-screen-only .dsk-line {
+  grid-row: 4;
+}
+/* Hidden after a while (useBarHidden); a banner waiting for the person, or keyboard focus in the bar, keeps them. */
+.cmp-dialog.is-screen-only.is-bar-hidden:not(:has(.cmp-banner, .ac-dialog__head:focus-within)) > .ac-dialog__head,
+.cmp-dialog.is-screen-only.is-bar-hidden:not(:has(.cmp-banner, .ac-dialog__head:focus-within))
+  :is(.cmp-asked, .dsk-line) {
+  opacity: 0;
+  translate: 0 -8px;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmp-dialog.is-screen-only.is-bar-hidden > .ac-dialog__head,
+  .cmp-dialog.is-screen-only.is-bar-hidden :is(.cmp-asked, .dsk-line) {
+    translate: none;
+  }
 }
 .cmp-dialog .ac-dialog__head {
   padding-bottom: 8px;
