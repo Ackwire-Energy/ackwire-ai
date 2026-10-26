@@ -40,6 +40,8 @@ export interface ConnectAiRequest {
   apiKey?: string;
   /** Opened by itself (Jev), not by a click: never over a dialog already open. */
   auto?: boolean;
+  /** Opened because the workspace's computer just got ready (its email, its notification): a plan's panel says so. */
+  ready?: boolean;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -60,6 +62,7 @@ export const useConnectAi = () => useContext(ConnectAiContext);
 export function ConnectAiProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const dir = useDirectory(org.id);
   const api = useApi();
   const toast = useToast();
   // Each opening is its own dialog (`n`): what was chosen in another one doesn't carry over.
@@ -73,7 +76,7 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per link
   useEffect(() => {
     if (asked !== "ai") return;
-    open({});
+    open({ ready: true });
     clearAsked(null);
   }, [asked]);
   const answer = useCallback(
@@ -97,7 +100,8 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
   return (
     <ConnectAiContext.Provider value={value}>
       {children}
-      {request && (
+      {/* A link opens it with the page: it shows once the agents are known, so it opens on the right one. */}
+      {request && !dir.loading && (
         <ConnectAiDialog
           key={request.n}
           request={request}
@@ -207,6 +211,7 @@ function ConnectAiDialog({
             key={choice}
             choice={choice}
             gates={gates}
+            justReady={request.ready}
             agents={agents}
             agentId={agentId}
             onAgent={setAgentId}

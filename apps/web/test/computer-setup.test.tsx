@@ -182,6 +182,23 @@ describe("the workspace's computer on its way: the notice on top of the work are
   });
 });
 
+describe("no AI yet while the workspace's computer is on its way", () => {
+  test("the banner says a plan signs in there once it's ready, and that a key works now; ready, today's hint", async () => {
+    const state = seedState({
+      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
+    });
+    const { push } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 330 }, state);
+    const banner = () => document.querySelector(".noai-banner")?.textContent ?? "";
+    expect(banner()).toBe(
+      "Os agentes ainda não têm uma IA para pensar. O seu plano entra no Computador da Acme quando ele ficar pronto. Uma chave de API já funciona agora.Conectar uma IA",
+    );
+    await push({ state: "ready", machineId: "00000000-0000-4000-8000-000000000999" });
+    expect(banner()).toContain(
+      "Os agentes ainda não têm uma IA para pensar. Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
+    );
+  });
+});
+
 describe("Configurações → Computadores: the workspace's own computer", () => {
   test("its card instead of the cloud's: steps, size, one user per agent; ready, online with its agents", async () => {
     const { push, machines } = await open(`/org/${ORG_ID}/settings/computers`, {

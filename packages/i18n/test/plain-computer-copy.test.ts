@@ -109,6 +109,7 @@ const CLOUD_EXTRA = [
   "onboarding.keyStep.lead",
   ...["signIn", "key", "ready", "useKey"].map((k) => `connectAi.wait.${k}`),
   "connectAi.titleFor",
+  "noAi.banner.orgHintPreparing",
   "agentPage.work.brain.add.startFailed",
   "outage.titleCloud",
   "outage.cloudSub",

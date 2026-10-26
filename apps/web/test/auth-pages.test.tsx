@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ImportInput, SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
@@ -97,6 +97,33 @@ describe("Entrar (e-mail primeiro)", () => {
     await press(/^Entrar/);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
     expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
+  });
+
+  test("signed in from the ready email's Connect your AI: #general with Connect an AI open, the computer ready", async () => {
+    const state = seedState({
+      me: null,
+      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai" } as const] },
+    });
+    for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = "u-walter";
+    const signedIn = seedState().me;
+    const { auth } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
+    const { api } = authApi(ACCOUNT, { state });
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await brain(orgId, agentId)), ownSignIn: false });
+    const { router } = await renderApp(`/login?redirect=${encodeURIComponent(`/org/${ORG_ID}?connect=ai`)}`, {
+      api,
+      auth,
+    });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Senha", "correct horse");
+    await press(/^Entrar/, 10);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(router.state.location.search).toEqual({});
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("O Computador da Acme está pronto.");
   });
 
   test("an account without a password: only the provider it signs in with", async () => {

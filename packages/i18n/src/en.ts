@@ -930,6 +930,7 @@ export const en: Translations = {
     banner: {
       org: "Your agents don't have an AI to think with yet.",
       orgHint: "Connect yours, or just type what you want, like “use my Claude plan”.",
+      orgHintPreparing: "Your plan signs in on {{computer}} once it's ready. An API key works now.",
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because it has no AI connected.",

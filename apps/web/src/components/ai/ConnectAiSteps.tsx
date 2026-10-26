@@ -136,6 +136,8 @@ export interface PlanPanelProps {
   own?: { chosen: boolean; onChoose: (own: boolean) => void };
   /** This server's own computer, picked a step before and not connected yet. */
   hostConnecting?: boolean;
+  /** The person came because the computer just got ready (its email, its notification): said first, once it is. */
+  justReady?: boolean;
   /** "Usar uma chave de API agora": the API key row. */
   onKey: () => void;
   /** Self-host with no computer for the agent: where one is connected. */
@@ -194,6 +196,7 @@ function PlanSteps({
   agentName,
   own,
   hostConnecting,
+  justReady,
   onKey,
   onComputer,
   onDone,
@@ -213,8 +216,8 @@ function PlanSteps({
   const [assigned, setAssigned] = useState<"saving" | "failed" | "done">("saving");
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
-  // It turns ready while the person watches: said once, in place.
-  const [waited, setWaited] = useState(gate.state === "preparing");
+  // It turns ready while the person watches, or they came because it did: said once, in place.
+  const [waited, setWaited] = useState(gate.state === "preparing" || justReady === true);
   useEffect(() => {
     if (gate.state === "preparing") setWaited(true);
   }, [gate.state]);

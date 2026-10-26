@@ -942,6 +942,8 @@ export const ptBR = {
     banner: {
       org: "Os agentes ainda não têm uma IA para pensar.",
       orgHint: "Conecte a sua, ou escreva o que quer, como “usar meu plano do Claude”.",
+      orgHintPreparing:
+        "O seu plano entra no {{computer}} quando ele ficar pronto. Uma chave de API já funciona agora.",
       orgAction: "Conectar uma IA",
     },
     agent: "{{name}} não vai responder porque não tem uma IA conectada.",
