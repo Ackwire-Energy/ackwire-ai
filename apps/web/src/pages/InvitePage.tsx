@@ -355,7 +355,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
             </p>
           </div>
           {agents.length > 0 && (
-            <div className="invite-ask__agents">
+            <div className="invite-ask__agents ac-iconline">
               <AvatarStack aria-hidden="true">
                 {agents.map((a) => (
                   <AgentAvatar key={a.id} name={a.name} appearance={lookOf(a)} size="sm" />
@@ -378,7 +378,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
                 {t("invite.ask.as", { email: user.email })}{" "}
                 <button
                   type="button"
-                  className="ac-link invite-ask__switch"
+                  className="ac-link"
                   onClick={async () => {
                     await auth.signOut();
                     qc.clear();

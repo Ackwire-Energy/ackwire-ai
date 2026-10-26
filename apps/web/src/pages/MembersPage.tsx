@@ -454,7 +454,7 @@ function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
                   title={r.email}
                   detail={
                     <>
-                      <span className="jr-proof" data-confirmed={r.confirmed || undefined}>
+                      <span className="jr-proof ac-iconline" data-confirmed={r.confirmed || undefined}>
                         <Icon name={r.confirmed ? "check" : "mail"} size={14} />
                         <span>{r.confirmed ? t("members.requests.confirmed") : t("members.requests.unconfirmed")}</span>
                       </span>

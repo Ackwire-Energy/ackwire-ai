@@ -59,6 +59,9 @@ describe("an invitation link asks to join", () => {
     expect(heading()).toBe("Pedir para entrar na Acme");
     expect(text()).toContain("Marina compartilhou este link. Um admin da Acme aprova cada pessoa nova.");
     expect(text()).toContain("Ada e Atlas já trabalham lá.");
+    // Their faces lead the line, on its first line when the names wrap.
+    const agents = screen().getByText("Ada e Atlas já trabalham lá.").parentElement;
+    expect(agents?.classList.contains("ac-iconline")).toBe(true);
     expect(screen().getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe("/login?redirect=%2Finvite%2Flnk");
     const send = button("Pedir para entrar");
     expect(send.hasAttribute("disabled")).toBe(true);
@@ -193,6 +196,8 @@ describe("Members › Requests to join", () => {
     expect(ana.textContent).toContain("Ana Souza pede para entrar");
     expect(ana.textContent).toContain("ana@estudio.com");
     expect(ana.textContent).toContain("E-mail confirmado: a pessoa entra quando você aprovar.");
+    const proof = within(ana).getByText("E-mail confirmado: a pessoa entra quando você aprovar.").parentElement;
+    expect(proof?.classList.contains("ac-iconline")).toBe(true);
     expect(ana.textContent).toContain("“Designer nova da Paula”");
     expect(ana.textContent).toMatch(/Pelo link de convite · fecha em /);
     expect(ana.querySelector(".ac-chip")?.textContent).toBe("Pediu há 2 h");

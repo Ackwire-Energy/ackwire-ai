@@ -12,17 +12,12 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-/* Whether approving lets them in or sends an invitation: the icon on the line's first line, as every icon-led line. */
+/* Whether approving lets them in or sends an invitation (an `.ac-iconline`). */
 .jr-proof {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
   color: var(--ink);
 }
 .jr-proof > :first-child {
-  flex: none;
   color: var(--muted);
-  translate: 0 calc(9px + 0.08em - 50%);
 }
 .jr-proof[data-confirmed] > :first-child {
   color: var(--ok);
