@@ -490,7 +490,13 @@ export const envVars = {
   EMAIL_FROM: {
     schema: z.string().optional(),
     description:
-      "Sender of transactional emails, e.g. `agentes <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes <ola@HOST>`, HOST being the host of `PUBLIC_URL`.",
+      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`.",
+    section: "Email",
+  },
+  EMAIL_ART: {
+    schema: z.enum(["auto", "attach"]).default("auto"),
+    description:
+      "Where emails get their pictures. `auto`: from this server's `/email/` when its address is public, else attached to each message. `attach`: always attached, for a server that people outside can't open.",
     section: "Email",
   },
   COMPOSIO_API_KEY: {
