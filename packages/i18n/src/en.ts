@@ -1422,6 +1422,7 @@ export const en: Translations = {
       openApprovals: "Open in Approvals",
       joinRequest_one: "{{name}} asks to join",
       joinRequest_other: "{{name}} and others ask to join",
+      joinRequestNames: "{{names}} ask to join",
       doing: {
         merge: "merge",
         deploy: "deploy",
@@ -1463,7 +1464,7 @@ export const en: Translations = {
       browserHandoff: "<b>{{name}}</b> needs you in its browser",
       desktopHandoff: "<b>{{name}}</b> needs you on its computer",
       joinRequest: "<b>{{name}}</b> asks to join",
-      joinRequestMany: "<b>{{name}}</b> and others ask to join",
+      joinRequestMany: "<b>{{names}}</b> ask to join",
       reaction_one: "<b>{{names}}</b> reacted to your message",
       reaction_other: "<b>{{names}}</b> reacted to your message",
     },

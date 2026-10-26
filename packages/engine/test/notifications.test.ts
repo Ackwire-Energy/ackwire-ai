@@ -212,6 +212,22 @@ test("one-off notifications are idempotent; done, undo, read-all and the cursor"
   await expect(markNotificationRead(deps(), f.owner.id, f.org.id, target, true)).rejects.toBeInstanceOf(NotFoundError);
 });
 
+test("a merged request-to-join notice keeps the first two names, each once, and counts every ask", async () => {
+  f = await setup();
+  for (const name of ["Ana Souza", "Ana Souza", "Bruno Lima", "Carla Dias"])
+    await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [f.owner.id],
+      kind: "join_request",
+      groupKey: `join_requests:${f.org.id}`,
+      waiting: true,
+      source: { label: "Acme" },
+      latest: { title: name, names: [name] },
+    });
+  const [row] = (await inbox(f.owner.id)).items;
+  expect([row?.count, row?.latest]).toEqual([4, { title: "Carla Dias", names: ["Ana Souza", "Bruno Lima"] }]);
+});
+
 test("snoozed notifications leave the inbox and come back on top when their time comes", async () => {
   f = await setup();
   const { bia } = await people();

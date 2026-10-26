@@ -3918,6 +3918,8 @@ export interface NotificationLatest {
   reason?: string;
   /** `approval`: asked while nobody watched, by a routine or an unattended run (ADR 0053 §8). */
   origin?: ApprovalOrigin;
+  /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
+  names?: string[];
 }
 
 export interface AppNotification {

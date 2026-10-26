@@ -1439,6 +1439,7 @@ export const ptBR = {
       openApprovals: "Abrir em Aprovações",
       joinRequest_one: "{{name}} pede para entrar",
       joinRequest_other: "{{name}} e outras pessoas pedem para entrar",
+      joinRequestNames: "{{names}} pedem para entrar",
       doing: {
         merge: "fazer um merge",
         deploy: "fazer um deploy",
@@ -1480,7 +1481,7 @@ export const ptBR = {
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
       desktopHandoff: "<b>{{name}}</b> precisa de você no computador",
       joinRequest: "<b>{{name}}</b> pede para entrar",
-      joinRequestMany: "<b>{{name}}</b> e outras pessoas pedem para entrar",
+      joinRequestMany: "<b>{{names}}</b> pedem para entrar",
       reaction_one: "<b>{{names}}</b> reagiu à sua mensagem",
       reaction_other: "<b>{{names}}</b> reagiram à sua mensagem",
     },

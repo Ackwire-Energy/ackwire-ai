@@ -68,8 +68,8 @@ export const NOTIFICATION_KINDS = [
   "computer_ready",
   /**
    * Someone asks to join through the invitation link (owners and admins, ADR 0068): waiting, one row per workspace
-   * merging the burst, `latest.title` the newest name, `source.label` the workspace's. No actor: the person isn't
-   * a member. Never their note.
+   * merging the burst, `latest.title` the newest name and `latest.names` the first ones, `source.label` the
+   * workspace's. No actor: the person isn't a member. Never their note.
    */
   "join_request",
 ] as const;
@@ -125,6 +125,11 @@ export interface NotificationLatest {
   reason?: string;
   /** `approval`: asked while nobody watched, by a routine (its name) or an unattended run (ADR 0053 §8). */
   origin?: ApprovalOrigin;
+  /**
+   * `join_request`: who asked, by name (they aren't members, so no actors), the first `MAX_NAMES` in the order they
+   * asked: a merged row names whoever its time is from, and `count` says how many asked in all.
+   */
+  names?: string[];
 }
 
 export interface NotificationView {
@@ -172,6 +177,9 @@ export const MAX_SNOOZE_MS = 365 * 24 * 3600_000;
 
 const nowOf = (deps: { now?: () => Date }) => deps.now?.() ?? new Date();
 
+/** How many people a merged row names (`latest.names`); the rest are counted. */
+const MAX_NAMES = 2;
+
 /**
  * Plain text for a card: code fences, markdown marks and links reduced to
  * their words, whitespace collapsed, at most `max` chars. `@mentions` stay.
@@ -214,6 +222,12 @@ const sameActor = (a: NotificationActor, b: NotificationActor) => a.type === b.t
 export function mergeActors(newest: NotificationActor | null | undefined, before: NotificationActor[]) {
   const list = newest ? [newest, ...before.filter((a) => !sameActor(a, newest))] : before;
   return list.slice(0, MAX_ACTORS);
+}
+
+/** A merge's `latest`: the newest event's, the names the row had kept first (each once, `MAX_NAMES`). */
+function mergeLatest(next: Record<string, unknown>, before: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(next.names) || !Array.isArray(before.names)) return next;
+  return { ...next, names: [...new Set([...before.names, ...next.names])].slice(0, MAX_NAMES) };
 }
 
 /** Drops empty values so the stored JSON holds only what is set. */
@@ -333,7 +347,7 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
           .set({
             actors: mergeActors(input.actor, open.actors),
             count: sql`${notifications.count} + 1`,
-            latest: Object.keys(latest).length ? latest : open.latest,
+            latest: Object.keys(latest).length ? mergeLatest(latest, open.latest) : open.latest,
             source: { ...open.source, ...source },
             readAt: null,
             updatedAt: now,

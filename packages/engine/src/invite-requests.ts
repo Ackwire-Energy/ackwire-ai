@@ -303,7 +303,7 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
       groupKey: group(orgId),
       waiting: true,
       source: { label: filed.orgName },
-      latest: { title: ask.name },
+      latest: { title: ask.name, names: [ask.name] },
     },
   ).catch(() => []);
   return true;

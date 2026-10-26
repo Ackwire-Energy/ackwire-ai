@@ -162,6 +162,15 @@ export function groupByDay(list: AppNotification[], now = new Date()): [DayGroup
 export const channelOf = (n: AppNotification) => n.source.channelId ?? n.source.dmId ?? null;
 
 /**
+ * Who asks to join in a request notice: the first people who asked, in that order (the notice's time is the first
+ * one's), and how many asked in all. A notice from before it kept the names has the newest one's only.
+ */
+export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
+  names: n.latest.names?.length ? n.latest.names : [n.latest.title ?? ""],
+  total: n.count,
+});
+
+/**
  * What the workspace itself tells, with nobody behind it (its computer is ready, its standing changed): its
  * headline's key, the whole of what it says; null for what someone did.
  */

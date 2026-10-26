@@ -73,10 +73,14 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   expect(toOwner?.text).toContain(`/org/${orgId}/settings/members?request=${request?.id}&do=approve`);
   expect(toOwner?.text).not.toContain("Paula");
   const inbox = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as {
-    items: { kind: string; waiting: boolean; latest: { title?: string } }[];
+    items: { kind: string; waiting: boolean; latest: { title?: string; names?: string[] } }[];
   };
   expect(inbox.items).toEqual([
-    expect.objectContaining({ kind: "join_request", waiting: true, latest: { title: "Ana Souza" } }),
+    expect.objectContaining({
+      kind: "join_request",
+      waiting: true,
+      latest: { title: "Ana Souza", names: ["Ana Souza"] },
+    }),
   ]);
 
   const approved = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, {

@@ -375,17 +375,43 @@ test("the admins' notice: who asks, a Members chip, and it opens Members", async
         waiting: true,
         count: 2,
         source: { label: "Acme" },
-        latest: { title: "Bruno Lima" },
+        latest: { title: "Bruno Lima", names: ["Ana Souza", "Bruno Lima"] },
       }),
     ],
   });
   const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
   await settle(6);
   const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
-  expect(notice.getAttribute("aria-label")).toBe("Bruno Lima e outras pessoas pedem para entrar");
-  expect(notice.textContent).toContain("Bruno Lima e outras pessoas pedem para entrar");
+  // Two people: both by name, the first to ask first, as the notice's face and time are hers.
+  expect(notice.getAttribute("aria-label")).toBe("Ana Souza e Bruno Lima pedem para entrar");
+  expect(notice.textContent).toContain("Ana Souza e Bruno Lima pedem para entrar");
+  expect(notice.querySelector(".nt-face")?.textContent).toBe("AS");
   expect(notice.querySelector(".ac-chip")?.textContent).toBe("Membros");
   await click(within(notice).getByRole("button", { name: "Abrir" }));
   await settle(6);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
+});
+
+test("the admins' notice names the first two who asked and counts the rest", async () => {
+  for (const [latest, count, said] of [
+    [
+      { title: "Carla Dias", names: ["Ana Souza", "Bruno Lima"] },
+      3,
+      "Ana Souza, Bruno Lima e mais 1 pedem para entrar",
+    ],
+    // Kept from before the notice held names: the newest one's, and how many more.
+    [{ title: "Bruno Lima" }, 2, "Bruno Lima e mais 1 pedem para entrar"],
+  ] as const) {
+    const state = seedState({
+      notifications: [
+        notification({ id: "n-join", kind: "join_request", waiting: true, count, source: { label: "Acme" }, latest }),
+      ],
+    });
+    await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+    await settle(6);
+    const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
+    expect(notice.getAttribute("aria-label")).toBe(said);
+    expect(notice.querySelector(".nt-meta")?.textContent).toContain(said);
+    cleanup();
+  }
 });
