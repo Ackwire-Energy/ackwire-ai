@@ -3,6 +3,7 @@ import type { BrowserHandoff, DesktopStatus, Edition, Machine } from "../api/typ
 import { handoffMinutesLeft, handoffScreen, isWaitingHandoff } from "../browser";
 import {
   type EtaView,
+  etaLine,
   type SetupView,
   setupEta,
   setupPending,
@@ -150,9 +151,8 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
     case "held":
       return t("agentComputer.status.held");
     case "preparing":
-      if (s.eta?.kind === "minutes") return t("agentComputer.status.preparing", { count: s.eta.count });
-      return s.eta?.kind === "underMinute" || s.eta?.kind === "almost"
-        ? t("agentComputer.status.preparingSoon")
+      return s.eta
+        ? `${t("agentComputer.status.preparingPlain")} · ${lowerFirst(etaLine(t, s.eta), w.locale)}`
         : t("agentComputer.status.preparingPlain");
     case "slow":
       return w.emailPromised ? t("agentComputer.status.slow") : t("agentComputer.status.slowPlain");

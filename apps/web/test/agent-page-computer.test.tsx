@@ -48,15 +48,21 @@ async function entryOf(o: Options = {}) {
 const line = (row: HTMLElement | null) => row?.querySelector(".cmp-entry__line")?.textContent ?? null;
 
 describe("the agent page's one entry: its status line", () => {
-  test("Cloud, its computer on its way: the time left, almost ready, or nothing said yet", async () => {
-    const at = (secondsLeft: number | null) => ({
-      step: "installing" as const,
+  test("Cloud, its computer on its way: the time left as every screen says it, or nothing said yet", async () => {
+    const at = (secondsLeft: number | null, step: "installing" | "connecting" = "installing") => ({
+      step,
       secondsLeft,
       expectedReadyAt: secondsLeft === null ? null : new Date(Date.now() + secondsLeft * 1000).toISOString(),
     });
     expect(line(await entryOf({ setup: at(330), machine: null }))).toBe("Sendo preparado · faltam uns 6 min");
     cleanup();
-    expect(line(await entryOf({ setup: at(50), machine: null }))).toBe("Sendo preparado · quase pronto");
+    expect(line(await entryOf({ setup: at(50), machine: null }))).toBe("Sendo preparado · falta menos de um minuto");
+    cleanup();
+    expect(line(await entryOf({ setup: at(10, "connecting"), machine: null }))).toBe("Sendo preparado · quase pronto…");
+    cleanup();
+    expect(line(await entryOf({ setup: at(-30), machine: null }))).toBe(
+      "Sendo preparado · demorando um pouco mais que o previsto",
+    );
     cleanup();
     expect(line(await entryOf({ setup: at(null), machine: null }))).toBe("Sendo preparado");
   });

@@ -8267,7 +8267,6 @@ export const en: Translations = {
       restarting: "Restarting after the update",
       network: "Setting up its network",
       firewall: "Setting up its protection",
-      finishing: "Running the last checks",
     },
     stepOf: "Step {{n}} of {{total}} · {{step}}",
     status: {
@@ -8397,9 +8396,6 @@ export const en: Translations = {
       held: "Paused for now",
       unavailable: "Its screen can't be shown right now",
       noScreen: "Doesn't use a screen or a browser",
-      preparing_one: "Being prepared · about 1 min left",
-      preparing_other: "Being prepared · about {{count}} min left",
-      preparingSoon: "Being prepared · almost ready",
       preparingPlain: "Being prepared",
       slow: "Taking longer than usual · we'll email you",
       slowPlain: "Taking longer than usual",

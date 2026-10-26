@@ -183,6 +183,32 @@ describe("the workspace's computer on its way: the notice on top of the work are
     expect(notice()).toContain(time.charAt(0).toLowerCase() + time.slice(1));
   });
 
+  test("the time line never steps back: almost ready only in the last step, a little longer once it runs out", async () => {
+    const { push } = await open(`/org/${ORG_ID}/settings/computers`, {
+      step: "installing",
+      stage: "apps",
+      secondsLeft: 50,
+    });
+    const notice = () => screen().getByRole("region", { name: NOTICE }).textContent ?? "";
+    const time = () =>
+      screen().getByRole("region", { name: "Computador da Acme" }).querySelector(".setup-eta")?.textContent;
+    expect(notice()).toContain("Passo 3 de 4 · Instalando os programas · falta menos de um minuto");
+    expect(time()).toBe("Falta menos de um minuto");
+    // The apps end early: the last step, almost ready.
+    await push({ step: "connecting", stage: "connecting", secondsLeft: 10 });
+    expect(notice()).toContain("Passo 4 de 4 · Conectando ao seu workspace · quase pronto…");
+    expect(time()).toBe("Quase pronto…");
+
+    // Another wait whose time runs out during the apps: a little longer than expected, in the last step too.
+    cleanup();
+    const late = await open(`/org/${ORG_ID}/settings/computers`, { step: "installing", stage: "apps", secondsLeft: 0 });
+    expect(notice()).toContain("Passo 3 de 4 · Instalando os programas · demorando um pouco mais que o previsto");
+    expect(time()).toBe("Demorando um pouco mais que o previsto");
+    await late.push({ step: "connecting", stage: "connecting", secondsLeft: -20 });
+    expect(notice()).toContain("Passo 4 de 4 · Conectando ao seu workspace · demorando um pouco mais que o previsto");
+    expect(time()).toBe("Demorando um pouco mais que o previsto");
+  });
+
   test("where people connect their own computers, nothing changes: no notice", async () => {
     await open(`/org/${ORG_ID}/c/${ENG_ID}`, null);
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();

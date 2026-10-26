@@ -8311,7 +8311,6 @@ export const ptBR = {
       restarting: "Reiniciando depois da atualização",
       network: "Configurando a rede",
       firewall: "Configurando a proteção",
-      finishing: "Fazendo as últimas verificações",
     },
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
     status: {
@@ -8338,7 +8337,7 @@ export const ptBR = {
       minutes_other: "Faltam uns {{count}} min",
       underMinute: "Falta menos de um minuto",
       almost: "Quase pronto…",
-      late: "Levando um pouco mais que o previsto",
+      late: "Demorando um pouco mais que o previsto",
     },
     email: {
       you: "Avisamos você em {{email}} quando ele ficar pronto.",
@@ -8442,9 +8441,6 @@ export const ptBR = {
       held: "Em pausa por enquanto",
       unavailable: "A tela não pode ser mostrada agora",
       noScreen: "Não usa tela nem navegador",
-      preparing_one: "Sendo preparado · falta cerca de 1 min",
-      preparing_other: "Sendo preparado · faltam uns {{count}} min",
-      preparingSoon: "Sendo preparado · quase pronto",
       preparingPlain: "Sendo preparado",
       slow: "Demorando mais que o normal · avisamos por e-mail",
       slowPlain: "Demorando mais que o normal",
