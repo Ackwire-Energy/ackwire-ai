@@ -1102,13 +1102,13 @@ function ApprovalDetails({
         <DetailsSection title={t("approvals.panel.trail")}>
           <ol className="ap-trail">
             {a.trail?.map((s) => (
-              <li key={s.at + s.text.slice(0, 12)}>
+              <li key={s.at + s.text.slice(0, 12)} className="ac-iconline">
                 <span className="ap-trail__dot" aria-hidden="true" />
                 <span className="ap-trail__text">{s.text}</span>
                 <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
               </li>
             ))}
-            <li className="is-current">
+            <li className="is-current ac-iconline">
               <span className="ap-trail__dot" aria-hidden="true" />
               <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
               <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>

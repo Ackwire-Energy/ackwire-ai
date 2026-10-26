@@ -98,3 +98,24 @@ describe("Aprovações: missions", () => {
     expect(open.getAttribute("href")).toBe(`/org/${ORG_ID}/threads/${mission.threadId}?m=msg-decision-1`);
   });
 });
+
+describe("Aprovações: a request's details", () => {
+  test("how it got here: each step's dot leads its text's first line", async () => {
+    const state = seedState();
+    const at = new Date().toISOString();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (merge)
+      merge.trail = [
+        { text: "O João pediu a correção do login", at },
+        { text: "A Ada abriu o PR #42 com a correção", at },
+      ];
+    await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
+    await settle(8);
+    const steps = [...document.querySelectorAll(".ap-trail li")];
+    expect(steps.length).toBe(3);
+    for (const step of steps) {
+      expect(step.classList.contains("ac-iconline")).toBe(true);
+      expect(step.firstElementChild?.classList.contains("ap-trail__dot")).toBe(true);
+    }
+  });
+});

@@ -978,7 +978,7 @@ body[data-window="popover"] {
 .dk-fr__end[data-near] {
   margin-top: 24px;
 }
-/* Run here's steps as they run. */
+/* Run here's steps as they run, each mark an `.ac-iconline` lead on its name's line. */
 .dk-fr__steps {
   list-style: none;
   margin: 24px 0 0;
@@ -988,20 +988,16 @@ body[data-window="popover"] {
   gap: 14px;
 }
 .dk-fr__steps li {
-  display: flex;
   gap: 12px;
-  align-items: flex-start;
 }
 .dk-fr__steps li[data-state="todo"] {
   color: var(--faint);
 }
 .dk-fr__stepmark {
-  flex: none;
   width: 20px;
   height: 20px;
   display: grid;
   place-items: center;
-  margin-top: 1px;
 }
 .dk-fr__steps li[data-state="done"] .dk-fr__stepmark {
   color: var(--ok);
