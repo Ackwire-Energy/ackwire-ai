@@ -73,15 +73,15 @@ export const SOURCE_NAME: Record<ImportSource, string> = {
   agenteschat: "agentes.chat",
 };
 /**
- * Each source's tile: its own mark (apps/web/public/brands/README.md), or letters where we ship none, so no two
- * tiles look alike.
+ * Each source's tile: its official mark (apps/web/public/brands/README.md), and the maker's own dark file where
+ * the mark would vanish on a dark theme.
  */
-export const SOURCE_MARK: Record<ImportSource, { icon: string } | { letters: string }> = {
-  openclaw: { letters: "OC" },
-  hermes: { letters: "H" },
-  openbotrun: { letters: "OR" },
-  paperclip: { letters: "P" },
-  openmausbot: { icon: "/brands/openmausbot.png" },
+export const SOURCE_MARK: Record<ImportSource, { icon: string; dark?: string }> = {
+  openclaw: { icon: "/brands/openclaw.svg" },
+  hermes: { icon: "/brands/hermes.svg", dark: "/brands/hermes-dark.svg" },
+  openbotrun: { icon: "/brands/openbotrun.svg" },
+  paperclip: { icon: "/brands/paperclip.svg", dark: "/brands/paperclip-dark.svg" },
+  openmausbot: { icon: "/brands/openmausbot.svg" },
   openbot: { icon: "/brands/openbot.png" },
   agenteschat: { icon: "/favicon.svg" },
 };

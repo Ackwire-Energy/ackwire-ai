@@ -376,6 +376,18 @@ describe("the onboarding where the workspace gets its own computer", () => {
     );
     expect(step.textContent).toContain("O Claude Code e o Codex já vêm nele.");
     expect(step.textContent).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    // Every line starts with its icon or its maker's mark, set on the line's first line of text.
+    const lines = [...step.querySelectorAll(".setup-progress--line, .setup-line, .setup-facts li, .onb__status")];
+    expect(lines.length).toBe(6);
+    for (const line of lines) {
+      expect(line.classList.contains("ac-iconline")).toBe(true);
+      expect(line.firstElementChild?.matches("svg.ac-icon, canvas.ac-pixspin, .ac-brand")).toBe(true);
+    }
+    // One lead size, so every line's words start in one column (the status under them is a box of its own).
+    for (const line of lines.filter((l) => !l.matches(".onb__status"))) {
+      const lead = line.firstElementChild as HTMLElement;
+      expect(lead.matches(".ac-brand--xs") || lead.style.width === "14px").toBe(true);
+    }
     // The lead says where, and the rail says how far: never "opcional".
     expect(document.body.textContent).toContain("Num computador só deste workspace, que está sendo preparado agora.");
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });

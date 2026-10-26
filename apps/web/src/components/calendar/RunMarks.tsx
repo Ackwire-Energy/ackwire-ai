@@ -1,6 +1,6 @@
 import type { CalItem, RunEntry, RunStatus } from "@agenteschat/client/lib/calendar";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
-import { Chip, type IconName, Popover, RunMark } from "@agenteschat/ui";
+import { Chip, cx, type IconName, Popover, RunMark } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import type { CSSProperties } from "react";
@@ -119,8 +119,8 @@ export function RunMarks({
             const it = r.item;
             const status = r.status ?? (r.count > 1 ? undefined : it.lastResult);
             return (
-              <li key={r.key} className="cal-runs__item">
-                {it.agentId && <AgentAvatar agentId={it.agentId} size="xs" name="" className="cal-runs__avatar" />}
+              <li key={r.key} className={cx("cal-runs__item", it.agentId && "ac-iconline")}>
+                {it.agentId && <AgentAvatar agentId={it.agentId} size="xs" name="" />}
                 <span className="cal-runs__text">
                   <b className="cal-runs__name">{it.title}</b>
                   <span className="small muted tabular">

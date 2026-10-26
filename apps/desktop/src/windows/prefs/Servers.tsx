@@ -1,4 +1,4 @@
-import { Button, Chip, Dialog, DialogFooter, Icon, type IconName, Menu, MenuItem, Switch } from "@agenteschat/ui";
+import { Button, Chip, Dialog, DialogFooter, Menu, MenuItem, Switch } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
@@ -6,12 +6,11 @@ import { isHereServer, type LocalServerStatus, type ServeProblem, type Tailnet }
 import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
 import { pairedHomes } from "../../control/store";
 import { useLocalServer, useOnShown } from "../../hooks";
-import { ReachProblem, ReachRow } from "../../ui/here";
+import { ReachProblem, ReachRow, ServerTile } from "../../ui/here";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
 import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
 
-const KIND_ICON: Record<ServerKind, IconName> = { cloud: "cloud", tailnet: "globe", here: "computer", own: "globe" };
 const KIND_SUB: Record<ServerKind, string> = {
   cloud: "desktop.servers.cloudSub",
   tailnet: "desktop.servers.ownTailnet",
@@ -84,11 +83,7 @@ export function Servers() {
               return (
                 <PrefRow
                   key={server}
-                  lead={
-                    <span className="dk-logo dk-logo--soft">
-                      <Icon name={KIND_ICON[kind]} size={16} />
-                    </span>
-                  }
+                  lead={<ServerTile kind={kind} />}
                   title={serverName(server)}
                   desc={t(KIND_SUB[kind])}
                   end={
@@ -168,11 +163,7 @@ function StoppedHere({ local }: { local: LocalServerStatus }) {
   return (
     <PrefCard>
       <PrefRow
-        lead={
-          <span className="dk-logo dk-logo--soft">
-            <Icon name="computer" size={16} />
-          </span>
-        }
+        lead={<ServerTile kind="here" />}
         title={t("desktop.server.title")}
         desc={t("desktop.server.notHere", { path: shortPath(local.dir) })}
         end={
@@ -262,11 +253,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
     <>
       <PrefCard>
         <PrefRow
-          lead={
-            <span className="dk-logo dk-logo--soft">
-              <Icon name="computer" size={16} />
-            </span>
-          }
+          lead={<ServerTile kind="here" />}
           title={t("desktop.server.title")}
           desc={t(local.reach ? "desktop.servers.hereTailnet" : "desktop.servers.hereOnly")}
           end={chip}

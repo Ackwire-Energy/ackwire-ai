@@ -449,7 +449,7 @@ function Detail({ entry, onConnect }: { entry: Entry; onConnect: () => void }) {
           <h4 className="catalog-detail__h">{t("connectors.detail.can")}</h4>
           <ul className="catalog-detail__caps">
             {entry.can.map((c) => (
-              <li key={c.text} data-asks={c.asks || undefined}>
+              <li key={c.text} className="ac-iconline" data-asks={c.asks || undefined}>
                 <Icon name={c.asks ? "shield" : "check"} size={14} />
                 <span>{c.text}</span>
               </li>
@@ -503,12 +503,12 @@ function OtherDetail({ onConnect }: { onConnect: () => void }) {
         <h4 className="catalog-detail__h">{t("connectors.detail.how")}</h4>
         <ul className="catalog-detail__caps">
           {(["1", "2"] as const).map((n) => (
-            <li key={n}>
+            <li key={n} className="ac-iconline">
               <Icon name="check" size={14} />
               <span>{t(`connectors.otherSteps.${n}`)}</span>
             </li>
           ))}
-          <li data-asks>
+          <li className="ac-iconline" data-asks>
             <Icon name="shield" size={14} />
             <span>{t("connectors.otherSteps.ask")}</span>
           </li>

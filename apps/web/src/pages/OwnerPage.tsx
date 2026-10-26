@@ -120,7 +120,7 @@ export function OwnerPage({ claim }: { claim: string | null }) {
                 <PasswordHelp password={password} />
               </div>
               {error && (
-                <p className="auth__error" role="alert">
+                <p className="auth__error ac-iconline" role="alert">
                   <Icon name="alert" size={14} />
                   {error}
                 </p>

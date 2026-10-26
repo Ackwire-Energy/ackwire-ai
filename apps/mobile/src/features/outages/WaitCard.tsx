@@ -3,7 +3,7 @@ import { brainUnavailableOf, waitCardState } from "@agenteschat/client/lib/machi
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Icon, ProviderLogo, Text } from "@/ui";
+import { Button, Icon, LineIcon, ProviderLogo, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { waitCardText } from "./logic";
 import { openSwitchComputer } from "./OutageNotice";
@@ -54,7 +54,11 @@ function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>>
       </View>
       <View style={styles.body}>
         {/* Waiting, the line names the brain that runs there. */}
-        {card.done ? null : <ProviderLogo id={card.brain} size="xs" />}
+        {card.done ? null : (
+          <LineIcon variant="small" size={14}>
+            <ProviderLogo id={card.brain} size="xs" />
+          </LineIcon>
+        )}
         <Text variant="small" tone="muted" importantForAccessibility="no" style={styles.grow}>
           {card.body}
         </Text>

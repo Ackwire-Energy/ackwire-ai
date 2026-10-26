@@ -298,18 +298,12 @@ p {
   color: var(--ink-muted);
 }
 .outage-dialog__hint {
-  display: flex;
-  gap: 8px;
   margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
   font-size: 13px;
   color: var(--ink-muted);
-}
-.outage-dialog__hint .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 
 /* The agent's one card while it waits for its computer (instead of repeated messages). */
@@ -323,9 +317,6 @@ p {
   background: var(--surface-sunken);
 }
 .waitcard__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: 600;
 }
 .waitcard__top .ac-icon {
@@ -335,15 +326,10 @@ p {
   color: var(--success);
 }
 .waitcard p {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   font-size: 13.5px;
   color: var(--ink-muted);
-}
-.waitcard p > .ac-brand {
-  margin-top: 2px;
 }
 .waitcard__acts {
   display: flex;
@@ -795,19 +781,12 @@ p {
   color: var(--ink-muted);
 }
 /* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+/* The engine line (an `.ac-iconline`) inside a line of text. */
 .channel__brain,
-/* The engine line: the icon sits with the first line when the text wraps. */
 .profile-card__brain {
   display: inline-flex;
-  align-items: flex-start;
   gap: 6px;
   vertical-align: top;
-}
-.profile-card__brain > .ac-icon,
-.profile-card__brain > .ac-brand,
-.channel__brain > .ac-brand {
-  flex: none;
-  margin-top: 2px;
 }
 .channel__messages {
   flex: 1;
@@ -858,16 +837,10 @@ p {
 }
 /* "O Theo só responde a Walter.": muted, only for me. */
 .channel__notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 4px 24px;
   padding: 4px 12px;
   font-size: 13px;
   color: var(--ink-muted);
-}
-.channel__notice .ac-icon {
-  flex: none;
 }
 .sidebar__item-meta .audience-chip--compact {
   font-size: 11px;
@@ -1069,13 +1042,10 @@ p {
   gap: 6px;
 }
 .evidence li {
-  display: flex;
-  gap: var(--space-2);
   font-size: 14px;
   line-height: 20px;
 }
 .evidence .ac-icon {
-  margin-top: 2px;
   color: var(--ink-muted);
 }
 
@@ -2590,10 +2560,12 @@ p {
 .level-row__asks .ac-chip {
   margin-left: 0;
 }
-.level-note,
 .level-legend__asks {
   display: flex;
   align-items: center;
+}
+.level-note,
+.level-legend__asks {
   gap: 6px;
   margin: 0;
 }
@@ -2659,6 +2631,7 @@ p {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
@@ -3117,6 +3090,7 @@ p {
   gap: 8px;
   align-items: center;
 }
+/* The words and their icon (an `.ac-iconline`) sit in the middle of the button beside them. */
 .computer-error {
   display: flex;
   align-items: center;
@@ -3125,7 +3099,6 @@ p {
   color: var(--ink);
 }
 .computer-error .ac-icon {
-  flex: none;
   color: var(--ink-muted);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -3434,14 +3407,10 @@ p {
   gap: 6px;
 }
 .catalog-detail__caps li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   font-size: 13.5px;
   color: var(--ink2);
 }
 .catalog-detail__caps .ac-icon {
-  margin-top: 3px;
   color: var(--ink-muted);
 }
 .catalog-detail__act {
@@ -3538,6 +3507,19 @@ p {
   background: var(--connector-color, var(--ink));
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
+}
+/* A service in a chip: its bare mark in the box of the chip's icons, a little smaller since it fills its square. */
+.ac-chip > .connector-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: none;
+  background: transparent;
+  font-size: 8px;
+}
+.ac-chip > .connector-icon > .connector-icon__mark {
+  width: 12px;
+  height: 12px;
 }
 
 /* Settings → Conectores: one row per connected service. */
@@ -4087,17 +4069,12 @@ p {
 }
 /* The mark sits on the first line (centered on its 18px line box), so wrapped text never pushes it down. */
 .tr-row__why {
-  display: flex;
-  align-items: flex-start;
   gap: 7px;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--muted);
   margin-top: 1px;
   min-width: 0;
-}
-.tr-row__why .ac-toolpx-spark {
-  margin-top: 4px;
 }
 .tr-row__why span {
   min-width: 0;
@@ -4121,6 +4098,7 @@ p {
   border-radius: var(--control-r-sm);
   font-weight: 600;
   font-size: var(--control-fs-sm);
+  line-height: normal;
   background: var(--raised);
   color: var(--ink);
   box-shadow: var(--e1), var(--top);
@@ -4548,6 +4526,7 @@ p {
   box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
   font-size: var(--control-fs-md);
+  line-height: normal;
   color: var(--faint);
   cursor: pointer;
   text-align: left;
@@ -4641,14 +4620,10 @@ p {
   align-self: flex-start;
 }
 .sandbox-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   color: var(--ink);
 }
 .sandbox-warning .ac-icon {
-  flex: none;
   color: var(--warn);
 }
 
@@ -4673,6 +4648,7 @@ p {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .live-code-toggle__btn:hover {
@@ -5214,6 +5190,7 @@ button.live-call__head:hover {
   font: inherit;
   font-size: 12.5px;
   font-weight: 650;
+  line-height: normal;
   color: var(--ink);
   cursor: pointer;
   transition: transform 0.18s var(--spring);
@@ -5243,8 +5220,6 @@ button.live-call__head:hover {
 }
 /* "Leu seu recado · …" inside the work: a well, like the design's mark. */
 .live-work__steer {
-  display: flex;
-  align-items: center;
   gap: 7px;
   width: max-content;
   max-width: 100%;
@@ -5274,8 +5249,6 @@ button.live-call__head:hover {
 }
 /* Editing a routine still read in UTC: a quiet hint under the zone. */
 .routine-utc-hint {
-  display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
   margin: -4px 0 0;
@@ -6101,6 +6074,13 @@ button.live-call__head:hover {
 .machine-row__icon {
   flex: none;
 }
+/* The portrait's column is as wide as the grid, so a list's names line up whatever each computer is. The drawing
+   starts at the row's edge like any other lead: centred, the narrow tower would leave a gap before it. */
+.machine-row__pic {
+  display: flex;
+  flex: none;
+  width: 48px;
+}
 .machine-row__name {
   font-weight: 600;
   color: inherit;
@@ -6250,103 +6230,7 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 
-/* Configurações → Computadores: the two kinds, the cloud card, your computers, each agent's. */
-.computers-kinds {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-@media (max-width: 900px) {
-  .computers-kinds {
-    grid-template-columns: 1fr;
-  }
-}
-.computers-kind {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-/* Runs to the card's edges (no white frame around it), fading into the card below. */
-.computers-kind__pic {
-  display: flex;
-  justify-content: center;
-  margin: -20px -20px 0;
-  padding: 26px 0 2px;
-  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
-  background: linear-gradient(180deg, var(--plate), transparent);
-}
-.computers-kind__title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: var(--font-display-weight, 300);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.computers-kind__points {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--ink2);
-  font-size: 13.5px;
-}
-.computers-kind__points li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.computers-kind__points .ac-icon {
-  margin-top: 3px;
-  color: var(--ok);
-}
-.computers-kind__points .ac-brand {
-  margin-top: 3px;
-}
-.computers-kind__head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-/* The numbers behind the ⓘ: one line each, the icon then the count. */
-.computers-kind__info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 6px 8px;
-  list-style: none;
-  font-size: 13px;
-  color: var(--ink2);
-}
-.computers-kind__info li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.computers-kind__info .ac-icon {
-  color: var(--muted);
-}
-.computers-kind__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-height: 44px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.computers-kind__foot > .ac-btn {
-  flex: none;
-}
+/* Configurações → Computadores: the cloud card, your computers, each agent's. */
 .computers-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -6365,15 +6249,8 @@ a.machine-row__name:hover {
   margin: 0;
 }
 .setup-progress--line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   font-size: 13px;
   color: var(--ink-muted);
-}
-.setup-progress--line > :first-child {
-  flex: none;
-  margin-top: 1px;
 }
 .setup-facts {
   display: flex;
@@ -6384,11 +6261,6 @@ a.machine-row__name:hover {
   list-style: none;
   font-size: 13px;
   color: var(--ink-muted);
-}
-.setup-facts li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 .setup-facts--stack {
   flex-direction: column;
@@ -6406,16 +6278,9 @@ a.machine-row__name:hover {
   font-variant-numeric: tabular-nums;
 }
 .setup-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   font-size: 13px;
   color: var(--ink-muted);
-}
-.setup-line > :first-child {
-  flex: none;
-  margin-top: 2px;
 }
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
@@ -6445,18 +6310,12 @@ a.machine-row__name:hover {
   flex-basis: 100%;
 }
 .computers-note {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: var(--plate);
   color: var(--ink-muted);
-}
-.computers-note .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .computers-empty {
   display: flex;
@@ -7035,8 +6894,6 @@ a.machine-row__name:hover {
   font-weight: 500;
 }
 .newag__note {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   margin: 12px 0 0;
   padding: 12px 14px;
@@ -7044,10 +6901,6 @@ a.machine-row__name:hover {
   background: var(--plate);
   color: var(--muted);
   font-size: 13px;
-}
-.newag__note svg {
-  flex: none;
-  margin-top: 2px;
 }
 .newag__note b {
   color: var(--ink);
@@ -7057,14 +6910,6 @@ a.machine-row__name:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-.newag__chip .connector-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  box-shadow: none;
-  background: transparent;
-  font-size: 8px;
 }
 .newag__pills {
   display: flex;
@@ -7571,6 +7416,7 @@ a.machine-row__name:hover {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
   transition:
     transform 0.18s var(--spring),
@@ -8000,9 +7846,6 @@ a.machine-row__name:hover {
 }
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 8px;
   color: var(--muted);
   font-size: 12.5px;
   line-height: 1.4;
@@ -8010,10 +7853,6 @@ a.machine-row__name:hover {
 .agp-wdlg__note b {
   color: var(--ink);
   font-weight: 600;
-}
-.agp-wdlg__note > .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .agp-wdlg__link {
   display: inline-flex;
@@ -8367,8 +8206,6 @@ a.machine-row__name:hover {
   white-space: nowrap;
 }
 .agp-readonly {
-  display: flex;
-  align-items: center;
   gap: 10px;
   margin: 0 0 14px;
   padding: 10px 14px;
@@ -8376,9 +8213,6 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font-size: 13px;
-}
-.agp-readonly svg {
-  flex: none;
 }
 .agp-ro {
   display: flex;
@@ -8427,15 +8261,9 @@ a.machine-row__name:hover {
 }
 /* "N ações pedem sua aprovação antes · Ver": one line, the lock on the first line of text. */
 .agp-asks {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   line-height: 20px;
-}
-.agp-asks .ac-icon {
-  flex: none;
-  margin-top: 3px;
 }
 .agp-asks__t {
   min-width: 0;
@@ -8973,8 +8801,6 @@ a.machine-row__name:hover {
   overflow-wrap: anywhere;
 }
 .agp-run__fail {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   color: var(--danger);
   font-size: 12.5px;
@@ -9762,6 +9588,7 @@ html[data-menu-overlay] .shell {
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   color: var(--muted);
   cursor: pointer;
 }
@@ -9861,6 +9688,7 @@ html[data-menu-overlay] .shell {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--ink);
   white-space: nowrap;
   cursor: pointer;
@@ -9904,9 +9732,6 @@ html[data-menu-overlay] .shell {
 
 /* Above the box when the connection drops, then "Conectado de novo". */
 .channel__conn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-height: 30px;
   margin: 0 4px 6px;
   padding: 4px 10px;
@@ -10002,8 +9827,6 @@ html[data-menu-overlay] .shell {
   text-decoration: underline;
 }
 .agp-files__note {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 12px 0 0;
 }

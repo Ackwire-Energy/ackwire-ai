@@ -24,6 +24,7 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { Markdown } from "@/lib/markdown";
@@ -57,9 +58,21 @@ export async function fileToBase64(file: Blob): Promise<string> {
   return btoa(binary);
 }
 
+/** GitHub's own mark, as the connector catalog draws it (in ink), for a skill installed from github.com. */
+const GITHUB_MARK = { iconUrl: "/connectors/github.svg", brandColor: null };
+
 function SourceChip({ skill }: { skill: Skill }) {
   const { t } = useTranslation();
-  return <Chip icon={SOURCE_ICON[skill.source] ?? "document"}>{t(`skills.source.${sourceKey(skill)}`)}</Chip>;
+  const key = sourceKey(skill);
+  const name = t(`skills.source.${key}`);
+  return (
+    <Chip
+      icon={SOURCE_ICON[skill.source] ?? "document"}
+      lead={key === "github" ? <ConnectorIcon def={GITHUB_MARK} label={name} /> : undefined}
+    >
+      {name}
+    </Chip>
+  );
 }
 
 function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null; onOpen: () => void }) {

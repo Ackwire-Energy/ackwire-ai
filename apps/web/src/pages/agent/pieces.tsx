@@ -21,7 +21,7 @@ export function ReadOnlyNote({ field }: { field?: Field }) {
   if (viewer === "owner") {
     if (field && field !== "instructions") return null;
     return (
-      <p className="agp-readonly">
+      <p className="agp-readonly ac-iconline">
         <Icon name="person" size={16} />
         <span>
           {field === "instructions" ? t("agentPage.readOnly.ownerInstructions") : t("agentPage.readOnly.owner", g)}
@@ -30,7 +30,7 @@ export function ReadOnlyNote({ field }: { field?: Field }) {
     );
   }
   return (
-    <p className="agp-readonly">
+    <p className="agp-readonly ac-iconline">
       <Icon name="info" size={16} />
       <span>
         {ownerFirst

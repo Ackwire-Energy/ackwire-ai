@@ -66,8 +66,8 @@ Each account's usage comes from the CLIs themselves: the rate-limit events durin
 
 ### 9. Official marks, next to the provider's name
 
-- The makers' marks are vendored as 24×24 path data in `packages/ui/src/brand/marks.ts`, from simple-icons 16.35.0 (CC0) and, for OpenAI, which simple-icons no longer carries, lobehub icons 1.95.1 (MIT). Each entry names the brand's own source.
-- One component draws them everywhere: `ProviderLogo` (web and desktop) and its React Native twin, by provider, plan, brain or executor id. A brand-colored mark sits on a tile tinted with its color; one-color marks follow the theme; an id without a mark shows its initial. `BrainLogo` is a wrapper.
+- The makers' marks are vendored as 24×24 path data in `packages/ui/src/brand/marks.ts`, each taken from the maker's own files (a press kit, a brand page, or its repository at a pinned commit), which every entry names. A mark can add shapes in fixed colors (Kimi's dot, OpenCode's block, with the maker's dark color where it has one) and a gradient (MiniMax). The `anthropic` provider draws Claude's mark: people know it as Claude.
+- One component draws them everywhere: `ProviderLogo` (web and desktop) and its React Native twin, by provider, plan, brain or executor id. A brand-colored mark sits on a tile tinted with its color; one-color marks follow the theme; an id without a mark shows its initial; an unavailable one is only dimmed, since the makers' rules forbid recoloring a mark. `BrainLogo` is a wrapper, and `ProviderStack` overlaps several marks for a line that names more than one maker.
 - A mark appears next to the name of the provider it stands for (keys, models, brains, accounts, notices), never inside our own feature names, and is never redrawn.
 
 ## Risks we accept

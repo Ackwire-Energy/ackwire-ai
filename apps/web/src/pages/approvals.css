@@ -341,19 +341,13 @@
 }
 /* What the agent said, after the action: its face, its name and its words. */
 .ap-said {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   font-size: 13.5px;
-  line-height: 1.5;
+  /* A length: the face sets its own font size, and its place on the first line reads the row's line. */
+  line-height: 20px;
   color: var(--ink2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.ap-said > :first-child {
-  flex: none;
-  margin-top: 1px;
 }
 .ap-said b {
   color: var(--ink);
@@ -367,17 +361,11 @@
 }
 /* Asked while nobody watched (a routine, or no one behind the run): one quiet line with its icon. */
 .ap-origin {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--muted);
-}
-.ap-origin > svg {
-  flex: none;
-  margin-top: 2px;
 }
 .ap-traits {
   display: flex;
@@ -453,6 +441,7 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .ap-refuse__suggest button:hover {
@@ -649,6 +638,7 @@
   flex-direction: column;
   gap: 8px;
 }
+/* Its dot is an `.ac-iconline` lead, on the text's first line. */
 .ap-trail li {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
@@ -664,7 +654,7 @@
 .ap-trail__dot {
   width: 10px;
   height: 10px;
-  margin: 4px 3px 0;
+  margin: 0 3px;
   border-radius: 3px;
   background: var(--line2);
 }

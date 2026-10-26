@@ -317,7 +317,7 @@ export function SwitchComputerDialog({
             );
           })}
         </div>
-        <p className="outage-dialog__hint">
+        <p className="outage-dialog__hint ac-iconline">
           <Icon name="info" size={16} />
           <span>{t("outage.dialog.hint", { name: o.name })}</span>
         </p>
@@ -370,7 +370,7 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   if (state !== "waiting") {
     return (
       <div className="waitcard" data-done="">
-        <span className="waitcard__top">
+        <span className="waitcard__top ac-iconline">
           <Icon name="check" size={16} />
           <span>{state === "back" ? t("outage.card.back", { name }) : t("outage.card.moved")}</span>
         </span>
@@ -379,11 +379,11 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   }
   return (
     <div className="waitcard">
-      <span className="waitcard__top">
+      <span className="waitcard__top ac-iconline">
         <Icon name="waiting" size={16} />
         <span>{t("outage.card.waiting", { name })}</span>
       </span>
-      <p>
+      <p className="ac-iconline">
         <ProviderLogo id={notice.brain} size="xs" />
         {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
       </p>

@@ -767,7 +767,7 @@ function Row({
               </>
             )}
             {s.replied && (
-              <div className="nt-replied">
+              <div className="nt-replied ac-iconline">
                 <Icon name="check" size={14} />
                 <span>{t("notifications.youReplied", { text: s.replied })}</span>
               </div>
@@ -1875,7 +1875,7 @@ export function NotificationsPage() {
       )}
 
       {filter === "all" && items.length > 0 && (
-        <div className="nt-foot">
+        <div className="nt-foot ac-iconline">
           <Icon name="check" size={14} />
           {t("notifications.foot")}
         </div>

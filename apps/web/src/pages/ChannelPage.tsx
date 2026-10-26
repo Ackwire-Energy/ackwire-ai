@@ -2288,7 +2288,7 @@ function LiveNotices({ channelId }: { channelId: string }) {
         const agent = dir.agentById.get(n.agentId);
         const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name) : "";
         return (
-          <p key={n.key} className="channel__notice" role="status">
+          <p key={n.key} className="channel__notice ac-iconline" role="status">
             <Icon name="lock" size={16} />
             <span>{known || n.text}</span>
           </p>
@@ -2570,7 +2570,7 @@ function ConnectionBanner({ status }: { status: ConnectionStatus }) {
   }, [down]);
   if (!down && !back) return null;
   return (
-    <p className="channel__conn" data-back={!down || undefined} role="status">
+    <p className="channel__conn ac-iconline" data-back={!down || undefined} role="status">
       <Icon name={down ? "cloud" : "check"} size={16} />
       {down ? t("channel.offline") : t("channel.backOnline")}
     </p>

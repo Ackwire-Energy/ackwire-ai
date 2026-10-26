@@ -2,6 +2,7 @@ import { keys, useApi } from "@agenteschat/client";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { type ComponentProps, type ReactNode, useState } from "react";
@@ -408,16 +409,27 @@ function doneText(t: ReturnType<typeof useTranslation>["t"], chosen: ReadonlySet
   return t(list.length === 1 ? "onboarding.done.textOne" : "onboarding.done.textMany", { names: list.join(", ") });
 }
 
+/** Each source's official logo (assets/images/brands/README.md). */
+const IMPORT_LOGO = {
+  OpenMausBot: require("../../../assets/images/brands/openmausbot.png"),
+  OpenBot: require("../../../assets/images/brands/openbot.png"),
+} as const;
+
 /** Trazer agentes: the two sources, and how to bring them (on the computer, for now). */
 function ImportStep() {
   const { t } = useTranslation();
+  const { colors: c } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <>
       {(["OpenMausBot", "OpenBot"] as const).map((source) => (
         <Line
           key={source}
-          lead={<Text style={styles.mono}>{source === "OpenMausBot" ? "OM" : "OB"}</Text>}
+          lead={
+            <View style={[styles.logoTile, { backgroundColor: c.sunken, borderColor: c.line }]}>
+              <Image source={IMPORT_LOGO[source]} contentFit="contain" style={styles.logo} />
+            </View>
+          }
           title={t(`mobile.onb.import${source}`)}
           sub={t(`mobile.onb.import${source}Desc`)}
           onPress={() => setOpen(true)}
@@ -731,7 +743,17 @@ const styles = StyleSheet.create({
   lead: { width: 38, alignItems: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  mono: { fontWeight: "700" },
+  // The web's `.imp-mark` tile (apps/web/src/components/import-flow.css).
+  logoTile: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    borderBottomLeftRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logo: { width: 22, height: 22 },
   box: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -8 },

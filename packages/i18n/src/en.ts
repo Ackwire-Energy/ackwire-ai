@@ -823,7 +823,7 @@ export const en: Translations = {
       browser: "Browser",
       database: "Databases",
       github: "GitHub",
-      sentry: "Production errors",
+      sentry: "Sentry",
       linear: "Linear",
       gdrive: "Google Drive",
       mail: "Email",

@@ -94,7 +94,7 @@ export function ConsultationCard({
               </p>
             </>
           )}
-          <p className="ac-consult__foot">
+          <p className="ac-consult__foot ac-iconline">
             <Icon name="eyeOff" size={14} />
             {t("chat.consultation.private", {
               from: from.name,

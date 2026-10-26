@@ -90,7 +90,7 @@ function DecisionBody({ s }: { s: ForumDecisionCards }) {
               </div>
               <div className="forum-pcr__col">
                 {p.pros.map((x) => (
-                  <span key={x}>
+                  <span key={x} className="ac-iconline">
                     <Icon name="plus" size={14} />
                     {x}
                   </span>
@@ -98,7 +98,7 @@ function DecisionBody({ s }: { s: ForumDecisionCards }) {
               </div>
               <div className="forum-pcr__col">
                 {p.cons.map((x) => (
-                  <span key={x}>
+                  <span key={x} className="ac-iconline">
                     <Icon name="dash" size={14} />
                     {x}
                   </span>
@@ -398,7 +398,7 @@ export function SynthesisCard({ topic }: { topic: ForumTopicDetail }) {
             <div>
               <button
                 type="button"
-                className="forum-vlink"
+                className="ac-link forum-vlink"
                 aria-expanded={showPrev}
                 onClick={() => setShowPrev((x) => !x)}
               >

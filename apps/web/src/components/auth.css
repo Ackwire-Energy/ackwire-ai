@@ -221,8 +221,6 @@
   color: var(--warn);
 }
 .auth__error {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 0;
   font-size: 13.5px;
