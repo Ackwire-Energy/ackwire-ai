@@ -1,5 +1,6 @@
 import { Popover as RPopover } from "radix-ui";
 import { type PointerEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { hoverPointer } from "../device";
 import { Icon } from "../icons/Icon";
 
 /** The app's own tooltip delay (`.ac-msg__tip`): a pointer resting this long on the ⓘ opens the hint. */
@@ -67,12 +68,12 @@ export function InfoHint({ name, children, id, side = "top", align = "center" }:
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setWhy(next), ms);
   };
-  // Mouse and pen only: a touch opens it with its tap.
+  // A touch opens it with its tap, never by passing over it.
   const enter = (e: PointerEvent) => {
-    if (e.pointerType !== "touch") after(OPEN_MS, (w) => w ?? "hover");
+    if (hoverPointer(e.pointerType)) after(OPEN_MS, (w) => w ?? "hover");
   };
   const leave = (e: PointerEvent) => {
-    if (e.pointerType !== "touch") after(CLOSE_MS, (w) => (w === "hover" ? null : w));
+    if (hoverPointer(e.pointerType)) after(CLOSE_MS, (w) => (w === "hover" ? null : w));
   };
   // A press on the ⓘ is decided by its own click, not taken for a press outside the bubble.
   const onAnchor = (e: Event) => {

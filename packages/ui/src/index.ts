@@ -296,7 +296,7 @@ export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./comp
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
-export { onScreenKeyboard } from "./device";
+export { hoverPointer, onScreenKeyboard } from "./device";
 export {
   EMOJI_CATEGORIES,
   EMOJIS,

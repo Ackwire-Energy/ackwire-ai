@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { CardHeader, Dialog, DialogBody, Field, InfoHint, Input } from "../src";
+import { CardHeader, Dialog, DialogBody, Field, hoverPointer, InfoHint, Input } from "../src";
 
 afterEach(cleanup);
 
@@ -78,6 +78,8 @@ describe("InfoHint", () => {
   });
 
   test("a mouse resting on it opens it after the delay; a touch never does", async () => {
+    // A mouse or a pen rests over things; a finger, or a pointer that doesn't say, only presses.
+    expect(["mouse", "pen", "touch", ""].map(hoverPointer)).toEqual([true, true, false, false]);
     render(<Hint />);
     await act(async () => fireEvent.pointerEnter(hintButton(), { pointerType: "touch" }));
     await wait(320);
