@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import { createCredential, decryptCredential, ForbiddenError, listCredentials, revokeCredential } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -57,4 +58,23 @@ test("only admins and owners manage credentials", async () => {
   await expect(listCredentials(f.db, member.id, f.org.id)).rejects.toBeInstanceOf(ForbiddenError);
   const admin = await addMember(f.db, f.org.id, "admin");
   expect((await listCredentials(f.db, admin.id, f.org.id)).length).toBe(1);
+});
+
+test('the label migration calls keys named after the provider "Claude" and leaves names people chose', async () => {
+  const add = (provider: "anthropic" | "openai", label: string) =>
+    createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, { provider, label, apiKey: "sk-test-key-5678" });
+  const named = await add("anthropic", "Anthropic");
+  const chosen = await add("anthropic", "Anthropic da Acme");
+  const openai = await add("openai", "Anthropic");
+  await runMigration(f.db, "claude_chatgpt_labels");
+  await runMigration(f.db, "claude_chatgpt_labels");
+  const rows = await f.db
+    .select({ id: schema.providerCredentials.id, label: schema.providerCredentials.label })
+    .from(schema.providerCredentials);
+  expect(Object.fromEntries(rows.map((r) => [r.id, r.label]))).toEqual({
+    [f.credential.id]: "main",
+    [named.id]: "Claude",
+    [chosen.id]: "Anthropic da Acme",
+    [openai.id]: "Anthropic",
+  });
 });

@@ -92,7 +92,7 @@ export function machineAccountRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "The computer's Claude Code and Codex accounts (the person who connected it, an admin, or anyone where nobody did)",
+        "The computer's Claude, ChatGPT and coding plan accounts (the person who connected it, an admin, or anyone where nobody did)",
       description:
         "Emails only of the caller's own accounts. Changes come as `machine.updated` org events with `accounts: true`.",
       request: { params: MachineParams },

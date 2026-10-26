@@ -428,6 +428,13 @@ describe("agent page: activity", () => {
     const state = seedState();
     state.runs.push(
       extra({ id: "run-f", what: "roda a suíte de checkout", status: "failed", errorCode: "run.budget_exceeded" }),
+      extra({
+        id: "run-k",
+        what: "resume o canal",
+        status: "failed",
+        errorCode: "run.missing_credential",
+        errorParams: { provider: "Claude" },
+      }),
       extra({ id: "run-w", what: "faz o merge do PR #42", status: "waiting_approval" }),
     );
     await go("?tab=activity", state);
@@ -440,6 +447,7 @@ describe("agent page: activity", () => {
     await click(within(filters).getByRole("radio", { name: /^Falhas/ }));
     expect(runs.textContent).toContain("roda a suíte de checkout");
     expect(runs.textContent).toContain("O orçamento do mês acabou.");
+    expect(runs.textContent).toContain("Falta uma chave do Claude no workspace.");
     expect(runs.textContent).not.toContain("faz o merge");
     await click(within(filters).getByRole("radio", { name: /^Esperando/ }));
     expect(runs.textContent).toContain("faz o merge do PR #42");
