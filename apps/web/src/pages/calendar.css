@@ -313,9 +313,9 @@
   right: 4px;
   pointer-events: none;
 }
+/* The `.ac-iconline` lead of the title's line: from the line's top, also in a bar that centres its other parts. */
 .cal-chip__avatar {
-  flex: none;
-  margin-top: 1px;
+  align-self: flex-start;
 }
 .cal-chip__text {
   display: flex;
@@ -421,15 +421,12 @@
   flex-direction: column;
   gap: 10px;
 }
+/* With the agent's face, an `.ac-iconline`. */
 .cal-runs__item {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
-}
-.cal-runs__avatar {
-  flex: none;
-  margin-top: 1px;
 }
 .cal-runs__text {
   display: flex;

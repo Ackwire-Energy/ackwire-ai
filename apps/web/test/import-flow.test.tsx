@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -99,6 +99,9 @@ const row = (title: string) => {
   return found as HTMLElement;
 };
 const chipOf = (title: string) => row(title).querySelector(".imp-row__chip")?.textContent;
+/** A line led by an icon that `.ac-iconline` puts on the line's first row. */
+const iconLine = (line: Element | null) =>
+  !!line?.classList.contains("ac-iconline") && !!line.firstElementChild?.matches("svg.ac-icon");
 /** `imports.apply` answering with `plan` for the dry run (and the default fake otherwise). */
 const withPlan = (api: ApiClient, state: State, plan: (input: ImportInput) => ImportItemResult[]) => {
   const fake = api.imports.apply;
@@ -143,6 +146,79 @@ describe("Configurações → Importar e exportar", () => {
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     expect(within(nav).queryByRole("link", { name: "Importar e exportar" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Exportar este workspace" })).toBeNull();
+  });
+
+  test("each app by its official logo, in the maker's own dark file when the app (not the system) is dark", async () => {
+    const device = domWindow().happyDOM.settings.device;
+    const logos = () =>
+      Object.fromEntries(
+        [...document.querySelectorAll(".imp-source")].map((card) => [
+          card.querySelector(".ac-option__title")?.textContent,
+          card.querySelector(".imp-mark img")?.getAttribute("src") ?? null,
+        ]),
+      );
+    try {
+      // The system is dark, but the app is set to light: the light files.
+      device.prefersColorScheme = "dark";
+      localStorage.setItem("agentes.theme", "light");
+      await go();
+      expect(logos()["Hermes Agent"]).toBe("/brands/hermes.svg");
+      expect(logos().Paperclip).toBe("/brands/paperclip.svg");
+      cleanup();
+      // The app set to dark: Hermes and Paperclip by their dark files, the others read on both.
+      localStorage.setItem("agentes.theme", "dark");
+      await go();
+      expect(logos()).toEqual({
+        OpenClaw: "/brands/openclaw.svg",
+        "Hermes Agent": "/brands/hermes-dark.svg",
+        "OpenBot.Run": "/brands/openbotrun.svg",
+        Paperclip: "/brands/paperclip-dark.svg",
+        OpenMausBot: "/brands/openmausbot.svg",
+        OpenBot: "/brands/openbot.png",
+        "Exportação do agentes.chat": "/favicon.svg",
+        // It names many apps: no one maker's logo fits.
+        "Outro app": null,
+      });
+    } finally {
+      device.prefersColorScheme = "light";
+      localStorage.removeItem("agentes.theme");
+    }
+  });
+
+  test("its notes and lists lead each line with an icon on the line's first row", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // The import leaves the routine out, so the report lists what didn't come.
+    const fake = api.imports.apply;
+    api.imports = {
+      ...api.imports,
+      apply: async (orgId, input) => {
+        const { items } = await fake(orgId, input);
+        if (input.dryRun) return { items };
+        const left = (i: ImportItemResult): ImportItemResult => ({
+          ...i,
+          action: "skip",
+          reason: "schedule_unsupported",
+        });
+        return { items: items.map((i) => (i.kind === "routine" ? left(i) : i)) };
+      },
+    };
+    await go(state, api);
+    const seen: [string, Element[]][] = [];
+    const take = (...selectors: string[]) => {
+      for (const s of selectors) seen.push([s, [...document.querySelectorAll(s)]]);
+    };
+    take(".imp-note", ".imp-export li");
+    await click(button(/^OpenClaw /), 1);
+    take(".imp-tip");
+    await pick("Pasta para importar", folder("paperclip-company"));
+    take(".imp-note", ".imp-todo li");
+    await click(button(/^Importar \d+ itens/), 8);
+    take(".imp-missed li");
+    for (const [selector, lines] of seen) {
+      expect([selector, lines.length > 0]).toEqual([selector, true]);
+      for (const line of lines) expect([selector, iconLine(line)]).toEqual([selector, true]);
+    }
   });
 
   test("a folder is recognized and planned on the server; unchecking an agent holds back what needs it; Importar applies and reports", async () => {
@@ -298,6 +374,7 @@ describe("Configurações → Importar e exportar", () => {
     await go(state, api);
     await pick("Arquivos para importar", [fixture("sales-desk.openmaus.json")]);
     expect(text()).toContain("Tudo isso já está aqui.");
+    expect(iconLine(document.querySelector(".imp-apply__none"))).toBe(true);
     expect(screen().queryByRole("button", { name: /^Importar \d/ })).toBeNull();
 
     action = "skip";

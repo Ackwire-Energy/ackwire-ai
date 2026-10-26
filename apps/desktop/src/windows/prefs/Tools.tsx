@@ -125,7 +125,7 @@ export function Tools() {
                   {t("desktop.tools.commandsSome", { orgs: listNames(commandsOnlyFor, i18n.language) })}
                 </span>
               )}
-              <span className="dk-honest">
+              <span className="dk-honest ac-iconline">
                 <Icon name="alert" size={14} />
                 <span>
                   {local.run
@@ -153,7 +153,7 @@ export function Tools() {
             />
           }
           under={
-            <span className="dk-honest">
+            <span className="dk-honest ac-iconline">
               <Icon name="lock" size={14} />
               <span>{t("desktop.tools.browserLogins")}</span>
             </span>

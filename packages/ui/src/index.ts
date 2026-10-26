@@ -201,7 +201,12 @@ export {
   planWindows,
 } from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
-export { ProviderLogo, type ProviderLogoProps } from "./components/ProviderLogo";
+export {
+  ProviderLogo,
+  type ProviderLogoProps,
+  ProviderStack,
+  type ProviderStackProps,
+} from "./components/ProviderLogo";
 export {
   modeOf,
   monthlyKindOf,

@@ -33,13 +33,13 @@ describe("provider marks where a provider is named", () => {
     await open("settings/keys", state);
     const keys = screen().getByRole("region", { name: "Chaves de provedor" });
     const row = (label: string) => within(keys).getByText(label).closest(".ac-list__row") as HTMLElement;
-    expect(marks(row("Claude da Acme"))).toEqual(["anthropic"]);
+    expect(marks(row("Claude da Acme"))).toEqual(["claude"]);
     expect(marks(row("OpenAI do time"))).toEqual(["openai"]);
 
     await act(async () => fireEvent.click(within(keys).getByRole("button", { name: "Adicionar chave" })));
     const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
     const trigger = within(add).getByRole("combobox", { name: "Provedor" });
-    expect(marks(trigger)).toEqual(["anthropic"]);
+    expect(marks(trigger)).toEqual(["claude"]);
     // Where to get a key, next to the field.
     const site = within(add).getByRole("link", { name: "Crie a chave em platform.claude.com/settings/keys." });
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
@@ -55,7 +55,7 @@ describe("provider marks where a provider is named", () => {
     expect(title()).toBe("Modelo e orçamento");
     const card = (name: RegExp) => screen().getByRole("button", { name }).querySelector(".newag__model-prov");
     expect(card(/^Claude Sonnet 5\.5/)?.textContent).toBe("Claude");
-    expect(marks(card(/^Claude Sonnet 5\.5/) as Element)).toEqual(["anthropic"]);
+    expect(marks(card(/^Claude Sonnet 5\.5/) as Element)).toEqual(["claude"]);
     expect(marks(card(/^GPT-5/) as Element)).toEqual(["openai"]);
   });
 

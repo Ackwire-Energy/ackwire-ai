@@ -73,6 +73,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .onb__back:hover:not(:disabled) {
@@ -167,38 +168,16 @@ textarea.onb__big.ac-input {
   font-size: 13px;
   color: var(--faint);
 }
-/* The one link look here, a field's help links too ("Create the key at…"). */
-.onb__link,
-.onb__body .ac-field__help a {
-  padding: 0;
-  border: 0;
-  background: none;
+/* An `.ac-link` in the host's sentence ("Change", "skip"): muted until hovered. */
+.onb__link {
   color: var(--muted);
-  font: inherit;
-  font-weight: 600;
-  text-align: start;
-  text-decoration: underline;
-  text-decoration-color: var(--line2);
-  text-underline-offset: 3px;
-  cursor: pointer;
 }
-.onb__link:hover:not(:disabled),
-.onb__body .ac-field__help a:hover {
+.onb__link:hover:not(:disabled) {
   color: var(--ink);
-  text-decoration-color: currentColor;
 }
 .onb__link:disabled {
   cursor: default;
-}
-/* A quiet line with its icon ("We sent a confirmation link to…"). */
-.onb__note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.onb__note > .ac-icon {
-  flex: none;
-  margin-top: 2px;
+  text-decoration-color: var(--line2);
 }
 .onb__starters {
   display: flex;
@@ -235,6 +214,7 @@ textarea.onb__big.ac-input {
   font: inherit;
   font-size: 16px;
   font-weight: 650;
+  line-height: normal;
   text-align: right;
   outline: none;
 }
@@ -328,8 +308,6 @@ textarea.onb__big.ac-input {
   margin-bottom: 4px;
 }
 .onb__status {
-  display: flex;
-  align-items: center;
   gap: 10px;
   margin: 0;
   padding: 12px 14px;

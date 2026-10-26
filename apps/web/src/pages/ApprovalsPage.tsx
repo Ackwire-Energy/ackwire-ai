@@ -542,7 +542,7 @@ function ApprovalOrigin({ approval }: { approval: Approval }) {
   if (!origin) return null;
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <p className="ap-origin">
+    <p className="ap-origin ac-iconline">
       <Icon name="routines" size={14} />
       <span>{tt(origin.key, origin.values)}</span>
     </p>
@@ -808,7 +808,7 @@ function RequestCard({
       <div className="ap-card__body">
         <ExactAction approval={a} max={4} />
         {why && (
-          <p className="ap-said">
+          <p className="ap-said ac-iconline">
             <AgentAvatar agentId={a.agentId} name={name} size="xs" />
             <span>
               <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} />
@@ -1102,13 +1102,13 @@ function ApprovalDetails({
         <DetailsSection title={t("approvals.panel.trail")}>
           <ol className="ap-trail">
             {a.trail?.map((s) => (
-              <li key={s.at + s.text.slice(0, 12)}>
+              <li key={s.at + s.text.slice(0, 12)} className="ac-iconline">
                 <span className="ap-trail__dot" aria-hidden="true" />
                 <span className="ap-trail__text">{s.text}</span>
                 <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
               </li>
             ))}
-            <li className="is-current">
+            <li className="is-current ac-iconline">
               <span className="ap-trail__dot" aria-hidden="true" />
               <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
               <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>

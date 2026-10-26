@@ -7,6 +7,7 @@ export type ComputerState = "online" | "paused" | "offline";
 export type ComputerCtx = Pick<CanvasRenderingContext2D, "fillRect" | "clearRect"> & { fillStyle: unknown };
 
 export const COMPUTER_GRID: 48;
+export const COMPUTER_ART: Record<ComputerKind, readonly [first: number, count: number]>;
 export const COMPUTER_KINDS: ComputerKind[];
 export const COMPUTER_STATES: ComputerState[];
 

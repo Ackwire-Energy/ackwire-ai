@@ -243,7 +243,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           />
         </Toolbar>
         {tab === "archived" && (
-          <p className="threads-note">
+          <p className="threads-note ac-iconline">
             <Icon name="lock" size={14} />
             <span>
               <b>{t("threads.notes.archivedTitle")}</b> {t("threads.notes.archived")}
@@ -251,7 +251,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           </p>
         )}
         {tab === "closed" && (
-          <p className="threads-note">
+          <p className="threads-note ac-iconline">
             <Icon name="refresh" size={14} />
             <span>{t("threads.notes.closed")}</span>
           </p>
@@ -611,7 +611,7 @@ function ThreadDetails({
       page={{ label: thread.state === "archived" ? t("threads.read") : t("threads.open"), onOpen: onGo }}
     >
       {thread.state === "archived" && (
-        <div className="thread-banner">
+        <div className="thread-banner ac-iconline">
           <Icon name="lock" size={16} />
           <div>
             <b>{t("threads.panel.archivedTitle")}</b>
@@ -620,7 +620,7 @@ function ThreadDetails({
         </div>
       )}
       {thread.state === "closed" && (
-        <div className="thread-banner">
+        <div className="thread-banner ac-iconline">
           <Icon name="refresh" size={16} />
           <div>
             <b>{t("threads.panel.closedTitle")}</b>

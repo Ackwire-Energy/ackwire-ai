@@ -20,6 +20,11 @@
 export const COMPUTER_GRID = 48;
 export const COMPUTER_KINDS = ["mac", "windows", "linux", "cloud"];
 export const COMPUTER_STATES = ["online", "paused", "offline"];
+/**
+ * The columns each drawing covers, shadow included, in every state and frame: [first, count]. A portrait's box
+ * is this wide, so its pixels meet the row's edge like any other lead (the tower is half the grid's width).
+ */
+export const COMPUTER_ART = { mac: [3, 42], windows: [4, 40], linux: [12, 25], cloud: [7, 38] };
 
 const N = COMPUTER_GRID;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);

@@ -45,6 +45,16 @@ describe("Configurações → Skills", () => {
     expect((rows[1]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Criada aqui");
     expect((rows[1]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Em agentes novos");
     expect((rows[2]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Enviada");
+    // GitHub is named by its own mark, the connector catalog's; the other sources keep their icons.
+    const chip = (name: string) =>
+      [...section().querySelectorAll(".skill-row .ac-chip")].find((c) => c.textContent === name) as HTMLElement;
+    const github = chip("GitHub").querySelector<HTMLElement>(".connector-icon__mark");
+    expect(github?.style.getPropertyValue("--connector-icon")).toBe('url("/connectors/github.svg")');
+    expect(chip("GitHub").querySelector("svg.ac-icon")).toBeNull();
+    for (const name of ["Criada aqui", "Enviada"]) {
+      expect(chip(name).querySelector(".connector-icon")).toBeNull();
+      expect(chip(name).querySelector("svg.ac-icon")).not.toBeNull();
+    }
   });
 
   test("detail: rendered body, files (scripts need a sandbox), remove names the agents", async () => {

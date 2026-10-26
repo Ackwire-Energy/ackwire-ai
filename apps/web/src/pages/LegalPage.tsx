@@ -100,7 +100,7 @@ function Inline({ line, bare }: { line: string; bare?: boolean }) {
       <strong key={i}>{p.text}</strong>
     ) : p.kind === "link" ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: pieces of one fixed line
-      <a key={i} href={p.href}>
+      <a key={i} href={p.href} className="ac-link">
         {p.text}
       </a>
     ) : (

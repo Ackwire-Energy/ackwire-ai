@@ -49,12 +49,12 @@ export function EmailLetter({ email, full }: { email: ApprovalEmail; full?: bool
         </div>
       )}
       {!full && long && (
-        <button type="button" className="email-letter__more" onClick={() => setOpen((o) => !o)}>
+        <button type="button" className="ac-link email-letter__more" onClick={() => setOpen((o) => !o)}>
           {open ? t("approval.email.less") : t("approval.email.more")}
         </button>
       )}
       {email.original && (
-        <p className="email-letter__original">
+        <p className="email-letter__original ac-iconline">
           <Icon name="reply" size={14} />
           <span>
             <Trans

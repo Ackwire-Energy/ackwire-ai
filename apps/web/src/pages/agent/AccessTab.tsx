@@ -185,14 +185,14 @@ export function AccessTab() {
         </div>
         <div className="agp-col">
           {resources.some(isGithub) && (
-            <p className="newag__note">
+            <p className="newag__note ac-iconline">
               <Icon name="repo" size={16} />
               <span>
                 <b>{t("repos.realTitle")}</b> {t("repos.realText", g)}
               </span>
             </p>
           )}
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="shield" size={16} />
             <span>
               <b>{t("newAgent.approvalsNote")}</b>{" "}
@@ -256,7 +256,7 @@ export function AccessTab() {
               </Link>
             )}
           </Card>
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="info" size={16} />
             <span>{t("agentPage.access.fineTune")}</span>
           </p>

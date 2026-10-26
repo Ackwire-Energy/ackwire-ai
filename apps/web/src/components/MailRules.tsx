@@ -139,7 +139,7 @@ export function MailRulesPanel({
           </span>
         </label>
         {policy.sendWithoutAsking && policy.senders.length === 0 && (
-          <p className="sandbox-warning small" role="note">
+          <p className="sandbox-warning small ac-iconline" role="note">
             <Icon name="alert" size={16} />
             {t("mail.agent.warning")}
           </p>

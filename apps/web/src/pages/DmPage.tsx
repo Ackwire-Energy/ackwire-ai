@@ -78,7 +78,7 @@ export function DmPage({ target }: { target: DmTarget }) {
             {thinks?.text && (
               <>
                 {" · "}
-                <span className="channel__brain">
+                <span className="channel__brain ac-iconline">
                   {thinks.mark ? (
                     <ProviderLogo id={thinks.mark} size="xs" />
                   ) : (

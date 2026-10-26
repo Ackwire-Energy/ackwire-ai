@@ -380,6 +380,7 @@
   flex: 1;
   min-width: 0;
   font-size: 15px;
+  line-height: normal;
   color: var(--ink);
 }
 .brw-typer input::placeholder {
@@ -401,6 +402,7 @@
   border-radius: var(--control-r-sm);
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   color: var(--muted);
 }
 .brw-secure[aria-pressed="true"] {
@@ -427,6 +429,7 @@
   border-radius: var(--control-r-sm);
   font-size: 12.5px;
   font-weight: 600;
+  line-height: normal;
   color: var(--muted);
   box-shadow: inset 0 0 0 1px var(--line2);
   display: inline-flex;
@@ -465,7 +468,6 @@
 }
 .brw-log li > .ac-icon {
   color: var(--muted);
-  margin-top: 2px;
 }
 .brw-log li small {
   color: var(--faint);
@@ -825,6 +827,7 @@
   flex: 1;
   min-width: 0;
   font-size: 14px;
+  line-height: normal;
   color: var(--ink);
 }
 .brw-tfield input::placeholder {
@@ -1137,8 +1140,6 @@
   }
 }
 .brw-steps__done {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 0;
   color: var(--muted);
@@ -1378,6 +1379,7 @@
   flex: 1;
   min-width: 0;
   font-size: 13.5px;
+  line-height: normal;
   color: var(--ink);
 }
 .brw-go__field input::placeholder {

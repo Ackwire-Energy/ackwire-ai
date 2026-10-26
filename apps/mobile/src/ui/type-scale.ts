@@ -107,3 +107,9 @@ export function countStyle(fontSize: number, fontWeight: Weight = weights.semibo
  * text centers there, or it looks too high.
  */
 export const readingMiddle = (fontSize: number, lineHeight: number) => lineHeight / 2 + 0.08 * fontSize;
+
+/** The box that sets a lead `size` tall (an icon, a maker's mark) on a line's reading middle, never above its top. */
+export function leadBox(line: { height: number; middle: number }, size: number) {
+  const paddingTop = Math.max(0, line.middle - size / 2);
+  return { paddingTop, height: Math.max(line.height, paddingTop + size) };
+}

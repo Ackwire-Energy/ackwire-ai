@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { CHROME_MAX_SCALE, readingMiddle, type TypeStyle, typeScale, typeStyle, weights } from "../src/ui/type-scale";
+import {
+  CHROME_MAX_SCALE,
+  leadBox,
+  readingMiddle,
+  type TypeStyle,
+  typeScale,
+  typeStyle,
+  weights,
+} from "../src/ui/type-scale";
 
 const STYLES: TypeStyle[] = [
   "largeTitle",
@@ -83,4 +91,16 @@ test("an icon beside text centers a hair under the line's middle, where the smal
   expect(readingMiddle(15.5, 21)).toBeCloseTo(11.74, 2);
   expect(readingMiddle(17, 22)).toBeGreaterThan(11);
   expect(readingMiddle(17, 22)).toBeLessThan(13);
+});
+
+test("a line's lead, an icon or a maker's mark in its place, centers on the first line where the eye reads it", () => {
+  // The computer setup sheet's lines (small: 15/20 on iOS), with a 16 pt icon or the 14 pt Claude mark.
+  const line = { height: 20, middle: readingMiddle(15, 20) };
+  for (const size of [14, 16]) {
+    const box = leadBox(line, size);
+    expect(box.paddingTop + size / 2).toBeCloseTo(line.middle, 6);
+    expect(box.height).toBe(20);
+  }
+  // Taller than the line: from its top, the box as tall as the lead.
+  expect(leadBox(line, 28)).toEqual({ paddingTop: 0, height: 28 });
 });
