@@ -29,6 +29,8 @@ export function Tools() {
   const homes = pairedHomes(snap);
   const { tools, commandsOnlyFor } = toolsHere(homes);
   const executors: ControlStatus["executors"] = homes.find((h) => h.status)?.status?.executors ?? {};
+  // The lines kept in sight under Commands describe its switch too: where it's on, and what commands can reach.
+  const commandsLines = commandsOnlyFor.length > 0 ? "tool-commands-some tool-commands-warn" : "tool-commands-warn";
 
   const set = async (tool: keyof RunnerTools, on: boolean) => {
     try {
@@ -116,7 +118,7 @@ export function Tools() {
           end={
             <Switch
               id="tool-commands"
-              aria-describedby="tool-commands-hint"
+              aria-describedby={`tool-commands-hint ${commandsLines}`}
               checked={tools.commands}
               disabled={homes.length === 0}
               onCheckedChange={(on) => void set("commands", on)}
@@ -125,13 +127,13 @@ export function Tools() {
           under={
             <>
               {commandsOnlyFor.length > 0 && (
-                <span className="dk-help">
+                <span id="tool-commands-some" className="dk-help">
                   {t("desktop.tools.commandsSome", { orgs: listNames(commandsOnlyFor, i18n.language) })}
                 </span>
               )}
               <span className="dk-honest ac-iconline">
                 <Icon name="alert" size={14} />
-                <span>
+                <span id="tool-commands-warn">
                   {local.run
                     ? t("desktop.tools.commandsWarnHere")
                     : homes.length > 1
@@ -150,7 +152,7 @@ export function Tools() {
           end={
             <Switch
               id="tool-browser"
-              aria-describedby="tool-browser-hint"
+              aria-describedby="tool-browser-hint tool-browser-logins"
               checked={tools.browser === true}
               disabled={homes.length === 0}
               onCheckedChange={(on) => void set("browser", on)}
@@ -159,7 +161,7 @@ export function Tools() {
           under={
             <span className="dk-honest ac-iconline">
               <Icon name="lock" size={14} />
-              <span>{t("desktop.tools.browserLogins")}</span>
+              <span id="tool-browser-logins">{t("desktop.tools.browserLogins")}</span>
             </span>
           }
         />

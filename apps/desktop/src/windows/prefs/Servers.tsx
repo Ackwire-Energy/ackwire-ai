@@ -278,17 +278,18 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
             </Button>
           }
         />
-        {/* The restart stays in sight, under the label: it reaches whoever is using agentes.chat at that moment. */}
+        {/* The restart stays in sight, under the label: it reaches whoever is using agentes.chat at that moment.
+            The switch is described by it too, after its hint. */}
         <PrefRow
           top
           title={t("desktop.here.usage")}
           hint={hintFor(t, t("desktop.here.usage"), t("desktop.here.usageText"))}
-          desc={t("desktop.server.usageRestart")}
+          desc={<span id="here-usage-prefs-line">{t("desktop.server.usageRestart")}</span>}
           htmlFor="here-usage-prefs"
           end={
             <Switch
               id="here-usage-prefs"
-              aria-describedby="here-usage-prefs-hint"
+              aria-describedby="here-usage-prefs-hint here-usage-prefs-line"
               checked={local.usage}
               disabled={busy === "usage"}
               onCheckedChange={(on) => void act("usage", () => host.setLocalUsage(on))}

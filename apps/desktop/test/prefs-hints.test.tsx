@@ -31,9 +31,9 @@ async function pane(
   view: ReactNode,
   ready: (el: HTMLElement) => unknown,
   check: (el: HTMLElement, host: FakeHost, opened: string[]) => Promise<void> | void,
-  options: { host?: (host: FakeHost) => void } = {},
+  options: { someCommands?: boolean; host?: (host: FakeHost) => void } = {},
 ) {
-  const host = createFakeHost("prefs", scenario);
+  const host = createFakeHost("prefs", scenario, { someCommands: options.someCommands });
   options.host?.(host);
   const opened: string[] = [];
   host.openExternal = async (url) => {
@@ -68,9 +68,13 @@ async function until(ready: () => unknown) {
   expect(Boolean(ready())).toBe(true);
 }
 
-/** The hint an element is described by (its text is in the page while the bubble is closed). */
+/** What an element is described by, each description in order (a hint's text is in the page while it's closed). */
 const describedBy = (el: Element | null | undefined) =>
-  document.getElementById(el?.getAttribute("aria-describedby") ?? "")?.textContent ?? null;
+  (el?.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .map((id) => document.getElementById(id)?.textContent)
+    .filter(Boolean)
+    .join(" ") || null;
 
 /** Each row: its title, its ⓘ's hint, the hint its switch reads (when it has one) and the line under the title. */
 const rows = (root: ParentNode) =>
@@ -146,7 +150,9 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         expect(row(el, "Send anonymous usage statistics to agentes.chat")).toEqual({
           title: "Send anonymous usage statistics to agentes.chat",
           hint: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
-          switch: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
+          // The switch reads the hint, then what changing it does.
+          switch:
+            "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names. Changing it restarts agentes.chat for a moment.",
           line: "Changing it restarts agentes.chat for a moment.",
         });
         expect(el.textContent).not.toContain("nothing is sent");
@@ -234,6 +240,13 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
           "Commands can reach the rest of this Mac, other organizations' folders included.",
           "Logins an agent makes stay on this Mac, in its folder. Use only test accounts or the agent's own.",
         ]);
+        // Their switches read the hint, then the line kept in sight under them.
+        expect(describedBy(el.querySelector("#tool-commands"))).toBe(
+          "Tests, builds and other Terminal commands. Each one shows in Activity. Commands can reach the rest of this Mac, other organizations' folders included.",
+        );
+        expect(describedBy(el.querySelector("#tool-browser"))).toBe(
+          "Opens websites for the agents in a browser of their own, without your logins. Logins an agent makes stay on this Mac, in its folder. Use only test accounts or the agent's own.",
+        );
         expect(row(el, "Protected mode")?.hint).toBe(
           "Commands only write in the allowed folders and don't read the rest of the Mac. Some tools may get slower.",
         );
@@ -241,6 +254,22 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
           "What agents of every organization can run on this Mac.",
         );
       },
+    ));
+
+  test("Tools: Commands on for only some organizations says where, on screen and to its switch", () =>
+    pane(
+      "selfhost",
+      <Tools />,
+      (el) => el.querySelector("#tool-commands-some"),
+      (el) => {
+        expect(el.querySelector("#tool-commands-some")?.textContent).toBe(
+          "On only for Acme. Turn it on for every organization here.",
+        );
+        expect(describedBy(el.querySelector("#tool-commands"))).toBe(
+          "Tests, builds and other Terminal commands. Each one shows in Activity. On only for Acme. Turn it on for every organization here. Commands can reach the rest of this Mac, other organizations' folders included.",
+        );
+      },
+      { someCommands: true },
     ));
 
   test("Tools › accounts: what the card is for behind its title's ⓘ; signing in, the wrong account behind one", () =>
