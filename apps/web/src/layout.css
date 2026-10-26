@@ -6387,10 +6387,11 @@ a.machine-row__name:hover {
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
 }
-/* Phone: the rail is a compact step bar (numbers only, no guide). */
+/* Phone: the rail is a compact step bar (numbers only, no guide); the page's height left goes to the step. */
 @media (max-width: 760px) {
   .onb {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
   }
   .onb__rail {
     position: relative;

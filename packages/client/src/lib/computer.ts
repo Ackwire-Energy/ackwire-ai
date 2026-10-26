@@ -63,11 +63,14 @@ export function busyView(action: ComputerAction, sinceMs: number, nowMs: number,
 
 /**
  * Which words the computers get: the Cloud's where a provisioner prepares each workspace's own computer
- * (`computer-setup` says `external`), self-host's where people connect theirs (`pair`). Null while loading:
- * no edition's words show then. `/api/health`'s edition isn't it: the Cloud runs the self-host image.
+ * (`computer-setup` says `external`), self-host's where people connect theirs (`pair`); before a workspace
+ * exists, `workspaceComputer` (`auth-config`) says the same. Null while loading: no edition's words show then.
+ * `/api/health`'s edition isn't it: the Cloud runs the self-host image.
  */
-export const computerEdition = (setup: ComputerSetup | null | undefined): Edition | null =>
-  setup ? (setup.mode === "external" ? "cloud" : "selfhost") : null;
+export function computerEdition(setup: ComputerSetup | null | undefined, workspaceComputer?: boolean): Edition | null {
+  const external = setup ? setup.mode === "external" : workspaceComputer;
+  return external === undefined ? null : external ? "cloud" : "selfhost";
+}
 
 /** The provisioner's steps, in order (`computerSetup.step.*`). */
 export const SETUP_STEPS: readonly ComputerSetupStep[] = ["reserving", "starting", "installing", "connecting"];

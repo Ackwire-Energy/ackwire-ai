@@ -26,6 +26,7 @@ import {
   MessageText,
   Meter,
   RunMark,
+  Steps,
 } from "../src";
 
 const body = () => within(document.body);
@@ -416,6 +417,20 @@ describe("Logo, Icon, Meter", () => {
     const meter = body().getByRole("meter", { name: "Orçamento usado" });
     expect(meter.getAttribute("aria-valuenow")).toBe("12.3");
     expect((meter.firstElementChild as HTMLElement).style.width).toBe("31%");
+  });
+
+  test("steps: the ones before the current are done; the current is under way, not done (on the last one too)", () => {
+    const bars = (current: number) => {
+      const { container, unmount } = render(<Steps current={current} total={4} label={`Passo ${current} de 4`} />);
+      const state = [...container.querySelectorAll(".ac-steps__bar")].map((b) =>
+        b.hasAttribute("data-current") ? "now" : b.getAttribute("data-done") === "true" ? "done" : "",
+      );
+      unmount();
+      return state;
+    };
+    expect(bars(1)).toEqual(["now", "", "", ""]);
+    expect(bars(2)).toEqual(["done", "now", "", ""]);
+    expect(bars(4)).toEqual(["done", "done", "done", "now"]);
   });
 });
 

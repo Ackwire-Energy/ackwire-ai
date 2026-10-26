@@ -7,7 +7,10 @@ export type AuthResult = { ok: true } | { ok: false; status: number; message: st
 
 export interface AuthClient {
   signIn(input: { email: string; password: string }): Promise<AuthResult>;
+  /** Creates the account, signed in; a server that sends e-mail sends the address a link that confirms it. */
   signUp(input: { name: string; email: string; password: string }): Promise<AuthResult>;
+  /** A new link confirming the signed-in person's own address (`email`). */
+  sendVerificationEmail(email: string): Promise<AuthResult>;
   /** Redirects the browser to the provider; comes back to `callbackURL`. */
   signInSocial(provider: "google" | "github" | "apple", callbackURL: string): Promise<AuthResult>;
   /** E-mails a link to `redirectTo?token=…` (only when the server can send e-mail: `passwordReset`). */

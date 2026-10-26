@@ -41,6 +41,11 @@
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
+  /* A source's monogram, when it has no mark of its own: the connector catalog's letters. */
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1;
 }
 .imp-mark__img {
   width: 22px;

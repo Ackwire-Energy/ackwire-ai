@@ -34,6 +34,8 @@ export interface AuthConfig {
   privacyUrl?: string | null;
   /** Where people write to whoever runs this server (a workspace on hold or suspended); null: not given. */
   supportEmail?: string | null;
+  /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
+  workspaceComputer?: boolean;
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -81,6 +83,8 @@ export interface User {
   image: string | null;
   /** Signs in with a password (false: only Google or Apple, or the desktop app that runs the server). */
   hasPassword?: boolean;
+  /** Opened the link that confirms the email address. */
+  emailVerified?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */

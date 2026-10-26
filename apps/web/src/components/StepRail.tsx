@@ -41,7 +41,8 @@ export function StepRail({
       <ol className="onb__steps">
         {steps.map((s, i) => {
           const done = s.done && i !== current;
-          const sub = s.note ?? (done && s.value ? s.value : s.optional && optionalLabel ? optionalLabel : null);
+          const sub =
+            s.note ?? (done && s.value ? s.value : s.optional && !s.done && optionalLabel ? optionalLabel : null);
           return (
             <li key={s.id} data-done={done || undefined}>
               <button

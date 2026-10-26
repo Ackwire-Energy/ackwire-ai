@@ -22,13 +22,14 @@ describe("sign-up policy (self-host)", () => {
   });
 
   test("auth-config: no landing page, legal links or support address unless configured; password reset when email goes out", async () => {
-    // The test server's fake email sender delivers.
+    // The test server's fake email sender delivers; people connect their own computers.
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
       landing: false,
       termsUrl: null,
       privacyUrl: null,
       supportEmail: null,
       passwordReset: true,
+      workspaceComputer: false,
     });
     await t.close();
     t = await createTestServer({
@@ -37,6 +38,8 @@ describe("sign-up policy (self-host)", () => {
         TERMS_URL: "https://example.com/terms",
         PRIVACY_URL: "https://example.com/privacy",
         SUPPORT_EMAIL: "help@example.com",
+        MACHINE_PROVISIONING: "external",
+        OPERATOR_API_TOKEN: "o".repeat(40),
       },
     });
     expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({
@@ -44,6 +47,7 @@ describe("sign-up policy (self-host)", () => {
       termsUrl: "https://example.com/terms",
       privacyUrl: "https://example.com/privacy",
       supportEmail: "help@example.com",
+      workspaceComputer: true,
     });
   });
 
