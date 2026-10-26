@@ -410,11 +410,12 @@ jobs:
         shell: bash
         run: bun apps/desktop/scripts/server-smoke.ts "$BIN_DIR/agentes-runner-x86_64-pc-windows-msvc.exe" apps/desktop/src-tauri/native
 
-      - name: Icons
+      - name: Icons and the installer's pictures
         working-directory: apps/desktop
         run: |
           bun scripts/icons.ts
           bun run tauri icon app-icon.png
+          bun scripts/installer-art.ts
 
       # The cached target may keep an older build's installer (another version): only this build's may be there.
       - name: Clear older bundles
