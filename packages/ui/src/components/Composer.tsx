@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { cx } from "../cx";
+import { onScreenKeyboard } from "../device";
 import {
   applyFormat,
   FORMAT_KINDS,
@@ -319,13 +320,6 @@ export function mentionQuery(text: string, caret: number): { start: number; quer
   const query = m[2] ?? "";
   return { start: caret - query.length - 1, query };
 }
-
-/** A phone or tablet typing on its on-screen keyboard (touch first, no mouse). */
-const onScreenKeyboard = () =>
-  typeof navigator !== "undefined" &&
-  navigator.maxTouchPoints > 0 &&
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(pointer: coarse)").matches;
 
 /** The chat message box: attach on the left, send (primary, icon only) on the right, focus on the whole box. */
 export function Composer({

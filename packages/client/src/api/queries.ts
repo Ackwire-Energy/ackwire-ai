@@ -410,7 +410,8 @@ export function cacheForumSuggestion(
   });
 }
 
-const newClientId = () =>
+/** A new message's `clientId`: sent again with the same one (its answer was lost), it's written only once. */
+export const newClientId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
