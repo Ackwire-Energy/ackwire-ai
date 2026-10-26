@@ -20,9 +20,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   type AgentScope,
-  DESKTOP_KEYBOARDS,
   DESKTOP_SIZE,
-  type DesktopKeyboard,
   type MachineReplies,
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
@@ -579,27 +577,6 @@ export class DesktopSessions {
   async stopAll(keep: ReadonlySet<string> = new Set()) {
     const leaving = [...this.desktops.values()].filter((d) => !keep.has(d.agent.id));
     await Promise.all(leaving.map((d) => this.stop(d.agent).catch(() => undefined)));
-  }
-
-  /**
-   * The keyboard layout of the person taking control (ADR 0058 §5), set as the agent with `setxkbmap`.
-   * Best effort: without it, or when it fails, the desktop keeps the layout it had.
-   */
-  async setKeyboard(agent: AgentScope, keyboard: DesktopKeyboard): Promise<void> {
-    const d = this.desktops.get(agent.id);
-    if (!d || !this.alive(d)) return;
-    const user = await this.opts.user(agent);
-    const setxkbmap = this.sys.which("setxkbmap", user.env.PATH);
-    if (!setxkbmap) return;
-    const [layout = "us", variant]: readonly string[] = DESKTOP_KEYBOARDS[keyboard];
-    const argv = [...user.prefix, setxkbmap, "-layout", layout, ...(variant ? ["-variant", variant] : [])];
-    const p = this.sys.spawn(argv, {
-      cwd: d.home,
-      env: { ...user.env, HOME: d.home, DISPLAY: `:${d.display}`, XAUTHORITY: d.xauthority },
-    });
-    void p.exited.then((code) => {
-      if (code !== 0) this.opts.log(`the desktop of ${agent.handle} kept its keyboard: setxkbmap ${keyboard} failed`);
-    });
   }
 
   /**

@@ -8340,17 +8340,6 @@ export const en: Translations = {
     keyboard: {
       label: "Keyboard",
       field: "Type on {{name}}'s computer",
-      layouts: {
-        br: "Portuguese (Brazil, ABNT2)",
-        us: "English (US)",
-        "us-intl": "English (US, international)",
-        gb: "English (UK)",
-        pt: "Portuguese (Portugal)",
-        es: "Spanish",
-        fr: "French",
-        de: "German",
-        it: "Italian",
-      },
     },
     seeWhole: "See the whole screen",
     card: {

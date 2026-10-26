@@ -8370,17 +8370,6 @@ export const ptBR = {
     keyboard: {
       label: "Teclado",
       field: "Digitar no computador {{of}} {{name}}",
-      layouts: {
-        br: "Português (ABNT2)",
-        us: "Inglês (EUA)",
-        "us-intl": "Inglês (EUA, internacional)",
-        gb: "Inglês (Reino Unido)",
-        pt: "Português (Portugal)",
-        es: "Espanhol",
-        fr: "Francês",
-        de: "Alemão",
-        it: "Italiano",
-      },
     },
     seeWhole: "Ver a tela inteira",
     card: {

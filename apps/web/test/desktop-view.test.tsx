@@ -451,14 +451,15 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops).toHaveLength(3);
   });
 
-  test("Assumir takes the screen's own handoff, control opens at quality 6 with the person's keyboard; Devolver hands it back", async () => {
+  test("Assumir takes the screen's own handoff, control opens at quality 6 with no keyboard to pick; Devolver hands it back", async () => {
+    // A layout an older version kept is never sent: what a key types is the person's own layout's.
     localStorage.setItem("agentes.screen.keyboard", "br");
     const t = await dialog();
     await connected();
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     expect(calls(t, "browser.takeover")).toEqual([[ORG_ID, ADA_ID, "desktop"]]);
     await settle(4);
-    expect(t.sockets.desktops.at(-1)?.url).toContain("&mode=control&keyboard=br");
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
     expect(t.sockets.desktops[0]?.closed).toBe(true);
     expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, focusOnClick: false });
     await connected();
@@ -468,8 +469,10 @@ describe("the agent's screen in the computer dialog", () => {
     expect(line()).toBe(
       "Copiar e colar como sempre: Ctrl C, Ctrl V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
     );
-    // No box to paste into: the person's own keys paste.
+    // No box to paste into and no keyboard to pick: the person's own keys paste, and type in their own layout.
     expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
+    expect(view().queryByRole("combobox")).toBeNull();
+    expect(document.querySelector(".dsk-line")?.textContent).toBe(line());
 
     // Esc in control goes to the computer: the dialog stays.
     await act(async () =>

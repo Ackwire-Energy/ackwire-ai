@@ -1,17 +1,15 @@
 import { describe, expect, test } from "bun:test";
 // By path: the client doesn't depend on the adapters, so the package isn't linked here.
-import { DESKTOP_KEYBOARDS as PROTOCOL_KEYBOARDS, STREAM_CLOSE } from "../../adapters/src/machine-protocol";
+import { STREAM_CLOSE } from "../../adapters/src/machine-protocol";
 import type { BrowserHandoff, DesktopStatus } from "../src/index";
 import {
   DESKTOP_CLOSE,
-  DESKTOP_KEYBOARDS,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
   desktopSocketUrl,
   desktopStatusState,
   desktopWithHandoff,
-  keyboardFor,
 } from "../src/index";
 
 const handoff = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
@@ -47,11 +45,10 @@ const status = (over: Partial<DesktopStatus> = {}): DesktopStatus => ({
 });
 
 describe("the agent's screen", () => {
-  test("the mirrors match the protocol: close codes and keyboard layouts", () => {
+  test("the mirror matches the protocol's close codes", () => {
     for (const [name, code] of Object.entries(DESKTOP_CLOSE)) {
       expect(STREAM_CLOSE[name as keyof typeof STREAM_CLOSE]).toBe(code);
     }
-    expect<string[]>([...DESKTOP_KEYBOARDS].sort()).toEqual(Object.keys(PROTOCOL_KEYBOARDS).sort());
   });
 
   test("close codes: what shows and whether it opens again by itself", () => {
@@ -118,29 +115,13 @@ describe("the agent's screen", () => {
     expect(desktopWithHandoff(taken, handoff({ id: "other", status: "done" }))).toBe(taken);
   });
 
-  test("socket addresses: ws or wss on the page's host; the keyboard only in control", () => {
+  test("socket addresses: ws or wss on the page's host; no keyboard layout, in either mode", () => {
     const base = { protocol: "https:", host: "agentes.chat" };
-    expect(desktopSocketUrl(base, { orgId: "o1", agentId: "a1", mode: "watch", keyboard: "br" })).toBe(
+    expect(desktopSocketUrl(base, { orgId: "o1", agentId: "a1", mode: "watch" })).toBe(
       "wss://agentes.chat/api/desktop?orgId=o1&agentId=a1&mode=watch",
     );
-    expect(
-      desktopSocketUrl("http://localhost:5173/x", {
-        orgId: "o 1",
-        agentId: "a1",
-        mode: "control",
-        keyboard: "us-intl",
-      }),
-    ).toBe("ws://localhost:5173/api/desktop?orgId=o%201&agentId=a1&mode=control&keyboard=us-intl");
-  });
-
-  test("the keyboard: ABNT2 by its ç key, else by the browser's language", () => {
-    expect(keyboardFor("en-US", "ç")).toBe("br");
-    expect(keyboardFor("pt-BR")).toBe("br");
-    expect(keyboardFor("pt-BR", ";")).toBe("us-intl");
-    expect(keyboardFor("en-US", ";")).toBe("us");
-    expect(keyboardFor("en-GB")).toBe("gb");
-    expect(keyboardFor("pt-PT")).toBe("pt");
-    expect(keyboardFor("de")).toBe("de");
-    expect(keyboardFor("ja-JP")).toBe("us");
+    expect(desktopSocketUrl("http://localhost:5173/x", { orgId: "o 1", agentId: "a1", mode: "control" })).toBe(
+      "ws://localhost:5173/api/desktop?orgId=o%201&agentId=a1&mode=control",
+    );
   });
 });

@@ -585,24 +585,6 @@ test("system mode: every process as the agent, and the password file root's (rea
   expect(existsSync(socket)).toBe(false);
 });
 
-test("the controller's keyboard: setxkbmap as the agent on its display; a variant only when the layout has one", async () => {
-  const t = setup();
-  await t.desktops.setKeyboard(dev, "br");
-  expect(t.fake.procs).toHaveLength(0);
-  await t.desktops.ensure(dev);
-  await t.desktops.setKeyboard(dev, "us-intl");
-  await t.desktops.setKeyboard(dev, "br");
-  const runs = t.fake.procs.filter((p) => p.argv[0] === "/usr/bin/setxkbmap");
-  expect(runs.map((p) => p.argv.slice(1))).toEqual([
-    ["-layout", "us", "-variant", "intl"],
-    ["-layout", "br"],
-  ]);
-  expect(runs[0]?.opts.env).toMatchObject({
-    DISPLAY: ":20",
-    XAUTHORITY: path.join(t.home, "desktop", "01a142cb", "Xauthority"),
-  });
-});
-
 test("system mode's desktop user: the agent's launcher and home; the cookie and the socket in ~/.agentes/desktop", () => {
   const launcher = systemLauncher({ id: dev.id, user: "ag-01a142cb", uid: 21001 }, true);
   expect(systemDesktopUser(launcher, { uid: 21001, gid: 21004 })).toEqual({

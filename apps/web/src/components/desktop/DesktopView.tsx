@@ -1,27 +1,23 @@
-import type { DesktopKeyboard, DesktopViewState, Edition, Machine } from "@agenteschat/client";
+import type { DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
-  DESKTOP_KEYBOARDS,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
   desktopSocketUrl,
   desktopStatusState,
-  isDesktopKeyboard,
-  keyboardFor,
   useBrowserHandoffMutations,
   useDesktopStatus,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, Input, modKey, Select } from "@agenteschat/ui";
+import { Button, Input, modKey } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
 import { showsPicture } from "@/lib/canvas";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
@@ -32,23 +28,6 @@ import { colorOf } from "../Sky";
 import { useScreenKeys } from "./screen-keys";
 import "../browser/browser.css";
 import "./desktop.css";
-
-type KeyboardNavigator = Navigator & {
-  keyboard?: { getLayoutMap(): Promise<{ get(code: string): string | undefined }> };
-};
-
-/** The layout to start with: the person's own choice, else a guess from the browser. */
-async function startingKeyboard(): Promise<DesktopKeyboard> {
-  const chosen = storage.get(STORAGE_KEYS.screenKeyboard);
-  if (isDesktopKeyboard(chosen)) return chosen;
-  let semicolon: string | undefined;
-  try {
-    semicolon = (await (navigator as KeyboardNavigator).keyboard?.getLayoutMap())?.get("Semicolon");
-  } catch {
-    // Not offered here (another browser, a frame): the language alone.
-  }
-  return keyboardFor(navigator.language, semicolon);
-}
 
 /** Its state settles: live, or only a person's own step changes it. */
 const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdated", "ended", "noRoom"];
@@ -66,9 +45,9 @@ const TOUCH = "(pointer: coarse)";
 /**
  * An agent's screen, live (ADR 0058), as the computer dialog's stage: noVNC on a socket of its own, which
  * starts a screen that isn't running. Watching is view-only at quality 3; in control (the screen's own
- * handoff is this person's) it takes the pointer and the keys at quality 6, with the person's keyboard layout
- * and their own copy and paste (`useScreenKeys`). While someone else is in control the screen stays hidden;
- * it opens again by itself after drops, restarts and hand backs. Its sub-line and actions go in the dialog's head.
+ * handoff is this person's) it takes the pointer and the keys at quality 6, with the person's own copy and
+ * paste (`useScreenKeys`). While someone else is in control the screen stays hidden; it opens again by itself
+ * after drops, restarts and hand backs. Its sub-line and actions go in the dialog's head.
  */
 export function DesktopView({
   agentId,
@@ -109,7 +88,6 @@ export function DesktopView({
   const [view, setView] = useState<DesktopViewState>("connecting");
   const [round, setRound] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
-  const [keyboard, setKeyboard] = useState<DesktopKeyboard | null>(null);
   const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
   const screenRef = useRef<HTMLDivElement>(null);
@@ -131,8 +109,7 @@ export function DesktopView({
         : "connecting";
   const mode = s ? desktopMode(s, me.user.id) : "watch";
   const inControl = mode === "control";
-  const controlKeyboard = inControl ? keyboard : null;
-  const connect = blocked === null && !gaveUp && keyboard !== null;
+  const connect = blocked === null && !gaveUp;
   const { refetch } = status;
   const copy = (value: string) =>
     navigator.clipboard?.writeText(value).then(
@@ -165,9 +142,6 @@ export function DesktopView({
     return () => window.removeEventListener("beforeunload", ask);
   }, [inControl]);
 
-  useEffect(() => {
-    void startingKeyboard().then(setKeyboard);
-  }, []);
   // A changed state may let it open again (a screen switched on, a computer back).
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when what blocks it changes
   useEffect(() => setGaveUp(false), [blocked]);
@@ -190,12 +164,7 @@ export function DesktopView({
         // The socket opens only once noVNC can take it in the same tick: the computer speaks first, and bytes
         // that reach a socket before noVNC listens are lost, leaving both sides waiting until the computer gives up.
         const socket = createSocket(
-          desktopSocketUrl(window.location, {
-            orgId: org.id,
-            agentId,
-            mode,
-            ...(controlKeyboard ? { keyboard: controlKeyboard } : {}),
-          }),
+          desktopSocketUrl(window.location, { orgId: org.id, agentId, mode }),
         ) as unknown as WebSocket;
         ws = socket;
         socket.binaryType = "arraybuffer";
@@ -269,7 +238,7 @@ export function DesktopView({
       window.removeEventListener("pagehide", leave);
       end();
     };
-  }, [connect, mode, controlKeyboard, round, org.id, agentId, createSocket, refetch, inControl, copiedThere]);
+  }, [connect, mode, round, org.id, agentId, createSocket, refetch, inControl, copiedThere]);
   useEffect(() => {
     const back = (e: PageTransitionEvent) => {
       if (e.persisted) setRound((r) => r + 1);
@@ -331,10 +300,6 @@ export function DesktopView({
   const giveUp = () => {
     if (!handoff) return;
     actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: failedToast });
-  };
-  const chooseKeyboard = (k: DesktopKeyboard) => {
-    storage.set(STORAGE_KEYS.screenKeyboard, k);
-    setKeyboard(k);
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
@@ -527,13 +492,6 @@ export function DesktopView({
                 {t("desktop.keyboard.label")}
               </Button>
             )}
-            <Select<DesktopKeyboard>
-              size="sm"
-              aria-label={t("desktop.keyboard.label")}
-              value={keyboard ?? undefined}
-              onValueChange={chooseKeyboard}
-              options={DESKTOP_KEYBOARDS.map((k) => ({ value: k, label: t(`desktop.keyboard.layouts.${k}`) }))}
-            />
             <span className="muted">
               {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
               {t("desktop.control.notice", g)}
