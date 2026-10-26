@@ -453,6 +453,16 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     const d = await dialog("Mudar onde trabalha", "Onde a Ada trabalha?");
     const mac = within(d).getByRole("radio", { name: /^MacBook/ });
     expect(mac.textContent).toContain("Ligado · Claude Code · Codex · Navegador");
+    // Portraits are as wide as their drawings: each sits in the same column, so the names line up, and the drawing
+    // starts at the row's edge like any other lead.
+    const options = within(d).getAllByRole("radio");
+    expect(options.length).toBeGreaterThan(1);
+    for (const option of options)
+      expect(option.querySelector(".ac-optrow__lead > .machine-row__pic > canvas.ac-computer")).toBeTruthy();
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    const column = css.split("\n.machine-row__pic {")[1]?.split("}")[0] ?? "";
+    expect(column).toContain("width: 48px");
+    expect(column).not.toContain("center");
     await click(mac);
     await click(within(d).getByRole("button", { name: "Usar o MacBook" }));
     await settle(6);

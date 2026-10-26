@@ -1214,15 +1214,19 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
               ? [
                   {
                     value: CLOUD,
-                    leading:
-                      cloud === "none" ? (
-                        <Icon name="dash" size={20} />
-                      ) : (
-                        <ComputerPortrait
-                          kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
-                          state={workspace ? setupPortrait(workspace, false) : "online"}
-                        />
-                      ),
+                    // Portraits are as wide as their drawings: one column keeps the titles in line.
+                    leading: (
+                      <span className="machine-row__pic">
+                        {cloud === "none" ? (
+                          <Icon name="dash" size={20} />
+                        ) : (
+                          <ComputerPortrait
+                            kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
+                            state={workspace ? setupPortrait(workspace, false) : "online"}
+                          />
+                        )}
+                      </span>
+                    ),
                     title: noComputer.label(cloud),
                     description: workspace
                       ? t(workspace.textKey)
@@ -1235,7 +1239,11 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
               : []),
             ...listed.map((m) => ({
               value: m.id,
-              leading: <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />,
+              leading: (
+                <span className="machine-row__pic">
+                  <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
+                </span>
+              ),
               title: m.name,
               description: `${status(m)} · ${offers(m)}`,
               children: note(m.id),

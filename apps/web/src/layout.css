@@ -6061,11 +6061,11 @@ button.live-call__head:hover {
 .machine-row__icon {
   flex: none;
 }
-/* The portrait's column is as wide as the grid, so a list's names line up whatever each computer is. */
+/* The portrait's column is as wide as the grid, so a list's names line up whatever each computer is. The drawing
+   starts at the row's edge like any other lead: centred, the narrow tower would leave a gap before it. */
 .machine-row__pic {
   display: flex;
   flex: none;
-  justify-content: center;
   width: 48px;
 }
 .machine-row__name {
