@@ -2181,6 +2181,11 @@ export interface ComputerSetup {
   state: "preparing" | "waiting" | "problem" | "ready" | null;
   /** While `preparing`. */
   step: ComputerSetupStep | null;
+  /**
+   * While `preparing`, when the provisioner says: what it is doing within its step (`updating`, `restarting`…), in
+   * its own word; one the app has no words for reads as its step. Absent from an older server.
+   */
+  stage?: string | null;
   /** While `waiting`: `capacity` (taking longer than usual). */
   reason: "capacity" | null;
   since: string | null;

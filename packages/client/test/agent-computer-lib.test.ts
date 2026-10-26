@@ -19,7 +19,6 @@ import {
 import {
   computerEdition,
   etaLine,
-  etaTickMs,
   etaView,
   promisesEmail,
   setupEta,
@@ -134,13 +133,6 @@ describe("the time left", () => {
     expect(etaLine(t, { kind: "underMinute" })).toBe("computerSetup.eta.underMinute");
     expect(etaLine(t, { kind: "almost" })).toBe("computerSetup.eta.almost");
     expect(etaLine(t, { kind: "late" })).toBe("computerSetup.eta.late");
-  });
-
-  test("repaints every 15 s, every 5 s under a minute", () => {
-    expect(etaTickMs({ kind: "minutes", count: 3 })).toBe(15_000);
-    expect(etaTickMs({ kind: "underMinute" })).toBe(5_000);
-    expect(etaTickMs({ kind: "almost" })).toBe(5_000);
-    expect(etaTickMs(null)).toBe(5_000);
   });
 });
 

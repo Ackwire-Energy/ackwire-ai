@@ -8287,6 +8287,16 @@ export const en: Translations = {
       installing: "Installing the apps",
       connecting: "Connecting it to your workspace",
     },
+    stage: {
+      ordering: "Getting a new computer",
+      wiping: "Clearing it for a fresh start",
+      booting: "Starting it for the first time",
+      updating: "Updating the system",
+      restarting: "Restarting after the update",
+      network: "Setting up its network",
+      firewall: "Setting up its protection",
+      finishing: "Running the last checks",
+    },
     stepOf: "Step {{n}} of {{total}} · {{step}}",
     status: {
       preparing: "Getting the computer ready.",

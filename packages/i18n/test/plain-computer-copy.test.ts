@@ -21,9 +21,15 @@ const NAMESPACES = [
   "support.",
 ];
 
-/** What the workspace computer's screens say in each state (`setupView`, `etaView` in packages/client/src/lib/computer.ts). */
+/**
+ * What the workspace computer's screens say in each state (`setupView`, `SETUP_STAGES`, `etaView` in
+ * packages/client/src/lib/computer.ts).
+ */
 const SETUP_KEYS = [
   ...["reserving", "starting", "installing", "connecting"].map((s) => `computerSetup.step.${s}`),
+  ...["ordering", "wiping", "booting", "updating", "restarting", "network", "firewall", "finishing"].map(
+    (s) => `computerSetup.stage.${s}`,
+  ),
   ...["preparing", "capacity", "problem", "ready"].flatMap((s) => [
     `computerSetup.status.${s}`,
     `computerSetup.chip.${s}`,

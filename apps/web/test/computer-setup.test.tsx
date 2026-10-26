@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import type { ComputerSetup, Machine } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
+import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
+  setSystemTime();
   cleanup();
   localStorage.clear();
 });
@@ -29,6 +31,16 @@ const keepOnly = async (...keep: string[]) => {
     const card = screen().getByRole("button", { name: new RegExp(name) });
     if ((card.getAttribute("aria-pressed") === "true") !== keep.includes(name)) await click(card);
   }
+};
+
+/** How often the query of this kind (its key's last part) is asked again, as its observer has it now. */
+const pollEvery = (qc: QueryClient, key: string) => {
+  const query = qc
+    .getQueryCache()
+    .findAll()
+    .find((q) => q.queryKey.at(-1) === key && q.getObserversCount() > 0);
+  const every = query?.observers[0]?.options.refetchInterval;
+  return typeof every === "function" && query ? every(query) : every;
 };
 
 /** The workspace's own computer as the server lists it: named by the server, no system, nobody paired it. */
@@ -128,6 +140,40 @@ describe("the workspace's computer on its way: the notice on top of the work are
     expect(notice().textContent).toContain("Algo deu errado ao preparar o computador");
     await push({ state: "ready", machineId: "00000000-0000-4000-8000-000000000999" });
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
+  });
+
+  test("what it is doing within its step, in the same words on every screen; a stage it has no words for is its step", async () => {
+    const { push } = await open(`/org/${ORG_ID}/settings/computers`, {
+      step: "installing",
+      stage: "updating",
+      secondsLeft: 330,
+    });
+    const notice = () => screen().getByRole("region", { name: NOTICE }).textContent;
+    const card = () => screen().getByRole("region", { name: "Computador da Acme" }).textContent;
+    expect(notice()).toContain("Passo 3 de 4 · Atualizando o sistema · faltam uns 6 min");
+    expect(card()).toContain("Passo 3 de 4 · Atualizando o sistema");
+    await push({ step: "installing", stage: "restarting", secondsLeft: 300 });
+    expect(notice()).toContain("Passo 3 de 4 · Reiniciando depois da atualização");
+    expect(card()).toContain("Passo 3 de 4 · Reiniciando depois da atualização");
+    await push({ step: "installing", stage: "defragmenting", secondsLeft: 240 });
+    expect(notice()).toContain("Passo 3 de 4 · Instalando os programas");
+    expect(card()).toContain("Passo 3 de 4 · Instalando os programas");
+  });
+
+  test("one time, read the same way everywhere: a screen opened later says what the notice says", async () => {
+    // A minute and two seconds left: ten seconds on, before the notice repaints, it is under a minute.
+    const { router } = await open(`/org/${ORG_ID}/c/${ENG_ID}`, { step: "installing", secondsLeft: 62 });
+    const notice = () => screen().getByRole("region", { name: NOTICE }).textContent ?? "";
+    expect(notice()).toContain("faltam uns 2 min");
+    setSystemTime(new Date(Date.now() + 10_000));
+    await act(async () =>
+      router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "computers" } }),
+    );
+    await settle(6);
+    const card = screen().getByRole("region", { name: "Computador da Acme" });
+    const time = card.querySelector(".setup-eta")?.textContent ?? "";
+    expect(time).toMatch(/^Falta/);
+    expect(notice()).toContain(time.charAt(0).toLowerCase() + time.slice(1));
   });
 
   test("where people connect their own computers, nothing changes: no notice", async () => {
@@ -577,6 +623,26 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(tile?.querySelector(".onb__stat-of")?.textContent).toBe("Computador da Acme Saúde");
   });
 
+  test("its first time shows at once: asked every 2 s until the provisioner says one, with the email line", async () => {
+    const r = await toComputerStep({ state: "preparing", specs: SPECS, notifyByEmail: true });
+    const step = () => (document.querySelector(".onb__workspace-computer") as HTMLElement).textContent ?? "";
+    expect(step()).toContain("Preparando o computador.");
+    expect(step()).not.toContain("Avisamos");
+    expect(pollEvery(r.services.queryClient, "computer-setup")).toBe(2000);
+    await r.reported({
+      state: "preparing",
+      step: "installing",
+      stage: "updating",
+      secondsLeft: 600,
+      specs: SPECS,
+      notifyByEmail: true,
+    });
+    expect(step()).toContain("Passo 3 de 4 · Atualizando o sistema");
+    expect(step()).toContain("Faltam uns 10 min");
+    expect(step()).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(pollEvery(r.services.queryClient, "computer-setup")).toBe(5000);
+  });
+
   test("the AI step while it's prepared: Claude's panel waits in place, then turns on by itself; nothing starts before a click", async () => {
     const r = await toComputerStep({
       state: "preparing",
@@ -589,14 +655,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     await click(screen().getByRole("button", { name: "Continuar" }));
     expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
     // Every step keeps asking about it while it's on its way.
-    const interval = (key: string) => {
-      const query = r.services.queryClient
-        .getQueryCache()
-        .findAll()
-        .find((q) => q.queryKey.at(-1) === key && q.getObserversCount() > 0);
-      const every = query?.observers[0]?.options.refetchInterval;
-      return typeof every === "function" && query ? every(query) : every;
-    };
+    const interval = (key: string) => pollEvery(r.services.queryClient, key);
     expect(interval("computer-setup")).toBe(5000);
     await keepOnly("Theo · PM");
     await click(screen().getByRole("button", { name: "Criar 1 agente" }));

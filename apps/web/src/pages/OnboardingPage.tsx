@@ -122,6 +122,11 @@ const TYPING_MS = 900;
 const HAPPY_MS = 1600;
 /** How often the workspace's computer is asked about while it's on its way (no socket is open here). */
 const COMPUTER_POLL_MS = 5000;
+/**
+ * In the wait's first minute, until the provisioner says when it will be ready (it does from its first pass): asked
+ * this often, so the time and the email line show as soon as it has.
+ */
+const FIRST_TIME_POLL_MS = 2000;
 
 /** `host`: the server's own computer. */
 type Computer = "cloud" | "machine" | "host" | null;
@@ -477,11 +482,11 @@ export function OnboardingPage() {
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
   const computerPoll = step.id === "computer" ? COMPUTER_POLL_MS : false;
   const me = useQuery({ ...meQuery(api), refetchInterval: computerPoll, refetchOnWindowFocus: "always" });
-  const setup = useComputerSetup(
-    created?.orgId ?? "",
-    Boolean(created),
-    (data) => computerPoll || (setupPending(setupView(data)) ? COMPUTER_POLL_MS : false),
-  );
+  const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), (data) => {
+    const view = setupView(data);
+    if (view?.phase === "preparing" && view.secondsLeft === null && (view.waited ?? 0) < 60) return FIRST_TIME_POLL_MS;
+    return computerPoll || (setupPending(view) ? COMPUTER_POLL_MS : false);
+  });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);

@@ -8321,6 +8321,16 @@ export const ptBR = {
       installing: "Instalando os programas",
       connecting: "Conectando ao seu workspace",
     },
+    stage: {
+      ordering: "Separando um computador novo",
+      wiping: "Limpando para começar do zero",
+      booting: "Iniciando pela primeira vez",
+      updating: "Atualizando o sistema",
+      restarting: "Reiniciando depois da atualização",
+      network: "Configurando a rede",
+      firewall: "Configurando a proteção",
+      finishing: "Fazendo as últimas verificações",
+    },
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
     status: {
       preparing: "Preparando o computador.",
