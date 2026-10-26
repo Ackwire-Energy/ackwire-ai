@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API_URL } from "@/config";
-import { connectToServer, PROBLEM_TEXT } from "@/features/server";
+import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl } from "@/lib/server";
 import { useSession } from "@/providers/session";
 import { AuthField } from "@/ui/auth/AuthField";
@@ -43,12 +43,7 @@ export default function Server() {
     if (check.ok) return switchTo(check.server);
     haptics.warning();
     const host = serverHost(check.server);
-    // Tailscale's own advice only for a Tailscale address (*.ts.net); any other host gets the plain one.
-    const text =
-      check.problem === "unreachable" && host.endsWith(".ts.net")
-        ? "mobile.auth.server.unreachableTailscale"
-        : PROBLEM_TEXT[check.problem];
-    setError(t(text, { host }));
+    setError(t(problemText(check.problem, check.server), { host }));
     setBusy(false);
   };
 

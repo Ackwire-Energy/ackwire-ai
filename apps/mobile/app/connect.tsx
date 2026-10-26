@@ -2,7 +2,7 @@ import { checkServer, normalizeServer, type ServerCheck, serverHost } from "@age
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { connectToServer, PROBLEM_TEXT } from "@/features/server";
+import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 import { useSession } from "@/providers/session";
@@ -71,7 +71,7 @@ export default function Connect() {
     router.replace(plan.move || !session.signedIn ? "/sign-in" : "/");
   };
 
-  const problem = check && !check.ok ? t(PROBLEM_TEXT[check.problem], { host: serverHost(target) }) : null;
+  const problem = check && !check.ok ? t(problemText(check.problem, target), { host: serverHost(target) }) : null;
   return (
     <AuthScaffold
       title={serverHost(target)}

@@ -1,4 +1,4 @@
-import type { ServerProblem } from "@agenteschat/client/lib/server";
+import { isTailnet, type ServerProblem } from "@agenteschat/client/lib/server";
 import { signOut } from "@/features/account";
 import { authClient, forgetSession } from "@/lib/auth";
 import { serverUrl, setServer } from "@/lib/server";
@@ -12,6 +12,13 @@ export const PROBLEM_TEXT: Record<ServerProblem, string> = {
   "server-too-old": "mobile.auth.server.serverTooOld",
   "app-too-old": "mobile.auth.server.appTooOld",
 };
+
+/**
+ * The text for a server that can't be used: Tailscale's own advice only on a tailnet (`isTailnet`, the
+ * web's test for its Tailscale step), the plain one anywhere else. `server` is the full address.
+ */
+export const problemText = (problem: ServerProblem, server: string): string =>
+  problem === "unreachable" && isTailnet(server) ? "mobile.auth.server.unreachableTailscale" : PROBLEM_TEXT[problem];
 
 /**
  * Moves the app to `target.server`, leaving the current one first so nothing crosses servers (`connectPlan`),

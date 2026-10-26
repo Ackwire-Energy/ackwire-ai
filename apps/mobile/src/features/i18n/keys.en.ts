@@ -350,8 +350,7 @@ export const featureKeysEn: FeatureTranslations = {
         summarize: "Sum it up in 3 points",
         nextStep: "What's the next step?",
       },
-      arrivedF: "{{name}} joined the team",
-      arrivedM: "{{name}} joined the team",
+      arrived: "{{name}} joined the team",
       meet: "Your first conversation with {{name}}",
       roleIntro: "{{role}} on your team. Ask in plain words.",
       noIntro: "Ask for what you need, in plain words.",
@@ -385,8 +384,8 @@ export const featureKeysEn: FeatureTranslations = {
         },
         writing: {
           how: "What kind of writing do you do best?",
-          task: "Write a draft of this week's report",
-          routine: "Every Friday, send me a summary of the week",
+          task: "Review a text of mine and tell me what to improve",
+          routine: "Every Friday, tell me what you wrote this week",
         },
         product: {
           how: "How do you set priorities?",
@@ -400,8 +399,8 @@ export const featureKeysEn: FeatureTranslations = {
         },
         general: {
           how: "What can you do for me?",
-          task: "Organize my tasks for today",
-          routine: "Every Monday, send me a summary of the week",
+          task: "Show me an example of what you do",
+          routine: "Every Monday, tell me what you did this week",
         },
       },
     },

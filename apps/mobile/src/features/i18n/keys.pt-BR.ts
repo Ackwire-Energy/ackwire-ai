@@ -210,7 +210,7 @@ export const featureKeysPtBR = {
       noAgents: "Para pedir algo a um agente, comece criando o seu.",
     },
     agent: {
-      question: "O que ele vai fazer?",
+      question: "O que esse agente vai fazer?",
       fine: "O resto a gente sugere. Você ajusta depois, no perfil.",
     },
   },
@@ -354,8 +354,7 @@ export const featureKeysPtBR = {
         summarize: "Resume em 3 pontos",
         nextStep: "Qual é o próximo passo?",
       },
-      arrivedF: "A {{name}} chegou na equipe",
-      arrivedM: "O {{name}} chegou na equipe",
+      arrived: "{{name}} chegou na equipe",
       meet: "Sua primeira conversa com {{name}}",
       roleIntro: "{{role}} na sua equipe. Peça em palavras simples.",
       noIntro: "Peça o que precisar, em palavras simples.",
@@ -389,8 +388,8 @@ export const featureKeysPtBR = {
         },
         writing: {
           how: "Que tipo de texto você escreve melhor?",
-          task: "Escreve um rascunho do relatório da semana",
-          routine: "Toda sexta, me manda um resumo da semana",
+          task: "Revisa um texto meu e diz o que melhorar",
+          routine: "Toda sexta, me conta o que você escreveu na semana",
         },
         product: {
           how: "Como você organiza as prioridades?",
@@ -404,8 +403,8 @@ export const featureKeysPtBR = {
         },
         general: {
           how: "O que você consegue fazer por mim?",
-          task: "Organiza as minhas tarefas de hoje",
-          routine: "Toda segunda, me manda um resumo da semana",
+          task: "Me mostra um exemplo do que você faz",
+          routine: "Toda segunda, me conta o que você fez na semana",
         },
       },
     },
