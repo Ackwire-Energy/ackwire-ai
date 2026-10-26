@@ -535,7 +535,7 @@ export const en: Translations = {
     keySite: "Create the key at {{site}}.",
     keyNotPlan: "Use a pay-as-you-go key: a subscription plan's key only works in coding tools.",
     keyInvalid: {
-      anthropic: "Anthropic keys start with sk-ant-. Check it and paste it again.",
+      anthropic: "Claude API keys start with sk-ant-. Check it and paste it again.",
       openai: "OpenAI keys start with sk-. Check it and paste it again.",
       deepseek: "DeepSeek keys start with sk-. Check it and paste it again.",
       moonshot: "Kimi keys start with sk-. Check it and paste it again.",
@@ -545,8 +545,8 @@ export const en: Translations = {
     },
     keyFromOther: "Is it from another provider?",
     advanced: "Advanced",
-    anthropicWorkspace: "Anthropic workspace ID",
-    anthropicWorkspaceHelp: "Optional. Only for keys that aren't scoped to a workspace.",
+    anthropicWorkspace: "Claude Console workspace ID",
+    anthropicWorkspaceHelp: "Only for a key that works in more than one workspace. The ID starts with wrkspc_.",
     openaiOrg: "OpenAI organization ID",
     openaiProject: "OpenAI project ID",
     optional: "Optional.",
@@ -974,7 +974,7 @@ export const en: Translations = {
       chatgpt: "ChatGPT plan",
       chatgptDesc: "Plus, Pro or Team, through Codex",
       api_key: "API key",
-      api_keyDesc: "Anthropic, OpenAI and others; pay as you go",
+      api_keyDesc: "Claude, OpenAI and others; pay as you go",
     },
     waitComputer: "Available once the computer is ready. You can use an API key now.",
     agent: "For which agent",
@@ -2416,7 +2416,7 @@ export const en: Translations = {
     defaultKey: "Workspace default key",
     defaultKeyDesc: "{{provider}} · ends in {{hint}}",
     otherKeyDesc: "{{provider}} · ends in {{hint}}",
-    modelNeedsKey: "Add an {{provider}} key to use it",
+    modelNeedsKey: "{{provider}} API key needed",
     noKeys: "No keys yet",
     budgetTitle: "Monthly budget",
     budget: "Monthly budget (US$)",
@@ -4340,10 +4340,15 @@ export const en: Translations = {
       titlePeople: "Now {{name}} replies to other people",
       body: {
         claude_code:
-          "Anthropic says personal Claude subscriptions are meant for personal use. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+          "Claude's terms say your plan is for your own use. Using it to reply to other people might go against them. If you continue, the risk is yours.",
         codex:
           "OpenAI says ChatGPT plans are meant for personal use. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
-        seat: "{{maker}} says each seat on the plan belongs to one person. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
+        seat: {
+          claude_code:
+            "Claude's terms say each seat is for one person. Using yours to reply to other people might go against them. If you continue, the risk is yours.",
+          codex:
+            "OpenAI's terms say each seat is for one person. Using yours to reply to other people might go against them. If you continue, the risk is yours.",
+        },
         other:
           "{{maker}} says the plan is for its subscriber only. Using yours to reply to other people might go against its terms. If you continue, the risk is yours.",
       },
@@ -7304,7 +7309,7 @@ export const en: Translations = {
     addKey: "Add key",
     addKeyTitle: "Add an API key",
     keyLabel: "Key name",
-    keyLabelPlaceholder: "E.g. Acme Anthropic",
+    keyLabelPlaceholder: "E.g. Acme Claude",
     keyValue: "API key",
     keyInvalid: "Paste the API key (at least 8 characters).",
     saveKey: "Save key",
