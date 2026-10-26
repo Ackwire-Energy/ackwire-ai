@@ -181,22 +181,18 @@ const ComputerSetup = z
     reason: z
       .enum(PROVISIONING_REASONS)
       .nullable()
-      .openapi({ description: "While `waiting`: `capacity` (taking longer than usual)." }),
+      .openapi({ description: "While `waiting`: `capacity` (no computer on its way yet)." }),
     since: z.string().nullable().openapi({ description: "When this state (and step or reason) began." }),
     requestedAt: z.string().nullable().openapi({
       description: "When its people started waiting: the computer's last removal, else the workspace's creation.",
     }),
-    expectedReadyAt: z
-      .string()
-      .nullable()
-      .openapi({ description: "While `preparing`, when known: when it should be ready (already past: any moment)." }),
+    expectedReadyAt: z.string().nullable().openapi({
+      description:
+        "While `preparing`, when known: the earliest time this wait was told it would be ready, never moved later (already past: it runs over).",
+    }),
     secondsLeft: z.number().int().nullable().openapi({
       description:
-        "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter. After a report that moved `expectedReadyAt` later within the same step and stage (a part running long, so the time moves with the clock), the seconds that report gave, held still for a minute, then counted down.",
-    }),
-    secondsSteady: z.number().int().nullable().openapi({
-      description:
-        "With `secondsLeft`: how many seconds from this answer it stays as it is before counting down (0: it counts down at once).",
+        "`expectedReadyAt` minus this server's clock when it answered (negative once past), so the device's clock doesn't matter.",
     }),
     secondsWaited: z.number().int().nullable().openapi({
       description: "This server's clock when it answered minus `requestedAt`, for the same reason.",

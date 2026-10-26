@@ -42,7 +42,7 @@ const Provisioning = z
     expectedReadyAt: z
       .string()
       .nullable()
-      .openapi({ description: "With `preparing`: the ready time you gave, kept while it is past (any moment now)." }),
+      .openapi({ description: "With `preparing`: the earliest ready time you gave in this wait." }),
     specs: Specs.nullable(),
   })
   .openapi("OperatorProvisioning");
@@ -74,7 +74,7 @@ const ProvisioningInput = z.object({
     .openapi({ description: "With `preparing`: reserving, starting, installing or connecting; ignored otherwise." }),
   stage: z.string().max(64).optional().openapi({
     description:
-      "With `preparing`: what the computer is doing within `step` (ordering, wiping, starting, booting, updating, restarting, network, firewall, apps, finishing, connecting); ignored otherwise. Any word is kept: the apps say one they have no words for as its step.",
+      "With `preparing`: what the computer is doing within `step` (ordering, wiping, starting, booting, updating, restarting, network, firewall, apps, connecting); ignored otherwise. Any word is kept: the apps say one they have no words for as its step.",
   }),
   reason: z
     .enum([...PROVISIONING_REASONS, "approval"])
@@ -88,7 +88,7 @@ const ProvisioningInput = z.object({
     .optional()
     .openapi({
       description:
-        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A time already past means any moment now, and while the stored one is past too it stays, so people see the wait run over.",
+        "With `preparing`: when the computer should be ready, at most 7 days ahead; ignored otherwise. A wait counts down to the earliest time it was told: a later one is kept out, so people see the wait run over.",
     }),
   etaSeconds: z
     .number()
@@ -161,7 +161,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Say how far the workspace's computer is",
       description:
-        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. A ready time moved later within the same step and stage (a part running long) holds still on their screens for a minute: while it keeps moving, send it again within that minute. A ready time over a minute ahead, `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
+        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
       request: { params: OrgParams, body: body(ProvisioningInput) },
       responses: {
         204: noContent[204],

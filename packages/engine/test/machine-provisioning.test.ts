@@ -17,6 +17,7 @@ import {
   type MachineHub,
   type MachineHubDeps,
   OrgPausedError,
+  type ProvisioningStep,
   pollDeviceToken,
   reduceMachineAccess,
   renameMachine,
@@ -222,7 +223,6 @@ describe("external provisioning", () => {
       expectedReadyAt: null,
       specs: null,
       secondsLeft: null,
-      secondsSteady: null,
       secondsWaited: expect.any(Number),
       notifyByEmail: false,
       machineId: null,
@@ -319,7 +319,7 @@ describe("external provisioning", () => {
     expect(await status()).toMatchObject({ state: "waiting", stage: null });
 
     // Ready, then taken away: no stage left over.
-    await report("finishing");
+    await report("apps");
     const { machineId, token } = await enrolled();
     await hello(token);
     expect(await status()).toMatchObject({ state: "ready", stage: null });
@@ -327,70 +327,60 @@ describe("external provisioning", () => {
     expect(await status()).toMatchObject({ state: "preparing", step: null, stage: null });
   });
 
-  test("a part running long: the time left holds still between the reports that move it, then counts down", async () => {
+  test("one wait counts down to the earliest time it was told: a later one is kept out, and it runs over", async () => {
     f = await setup();
     const events = heard("machine.provisioning");
     const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id);
+    // A cold run as its provisioner reported it: planned again at each stage from the stage the computer was in, every
+    // time later than the first, as the app install ran 50 s past its estimate. Ready came at 16:11:34.614.
+    const first = Date.parse("2026-10-26T16:05:05.889Z");
     const t0 = Date.now();
-    const at = (s: number) => setSystemTime(new Date(t0 + s * 1000));
-    const report = (stage: string, readyAt: number) =>
-      setProvisioning(deps(), f.org.id, {
-        state: "preparing",
-        step: "installing",
-        stage,
-        expectedReadyAt: new Date(t0 + readyAt * 1000),
-      });
-    type Answer = { secondsLeft: number; secondsSteady: number };
-    // What a screen says `s` seconds after an answer, in minutes: its seconds left less those gone since, once its
-    // steady ones have (`etaView` in packages/client).
-    const minutes = (answer: Answer, s: number) =>
-      Math.ceil((answer.secondsLeft - Math.max(0, s - answer.secondsSteady)) / 60);
-    const ups = (shown: number[]) => shown.filter((m, i) => i > 0 && m > (shown[i - 1] ?? m)).length;
+    const at = (clock: string) => new Date(t0 + Date.parse(`2026-10-26T${clock}Z`) - first);
+    const report = (sent: string, step: ProvisioningStep, stage: string, readyAt: string) => {
+      setSystemTime(at(sent));
+      return setProvisioning(deps(), f.org.id, { state: "preparing", step, stage, expectedReadyAt: at(readyAt) });
+    };
+    const told = at("16:10:08.587").toISOString();
+    await report("16:05:05.889", "installing", "updating", "16:10:08.587");
+    await report("16:06:22.927", "installing", "restarting", "16:10:41.447");
+    await report("16:06:38.499", "installing", "network", "16:10:43.025");
+    await report("16:06:54.782", "installing", "firewall", "16:10:44.936");
+    await report("16:07:10.284", "installing", "apps", "16:10:51.961");
+    // Every stage is heard, with the first time.
+    expect(events.map((e) => [e.stage, e.expectedReadyAt])).toEqual(
+      ["updating", "restarting", "network", "firewall", "apps"].map((stage) => [stage, told]),
+    );
+    expect(events.at(-1)).toMatchObject({ secondsLeft: 178 });
+    setSystemTime(at("16:10:08.587"));
+    expect(await status()).toMatchObject({ expectedReadyAt: told, secondsLeft: 0 });
+    // Past it, the provisioner's time slides with the clock: no new time, nothing heard.
+    await report("16:11:07.677", "installing", "apps", "16:11:24.500");
+    expect(events).toHaveLength(5);
+    expect(await status()).toMatchObject({ expectedReadyAt: told, secondsLeft: -59 });
+    // The last step, still past the first time: it runs over until it is ready.
+    await report("16:11:30.630", "connecting", "connecting", "16:11:43.372");
+    expect(events.at(-1)).toMatchObject({ step: "connecting", expectedReadyAt: told, secondsLeft: -82 });
+    for (const answer of [...events, await status()]) expect(answer).not.toHaveProperty("secondsSteady");
 
-    // The system update should end 43 s in, with 257 s of parts after it, and runs long. The provisioner plans again
-    // on passes 5 s apart (now plus those 257 s, once the update is past its time) and reports a time that moved by
-    // more than 30 s: a screen fed by the events and one asking at every pass.
-    const fed: number[] = [];
-    const asked: number[] = [];
-    let sent = 0;
-    let heardAt = 0;
-    for (let s = 0; s <= 300; s += 5) {
-      at(s);
-      const readyAt = Math.max(300, s + 257);
-      if (s === 0 || Math.abs(readyAt - sent) > 30) {
-        await report("updating", readyAt);
-        [sent, heardAt] = [readyAt, s];
-      }
-      fed.push(minutes(events.at(-1) as Answer, s - heardAt));
-      asked.push(minutes((await status()) as Answer, 0));
-    }
-    // Up once, at the first report that moved the time (75 s in: one that moved less isn't sent); from there 5 min
-    // every time, never 4 again.
-    expect([ups(fed), ups(asked)]).toEqual([1, 1]);
-    expect(new Set([...fed.slice(15), ...asked.slice(15)])).toEqual(new Set([5]));
-    expect(events.at(-1)).toMatchObject({ stage: "updating", secondsLeft: 257, secondsSteady: 60 });
-
-    // The update ends: the restart's report counts down at once.
-    at(305);
-    await report("restarting", 562);
-    expect(events.at(-1)).toMatchObject({ stage: "restarting", secondsLeft: 257, secondsSteady: 0 });
-    at(335);
-    expect(await status()).toMatchObject({ secondsLeft: 227, secondsSteady: 0 });
-    // A later time once, then no more: still for a minute, then counted down from there.
-    at(340);
-    await report("restarting", 700);
-    at(370);
-    expect(await status()).toMatchObject({ secondsLeft: 360, secondsSteady: 30 });
-    at(430);
-    expect(await status()).toMatchObject({ secondsLeft: 330, secondsSteady: 0 });
-    // The same time again changes nothing; an earlier one counts down at once.
-    await report("restarting", 700);
-    expect(await status()).toMatchObject({ secondsLeft: 330, secondsSteady: 0 });
-    await report("restarting", 650);
-    expect(await status()).toMatchObject({ secondsLeft: 220, secondsSteady: 0 });
+    // Waiting, then preparing again: a new wait, counted down to what it is told now. A part ending early brings the
+    // time forward at once; a later one is kept out again.
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    await report("16:12:00.000", "reserving", "ordering", "16:26:00.000");
+    expect(events.at(-1)).toMatchObject({ expectedReadyAt: at("16:26:00.000").toISOString(), secondsLeft: 840 });
+    await report("16:13:00.000", "reserving", "ordering", "16:25:00.000");
+    expect(events.at(-1)).toMatchObject({ expectedReadyAt: at("16:25:00.000").toISOString(), secondsLeft: 720 });
+    const heardBefore = events.length;
+    await report("16:13:05.000", "reserving", "ordering", "16:25:30.000");
+    expect(events).toHaveLength(heardBefore);
+    expect((await status()).expectedReadyAt).toBe(at("16:25:00.000").toISOString());
+    // Its computer taken away: a new wait too.
+    const { machineId } = await enrolled();
+    await revokeManagedMachine(deps(), f.org.id, machineId);
+    await report("16:14:00.000", "starting", "wiping", "16:29:00.000");
+    expect((await status()).expectedReadyAt).toBe(at("16:29:00.000").toISOString());
   });
 
-  test("the ready time: past times keep the first, the seconds left come from the server, older words still read", async () => {
+  test("the ready time: the seconds left come from the server, a past one stays past, older words still read", async () => {
     f = await setup();
     const events = heard("machine.provisioning");
     const status = () => computerSetup(f.db, "external", f.owner.id, f.org.id, true);
@@ -426,26 +416,14 @@ describe("external provisioning", () => {
     await report(new Date(Date.now() - 1000));
     expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
     expect((await status()).secondsLeft).toBeLessThanOrEqual(-90);
-    // The provisioner's clock a little ahead of this one: its "now" arrives seconds in the future, and still is now.
+    // Nor does a time ahead start a countdown again: a provisioner's clock a little ahead of this one, or a new plan.
     await report(new Date(Date.now() + 10_000));
+    await report(new Date(Date.now() + 120_000));
     expect(await status()).toMatchObject({ expectedReadyAt: overdue.toISOString() });
     expect(events.length).toBe(heardBefore);
-    // A time ahead replaces it.
-    const soon = new Date(Date.now() + 30_000);
-    await report(soon);
-    expect((await status()).expectedReadyAt).toBe(soon.toISOString());
-    const later = new Date(Date.now() + 120_000);
-    await report(later);
-    expect((await status()).expectedReadyAt).toBe(later.toISOString());
-
-    // An older provisioner's countdown is a time from now.
-    const sent = Date.now();
-    await report(undefined, 600);
-    const eta = Date.parse((await status()).expectedReadyAt ?? "");
-    expect(eta).toBeGreaterThanOrEqual(sent + 600_000);
-    expect(eta).toBeLessThanOrEqual(Date.now() + 600_000);
 
     // Only `preparing` has a time.
+    const later = new Date(Date.now() + 120_000);
     await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity", expectedReadyAt: later });
     expect(await status()).toMatchObject({
       state: "waiting",
@@ -463,6 +441,13 @@ describe("external provisioning", () => {
     expect((await status()).reason).toBe("capacity");
     await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
     expect((await status()).since).toBe(since);
+
+    // An older provisioner's countdown is a time from now, here the new wait's first.
+    const sent = Date.now();
+    await report(undefined, 600);
+    const eta = Date.parse((await status()).expectedReadyAt ?? "");
+    expect(eta).toBeGreaterThanOrEqual(sent + 600_000);
+    expect(eta).toBeLessThanOrEqual(Date.now() + 600_000);
   });
 
   test("the ready email is promised by a ready time over a minute ahead, waiting or a problem, until it is ready", async () => {
@@ -474,19 +459,24 @@ describe("external provisioning", () => {
         .where(eq(schema.machineProvisioning.orgId, orgId));
       return row?.emailWhenReady;
     };
-    const preparing = (seconds: number) =>
-      setProvisioning(deps(), f.org.id, {
+    const preparing = (seconds: number, orgId = f.org.id) =>
+      setProvisioning(deps(), orgId, {
         state: "preparing",
         step: "starting",
         expectedReadyAt: new Date(Date.now() + seconds * 1000),
       });
     await preparing(30);
     expect(await promised()).toBe(false);
+    // A later time within the same wait isn't what its people are told (they count down to the first), so it
+    // promises nothing either: the email still goes if the wait itself takes over a minute.
     await preparing(90);
-    expect(await promised()).toBe(true);
-    // Told once, kept: a later, shorter estimate doesn't take it back.
-    await preparing(10);
-    expect(await promised()).toBe(true);
+    expect(await promised()).toBe(false);
+    const later = (await createOrganization(f.db, (await addUser(f.db, "later")).id, { name: "later" })).organization;
+    await preparing(90, later.id);
+    expect(await promised(later.id)).toBe(true);
+    // Told once, kept: a shorter estimate doesn't take it back.
+    await preparing(10, later.id);
+    expect(await promised(later.id)).toBe(true);
     for (const state of ["waiting", "problem"] as const) {
       const other = await createOrganization(f.db, (await addUser(f.db, state)).id, { name: state });
       await setProvisioning(deps(), other.organization.id, { state });
@@ -594,7 +584,6 @@ describe("external provisioning", () => {
           expectedReadyAt: null,
           specs: null,
           secondsLeft: null,
-          secondsSteady: null,
           secondsWaited: expect.any(Number),
           notifyByEmail: false,
           machineId,
@@ -774,7 +763,6 @@ describe("external provisioning", () => {
       expectedReadyAt: null,
       specs: null,
       secondsLeft: null,
-      secondsSteady: null,
       secondsWaited: null,
       notifyByEmail: true,
       machineId: null,
