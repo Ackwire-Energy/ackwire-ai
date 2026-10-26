@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AiComputer, ComputerSetup, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AiComputer, ComputerSetup, MachineAccount } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -43,48 +44,131 @@ const account = (over: Partial<MachineAccount> = {}): MachineAccount => ({
   ...over,
 });
 
+/** The sign-in window: the page opens it on the click, then sends it to the provider's page. */
+async function withPopup(run: () => Promise<void>) {
+  const realOpen = window.open;
+  const opened: string[] = [];
+  const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
+  window.open = ((url: string) => {
+    opened.push(url);
+    return popup;
+  }) as unknown as typeof window.open;
+  try {
+    await run();
+  } finally {
+    window.open = realOpen;
+  }
+  return { opened, popup };
+}
+
 /**
- * Contas de IA with the MacBook (Ada on it, Walter's), and "Conectar uma IA" opened. `setup`: the workspace gets
- * its own computer (the Cloud), this far; then there is no MacBook.
+ * Settings › AI accounts with Ada (Walter's) on the MacBook, a computer someone else connected for the workspace
+ * (`brain`: Ada's view), and "Conectar uma IA" opened. `setup`: the workspace gets its own computer, this far.
  */
-async function connect(computers: AiComputer[] = [MAC], setup?: Partial<ComputerSetup>) {
+async function connect({
+  computers = [MAC],
+  setup,
+  brain = {},
+  mine = [ADA_ID],
+  path = `/org/${ORG_ID}/settings/keys`,
+}: {
+  computers?: AiComputer[];
+  setup?: Partial<ComputerSetup>;
+  brain?: Partial<AgentBrain>;
+  /** Walter's agents (a plan thinks only for its owner's). */
+  mine?: string[];
+  /** Where the dialog opens: Settings' button, or a link that asks for it. */
+  path?: string;
+} = {}) {
   const state = seedState();
-  const ada = state.agents.find((a) => a.id === ADA_ID);
-  if (ada) ada.ownerUserId = "u-walter";
+  for (const a of state.agents) if (mine.includes(a.id)) a.ownerUserId = "u-walter";
   const api = createFakeApi(state);
   const machines = fakeMachinesOf.get(api);
   if (setup) machines?.setSetup(setup);
   else machines?.pair({ id: "machine_1", name: "MacBook", agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }] });
   machines?.setAiAccounts({ accounts: [], computers });
-  await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
+  const viewOf = api.agents.brain;
+  api.agents.brain = async (orgId, agentId) => ({ ...(await viewOf(orgId, agentId)), ownSignIn: false, ...brain });
+  const { router, services } = await renderApp(path, { api });
   await settle(6);
-  await click(screen().getByRole("button", { name: "Conectar uma IA" }));
+  if (!path.includes("connect=ai")) await click(screen().getByRole("button", { name: "Conectar uma IA" }));
+  await settle(4);
   const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
-  return { state, api, machines, dialog };
+  // The picker's options (the API key's makers are tiles too, in their own group).
+  const picker = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
+  const tile = (name: string) => within(picker).getByRole("button", { name: new RegExp(`^${name}`) });
+  return { state, api, machines, dialog, tile, router, services };
 }
 
-describe("Conectar uma IA", () => {
-  test("a coding plan's key: its own key page, the key sealed to the computer (in no request), then its name and agent", async () => {
-    const { state, machines, dialog } = await connect();
-    // The plans each computer can take; the first steps say what each is.
-    for (const name of ["Claude", "ChatGPT", "GLM Coding", "Kimi Code", "MiniMax", "OpenCode Go"])
-      expect(within(dialog).getByRole("button", { name: new RegExp(`^${name}`) })).toBeTruthy();
+const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
+/** A Claude plan's account, as the computer reports it once the sign-in ends. */
+const claudeMax = account({ id: "acct_max", label: "Claude Max", provider: null, keyHint: null });
+
+describe("Conectar uma IA: one picker, plans first", () => {
+  test("Settings › AI accounts opens the same picker: six plans, then the API key, Claude chosen with its sign-in", async () => {
+    const { dialog, tile } = await connect();
+    const group = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
+    const tiles = within(group)
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+    expect(tiles).toEqual([
+      "Claude",
+      "ChatGPT",
+      "GLM Coding",
+      "Kimi Code",
+      "MiniMax",
+      "OpenCode Go",
+      "Chave de APIClaude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
+    ]);
+    // Each by its maker's mark; the key row by four of them, overlapped.
+    expect([...group.querySelectorAll(".ac-brand--sm")].map((m) => m.getAttribute("data-mark"))).toEqual([
+      "claude",
+      "openai",
+      "zai",
+      "kimi",
+      "minimax",
+      "opencode",
+    ]);
+    const stack = tile("Chave de API").querySelector(".ac-brand-stack");
+    expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
+      "claude",
+      "openai",
+      "deepseek",
+      "kimi",
+    ]);
+    expect(dialog.textContent).toContain("Ou pague pelo uso");
+    expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("Pro, Max, Team ou Enterprise");
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    // A first sign-in asks for no account, and nothing asks for a computer or a name.
+    expect(within(panel).queryByLabelText("Qual conta? (opcional)")).toBeNull();
+    expect(dialog.textContent).not.toContain("Em qual computador?");
+    // Until something is connected the body is the dialog's last part: its own edge under the panel, no footer.
+    expect(dialog.querySelector(".ac-dialog__body:last-child")).not.toBeNull();
+    expect(dialog.querySelector(".ac-dialog__footer")).toBeNull();
+  });
+
+  test("a coding plan's key: its own key page, then the key sealed to the computer (in no request); the agent thinks with it", async () => {
+    const { state, machines, dialog, tile } = await connect();
     machines?.endLogin("login_1", { state: "done", account: account() });
-    await click(within(dialog).getByRole("button", { name: /^GLM Coding/ }));
-    const block = within(dialog).getByRole("region", { name: "Conectar GLM Coding" });
-    expect(within(block).getByRole("link", { name: "Abrir z.ai" }).getAttribute("href")).toBe(
+    await click(tile("GLM Coding"));
+    const panel = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    expect(panel.textContent).toContain("Lite, Pro ou Max");
+    expect(panel.textContent).toContain("Num plano de equipe, use a chave da página Team Plan.");
+    expect(within(panel).getByRole("link", { name: "Abrir z.ai" }).getAttribute("href")).toBe(
       "https://z.ai/manage-apikey/apikey-list",
     );
     // Nothing starts on the computer until the key is there; a paste that isn't a key says so.
     expect(machines?.lastLogin()).toBeUndefined();
-    const keyBox = within(block).getByLabelText("Chave do GLM Coding");
+    const keyBox = within(panel).getByLabelText("Chave do GLM Coding");
     await type(keyBox, "short");
-    expect(block.textContent).toContain("Isso não parece uma chave do GLM Coding.");
+    expect(panel.textContent).toContain("Isso não parece uma chave do GLM Coding.");
     const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
     await type(keyBox, KEY);
-    await click(within(block).getByRole("button", { name: "Enviar ao MacBook" }));
+    await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
     await settle(8);
-    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+    expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
       ORG_ID,
       "machine_1",
       "claude_code",
@@ -92,40 +176,46 @@ describe("Conectar uma IA", () => {
     ]);
     expect(machines?.lastLogin()?.box).not.toBeNull();
     expect(JSON.stringify(state.calls)).not.toContain("0123456789abcdef");
-
-    // The last step: what people call it, and the agent it thinks for.
-    expect(dialog.textContent).toContain("Pronto: GLM Coding está no MacBook.");
-    await type(within(dialog).getByLabelText("Como quer chamar esta conta? Os outros veem este nome."), "GLM do Walt");
-    await click(within(dialog).getByRole("button", { name: "Concluir" }));
-    await settle(6);
-    expect(state.calls.find((c) => c.method === "machines.renameAccount")?.args).toEqual([
-      ORG_ID,
-      "machine_1",
-      "acct_new",
-      "GLM do Walt",
-    ]);
-    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+    // No naming step: the agent thinks with it at once.
+    expect(calls(state, "agents.setBrain")[0]?.args).toEqual([
       ORG_ID,
       ADA_ID,
       { brain: "claude_code", account: "acct_new" },
     ]);
-    expect(document.body.textContent).toContain("Ada agora pensa com GLM do Walt.");
+    expect(calls(state, "machines.renameAccount")).toHaveLength(0);
+    expect(dialog.textContent).toContain("Ada agora pensa com GLM Coding.");
+    await click(within(dialog).getByRole("button", { name: "Pronto" }));
+    expect(screen().queryByRole("dialog")).toBeNull();
   });
 
-  test("ChatGPT shows the code to type on its page", async () => {
-    const { dialog } = await connect();
-    await click(within(dialog).getByRole("button", { name: /^ChatGPT/ }));
+  test("ChatGPT: first its settings, then a sign-in that starts only on its button; switching tiles starts nothing", async () => {
+    const { state, dialog, tile } = await connect();
+    await click(tile("ChatGPT"));
+    await click(tile("Claude"));
+    await click(tile("ChatGPT"));
+    await settle(4);
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel.textContent).toContain("Plus, Pro, Business ou Enterprise");
+    expect(panel.textContent).toContain("Permita o login com código no ChatGPT");
+    expect(within(panel).getByRole("link", { name: "Abrir as configurações do ChatGPT" }).getAttribute("href")).toBe(
+      "https://chatgpt.com/#settings/Security",
+    );
+    const { opened, popup } = await withPopup(() =>
+      click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })),
+    );
     await settle(6);
-    const block = within(dialog).getByRole("region", { name: "Adicionar conta do ChatGPT" });
-    expect(within(block).getByRole("status", { name: "" }).textContent).toContain("Esperando");
-    expect(within(block).getByLabelText("Código para o ChatGPT").textContent).toBe("ABCD-1234");
+    expect(opened).toEqual(["about:blank"]);
+    expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([[ORG_ID, "machine_1", "codex"]]);
+    expect(popup.location.href).toBe("https://auth.openai.com/codex/device");
+    expect(within(panel).getByLabelText("Código para o ChatGPT").textContent).toBe("ABCD-1234");
+    expect(within(panel).getByRole("link", { name: "Abrir de novo" })).toBeTruthy();
   });
 
   test("Claude: the same account twice is refused, and the page says how to add another", async () => {
     const { machines, dialog } = await connect();
     machines?.endLogin("login_1", { state: "failed", duplicate: { label: "Trabalho" } });
-    await click(within(dialog).getByRole("button", { name: /^Claude/ }));
-    await click(within(dialog).getByRole("button", { name: "Entrar com Claude" }));
+    await withPopup(() => click(within(dialog).getByRole("button", { name: "Entrar com Claude" })));
     await settle(8);
     expect(dialog.textContent).toContain(
       "Essa conta já está aqui (Trabalho). Para adicionar outra, saia do Claude na página que abriu",
@@ -133,22 +223,67 @@ describe("Conectar uma IA", () => {
     expect(within(dialog).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
   });
 
-  test("a choice no computer of the person's can take says why; with none, connecting one comes first", async () => {
-    const { dialog } = await connect([{ ...MAC, keys: false, brains: { claude_code: true, codex: false } }]);
-    const chatgpt = within(dialog).getByRole("button", { name: /^ChatGPT/ }) as HTMLButtonElement;
-    expect(chatgpt.disabled).toBe(true);
-    expect(chatgpt.textContent).toContain("Precisa de um computador seu com o Codex");
-    const kimi = within(dialog).getByRole("button", { name: /^Kimi Code/ }) as HTMLButtonElement;
-    expect(kimi.disabled).toBe(true);
-    expect(kimi.textContent).toContain("Atualize o agentes no computador");
-    cleanup();
-    const none = await connect([{ ...MAC, canAdd: false, mine: false }]);
-    expect(none.dialog.textContent).toContain("Conecte um seu primeiro.");
-    expect(within(none.dialog).getByRole("link", { name: "Conectar um computador" })).toBeTruthy();
+  test("a computer the person connected: its own sign-in, saved for the agent at once; or another account", async () => {
+    const { state, dialog } = await connect({ brain: { ownSignIn: true } });
+    const own = within(dialog).getByRole("button", { name: /^A conta do Claude com login no MacBook/ });
+    expect(own.textContent).toContain("Todos os agentes pensam com ela. Nada para entrar.");
+    expect(dialog.textContent).toContain("Eles só respondem a você enquanto pensam com o seu plano.");
+    // Another account: the steps, asking which one.
+    await click(within(dialog).getByRole("button", { name: /^Outra conta do Claude, para um agente/ }));
+    expect(within(dialog).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    expect(within(dialog).getByLabelText("Qual conta? (opcional)")).toBeTruthy();
+    await click(own);
+    await settle(4);
+    expect(calls(state, "agents.setBrain")[0]?.args).toEqual([ORG_ID, ADA_ID, { brain: "claude_code", account: null }]);
+    expect(dialog.textContent).toContain("Ada agora usa a conta do próprio MacBook.");
+  });
+
+  test("a plan its computer can't take: its tile dims, and its panel says why, with the key one click away", async () => {
+    const { dialog, tile } = await connect({
+      computers: [{ ...MAC, keys: false, brains: { claude_code: true, codex: false } }],
+      brain: {
+        options: [
+          { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
+          { kind: "claude_code", available: true, experimental: false, models: [], defaultModel: "sonnet" },
+          {
+            kind: "codex",
+            available: false,
+            reason: "not_installed",
+            experimental: true,
+            models: [],
+            defaultModel: null,
+          },
+        ],
+      },
+    });
+    const dimmed = (name: string) => tile(name).querySelector(".ac-brand--off") !== null;
+    expect(dimmed("Claude")).toBe(false);
+    expect(dimmed("ChatGPT")).toBe(true);
+    expect(dimmed("Kimi Code")).toBe(true);
+    await click(tile("ChatGPT"));
+    expect(dialog.textContent).toContain("Não está instalado no MacBook.");
+    await click(tile("Kimi Code"));
+    expect(dialog.textContent).toContain("Atualize o agentes no computador para usar a chave de um plano");
+    await click(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" }));
+    expect(tile("Chave de API").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("self-host with no computer for the agent: plans dim, the key comes first, and a plan's panel says to connect one", async () => {
+    const { dialog, tile, router } = await connect({ computers: [], brain: { computer: null, machines: [] } });
+    expect(tile("Chave de API").getAttribute("aria-pressed")).toBe("true");
+    expect(tile("Claude").querySelector(".ac-brand--off")).not.toBeNull();
+    await click(tile("Claude"));
+    expect(dialog.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
+    await click(within(dialog).getByRole("button", { name: "Conectar um computador" }));
+    await settle(4);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers`);
   });
 
   test("before the server says which edition this is: a wait, never a computer to connect", async () => {
     const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.ownerUserId = "u-walter";
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [], computers: [] });
     // The Cloud's answer still on its way: self-host's words would send its people to pair a computer.
@@ -157,38 +292,198 @@ describe("Conectar uma IA", () => {
     await settle(6);
     await click(screen().getByRole("button", { name: "Conectar uma IA" }));
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
-    expect(within(dialog).queryByRole("link", { name: "Conectar um computador" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
     expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado/);
   });
 
-  test("on the Cloud, while the workspace's computer is prepared: where plans will sign in and how long, no computer to connect", async () => {
-    const { dialog } = await connect([], {
-      step: "installing",
-      secondsLeft: 330,
-      expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
-      notifyByEmail: true,
+  test("on the Cloud while its computer is prepared: the wait in the panel, sign-in off, no computer to connect", async () => {
+    const { state, dialog } = await connect({
+      computers: [],
+      brain: { computer: null, machines: [] },
+      setup: {
+        step: "installing",
+        secondsLeft: 330,
+        expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
+        notifyByEmail: true,
+      },
     });
-    expect(dialog.textContent).toContain(
-      "Os seus planos entram no Computador da Acme, que está sendo preparado. Volte aqui quando ele ficar pronto.",
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("Passo 3 de 4 · Instalando os programas");
+    expect(panel.textContent).toContain("Faltam uns 6 min");
+    expect(panel.textContent).toContain(
+      "Avisamos você em walter@acme.com.br quando ele ficar pronto. Pode fechar esta página.",
     );
-    expect(dialog.textContent).toContain("Faltam uns 6 min");
-    expect(dialog.textContent).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
-    expect(within(dialog).queryByRole("link", { name: "Conectar um computador" })).toBeNull();
-    expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado/);
+    expect(panel.textContent).toContain("Você entra aqui assim que ele ficar pronto.");
+    expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(dialog).queryByRole("button", { name: "Conectar um computador" })).toBeNull();
+    expect(dialog.textContent).not.toMatch(/Conecte um seu|computador conectado|seu computador/);
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
   });
 
-  test("on the Cloud, its computer not answering: said by name, looked after", async () => {
-    const workspace: AiComputer = {
-      ...MAC,
-      machineId: "managed_1",
-      name: "Computador da Acme",
-      online: false,
-      mine: false,
-    };
-    const { dialog } = await connect([workspace], { state: "ready" });
-    const claude = within(dialog).getByRole("button", { name: /^Claude/ }) as HTMLButtonElement;
-    expect(claude.disabled).toBe(true);
-    expect(claude.textContent).toContain("O Computador da Acme não está respondendo agora. Já estamos cuidando.");
+  test("on the Cloud, its computer not answering: said by name, looked after, a key meanwhile", async () => {
+    const workspace: AiComputer = { ...MAC, machineId: "managed_1", name: "Computador da Acme", online: false };
+    const { dialog } = await connect({
+      computers: [workspace],
+      setup: { state: "ready" },
+      brain: { computer: { machineId: "managed_1", name: "Computador da Acme", online: false } },
+    });
+    expect(dialog.textContent).toContain("O Computador da Acme não está respondendo agora. Já estamos cuidando.");
+    expect(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
     expect(dialog.textContent).not.toMatch(/Seu computador está desligado|desligado/);
+  });
+
+  test("the email's link on a cold load: once the agents arrive, Claude's sign-in for the viewer's agent", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.ownerUserId = "u-walter";
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    machines?.pair({ id: "machine_1", name: "MacBook", agents: [{ id: ADA_ID, name: "Ada", handle: "ada" }] });
+    machines?.setAiAccounts({ accounts: [], computers: [MAC] });
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await viewOf(orgId, agentId)), ownSignIn: false });
+    // The agents' list answers only after the dialog opened.
+    let arrive = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    const list = api.agents.list;
+    api.agents.list = async (orgId) => {
+      await arrived;
+      return list(orgId);
+    };
+    await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    await act(async () => arrive());
+    await settle(8);
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+    expect(dialog.querySelector(".ac-spinner, .ac-pixspin")).toBeNull();
+  });
+
+  test("a plan for Ada, then the API key for the rest: its field is there, and only a saved key says it's saved", async () => {
+    const { state, machines, dialog, tile } = await connect();
+    machines?.endLogin("login_1", { state: "done", account: claudeMax });
+    await withPopup(() => click(within(dialog).getByRole("button", { name: "Entrar com Claude" })));
+    await settle(8);
+    expect(dialog.textContent).toContain("Ada agora pensa com Claude Max.");
+    await click(tile("Chave de API"));
+    const panel = within(dialog).getByRole("region", { name: "Chave de API" });
+    expect(panel.textContent).not.toContain("Salva.");
+    await type(within(panel).getByLabelText("Cole aqui"), "sk-ant-api03-abcdefghijklmnop");
+    await click(within(panel).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(calls(state, "agents.addCredential")).toHaveLength(1);
+    expect(panel.textContent).toContain("Salva. Todo agente sem plano pensa com ela.");
+  });
+
+  test("a sign-in started once the computer is ready is stopped on that computer when its panel goes", async () => {
+    const workspace: AiComputer = { ...MAC, machineId: "managed_1", name: "Computador da Acme" };
+    const { state, api, machines, dialog, tile, services } = await connect({
+      computers: [],
+      brain: { computer: null, machines: [] },
+      setup: {
+        step: "installing",
+        secondsLeft: 330,
+        expectedReadyAt: new Date(Date.now() + 330_000).toISOString(),
+        notifyByEmail: true,
+      },
+    });
+    const signIn = () =>
+      within(dialog).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement | HTMLAnchorElement;
+    expect((signIn() as HTMLButtonElement).disabled).toBe(true);
+    // It turns ready while the person watches.
+    const waiting = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await waiting(orgId, agentId)),
+      computer: { machineId: "managed_1", name: "Computador da Acme", online: true },
+    });
+    machines?.setAiAccounts({ accounts: [], computers: [workspace] });
+    machines?.setSetup({ state: "ready", machineId: "managed_1" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(8);
+    await withPopup(() => click(signIn()));
+    await settle(4);
+    expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([ORG_ID, "managed_1", "claude_code"]);
+    // Another tile: the sign-in stops where it runs.
+    await click(tile("ChatGPT"));
+    expect(calls(state, "machines.cancelAccountLogin").map((c) => c.args)).toEqual([[ORG_ID, "managed_1", "login_1"]]);
+  });
+
+  test("the agent's view failing to load again mid-sign-in: the steps stay, and nothing is stopped", async () => {
+    const { state, api, dialog, services } = await connect();
+    await withPopup(() => click(within(dialog).getByRole("button", { name: "Entrar com Claude" })));
+    await settle(6);
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).getByRole("link", { name: "Abrir de novo" })).toBeTruthy();
+    api.agents.brain = async () => {
+      throw new ApiError(503, "unavailable", "Restarting");
+    };
+    await act(async () => services.queryClient.invalidateQueries({ queryKey: keys.agentBrain(ORG_ID, ADA_ID) }));
+    await settle(6);
+    expect(panel.textContent).not.toContain("Não foi possível carregar");
+    expect(within(panel).getByRole("link", { name: "Abrir de novo" })).toBeTruthy();
+    expect(calls(state, "machines.cancelAccountLogin")).toHaveLength(0);
+  });
+
+  test("for which agent: another tile keeps the one chosen; once it thinks with a plan, the next tile moves on", async () => {
+    const { state, machines, dialog, tile, services } = await connect({ mine: [ADA_ID, ATLAS_ID] });
+    state.aiStatus = {
+      any: false,
+      agents: [
+        { agentId: ADA_ID, state: "no_ai", reason: "no_key" },
+        { agentId: ATLAS_ID, state: "no_ai", reason: "no_key" },
+      ],
+    };
+    await act(async () => services.queryClient.invalidateQueries({ queryKey: keys.aiStatus(ORG_ID) }));
+    await settle(4);
+    const agent = () => within(dialog).getByRole("combobox", { name: "Para qual agente" });
+    expect(agent().textContent).toContain("Ada");
+    agent().focus();
+    await act(async () => fireEvent.keyDown(agent(), { key: "Enter" }));
+    await click(screen().getByRole("option", { name: "Atlas" }));
+    await click(tile("ChatGPT"));
+    expect(agent().textContent).toContain("Atlas");
+    // Atlas signs in with ChatGPT: the next plan is for Ada.
+    machines?.endLogin("login_1", {
+      state: "done",
+      account: account({ id: "acct_plus", kind: "codex", label: "ChatGPT Plus", provider: null, keyHint: null }),
+    });
+    await withPopup(() => click(within(dialog).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(8);
+    expect(calls(state, "agents.setBrain")[0]?.args).toEqual([
+      ORG_ID,
+      ATLAS_ID,
+      { brain: "codex", account: "acct_plus" },
+    ]);
+    expect(dialog.textContent).toContain("Atlas agora pensa com ChatGPT Plus.");
+    await click(tile("Claude"));
+    expect(agent().textContent).toContain("Ada");
+  });
+
+  test("a hold on the workspace while its computer is prepared: the panel says the hold alone, sign-in off", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.ownerUserId = "u-walter";
+    const me = state.me;
+    if (me) me.organizations = me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: null } }));
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ step: "installing", secondsLeft: 330, notifyByEmail: true });
+    fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [], computers: [] });
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await viewOf(orgId, agentId)),
+      ownSignIn: false,
+      computer: null,
+      machines: [],
+    });
+    await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
+    await settle(8);
+    const panel = within(screen().getByRole("dialog", { name: "Conectar uma IA" })).getByRole("region", {
+      name: "Seu plano do Claude",
+    });
+    expect(panel.textContent).toContain("Os agentes deste workspace estão pausados para uma revisão.");
+    expect(panel.textContent).not.toMatch(/Faltam|Avisamos|Você entra aqui/);
+    expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -228,7 +228,7 @@ export const ptBR = {
       workspace: "Workspace",
       context: "Contexto",
       import: "Trazer seus agentes",
-      agents: "Agentes e chave",
+      agents: "Agentes e IA",
       computer: "Computador",
       team: "Time",
       done: "Pronto",
@@ -256,8 +256,7 @@ export const ptBR = {
       continue: "Continuar",
       create_one: "Criar {{count}} agente",
       create_other: "Criar {{count}} agentes",
-      saveAndCreate_one: "Salvar e criar {{count}} agente",
-      saveAndCreate_other: "Salvar e criar {{count}} agentes",
+      saveAndContinue: "Salvar e continuar",
       invite_one: "Convidar {{count}} pessoa",
       invite_other: "Convidar {{count}} pessoas",
     },
@@ -534,13 +533,8 @@ export const ptBR = {
     },
     brain: {
       title: "Quem pensa",
-      help: "Os agentes podem pensar com o seu plano do Claude, com login no {{computer}}. Assim não precisa de chave de API.",
-      model: "Modelo pela API",
-      modelDesc: "Precisa de uma chave de API, no próximo passo.",
-      claudeCode: "Claude Code no {{computer}}",
-      claudeCodeDesc: "Usa o seu plano do Claude, com login no {{computer}}.",
       failed:
-        "O Claude Code ainda não está disponível no {{computer}}: os agentes seguem pelo modelo da API. Dá para trocar em cada agente.",
+        "Alguns agentes não conseguiram passar a usar a conta do {{brand}} no {{computer}}. Dá para trocar na página de cada um.",
     },
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organiza tarefas, resume conversas e cuida do fórum." },
@@ -556,10 +550,9 @@ export const ptBR = {
     },
     keyStep: {
       title: "Qual IA eles vão usar?",
-      lead: "Os agentes precisam de uma IA para pensar: uma chave de API, ou o seu plano do Claude ou do ChatGPT com login no computador.",
-      useComputer: "Ou entre com o seu plano do Claude ou do ChatGPT no {{computer}}: sem chave.",
-      planLater: "Sem chave? Conecte depois e entre com o seu plano quando o {{computer}} ficar pronto.",
-      planLaterReady: "Sem chave? Conecte depois e entre com o seu plano no {{computer}}.",
+      lead: "Entre com o seu plano de IA e eles pensam com ele: sem chave de API. Ou use uma chave de API, paga pelo uso.",
+      leadNoComputer:
+        "Os agentes pensam com uma chave de API, ou com o seu plano de IA num computador que você conectar.",
     },
     budget: {
       title: "Limite de gasto por agente",
@@ -571,8 +564,6 @@ export const ptBR = {
       notePlatform:
         "Com a chave do agentes.chat, o limite vale para o uso da API: quando um agente chega nele, ele para e te avisa.",
     },
-    provider: "Provedor",
-    keyFor: "Chave da API da {{provider}}",
     keySite: "Crie a chave em {{site}}.",
     keyNotPlan:
       "Use uma chave de pagamento por uso: a de um plano de assinatura só funciona em ferramentas de programação.",
@@ -586,13 +577,8 @@ export const ptBR = {
         "Cole a chave inteira da MiniMax, sem espaços. As que começam com sk-cp- são do plano e não servem aqui.",
     },
     keyFromOther: "É de outro provedor?",
-    advanced: "Avançado",
     anthropicWorkspace: "ID do workspace no Claude Console",
     anthropicWorkspaceHelp: "Só para uma chave que vale em mais de um workspace. O ID começa com wrkspc_.",
-    openaiOrg: "ID da organização na OpenAI",
-    openaiProject: "ID do projeto na OpenAI",
-    optional: "Opcional.",
-    platformChoice: "Usar a chave do agentes.chat",
     platformKeyDesc: "Sem chave sua: os agentes usam a chave do agentes.chat. Você vê o custo de cada agente.",
     suggestedAuto: "Começa no Automático: escolhe o modelo e o esforço para cada tarefa. Dá para trocar depois.",
     computer: {
@@ -1013,15 +999,55 @@ export const ptBR = {
       chatgpt: "Conectar o seu plano do ChatGPT",
       api_key: "Adicionar uma chave de API",
     },
-    option: {
-      claude: "Plano do Claude",
-      claudeDesc: "Pro, Max ou Team, pelo Claude Code",
-      chatgpt: "Plano do ChatGPT",
-      chatgptDesc: "Plus, Pro ou Team, pelo Codex",
-      api_key: "Chave de API",
-      api_keyDesc: "Claude, OpenAI e outros; paga pelo uso",
+    titleFor: "Conectar uma IA {{for}} {{name}}",
+    orPayGo: "Ou pague pelo uso",
+    plan: {
+      claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Team ou Enterprise" },
+      chatgpt: { title: "Seu plano do ChatGPT", tiers: "Plus, Pro, Business ou Enterprise" },
+      zai: { tiers: "Lite, Pro ou Max" },
+      kimi: { tiers: "Plus, Pro, Max ou Ultra" },
+      minimax: { tiers: "Go, Explore ou Build" },
+      opencode: { tiers: "Go ou Go Plus" },
     },
-    waitComputer: "Disponível quando o computador ficar pronto. Dá para usar uma chave de API agora.",
+    key: {
+      title: "Chave de API",
+      makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
+      sub: "Você paga pelo uso, direto ao provedor",
+      create: "Crie a sua chave de API {{of}} {{provider}}",
+      paste: "Cole aqui",
+      forAll: "Todo agente sem plano pensa com ela.",
+      saved: "Salva. Todo agente sem plano pensa com ela.",
+      notPlan: "Use aqui uma chave de pagamento por uso. A chave de um plano de código vai na opção dele, acima.",
+      platform: "agentes.chat",
+    },
+    wait: {
+      signIn: "Você entra aqui assim que ele ficar pronto.",
+      key: "Enquanto isso, crie a chave: você envia aqui assim que ele ficar pronto.",
+      ready: "O {{computer}} está pronto.",
+      useKey: "Usar uma chave de API agora",
+      connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
+    },
+    own: {
+      this: "A conta do {{brand}} com login no {{computer}}",
+      thisText: "Todos os agentes pensam com ela. Nada para entrar.",
+      other: "Outra conta do {{brand}}, para um agente",
+      otherText: "Você entra por aqui; ela fica no {{computer}}.",
+      note: "Eles só respondem a você enquanto pensam com o seu plano.",
+    },
+    chatgptCode: {
+      title: "Permita o login com código no ChatGPT",
+      text: "No ChatGPT, abra Configurações › Segurança e permita o login com código de dispositivo para o Codex. Num plano Business ou Enterprise, quem administra o workspace permite.",
+      open: "Abrir as configurações do ChatGPT",
+    },
+    zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
+    who: {
+      key: "Chave de API · {{provider}}",
+      line: "Cada plano pensa por um agente. Para os outros, escolha outro plano acima, ou uma chave de API para todos eles.",
+      keyFor: "Chave de API para {{names}}",
+    },
+    assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
+    noAgents: "Um plano só pensa pelos agentes de quem o conecta, e você ainda não tem nenhum.",
+    done: "Pronto",
     agent: "Para qual agente",
     keyLocked: "Uma chave de API, só um admin adiciona.",
     accountsLocked: "Só {{name}} conecta um plano no {{computer}}.",
@@ -1803,7 +1829,10 @@ export const ptBR = {
         },
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
-          stepOne: { claude_code: "Entre no Claude com a outra conta", codex: "Entre no ChatGPT com a outra conta" },
+          stepOne: {
+            claude_code: "Entre no Claude com a conta que vai usar",
+            codex: "Entre no ChatGPT com a conta que vai usar",
+          },
           stepOneText: {
             claude_code: "Abre a página do próprio Claude. Se ela entrar na conta errada, saia de lá e tente de novo.",
             codex: "Abre a página da própria OpenAI. Se ela entrar na conta errada, saia de lá e tente de novo.",
@@ -1828,7 +1857,7 @@ export const ptBR = {
             codex:
               "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do ChatGPT na página que abriu e entre com a outra conta.",
           },
-          startFailed: "O {{computer}} não respondeu. Veja se ele está ligado e tente de novo.",
+          startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
           done: "A conta {{account}} entrou no {{computer}}. Clique em Usar para salvar.",
         },
@@ -4480,23 +4509,13 @@ export const ptBR = {
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },
     connect: {
-      title: "Conectar uma IA",
-      sub: "Seu plano pensa pelos seus agentes, no computador onde ele fica.",
       claude_code: "Claude",
-      claude_codeText: "Seu plano Pro, Max ou Team",
       codex: "ChatGPT",
-      codexText: "Seu plano Plus, Pro ou Business",
-      keyText: "Com a chave do plano",
       needs: {
-        claude_code: "Precisa de um computador seu com o Claude Code",
-        codex: "Precisa de um computador seu com o Codex",
         keys: "Atualize o agentes no computador para usar a chave de um plano",
-        online: "O computador está offline agora",
       },
       noComputer: "As contas ficam num computador conectado. Conecte um seu primeiro.",
       addComputer: "Conectar um computador",
-      computer: "Em qual computador?",
-      preparing: "Os seus planos entram no {{computer}}, que está sendo preparado. Volte aqui quando ele ficar pronto.",
       needsCloud: {
         claude_code: "Ainda não está pronto no {{computer}}",
         codex: "Ainda não está pronto no {{computer}}",
@@ -4504,19 +4523,13 @@ export const ptBR = {
       },
     },
     done: {
-      title: "Pronto: {{label}} está no {{computer}}.",
       name: "Como quer chamar esta conta? Os outros veem este nome.",
-      agent: "Usar com qual agente?",
-      noAgent: "Nenhum agora",
-      noAgents: "Nenhum agente seu trabalha no {{computer}} ainda. Escolha esta conta na página do agente depois.",
-      finish: "Concluir",
-      saved: "{{label}} está pronta.",
       savedAgent: "{{agent}} agora pensa com {{label}}.",
     },
     page: {
       title: "Seus planos",
       text: "Cada conta pensa por um agente. Ela fica no computador; o agentes.chat guarda só o nome, o email e o uso.",
-      empty: "Conecte o seu plano do Claude ou do ChatGPT e seus agentes pensam com ele, sem chave de API.",
+      empty: "Conecte o seu plano de IA, como o Claude ou o ChatGPT, e os agentes pensam com ele: sem chave de API.",
       connect: "Conectar uma IA",
       keyEnds: "chave …{{hint}}",
       on: "no {{computer}}",
@@ -5607,15 +5620,6 @@ export const ptBR = {
       "Usa o orçamento {{of}} {{name}}. Desligado, {{article}} {{name}} avisa e responde quando o computador voltar.",
     hidden: "{{owner}} ou um admin escolhe quem pensa.",
     hiddenAdmins: "Só admins escolhem quem pensa.",
-    warning: {
-      title: "Usar o seu plano nos agentes?",
-      claude_code:
-        "Os agentes vão pensar com o seu plano do Claude e responder só a você. Para outra pessoa falar com um deles, desligue Só responde a você em Quem pensa, na página do agente.",
-      codex:
-        "Os agentes vão pensar com o seu plano do ChatGPT e responder só a você. Para outra pessoa falar com um deles, desligue Só responde a você em Quem pensa, na página do agente.",
-      confirm: "Usar meu plano",
-      cancel: "Agora não",
-    },
     summary: {
       model: "Modelo (API)",
       claude_code: "Claude Code · {{model}}",
@@ -7163,8 +7167,6 @@ export const ptBR = {
     onIt: {
       title: "Neste computador",
       screens: "Uma tela para cada agente, com o navegador e os arquivos dele",
-      plans: "O Claude Code e o Codex, prontos para cada agente entrar com o seu plano do Claude ou do ChatGPT",
-      coding: "Planos de código da Z.ai (GLM), Kimi, MiniMax e OpenCode, com a chave do plano",
     },
     hostMissing:
       "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no <code>SELF_HOSTING.md</code>.",
@@ -8427,7 +8429,8 @@ export const ptBR = {
     managedHint: "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
     continue: "Pode seguir: os agentes começam a usar assim que ele ficar pronto.",
     plans:
-      "O Claude Code e o Codex já vêm nele. Cada agente entra com o seu plano do Claude ou do ChatGPT, ou com o plano de código de outra IA.",
+      "Os agentes podem pensar com o seu próprio plano de IA, com login neste computador. Não precisa de chave de API.",
+    plansMarks: "Claude, ChatGPT, GLM, Kimi e outros planos de IA",
     eta: {
       minutes_one: "Falta cerca de 1 min",
       minutes_other: "Faltam uns {{count}} min",
@@ -8437,6 +8440,7 @@ export const ptBR = {
     },
     email: {
       you: "Avisamos você em {{email}} quando ele ficar pronto. Pode fechar esta página.",
+      youStay: "Avisamos você em {{email}} quando ele ficar pronto.",
       here: "Aparece aqui assim que ficar pronto.",
     },
   },

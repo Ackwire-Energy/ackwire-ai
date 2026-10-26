@@ -173,7 +173,7 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(text).toContain("Faltam uns 6 min");
     expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto. Pode fechar esta página.");
     expect(text).toContain("A Ada começa a usar assim que ele ficar pronto.");
-    expect(text).toContain("O Claude Code e o Codex já vêm nele.");
+    expect(text).toContain("Os agentes podem pensar com o seu próprio plano de IA, com login neste computador.");
     expect(text).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);

@@ -18,6 +18,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import {
   Button,
   Card,
@@ -26,7 +27,7 @@ import {
   ComputerPortrait,
   Icon,
   type IconName,
-  ProviderLogo,
+  ProviderStack,
   Spinner,
   Steps,
 } from "@agenteschat/ui";
@@ -110,9 +111,21 @@ export function SetupProgress({ view }: { view: SetupView }) {
 
 /**
  * The wait in words, under the steps: the time left, then who hears when it's ready. Only owners get the
- * email, so only they are told so (`promisesEmail`); everyone else is told it shows here.
+ * email, so only they are told so (`promisesEmail`); everyone else is told it shows here. `closeable` false: the
+ * page holds something not saved yet (the setup's Computer step, before the agents exist), so the email line
+ * doesn't say it can be closed. `bell` false: where a line of the caller's own says what happens once it's ready.
  */
-export function SetupWaitLines({ view, reader }: { view: SetupView; reader: WaitReader }) {
+export function SetupWaitLines({
+  view,
+  reader,
+  closeable = true,
+  bell = true,
+}: {
+  view: SetupView;
+  reader: WaitReader;
+  closeable?: boolean;
+  bell?: boolean;
+}) {
   const { t } = useTranslation();
   const { eta, email } = useSetupWait(view, reader.held);
   if (!setupPending(view) || reader.held) return null;
@@ -124,10 +137,16 @@ export function SetupWaitLines({ view, reader }: { view: SetupView; reader: Wait
           {etaLine(t, eta)}
         </p>
       )}
-      <p className="setup-line ac-iconline">
-        <Icon name={emailed ? "mail" : "bell"} size={14} />
-        <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
-      </p>
+      {(emailed || bell) && (
+        <p className="setup-line ac-iconline">
+          <Icon name={emailed ? "mail" : "bell"} size={14} />
+          <span>
+            {emailed
+              ? t(closeable ? "computerSetup.email.you" : "computerSetup.email.youStay", { email: reader.email })
+              : t("computerSetup.email.here")}
+          </span>
+        </p>
+      )}
     </>
   );
 }
@@ -151,12 +170,15 @@ export function SetupFacts({ view }: { view: SetupView }) {
   );
 }
 
-/** Claude Code and Codex come ready on it: each agent signs in there with a plan. */
+/**
+ * The AI plans the agents sign in with on this computer, led by their makers' marks: on a row of its own under a
+ * hairline, since the overlapped marks are wider than the facts' icons and would push the text out of their column.
+ */
 export function SetupPlans() {
   const { t } = useTranslation();
   return (
-    <p className="setup-line ac-iconline">
-      <ProviderLogo id="claude_code" size="xs" />
+    <p className="setup-line setup-plans ac-iconline">
+      <ProviderStack ids={PLAN_MARKS} label={t("computerSetup.plansMarks")} />
       <span>{t("computerSetup.plans")}</span>
     </p>
   );
@@ -164,22 +186,32 @@ export function SetupPlans() {
 
 /**
  * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left,
- * who hears when it's ready, the agent that waits for it (in its dialog), the plans and the size.
+ * who hears when it's ready, the agent that waits for it (in its dialog), the size, then the plans.
  */
-export function SetupWait({ view, reader, agentName }: { view: SetupView; reader: WaitReader; agentName?: string }) {
+export function SetupWait({
+  view,
+  reader,
+  agentName,
+  closeable,
+}: {
+  view: SetupView;
+  reader: WaitReader;
+  agentName?: string;
+  closeable?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <div className="setup-wait">
       <SetupProgress view={view} />
-      <SetupWaitLines view={view} reader={reader} />
+      <SetupWaitLines view={view} reader={reader} closeable={closeable} />
       {agentName && view.phase !== "ready" && (
         <p className="setup-line ac-iconline">
           <Icon name="clock" size={14} />
           <span>{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
         </p>
       )}
-      <SetupPlans />
       <SetupFacts view={view} />
+      <SetupPlans />
     </div>
   );
 }

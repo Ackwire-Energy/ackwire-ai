@@ -110,9 +110,34 @@ p {
 .grid-options--sm {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
-/* A provider by its mark and name: one line, centered on the mark. */
-.onb__provider {
+/* The AI picker's plans and the key's makers: three tiles in the setup's column and in the dialog, two at 390px
+   wide; each a mark and its name on one line, centred on the mark, chosen or not ("OpenCode Go" is the longest). */
+.grid-options--plans {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.grid-options--plans > .ac-option {
   align-items: center;
+  gap: 10px;
+  padding-inline: 10px;
+}
+.grid-options--plans .ac-option__title {
+  font-size: 14px;
+}
+.ai-picker__or {
+  grid-column: 1 / -1;
+  margin: 6px 0 -2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+/* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
+.grid-options--plans > .ai-picker__key {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+/* Our own key after the six makers: a row of its own, so its name keeps its line beside the check. */
+.grid-options--plans > .ai-key__ours {
+  grid-column: 1 / -1;
 }
 .grid-fields {
   display: grid;
@@ -6282,6 +6307,11 @@ a.machine-row__name:hover {
   font-size: 13px;
   color: var(--ink-muted);
 }
+/* The plans the agents sign in with, under a hairline: its overlapped marks are wider than the facts' icons. */
+.setup-plans {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 /* A hold says why and where to ask, whole: it wraps instead of cutting the line. */
 .hold-banner .outage__text {
   flex-wrap: wrap;
@@ -7949,18 +7979,19 @@ a.machine-row__name:hover {
   font-size: 15px;
   font-weight: 650;
 }
+/* A step (an `.ac-iconline`): its number centred on the title's 14/20 line. */
 .agp-addacct__step {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  font-size: 14px;
+  line-height: 20px;
 }
 .agp-addacct__step > i {
-  flex: none;
   display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
-  margin-top: 1px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
@@ -8012,9 +8043,16 @@ a.machine-row__name:hover {
   font-weight: 600;
   color: var(--faint);
 }
+/* At phone width a step's words take the row, and its button goes under them, in their column. */
 @media (max-width: 640px) {
   .agp-addacct__step {
     flex-wrap: wrap;
+  }
+  .agp-addacct__step.ac-iconline > .agp-addacct__text {
+    flex-basis: calc(100% - 32px);
+  }
+  .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
+    margin-left: 32px;
   }
 }
 
@@ -9831,28 +9869,86 @@ html[data-menu-overlay] .shell {
   margin: 12px 0 0;
 }
 
-/* Contas de IA: the connect choices (one that no computer of the person's can take says why) and the rows. */
-.ai-connect__choices {
+/* The chosen option's panel under the picker: its lead centred on its name's 20px line (as a card's head), the
+   tiers, for which agent at the right (under the name at phone width), a hairline, then its steps. */
+.ai-panel__head {
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  line-height: 20px;
+}
+/* Steps under a wait or a line about the computer: a hairline between them too, as under the head. */
+.ai-panel > :not(.ai-panel__head) + .agp-addacct {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.ai-panel__title {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ai-panel__title > b {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 650;
+}
+.ai-panel__title > span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ai-panel__agent {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.ai-panel__row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.ai-panel__row > .ac-setnote {
+  flex: 1 1 240px;
+}
+@media (max-width: 640px) {
+  .ai-panel__agent {
+    flex-basis: 100%;
+  }
+  .ai-panel__agent > .ac-select {
+    flex: 1;
+  }
+}
+/* Who thinks (the setup, after a plan): each agent and what it thinks with. */
+.ai-who__list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 0;
   margin: 0;
   padding: 0;
-  border: 0;
+  list-style: none;
 }
-.ai-connect__choices legend {
-  margin-bottom: 8px;
-  padding: 0;
+.ai-who__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.ai-who__name {
+  flex: 0 0 72px;
   font-weight: 600;
 }
-.ai-connect__choices .ac-option {
-  align-items: center;
-}
-.ai-connect__choices .ac-option:disabled {
-  cursor: default;
-  opacity: 0.6;
-  box-shadow: none;
+.ai-who__thinks {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }
 .ai-accounts__empty {
   display: flex;

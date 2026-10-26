@@ -1804,22 +1804,30 @@ export function useSaveSandboxSettings(orgId: string) {
   });
 }
 
-/** `pollMs`: refetch this often (while starting or stopping); `false` = no polling. */
-/** "Quem pensa" (its owner or an admin; members don't load it). */
-export const useAgentBrain = (orgId: string, agentId: string, enabled = true) => {
+/**
+ * "Quem pensa" (its owner or an admin; members don't load it). `pollMs`: asked again this often where no event
+ * keeps it current (the onboarding opens no socket).
+ */
+export const useAgentBrain = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.agentBrain(orgId, agentId),
     queryFn: () => api.agents.brain(orgId, agentId),
     enabled,
     retry: false,
+    refetchInterval: pollMs,
   });
 };
 
 /** "Contas de IA": the viewer's AI accounts on every computer, and where they can add one. */
-export const useAiAccounts = (orgId: string, enabled = true) => {
+export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.aiAccounts(orgId), queryFn: () => api.machines.aiAccounts(orgId), enabled });
+  return useQuery({
+    queryKey: keys.aiAccounts(orgId),
+    queryFn: () => api.machines.aiAccounts(orgId),
+    enabled,
+    refetchInterval: pollMs,
+  });
 };
 
 /** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */

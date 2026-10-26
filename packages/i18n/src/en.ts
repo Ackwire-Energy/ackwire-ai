@@ -221,7 +221,7 @@ export const en: Translations = {
       workspace: "Workspace",
       context: "Context",
       import: "Bring your agents",
-      agents: "Agents and key",
+      agents: "Agents and AI",
       computer: "Computer",
       team: "Team",
       done: "Done",
@@ -249,8 +249,7 @@ export const en: Translations = {
       continue: "Continue",
       create_one: "Create {{count}} agent",
       create_other: "Create {{count}} agents",
-      saveAndCreate_one: "Save and create {{count}} agent",
-      saveAndCreate_other: "Save and create {{count}} agents",
+      saveAndContinue: "Save and continue",
       invite_one: "Invite {{count}} person",
       invite_other: "Invite {{count}} people",
     },
@@ -526,13 +525,8 @@ export const en: Translations = {
     },
     brain: {
       title: "Who thinks",
-      help: "Your agents can think with your Claude plan, signed in on {{computer}}. Then no API key is needed.",
-      model: "Model through the API",
-      modelDesc: "Needs an API key, in the next step.",
-      claudeCode: "Claude Code on {{computer}}",
-      claudeCodeDesc: "Uses your Claude plan, signed in on {{computer}}.",
       failed:
-        "Claude Code isn't available on {{computer}} yet: your agents use the API model. You can switch each agent later.",
+        "Some agents couldn't switch to the {{brand}} account on {{computer}}. You can switch each one on its page.",
     },
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organizes tasks, summarizes conversations and runs the forum." },
@@ -548,10 +542,8 @@ export const en: Translations = {
     },
     keyStep: {
       title: "Which AI will they use?",
-      lead: "Your agents need an AI to think with: an API key, or your Claude or ChatGPT plan signed in on the computer.",
-      useComputer: "Or sign in with your Claude or ChatGPT plan on {{computer}}: no key needed.",
-      planLater: "No key? Connect later, then sign in with your plan once {{computer}} is ready.",
-      planLaterReady: "No key? Connect later, then sign in with your plan on {{computer}}.",
+      lead: "Sign in with your AI plan and they think with it: no API key needed. Or use an API key, paid as you go.",
+      leadNoComputer: "Your agents think with an API key, or with your AI plan on a computer you connect.",
     },
     budget: {
       title: "Spending limit per agent",
@@ -563,8 +555,6 @@ export const en: Translations = {
       notePlatform:
         "With the agentes.chat key, the limit covers API usage: when an agent hits it, it stops and tells you.",
     },
-    provider: "Provider",
-    keyFor: "{{provider}} API key",
     keySite: "Create the key at {{site}}.",
     keyNotPlan: "Use a pay-as-you-go key: a subscription plan's key only works in coding tools.",
     keyInvalid: {
@@ -577,13 +567,8 @@ export const en: Translations = {
         "Paste the whole MiniMax key, with no spaces. Keys starting with sk-cp- belong to the plan and don't work here.",
     },
     keyFromOther: "Is it from another provider?",
-    advanced: "Advanced",
     anthropicWorkspace: "Claude Console workspace ID",
     anthropicWorkspaceHelp: "Only for a key that works in more than one workspace. The ID starts with wrkspc_.",
-    openaiOrg: "OpenAI organization ID",
-    openaiProject: "OpenAI project ID",
-    optional: "Optional.",
-    platformChoice: "Use the agentes.chat key",
     platformKeyDesc: "No key of your own: agents use the agentes.chat key. You see each agent's cost.",
     suggestedAuto: "Starts on Automatic: it picks the model and effort for each task. You can change it later.",
     computer: {
@@ -1001,15 +986,55 @@ export const en: Translations = {
       chatgpt: "Connect your ChatGPT plan",
       api_key: "Add an API key",
     },
-    option: {
-      claude: "Claude plan",
-      claudeDesc: "Pro, Max or Team, through Claude Code",
-      chatgpt: "ChatGPT plan",
-      chatgptDesc: "Plus, Pro or Team, through Codex",
-      api_key: "API key",
-      api_keyDesc: "Claude, OpenAI and others; pay as you go",
+    titleFor: "Connect an AI for {{name}}",
+    orPayGo: "Or pay as you go",
+    plan: {
+      claude: { title: "Your Claude plan", tiers: "Pro, Max, Team or Enterprise" },
+      chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },
+      zai: { tiers: "Lite, Pro or Max" },
+      kimi: { tiers: "Plus, Pro, Max or Ultra" },
+      minimax: { tiers: "Go, Explore or Build" },
+      opencode: { tiers: "Go or Go Plus" },
     },
-    waitComputer: "Available once the computer is ready. You can use an API key now.",
+    key: {
+      title: "API key",
+      makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax",
+      sub: "You pay per use, straight to the provider",
+      create: "Create your {{provider}} API key",
+      paste: "Paste it here",
+      forAll: "Every agent without a plan thinks with it.",
+      saved: "Saved. Every agent without a plan thinks with it.",
+      notPlan: "Use a pay-as-you-go key here. A coding plan's key goes in its own option above.",
+      platform: "agentes.chat",
+    },
+    wait: {
+      signIn: "You sign in here as soon as it's ready.",
+      key: "Meanwhile, create the key: you send it here as soon as it's ready.",
+      ready: "{{computer}} is ready.",
+      useKey: "Use an API key now",
+      connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
+    },
+    own: {
+      this: "The {{brand}} account signed in on {{computer}}",
+      thisText: "Every agent thinks with it. Nothing to sign in.",
+      other: "Another {{brand}} account, for one agent",
+      otherText: "You sign in from here; it stays on {{computer}}.",
+      note: "They only reply to you while they think with your plan.",
+    },
+    chatgptCode: {
+      title: "Allow sign-in with a code in ChatGPT",
+      text: "In ChatGPT, open Settings › Security and allow device code sign-in for Codex. On a Business or Enterprise plan, a workspace admin allows it.",
+      open: "Open ChatGPT settings",
+    },
+    zaiTeam: "On a team plan, use the key from your Team Plan page.",
+    who: {
+      key: "API key · {{provider}}",
+      line: "Each plan thinks for one agent. For the others, pick another plan above, or one API key for all of them.",
+      keyFor: "API key for {{names}}",
+    },
+    assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
+    noAgents: "A plan thinks only for its owner's agents, and you have none yet.",
+    done: "Done",
     agent: "For which agent",
     keyLocked: "Only an admin adds an API key.",
     accountsLocked: "Only {{name}} connects a plan on {{computer}}.",
@@ -1790,8 +1815,8 @@ export const en: Translations = {
         add: {
           title: { claude_code: "Add a Claude account", codex: "Add a ChatGPT account" },
           stepOne: {
-            claude_code: "Sign in to Claude with the other account",
-            codex: "Sign in to ChatGPT with the other account",
+            claude_code: "Sign in to Claude with the account to use",
+            codex: "Sign in to ChatGPT with the account to use",
           },
           stepOneText: {
             claude_code: "Opens Claude's own page. If it signs in to the wrong account, sign out there and try again.",
@@ -1817,7 +1842,7 @@ export const en: Translations = {
             codex:
               "That account is already here ({{account}}). To add another, sign out of ChatGPT on the page that opened and sign in with the other one.",
           },
-          startFailed: "{{computer}} didn't answer. Check that it's on and try again.",
+          startFailed: "{{computer}} didn't answer. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
           done: "The {{account}} account is on {{computer}}. Click Use to save.",
         },
@@ -4464,23 +4489,13 @@ export const en: Translations = {
       duplicateKey: "That key is already here ({{account}}).",
     },
     connect: {
-      title: "Connect an AI",
-      sub: "Your plan thinks for your agents, on the computer where it stays.",
       claude_code: "Claude",
-      claude_codeText: "Your Pro, Max or Team plan",
       codex: "ChatGPT",
-      codexText: "Your Plus, Pro or Business plan",
-      keyText: "With the plan's key",
       needs: {
-        claude_code: "Needs a computer of yours with Claude Code",
-        codex: "Needs a computer of yours with Codex",
         keys: "Update agentes on the computer to use a plan's key",
-        online: "The computer is offline right now",
       },
       noComputer: "Accounts stay on a connected computer. Connect one of yours first.",
       addComputer: "Connect a computer",
-      computer: "On which computer?",
-      preparing: "Your plans sign in on {{computer}}, which is being prepared. Come back here once it's ready.",
       needsCloud: {
         claude_code: "Not ready on {{computer}} yet",
         codex: "Not ready on {{computer}} yet",
@@ -4488,19 +4503,13 @@ export const en: Translations = {
       },
     },
     done: {
-      title: "Done: {{label}} is on {{computer}}.",
       name: "What do you want to call it? Others see this name.",
-      agent: "Use it with which agent?",
-      noAgent: "None for now",
-      noAgents: "None of your agents work on {{computer}} yet. Pick this account on the agent's page later.",
-      finish: "Finish",
-      saved: "{{label}} is ready.",
       savedAgent: "{{agent}} now thinks with {{label}}.",
     },
     page: {
       title: "Your plans",
       text: "Each account thinks for one agent. It stays on the computer; agentes.chat keeps only its name, email and usage.",
-      empty: "Connect your Claude or ChatGPT plan and your agents think with it, no API key needed.",
+      empty: "Connect your AI plan, like Claude or ChatGPT, and your agents think with it: no API key needed.",
       connect: "Connect an AI",
       keyEnds: "key …{{hint}}",
       on: "on {{computer}}",
@@ -5590,15 +5599,6 @@ export const en: Translations = {
     fallbackHint: "Uses {{name}}'s budget. Off: {{name}} says so and answers when the computer is back.",
     hidden: "{{owner}} or an admin chooses who thinks.",
     hiddenAdmins: "Only admins choose who thinks.",
-    warning: {
-      title: "Use your plan for the agents?",
-      claude_code:
-        "Your agents will think with your Claude plan and reply only to you. To let someone else talk to one, turn off Only replies to you in Who thinks, on the agent's page.",
-      codex:
-        "Your agents will think with your ChatGPT plan and reply only to you. To let someone else talk to one, turn off Only replies to you in Who thinks, on the agent's page.",
-      confirm: "Use my plan",
-      cancel: "Not now",
-    },
     summary: {
       model: "Model (API)",
       claude_code: "Claude Code · {{model}}",
@@ -7141,8 +7141,6 @@ export const en: Translations = {
     onIt: {
       title: "On this computer",
       screens: "Each agent's own screen, with its browser and its files",
-      plans: "Claude Code and Codex, ready for each agent to sign in with your Claude or ChatGPT plan",
-      coding: "Coding plans from Z.ai (GLM), Kimi, MiniMax and OpenCode, with the plan's key",
     },
     hostMissing:
       "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>.",
@@ -8397,8 +8395,8 @@ export const en: Translations = {
     agentWaiting: "{{name}} starts using it as soon as it's ready.",
     managedHint: "The workspace's own computer: always on, with a user of its own for each agent.",
     continue: "You can go on: your agents start using it as soon as it's ready.",
-    plans:
-      "Claude Code and Codex come ready on it. Each agent signs in with your Claude or ChatGPT plan, or another AI's coding plan.",
+    plans: "Your agents can think with your own AI plan, signed in on this computer. No API key needed.",
+    plansMarks: "Claude, ChatGPT, GLM, Kimi and other AI plans",
     eta: {
       minutes_one: "About 1 min left",
       minutes_other: "About {{count}} min left",
@@ -8408,6 +8406,7 @@ export const en: Translations = {
     },
     email: {
       you: "We'll email you at {{email}} when it's ready. You can close this page.",
+      youStay: "We'll email you at {{email}} when it's ready.",
       here: "It shows here as soon as it's ready.",
     },
   },
