@@ -1,8 +1,9 @@
 import { type LegalBlock, type LegalKind, legalDocument, legalInline } from "@agenteschat/i18n/legal";
 import { Logo, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import { type LocaleCode, locales, usePageT } from "@/i18n";
+import { useDocumentTitle } from "@/lib/desktop";
 import "./legal.css";
 
 /**
@@ -18,10 +19,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
   const updated = new Intl.DateTimeFormat(lang, { dateStyle: "long", timeZone: "UTC" }).format(
     new Date(`${doc.updated}T00:00:00Z`),
   );
-
-  useEffect(() => {
-    document.title = `${doc.title} · agentes.chat`;
-  }, [doc.title]);
+  useDocumentTitle(`${doc.title} · agentes.chat`);
 
   return (
     <div className="legal" lang={lang}>
