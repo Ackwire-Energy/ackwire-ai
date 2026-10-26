@@ -59,6 +59,7 @@ async function firstRun(
     await act(async () => root.unmount());
     el.remove();
     stop();
+    for (const runner of host.runners.values()) runner.stop();
   }
 }
 
