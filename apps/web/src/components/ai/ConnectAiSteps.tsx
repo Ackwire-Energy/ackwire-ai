@@ -62,30 +62,35 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
   const view = brain.data;
   const row = ai.data?.computers.find((c) => c.machineId === view?.computer?.machineId);
   // Once ready, the workspace's computer is every agent's: a view from before that still has none is asked again
-  // now, not at its next poll, so the panel turns on as the rest of the page says ready.
+  // now with the accounts (a coding plan reads that computer's row there), not at their next poll. Until both
+  // answers are in, every plan reads as ready with its sign-in loading, as the rest of the page says ready.
   const behind = edition === "cloud" && setup?.phase === "ready" && view !== undefined && !view.computer;
+  const [asking, setAsking] = useState(false);
   const { refetch: brainAgain } = brain;
   const { refetch: accountsAgain } = ai;
   useEffect(() => {
     if (!behind) return;
-    void brainAgain();
-    void accountsAgain();
+    setAsking(true);
+    void Promise.allSettled([brainAgain(), accountsAgain()]).then(() => setAsking(false));
   }, [behind, brainAgain, accountsAgain]);
+  const catching = behind || asking;
   // A panel here waited for that computer: once it's ready, it says so whenever it shows again (another plan, another
   // step and back).
   const [waited, setWaited] = useState(false);
   const markWaited = useCallback(() => setWaited(true), []);
   const gateOf = (choice: PlanChoice): PlanGate =>
-    planGate({
-      choice,
-      edition,
-      setup,
-      // A coding plan also needs to know whether that computer takes a plan's key.
-      brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
-      computer: row,
-    });
+    catching
+      ? { state: "ready" }
+      : planGate({
+          choice,
+          edition,
+          setup,
+          // A coding plan also needs to know whether that computer takes a plan's key.
+          brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
+          computer: row,
+        });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited };
+  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited, catching };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -436,6 +441,7 @@ function PlanSteps({
           askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
           local={view?.ownSignIn}
           ready={ready}
+          loading={gates.catching}
           note={!coding && <SettingNote icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</SettingNote>}
           onAdded={(a) => void assign(a)}
         />

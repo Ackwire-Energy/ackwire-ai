@@ -44,6 +44,8 @@ export interface AddAccountProps {
   local?: boolean;
   /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
   ready?: boolean;
+  /** It just got ready and the page is still asking about it: what starts there shows it's loading. */
+  loading?: boolean;
   /** Under the steps. */
   note?: ReactNode;
   /** Its own head, with Back; without it, the place that shows it says what it is. */
@@ -137,6 +139,7 @@ function AddAccountFlow({
   askEmail,
   local,
   ready = true,
+  loading = false,
   note,
   onBack,
   onAdded,
@@ -299,14 +302,19 @@ function AddAccountFlow({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              if (valid) void send();
+              if (valid && ready && !loading) void send();
             }
           }}
         />
         <Button icon="copy" disabled={sent} onClick={() => void paste()}>
           {t("aiAccounts.add.paste")}
         </Button>
-        <Button variant="primary" loading={sending} disabled={!valid || sent || !ready} onClick={() => void send()}>
+        <Button
+          variant="primary"
+          loading={sending || loading}
+          disabled={!valid || sent || !ready}
+          onClick={() => void send()}
+        >
           {t("agentPage.work.brain.add.send", { computer })}
         </Button>
       </span>
@@ -392,7 +400,14 @@ function AddAccountFlow({
             login ? (
               openAgain(login.url)
             ) : (
-              <Button size="sm" variant="primary" icon="external" loading={starting} disabled={!ready} onClick={start}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="external"
+                loading={starting || loading}
+                disabled={!ready}
+                onClick={start}
+              >
                 {t("agentPage.work.brain.add.open.codex")}
               </Button>
             )
@@ -432,7 +447,7 @@ function AddAccountFlow({
                 size="sm"
                 variant="primary"
                 icon="external"
-                loading={starting}
+                loading={starting || loading}
                 disabled={!emailOk || !ready}
                 onClick={start}
               >

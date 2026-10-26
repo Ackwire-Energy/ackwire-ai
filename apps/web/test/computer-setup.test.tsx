@@ -863,6 +863,72 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
   });
 
+  test("the AI step as it turns ready, the agent's view and the accounts still on their way: ready, its sign-in loading, never a wait", async () => {
+    for (const plan of ["Claude", "GLM Coding"] as const) {
+      const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });
+      await click(screen().getByRole("button", { name: "Continuar" }));
+      await keepOnly("Theo · PM");
+      await click(screen().getByRole("button", { name: "Criar 1 agente" }));
+      if (plan !== "Claude") {
+        const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
+        await click(within(picker).getByRole("button", { name: /^GLM Coding/ }));
+      }
+      const panel = () =>
+        screen().getByRole("region", { name: plan === "Claude" ? "Seu plano do Claude" : "GLM Coding Plan" });
+      const action = () =>
+        within(panel()).getByRole("button", { name: plan === "Claude" ? "Entrar com Claude" : /^Enviar ao/ });
+      // Asked again at ready, the agent's view and the accounts answer late, the view first: each says what was
+      // true when it was asked.
+      let viewIn = () => {};
+      let accountsIn = () => {};
+      const viewBack = new Promise<void>((done) => {
+        viewIn = done;
+      });
+      const accountsBack = new Promise<void>((done) => {
+        accountsIn = done;
+      });
+      const brain = r.api.agents.brain;
+      r.api.agents.brain = async (...args) => {
+        const answer = brain(...args);
+        await viewBack;
+        return answer;
+      };
+      const accounts = r.api.machines.aiAccounts;
+      r.api.machines.aiAccounts = async (...args) => {
+        const answer = accounts(...args);
+        await accountsBack;
+        return answer;
+      };
+      const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
+      r.machines.setSetup({ state: "ready", machineId: "m-1", specs: SPECS });
+      r.computer.ready = true;
+      await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.computerSetup(orgId) }));
+      await settle(8);
+      // Whatever has come back, the panel says what the rail says, and no plan dims.
+      const saysReady = () => {
+        const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+        expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
+        expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+        expect(panel().textContent).not.toContain("assim que ele ficar pronto");
+        expect(panel().textContent).not.toContain("Ainda não está pronto");
+        expect(document.querySelectorAll(".grid-options--plans .ac-brand--off")).toHaveLength(0);
+      };
+      saysReady();
+      expect(action().getAttribute("aria-busy")).toBe("true");
+      viewIn();
+      await settle(8);
+      saysReady();
+      expect(action().getAttribute("aria-busy")).toBe("true");
+      accountsIn();
+      await settle(8);
+      saysReady();
+      expect(action().hasAttribute("aria-busy")).toBe(false);
+      if (plan === "Claude") expect((action() as HTMLButtonElement).disabled).toBe(false);
+      expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(0);
+      cleanup();
+    }
+  });
+
   test("the AI step while it waits for a computer or has a problem: the email in place of a time, no key button", async () => {
     for (const setup of [{ state: "waiting", reason: "capacity" }, { state: "problem" }] as const) {
       const r = await toComputerStep({ ...setup, specs: SPECS, notifyByEmail: true });
@@ -878,7 +944,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(lines.filter(leadsWithClock).map((l) => l.textContent)).toEqual([
         "Você entra aqui assim que ele ficar pronto.",
       ]);
-      // A key is the picker's own row, in view above the panel: no button for it in any wait.
+      // A key is the picker's own row, under the panel: no button for it in any wait.
       expect(within(panel).queryByRole("button", { name: "Usar uma chave de API agora" })).toBeNull();
       const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
       await click(within(picker).getByRole("button", { name: /^Chave de API/ }));
