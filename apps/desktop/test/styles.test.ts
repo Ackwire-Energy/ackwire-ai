@@ -42,6 +42,11 @@ describe("Run here", () => {
     // The sticky bar's own margin shorthand would win over that auto: its top has to be auto too.
     expect(rule(".dk-fr__here .dk-fr__end")).toMatch(/\n\s*margin: auto -48px -28px;/);
   });
+
+  test("Your own server's cards leave no word alone on a line", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    expect(css.split("\n.dk-fr__card small {")[1]?.split("}")[0]).toContain("text-wrap: pretty;");
+  });
 });
 
 describe("switch rows", () => {

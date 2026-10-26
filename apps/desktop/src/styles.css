@@ -746,6 +746,8 @@ body[data-window="popover"] {
 .dk-fr__card small {
   color: var(--muted);
   font-size: 12.5px;
+  /* No word alone on the last line ("…while it's / on."). */
+  text-wrap: pretty;
 }
 .dk-fr__card[data-later] b,
 .dk-fr__card[data-later] .dk-fr__card-art {
