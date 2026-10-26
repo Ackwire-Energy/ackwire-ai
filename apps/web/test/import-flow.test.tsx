@@ -99,6 +99,9 @@ const row = (title: string) => {
   return found as HTMLElement;
 };
 const chipOf = (title: string) => row(title).querySelector(".imp-row__chip")?.textContent;
+/** A line led by an icon that `.ac-iconline` puts on the line's first row. */
+const iconLine = (line: Element | null) =>
+  !!line?.classList.contains("ac-iconline") && !!line.firstElementChild?.matches("svg.ac-icon");
 /** `imports.apply` answering with `plan` for the dry run (and the default fake otherwise). */
 const withPlan = (api: ApiClient, state: State, plan: (input: ImportInput) => ImportItemResult[]) => {
   const fake = api.imports.apply;
@@ -183,15 +186,38 @@ describe("Configurações → Importar e exportar", () => {
   });
 
   test("its notes and lists lead each line with an icon on the line's first row", async () => {
-    await go();
-    const leads = [
-      ...document.querySelectorAll(".imp-note"),
-      ...screen().getByRole("region", { name: "Exportar este workspace" }).querySelectorAll("li"),
-    ];
-    expect(leads.length).toBeGreaterThan(5);
-    for (const line of leads) {
-      expect(line.classList.contains("ac-iconline")).toBe(true);
-      expect(line.firstElementChild?.matches("svg.ac-icon")).toBe(true);
+    const state = seedState();
+    const api = createFakeApi(state);
+    // The import leaves the routine out, so the report lists what didn't come.
+    const fake = api.imports.apply;
+    api.imports = {
+      ...api.imports,
+      apply: async (orgId, input) => {
+        const { items } = await fake(orgId, input);
+        if (input.dryRun) return { items };
+        const left = (i: ImportItemResult): ImportItemResult => ({
+          ...i,
+          action: "skip",
+          reason: "schedule_unsupported",
+        });
+        return { items: items.map((i) => (i.kind === "routine" ? left(i) : i)) };
+      },
+    };
+    await go(state, api);
+    const seen: [string, Element[]][] = [];
+    const take = (...selectors: string[]) => {
+      for (const s of selectors) seen.push([s, [...document.querySelectorAll(s)]]);
+    };
+    take(".imp-note", ".imp-export li");
+    await click(button(/^OpenClaw /), 1);
+    take(".imp-tip");
+    await pick("Pasta para importar", folder("paperclip-company"));
+    take(".imp-note", ".imp-todo li");
+    await click(button(/^Importar \d+ itens/), 8);
+    take(".imp-missed li");
+    for (const [selector, lines] of seen) {
+      expect([selector, lines.length > 0]).toEqual([selector, true]);
+      for (const line of lines) expect([selector, iconLine(line)]).toEqual([selector, true]);
     }
   });
 
@@ -348,6 +374,7 @@ describe("Configurações → Importar e exportar", () => {
     await go(state, api);
     await pick("Arquivos para importar", [fixture("sales-desk.openmaus.json")]);
     expect(text()).toContain("Tudo isso já está aqui.");
+    expect(iconLine(document.querySelector(".imp-apply__none"))).toBe(true);
     expect(screen().queryByRole("button", { name: /^Importar \d/ })).toBeNull();
 
     action = "skip";
