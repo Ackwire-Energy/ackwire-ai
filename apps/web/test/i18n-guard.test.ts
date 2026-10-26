@@ -1,20 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { en, ptBR } from "@agenteschat/i18n";
 import { legalDocuments } from "@agenteschat/i18n/legal";
 import { leaves } from "../../../packages/i18n/test/leaves";
+import { filesNamingMakers, MAKER_WORDS, sourceFiles, withoutComments } from "../../../packages/i18n/test/maker-words";
 
 const REPO = join(import.meta.dir, "..", "..", "..");
 const ROOTS = [join(import.meta.dir, "..", "src"), join(REPO, "packages", "ui", "src")];
-const files = (dir: string, ext = /\.tsx$/): string[] =>
-  readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return name === "locales" ? [] : files(path, ext);
-    return ext.test(path) ? [path] : [];
-  });
-const withoutComments = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
 /** The dev-only component gallery shows sample content on purpose. */
 const SKIP_FILES = ["GalleryPage.tsx"];
 /** Brand names, keys, symbols and code that stay as they are. */
@@ -31,7 +24,7 @@ describe("no hardcoded UI text", () => {
   test("JSX text and aria-label / title / placeholder / alt literals go through t()", () => {
     const offenders: string[] = [];
     for (const root of ROOTS)
-      for (const f of files(root)) {
+      for (const f of sourceFiles(root, /\.tsx$/)) {
         if (SKIP_FILES.some((s) => f.endsWith(s))) continue;
         const source = withoutComments(readFileSync(f, "utf8"));
         const where = (i: number) => `${relative(root, f)}:${source.slice(0, i).split("\n").length}`;
@@ -54,27 +47,27 @@ describe("no hardcoded UI text", () => {
   });
 });
 
-describe("Claude, never Anthropic, in what a person reads", () => {
+describe("Claude and ChatGPT, not their makers, in what a person reads", () => {
   /** A legal text names the company, once, beside the product people know. */
   const MAKER = { en: "Anthropic, which makes Claude", "pt-BR": "a Anthropic, que faz o Claude" } as const;
+  const inCopy = new RegExp(MAKER_WORDS.source, "i");
 
-  test("the copy, the terms and the apps' own words", () => {
+  // The phone's and the Mac app's own code: in their own tests, which run when only those apps change.
+  test("the copy, the terms, and the web app's, design system's and client's code", () => {
     const copy = [
       ...leaves(en).map(([k, v]) => [`en ${k}`, v] as const),
       ...leaves(ptBR).map(([k, v]) => [`pt-BR ${k}`, v] as const),
     ]
-      .filter(([, v]) => /anthropic/i.test(String(v)))
+      .filter(([, v]) => inCopy.test(String(v)))
       .map(([k]) => k);
     const legal = Object.entries(legalDocuments).flatMap(([kind, byLocale]) =>
       Object.entries(byLocale)
-        .filter(([lng, doc]) => /anthropic/i.test(JSON.stringify(doc).replaceAll(MAKER[lng as keyof typeof MAKER], "")))
+        .filter(([lng, doc]) => inCopy.test(JSON.stringify(doc).replaceAll(MAKER[lng as keyof typeof MAKER], "")))
         .map(([lng]) => `${kind} ${lng}`),
     );
-    // Code keeps the provider's id, `anthropic`; a capitalized "Anthropic" outside comments is words.
-    const words = ["apps/web/src", "packages/ui/src", "packages/client/src", "apps/mobile/src", "apps/desktop/src"]
-      .flatMap((dir) => files(join(REPO, dir), /\.tsx?$/))
-      .filter((f) => withoutComments(readFileSync(f, "utf8")).includes("Anthropic"))
-      .map((f) => relative(REPO, f));
-    expect([...copy, ...legal, ...words]).toEqual([]);
+    const words = filesNamingMakers(
+      ["apps/web/src", "packages/ui/src", "packages/client/src"].map((d) => join(REPO, d)),
+    );
+    expect([...copy, ...legal, ...words.map((f) => relative(REPO, f))]).toEqual([]);
   });
 });
