@@ -20,6 +20,7 @@ import {
   Field,
   glowTones,
   Icon,
+  InfoHint,
   Input,
   PixelSky,
   PixelSpinner,
@@ -58,9 +59,10 @@ import {
 } from "../control/local-server";
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, writePref } from "../hooks";
-import { BrandFace, CommandCopy } from "../ui/bits";
+import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
 import { shortPath } from "../ui/time";
+import { hintFor, PrefRow } from "./prefs/shared";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
 const HORIZON: SkyOptions = {
@@ -325,6 +327,13 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
           <Icon name="chevronRight" size={16} className="dk-fr__card-go" />
         </button>
       </div>
+      {!later && (
+        <p className="dk-help dk-fr__which">
+          <HelpLink slug="run-on-your-computer" section="who">
+            {t("desktop.own.which")}
+          </HelpLink>
+        </p>
+      )}
     </>
   );
 }
@@ -401,6 +410,7 @@ function Connect({
     e.preventDefault();
     if (address.trim()) void submit(address);
   };
+  const none = hintFor(t, t("desktop.connect.none"), t("desktop.connect.noneText"));
 
   return (
     <>
@@ -467,9 +477,11 @@ function Connect({
       )}
       {INSTALL_COMMAND_LIVE && (
         <section className="dk-fr__none" aria-label={t("desktop.connect.none")}>
-          <h2>{t("desktop.connect.none")}</h2>
+          <span className="ac-hintline">
+            <h2>{t("desktop.connect.none")}</h2>
+            <InfoHint name={none.name}>{none.text}</InfoHint>
+          </span>
           <CommandCopy command={INSTALL_COMMAND} />
-          <p className="dk-help">{t("desktop.connect.noneText")}</p>
         </section>
       )}
     </>
@@ -662,9 +674,7 @@ function RunHere({
       <BackLink label={t("desktop.own.title")} onClick={onBack} />
       <h1 className="dk-fr__h1sm">{t("desktop.here.title")}</h1>
       <p className="dk-lead dk-fr__wide">
-        {view.ask
-          ? t("desktop.here.how")
-          : `${t("desktop.here.how")} ${t("desktop.here.again", { path: shortPath(status.dir) })}`}
+        {view.ask ? t("desktop.here.how") : t("desktop.here.again", { path: shortPath(status.dir) })}
       </p>
       <form className="dk-fr__here" onSubmit={submit} noValidate>
         {view.ask && (
@@ -680,7 +690,6 @@ function RunHere({
             </Field>
             <Field
               label={t("desktop.here.email")}
-              labelAside={<span className="dk-help">{t("desktop.here.emailHint")}</span>}
               error={tried && !emailOk ? t("desktop.here.emailNeeded") : undefined}
             >
               <Input
@@ -697,21 +706,14 @@ function RunHere({
         )}
         <div className="dk-card">
           <ReachRow tailnet={tailnet} on={reach} onChange={setReach} />
-          <div className="dk-crow">
-            <span className="dk-crow__text">
-              <label htmlFor="here-usage" className="dk-crow__title">
-                {t("desktop.here.usage")}
-              </label>
-              <small>{t("desktop.here.usageText")}</small>
-            </span>
-            <span className="dk-crow__end">
-              <Switch id="here-usage" checked={usage} onCheckedChange={setUsage} />
-            </span>
-          </div>
-        </div>
-        <div className="dk-fr__notes">
-          <p className="dk-help">{t("desktop.here.agents")}</p>
-          <p className="dk-help">{t("desktop.here.limits")}</p>
+          <PrefRow
+            title={t("desktop.here.usage")}
+            hint={hintFor(t, t("desktop.here.usage"), t("desktop.here.usageText"))}
+            htmlFor="here-usage"
+            end={
+              <Switch id="here-usage" aria-describedby="here-usage-hint" checked={usage} onCheckedChange={setUsage} />
+            }
+          />
         </div>
         <div className="dk-fr__end">
           <Button type="submit" variant="primary" autoFocus={!view.ask}>

@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
 import { REASON_TEXT, type ServeProblem, type Tailnet } from "../control/local-server";
 import type { ServerKind } from "../control/server";
+import { hintFor, PrefRow } from "../windows/prefs/shared";
 import { CommandCopy } from "./bits";
 import { useToast } from "./Toast";
 
@@ -43,7 +44,10 @@ export function ServerTile({ kind }: { kind: ServerKind }) {
   );
 }
 
-/** "Reach it from your phone and teammates": by what Tailscale is doing on this computer. */
+/**
+ * "Reach it from your phone and teammates", what it does behind its ⓘ. While Tailscale is missing or not
+ * connected the switch can't be used, and one line under the label says why, with what fixes it.
+ */
 export function ReachRow({
   tailnet,
   on,
@@ -58,50 +62,47 @@ export function ReachRow({
   const { t } = useTranslation();
   const host = useHost();
   const usable = tailnet.state === "on" || on;
+  const missing = tailnet.state === "missing";
   // Not connected, and no Tailscale app to open: it connects from the terminal.
-  const fromTerminal = !usable && tailnet.state === "off" && host.platform !== "mac";
+  const fromTerminal = !usable && !missing && host.platform !== "mac";
   return (
-    <div className="dk-crow" data-top>
-      <span className="dk-crow__text">
-        <label htmlFor="here-reach" className="dk-crow__title">
-          {t("desktop.here.reach")}
-        </label>
-        <small>
+    <PrefRow
+      top
+      title={t("desktop.here.reach")}
+      hint={hintFor(t, t("desktop.here.reach"), t("desktop.here.reachText"))}
+      htmlFor="here-reach"
+      desc={
+        !usable && (
           <span>
-            {tailnet.state === "on" || on
-              ? t("desktop.here.reachText")
+            {missing
+              ? t("desktop.here.reachMissing")
               : fromTerminal
                 ? t("desktop.here.reachOffTerminal")
-                : tailnet.state === "off"
-                  ? t("desktop.here.reachOff")
-                  : t("desktop.here.reachMissing")}
-            {!usable && (tailnet.state === "missing" || host.platform === "mac") && (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  className="ac-link dk-link"
-                  onClick={() =>
-                    void host.openTailscale(tailnet.state === "missing" ? "download" : "app").catch(() => {})
-                  }
-                >
-                  {tailnet.state === "missing" ? t("desktop.here.getTailscale") : t("desktop.here.openTailscale")}
-                </button>
-              </>
-            )}
-            {fromTerminal && (
-              <>
-                {" "}
-                <CommandCopy command={TAILSCALE_UP} inline />
-              </>
+                : t("desktop.here.reachOff")}{" "}
+            {fromTerminal ? (
+              <CommandCopy command={TAILSCALE_UP} inline />
+            ) : (
+              <button
+                type="button"
+                className="ac-link dk-link"
+                onClick={() => void host.openTailscale(missing ? "download" : "app").catch(() => {})}
+              >
+                {missing ? t("desktop.here.getTailscale") : t("desktop.here.openTailscale")}
+              </button>
             )}
           </span>
-        </small>
-      </span>
-      <span className="dk-crow__end">
-        <Switch id="here-reach" checked={on} disabled={!usable || busy} onCheckedChange={onChange} />
-      </span>
-    </div>
+        )
+      }
+      end={
+        <Switch
+          id="here-reach"
+          aria-describedby="here-reach-hint"
+          checked={on}
+          disabled={!usable || busy}
+          onCheckedChange={onChange}
+        />
+      }
+    />
   );
 }
 

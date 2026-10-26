@@ -152,7 +152,8 @@ export const desktopPtBR = {
     connectText: "Ele roda em outro computador: um Mac mini, um notebook sobrando ou um servidor na internet.",
     here: "Rodar o agentes.chat neste {{device}}",
     hereLater: "Por enquanto, no Mac e no Linux.",
-    hereText: "Este {{device}} vira o servidor, com um clique.",
+    hereText: "Este {{device}} vira o servidor, enquanto estiver ligado.",
+    which: "Qual escolher?",
   },
   connect: {
     title: "Conectar ao meu servidor",
@@ -167,8 +168,7 @@ export const desktopPtBR = {
     foundHere: "O agentes.chat está rodando aqui",
     use: "Usar",
     none: "Ainda não tem? Rode isto nele",
-    noneText:
-      "No terminal de um servidor ou de um Mac mini. No fim, aparece um link que abre este app e pergunta se quer conectá-lo a esse servidor.",
+    noneText: "No terminal de um servidor ou de um Mac mini. No fim, aparece um link que conecta este app a ele.",
     invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
     httpRefused:
       "{{host}} usa http sem cadeado, que só funciona neste {{device}}. Use o endereço do Tailscale ou um com https.",
@@ -185,29 +185,23 @@ export const desktopPtBR = {
   /** "Rodar o agentes.chat neste computador" (FirstRun.tsx), and on Windows the two ways for now. */
   here: {
     title: "Rodar o agentes.chat neste {{device}}",
-    how: "Ele roda dentro deste app, com um banco de dados embutido, e guarda tudo numa pasta deste {{device}}. Nada mais para instalar: sem Docker, sem banco para configurar.",
+    how: "Ele roda dentro deste app, com um banco de dados embutido, e guarda tudo numa pasta deste {{device}}.",
     again: "Ele já rodou aqui, e os dados continuam em {{path}}.",
     name: "Seu nome",
     nameNeeded: "Escreva o seu nome.",
     email: "Seu e-mail",
-    emailHint: "A sua equipe vê.",
     emailNeeded: "Escreva o seu e-mail, como ana@exemplo.com.",
     reach: "Acessar pelo celular e pela equipe",
     reachText:
       "Com o Tailscale, uma rede particular dos seus aparelhos: o seu celular e quem você convidar entram nela, e mais ninguém chega ao agentes.chat.",
-    reachOff: "O Tailscale está neste {{device}}, mas desconectado. Abra o Tailscale e conecte.",
-    reachOffTerminal: "O Tailscale está neste {{device}}, mas desconectado. Conecte pelo terminal:",
-    reachMissing:
-      "Instale o Tailscale, que é grátis, para acessar o agentes.chat pelo celular e convidar a equipe. Dá para fazer depois.",
+    reachOff: "O Tailscale não está conectado.",
+    reachOffTerminal: "O Tailscale não está conectado. Conecte pelo terminal:",
+    reachMissing: "Precisa do Tailscale, que é grátis.",
     openTailscale: "Abrir o Tailscale",
     getTailscale: "Baixar o Tailscale",
     usage: "Enviar estatísticas de uso anônimas ao agentes.chat",
     usageText:
       "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
-    agents:
-      "Os agentes também trabalham aqui, em pastas só deles, com um navegador e com o Claude Code ou o Codex quando estão neste {{device}}. Comandos ficam desligados até você ligar.",
-    limits:
-      "Feito para você ou uma equipe pequena, enquanto este {{device}} estiver ligado. Para uma equipe maior ou um servidor sempre ligado, instale num servidor e escolha Conectar ao meu servidor; os dados podem ir para lá depois.",
     start: "Iniciar o agentes.chat",
     setting: "Preparando o agentes.chat neste {{device}}",
     step: {
@@ -228,8 +222,7 @@ export const desktopPtBR = {
     fail: {
       start: "O agentes.chat não iniciou neste {{device}}.",
       account: "A sua conta não foi criada.",
-      reach:
-        "O acesso pelos aparelhos não ligou: {{reason}}. Enquanto isso, o agentes.chat funciona neste {{device}}; tente de novo nas Preferências.",
+      reach: "O acesso pelos aparelhos não ligou: {{reason}}. Tente de novo em Preferências\u00a0›\u00a0Servidores.",
     },
     reason: {
       https: "o HTTPS está desligado na sua rede do Tailscale",
@@ -245,16 +238,14 @@ export const desktopPtBR = {
     notRunning: "O agentes.chat está instalado neste {{device}}, mas não está rodando",
     notRunningText: "Ele foi instalado pelo terminal, em {{path}}. Inicie por lá e tente de novo.",
     running: "O agentes.chat já roda neste {{device}}",
-    runningText: "Este app roda ele, em {{url}}. Os ajustes ficam em Preferências\u00a0›\u00a0Servidores.",
+    runningText: "Este app roda ele, em {{url}}.",
     openIt: "Abrir",
     win: {
       title: "Rodar o agentes.chat neste PC",
       lead: "No Windows, isso vem depois. Por enquanto, dois caminhos:",
-      later:
-        "No Windows, isso vem depois. Por enquanto, rode o agentes.chat em outro computador, um Mac, um Linux ou um servidor na internet, e escolha Conectar ao meu servidor.",
-      other:
-        "Em outro computador, um Mac, um Linux ou um servidor na internet: rode a instalação de um comando e escolha Conectar ao meu servidor.",
-      wsl: "Neste PC, com o WSL 2: abra o Ubuntu pelo menu Iniciar, rode isto e escolha Conectar ao meu servidor. Ele encontra aqui.",
+      later: "No Windows, isso vem depois: por enquanto, rode em outro computador e conecte a ele.",
+      other: "Em outro computador: rode lá a instalação de um comando.",
+      wsl: "Neste PC, com o WSL 2: rode isto no Ubuntu.",
     },
   },
   /** A link to a server (`agenteschat://connect`): the server in large type, nothing changes before Connect. */
@@ -564,9 +555,8 @@ export const desktopPtBR = {
     migrating: "Atualizando o agentes.chat neste {{device}}. Pode levar um minuto.",
     stopped: "O agentes.chat parou neste {{device}}",
     failing: "O agentes.chat não está iniciando neste {{device}}",
-    tailnetOff:
-      "O agentes.chat está rodando, mas abre pelo endereço do Tailscale, e o Tailscale não está conectado neste {{device}}.",
-    tailnetUp: "Para conectar, rode sudo tailscale up no terminal.",
+    tailnetOff: "Conecte o Tailscale neste {{device}} para abrir o agentes.chat.",
+    tailnetUp: "No terminal: sudo tailscale up",
     onlyHere: "Usar só neste {{device}}",
     start: "Iniciar",
     copy: "Copiar o diagnóstico",

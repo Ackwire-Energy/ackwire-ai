@@ -1,4 +1,6 @@
 import type { ControlAgent, ControlStatus } from "@agenteschat/adapters/runner-control";
+import { helpUrl } from "@agenteschat/client/lib/server";
+import type { HelpSlug } from "@agenteschat/i18n/help";
 import {
   type AgentState,
   Avatar,
@@ -14,6 +16,7 @@ import {
 } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useHost } from "../app";
 
 /**
  * A command to copy, with Copy turning into Copied. `inline`: a short one inside a line of text, with an icon
@@ -63,6 +66,24 @@ export function CommandCopy({ command, inline = false }: { command: string; inli
         {copied ? t("desktop.common.copied") : t("desktop.common.copy")}
       </Button>
     </div>
+  );
+}
+
+/**
+ * A help page on agentes.chat, in the app's language, as a help line's link: the browser opens it with only the
+ * page, the language and the section, so the site never learns which server this app opens.
+ */
+export function HelpLink({ slug, section, children }: { slug: HelpSlug; section?: string; children: ReactNode }) {
+  const { i18n } = useTranslation();
+  const host = useHost();
+  return (
+    <button
+      type="button"
+      className="ac-link ac-link--muted dk-link"
+      onClick={() => void host.openExternal(helpUrl(slug, i18n.language, section)).catch(() => {})}
+    >
+      {children}
+    </button>
   );
 }
 

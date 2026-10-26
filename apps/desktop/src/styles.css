@@ -773,6 +773,9 @@ body[data-window="popover"] {
   bottom: 18px;
   color: var(--faint);
 }
+.dk-fr__which {
+  margin-top: 16px;
+}
 .dk-fr__form {
   margin-top: 24px;
   display: flex;
@@ -968,6 +971,7 @@ body[data-window="popover"] {
   max-width: none;
 }
 .dk-fr__here {
+  flex: 1 0 auto;
   margin-top: 14px;
   display: flex;
   flex-direction: column;
@@ -980,11 +984,6 @@ body[data-window="popover"] {
 }
 .dk-fr__body .dk-fr__wide {
   max-width: 66ch;
-}
-.dk-fr__notes {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 /* Start stays in view when the form is taller than the window: it sticks to the bottom edge. */
 .dk-fr__here .dk-fr__end {
@@ -1300,6 +1299,17 @@ body[data-window="popover"] {
   font-weight: 600;
   margin: 18px 4px 8px;
 }
+/* A card title with its ⓘ after the heading: the heading keeps the title's type, the ⓘ sits on its line. */
+.dk-ctitle.ac-hintline {
+  align-items: flex-start;
+  gap: 4px;
+}
+.dk-ctitle > h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+}
 .dk-card {
   background: var(--raised);
   border-radius: 18px;
@@ -1342,6 +1352,14 @@ body[data-window="popover"] {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+/* A switch's label at regular weight, lighter than a field's; a line under it stays small and muted. */
+.dk-crow:has(> .dk-crow__end > .ac-switch) .dk-crow__title {
+  font-weight: 400;
+}
+/* A chip after a title's ⓘ keeps the title's own gap. */
+.dk-crow .ac-hintline > .ac-chip {
+  margin-left: 4px;
 }
 .dk-crow__text small {
   color: var(--muted);

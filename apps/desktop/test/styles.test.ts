@@ -34,3 +34,12 @@ describe("Connect's found servers", () => {
     expect(rule(".dk-fr__found .dk-ctitle")).toContain("margin-inline: 0;");
   });
 });
+
+describe("switch rows", () => {
+  test("a switch's label is regular weight, lighter than a field's label; other row titles stay bold", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".dk-crow__title")).toContain("font-weight: 600;");
+    expect(rule(".dk-crow:has(> .dk-crow__end > .ac-switch) .dk-crow__title")).toContain("font-weight: 400;");
+  });
+});
