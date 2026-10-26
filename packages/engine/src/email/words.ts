@@ -145,6 +145,52 @@ const en = {
     why: (org: string) =>
       `You got this email because you own ${org} on agentes.chat. It's the only email about this computer.`,
   },
+  joinRequest: {
+    subject: "Someone asks to join your workspace",
+    preheader: "Approve or deny it in Members. Nothing happens until you answer.",
+    headline: "A request to join is waiting",
+    body: (org: string): Text => ["They opened ", { b: org }, "'s invitation link and asked to join."],
+    note: "Approve only people you expect. They join as a member unless you pick another role on the page.",
+    approve: "Approve",
+    deny: "Deny",
+    more: "All waiting requests are in Members.",
+    why: (org: string) =>
+      `You got this email because you're an owner or admin of ${org}. It goes out at most once an hour.`,
+  },
+  joinAnswer: {
+    someone: "Someone",
+    joined: {
+      subject: "Your request to join was approved",
+      preheader: "You're in. Open the workspace to start.",
+      headline: "You're in",
+      body: (who: string, org: string, role: string): Text => [
+        `${who} approved your request. You joined `,
+        { b: org },
+        ` as ${role}.`,
+      ],
+      button: "Open the workspace",
+    },
+    invited: {
+      subject: "Your request to join was approved",
+      preheader: "One step left: accept the invitation within 7 days.",
+      headline: "Approved: one step left",
+      body: (who: string, org: string): Text => [`${who} approved your request to join `, { b: org }, "."],
+      next: "Accept the invitation with this email address within 7 days.",
+      button: "Accept invitation",
+      // Anyone with the link can type any address, so this can reach someone who never asked.
+      small: "If you didn't ask to join, ignore this email. Nothing happens until you accept.",
+    },
+    denied: {
+      subject: "Your request to join wasn't approved",
+      preheader: "Someone at the workspace looked at it and didn't approve it.",
+      headline: "Your request wasn't approved",
+      body: (org: string): Text => ["Someone at ", { b: org }, " looked at your request and didn't approve it."],
+      reason: (reason: string): Text => [{ b: "Their note: " }, `“${reason}”`],
+      small:
+        "If you think it's a mistake, ask someone there to invite you by email. If you didn't ask to join, ignore this email.",
+    },
+    why: (org: string) => `You got this email because this address asked to join ${org} on agentes.chat.`,
+  },
 };
 
 type Words = typeof en;
@@ -282,6 +328,46 @@ const ptBR: Words = {
     button: { ai: "Conectar sua IA", task: "Passar a primeira tarefa", create: "Criar um agente" },
     why: (org) =>
       `Você recebeu este e-mail porque é dono da ${org} no agentes.chat. É o único e-mail sobre este computador.`,
+  },
+  joinRequest: {
+    subject: "Alguém pede para entrar no seu workspace",
+    preheader: "Aprove ou recuse em Membros. Nada acontece até você responder.",
+    headline: "Um pedido para entrar espera por você",
+    body: (org) => ["Essa pessoa abriu o link de convite da ", { b: org }, " e pediu para entrar."],
+    note: "Aprove só quem você espera. A pessoa entra como membro, a não ser que você escolha outro papel na página.",
+    approve: "Aprovar",
+    deny: "Recusar",
+    more: "Todos os pedidos em espera estão em Membros.",
+    why: (org) => `Você recebeu este e-mail porque é dono ou admin da ${org}. É enviado no máximo uma vez por hora.`,
+  },
+  joinAnswer: {
+    someone: "Alguém",
+    joined: {
+      subject: "Seu pedido para entrar foi aprovado",
+      preheader: "Você já está dentro. Abra o workspace para começar.",
+      headline: "Você entrou",
+      body: (who, org, role) => [`${who} aprovou seu pedido. Você entrou na `, { b: org }, ` como ${role}.`],
+      button: "Abrir o workspace",
+    },
+    invited: {
+      subject: "Seu pedido para entrar foi aprovado",
+      preheader: "Falta um passo: aceite o convite em até 7 dias.",
+      headline: "Aprovado: falta um passo",
+      body: (who, org) => [`${who} aprovou seu pedido para entrar na `, { b: org }, "."],
+      next: "Aceite o convite com este endereço de e-mail em até 7 dias.",
+      button: "Aceitar convite",
+      small: "Se você não pediu para entrar, ignore este e-mail. Nada acontece até você aceitar.",
+    },
+    denied: {
+      subject: "Seu pedido para entrar não foi aprovado",
+      preheader: "Alguém do workspace viu e não aprovou.",
+      headline: "Seu pedido não foi aprovado",
+      body: (org) => ["Alguém da ", { b: org }, " viu seu pedido e não aprovou."],
+      reason: (reason) => [{ b: "Recado: " }, `“${reason}”`],
+      small:
+        "Se acha que foi engano, peça a alguém de lá para convidar você por e-mail. Se você não pediu para entrar, ignore este e-mail.",
+    },
+    why: (org) => `Você recebeu este e-mail porque este endereço pediu para entrar na ${org} no agentes.chat.`,
   },
 };
 

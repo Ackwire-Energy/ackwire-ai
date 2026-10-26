@@ -57,8 +57,40 @@ export type EmailTemplate =
       when: string;
       url: string;
     }
-  /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
+  /**
+   * Someone opened an expired email invitation and asked for a new one. `email` is empty only in jobs queued
+   * from an invitation link before links asked to join instead.
+   */
   | { kind: "invite_request"; locale?: EmailLocale; orgName: string; email: string; url: string }
+  /**
+   * Someone asks to join through the workspace's invitation link (ADR 0068), to its owners and admins at most
+   * once an hour. Approve and Deny open the request in the app: a link in an email never acts by itself, because
+   * mail scanners open every link. The note the person typed never goes out.
+   */
+  | {
+      kind: "join_request";
+      locale?: EmailLocale;
+      orgName: string;
+      name: string;
+      email: string;
+      url: string;
+      denyUrl: string;
+    }
+  /**
+   * The answer to a request to join (ADR 0068), to the address that asked: in (`url` the workspace), approved
+   * with an invitation to accept (`url` the invitation), or not approved with the admin's `reason`.
+   */
+  | {
+      kind: "join_answer";
+      locale?: EmailLocale;
+      outcome: "joined" | "invited" | "denied";
+      orgName: string;
+      /** Empty: "Someone" in the email's language. */
+      approverName?: string;
+      role?: string;
+      url?: string;
+      reason?: string | null;
+    }
   | { kind: "verify_email"; locale?: EmailLocale; url: string }
   /**
    * Double opt-in for the landing page's waiting list, in the language they
@@ -139,6 +171,11 @@ async function readPictures(dir: string) {
     return null;
   }
 }
+
+/** A name typed on an invitation link's page, as the admins' email shows it (ADR 0068). */
+const JOIN_NAME_SHOWN = 60;
+/** An admin's reason for denying a request to join, as long as it is kept. */
+const JOIN_REASON_SHOWN = 300;
 
 /**
  * One email's content: our words in the subject, preheader, headline and buttons; what people typed or
@@ -326,6 +363,62 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.why(org),
       );
     }
+    case "join_request": {
+      const c = w.joinRequest;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [
+          { people: [{ name: inertText(t.name, JOIN_NAME_SHOWN), detail: inertText(t.email) }] },
+          { p: c.body(org) },
+          { note: c.note },
+          { button: c.approve, url: t.url, also: { label: c.deny, url: t.denyUrl, danger: true } },
+          { small: c.more },
+        ],
+        c.why(org),
+      );
+    }
+    case "join_answer": {
+      const a = w.joinAnswer;
+      const org = inertText(t.orgName);
+      const who = inertText(t.approverName ?? "") || a.someone;
+      const url = t.url ?? "";
+      if (t.outcome === "joined") {
+        const c = a.joined;
+        return doc(
+          c.subject,
+          c.preheader,
+          c.headline,
+          [{ p: c.body(who, org, w.role[t.role ?? "member"] ?? "") }, { button: c.button, url }],
+          a.why(org),
+        );
+      }
+      if (t.outcome === "invited") {
+        const c = a.invited;
+        return doc(
+          c.subject,
+          c.preheader,
+          c.headline,
+          [{ p: c.body(who, org) }, { p: c.next }, { button: c.button, url }, { small: c.small }, fallback(url)],
+          a.why(org),
+        );
+      }
+      const c = a.denied;
+      const reason = t.reason?.trim();
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [
+          { p: c.body(org) },
+          ...(reason ? [{ note: c.reason(inertText(reason, JOIN_REASON_SHOWN)) }] : []),
+          { small: c.small },
+        ],
+        a.why(org),
+      );
+    }
   }
 }
 
@@ -335,7 +428,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
  */
 export function renderEmail(
   t: EmailTemplate,
-  art: EmailArt = emailArtAt(URL.canParse(t.url) ? new URL(t.url).origin : ""),
+  art: EmailArt = emailArtAt(t.url && URL.canParse(t.url) ? new URL(t.url).origin : ""),
 ) {
   const sender = URL.canParse(art.home) && !isAgentesCloud(art.home) ? new URL(art.home).host : null;
   const doc = docOf(t, sender);

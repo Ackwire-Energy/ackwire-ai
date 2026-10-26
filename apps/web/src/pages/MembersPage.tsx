@@ -1,36 +1,59 @@
-import type { InvitationWithStatus, Role } from "@agenteschat/client";
+import type { InvitationWithStatus, InviteLink, JoinRequest, Role } from "@agenteschat/client";
 import {
   useAllInvitations,
+  useApproveJoinRequest,
   useChangeRole,
+  useDenyJoinRequest,
+  useInviteLinks,
   useInviteMany,
+  useJoinRequests,
+  useMakeInviteLink,
   usePeople,
   useResendInvitation,
   useRevokeInvitation,
+  useTurnOffInviteLink,
 } from "@agenteschat/client";
 import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
+import {
+  APPROVE_ROLES,
+  type ApproveRole,
+  approvalNews,
+  askedLabel,
+  JOIN_REASON_MAX,
+} from "@agenteschat/client/lib/join-requests";
 import { can } from "@agenteschat/client/lib/permissions";
 import { parseEmails } from "@agenteschat/client/lib/text";
 import {
+  Alert,
+  ApprovalCard,
   Avatar,
   Button,
   Card,
+  Dialog,
+  DialogBody,
+  DialogFooter,
   Field,
   FilterBar,
   FilterChip,
+  Icon,
   Input,
   List,
   Select,
   type SelectOption,
+  Textarea,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Link, useSearch } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useFilterCopy } from "@/components/filters";
-import { LoadingList } from "@/components/Loading";
+import { LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TYPED_VALUES } from "@/i18n";
+import { copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
+import "./members.css";
 
 /** "Enviado há 2 dias · expira em 5 dias" / "Expirou ontem". */
 export function invitationStatus(
@@ -112,6 +135,8 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   };
 
   const [roles, setRoles] = useState<string[]>([]);
+  // `?request=…&do=approve|deny`: the admins' email opens that request here.
+  const search = useSearch({ strict: false }) as { request?: string; do?: string };
   const filterCopy = useFilterCopy();
   const people = (peopleQuery.data ?? []).filter((m) => roles.length === 0 || roles.includes(m.role));
   const pending = invitations.data ?? [];
@@ -133,6 +158,8 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           })}
         </p>
       </header>
+
+      {manage && <JoinRequests focus={search.request} action={search.do} />}
 
       {manage && (
         <Card aria-labelledby="sec-invite">
@@ -168,7 +195,10 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
               {t("members.invite")}
             </Button>
           </div>
-          <span className="small muted">{t("members.roleNote")}</span>
+          <span className="small muted">
+            {t("members.link.emailsJoin")} {t("members.roleNote")}
+          </span>
+          <InviteLinkBlock />
         </Card>
       )}
 
@@ -324,6 +354,295 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           })}
         </List>
       </section>
+    </div>
+  );
+}
+
+/**
+ * Members › Requests (ADR 0068): who asked to join through the invitation link, oldest first, each answered with
+ * a role or denied with a reason. `focus` (from the admins' email): that request in view with Approve focused,
+ * which the admin still presses, or its Deny dialog open.
+ */
+function JoinRequests({ focus, action }: { focus?: string; action?: string }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const list = useJoinRequests(org.id);
+  const approve = useApproveJoinRequest(org.id);
+  const deny = useDenyJoinRequest(org.id);
+  const [roles, setRoles] = useState<Record<string, ApproveRole>>({});
+  const [denying, setDenying] = useState<JoinRequest | null>(null);
+  const [reason, setReason] = useState("");
+  const [handOff, setHandOff] = useState<{ name: string; url: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [gone, setGone] = useState(false);
+  const approveButtons = useRef(new Map<string, HTMLButtonElement>());
+  const opened = useRef<string | null>(null);
+  const requests = list.data ?? [];
+
+  useEffect(() => {
+    if (!focus || opened.current === focus || !list.data) return;
+    opened.current = focus;
+    const request = list.data.find((r) => r.id === focus);
+    if (!request) return setGone(true);
+    if (action === "deny") {
+      setReason("");
+      return setDenying(request);
+    }
+    const button = approveButtons.current.get(request.id);
+    button?.scrollIntoView({ block: "center" });
+    button?.focus();
+  }, [focus, action, list.data]);
+
+  const roleOptions: SelectOption<ApproveRole>[] = APPROVE_ROLES.map((r) => ({
+    value: r,
+    label: t(`roles.${r}`),
+    description: t(`roles.${r}Desc`),
+  }));
+  const approveOne = (r: JoinRequest) =>
+    approve.mutate(
+      { id: r.id, role: roles[r.id] ?? "member" },
+      {
+        onSuccess: (result) => {
+          const news = approvalNews(result);
+          if ("send" in news) {
+            setCopied(false);
+            setHandOff({ name: r.name, url: news.send });
+          } else if (news.said === "joined") toast.show(t("members.requests.joined", { name: r.name }));
+          else toast.show(t("members.requests.invited", { email: r.email }));
+        },
+      },
+    );
+  const denyOne = () => {
+    if (!denying) return;
+    deny.mutate(
+      { id: denying.id, reason: reason.trim() || undefined },
+      {
+        onSuccess: () => toast.show(t("members.requests.denied")),
+        onSettled: () => setDenying(null),
+      },
+    );
+  };
+
+  return (
+    <>
+      {gone && <Alert tone="neutral">{t("members.requests.gone")}</Alert>}
+      {requests.length > 0 && (
+        <section aria-labelledby="sec-requests" className="section section--tight">
+          <h2 id="sec-requests" className="section-title">
+            {t("members.requests.title")} <span className="jr-count">{requests.length}</span>
+          </h2>
+          <div className="jr-list">
+            {requests.map((r) => {
+              const answering =
+                (approve.isPending && approve.variables?.id === r.id) ||
+                (deny.isPending && deny.variables?.id === r.id);
+              return (
+                <ApprovalCard
+                  key={r.id}
+                  id={`join-request-${r.id}`}
+                  status="waiting"
+                  wide
+                  aria-label={t("members.requests.label", { name: r.name })}
+                  avatar={<Avatar size="sm" name={r.name} />}
+                  who={
+                    <Trans
+                      i18nKey="members.requests.asks"
+                      values={{ name: r.name }}
+                      components={{ b: <b /> }}
+                      {...TYPED_VALUES}
+                    />
+                  }
+                  statusLabel={askedLabel(t, i18n.language, r.createdAt)}
+                  title={r.email}
+                  detail={
+                    <>
+                      <span className="jr-proof ac-iconline" data-confirmed={r.confirmed || undefined}>
+                        <Icon name={r.confirmed ? "check" : "mail"} size={14} />
+                        <span>{r.confirmed ? t("members.requests.confirmed") : t("members.requests.unconfirmed")}</span>
+                      </span>
+                      <span className="jr-via">
+                        {t("members.requests.via", { date: formatShortDate(i18n.language, r.expiresAt) })}
+                      </span>
+                    </>
+                  }
+                  why={r.note ? t("members.requests.note", { note: r.note }) : undefined}
+                  actions={
+                    <>
+                      <div className="jr-role">
+                        <Select
+                          size="sm"
+                          aria-label={t("members.requests.roleOf", { name: r.name })}
+                          value={roles[r.id] ?? "member"}
+                          onValueChange={(role) => setRoles((prev) => ({ ...prev, [r.id]: role }))}
+                          options={roleOptions}
+                        />
+                      </div>
+                      <Button
+                        ref={(el) => {
+                          if (el) approveButtons.current.set(r.id, el);
+                          else approveButtons.current.delete(r.id);
+                        }}
+                        size="sm"
+                        variant="primary"
+                        disabled={answering}
+                        loading={approve.isPending && approve.variables?.id === r.id}
+                        onClick={() => approveOne(r)}
+                      >
+                        {t("members.requests.approve")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ac-btn--danger"
+                        disabled={answering}
+                        onClick={() => {
+                          setReason("");
+                          setDenying(r);
+                        }}
+                      >
+                        {t("members.requests.deny")}
+                      </Button>
+                    </>
+                  }
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
+      <Dialog
+        open={denying !== null}
+        onOpenChange={(open) => !open && setDenying(null)}
+        title={t("members.requests.denyTitle", { name: denying?.name ?? "" })}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogBody>
+          <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
+            <Textarea rows={3} maxLength={JOIN_REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          <Button onClick={() => setDenying(null)}>{t("common.cancel")}</Button>
+          <Button variant="danger" loading={deny.isPending} onClick={denyOne}>
+            {t("members.requests.deny")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+      <Dialog
+        open={handOff !== null}
+        onOpenChange={(open) => !open && setHandOff(null)}
+        title={t("members.requests.copyTitle", { name: handOff?.name ?? "" })}
+        description={t("members.requests.copyText", { name: handOff?.name ?? "" })}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogBody>
+          <div className="jr-copy">
+            <Input
+              readOnly
+              value={handOff?.url ?? ""}
+              aria-label={t("members.requests.copyTitle", { name: handOff?.name ?? "" })}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <Button icon="copy" onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}>
+              {copied ? t("common.copied") : t("common.copy")}
+            </Button>
+          </div>
+        </DialogBody>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * The workspace's invitation link (ADR 0068), in the "Invite people" card: whoever has it can only ask to join,
+ * and an admin approves each person. Links made before links could be shown again are listed to turn off.
+ */
+function InviteLinkBlock() {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const links = useInviteLinks(org.id);
+  const make = useMakeInviteLink(org.id);
+  const turnOff = useTurnOffInviteLink(org.id);
+  const [copied, setCopied] = useState(false);
+  const [closing, setClosing] = useState<InviteLink | null>(null);
+  const all = links.data ?? [];
+  const current = all.find((l) => l.url !== null);
+  const until = (l: InviteLink) => formatShortDate(i18n.language, l.expiresAt);
+  const turnOffButton = (l: InviteLink) => (
+    <Button variant="ghost" size="sm" className="ac-btn--danger" onClick={() => setClosing(l)}>
+      {t("members.link.turnOff")}
+    </Button>
+  );
+
+  return (
+    <div className="jr-link">
+      <span className="ac-field__label" id="invite-link-label">
+        {t("members.link.title")}
+      </span>
+      {links.isPending ? (
+        <LoadingLine width={320} />
+      ) : current?.url ? (
+        <>
+          <div className="jr-copy">
+            <Input
+              readOnly
+              value={current.url}
+              aria-labelledby="invite-link-label"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <Button icon="copy" onClick={() => void copyText(current.url ?? "", () => setCopied(true))}>
+              {copied ? t("common.copied") : t("common.copy")}
+            </Button>
+          </div>
+          <div className="jr-link__foot">
+            <span className="small muted">{t("members.link.help", { date: until(current) })}</span>
+            {turnOffButton(current)}
+          </div>
+        </>
+      ) : (
+        <div>
+          <Button loading={make.isPending} onClick={() => make.mutate()}>
+            {t("members.link.make")}
+          </Button>
+        </div>
+      )}
+      {all
+        .filter((l) => l.url === null)
+        .map((l) => {
+          const when = relativeTime(t, i18n.language, l.createdAt);
+          return (
+            <div key={l.id} className="jr-link__foot">
+              <span className="small muted">
+                {l.createdBy
+                  ? t("members.link.earlier", { when, name: l.createdBy, date: until(l) })
+                  : t("members.link.earlierNoName", { when, date: until(l) })}
+              </span>
+              {turnOffButton(l)}
+            </div>
+          );
+        })}
+      <Dialog
+        open={closing !== null}
+        onOpenChange={(open) => !open && setClosing(null)}
+        title={t("members.link.turnOffTitle")}
+        description={t("members.link.turnOffText", { count: closing?.waiting ?? 0 })}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setClosing(null)}>{t("common.cancel")}</Button>
+          <Button
+            variant="danger"
+            loading={turnOff.isPending}
+            onClick={() => closing && turnOff.mutate(closing.id, { onSettled: () => setClosing(null) })}
+          >
+            {t("members.link.turnOff")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

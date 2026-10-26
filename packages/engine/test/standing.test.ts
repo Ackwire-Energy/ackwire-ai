@@ -11,12 +11,12 @@ import {
   createAgent,
   createFakeJudge,
   createInvitation,
-  createInviteLink,
   createOrganization,
   deleteAccount,
   drainOutbox,
   ForbiddenError,
   getMembership,
+  inviteLink,
   isUserBlocked,
   listMemberships,
   type MachineHub,
@@ -34,7 +34,7 @@ import {
   setUserBlocked,
   standingJudge,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { channelRoutine, fire, routineRow } from "./routine-fixtures";
 
@@ -210,7 +210,7 @@ describe("suspended", () => {
 
     for (const refused of [
       () => createInvitation(f.db, f.owner.id, f.org.id, { email: "carl@example.com", role: "member" }),
-      () => createInviteLink(f.db, f.owner.id, f.org.id),
+      () => inviteLink(f.db, SECRET, f.owner.id, f.org.id),
       () => resendInvitation(f.db, f.owner.id, f.org.id, sent.invitation.id),
       () => acceptInvitation(f.db, bia, sent.token),
     ]) {
@@ -413,7 +413,7 @@ describe("user block", () => {
     await f.db
       .insert(schema.pushDevices)
       .values({ userId: bia.id, token: "ExponentPushToken[bia]", platform: "ios", locale: "en" });
-    const link = await createInviteLink(f.db, f.owner.id, f.org.id);
+    const link = await inviteLink(f.db, SECRET, f.owner.id, f.org.id);
     const events: unknown[] = [];
     f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));
 

@@ -4,7 +4,7 @@ import { isSafeId } from "../shared/logic";
 
 /**
  * Where things open in the app (Expo Router paths). Deep links
- * (`agenteschat://chat/<id>`, `approval/<id>`, `mission/<id>`, `activity`, `threads`),
+ * (`agenteschat://chat/<id>`, `approval/<id>`, `mission/<id>`, `activity`, `threads`, `join-requests`),
  * push payloads (ADR 0035 §4) and inbox items all end up here.
  */
 
@@ -19,7 +19,8 @@ export type AppHref =
   | `/handoff/${string}`
   | `/issues/${number}`
   | "/activity"
-  | "/threads";
+  | "/threads"
+  | "/join-requests";
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
@@ -50,9 +51,13 @@ export interface PushPayload {
 
 const MISSION_KINDS = new Set(["mission_finished", "mission_stopped"]);
 
-/** The screen a push opens. A high-risk approval opens the request (it is never approved from the push). */
+/**
+ * The screen a push opens. A high-risk approval opens the request, and someone asking to join opens the requests
+ * (neither is ever answered from the push).
+ */
 export function hrefForPush(p: PushPayload): AppHref {
   if (isSafeId(p.approvalId)) return `/approval/${p.approvalId}`;
+  if (p.kind === "join_request") return "/join-requests";
   // An agent needs a person in its browser: its conversation, with the request's card in control.
   if (p.kind === "browser_handoff" && isSafeId(p.handoffId)) return handoffHref(p.handoffId, p.channelId, p.threadId);
   if (isSafeId(p.missionId) && typeof p.kind === "string" && MISSION_KINDS.has(p.kind))
@@ -67,7 +72,7 @@ export function hrefForPush(p: PushPayload): AppHref {
  * route, checked; anything else → null.
  */
 export function hrefFromUrl(url: string): AppHref | null {
-  const m = /^(?:[a-z][a-z0-9+.-]*:\/\/)?\/?([a-z]+)(?:\/([^?#/]+))?\/?(?:\?([^#]*))?/i.exec(url.trim());
+  const m = /^(?:[a-z][a-z0-9+.-]*:\/\/)?\/?([a-z][a-z-]*)(?:\/([^?#/]+))?\/?(?:\?([^#]*))?/i.exec(url.trim());
   if (!m) return null;
   const [, screen = "", rawId, query = ""] = m;
   const id = rawId ? safeDecode(rawId) : undefined;
@@ -76,6 +81,8 @@ export function hrefFromUrl(url: string): AppHref | null {
       return "/activity";
     case "threads":
       return "/threads";
+    case "join-requests":
+      return "/join-requests";
     case "chat": {
       if (!isSafeId(id)) return null;
       const thread = queryParam(query, "thread");
@@ -137,6 +144,7 @@ export function notificationHref(
     return isSafeId(dm) ? chatHref(dm) : `/agent/${agent.id}`;
   }
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
+  if (n.kind === "join_request") return "/join-requests";
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
   if (n.kind === "browser_handoff" && isSafeId(s.handoffId))
     return handoffHref(s.handoffId, s.channelId ?? s.dmId, s.threadId);

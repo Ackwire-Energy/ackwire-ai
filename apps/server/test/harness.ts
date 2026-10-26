@@ -252,13 +252,36 @@ export function browser(t: TestServer) {
 
 export type Browser = ReturnType<typeof browser>;
 
-export async function signUp(b: Browser, email: string, options: { inviteToken?: string } = {}) {
+export async function signUp(b: Browser, email: string) {
   const res = await b("/api/auth/sign-up/email", {
     json: { email, password: "correct horse battery", name: email.split("@")[0] },
-    headers: options.inviteToken ? { "x-invite-token": options.inviteToken } : undefined,
   });
   if (res.status !== 200) throw new Error(`sign-up failed: ${res.status} ${await res.text()}`);
   return res;
+}
+
+/**
+ * Someone joins `orgId` the way people do (ADR 0068): `admin` invites the address by email, a new browser signs
+ * up with it (the invitation opens sign-up on this closed server) and accepts. `as`: an account already signed in
+ * with that address accepts instead.
+ */
+export async function joinByInvitation(
+  t: TestServer,
+  admin: Browser,
+  orgId: string,
+  email: string,
+  options: { role?: "member" | "admin"; as?: Browser } = {},
+) {
+  const invited = await admin(`/api/app/organizations/${orgId}/invitations`, {
+    json: { email, role: options.role ?? "member" },
+  });
+  if (invited.status !== 201) throw new Error(`invite failed: ${invited.status} ${await invited.text()}`);
+  const token = ((await invited.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  const b = options.as ?? browser(t);
+  if (!options.as) await signUp(b, email);
+  const accepted = await b(`/api/app/invitations/${token}/accept`, { json: {} });
+  if (accepted.status !== 200) throw new Error(`accept failed: ${accepted.status} ${await accepted.text()}`);
+  return b;
 }
 
 /**

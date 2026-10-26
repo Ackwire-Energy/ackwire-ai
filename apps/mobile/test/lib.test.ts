@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
-import { chooseOrg } from "../src/lib/org-choice";
+import { chooseOrg, firstRunMounted } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
@@ -95,6 +95,17 @@ test("organization choice: remembered if still a member, else the first", () => 
   expect(chooseOrg(orgs, "b")).toBe("b");
   expect(chooseOrg(orgs, "gone")).toBe("a");
   expect(chooseOrg([], "a")).toBeNull();
+});
+
+test("the first run: kept, hidden, under an invitation's screen once mounted; never first mounted under one", () => {
+  // An invitation opened from the first run: its answers and its workspace stay.
+  expect(firstRunMounted(true, true, true)).toBe(true);
+  // An invitation opened first: the first run waits for it to close, then mounts.
+  expect(firstRunMounted(false, true, true)).toBe(false);
+  expect(firstRunMounted(false, true, false)).toBe(true);
+  // A workspace now (joined, or made): gone, and not kept for the next invitation.
+  expect(firstRunMounted(true, false, false)).toBe(false);
+  expect(firstRunMounted(false, false, true)).toBe(false);
 });
 
 test("every icon of the design is there", () => {
