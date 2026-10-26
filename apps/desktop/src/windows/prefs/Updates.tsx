@@ -43,7 +43,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
 
   return (
     <>
-      <PrefHead title={t("desktop.prefs.updates.title")} lead={t("desktop.prefs.updates.lead")} />
+      <PrefHead title={t("desktop.prefs.updates.title")} />
       <PrefCard>
         <div className="dk-ver">
           <span className="dk-ver__big ac-num">{update.version ?? "…"}</span>
@@ -86,7 +86,6 @@ export function Updates({ update }: { update: UpdateCheck }) {
                 <Button variant="primary" icon="download" loading={installing} onClick={() => void install()}>
                   {t("desktop.prefs.updates.install")}
                 </Button>
-                <span className="dk-help">{t("desktop.prefs.updates.keepNote")}</span>
               </div>
             </PrefCard>
           )}

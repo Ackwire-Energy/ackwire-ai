@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { ControlError } from "../../control/client";
 import { type Home, orgName, pairedHomes } from "../../control/store";
-import { AgentFace, OrgTile } from "../../ui/bits";
+import { AgentFace, HelpLink, OrgTile } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { baseName, listNames, shortPath } from "../../ui/time";
 import { PrefCard, PrefHead, PrefRow } from "./shared";
@@ -22,16 +22,8 @@ export function Folders() {
   const [removing, setRemoving] = useState<RunnerFolderGrant | null>(null);
   const home = homes.find((h) => h.homeId === picked) ?? homes[0];
 
-  if (!home) {
-    return (
-      <>
-        <PrefHead title={t("desktop.prefs.folders.title")} lead={t("desktop.prefs.folders.lead")} />
-        <PrefCard>
-          <PrefRow title={t("desktop.prefs.general.noOrgsTitle")} desc={t("desktop.prefs.general.noOrgsBody")} />
-        </PrefCard>
-      </>
-    );
-  }
+  // Preferences shows this tab only while an organization's agents work here: no empty state of its own.
+  if (!home) return <PrefHead title={t("desktop.prefs.folders.title")} lead={t("desktop.prefs.folders.lead")} />;
 
   const folders = home.access?.folders ?? [];
   const org = orgName(home);
@@ -107,9 +99,10 @@ export function Folders() {
           />
         ))}
       </PrefCard>
-      <p className="dk-note ac-iconline">
-        <Icon name="info" size={16} />
-        <span>{t("desktop.prefs.folders.note", { org, path: shortPath(home.status?.workspace ?? "~/agentes") })}</span>
+      <p className="dk-help dk-under-card">
+        <HelpLink slug="computers" section="folders">
+          {t("desktop.prefs.folders.how")}
+        </HelpLink>
       </p>
 
       <Dialog

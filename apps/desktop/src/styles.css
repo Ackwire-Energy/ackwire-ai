@@ -191,15 +191,6 @@ p {
   align-items: center;
   gap: 4px;
 }
-.dk-note {
-  gap: 10px;
-  margin-top: 16px;
-  padding: 11px 13px;
-  border-radius: 14px;
-  background: var(--plate);
-  color: var(--muted);
-  font-size: 12.5px;
-}
 .dk-honest {
   font-size: 12.5px;
   color: var(--ink2);

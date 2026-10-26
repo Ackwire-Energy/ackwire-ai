@@ -15,8 +15,6 @@ describe("equal side padding", () => {
       ".dk-fr__end[data-near]",
       ".dk-fr__steps",
       ".dk-fr__bar",
-      // Preferences › Folders: the note under the cards.
-      ".dk-note",
     ]) {
       expect(rule(selector)).toBeDefined();
       expect(rule(selector)).not.toContain("max-width");

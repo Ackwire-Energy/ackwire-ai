@@ -7,7 +7,7 @@ import { orgName, pairedHomes } from "../../control/store";
 import { OrgTile, Stepper } from "../../ui/bits";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
-import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "./shared";
 
 /** The runner's defaults (the same numbers `agentes-runner` uses when the config has none). */
 export const DEFAULT_LIMITS: Required<Omit<ControlConfigPatch, "name">> = {
@@ -77,7 +77,7 @@ export function Advanced() {
       <PrefCard>
         <PrefRow
           title={t("desktop.prefs.advanced.concurrent")}
-          desc={t("desktop.prefs.advanced.concurrentDesc")}
+          hint={hintFor(t, t("desktop.prefs.advanced.concurrent"), t("desktop.prefs.advanced.concurrentDesc"))}
           end={
             <Stepper
               label={t("desktop.prefs.advanced.concurrent")}
@@ -90,7 +90,7 @@ export function Advanced() {
         />
         <PrefRow
           title={t("desktop.prefs.advanced.maxTime")}
-          desc={t("desktop.prefs.advanced.maxTimeDesc")}
+          hint={hintFor(t, t("desktop.prefs.advanced.maxTime"), t("desktop.prefs.advanced.maxTimeDesc"))}
           end={
             <Segmented
               size="sm"
@@ -114,7 +114,7 @@ export function Advanced() {
       <PrefCard>
         <PrefRow
           title={t("desktop.prefs.advanced.brainMax")}
-          desc={t("desktop.prefs.advanced.brainMaxDesc")}
+          hint={hintFor(t, t("desktop.prefs.advanced.brainMax"), t("desktop.prefs.advanced.brainMaxDesc"))}
           end={
             <Stepper
               label={t("desktop.prefs.advanced.brainMax")}
@@ -146,19 +146,16 @@ export function Advanced() {
         />
       </PrefCard>
 
-      <CardTitle>{t("desktop.prefs.advanced.folder")}</CardTitle>
+      <CardTitle hint={hintFor(t, t("desktop.prefs.advanced.folder"), t("desktop.prefs.advanced.folderDesc"))}>
+        {t("desktop.prefs.advanced.folder")}
+      </CardTitle>
       <PrefCard>
         {homes.map((h) => (
           <PrefRow
             key={h.homeId}
             lead={<OrgTile name={orgName(h)} logo={h.logo} size="md" />}
             title={orgName(h)}
-            desc={
-              <>
-                {h.status?.workspace && <span className="dk-path">{shortPath(h.status.workspace)}</span>}
-                <span>{t("desktop.prefs.advanced.folderDesc")}</span>
-              </>
-            }
+            desc={h.status?.workspace && <span className="dk-path">{shortPath(h.status.workspace)}</span>}
             end={
               h.status?.workspace ? (
                 <Button size="sm" variant="ghost" onClick={() => void host.revealFolder(h.status?.workspace ?? "")}>

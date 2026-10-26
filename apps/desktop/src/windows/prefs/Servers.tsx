@@ -9,7 +9,7 @@ import { useLocalServer, useOnShown } from "../../hooks";
 import { ReachProblem, ReachRow, ServerTile } from "../../ui/here";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
-import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "./shared";
 
 const KIND_SUB: Record<ServerKind, string> = {
   cloud: "desktop.servers.cloudSub",
@@ -289,13 +289,17 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
             </Button>
           }
         />
+        {/* The restart stays in sight, under the label: it reaches whoever is using agentes.chat at that moment. */}
         <PrefRow
+          top
           title={t("desktop.here.usage")}
-          desc={`${t("desktop.here.usageText")} ${t("desktop.server.usageRestart")} ${t("desktop.server.usageBoth")}`}
+          hint={hintFor(t, t("desktop.here.usage"), t("desktop.here.usageText"))}
+          desc={t("desktop.server.usageRestart")}
           htmlFor="here-usage-prefs"
           end={
             <Switch
               id="here-usage-prefs"
+              aria-describedby="here-usage-prefs-hint"
               checked={local.usage}
               disabled={busy === "usage"}
               onCheckedChange={(on) => void act("usage", () => host.setLocalUsage(on))}

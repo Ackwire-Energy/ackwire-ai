@@ -17,7 +17,7 @@ import { useLocalServer } from "../../hooks";
 import { useToast } from "../../ui/Toast";
 import { listNames } from "../../ui/time";
 import { ToolAccounts } from "./Accounts";
-import { CardTitle, PrefCard, PrefHead, PrefRow } from "./shared";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "./shared";
 
 /** Tools are for the whole computer: every organization gets the same switch. */
 export function Tools() {
@@ -72,13 +72,15 @@ export function Tools() {
           title={
             <>
               <ProviderLogo id="claude_code" size="xs" />
-              {t("desktop.tools.claudeName")} {exec(executors.claude)}
+              {t("desktop.tools.claudeName")}
             </>
           }
-          desc={executors.claude ? t("desktop.tools.claudeDesc") : t("desktop.tools.notInstalled")}
+          hint={hintFor(t, t("desktop.tools.claudeName"), t("desktop.tools.claudeDesc"))}
+          chip={exec(executors.claude)}
           end={
             <Switch
               id="tool-claude"
+              aria-describedby="tool-claude-hint"
               checked={tools.claude && !!executors.claude}
               disabled={!executors.claude || homes.length === 0}
               onCheckedChange={(on) => void set("claude", on)}
@@ -91,13 +93,15 @@ export function Tools() {
           title={
             <>
               <ProviderLogo id="codex" size="xs" />
-              {t("desktop.tools.codexName")} {exec(executors.codex)}
+              {t("desktop.tools.codexName")}
             </>
           }
-          desc={executors.codex ? t("desktop.tools.codexDesc") : t("desktop.tools.notInstalled")}
+          hint={hintFor(t, t("desktop.tools.codexName"), t("desktop.tools.codexDesc"))}
+          chip={exec(executors.codex)}
           end={
             <Switch
               id="tool-codex"
+              aria-describedby="tool-codex-hint"
               checked={tools.codex && !!executors.codex}
               disabled={!executors.codex || homes.length === 0}
               onCheckedChange={(on) => void set("codex", on)}
@@ -105,14 +109,14 @@ export function Tools() {
           }
         />
         <PrefRow
-          top
           lead={logo("code")}
           htmlFor="tool-commands"
           title={t("desktop.tools.commandsName")}
-          desc={t("desktop.tools.commandsDesc")}
+          hint={hintFor(t, t("desktop.tools.commandsName"), t("desktop.tools.commandsDesc"))}
           end={
             <Switch
               id="tool-commands"
+              aria-describedby="tool-commands-hint"
               checked={tools.commands}
               disabled={homes.length === 0}
               onCheckedChange={(on) => void set("commands", on)}
@@ -139,14 +143,14 @@ export function Tools() {
           }
         />
         <PrefRow
-          top
           lead={logo("globe")}
           htmlFor="tool-browser"
           title={t("desktop.tools.browserName")}
-          desc={t("desktop.tools.browserDesc")}
+          hint={hintFor(t, t("desktop.tools.browserName"), t("desktop.tools.browserDesc"))}
           end={
             <Switch
               id="tool-browser"
+              aria-describedby="tool-browser-hint"
               checked={tools.browser === true}
               disabled={homes.length === 0}
               onCheckedChange={(on) => void set("browser", on)}
@@ -166,16 +170,20 @@ export function Tools() {
       <CardTitle>{t("desktop.prefs.tools.protection")}</CardTitle>
       <PrefCard>
         <PrefRow
-          top
           lead={logo("shield")}
           htmlFor="protected-mode"
-          title={
-            <>
-              {t("desktop.prefs.tools.protectedTitle")} <Chip icon="clock">{t("desktop.common.soon")}</Chip>
-            </>
+          title={t("desktop.prefs.tools.protectedTitle")}
+          hint={hintFor(t, t("desktop.prefs.tools.protectedTitle"), t("desktop.prefs.tools.protectedDesc"))}
+          chip={<Chip icon="clock">{t("desktop.common.soon")}</Chip>}
+          end={
+            <Switch
+              id="protected-mode"
+              aria-describedby="protected-mode-hint"
+              checked={false}
+              disabled
+              onCheckedChange={() => {}}
+            />
           }
-          desc={t("desktop.prefs.tools.protectedDesc")}
-          end={<Switch id="protected-mode" checked={false} disabled onCheckedChange={() => {}} />}
         />
       </PrefCard>
     </>
