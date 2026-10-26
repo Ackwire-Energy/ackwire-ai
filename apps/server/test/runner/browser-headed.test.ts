@@ -588,7 +588,8 @@ test.if(posix)(
     expect(Date.now() - listedAt).toBeGreaterThanOrEqual(140);
     const outcomes = () => t.lines.filter((l) => l.startsWith("Browser on the desktop"));
     expect(outcomes()).toEqual(["Browser on the desktop of dev: opened in 0.0 s"]);
-    // Already there: to the front at once, without waiting for a window.
+    // Already there (a click from the apps menu: docklike handles a plain one on Browser itself): to the front at
+    // once, without waiting for a window.
     devtools.urls = [];
     await t.manager.show(dev, folder, () => {});
     expect(devtools.urls).toEqual([
@@ -597,7 +598,7 @@ test.if(posix)(
     ]);
     expect(outcomes()).toEqual([
       "Browser on the desktop of dev: opened in 0.0 s",
-      "Browser on the desktop of dev: brought to the front",
+      "Browser on the desktop of dev: already open: brought to the front",
     ]);
     // Chrome's endpoint doesn't answer: Chrome stays behind, and the log doesn't say it came to the front.
     devtools.stalled = true;
