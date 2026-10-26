@@ -97,18 +97,15 @@ export const desktopPtBR = {
     reconnect: "Reconectar",
     reconnecting: "Reconectando…",
     offlineTitle: "Sem internet. Tentando de novo…",
-    offlineBody:
-      "O que já começou continua rodando aqui e manda o resultado quando a conexão voltar. Nada novo começa até lá.",
+    offlineBody: "O que já começou continua rodando aqui e manda o resultado quando a conexão voltar.",
     unreachable: "Sem acesso a {{host}}. Tentando de novo…",
     unreachableBody: "O que já começou continua rodando aqui e manda o resultado quando o servidor voltar.",
     pausedUntil: "Pausado até {{time}}",
     pausedUntilResume: "Pausado até você retomar",
-    pausedBody:
-      "Nenhum agente, de nenhuma organização, começa nada novo neste {{device}}. Se alguém pedir, o agente avisa no chat que você pausou.",
+    pausedBody: "Nenhum agente, de nenhuma organização, começa nada novo neste {{device}}.",
     resumeNow: "Retomar agora",
     plusHour: "+1 hora",
     updateTitle: "Versão {{version}} disponível",
-    updateBody: "O app se atualiza e reabre em segundos. Seus servidores e configurações continuam.",
     updateSee: "Ver novidades",
     requiredTitle: "Atualize para continuar",
     requiredBody: "Esta versão do app ficou antiga para o servidor.",
@@ -316,7 +313,6 @@ export const desktopPtBR = {
     stoppedBanner: "O agentes.chat parou neste {{device}}",
     stoppedBody: "Ninguém consegue usar até ele iniciar de novo.",
     failingBanner: "O agentes.chat não está iniciando neste {{device}}",
-    failingBody: "Tente de novo, ou copie o diagnóstico para quem for te ajudar.",
     version: "Versão {{version}}, atualizada com o app",
     updatesWithApp: "Atualizar o app atualiza também o agentes.chat neste {{device}}.",
     updateBack: "A atualização não iniciou; o agentes.chat voltou para a {{version}}.",
@@ -324,7 +320,7 @@ export const desktopPtBR = {
   /** The system's own dialog before a page pairs this computer (main_window.rs draws it). */
   pair: {
     title: "Deixar os agentes de {{org}} trabalharem neste {{device}}?",
-    body: "{{host}} pediu. Eles começam sem pastas suas e com comandos desligados; você libera mais nas Preferências.",
+    body: "{{host}} pediu. Eles começam sem pastas suas e com comandos desligados.",
     allow: "Permitir",
     notNow: "Agora não",
   },
