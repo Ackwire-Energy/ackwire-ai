@@ -195,6 +195,16 @@ samp {
 :where(a:hover) {
   text-decoration-color: currentColor;
 }
+/* A link that opens something here is a button: no box of its own, and the sentence's type. Every font setting
+   inherits, since the browser's own button font drops the page's size adjustment and figures. Before `.ac-link`, so
+   the link's weight and any class that sets a size still win. */
+:where(button).ac-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+}
 /* Text link: an action in a sentence; `--muted` for a help line's link. */
 .ac-link {
   color: var(--ink);
@@ -213,17 +223,6 @@ samp {
 }
 .ac-link--muted:hover {
   color: var(--ink);
-}
-/* A link that opens something here is a button: no box of its own. The weight stays the link's, and a class that
-   sets a size still wins. */
-:where(button).ac-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  text-align: start;
 }
 .ac-link:focus-visible {
   outline: none;
