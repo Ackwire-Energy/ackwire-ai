@@ -201,7 +201,8 @@ describe("Configurações → Importar e exportar", () => {
     expect(lock.querySelector(".ac-hintline > span")?.textContent).toBe(
       "Lido no seu navegador. Arquivos de chaves e de login nunca são abertos.",
     );
-    const about = within(lock).getByRole("button", { name: /^Sobre Lido no seu navegador\./ });
+    // Named by its subject, so a screen reader doesn't read the line's sentence a second time.
+    const about = within(lock).getByRole("button", { name: "Sobre Privacidade" });
     const more = "Um link do GitHub passa pelo servidor do workspace. Nada muda aqui até você confirmar.";
     expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(more);
     await click(about, 2);

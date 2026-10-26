@@ -521,7 +521,7 @@ function Picker({ flow }: { flow: ImportFlowState }) {
         <Icon name="lock" size={16} />
         <span className="ac-hintline">
           <span>{t("onboarding.import.privacy")}</span>
-          <InfoHint name={t("common.about", { label: t("onboarding.import.privacy") })}>
+          <InfoHint name={t("common.about", { label: t("onboarding.import.privacyLabel") })}>
             {t("onboarding.import.privacyMore")}
           </InfoHint>
         </span>

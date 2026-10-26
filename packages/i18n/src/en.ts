@@ -328,6 +328,7 @@ export const en: Translations = {
       pastePlaceholder: "https://github.com/… or the reply's JSON",
       readPasted: "Read",
       privacy: "Read in your browser. Key and login files are never opened.",
+      privacyLabel: "Privacy",
       privacyMore: "A GitHub link goes through the workspace's server. Nothing changes here until you confirm.",
       reading: "Reading the files…",
       planning: "Comparing with what's already here…",

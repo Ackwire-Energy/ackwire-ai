@@ -335,6 +335,7 @@ export const ptBR = {
       pastePlaceholder: "https://github.com/… ou o JSON da resposta",
       readPasted: "Ler",
       privacy: "Lido no seu navegador. Arquivos de chaves e de login nunca são abertos.",
+      privacyLabel: "Privacidade",
       privacyMore: "Um link do GitHub passa pelo servidor do workspace. Nada muda aqui até você confirmar.",
       reading: "Lendo os arquivos…",
       planning: "Comparando com o que já está aqui…",
