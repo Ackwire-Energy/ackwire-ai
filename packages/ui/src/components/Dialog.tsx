@@ -77,6 +77,13 @@ export function Dialog({
           className={cx("ac-dialog", className)}
           style={{ "--ac-dialog-width": `${width}px` } as CSSProperties}
           onEscapeKeyDown={onEscapeKeyDown}
+          // Focus starts on the dialog itself (the event's target), never on its first control, the head's ×: opened
+          // from a link or by itself, a ring would sit on × with nothing pressed. Tab reaches × first; a field that
+          // takes the focus on its own (autoFocus) keeps it, since Radix asks only when nothing inside has it.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.target as HTMLElement).focus();
+          }}
           onPointerDownOutside={(e) => {
             if (onToast.current) e.preventDefault();
           }}
