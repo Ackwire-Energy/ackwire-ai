@@ -86,6 +86,20 @@
   top: calc(50% - 15px);
   height: calc(var(--cmp-screen) * 900 / 1280 + 100px);
 }
+/*
+ * A tablet: in control the line under the screen holds the Keyboard button, a 40 px touch control, 18 px taller than
+ * the 22 px line. The frame keeps room for it, and in control the dialog adds those 18 px below, keeping its top, so
+ * the screen keeps its size and place.
+ */
+@media (pointer: coarse) and (min-width: 721px) {
+  .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
+    --cmp-screen: min(96vw - 32px, 1280px, (94dvh - 148px) * 1280 / 900);
+  }
+  .ac-dialog.cmp-dialog:where(:has(.dsk-line)) {
+    top: calc(50% + 9px);
+    height: calc(var(--cmp-screen) * 900 / 1280 + 148px);
+  }
+}
 .cmp-steps-row {
   flex: none;
   height: 22px;
@@ -457,17 +471,21 @@
   }
 }
 /*
- * A phone's head: the name and the line under it share the first row with Close, and the actions get a row of their
- * own under them, so the name never folds into short lines beside a button. Full screen's bar keeps one row.
+ * A phone's head: the name and the line under it share the first row with Close, and actions with words get a row of
+ * their own under them, so the name never folds into short lines beside a button. Icons alone (full screen) stay
+ * beside Close, with no row of their own. Full screen's bar keeps one row.
  */
 @media (max-width: 640px) {
   .cmp-dialog:not(.is-screen-only) > .ac-dialog__head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     row-gap: 8px;
   }
-  .cmp-dialog:not(.is-screen-only) .cmp-acts {
-    grid-area: 2 / 2 / 3 / 4;
+  .cmp-dialog:not(.is-screen-only) .cmp-acts:has(> :not(.ac-btn--icon)) {
+    grid-area: 2 / 2 / 3 / 5;
+  }
+  .cmp-dialog:not(.is-screen-only) > .ac-dialog__head > :last-child {
+    grid-column: -2;
   }
   .cmp-acts:empty {
     display: none;

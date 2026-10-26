@@ -1125,13 +1125,57 @@ describe("the dialog's size (computer.css)", () => {
     expect(kit).toContain("@media (pointer: coarse) {\n  .ac-btn--sm {\n    min-height: var(--control-h-md);");
   });
 
-  test("a phone's head: the name and its line share a row with Close, the actions get a row of their own", async () => {
-    const phone = (await css()).split("@media (max-width: 640px) {")[1] ?? "";
-    const head = phone.split(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head {")[1]?.split("}")[0] ?? "";
+  /** The phone's head: a rule of `@media (max-width: 640px)`. */
+  const phoneRule = async (selector: string) =>
+    (await css()).split("@media (max-width: 640px) {")[1]?.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
+  /** On a phone, actions with words get the head's second row (`computer.css`). */
+  const OWN_ROW = ".cmp-dialog:not(.is-screen-only) .cmp-acts:has(> :not(.ac-btn--icon))";
+
+  test("a phone's head: the name and its line share a row with Close, actions with words get a row of their own", async () => {
+    const head = await phoneRule(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head");
     expect(head).toContain("display: grid");
-    expect(head).toContain("grid-template-columns: auto minmax(0, 1fr) auto");
-    expect(phone.split(".cmp-dialog:not(.is-screen-only) .cmp-acts {")[1]?.split("}")[0]).toContain(
-      "grid-area: 2 / 2 / 3 / 4",
+    // The face, the name and its line, an icon alone, Close.
+    expect(head).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto");
+    expect(await phoneRule(OWN_ROW)).toContain("grid-area: 2 / 2 / 3 / 5");
+    expect(await phoneRule(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head > :last-child")).toContain(
+      "grid-column: -2",
+    );
+  });
+
+  test("on a phone, full screen alone stays beside Close: no row of its own for one icon", async () => {
+    // Watching with no Take control: full screen is the head's only action.
+    await dialog({ ...RUNNING, canControl: false });
+    await connected();
+    const acts = () => document.querySelector(".cmp-acts") as HTMLElement;
+    expect([...acts().children].map((b) => b.getAttribute("aria-label"))).toEqual(["Tela cheia"]);
+    expect(document.querySelector(OWN_ROW)).toBeNull();
+    cleanup();
+    // With Take control, and in control with Devolver: the actions' row.
+    await dialog();
+    await connected();
+    expect(document.querySelector(OWN_ROW)).toBe(acts());
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    expect(view().getByRole("button", { name: "Devolver" })).toBeTruthy();
+    expect(document.querySelector(OWN_ROW)).toBe(acts());
+  });
+
+  test("a tablet keeps room for the Keyboard button: watching or in control, one screen size and place", async () => {
+    const text = await css();
+    const tablet = text.split("@media (pointer: coarse) and (min-width: 721px) {")[1] ?? "";
+    const inTablet = (selector: string) => tablet.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
+    // The 22 px line's room plus the 18 px a 40 px touch control adds to it.
+    expect(inTablet(".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
+      "--cmp-screen: min(96vw - 32px, 1280px, (94dvh - 148px) * 1280 / 900)",
+    );
+    // In control those 18 px go below, the top where it was: centred on 50% + 9 px.
+    const control = inTablet(".ac-dialog.cmp-dialog:where(:has(.dsk-line))");
+    expect(control).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 148px)");
+    expect(control).toContain("top: calc(50% + 9px)");
+    // After the frame's own rules, which it outweighs at the same weight.
+    expect(text.indexOf("@media (pointer: coarse) and (min-width: 721px)")).toBeGreaterThan(
+      text.indexOf("height: calc(var(--cmp-screen) * 900 / 1280 + 100px)"),
     );
   });
 
