@@ -201,53 +201,53 @@ function ConnectAiDialog({
         {dir.loading || status.isPending ? (
           <Spinner />
         ) : (
-          <>
-            <AiPicker
-              choice={choice}
-              onPick={(next) => {
-                setPicked(next);
-                // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
-                if (next !== "key" && next !== choice && agentId !== undefined && linked.includes(agentId))
-                  setPickedAgent(firstAgent(agents, hasAi)?.id);
-              }}
-              dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
-            />
-            {choice === "key" ? (
-              <KeyPanel
-                draft={draft}
-                onDraft={setDraft}
-                locked={!mayAddKey}
-                saved={keySaved}
-                saving={add.isPending}
-                onSave={saveKey}
-              />
-            ) : (
-              <PlanPanel
-                key={choice}
-                choice={choice}
-                gates={gates}
-                justReady={request.ready}
-                agents={agents}
-                agentId={agentId}
-                onAgent={setPickedAgent}
-                locked={locked}
-                onKey={() => setPicked("key")}
-                onComputer={() => {
-                  onClose();
-                  void navigate({
-                    to: "/org/$orgId/settings/$section",
-                    params: { orgId: org.id, section: "computers" },
-                  });
-                }}
-                onDone={(id) => {
-                  // The panel stays on that agent, saying it's done.
-                  setPickedAgent(id);
-                  setLinked((l) => [...l, id]);
-                  done();
-                }}
-              />
-            )}
-          </>
+          <AiPicker
+            choice={choice}
+            onPick={(next) => {
+              setPicked(next);
+              // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
+              if (next !== "key" && next !== choice && agentId !== undefined && linked.includes(agentId))
+                setPickedAgent(firstAgent(agents, hasAi)?.id);
+            }}
+            dims={(c) => agentId !== undefined && gateDims(gates.gateOf(c))}
+            panel={
+              choice === "key" ? (
+                <KeyPanel
+                  draft={draft}
+                  onDraft={setDraft}
+                  locked={!mayAddKey}
+                  saved={keySaved}
+                  saving={add.isPending}
+                  onSave={saveKey}
+                />
+              ) : (
+                <PlanPanel
+                  key={choice}
+                  choice={choice}
+                  gates={gates}
+                  justReady={request.ready}
+                  agents={agents}
+                  agentId={agentId}
+                  onAgent={setPickedAgent}
+                  locked={locked}
+                  onKey={() => setPicked("key")}
+                  onComputer={() => {
+                    onClose();
+                    void navigate({
+                      to: "/org/$orgId/settings/$section",
+                      params: { orgId: org.id, section: "computers" },
+                    });
+                  }}
+                  onDone={(id) => {
+                    // The panel stays on that agent, saying it's done.
+                    setPickedAgent(id);
+                    setLinked((l) => [...l, id]);
+                    done();
+                  }}
+                />
+              )
+            }
+          />
         )}
       </DialogBody>
       {connected && (

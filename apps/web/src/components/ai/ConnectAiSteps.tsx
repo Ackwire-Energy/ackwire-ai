@@ -76,35 +76,44 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
 
-/** The six plans as tiles (one dims where it can't sign in; it still opens its panel), then the API key row. */
+/**
+ * The six plans as tiles (one dims where it can't sign in; it still opens its panel), then the API key row, with the
+ * chosen option's `panel` right under it: nothing comes between an option and its steps.
+ */
 export function AiPicker({
   choice,
   onPick,
   dims,
+  panel,
 }: {
   choice: AiChoice;
   onPick: (choice: AiChoice) => void;
   dims?: (choice: PlanChoice) => boolean;
+  panel: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
-    <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
-      {PLAN_CHOICES.map((c) => (
-        <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
-          <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
-          <span className="ac-option__title">{planLabel(t, c)}</span>
+    <>
+      {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+      <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
+        {PLAN_CHOICES.map((c) => (
+          <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
+            <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
+            <span className="ac-option__title">{planLabel(t, c)}</span>
+          </OptionCard>
+        ))}
+        {choice !== "key" && panel}
+        <p className="ai-picker__or">{t("connectAi.orPayGo")}</p>
+        <OptionCard pressed={choice === "key"} onClick={() => onPick("key")} className="ai-picker__key ac-iconline">
+          <ProviderStack ids={KEY_MARKS} />
+          <span className="ac-option__text">
+            <span className="ac-option__title">{t("connectAi.key.title")}</span>
+            <span className="ac-option__desc">{t("connectAi.key.makers")}</span>
+          </span>
         </OptionCard>
-      ))}
-      <p className="ai-picker__or">{t("connectAi.orPayGo")}</p>
-      <OptionCard pressed={choice === "key"} onClick={() => onPick("key")} className="ai-picker__key ac-iconline">
-        <ProviderStack ids={KEY_MARKS} />
-        <span className="ac-option__text">
-          <span className="ac-option__title">{t("connectAi.key.title")}</span>
-          <span className="ac-option__desc">{t("connectAi.key.makers")}</span>
-        </span>
-      </OptionCard>
-    </div>
+      </div>
+      {choice === "key" && panel}
+    </>
   );
 }
 

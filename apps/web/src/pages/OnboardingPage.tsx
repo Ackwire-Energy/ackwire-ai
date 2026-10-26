@@ -1177,38 +1177,44 @@ export function OnboardingPage() {
               {orgSummary && me.data ? (
                 // The workspace exists: its panels read it like any of its pages.
                 <OrgProvider org={orgSummary} me={me.data}>
-                  <AiPicker choice={choice} onPick={pickAi} dims={(c) => noComputer || gateDims(gates.gateOf(c))} />
-                  {choice === "key" ? (
-                    <>
-                      <KeyPanel draft={draft} onDraft={setDraft} platform={platform} saved={keySaved} />
-                      <BudgetCard
-                        value={budgetValue}
-                        invalid={!budgetOk}
-                        platform={draft.provider === "platform"}
-                        onChange={(v) => setBudget(v)}
-                      />
-                    </>
-                  ) : (
-                    <PlanPanel
-                      key={choice}
-                      choice={choice}
-                      gates={gates}
-                      agents={crewAgents}
-                      agentId={aiAgentId}
-                      onAgent={setAiAgent}
-                      own={{ chosen: own, onChoose: setOwn }}
-                      hostConnecting={computer === "host"}
-                      onKey={() => pickAi("key")}
-                      onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
-                      onDone={(agentId, account) => {
-                        // The panel stays on that agent, saying it's done; another tile moves on to the next one.
-                        setAiAgent(agentId);
-                        if (account)
-                          setPlanned((p) => ({
-                            ...p,
-                            [agentId]: { label: account.label, mark: account.provider ?? account.kind },
-                          }));
-                      }}
+                  <AiPicker
+                    choice={choice}
+                    onPick={pickAi}
+                    dims={(c) => noComputer || gateDims(gates.gateOf(c))}
+                    panel={
+                      choice === "key" ? (
+                        <KeyPanel draft={draft} onDraft={setDraft} platform={platform} saved={keySaved} />
+                      ) : (
+                        <PlanPanel
+                          key={choice}
+                          choice={choice}
+                          gates={gates}
+                          agents={crewAgents}
+                          agentId={aiAgentId}
+                          onAgent={setAiAgent}
+                          own={{ chosen: own, onChoose: setOwn }}
+                          hostConnecting={computer === "host"}
+                          onKey={() => pickAi("key")}
+                          onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
+                          onDone={(agentId, account) => {
+                            // The panel stays on that agent, saying it's done; another tile moves on to the next one.
+                            setAiAgent(agentId);
+                            if (account)
+                              setPlanned((p) => ({
+                                ...p,
+                                [agentId]: { label: account.label, mark: account.provider ?? account.kind },
+                              }));
+                          }}
+                        />
+                      )
+                    }
+                  />
+                  {choice === "key" && (
+                    <BudgetCard
+                      value={budgetValue}
+                      invalid={!budgetOk}
+                      platform={draft.provider === "platform"}
+                      onChange={(v) => setBudget(v)}
                     />
                   )}
                   {Object.keys(planned).length > 0 && crewAgents.length > 1 && (

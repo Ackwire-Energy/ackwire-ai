@@ -109,10 +109,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
   test("Settings › AI accounts opens the same picker: six plans, then the API key, Claude chosen with its sign-in", async () => {
     const { dialog, tile } = await connect();
     const group = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
-    const tiles = within(group)
-      .getAllByRole("button")
-      .map((b) => b.textContent);
-    expect(tiles).toEqual([
+    const options = [...group.querySelectorAll(":scope > .ac-option")];
+    expect(options.map((b) => b.textContent)).toEqual([
       "Claude",
       "ChatGPT",
       "GLM Coding",
@@ -122,14 +120,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Chave de APIClaude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
     ]);
     // Each by its maker's mark; the key row by four of them, overlapped.
-    expect([...group.querySelectorAll(".ac-brand--sm")].map((m) => m.getAttribute("data-mark"))).toEqual([
-      "claude",
-      "openai",
-      "zai",
-      "kimi",
-      "minimax",
-      "opencode",
-    ]);
+    expect(
+      options.flatMap((o) => [...o.querySelectorAll(".ac-brand--sm")]).map((m) => m.getAttribute("data-mark")),
+    ).toEqual(["claude", "openai", "zai", "kimi", "minimax", "opencode"]);
     const stack = tile("Chave de API").querySelector(".ac-brand-stack");
     expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
       "claude",
@@ -140,6 +133,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.textContent).toContain("Ou pague pelo uso");
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    // Right under the plans: the API key row comes after Claude's steps, never between Claude and them.
+    expect(options[5]?.nextElementSibling).toBe(panel);
+    expect(panel.compareDocumentPosition(tile("Chave de API")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(panel.textContent).toContain("Pro, Max, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     // The sign-in step is its title, its ⓘ and its button: what to do on the wrong account and where the account
@@ -156,6 +152,25 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Until something is connected the body is the dialog's last part: its own edge under the panel, no footer.
     expect(dialog.querySelector(".ac-dialog__body:last-child")).not.toBeNull();
     expect(dialog.querySelector(".ac-dialog__footer")).toBeNull();
+  });
+
+  test("a one-line tile's check sits in its middle; the chosen plan's panel takes a row of its own, 12px under the plans", async () => {
+    const read = async (path: string) =>
+      (await Bun.file(new URL(path, import.meta.url).pathname).text()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const rule = (css: string, selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    const ui = await read("../../../packages/ui/src/styles/components.css");
+    const check = rule(ui, '.ac-option[aria-pressed="true"]::after,\n.ac-option[data-state="checked"]::after');
+    expect(check).toContain("height: 18px");
+    const layout = await read("../src/layout.css");
+    // The API key row's two lines keep the check in the corner, beside its name.
+    expect(rule(layout, ".grid-options--plans > .ac-option:not(.ai-picker__key)::after")).toContain(
+      "top: calc(50% - 9px)",
+    );
+    const panel = rule(layout, ".grid-options--plans > .ai-panel");
+    expect(panel).toContain("grid-column: 1 / -1");
+    // The grid's 8px gap and 4px more: as far under the plans as the key's panel is under its row.
+    expect(rule(layout, ".grid-options")).toContain("gap: var(--space-2)");
+    expect(panel).toContain("margin-top: 4px");
   });
 
   test("a coding plan's key: its own key page, then the key sealed to the computer (in no request); the agent thinks with it", async () => {
@@ -432,6 +447,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.textContent).toContain("Ada agora pensa com Claude Max.");
     await click(tile("Chave de API"));
     const panel = within(dialog).getByRole("region", { name: "Chave de API" });
+    // Right under its row, the picker's last; Claude's panel is gone from above it.
+    expect(tile("Chave de API").parentElement?.lastElementChild).toBe(tile("Chave de API"));
+    expect(tile("Chave de API").parentElement?.nextElementSibling).toBe(panel);
+    expect(within(dialog).queryByRole("region", { name: "Seu plano do Claude" })).toBeNull();
     // The row just chosen already names it: no head again, and who charges for it, once.
     expect(panel.querySelector(".ai-panel__head")).toBeNull();
     expect(shownText(panel).split("Você paga pelo uso, direto ao provedor.")).toHaveLength(2);

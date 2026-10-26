@@ -123,6 +123,16 @@ p {
 .grid-options--plans .ac-option__title {
   font-size: 14px;
 }
+/* A one-line tile's check sits in its middle, as its mark and its name do. */
+.grid-options--plans > .ac-option:not(.ai-picker__key)::after {
+  top: calc(50% - 9px);
+}
+/* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
+   nothing comes between an option and its steps. */
+.grid-options--plans > .ai-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
 .ai-picker__or {
   grid-column: 1 / -1;
   margin: 6px 0 -2px;
