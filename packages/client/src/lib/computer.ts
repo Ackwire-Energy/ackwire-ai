@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AgentComputer, ComputerSetup, ComputerSetupStep, Edition, Machine } from "../api/types";
-import { type ComputerState, computerKind } from "./machines";
+import { type ComputerState, computerKind, machineTitle } from "./machines";
 
 /** What a person asked the agent's PC to do. */
 export type ComputerAction = "start" | "stop" | "remove";
@@ -219,7 +219,8 @@ export const WORKSPACE_COMPUTER_KIND = computerKind("other");
 /**
  * The agent's computer as this reader calls it. The workspace's own keeps the name it got in its first owner's
  * language (mirrors `managedMachineName` in packages/engine/src/machine-provisioning.ts) until someone renames
- * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name.
+ * it: until then it reads in the reader's words, as before it exists. Any other computer goes by its own name, and
+ * the server's own, until its runner names it, by what it is.
  */
 export function computerName(
   t: TFunction,
@@ -228,7 +229,7 @@ export function computerName(
 ): string {
   const ours = t("computerSetup.title", { org: orgName });
   if (!machine) return ours;
-  if (machine.kind !== "managed") return machine.name;
+  if (machine.kind !== "managed") return machineTitle(machine, t("machines.host.label"));
   return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
 }
 

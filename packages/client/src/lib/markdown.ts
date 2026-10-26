@@ -145,6 +145,16 @@ export const SAFE_URL = /^(https?:|mailto:)/i;
 /** Same rule as the backend (`parseMentionHandles`): emails are not mentions. */
 export const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
+/** The first of `agents` a text @mentions, ignoring case as the backend does; undefined when it names none of them. */
+export function firstMentioned<A extends { handle: string }>(text: string, agents: readonly A[]): A | undefined {
+  for (const m of text.matchAll(MENTION)) {
+    const handle = m[2]?.toLowerCase();
+    const agent = agents.find((a) => a.handle.toLowerCase() === handle);
+    if (agent) return agent;
+  }
+  return undefined;
+}
+
 /** `[[Processos/Onboarding|o onboarding]]` → { title: "Processos/Onboarding", label: "o onboarding" }. */
 export function parseWikiToken(token: string) {
   const inner = token.slice(2, -2);

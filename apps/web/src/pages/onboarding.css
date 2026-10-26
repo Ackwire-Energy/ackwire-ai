@@ -401,36 +401,43 @@ textarea.onb__big.ac-input {
 .onb__crew {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-top: 16px;
 }
-.onb__summary {
+/* Their computer after the faces: its portrait on a plate of the sky's glass, shaped like a face's tile. Spaced by
+   the row's gap alone, so a plate wrapped onto a line of its own starts under the first face. */
+.onb__crew-computer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 30%;
+  background: var(--sky-glass);
+  box-shadow: var(--e1);
+}
+/* Done's first message: the agent's offer in the bubble, the message in a box as tall as its text, and a line on
+   whether the agent can start on it now. */
+.onb__say {
   margin: 0;
-}
-.onb__summary dd {
-  margin: 0;
-}
-.onb__stat {
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: 22px;
-  overflow-wrap: anywhere;
-}
-/* A name, not a number: in words of its own size (a connected computer's). */
-.onb__stat--name {
-  font-family: inherit;
-  font-weight: 600;
   font-size: 15px;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 1.45;
 }
-/* Under the big word, whose it is ("Ready" · Acme's computer). */
-.onb__stat-of {
-  font-size: 13px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
+/* One line is the big button's height: 1 + 11 + 24 + 11 + 1. */
+.onb__first-text.ac-input {
+  min-height: var(--control-h-lg);
+  padding: 11px 12px;
+  font-size: 16px;
+  line-height: 24px;
+  resize: none;
+}
+.onb__first-line[data-state="ready"] > .ac-icon {
+  color: var(--ok);
+}
+.onb__first-line[data-state="no_ai"] > .ac-icon {
+  color: var(--attention);
 }
 /* Phone. */
 @media (max-width: 760px) {
@@ -443,6 +450,15 @@ textarea.onb__big.ac-input {
   }
   .onb__ask .onb__title {
     font-size: 18px;
+  }
+  /* Four faces and the computer on one line from 360 px wide; the portrait keeps its 48 px, whole pixels. */
+  .onb__crew {
+    gap: 8px;
+  }
+  .onb__crew .ac-avatar--lg,
+  .onb__crew-computer {
+    width: 48px;
+    height: 48px;
   }
 }
 /* Clear the home bar; the e-mail chips field stays at 16px (no zoom on focus). */

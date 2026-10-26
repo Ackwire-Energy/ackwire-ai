@@ -155,6 +155,9 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     // Renamed by an admin: theirs. Any other computer: its own.
     expect(computerName(t, "Oficina", managed("Servidor da loja"))).toBe("Servidor da loja");
     expect(computerName(t, "Oficina", { kind: "connected", name: "Oficina's computer" })).toBe("Oficina's computer");
+    // The server's own: its runner's name, and what it is until the runner names it.
+    expect(computerName(t, "Oficina", { kind: "host", name: "srv-1" })).toBe("srv-1");
+    expect(computerName(t, "Oficina", { kind: "host", name: "" })).toBe("machines.host.label");
   });
 
   test("drawn as a server before and after it exists, never as the cloud computer an agent gets", () => {

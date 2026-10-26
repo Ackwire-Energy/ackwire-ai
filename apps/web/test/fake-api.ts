@@ -1421,6 +1421,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("chat.post", orgId, channelId, input);
         if (state.holdPosts) await state.holdPosts;
         if (state.failPosts) throw new ApiError(503, "unavailable", "Try again");
+        // Like the server: a resend (the same person's `clientId`) gets the message already written.
+        const resent = input.clientId
+          ? state.messages.find((m) => m.clientId === input.clientId && m.author.id === (state.me?.user.id ?? null))
+          : undefined;
+        if (resent) return resent;
         // Like the server: the quoted message must be in this channel; the meta is built here.
         const meta: Record<string, unknown> = {};
         if (input.replyTo) {
