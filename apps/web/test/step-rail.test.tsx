@@ -11,12 +11,13 @@ const steps: RailStep[] = NAMES.map((name, i) => ({ id: `s${i}`, name, done: i <
 
 /**
  * The step bar as a phone lays it out (the rail's CSS at 390px): a 231px strip from x = 16 and the steps' 32px
- * pills 4px apart, moved by the strip's own sideways scroll.
+ * pills 4px apart, moved by the strip's own sideways scroll. Patched on Element.prototype, where the method lives:
+ * put back there, no copy is left on HTMLElement.prototype to hide later test files' own patches.
  */
-const real = HTMLElement.prototype.getBoundingClientRect;
+const real = Element.prototype.getBoundingClientRect;
 const box = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 32, width, height: 32 });
 function phoneWidth() {
-  HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+  Element.prototype.getBoundingClientRect = function (this: Element) {
     const strip = this.parentElement;
     if (this.classList.contains("onb__steps")) return box(16, 231) as DOMRect;
     if (strip?.classList.contains("onb__steps"))
@@ -26,7 +27,7 @@ function phoneWidth() {
 }
 
 afterEach(() => {
-  HTMLElement.prototype.getBoundingClientRect = real;
+  Element.prototype.getBoundingClientRect = real;
   cleanup();
 });
 
@@ -73,7 +74,7 @@ describe("the step bar on a phone", () => {
     phoneWidth();
     const { container } = render(rail(3));
     expect((container.querySelector(".onb__steps") as HTMLElement).scrollLeft).toBe(0);
-    HTMLElement.prototype.getBoundingClientRect = real;
+    Element.prototype.getBoundingClientRect = real;
     cleanup();
     const desktop = render(rail(6));
     expect((desktop.container.querySelector(".onb__steps") as HTMLElement).scrollLeft).toBe(0);
