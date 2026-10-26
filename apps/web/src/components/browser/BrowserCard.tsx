@@ -1039,10 +1039,12 @@ export function BrowserCard({
                   ))}
                 </div>
                 <Textarea
+                  rows={1}
+                  autoGrow
+                  className="brw-ac__note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={t("browser.live.failPlaceholder")}
-                  rows={2}
                   maxLength={900}
                 />
                 <div className="brw-ac__row">
@@ -1056,13 +1058,15 @@ export function BrowserCard({
                 </div>
               </div>
             ) : handingBack ? (
-              // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on two lines
-              // that wrap like the note of a failure above, so all of it stays in sight. Enter hands back as in the
-              // chat: Shift+Enter, an input method's Enter and a phone's return key add a line instead.
+              // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on one line that
+              // grows as it wraps (`.brw-ac__note`), so all of it stays in sight. Enter hands back as in the chat:
+              // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
               <div className="brw-ac__foot brw-ac__fail">
                 <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
                 <Textarea
-                  rows={2}
+                  rows={1}
+                  autoGrow
+                  className="brw-ac__note"
                   ref={backRef}
                   value={backNote}
                   onChange={(e) => setBackNote(e.target.value)}

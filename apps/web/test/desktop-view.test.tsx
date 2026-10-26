@@ -507,9 +507,15 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
-    // Two lines that wrap: a note stays in sight on a narrow screen, where one line scrolled its start away.
+    // One line in the middle of its field that grows as it wraps (its height set to its text): all of a note stays
+    // in sight, and there is no grip to drag.
     const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
-    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
+    expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
+      "TEXTAREA",
+      "1",
+      "ac-input brw-ac__note",
+    ]);
+    expect(note.style.height).not.toBe("");
     await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
     /** Whether the key is left to the note (a new line), not taken to hand back. */
     const enter = async (init: KeyboardEventInit = {}) => {
@@ -990,6 +996,13 @@ describe("the dialog's size (computer.css)", () => {
     expect(phone.split(".cmp-dialog:not(.is-screen-only) .cmp-acts {")[1]?.split("}")[0]).toContain(
       "grid-area: 2 / 2 / 3 / 4",
     );
+  });
+
+  test("a note to the agent: one line in the middle of its field, growing up to four, with no grip", async () => {
+    const brw = await Bun.file(new URL("../src/components/browser/browser.css", import.meta.url).pathname).text();
+    const note = rule(brw, ".brw-ac__note.ac-input");
+    expect(note).toContain("resize: none");
+    expect(note).toContain("max-height: 110px");
   });
 
   test("full screen on the agent's screen: the screen alone on its ground, what floats over it hidden after a while", async () => {

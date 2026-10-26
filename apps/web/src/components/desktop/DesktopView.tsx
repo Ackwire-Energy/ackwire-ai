@@ -457,13 +457,15 @@ export function DesktopView({
       </div>
       {inControl &&
         (handingBack ? (
-          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. Two lines that
-          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away. Enter hands
-          // back as in the chat: Shift+Enter, an input method's Enter and a phone's return key add a line instead.
+          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. One line that grows
+          // as it wraps (`.brw-ac__note`), so all of a note stays in sight. Enter hands back as in the chat:
+          // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
           <div className="brw-ac__foot brw-ac__fail">
             <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
             <Textarea
-              rows={2}
+              rows={1}
+              autoGrow
+              className="brw-ac__note"
               autoFocus
               value={backNote}
               onChange={(e) => setBackNote(e.target.value)}

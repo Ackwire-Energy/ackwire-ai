@@ -89,13 +89,24 @@ describe("a help request opens the agent's browser in its card", () => {
         .map((b) => b.getAttribute("aria-label")),
     ).toEqual(["Tab", "Enter", "Apagar", "Esc"]);
 
+    // Desistir asks what happened: its note is one line in the middle of its field that grows as it wraps.
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Desistir" })));
+    expect(card.textContent).toContain("O que aconteceu?");
+    const why = within(card).getByPlaceholderText("Conte com suas palavras") as HTMLTextAreaElement;
+    expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
+
     // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(note);
-    // Two lines that wrap, like the note of a failure: all of it stays in sight.
-    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
+    // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
+    expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
+      "TEXTAREA",
+      "1",
+      "ac-input brw-ac__note",
+    ]);
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
     // Shift+Enter adds a line, as in the chat; Enter sends the note, and adds no line to it.
     expect(fireEvent.keyDown(note, { key: "Enter", shiftKey: true })).toBe(true);
