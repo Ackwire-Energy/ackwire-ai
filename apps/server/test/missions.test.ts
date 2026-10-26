@@ -360,6 +360,13 @@ test("missions API: the copy of the project (ADR 0044) — DTO fields, setup fai
             command: "x",
           });
         }
+        if (frame.op === "brain.turn") {
+          // The mission's main session (Claude Code on this computer) ends each turn as a runner does: `brain.done`,
+          // then the reply with its final event. A reply without them leaves the turn waiting out the brain's grace
+          // for the stream's end, 1.5 s of real time.
+          const final = { type: "done", text: "ok", session: { id: frame.session.id } };
+          return void reply({ type: "brain.done", runId: frame.runId }).then(() => ok({ runId: frame.runId, final }));
+        }
         if (frame.op === "read") return ok({ base64: null, size: 0 });
         return ok({ size: 0 });
       }, 1);
