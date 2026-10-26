@@ -1377,7 +1377,7 @@ export const featureKeysEn: FeatureTranslations = {
     importSkip: "I don't, skip",
     agentsAda: "I'm already here",
     thinkOwn: "They think with your key or subscription",
-    thinkOwnSub: "An AI plan or an API key, in the next step.",
+    thinkOwnSub: "An AI plan or an API key, in the next step. Change it later in You\u00a0›\u00a0AI accounts.",
     share: "Share an invite link",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
     emailsPlaceholder: "name@company.com",
