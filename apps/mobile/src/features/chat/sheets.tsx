@@ -493,6 +493,7 @@ export function ChannelOptions({
   leading,
   agentId,
   onPins,
+  onMembers,
 }: {
   channelId: string;
   title: string;
@@ -501,6 +502,8 @@ export function ChannelOptions({
   /** An agent's DM: "Perfil". */
   agentId?: string | null;
   onPins: () => void;
+  /** A channel: who is in it (and, for admins, adding and removing). */
+  onMembers?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -512,6 +515,9 @@ export function ChannelOptions({
       <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
       <ActionList
         items={[
+          ...(onMembers
+            ? [{ key: "members", icon: "members" as const, label: t("shell.members"), onPress: onMembers }]
+            : []),
           {
             key: "pins",
             icon: "pin",
