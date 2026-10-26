@@ -21,7 +21,14 @@ export function GroupedList({ children }: { children?: ReactNode }) {
             <View
               style={[
                 styles.divider,
-                { backgroundColor: c.line2, marginLeft: (child.props as { icon?: unknown }).icon ? 54 : 14 },
+                {
+                  backgroundColor: c.line2,
+                  marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
+                    ? 54
+                    : (child.props as { leading?: unknown }).leading
+                      ? 58
+                      : 14,
+                },
               ]}
             />
           ) : null}
@@ -54,6 +61,8 @@ export interface GroupedRowProps {
   label: string;
   /** A small line under the label. */
   sub?: string;
+  /** Lines the small line may take (default 1). */
+  subLines?: number;
   /** A rounded tile with this icon on the left. */
   icon?: IconName;
   /** Anything else on the left (an organization's tile). */
@@ -75,6 +84,7 @@ export interface GroupedRowProps {
 export function GroupedRow({
   label,
   sub,
+  subLines = 1,
   icon,
   leading,
   value,
@@ -111,7 +121,7 @@ export function GroupedRow({
           {label}
         </Text>
         {sub ? (
-          <Text variant="footnote" tone="faint" numberOfLines={1}>
+          <Text variant="footnote" tone="faint" numberOfLines={subLines}>
             {sub}
           </Text>
         ) : null}

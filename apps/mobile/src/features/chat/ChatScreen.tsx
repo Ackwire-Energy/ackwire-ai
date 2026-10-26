@@ -29,7 +29,7 @@ import {
   useThreadMission,
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
-import { issueTakenOf } from "@agenteschat/client/lib/issues";
+import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -162,6 +162,9 @@ const COMPOSER_INPUT_ID = "chat-composer";
  * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
  * for help a push or the inbox opened it for (its card opens in place, in control).
  */
+/** "Revisor, Dev" for a screen reader, or just "Revisor" while there is no role or status (never "Revisor, ."). */
+const who = (name: string, status: string) => (status ? `${name}, ${status}` : name);
+
 export function ChatScreen({
   channelId,
   threadId,
@@ -198,6 +201,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const dms = useDms(orgId);
   const channel = channels.data?.find((x) => x.id === channelId);
   const dm = dms.data?.find((d) => d.channelId === channelId);
+  // A conversation the loaded lists don't have yet (opened a moment ago, or reached by a link): they load
+  // again once, so the header gets its name.
+  const unlisted = channels.isSuccess && dms.isSuccess && !channel && !dm;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once each time the conversation goes missing
+  useEffect(() => {
+    if (!unlisted) return;
+    void channels.refetch();
+    void dms.refetch();
+  }, [unlisted]);
   const isThread = Boolean(threadId);
   const thread = useThreadInfo(orgId, threadId);
   const missionQ = useThreadMission(orgId, threadId);
@@ -400,7 +412,11 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             {
               kind: "marker",
               key: "started",
-              text: t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
+              // In a DM, with whom (its channel name is internal, "dm-…"); in a channel, where.
+              text:
+                info?.channelKind === "dm" || dm
+                  ? t("mobile.chat.startedWith", { name: dm?.with.name ?? "" })
+                  : t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
             },
             // The root as it started the thread (its mission card is pinned above already).
             {
@@ -432,7 +448,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...runRowsOf(openingRuns(shownRuns)),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, turnKeyOf, browsing, held, superseded, t]);
+  }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
@@ -783,25 +799,49 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // The header is glass over the conversation: the system's
   // back and "…" circles, and in the middle a pill with who or where, its sky and what the agent is doing.
   const info = thread.data;
-  const title = isThread ? (info ? threadTitle(info) : "") : dm ? dm.with.name : channel ? `#${channel.name}` : "";
+  // A task's work thread: its root was written by the server in one language ("Issue #1: …"); the card's
+  // number and title, in the reader's.
+  const rootWork = isThread ? issueWorkOf(list.find((m) => m.id === threadId)?.meta) : null;
+  const title = isThread
+    ? rootWork
+      ? t("issues.open", { number: rootWork.number, title: rootWork.title })
+      : info
+        ? threadTitle(info)
+        : ""
+    : dm
+      ? dm.with.name
+      : channel
+        ? `#${channel.name}`
+        : "";
   const agentsHere = (roster.data ?? []).filter((r) => r.type === "agent").length;
   const subtitle = isThread
     ? info
-      ? t(
-          mission
-            ? "mobile.chat.missionIn"
-            : info.state === "closed"
-              ? "mobile.chat.closedThreadIn"
-              : "mobile.chat.threadIn",
-          {
-            channel: info.channelName,
-          },
-        )
+      ? info.channelKind === "dm"
+        ? // A DM's channel name is internal ("dm-…"): the thread says who it is with.
+          t(
+            mission
+              ? "mobile.chat.missionWith"
+              : info.state === "closed"
+                ? "mobile.chat.closedThreadWith"
+                : "mobile.chat.threadWith",
+            { name: dm?.with.name ?? "" },
+          )
+        : t(
+            mission
+              ? "mobile.chat.missionIn"
+              : info.state === "closed"
+                ? "mobile.chat.closedThreadIn"
+                : "mobile.chat.threadIn",
+            {
+              channel: info.channelName,
+            },
+          )
       : undefined
     : dmAgentId
       ? dir.agentById.get(dmAgentId)?.role || undefined
       : channel && roster.data
-        ? t("mobile.chat.members", { count: roster.data.length, agents: agentsHere })
+        ? // People and agents counted apart: "1 pessoa · 3 agentes", never "4 membros · 3 agentes".
+          `${t("mobile.chat.people", { count: roster.data.length - agentsHere })} · ${t("mobile.chat.agentsHere", { count: agentsHere })}`
         : undefined;
   // An agent's DM while it works: the pill's quiet line says what it does ("Consultando o GitHub").
   const dmDoing = useMemo(() => {
@@ -859,7 +899,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         title={title}
         subtitle={subtitle}
         onPress={openOptions}
-        label={t("mobile.chat.headerChannel", { name: title, status: subtitle ?? "" })}
+        label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : dm ? (
       <HeaderPill
@@ -877,8 +917,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         label={
           dmAgentId
-            ? t("mobile.chat.headerAgent", { name: dm.with.name, status: dmDoing ?? subtitle ?? "" })
-            : t("mobile.chat.headerChannel", { name: dm.with.name, status: "" })
+            ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmDoing ?? subtitle ?? "") })
+            : t("mobile.chat.headerChannel", { who: who(dm.with.name, "") })
         }
       />
     ) : channel ? (
@@ -898,7 +938,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           ) : undefined
         }
         onPress={openOptions}
-        label={t("mobile.chat.headerChannel", { name: title, status: subtitle ?? "" })}
+        label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
   const right =
@@ -1096,6 +1136,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             keyExtractor={rowKey}
             getItemType={rowType}
             renderItem={renderItem}
+            // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+            // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+            extraData={renderItem}
             estimatedItemSize={72}
             // Opens at the latest message, short conversations sit at the bottom like any chat.
             initialScrollAtEnd

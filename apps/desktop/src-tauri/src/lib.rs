@@ -1,7 +1,7 @@
 //! agentes.chat for macOS, Windows and Linux: the main window on the server open now (agentes.chat or a
 //! server of the person's own, `servers`), the welcome window that finds one, and, only while agents work on
 //! this computer for a server of the person's own, the runners it spawns (one per organization), the menu bar
-//! popover and Preferences' tabs for this computer. On a Mac or Linux it can also run agentes.chat itself, as
+//! popover and Preferences' tabs for this computer. On every system it can also run agentes.chat itself, as
 //! its child (`local_server`, with this computer as its agents' computer, `host_sync`). Rust stays thin:
 //! windows, the tray, the server list, links, the children, single instance, start at login, notifications,
 //! native dialogs and self-update. Everything else lives in the runner and the server (TypeScript) and in the
@@ -181,6 +181,18 @@ fn stop_children(app: &AppHandle) {
     let _ = server.join();
 }
 
+/// A program the app starts opens no console window of its own on Windows (the runner, the server and the
+/// tools they call are console programs, and the app has no console to lend them). Nothing elsewhere.
+pub(crate) fn no_console(command: &mut std::process::Command) -> &mut std::process::Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 /// Graceful quit: the children stop, then the app exits.
 fn begin_quit(app: AppHandle) {
     let runners = app.state::<Runners>();
@@ -225,9 +237,10 @@ async fn runner_remove(app: AppHandle, home_id: String) -> Result<(), String> {
 }
 
 /// A page of a server this app opens goes to the main window, on that server; a provider's sign-in page, the
-/// app's own downloads and the help pages open in the person's browser. Nothing else.
+/// app's own downloads and the help pages open in the person's browser. Nothing else. Async, as every command
+/// that may make a window (`server_choose`).
 #[tauri::command]
-fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+async fn open_external(app: AppHandle, url: String) -> Result<(), String> {
     if url.len() > 4096 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return Err("not a link the app opens".into());
     }
@@ -258,8 +271,9 @@ fn set_tray_state(app: AppHandle, state: String) -> Result<(), String> {
     tray::set_state(&app, &state)
 }
 
+/// Async: Welcome and Preferences are made here (`server_choose`).
 #[tauri::command]
-fn show_window(app: AppHandle, name: String) -> Result<(), String> {
+async fn show_window(app: AppHandle, name: String) -> Result<(), String> {
     present(&app, &name)
 }
 
@@ -318,7 +332,18 @@ fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
 /// the plugin), stops the runners and relaunches. `false`: nothing newer to install.
 #[tauri::command]
 async fn update_install(app: AppHandle) -> Result<bool, String> {
-    let updater = app.updater().map_err(|e| e.to_string())?;
+    // Windows runs the installer and ends the app at once, and the installer can't replace the files of a
+    // runner or a server still running: they stop first there (then the plugin's own cleanup, which this
+    // replaces).
+    let before_exit = app.clone();
+    let updater = app
+        .updater_builder()
+        .on_before_exit(move || {
+            stop_children(&before_exit);
+            before_exit.cleanup_before_exit();
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
     let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
         return Ok(false);
     };

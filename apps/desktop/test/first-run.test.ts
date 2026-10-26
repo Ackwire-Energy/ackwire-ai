@@ -9,9 +9,7 @@ import {
   linkView,
   ownServerScreen,
   PROBLEM_TEXT,
-  runHereScreen,
   typedServer,
-  WSL_INSTALL_COMMAND,
 } from "../src/control/first-run";
 import { MAX_MENU_LABEL, menuLabels } from "../src/control/menu-labels";
 import { platformOf } from "../src/control/platform";
@@ -37,14 +35,9 @@ const down = (server: string): ServerCheck => ({ ok: false, server, problem: "un
 
 describe("which screen", () => {
   test("your own server: the two ways where both exist, else straight to Connect", () => {
-    expect(ownServerScreen("windows", false)).toBe("own");
-    expect(ownServerScreen("mac", true)).toBe("own");
-    expect(ownServerScreen("linux", true)).toBe("own");
+    expect(ownServerScreen(true)).toBe("own");
     // A build without the server (development): no card that can't work.
-    expect(ownServerScreen("mac", false)).toBe("connect");
-    expect(runHereScreen("mac")).toBe("here");
-    expect(runHereScreen("linux")).toBe("here");
-    expect(runHereScreen("windows")).toBe("windows");
+    expect(ownServerScreen(false)).toBe("connect");
   });
 
   test("the system from the web view's own user agent", () => {
@@ -53,9 +46,8 @@ describe("which screen", () => {
     expect(platformOf("Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/605.1.15")).toBe("linux");
   });
 
-  test("the setup's command, and on Windows the one for WSL 2 with no network question", () => {
+  test("the setup's command", () => {
     expect(INSTALL_COMMAND).toBe("curl -fsSL https://agentes.chat/install | sh");
-    expect(WSL_INSTALL_COMMAND).toBe("curl -fsSL https://agentes.chat/install | sh -s -- --network local");
   });
 
   test("Esc: back a screen, or the window closes; never while agentes.chat is being set up here", () => {

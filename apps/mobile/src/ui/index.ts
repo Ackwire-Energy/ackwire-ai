@@ -59,8 +59,9 @@ export {
   usePushedOptions,
   useScrollUnderPushedOptions,
 } from "./navigation";
+export { OptionTile } from "./OptionTile";
 export { PressScale, type PressScaleProps } from "./PressScale";
-export { ProviderLogo, type ProviderLogoProps, ProviderStack } from "./ProviderLogo";
+export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";
@@ -69,7 +70,7 @@ export { Segmented, type SegmentedProps } from "./Segmented";
 export { Sheet, type SheetProps } from "./Sheet";
 export { SheetScreen, type SheetScreenProps } from "./SheetScreen";
 export { searchCancelVisible, searchShowsResults } from "./searchMode";
-export { systemText, Text, type TextProps, type TextTone, type TextVariant } from "./Text";
+export { fieldText, systemText, Text, type TextProps, type TextTone, type TextVariant } from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
 export {

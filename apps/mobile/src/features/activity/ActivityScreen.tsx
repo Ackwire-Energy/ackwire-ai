@@ -77,7 +77,6 @@ export function ActivityScreen() {
     <LargeTitleScreen
       title={t("mobile.activity.title")}
       {...header}
-      grouped
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <Filters

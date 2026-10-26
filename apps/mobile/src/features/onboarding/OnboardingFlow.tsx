@@ -1,4 +1,5 @@
 import { keys, useApi } from "@agenteschat/client";
+import type { AiChoice } from "@agenteschat/client/lib/no-ai";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,20 +12,21 @@ import { Pressable, ScrollView, Share, StyleSheet, TextInput, View } from "react
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useConnectKey } from "@/features/ai/ConnectAi";
 import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Sky } from "@/sky/Sky";
-import { AgentAvatar, Button, Icon, IconButton, type IconName, LineIcon, systemText, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, IconButton, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { TextArea } from "../shared/TextArea";
+import { AiStep } from "./AiStep";
 import {
   emailsFrom,
   GUIDE,
   HOST,
   introducesAt,
-  nextStep,
   OPTIONAL,
   PRESET_LOOK,
   PRESET_ROLE,
@@ -36,16 +38,16 @@ import {
   STEPS,
   type StepId,
   stepText,
-  zoneCity,
+  zoneLabel,
 } from "./logic";
 
 /**
  * The first run on the phone: signed in with no workspace yet, one
  * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
- * (optional; brought from the web) → Agentes (they think with an AI plan or a key, connected on the web; nothing
- * to pay or paste on the phone) → Pessoas (optional: share a link or type e-mails) → Pronto, which opens the DM
- * with Ada. No computer step.
+ * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
+ * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto, which opens the DM with Ada.
+ * No computer step.
  */
 export function OnboardingFlow() {
   const { t, i18n } = useTranslation();
@@ -68,13 +70,19 @@ export function OnboardingFlow() {
   const [error, setError] = useState<string | null>(null);
   const zone = phoneTimezone();
   const orgName = name.trim();
+  // The AI step's key, for the workspace just created (no workspace is chosen yet: it gets the id).
+  const ai = useConnectKey(created?.orgId ?? "");
+  // The AI step's option (the plans first, as on the web) and the agents a plan was connected for there.
+  const [aiShown, setAiShown] = useState<AiChoice | null>(null);
+  const [planned, setPlanned] = useState<string[]>([]);
+  const [aiSaved, setAiSaved] = useState(false);
 
-  const run = async (work: () => Promise<void>, then: StepId) => {
+  const run = async (work: () => Promise<void>, then: StepId | (() => StepId)) => {
     setPending(true);
     setError(null);
     try {
       await work();
-      setStep(then);
+      setStep(typeof then === "function" ? then() : then);
     } catch {
       setError(t("mobile.onb.failed"));
     } finally {
@@ -107,29 +115,46 @@ export function OnboardingFlow() {
       setSavedContext(context.trim());
     }, "import");
 
-  const saveAgents = () =>
-    run(async () => {
-      if (!created) return;
-      const ids = { ...agentIds };
-      for (const p of PRESETS) {
-        if (!chosen.has(p) || ids[p]) continue;
-        const role = PRESET_ROLE[p];
-        const agent = await api.agents.create(created.orgId, {
-          name: t(`onboarding.presets.${p}.name`),
-          handle: handleFrom(t(`onboarding.presets.${p}.name`)),
-          role: t(`onboarding.presets.${p}.role`),
-          instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
-          // "Automático": each task gets its model and effort.
-          model: AUTO,
-          // null = the workspace's default key (or a subscription, connected on the computer).
-          credentialId: null,
-          appearance: PRESET_LOOK[p],
-        });
-        await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
-        ids[p] = agent.id;
-        setAgentIds({ ...ids });
-      }
-    }, "team");
+  const saveAgents = () => {
+    let next: StepId = "ai";
+    return run(
+      async () => {
+        if (!created) return;
+        const ids = { ...agentIds };
+        for (const p of PRESETS) {
+          if (!chosen.has(p) || ids[p]) continue;
+          const role = PRESET_ROLE[p];
+          const agent = await api.agents.create(created.orgId, {
+            name: t(`onboarding.presets.${p}.name`),
+            handle: handleFrom(t(`onboarding.presets.${p}.name`)),
+            role: t(`onboarding.presets.${p}.role`),
+            instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
+            // "Automático": each task gets its model and effort.
+            model: AUTO,
+            // null = the workspace's default key (or a subscription, connected on the computer).
+            credentialId: null,
+            appearance: PRESET_LOOK[p],
+          });
+          await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
+          ids[p] = agent.id;
+          setAgentIds({ ...ids });
+        }
+        // The AI step only when the agents have nothing to think with yet (a platform key on Cloud, a key
+        // saved going back and forth).
+        const status = await api.agents.aiStatus(created.orgId).catch(() => null);
+        if (status?.any) next = "team";
+      },
+      () => next,
+    );
+  };
+
+  const saveAi = async () => {
+    setError(null);
+    if (await ai.save()) {
+      setAiSaved(true);
+      setStep("team");
+    }
+  };
 
   const sendInvites = () =>
     run(async () => {
@@ -181,13 +206,19 @@ export function OnboardingFlow() {
           .then((r) => r.channelId)
           .catch(() => null)
       : null;
+    // The lists were loaded (prefetched) before this DM existed: the conversation finds it in them for its
+    // header. Pushed over the tabs, so its back button leads home.
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: keys.dms(created.orgId), refetchType: "all" }),
+      qc.invalidateQueries({ queryKey: keys.channels(created.orgId), refetchType: "all" }),
+    ]).catch(() => {});
     setPending(false);
-    router.replace(channelId ? chatHref(channelId) : chatHref(created.generalChannelId));
+    router.push(channelId ? chatHref(channelId) : chatHref(created.generalChannelId));
   };
 
   const host = HOST[step];
   const count = [...chosen].filter((p) => !agentIds[p]).length;
-  const [title, lead] = stepText(t, step, orgName, chosen);
+  const [title, lead] = stepText(t, step, { org: orgName, chosen, aiSaved });
 
   const primary: Partial<Record<StepId, { label: string; onPress: () => void; ready: boolean }>> = {
     workspace: {
@@ -201,11 +232,28 @@ export function OnboardingFlow() {
       onPress: () => void saveAgents(),
       ready: true,
     },
-    team: {
-      label: emails.length ? t("onboarding.actions.invite", { count: emails.length }) : t("mobile.onb.later"),
-      onPress: () => void (emails.length ? sendInvites() : setStep("done")),
-      ready: true,
-    },
+    // A key is saved by the step's button; a plan is connected in its panel, then the step goes on.
+    ...(aiShown === "key"
+      ? {
+          ai: {
+            label: ai.saving ? t("mobile.ai.saving") : t("mobile.ai.save"),
+            onPress: () => void saveAi(),
+            ready: ai.ready && ai.looksRight && !ai.saving,
+          },
+        }
+      : planned.length > 0
+        ? { ai: { label: t("onboarding.actions.continue"), onPress: () => setStep("team"), ready: true } }
+        : {}),
+    // With no e-mails the step has no main action: "Agora não" is the quiet way on, below.
+    ...(emails.length
+      ? {
+          team: {
+            label: t("onboarding.actions.invite", { count: emails.length }),
+            onPress: () => void sendInvites(),
+            ready: true,
+          },
+        }
+      : {}),
     done: {
       label: t("mobile.onb.talk", { name: t(`onboarding.presets.${GUIDE}.name`) }),
       onPress: () => void finish(),
@@ -222,7 +270,6 @@ export function OnboardingFlow() {
       lead={lead}
       host={host}
       onBack={back && !pending ? () => setStep(back) : undefined}
-      onSkip={OPTIONAL.has(step) && !pending ? () => setStep(nextStep(step)) : undefined}
       footer={
         <>
           {error ? (
@@ -241,6 +288,12 @@ export function OnboardingFlow() {
           ) : null}
           {step === "import" ? (
             <Button variant="ghost" wide label={t("mobile.onb.importSkip")} onPress={() => setStep("agents")} />
+          ) : null}
+          {step === "ai" ? (
+            <Button variant="ghost" wide label={t("connectAi.later")} onPress={() => setStep("team")} />
+          ) : null}
+          {step === "team" ? (
+            <Button variant="ghost" wide label={t("mobile.onb.later")} onPress={() => setStep("done")} />
           ) : null}
         </>
       }
@@ -262,7 +315,7 @@ export function OnboardingFlow() {
             end={t("mobile.onb.logoPick")}
             onPress={() => void pickLogo()}
           />
-          {zone ? <Note icon="clock" text={t("mobile.onb.zone", { zone: zoneCity(zone) })} /> : null}
+          {zone ? <Note icon="clock" text={t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} /> : null}
         </>
       ) : null}
 
@@ -313,16 +366,23 @@ export function OnboardingFlow() {
         />
       ) : null}
 
+      {step === "ai" && created ? (
+        <AiStep
+          orgId={created.orgId}
+          orgName={orgName}
+          agents={PRESETS.flatMap((p) => {
+            const id = agentIds[p];
+            return id ? [{ id, name: t(`onboarding.presets.${p}.name`) }] : [];
+          })}
+          form={ai}
+          planned={planned}
+          onPlanned={(id) => setPlanned((l) => (l.includes(id) ? l : [...l, id]))}
+          onShown={setAiShown}
+        />
+      ) : null}
+
       {step === "team" ? (
         <>
-          <Button
-            variant="secondary"
-            wide
-            icon="share"
-            label={t("mobile.onb.share")}
-            onPress={() => void shareLink()}
-          />
-          <Note icon="shield" text={t("mobile.onb.shareNote")} />
           <View style={styles.emails}>
             {emails.map((e) => (
               <Pressable
@@ -352,6 +412,14 @@ export function OnboardingFlow() {
           />
           {bad.length ? <Note icon="help" text={t("mobile.onb.invalidEmail")} danger /> : null}
           <Note icon="agent" text={t("mobile.onb.membersNote")} />
+          <Button
+            variant="secondary"
+            wide
+            icon="share"
+            label={t("mobile.onb.share")}
+            onPress={() => void shareLink()}
+          />
+          <Note icon="shield" text={t("mobile.onb.shareNote")} />
         </>
       ) : null}
     </StepFrame>
@@ -385,7 +453,7 @@ function ImportStep() {
   );
 }
 
-/** Agentes: the ready team (Ada always), and how they think (an AI plan or a key, connected on the web). */
+/** Agentes: the ready team, Ada always (what they think with is the next step's). */
 function AgentsStep({
   chosen,
   created,
@@ -431,7 +499,6 @@ function AgentsStep({
           </Pressable>
         );
       })}
-      <Line lead={<Icon name="bolt" size={18} />} title={t("mobile.onb.thinkOwn")} sub={t("mobile.onb.thinkOwnSub")} />
     </>
   );
 }
@@ -443,7 +510,6 @@ function StepFrame({
   lead,
   host,
   onBack,
-  onSkip,
   footer,
   children,
 }: {
@@ -452,7 +518,6 @@ function StepFrame({
   lead?: string | undefined;
   host: Preset;
   onBack?: (() => void) | undefined;
-  onSkip?: (() => void) | undefined;
   footer: ReactNode;
   children: ReactNode;
 }) {
@@ -466,18 +531,16 @@ function StepFrame({
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: c.bg }]} behavior="padding">
       {done ? <Sky color="sky" depth={0.8} fade={0.4} style={styles.doneSky} /> : null}
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-        {onBack ? <IconButton icon="back" label={t("mobile.onb.back")} onPress={onBack} plate /> : null}
+        {/* The first step has no way back: its place stays, so the strip doesn't shift on the next one. */}
+        {onBack ? (
+          <IconButton icon="back" label={t("mobile.onb.back")} onPress={onBack} plate />
+        ) : done ? null : (
+          <View style={styles.backSpace} />
+        )}
         <Strip progress={progressAt(step)} />
         <Text variant="footnote" tone="muted">
           {done ? t("mobile.onb.done") : t("mobile.onb.progress", { n, total })}
         </Text>
-        {onSkip ? (
-          <Pressable onPress={onSkip} accessibilityRole="button" hitSlop={8}>
-            <Text variant="footnote" style={styles.bold}>
-              {t("mobile.onb.skip")}
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Animated.View key={step} entering={FadeIn.duration(220)} style={styles.stack}>
@@ -631,6 +694,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   doneSky: { position: "absolute", left: 0, right: 0, top: 0, height: 320 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
+  backSpace: { width: 40, height: 40 },
   strip: { flex: 1, height: 22, justifyContent: "center" },
   stripFill: { top: 8, bottom: 8, borderRadius: 3, overflow: "hidden" },
   walker: { position: "absolute", top: 0 },
@@ -651,7 +715,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    ...systemText("body"),
+    ...fieldText("body"),
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

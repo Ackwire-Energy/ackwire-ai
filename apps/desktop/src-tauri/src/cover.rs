@@ -36,7 +36,9 @@ struct Shown {
 pub fn attach(app: &AppHandle, window: &tauri::Window) -> tauri::Result<()> {
     let size = window.inner_size()?;
     let cover = WebviewBuilder::new(LABEL, WebviewUrl::App("cover.html".into()))
-        .transparent(true)
+        // Transparent only where the site shows through it as it fades: a transparent WebView2 shows black, not
+        // the web view under it, and drops the color.
+        .transparent(!cfg!(target_os = "windows"))
         .background_color(SKY)
         .auto_resize();
     window.add_child(cover, LogicalPosition::new(0.0, 0.0), size)?;

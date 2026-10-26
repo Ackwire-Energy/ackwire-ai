@@ -1,5 +1,6 @@
-import { type Actor, type Issue, type IssuePriority, useIssueAction } from "@agenteschat/client";
+import { type Actor, type Issue, type IssuePriority, useAiStatus, useIssueAction } from "@agenteschat/client";
 import { PRIORITIES } from "@agenteschat/client/lib/issues";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -38,7 +39,9 @@ export function NewIssueForm() {
   const toast = useToast();
   const dir = useDirectory();
   const meId = useMeId();
-  const action = useIssueAction(useOrgId());
+  const orgId = useOrgId();
+  const action = useIssueAction(orgId);
+  const ai = useAiStatus(orgId);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [who, setWho] = useState<Actor | null>(null);
@@ -158,7 +161,14 @@ export function NewIssueForm() {
                 ))
             : null}
         </GroupedList>
-        {who?.type === "agent" ? <GroupedFooter>{t("mobile.issues.form.agentStarts")}</GroupedFooter> : null}
+        {who?.type === "agent" ? (
+          <GroupedFooter>
+            {/* "Starts as soon as it's created" isn't true for an agent with no AI: it waits for one. */}
+            {aiStateOf(ai.data, who.id) === "no_ai"
+              ? t("mobile.ai.taskNoAi", { name: dir.agentById.get(who.id)?.name ?? "" })
+              : t("mobile.issues.form.agentStarts")}
+          </GroupedFooter>
+        ) : null}
       </View>
       <View>
         <GroupedHeader>{t("mobile.issues.form.details")}</GroupedHeader>

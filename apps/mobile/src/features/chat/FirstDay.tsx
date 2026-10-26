@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Icon, Sky, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
-import { agentLook, genderOf } from "../shared/logic";
+import { agentLook } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { agentIntro, firstAsks, isNewAgent } from "./intent";
 
@@ -27,11 +27,11 @@ export function FirstDay({
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
-  const g = genderOf(agent.name);
   const intro = agentIntro(agent);
   const asks = useMemo(() => firstAsks(agent), [agent]);
   const title = isNewAgent(agent.createdAt)
-    ? t(`mobile.chat.intent.arrived${g}`, { name: agent.name })
+    ? // No "o"/"a" before the name: guessing it from the name gave "O Atende".
+      t("mobile.chat.intent.arrived", { name: agent.name })
     : t("mobile.chat.intent.meet", { name: agent.name });
   const line =
     intro.kind === "what"

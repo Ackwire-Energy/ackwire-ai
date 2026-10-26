@@ -1,8 +1,8 @@
 import { markOf, PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import type { Scheme } from "./palette";
 
-/** Box and drawing per size, in points: the web's sizes. */
-export const LOGO_SIZES = { xs: [14, 14], chip: [20, 12], sm: [30, 16], tile: [48, 26] } as const;
+/** Box and drawing per size, in points: the web's sizes, and `hero` (a page's head, on a raised tile). */
+export const LOGO_SIZES = { xs: [14, 14], chip: [20, 12], sm: [30, 16], tile: [48, 26], hero: [64, 34] } as const;
 export type LogoSize = keyof typeof LOGO_SIZES;
 
 /** The id of the gradient a mark's main shape is filled with, inside its own drawing. */

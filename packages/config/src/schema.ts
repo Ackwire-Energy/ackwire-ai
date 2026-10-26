@@ -553,7 +553,11 @@ export const envVars = {
     secret: true,
   },
   FILES_DIR: {
-    schema: z.string().regex(/^\//, "must be an absolute path").optional(),
+    // `/data/files`, or on Windows (the desktop app's server) `C:\…` or `\\server\share\…`.
+    schema: z
+      .string()
+      .regex(/^(\/|[A-Za-z]:[\\/]|\\\\)/, "must be an absolute path")
+      .optional(),
     description:
       "Absolute path of a folder on this server's disk for platform file storage (Drive files, uploads, photos), used when the `S3_*` bucket is not set. Without either, files are stored in Postgres. Choose before the first upload: files stay in the store they were written to.",
     section: "Storage",

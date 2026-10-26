@@ -53,11 +53,11 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
 };
 
 /// Whether agents may work on this computer for `origin`: never for agentes.chat (each workspace has a
-/// computer of its own), a server on this computer itself, the server here included at its Tailscale address
-/// (`server_here`: its own computer is set up with it), or on Windows (no program for agents ships there yet).
+/// computer of its own) or a server on this computer itself, the server here included at its Tailscale address
+/// (`server_here`: its own computer is set up with it).
 /// Another server on this computer at its address for people is `discover::served_here`, which asks it.
 pub fn agents_here(origin: &str, server_here: bool) -> bool {
-    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here && PLATFORM != "windows"
+    origin != servers::CLOUD && !servers::is_loopback(origin) && !server_here
 }
 
 /// What a navigation in the window does.
@@ -207,9 +207,10 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
             }
         })
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
-        // browser, the device's name in its words); nothing else.
+        // browser, the device's name in its words), and that `this_mac` takes `servers` (older apps refuse
+        // it, so the site's sign-in offers another server only where this says so); nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?} }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true }});"
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
@@ -339,8 +340,10 @@ fn front(app: &AppHandle) -> Result<(), String> {
 /// pairing it with one (`connect`: the system's own dialog asks first, then the site confirms the runner's
 /// code with its own session), reconnecting it (`reconnect`), Preferences on a tab (`prefs`), the menu bar's
 /// access requests (`requests`), the Dock's badge (`badge`), the Go menu's organizations (`orgs`), a
-/// notification while the app is in the background (`notify`) and, on the server here, signing its owner in
-/// (`signIn`: the app spends its owner key on a one-time sign-in, which the window trades itself). Rust checks
+/// notification while the app is in the background (`notify`), the first run's window to pick another server
+/// (`servers`: the sign-in page's way out, the same window as Servers › Add a server…) and, on the server
+/// here, signing its owner in (`signIn`: the app spends its owner key on a one-time sign-in, which the window
+/// trades itself). Rust checks
 /// each request, rebuilds it from the keys it may have, adds the asking page's own `origin`, whether agents may
 /// work here for it and whether it is the server here (`local`), and relays it: the popover's code owns the
 /// runners (apps/desktop/src/control/this-mac.ts) and answers through `this_mac_reply`. The machine's token
@@ -394,6 +397,7 @@ fn checked(request: &Value) -> Result<Value, String> {
         Some("status") => Ok(json!({ "kind": "status" })),
         Some("requests") => Ok(json!({ "kind": "requests" })),
         Some("signIn") => Ok(json!({ "kind": "signIn" })),
+        Some("servers") => Ok(json!({ "kind": "servers" })),
         Some("connect") => {
             let mut out = json!({ "kind": "connect", "orgId": org()? });
             if let Some(name) = display_name(request.get("orgName")) {
@@ -608,6 +612,11 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             }
             return Ok(json!({}));
         }
+        // Only a window of the app's own: the person picks and confirms the server there.
+        Some("servers") => {
+            crate::present(&app, "welcome")?;
+            return Ok(json!({}));
+        }
         _ => {}
     }
     let asks_here = matches!(request["kind"].as_str(), Some("status" | "connect" | "reconnect"));
@@ -764,7 +773,7 @@ mod tests {
         assert!(!agents_here("https://agentes.chat", false));
         assert!(!agents_here("http://127.0.0.1:4310", false));
         assert!(!agents_here("http://localhost:3000", false));
-        assert_eq!(agents_here("https://agentes.tail1234.ts.net", false), PLATFORM != "windows");
+        assert!(agents_here("https://agentes.tail1234.ts.net", false));
         assert!(!agents_here("https://ana-mac.tail1234.ts.net", true), "the server here, at its Tailscale address");
     }
 
@@ -792,6 +801,10 @@ mod tests {
         assert!(checked(&json!({ "kind": "reconnect" })).is_err());
         assert_eq!(checked(&json!({ "kind": "requests", "x": 1 })), Ok(json!({ "kind": "requests" })));
         assert_eq!(checked(&json!({ "kind": "signIn", "key": "x" })), Ok(json!({ "kind": "signIn" })));
+        assert_eq!(
+            checked(&json!({ "kind": "servers", "url": "https://evil.example" })),
+            Ok(json!({ "kind": "servers" }))
+        );
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
     }
 

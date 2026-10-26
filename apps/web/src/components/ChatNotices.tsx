@@ -1,6 +1,12 @@
 import type { Message } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
-import { type MessageNotice, noticeAgentHandle, noticeOf, noticeRoutineName } from "@agenteschat/client/lib/notices";
+import {
+  consultationOfNotice,
+  type MessageNotice,
+  noticeAgentHandle,
+  noticeOf,
+  noticeRoutineName,
+} from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
 import { Icon, type IconName } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -8,6 +14,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageBody } from "@/chat/MessageBody";
+import { ConsultationCard } from "@/components/ConsultationCard";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import "./chat-notices.css";
@@ -27,7 +34,8 @@ function noticeLabel(
   nameOfHandle: (handle: string) => string | null,
 ): string {
   const handle = noticeAgentHandle(notice);
-  const from = handle ? `@${nameOfHandle(handle) ?? handle}` : notice.from;
+  // The agent's name, without the @ of its handle (`from` is written for the agent).
+  const from = handle ? (nameOfHandle(handle) ?? handle) : notice.from;
   switch (notice.kind) {
     case "routine_handoff": {
       const routine = noticeRoutineName(notice);
@@ -89,7 +97,7 @@ function EventLine({
 
 /**
  * What reached an agent's conversation while it wasn't looking (`meta.notice`): "Rotina «Sentry»
- * entregou um relatório", "@Infra respondeu", "Nota de @Dev", "Chegou o resultado que Ada esperava".
+ * entregou um relatório", "Infra respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava".
  * The agent's own reply (if it has something to say) follows as a normal message.
  */
 export function NoticeLine({ message }: { message: Message }) {
@@ -98,6 +106,15 @@ export function NoticeLine({ message }: { message: Message }) {
   const dir = useDirectory(org.id);
   const notice = noticeOf(message.meta);
   if (!notice) return null;
+  // Another agent's answer with its consultation: the same card as a reply that waited for it (who asked
+  // whom, the question and the answer), not the text written for the asking agent.
+  const consulted = consultationOfNotice(message.meta);
+  if (consulted)
+    return (
+      <div className="cn-line" data-message-id={message.id}>
+        <ConsultationCard consultation={consulted.consultation} askerId={consulted.askerId} />
+      </div>
+    );
   const nameOfHandle = (handle: string) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null;
   return (
     <EventLine

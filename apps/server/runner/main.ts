@@ -534,10 +534,6 @@ async function host(p: Parsed): Promise<number> {
  * everywhere, so as the person on Linux too (system mode stays root's service).
  */
 async function hostOnce(flags: NonNullable<ReturnType<typeof hostFlags>>, rotate: string[]): Promise<number> {
-  if (process.platform === "win32") {
-    console.error("The server's computer runs on Linux or macOS.");
-    return 1;
-  }
   const envToken = flags.tokenEnv ? process.env[flags.tokenEnv]?.trim() || null : null;
   const computer = new HostComputer({
     server: flags.server,

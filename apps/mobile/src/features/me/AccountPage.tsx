@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { authClient } from "@/lib/auth";
 import { useOrg } from "@/providers/org";
 import {
+  fieldText,
   GroupedField,
   GroupedFooter,
   GroupedHeader,
@@ -17,7 +18,6 @@ import {
   GroupedRow,
   PersonAvatar,
   SearchField,
-  systemText,
   Text,
   useToast,
 } from "@/ui";
@@ -181,7 +181,7 @@ export function AccountPage({
       ]);
   };
 
-  const input = [systemText("callout"), styles.input, { color: c.ink }];
+  const input = [fieldText("callout"), styles.input, { color: c.ink }];
   const zoneLabel = draft.zone ? zoneName(draft.zone, i18n.language) : t("mobile.me.account.orgZone");
   return (
     <Page

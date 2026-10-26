@@ -14,6 +14,8 @@ import {
   PG_MAJOR,
   PGLITE_VERSION,
   PgMajorMismatchError,
+  pgliteFolder,
+  pgliteUrl,
   restorePglite,
 } from "../src/pglite";
 import { users } from "../src/schema";
@@ -30,6 +32,16 @@ beforeAll(async () => {
   await first.close();
 });
 afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+test("a folder's URL and back, on a Mac or Linux and on Windows", () => {
+  expect(pgliteUrl("/home/ana/.agentes/db")).toBe("pglite:///home/ana/.agentes/db");
+  expect(pgliteFolder("pglite:///home/ana/.agentes/db")).toBe("/home/ana/.agentes/db");
+  expect(pgliteUrl("C:\\Users\\ana\\.agentes\\db")).toBe("pglite:///C:\\Users\\ana\\.agentes\\db");
+  expect(pgliteFolder("pglite:///C:\\Users\\ana\\.agentes\\db")).toBe("C:\\Users\\ana\\.agentes\\db");
+  expect(pgliteFolder("pglite:///D:/data/db")).toBe("D:/data/db");
+  expect(pgliteFolder("pglite://relative/db")).toBeNull();
+  expect(pgliteFolder("postgres://db.example.com/agentes")).toBeNull();
+});
 
 test("a folder keeps its data across a reopen and records what wrote it", async () => {
   expect(folderVersion(db)).toEqual({ pglite: PGLITE_VERSION, pgMajor: PG_MAJOR });

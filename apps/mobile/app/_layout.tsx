@@ -8,6 +8,7 @@ import { StyleSheet, View } from "react-native";
 import { Entering } from "@/features/auth/Entering";
 import { forgetInvite, loadPendingInvite } from "@/features/auth/invite";
 import { LaunchSplash } from "@/features/launch/LaunchSplash";
+import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
@@ -54,7 +55,10 @@ function Gate() {
   // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
   const [launching, setLaunching] = useState(true);
   const hideNative = useCallback(() => void SplashScreen.hideAsync().catch(() => {}), []);
-  const launched = useCallback(() => setLaunching(false), []);
+  const launched = useCallback(() => {
+    setLaunching(false);
+    markLaunched();
+  }, []);
   useEffect(() => {
     if (ready) hideNative();
   }, [ready, hideNative]);

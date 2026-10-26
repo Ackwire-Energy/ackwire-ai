@@ -3,12 +3,12 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API_URL } from "@/config";
-import { connectToServer, PROBLEM_TEXT } from "@/features/server";
+import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl } from "@/lib/server";
 import { useSession } from "@/providers/session";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Text } from "@/ui/Text";
@@ -42,7 +42,8 @@ export default function Server() {
     const check = await checkServer(server);
     if (check.ok) return switchTo(check.server);
     haptics.warning();
-    setError(t(PROBLEM_TEXT[check.problem], { host: serverHost(check.server) }));
+    const host = serverHost(check.server);
+    setError(t(problemText(check.problem, check.server), { host }));
     setBusy(false);
   };
 
@@ -73,7 +74,7 @@ export default function Server() {
         accessibilityLabel={t("mobile.auth.server.label")}
       />
       {error ? (
-        <Text tone="danger" variant="small">
+        <Text tone="danger" variant="small" style={CENTER}>
           {error}
         </Text>
       ) : null}

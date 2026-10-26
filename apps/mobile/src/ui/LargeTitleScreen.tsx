@@ -31,7 +31,7 @@ export interface LargeTitleScreenProps {
   /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
   onScrollBeginDrag?: () => void;
   /**
-   * The grouped gray background (Atividade, settings-like screens) with white cards on it; lists and chat
+   * The grouped gray background (settings-like screens) with white cards on it; the tabs, lists and chat
    * stay on the plain (white, in light) background.
    */
   grouped?: boolean;

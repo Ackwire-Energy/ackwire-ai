@@ -24,7 +24,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, InfoHint, LineIcon, Segmented, systemText, Text, useToast } from "@/ui";
+import { Button, fieldText, InfoHint, LineIcon, Segmented, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    ...systemText("body"),
+    ...fieldText("body"),
   },
   keyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   paste: {

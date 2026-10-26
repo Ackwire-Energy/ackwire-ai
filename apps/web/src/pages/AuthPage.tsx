@@ -12,7 +12,15 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
-import { browserSignInUrl, challengeOf, inDesktopApp, newVerifier, SIGNED_IN_PATH, thisMac } from "@/lib/desktop";
+import {
+  browserSignInUrl,
+  challengeOf,
+  desktopPicksServer,
+  inDesktopApp,
+  newVerifier,
+  SIGNED_IN_PATH,
+  thisMac,
+} from "@/lib/desktop";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 
 /**
@@ -566,6 +574,12 @@ export function AuthPage({
                 <a href={privacyUrl}>{t("auth.privacy")}</a>
                 {t("auth.termsAfter")}
               </p>
+            )}
+
+            {step === "email" && desktopPicksServer() && (
+              <button type="button" className="auth__quiet" onClick={() => void thisMac.otherServer().catch(() => {})}>
+                {t("auth.desktop.otherServer")}
+              </button>
             )}
           </div>
         )}

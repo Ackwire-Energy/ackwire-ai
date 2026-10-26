@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, View } from "react-native";
-import { Button, Icon, SheetScreen, systemText, Text, useToast } from "@/ui";
+import { Button, fieldText, Icon, SheetScreen, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
@@ -75,6 +75,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 20,
   },
-  input: { flex: 1, paddingVertical: 12, ...systemText("body") },
+  input: { flex: 1, paddingVertical: 12, ...fieldText("body") },
   fine: { marginHorizontal: 6, marginBottom: 4 },
 });
