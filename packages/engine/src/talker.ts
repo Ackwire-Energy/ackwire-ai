@@ -6,6 +6,7 @@ import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
+import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, isTerminal, replyThreadOf } from "./runs";
 import { loadTalkerSnapshot, type TalkerSnapshot } from "./talker-snapshot";
 import type { WaitMessageOutcome } from "./waits";
@@ -64,12 +65,13 @@ export type TalkerSkip =
   | "reads_soon"
   | "rate_limited"
   | "ended"
+  | "held"
   | "answered"
   | "no_agent";
 
 /**
  * Whether the conversation layer is worth a model call at all (code decides;
- * cheap and quiet by default). Considered: a run that waits (an approval,
+ * cheap and quiet by default). Considered: a run that waits (a question,
  * browser help, another agent, its computer), a computer brain mid-turn (it
  * may not read the message for minutes), or a model-brain run quiet for
  * `TALKER_QUIET_MS` (a long tool). Skipped: background work, a "stop", a
@@ -112,7 +114,6 @@ const SYSTEM = (name: string) =>
     "Rules:",
     "- Use only the facts in `snapshot`. Never claim a result, progress or decision that isn't there. Never invent what the task found.",
     "- Never promise an action the task may not take, and never say you did something. You can't run tools, change anything or grant anything.",
-    "- Waiting on an approval: say what the card asks and that a person decides with Approve or Deny on the card; text in the chat never approves it.",
     '- When the task will handle the message (a correction, a new instruction, more detail), say briefly that it\'s noted and when it will be read (e.g. "Anotado, leio assim que terminar este passo.").',
     "- A question you can answer from the snapshot (status, what it's doing, what it waits on): answer it plainly.",
     "- If the message only asks to stop or cancel, or is small talk that needs no answer, or the conversation already answered it: pass.",
@@ -190,6 +191,27 @@ async function lastActivityAt(db: Database, run: AgentRun): Promise<Date> {
   return step && step.createdAt > start ? step.createdAt : start;
 }
 
+/**
+ * The run waits on something a message can't move (`holdsMessages`), or handed this message on as it paused
+ * and has since gone on (the `redispatchedMessageIds` step on its trail). The answer then comes from the run
+ * the message went to (or, read before the pause, after the decision): a fast reply now would be a second
+ * answer, one that run never reads.
+ */
+async function heldOrHandedOn(db: Executor, run: AgentRun, messageId: string): Promise<boolean> {
+  if (await holdsMessages(db, run)) return true;
+  const [handed] = await db
+    .select({ id: agentRunSteps.id })
+    .from(agentRunSteps)
+    .where(
+      and(
+        eq(agentRunSteps.runId, run.id),
+        sql`${agentRunSteps.data} @> ${JSON.stringify({ redispatchedMessageIds: [messageId] })}::jsonb`,
+      ),
+    )
+    .limit(1);
+  return handed !== undefined;
+}
+
 /** The snapshot as the model reads it. */
 const promptOf = (s: TalkerSnapshot) => JSON.stringify({ snapshot: s }, null, 1);
 
@@ -230,6 +252,8 @@ export function createTalker(deps: TalkerDeps): Talker {
       // The run as it is now (a wait may have moved it); the policy judged it as the message found it.
       const [run] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, landed.id));
       if (!run || isTerminal(run.status)) return decide("ended");
+      // No model call for a reply that can't be posted (checked again before posting: it may pause meanwhile).
+      if (await heldOrHandedOn(deps.db, run, message.id)) return decide("held");
       try {
         const snapshot = await loadTalkerSnapshot(deps.db, {
           run: waited ? { ...run, status: landed.status } : run,
@@ -285,10 +309,11 @@ async function ask(deps: TalkerDeps, run: AgentRun, agent: Agent, snapshot: Talk
 
 /**
  * Posts the fast reply, unless the moment passed: the run ended (a "stop",
- * its answer), another fast reply went first, or the agent already wrote
- * after the person's message. Queued at the front of the run's unread
- * messages, and only next to the person's own: it never makes the task take
- * a turn by itself, nor becomes the message a redispatch answers (the last).
+ * its answer), paused or handed the message on (`heldOrHandedOn`), another
+ * fast reply went first, or the agent already wrote after the person's
+ * message. Queued at the front of the run's unread messages, and only next
+ * to the person's own: it never makes the task take a turn by itself, nor
+ * becomes the message a redispatch answers (the last).
  */
 async function postReply(
   deps: TalkerDeps,
@@ -301,6 +326,7 @@ async function postReply(
   const result = await deps.db.transaction(async (tx) => {
     const [locked] = await tx.select().from(agentRuns).where(eq(agentRuns.id, run.id)).for("update");
     if (!locked || isTerminal(locked.status)) return "ended" as const;
+    if (await heldOrHandedOn(tx, locked, message.id)) return "held" as const;
     // Under the run's lock: two messages considered at once get one reply.
     const last = await lastReplyAt(tx, run, at);
     if (last && (at.getTime() - last.getTime() < TALKER_MIN_GAP_MS || last >= message.createdAt)) {

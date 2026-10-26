@@ -476,6 +476,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         connectionId: conn.connectionId,
       })
       .catch(() => undefined);
+    // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
+    // Stored before `welcome`: what the runner found since `hello` comes once it is welcomed (`accounts.changed`)
+    // and must land after this older list, never under it.
+    const removed =
+      frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts
+        ? await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch((error) => {
+            deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) });
+            return [];
+          })
+        : [];
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
     send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs });
@@ -502,16 +512,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (frame.protocol >= PAUSE_PROTOCOL) {
       await publishMachineUpdated(pubsub, machine.orgId, machine.id, { paused: conn.pause, access: true });
     }
-    // Protocol 13 (ADR 0041): the accounts of the computer brains on it (an older runner says nothing: kept).
-    if (frame.protocol >= ACCOUNTS_PROTOCOL && frame.accounts) {
-      const remove = await syncMachineAccounts({ db, pubsub }, machine.orgId, machine.id, frame.accounts).catch(
-        (error) => {
-          deps.log?.warn("account sync failed", { machineId: machine.id, error: String(error) });
-          return [];
-        },
-      );
-      removeAccounts(conn, remove);
-    }
+    removeAccounts(conn, removed);
     if (frame.protocol >= TASKS_PROTOCOL) {
       await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
         (error) => deps.log?.warn("task reconcile failed", { machineId: machine.id, error: String(error) }),

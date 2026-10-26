@@ -783,3 +783,45 @@ test.if(process.platform !== "win32")(
   },
   20_000,
 );
+
+test.if(process.platform !== "win32")(
+  "accounts: a first look that ends after hello went out, before welcome, reaches the server on welcome",
+  async () => {
+    const { home } = pairedHome();
+    const existing = "0193ffff-0000-7000-8000-000000000003";
+    const dir = path.join(home, "accounts", "codex", existing);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    // The CLIs answer once `gate` exists: the first look is still going when hello goes out.
+    const gate = path.join(home, "gate");
+    const fakeCli = [
+      "/bin/sh",
+      "-c",
+      'while [ ! -e "$0" ]; do sleep 0.01; done; exec "$@"',
+      gate,
+      process.execPath,
+      path.join(import.meta.dir, "fake-account-cli.mjs"),
+    ];
+    const found = [{ id: existing, kind: "codex", loggedIn: true }];
+    const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
+    await waitFor(() => c.sockets.length === 1);
+    const s = c.sockets[0] as FakeSocket;
+    s.handlers.onOpen();
+    await waitFor(() => s.of("hello").length === 1);
+    expect(s.of("hello")[0]?.accounts).toBeUndefined();
+    // It ends before the server's welcome, while nothing can reach the server yet.
+    writeFileSync(gate, "");
+    expect(await c.data({ type: "accounts.list" })).toEqual({ accounts: found });
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+    await waitFor(() => s.of("accounts.changed").length > 0);
+    expect(s.of("accounts.changed")).toMatchObject([{ accounts: found }]);
+
+    // A hello that already lists them: welcome adds nothing.
+    expect(await c.data({ type: "reconnect" })).toEqual({ reconnecting: true });
+    await waitFor(() => c.sockets.length === 2);
+    const again = await c.connect();
+    expect(again.of("hello")[0]?.accounts).toMatchObject(found);
+    expect(again.of("accounts.changed")).toEqual([]);
+  },
+  20_000,
+);

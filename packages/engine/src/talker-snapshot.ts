@@ -6,8 +6,7 @@ import { latestPlan, missionOfThread, planMark } from "./missions";
 import { type AgentRun, replyThreadOf } from "./runs";
 import type { WaitMessageOutcome } from "./waits";
 
-const { agentRunSteps, approvals, agentQuestions, agentConsultations, browserHandoffs, messages, users, agents } =
-  schema;
+const { agentRunSteps, agentQuestions, agentConsultations, browserHandoffs, messages, users, agents } = schema;
 
 /** Recent steps of the task shown to the talker. */
 const SNAPSHOT_STEPS = 12;
@@ -32,7 +31,7 @@ export interface TalkerSnapshot {
   task: string;
   elapsedSeconds: number;
   status: AgentRun["status"];
-  /** What it waits on, in words ("approval card «Merge PR #42»"). */
+  /** What it waits on, in words ("an answer to its question «Staging or production?»"). */
   waitingOn: string[];
   /** What the message did to the wait, if it waited. */
   waitOutcome: WaitMessageOutcome | null;
@@ -82,17 +81,7 @@ function stepLine(kind: string, data: Record<string, unknown>): string | null {
 async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
   const out: string[] = [];
   if (run.waitingMachineId) out.push("its computer to come back online (it is offline)");
-  if (run.status === "waiting_approval") {
-    const rows = await db
-      .select({ title: approvals.title })
-      .from(approvals)
-      .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending")));
-    for (const r of rows) {
-      out.push(
-        `a person's decision on the approval card "${clip(r.title, 200)}" (Approve or Deny on the card; chat text never approves it)`,
-      );
-    }
-  }
+  // An approval or a secret never gets here: the talker says nothing for a run that holds messages.
   if (run.status !== "waiting_input") return out;
   const [questions, handoffs, consults] = await Promise.all([
     db
