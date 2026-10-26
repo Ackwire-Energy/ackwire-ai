@@ -189,9 +189,13 @@ test("the dock's CSS: glass and a hairline rounded at both ends, a mark under ea
   const css = textOf("/home/ag-01a142cb", look({ dock: "docklike" }), ".config/gtk-3.0/gtk.css");
   expect(textOf("/home/ag-01a142cb", look(), ".config/gtk-3.0/gtk.css")).toBe(css);
   // docklike's window fills the dock's right end inside its 1 px frame: its corners' radius is the dock's less that
-  // pixel, and the ring around them is where the frame's hairline goes. docklike's launchers carry `open_group`
-  // while their app has windows and `active_group` while one of them is active; the panel's own dock has a button
-  // for each window instead, checked while it is active.
+  // pixel, and the ring around them is where the frame's hairline goes, in the tone the frame shows: the ink at 0.18
+  // over the glass's white at 0.88 is one colour, at 1 - 0.12 × 0.82 ≈ 0.9 alpha. docklike's launchers carry
+  // `open_group` while their app has windows and `active_group` while one of them is active; the panel's own dock
+  // has a button for each window instead, checked while it is active.
+  expect([4, 32, 63].map((ink) => Math.round((ink * 0.18 + 255 * 0.88 * 0.82) / (1 - 0.12 * 0.82)))).toEqual([
+    205, 210, 217,
+  ]);
   expect(
     css,
   ).toBe(`/* The dock: the design system's glass, rounded, with a hairline that still shows on the sky's pale band. */
@@ -207,12 +211,14 @@ test("the dock's CSS: glass and a hairline rounded at both ends, a mark under ea
  * docklike draws in a window of its own process that fills the dock's right end inside the frame's 1 px, and the
  * dock's own drawing never shows under it: there that window is the dock. The glass and its light, no frame of its
  * own; its right corners rounded like the dock's, and the hairline around them a 1 px ring outside it (only the
- * corners fall inside the window; the dock draws the straight edges itself).
+ * corners fall inside the window; the dock draws the straight edges itself), in the hairline's tone over the glass,
+ * since the ring lies on the wallpaper. GTK's CSS can't tell docklike's window from another plugin's that runs in a
+ * process of its own: one added to the dock gets these corners too.
  */
 #XfcePanelWindowWrapper.xfce4-panel.background {
   border: none;
   border-radius: 0 15px 15px 0;
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(4, 32, 63, 0.18);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(205, 210, 217, 0.9);
 }
 
 .xfce4-panel.background button {
@@ -278,8 +284,21 @@ test("Browser: the runner's own command with the desktop's socket, nothing else;
       "",
     ].join("\n"),
   );
-  // The window that says why it didn't open has a class of its own: its entry, out of the menu, gives the dock its
-  // icon, and opened it is Browser's command.
+  // Browser's two notes have classes of their own, so a click on Browser reaches the runner: each one's entry, out of
+  // the menu, gives the dock its icon (Browser's for the wait), and opened it is Browser's command.
+  expect(textOf("/home/ag-01a142cb", look(), ".local/share/applications/agentes-wait.desktop")).toBe(
+    [
+      "[Desktop Entry]",
+      "Type=Application",
+      "Name=Browser",
+      `Exec=${RUNNER.join(" ")} desktop-browser ${SOCKET}`,
+      "Icon=org.xfce.webbrowser",
+      "StartupWMClass=agentes-wait",
+      "StartupNotify=false",
+      "NoDisplay=true",
+      "",
+    ].join("\n"),
+  );
   expect(textOf("/home/ag-01a142cb", look(), ".local/share/applications/agentes-note.desktop")).toBe(
     [
       "[Desktop Entry]",
@@ -476,7 +495,7 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
     version: 4,
-    files: "464f28008150266e",
+    files: "385de5380da648ca",
   });
 });
 

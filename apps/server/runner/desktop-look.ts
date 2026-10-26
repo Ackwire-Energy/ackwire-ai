@@ -81,9 +81,11 @@ export const BROWSER_WM_CLASS = "agentes-browser";
 /** The icon theme's web browser (a globe), with the theme's Files and Terminal icons. */
 export const BROWSER_ICON = "org.xfce.webbrowser";
 /**
- * The window that says why Browser didn't open (`desktop-browser.ts`) has a class of its own: with Browser's, a
- * click on Browser would only bring that window up, where it should try again.
+ * Browser's notes (`desktop-browser.ts`) have window classes of their own: with Browser's, docklike would show them
+ * on Browser, and a click there would only raise or hide the note, never reach the runner, where it is told `busy`
+ * while the browser opens (the wait) or tries again (the one that says why it didn't open).
  */
+export const WAIT_WM_CLASS = "agentes-wait";
 export const NOTE_WM_CLASS = "agentes-note";
 export const NOTE_ICON = "dialog-warning";
 
@@ -100,6 +102,11 @@ const MARK = Buffer.from(MARK_BASE64, "base64");
 const INK = "4, 32, 63";
 /** The dock's rounded ends; its frame is 1 px. */
 const DOCK_RADIUS = 16;
+/**
+ * The dock's hairline as it shows on its glass, in one colour: the ink at 0.18 over white at 0.88. Where a ring
+ * draws it on nothing (docklike's corners), it lands on the wallpaper in the same tone as the dock's own frame.
+ */
+const HAIRLINE_ON_GLASS = "rgba(205, 210, 217, 0.9)";
 
 /** Browser, Files and Terminal, in the dock's and the menu's order. */
 interface DockApp {
@@ -165,15 +172,15 @@ const desktopEntry = (app: DockApp) =>
     "",
   ].join("\n");
 
-/** The note's entry, out of the menu: docklike shows the note's window with its icon. Opened, it is Browser's command. */
-const noteEntry = (browser: DockApp) =>
+/** A note's entry, out of the menu: docklike shows the note's window with its icon. Opened, it is Browser's command. */
+const noteEntry = (browser: DockApp, wmClass: string, icon: string) =>
   [
     "[Desktop Entry]",
     "Type=Application",
     `Name=${browser.name}`,
     `Exec=${browser.exec}`,
-    `Icon=${NOTE_ICON}`,
-    `StartupWMClass=${NOTE_WM_CLASS}`,
+    `Icon=${icon}`,
+    `StartupWMClass=${wmClass}`,
     "StartupNotify=false",
     "NoDisplay=true",
     "",
@@ -405,12 +412,14 @@ const GTK_CSS = `/* The dock: the design system's glass, rounded, with a hairlin
  * docklike draws in a window of its own process that fills the dock's right end inside the frame's 1 px, and the
  * dock's own drawing never shows under it: there that window is the dock. The glass and its light, no frame of its
  * own; its right corners rounded like the dock's, and the hairline around them a 1 px ring outside it (only the
- * corners fall inside the window; the dock draws the straight edges itself).
+ * corners fall inside the window; the dock draws the straight edges itself), in the hairline's tone over the glass,
+ * since the ring lies on the wallpaper. GTK's CSS can't tell docklike's window from another plugin's that runs in a
+ * process of its own: one added to the dock gets these corners too.
  */
 #XfcePanelWindowWrapper.xfce4-panel.background {
   border: none;
   border-radius: 0 ${DOCK_RADIUS - 1}px ${DOCK_RADIUS - 1}px 0;
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(${INK}, 0.18);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 0 0 1px ${HAIRLINE_ON_GLASS};
 }
 
 .xfce4-panel.background button {
@@ -538,7 +547,8 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
     [".config/gtk-3.0/gtk.css", GTK_CSS],
     [".config/menus/xfce-applications.menu", menu(apps)],
     ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),
-    [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp)],
+    [`.local/share/applications/${WAIT_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, WAIT_WM_CLASS, BROWSER_ICON)],
+    [`.local/share/applications/${NOTE_WM_CLASS}.desktop`, noteEntry(apps[0] as DockApp, NOTE_WM_CLASS, NOTE_ICON)],
     ...Object.entries(HIDDEN).map(([id, name]): [string, string] => [
       `.local/share/applications/${id}.desktop`,
       hidden(name),

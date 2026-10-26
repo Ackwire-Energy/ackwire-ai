@@ -4,7 +4,7 @@ import { chmodSync, chownSync, rmSync, statSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import type { MachineErrorCode } from "@agenteschat/adapters/machine-protocol";
-import { BROWSER_ICON, BROWSER_WM_CLASS, NOTE_ICON, NOTE_WM_CLASS } from "./desktop-look";
+import { BROWSER_ICON, NOTE_ICON, NOTE_WM_CLASS, WAIT_WM_CLASS } from "./desktop-look";
 import { toMachineError } from "./errors";
 
 /**
@@ -134,8 +134,8 @@ const NOTE_COLUMNS = 56;
 /**
  * The note as an xfce4-terminal of its own (every desktop has one), small, with no menu or bars: the text
  * wrapped and indented, the cursor hidden, a row free above and below. The wait stays until closed, with Browser's
- * window class, so the dock shows it on Browser; the reason stays until Enter, with a class of its own, so a click
- * on Browser tries again rather than bringing that window up.
+ * icon; the reason until Enter. Each has a window class of its own (`desktop-look.ts`), so a click on Browser
+ * always reaches the runner: told `busy` during the wait, trying again after the reason.
  */
 export function noteArgs(kind: "wait" | "error", text: string): string[] {
   const error = kind === "error";
@@ -143,7 +143,7 @@ export function noteArgs(kind: "wait" | "error", text: string): string[] {
   const end = error ? "printf '\\n  %s' 'Press Enter to close.'; read -r _" : `exec sleep ${SHOW_MS / 1000}`;
   return [
     "--disable-server",
-    `--class=${error ? NOTE_WM_CLASS : BROWSER_WM_CLASS}`,
+    `--class=${error ? NOTE_WM_CLASS : WAIT_WM_CLASS}`,
     "--title=Browser",
     `--icon=${error ? NOTE_ICON : BROWSER_ICON}`,
     "--hide-menubar",

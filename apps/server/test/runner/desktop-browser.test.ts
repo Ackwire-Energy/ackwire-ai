@@ -274,9 +274,10 @@ test("the note: a small terminal window, its text wrapped and indented with a ro
     "--hide-scrollbar",
   ];
   const show = "printf '\\033[?25l\\n'; printf '%s\\n' \"$1\" | fold -s -w 56 | sed 's/^/  /';";
-  // The wait has Browser's window class: the dock shows it on Browser.
+  // The wait has Browser's icon and a class of its own: with Browser's, docklike would show it on Browser, and a
+  // second click there would hide it instead of reaching the runner (told `busy`).
   expect(noteArgs("wait", "Opening the browser…")).toEqual([
-    ...head("agentes-browser", "org.xfce.webbrowser"),
+    ...head("agentes-wait", "org.xfce.webbrowser"),
     "--geometry=60x3",
     "-x",
     "/bin/sh",
