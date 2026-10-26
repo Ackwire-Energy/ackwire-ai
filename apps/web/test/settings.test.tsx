@@ -245,9 +245,15 @@ describe("Configurações da organização", () => {
       await settle();
     };
     const field = within(add).getByLabelText("Chave da API");
+    // The name's example is the chosen provider's; the key's, how its keys start where the maker publishes it.
+    const name = () => within(add).getByLabelText("Nome da chave");
+    expect(name().getAttribute("placeholder")).toBe("Ex.: Claude da Acme");
+    expect(field.getAttribute("placeholder")).toBe("sk-ant-…");
 
     // MiniMax also sells a plan: the help says its key won't do, and its sk-cp- keys are refused.
     await choose("MiniMax");
+    expect(name().getAttribute("placeholder")).toBe("Ex.: MiniMax da Acme");
+    expect(field.hasAttribute("placeholder")).toBe(false);
     expect(add.textContent).toContain("Use uma chave de pagamento por uso");
     await type(field, "sk-cp-abcdefghijklmnopqrst");
     await click(within(add).getByRole("button", { name: "Salvar chave" }));

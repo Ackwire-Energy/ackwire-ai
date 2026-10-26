@@ -76,12 +76,20 @@ describe("Contas de IA", () => {
   test("never blank: with no plan yet, one way to connect one, the same picker as everywhere", async () => {
     await page([]);
     const plans = screen().getByRole("region", { name: "Seus planos" });
-    // Its title and ⓘ (what a plan is for and where it stays), the empty line, Connect: nothing else to read.
+    // Its title and ⓘ (what a plan is for and where it stays), Connect, the empty line: nothing else to read.
     expect(hintOf("Seus planos", plans).text).toBe(
       "Cada conta pensa por um agente e fica no computador onde foi conectada; quem administra esse computador pode acessá-la. O agentes.chat guarda só o nome, o email e o uso.",
     );
-    expect(shownText(plans)).toBe("Seus planosNenhum plano ainda.Conectar uma IA");
-    await act(async () => fireEvent.click(within(plans).getByRole("button", { name: "Conectar uma IA" })));
+    expect(shownText(plans)).toBe("Seus planosConectar uma IANenhum plano ainda.");
+    // Its action in its head, the way Provider keys has Add key: the same kind of button in the same place.
+    const connect = within(plans).getByRole("button", { name: "Conectar uma IA" });
+    const add = within(screen().getByRole("region", { name: "Chaves de provedor" })).getByRole("button", {
+      name: "Adicionar chave",
+    });
+    expect(connect.parentElement?.querySelector("h2")?.textContent).toBe("Seus planos");
+    expect(add.parentElement?.querySelector("h2")?.textContent).toBe("Chaves de provedor");
+    expect(connect.className).toBe(add.className);
+    await act(async () => fireEvent.click(connect));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     expect(within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" })).toBeTruthy();

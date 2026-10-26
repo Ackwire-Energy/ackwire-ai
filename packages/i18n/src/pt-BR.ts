@@ -7314,7 +7314,7 @@ export const ptBR = {
     addKey: "Adicionar chave",
     addKeyTitle: "Adicionar chave de API",
     keyLabel: "Nome da chave",
-    keyLabelPlaceholder: "Ex.: Claude da Acme",
+    keyLabelPlaceholder: "Ex.: {{provider}} da Acme",
     workspaceIdPlaceholder: "Opcional",
     keyValue: "Chave da API",
     keyInvalid: "Cole a chave da API (pelo menos 8 caracteres).",

@@ -7276,7 +7276,7 @@ export const en: Translations = {
     addKey: "Add key",
     addKeyTitle: "Add an API key",
     keyLabel: "Key name",
-    keyLabelPlaceholder: "E.g. Acme Claude",
+    keyLabelPlaceholder: "E.g. Acme {{provider}}",
     workspaceIdPlaceholder: "Optional",
     keyValue: "API key",
     keyInvalid: "Paste the API key (at least 8 characters).",

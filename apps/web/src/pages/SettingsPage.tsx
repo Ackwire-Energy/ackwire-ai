@@ -806,7 +806,7 @@ export function KeyDialog({
               <Input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder={t("settings.keyLabelPlaceholder")}
+                placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
               />
             </Field>
           )}

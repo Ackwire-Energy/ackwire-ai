@@ -9973,12 +9973,6 @@ html[data-menu-overlay] .shell {
   line-height: 18px;
   color: var(--ink-muted);
 }
-.ai-accounts__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
 .ai-accounts__row .ac-planmeter {
   margin-top: 4px;
   max-width: 320px;
