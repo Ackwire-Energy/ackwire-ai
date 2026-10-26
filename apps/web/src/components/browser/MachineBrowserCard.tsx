@@ -101,7 +101,6 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         id="sec-machine-browser"
         icon="globe"
         title={t("browser.title")}
-        subtitle={t("browser.machine.description")}
         action={
           switchedOn &&
           canReduceAccess(m) && (

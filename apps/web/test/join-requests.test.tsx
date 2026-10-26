@@ -201,11 +201,11 @@ describe("Members › Requests to join", () => {
     const ana = within(section).getByRole("group", { name: "Ana Souza pede para entrar" });
     expect(ana.textContent).toContain("Ana Souza pede para entrar");
     expect(ana.textContent).toContain("ana@estudio.com");
-    expect(ana.textContent).toContain("E-mail confirmado: a pessoa entra quando você aprovar.");
-    const proof = within(ana).getByText("E-mail confirmado: a pessoa entra quando você aprovar.").parentElement;
+    expect(ana.textContent).toContain("E-mail confirmado");
+    const proof = within(ana).getByText("E-mail confirmado").parentElement;
     expect(proof?.classList.contains("ac-iconline")).toBe(true);
     expect(ana.textContent).toContain("“Designer nova da Paula”");
-    expect(ana.textContent).toMatch(/Pelo link de convite · fecha em /);
+    expect(within(ana).getByText(/^Fecha em \S+/)).toBeTruthy();
     expect(ana.querySelector(".ac-chip")?.textContent).toBe("Pediu há 2 h");
     expect(card("Bruno Lima").textContent).toContain("E-mail não confirmado: aprovar manda um convite para ele.");
     expect(card("Bruno Lima").querySelector(".ac-chip")?.textContent).toMatch(/^Pediu em \d/);
@@ -237,7 +237,7 @@ describe("Members › Requests to join", () => {
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Mande este link para Bruno Lima" });
-    expect(dialog.textContent).toContain("Este servidor não manda e-mail.");
+    expect(dialog.textContent).toContain("Este servidor não manda e-mail. O link vale por 7 dias.");
     expect((within(dialog).getByRole("textbox") as HTMLInputElement).value).toBe("http://localhost:3000/invite/tok-r2");
   });
 
@@ -331,13 +331,21 @@ describe("Members › Invitation link", () => {
       ],
     });
     const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(invite.textContent).toContain("Quem você convida por e-mail entra direto.");
+    // Inviting by email lets people straight in: the Emails field's ⓘ says so, and describes the field.
+    const about = within(invite).getByRole("button", { name: "Sobre E-mails, separados por vírgula" });
+    const joins = document.getElementById(about.getAttribute("aria-describedby") ?? "");
+    expect(joins?.textContent).toBe("Quem você convida por e-mail entra direto.");
+    expect(within(invite).getByLabelText("E-mails, separados por vírgula").getAttribute("aria-describedby")).toBe(
+      joins?.id ?? null,
+    );
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(
       "http://localhost:3000/invite/k3J",
     );
-    expect(invite.textContent).toMatch(
-      /Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
+    // Who can get in through a shared link stays on screen, not behind an ⓘ.
+    const linkLine = within(invite).getByText(
+      /^Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
     );
+    expect(linkLine.closest("[hidden]")).toBeNull();
     expect(invite.textContent).toMatch(/Link anterior · criado .+ por João · vale até /);
 
     const [turnOff] = within(invite).getAllByRole("button", { name: "Desativar" });

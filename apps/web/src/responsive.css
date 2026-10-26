@@ -515,6 +515,10 @@
   .outage__crew {
     display: none;
   }
+  /* The setup notice names no one: its faces are who waits for the computer. */
+  .setup-notice .outage__crew {
+    display: inline-flex;
+  }
   .outage__acts {
     flex-basis: 100%;
   }

@@ -10,6 +10,7 @@ import {
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
+  catchUpChannel,
   consultSeeds,
   consultsIn,
   dismissRun,
@@ -248,7 +249,9 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     [channelId],
   );
 
-  // On open and after every reconnect: the server's active runs replace what we guessed.
+  // On open and after every reconnect: the server's active runs replace what we guessed. The channel's events reach
+  // us only once the server confirms its subscription (the first, and after every reconnect): then the runs are
+  // checked again and what the lists missed before then (an answer posted while the conversation opened) is added.
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
@@ -266,9 +269,15 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       check();
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
     });
+    const offSubscribed = connection?.onSubscribed((id) => {
+      if (id !== channelId) return;
+      check();
+      void catchUpChannel(api, qc, orgId, channelId);
+    });
     return () => {
       alive = false;
       off?.();
+      offSubscribed?.();
     };
   }, [api, connection, enabled, orgId, channelId, qc]);
 

@@ -42,6 +42,7 @@ import {
   EmptyState,
   Field,
   Icon,
+  InfoHint,
   Input,
   List,
   Menu,
@@ -55,6 +56,7 @@ import { useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenComputer } from "@/components/computer/open";
+import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
@@ -62,7 +64,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
-import { SetupFacts, SetupPlans, useSetupView } from "./WorkspaceComputer";
+import { ComputerTitle, SetupFacts, useSetupView } from "./WorkspaceComputer";
 
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
@@ -185,9 +187,12 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
   const app = useAgentsHere() && !download;
   return (
     <div className="machine-connect">
-      <p className="small muted" style={{ margin: 0 }}>
-        {app ? t("machines.thisMac.text") : t("machines.download.text")}
-      </p>
+      {/* With no build published there is nothing to install: the note below says the app isn't out yet. */}
+      {(app || release) && (
+        <p className="small muted" style={{ margin: 0 }}>
+          {app ? t("machines.thisMac.text") : t("machines.download.text")}
+        </p>
+      )}
       {app ? (
         <div className="row" style={{ gap: 12, alignItems: "center" }}>
           <ComputerPortrait kind="mac" state="online" />
@@ -216,7 +221,12 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
           </div>
           {release.sha256 && (
             <div className="machine-connect__sha">
-              <span className="small muted">{t("machines.download.sha")}</span>
+              <span className="ac-hintline small muted">
+                <span>{t("machines.download.sha")}</span>
+                <InfoHint name={t("common.about", { label: t("machines.download.sha") })}>
+                  {t("machines.download.shaHelp")}
+                </InfoHint>
+              </span>
               <code className="machine-connect__hash">{release.sha256}</code>
               <Button
                 size="sm"
@@ -228,7 +238,6 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
               />
             </div>
           )}
-          {release.sha256 && <span className="small muted">{t("machines.download.shaHelp")}</span>}
         </div>
       ) : (
         <Alert tone="neutral">{t("machines.download.unavailable")}</Alert>
@@ -259,7 +268,6 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
               {t("machines.download.otherText")}
             </p>
             <CommandBlock command={installCommand(origin)} />
-            <span className="small muted">{t("machines.download.otherNeeds")}</span>
           </div>
         )}
       </div>
@@ -564,7 +572,6 @@ export function MachinesSection() {
   const { org } = useOrg();
   const machines = useMachines(org.id);
   const canPair = can(org.role, "post");
-  const agentsHere = useAgentsHere();
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
   // This server's computer and the workspace's own have cards of their own: this list is people's.
@@ -574,10 +581,14 @@ export function MachinesSection() {
       <Card aria-labelledby="sec-machines">
         <div className="computers-card__head">
           <span className="computers-card__title">
-            <h2 id="sec-machines" className="ac-card__title">
-              {t("computers.other.title")}
-            </h2>
-            <span className="small muted">{t("computers.other.text")}</span>
+            <span className="ac-hintline">
+              <h2 id="sec-machines" className="ac-card__title">
+                {t("computers.other.title")}
+              </h2>
+              <InfoHint name={t("common.about", { label: t("computers.other.title") })}>
+                {t("computers.other.text")}
+              </InfoHint>
+            </span>
           </span>
           <DownloadMacButton />
         </div>
@@ -590,9 +601,6 @@ export function MachinesSection() {
             <ComputerPortrait kind="mac" state="offline" size={96} />
             <span className="computers-empty__text">
               <b>{t("computers.other.emptyTitle")}</b>
-              <span className="small muted">
-                {agentsHere ? t("machines.thisMac.emptyText") : t("computers.other.emptyText")}
-              </span>
             </span>
           </div>
         )}
@@ -708,12 +716,9 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
   const here = useIsThisMac(org.id, m.id);
   return (
     <Card aria-labelledby="sec-machine-folders">
-      <div className="stack-4" style={{ gap: 2 }}>
-        <h2 id="sec-machine-folders" className="ac-card__title">
-          {t("machines.access.folders")}
-        </h2>
-        <span className="small muted">{t("machines.access.foldersText")}</span>
-      </div>
+      <h2 id="sec-machine-folders" className="ac-card__title">
+        {t("machines.access.folders")}
+      </h2>
       {!access && m.canManage && here ? (
         <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <p className="small muted" style={{ margin: 0, flex: 1, minWidth: 200 }}>
@@ -805,12 +810,9 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
   if (!access) return null;
   return (
     <Card aria-labelledby="sec-machine-tools">
-      <div className="stack-4" style={{ gap: 2 }}>
-        <h2 id="sec-machine-tools" className="ac-card__title">
-          {t("machines.access.tools")}
-        </h2>
-        <span className="small muted">{t("machines.access.toolsText")}</span>
-      </div>
+      <h2 id="sec-machine-tools" className="ac-card__title">
+        {t("machines.access.tools")}
+      </h2>
       <List aria-label={t("machines.access.tools")}>
         {MACHINE_TOOLS.map((tool) => {
           const on = access.tools[tool];
@@ -825,8 +827,10 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
                 <ProviderLogo id={tool} size="sm" off={!on} />
               )}
               <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
-                <span className="machine-folder__name">{name}</span>
-                <span className="small muted">{t(`machines.access.toolText.${tool}`)}</span>
+                <span className="ac-hintline">
+                  <span className="machine-folder__name">{name}</span>
+                  <InfoHint name={t("common.about", { label: name })}>{t(`machines.access.toolText.${tool}`)}</InfoHint>
+                </span>
                 {tool === "commands" && on && <span className="small muted">{t("machines.access.commandsWarn")}</span>}
               </span>
               <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
@@ -895,28 +899,6 @@ function GrantCard({ machine: m }: { machine: Machine }) {
 }
 
 /**
- * The workspace's own computer's page: what is on it for every agent, in a person's words. Its browser and files
- * are on each agent's screen, not cards of their own; "always on" is the page's lead.
- */
-function OnThisComputerCard() {
-  const { t } = useTranslation();
-  return (
-    <Card aria-labelledby="sec-on-this-computer">
-      <h2 id="sec-on-this-computer" className="ac-card__title">
-        {t("computers.onIt.title")}
-      </h2>
-      <ul className="setup-facts setup-facts--stack">
-        <li className="ac-iconline">
-          <Icon name="computer" size={14} />
-          {t("computers.onIt.screens")}
-        </li>
-      </ul>
-      <SetupPlans />
-    </Card>
-  );
-}
-
-/**
  * Open beside each agent on a computer's page: the agent's computer in its dialog, in place. Only for whoever may
  * watch it (its screen's state answers them; anyone else gets a 403), as on the agent's page.
  */
@@ -980,6 +962,12 @@ export function MachinePage({ machineId }: { machineId: string }) {
   const paused = isPaused(m);
   // The workspace's own computer (ADR 0056 §10): its size and one user per agent, never its system or folder.
   const managed = m.kind === "managed";
+  const title = machineTitle(m, t("machines.host.label"));
+  const heading = (
+    <h2 id="sec-machine" className="ac-card__title">
+      {title}
+    </h2>
+  );
   return (
     <>
       {back}
@@ -992,9 +980,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
             size={96}
           />
           <span className="list-col machine-page__title">
-            <h2 id="sec-machine" className="ac-card__title">
-              {machineTitle(m, t("machines.host.label"))}
-            </h2>
+            {managed ? <ComputerTitle name={title}>{heading}</ComputerTitle> : heading}
             <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               {m.kind === "host" && m.name && <Chip icon="computer">{t("machines.host.label")}</Chip>}
               <MachineChip online={m.online} />
@@ -1051,7 +1037,8 @@ export function MachinePage({ machineId }: { machineId: string }) {
                         <span className="machine-page__agent-name">
                           {a.name} <span className="muted">@{a.handle}</span>
                         </span>
-                        {folders && (
+                        {/* On the workspace's own computer, each agent's own folder is its name's ⓘ. */}
+                        {folders && (folders.length > 0 || !managed) && (
                           <span className="small muted">
                             {folders.length > 0
                               ? t("machines.page.agentFolders", { folders: joinNames(folders, t("newAgent.and")) })
@@ -1076,7 +1063,9 @@ export function MachinePage({ machineId }: { machineId: string }) {
         </p>
       )}
       {managed ? (
-        <OnThisComputerCard />
+        <p className="page__note">
+          <HelpLink slug="workspace-computer">{t("computers.about")}</HelpLink>
+        </p>
       ) : (
         <>
           <FoldersCard machine={m} onReduce={setReduce} />

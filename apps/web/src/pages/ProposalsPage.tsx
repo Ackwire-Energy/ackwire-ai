@@ -186,7 +186,6 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                     current.target.type === "org_context" ? t("proposals.finalTextContext") : t("proposals.finalText")
                   }
                   id="prop-edit"
-                  help={t("proposals.finalHelp")}
                 >
                   <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
                 </Field>

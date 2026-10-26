@@ -352,7 +352,7 @@ function ComputerStage({
         <div className="cmp-prep">
           <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="paused" size={96} />
           <b className="cmp-prep__title">{t("computerSetup.notice.title", { org: org.name })}</b>
-          <SetupWait view={f.setup} reader={reader} agentName={agent.name} />
+          <SetupWait view={f.setup} reader={reader} />
         </div>
       </>
     );
@@ -452,11 +452,8 @@ function ComputerStage({
               color={color}
               art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
               text={t("agentComputer.state.offline", { computer })}
-              help={
-                since
-                  ? t("agentComputer.state.offlineHelp", { ...g, time: since })
-                  : t("agentComputer.state.offlineHelpPlain", g)
-              }
+              // The head already says since when.
+              help={t("agentComputer.state.offlineHelpPlain", g)}
               action={
                 manages &&
                 outage &&
@@ -512,7 +509,6 @@ function ComputerStage({
             color={color}
             icon="dash"
             text={t("agentComputer.state.noScreen", g)}
-            help={manages ? t("agentComputer.state.noScreenHelp") : undefined}
             action={
               manages && (
                 <Button size="sm" onClick={openTools}>

@@ -17,8 +17,6 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import {
   Button,
   Card,
@@ -27,12 +25,12 @@ import {
   ComputerPortrait,
   Icon,
   type IconName,
-  ProviderStack,
+  InfoHint,
   Spinner,
   Steps,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -114,21 +112,10 @@ export function SetupProgress({ view }: { view: SetupView }) {
 
 /**
  * The wait in words, under the steps: the time left, then who hears when it's ready. Only owners get the
- * email, so only they are told so (`promisesEmail`); everyone else is told it shows here. `closeable` false: the
- * page holds something not saved yet (the setup's Computer step, before the agents exist), so the email line
- * doesn't say it can be closed. `bell` false: where a line of the caller's own says what happens once it's ready.
+ * email, so only they are told so (`promisesEmail`); everyone else is told it shows here. `bell` false: the time
+ * left alone, where a line of the caller's own says what happens once it's ready.
  */
-export function SetupWaitLines({
-  view,
-  reader,
-  closeable = true,
-  bell = true,
-}: {
-  view: SetupView;
-  reader: WaitReader;
-  closeable?: boolean;
-  bell?: boolean;
-}) {
+export function SetupWaitLines({ view, reader, bell = true }: { view: SetupView; reader: WaitReader; bell?: boolean }) {
   const { t } = useTranslation();
   const { eta, email } = useSetupWait(view, reader.held);
   if (!setupPending(view) || reader.held) return null;
@@ -140,81 +127,52 @@ export function SetupWaitLines({
           {etaLine(t, eta)}
         </p>
       )}
-      {(emailed || bell) && (
+      {bell && (
         <p className="setup-line ac-iconline">
           <Icon name={emailed ? "mail" : "bell"} size={14} />
-          <span>
-            {emailed
-              ? t(closeable ? "computerSetup.email.you" : "computerSetup.email.youStay", { email: reader.email })
-              : t("computerSetup.email.here")}
-          </span>
+          <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
         </p>
       )}
     </>
   );
 }
 
-/** "4 CPUs · 8 GB de memória · 100 GB de disco" (once the provisioner said) and "Um usuário para cada agente". */
+/** "4 CPUs · 8 GB de memória · 100 GB de disco", once the provisioner said. */
 export function SetupFacts({ view }: { view: SetupView }) {
   const { t } = useTranslation();
+  if (!view.specs) return null;
   return (
-    <ul className="setup-facts">
-      {view.specs && (
-        <li className="ac-iconline">
-          <Icon name="computer" size={14} />
-          {t("computerSetup.specs", view.specs)}
-        </li>
-      )}
-      <li className="ac-iconline">
-        <Icon name="members" size={14} />
-        {t("computerSetup.users")}
-      </li>
-    </ul>
-  );
-}
-
-/**
- * The AI plans the agents sign in with on this computer, led by their makers' marks: on a row of its own under a
- * hairline, since the overlapped marks are wider than the facts' icons and would push the text out of their column.
- */
-export function SetupPlans() {
-  const { t } = useTranslation();
-  return (
-    <p className="setup-line setup-plans ac-iconline">
-      <ProviderStack ids={PLAN_MARKS} label={t("computerSetup.plansMarks")} />
-      <span>{t("computerSetup.plans")}</span>
+    <p className="setup-line ac-iconline">
+      <Icon name="computer" size={14} />
+      <span>{t("computerSetup.specs", view.specs)}</span>
     </p>
   );
 }
 
 /**
- * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left,
- * who hears when it's ready, the agent that waits for it (in its dialog), the size, then the plans.
+ * The workspace computer's name with its ⓘ (one user per agent, each with its own folder), wherever the name
+ * shows: the setup's card, Settings › Computers and the computer's own page.
  */
-export function SetupWait({
-  view,
-  reader,
-  agentName,
-  closeable,
-}: {
-  view: SetupView;
-  reader: WaitReader;
-  agentName?: string;
-  closeable?: boolean;
-}) {
+export function ComputerTitle({ children, name }: { children: ReactNode; name: string }) {
   const { t } = useTranslation();
+  return (
+    <span className="ac-hintline">
+      {children}
+      <InfoHint name={t("common.about", { label: name })}>{t("computerSetup.users")}</InfoHint>
+    </span>
+  );
+}
+
+/**
+ * The preparing screen's parts, the same in the onboarding and the computer dialog: the steps, the time left, who
+ * hears when it's ready, then the size.
+ */
+export function SetupWait({ view, reader }: { view: SetupView; reader: WaitReader }) {
   return (
     <div className="setup-wait">
       <SetupProgress view={view} />
-      <SetupWaitLines view={view} reader={reader} closeable={closeable} />
-      {agentName && setupPending(view) && (
-        <p className="setup-line ac-iconline">
-          <Icon name="clock" size={14} />
-          <span>{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
-        </p>
-      )}
+      <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
-      <SetupPlans />
     </div>
   );
 }
@@ -237,7 +195,7 @@ export const managedOf = (machines: Machine[] | undefined) => machines?.find((m)
 /**
  * Configurações → Computadores where the workspace gets its own computer: its card, with no hostname, system or
  * address, and no Remove. On its way: the steps, the time left, or why it waits; ready: online or not. Always
- * its size and one user per agent, and the agents on it.
+ * its size, one user per agent behind its name's ⓘ, and the agents on it.
  */
 export function WorkspaceComputerCard({ view }: { view: SetupView }) {
   const { t } = useTranslation();
@@ -254,19 +212,21 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
           size={96}
         />
         <span className="computers-card__title">
-          <h2 id="sec-workspace-computer" className="ac-card__title">
-            {machine ? (
-              <Link
-                to="/org/$orgId/settings/computers/$machineId"
-                params={{ orgId: org.id, machineId: machine.id }}
-                className="machine-row__name"
-              >
-                {title}
-              </Link>
-            ) : (
-              title
-            )}
-          </h2>
+          <ComputerTitle name={title}>
+            <h2 id="sec-workspace-computer" className="ac-card__title">
+              {machine ? (
+                <Link
+                  to="/org/$orgId/settings/computers/$machineId"
+                  params={{ orgId: org.id, machineId: machine.id }}
+                  className="machine-row__name"
+                >
+                  {title}
+                </Link>
+              ) : (
+                title
+              )}
+            </h2>
+          </ComputerTitle>
           <span className="row" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <SetupChip view={view} machine={machine} />
           </span>
@@ -298,9 +258,9 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
 
 /**
  * "Preparando o computador da Acme": the notice at the top of the work area while the workspace's own computer
- * is on its way: the step, the time left and the agents that wait for it ("Passo 3 de 4 · Instalando os
- * programas · faltam uns 6 min · Ada e Theo esperam por ele"). Everyone sees it; closed, it stays closed until
- * the state (or the step) changes.
+ * is on its way: the step and the time left ("Passo 3 de 4 · Instalando os programas · faltam uns 6 min"), and
+ * the faces of the agents that wait for it, each named by its label. Everyone sees it; closed, it stays closed
+ * until the state (or the step) changes.
  */
 export function ComputerSetupNotice() {
   const { t, i18n } = useTranslation();
@@ -320,15 +280,6 @@ export function ComputerSetupNotice() {
       ? t("computerSetup.stepOf", { n: view.stepNumber, total: SETUP_STEPS.length, step: t(view.textKey) })
       : t(view.textKey),
     eta ? lowerFirst(etaLine(t, eta), i18n.language) : null,
-    waiting.length > 0
-      ? t("computerSetup.notice.waits", {
-          count: waiting.length,
-          names: joinNames(
-            waiting.map((a) => a.name),
-            t("newAgent.and"),
-          ),
-        })
-      : null,
   ]
     .filter(Boolean)
     .join(" · ");

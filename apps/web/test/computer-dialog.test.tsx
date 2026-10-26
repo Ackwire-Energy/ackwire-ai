@@ -152,7 +152,7 @@ afterEach(() => {
 });
 
 describe("the computer dialog, Cloud: the workspace's own computer", () => {
-  test("being prepared: the steps, the time left, the email to owners, the plans; no screen yet", async () => {
+  test("being prepared: the steps, the time left, the email to owners, the size; no screen yet", async () => {
     const t = await dialog({
       setup: {
         step: "installing",
@@ -171,10 +171,11 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(text).toContain("Preparando o computador da Acme");
     expect(text).toContain("Passo 3 de 4 · Instalando os programas");
     expect(text).toContain("Faltam uns 6 min");
-    expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto. Pode fechar esta página.");
-    expect(text).toContain("A Ada começa a usar assim que ele ficar pronto.");
-    expect(text).toContain("Os agentes podem pensar com o seu próprio plano de IA, com login neste computador.");
+    expect(text).toContain("Avisamos você em walter@acme.com.br quando ele ficar pronto.");
+    expect(text).not.toContain("Pode fechar esta página");
     expect(text).toContain("4 CPUs · 8 GB de memória · 100 GB de disco");
+    // The head already says whose computer this is: no line that Ada waits, no users line, no plans.
+    expect(text).not.toMatch(/começa a usar|Um usuário para cada agente|plano de IA/);
     // Nothing to do but close: no screen opens, no take control.
     expect(t.sockets.screens).toHaveLength(0);
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
@@ -219,7 +220,8 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     });
     expect(sub()).toBe("Em pausa por enquanto · dá para assistir");
     expect(box().textContent).toContain("A Ada está em pausa por enquanto");
-    expect(box().textContent).toContain("Dá para assistir. Ninguém assume o controle até a pausa acabar.");
+    expect(box().textContent).toContain("Ninguém assume o controle até a pausa acabar.");
+    expect(box().textContent).not.toContain("Dá para assistir.");
     expect(box().textContent).not.toContain("min");
   });
 
@@ -248,9 +250,8 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     });
     expect(sub()).toBe("Sem resposta");
     expect(box().textContent).toContain("O Computador da Acme não está respondendo");
-    expect(box().textContent).toContain(
-      "Costuma voltar em poucos minutos. Já estamos cuidando: nada a fazer do seu lado.",
-    );
+    expect(box().textContent).toContain("Costuma voltar em poucos minutos. Já estamos cuidando.");
+    expect(box().textContent).not.toContain("nada a fazer");
     expect(view().queryByRole("button", { name: "Trocar computador" })).toBeNull();
     expect(t.sockets.screens).toHaveLength(0);
   });
@@ -359,7 +360,7 @@ describe("the computer dialog, self-host", () => {
     await dialog({ machine: { paused: { until: until.toISOString() } } });
     const banner = box().querySelector(".cmp-banner") as HTMLElement;
     expect(banner.textContent).toContain("O Servidor de casa está pausado até");
-    expect(banner.textContent).toContain("Quem conectou pausou os agentes no próprio computador.");
+    expect(banner.textContent).toContain("Pausado no próprio computador por quem o conectou.");
     expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
   });
 
@@ -373,7 +374,9 @@ describe("the computer dialog, self-host", () => {
       browser: true,
     });
     expect(box().textContent).toContain("O Servidor de casa está offline");
-    expect(box().textContent).toMatch(/Desde \d\d:\d\d\. A Ada espera o computador voltar\./);
+    // Since when is the head's: the cover says only that Ada waits.
+    expect(box().textContent).toContain("A Ada espera o computador voltar.");
+    expect(box().textContent).not.toMatch(/Desde \d\d:\d\d/);
     expect(sub()).toMatch(/^Offline desde \d\d:\d\d$/);
     // The switch shows where the server lists the outage.
     expect(view().queryByRole("button", { name: "Trocar computador" })).toBeNull();
@@ -435,10 +438,10 @@ describe("the computer dialog, self-host", () => {
     expect(view().getByRole("button", { name: "Escolher um computador" })).toBeTruthy();
   });
 
-  test("neither its screen nor its browser: where to allow them", async () => {
+  test("neither its screen nor its browser: where to allow them is the button", async () => {
     await dialog({ desktop: { available: false, reason: "no_desktop" } });
     expect(box().textContent).toContain("A Ada não tem tela para mostrar aqui");
-    expect(box().textContent).toContain("Libere a tela ou o navegador em Ferramentas e acesso.");
+    expect(box().textContent).not.toContain("Libere a tela ou o navegador");
     expect(view().getByRole("button", { name: "Abrir Ferramentas e acesso" })).toBeTruthy();
   });
 

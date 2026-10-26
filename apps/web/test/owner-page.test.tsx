@@ -122,6 +122,8 @@ describe("Adicionar uma senha (account menu)", () => {
     await click(within(menu).getByRole("menuitem", { name: /^Adicionar uma senha/ }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Adicionar uma senha" });
+    // The menu item already says what it's for: the dialog goes straight to the field.
+    expect(dialog.querySelector(".ac-dialog__body > p")).toBeNull();
     const save = within(dialog).getByRole("button", { name: "Salvar senha" });
     expect(save.hasAttribute("disabled")).toBe(true);
     await type(within(dialog).getByLabelText("Nova senha"), "correct horse battery");

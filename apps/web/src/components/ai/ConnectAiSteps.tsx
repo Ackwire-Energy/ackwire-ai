@@ -40,7 +40,7 @@ import { useOrg } from "@/components/org-context";
 import { KeyMismatch } from "@/components/ProviderKey";
 import { managedOf, SetupProgress, SetupWaitLines, useWaitReader } from "@/components/WorkspaceComputer";
 import { useToast } from "@/lib/toast";
-import { AddAccount, OpenPage, Step } from "./AddAccountFlow";
+import { AddAccount, OpenPage, Step, StepTitle } from "./AddAccountFlow";
 
 /*
  * One picker wherever an AI is connected (the setup's AI step, Connect an AI, Settings › AI accounts): the six
@@ -395,11 +395,11 @@ function PlanSteps({
             <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
               <span className="ac-option__text">
                 <span className="ac-option__title">{t("connectAi.own.other", { brand })}</span>
-                <span className="ac-option__desc">{t("connectAi.own.otherText", { computer })}</span>
               </span>
             </OptionCard>
           </div>
-          <SettingNote icon="lock">{t("connectAi.own.note")}</SettingNote>
+          {/* With another account, its steps say it once, for its one agent. */}
+          {!otherChosen && <SettingNote icon="lock">{t("connectAi.own.note")}</SettingNote>}
         </>
       )}
       {steps && (!ownable || otherChosen) && (
@@ -413,9 +413,7 @@ function PlanSteps({
           askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
           local={view?.ownSignIn}
           ready={ready}
-          note={
-            !coding && <SettingNote icon="lock">{t("aiAccounts.share.on", agentGrammar(t, agentName))}</SettingNote>
-          }
+          note={!coding && <SettingNote icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</SettingNote>}
           onAdded={(a) => void assign(a)}
         />
       )}
@@ -430,8 +428,9 @@ export interface KeyDraft {
 }
 
 /**
- * The API key: its maker, by its mark; where that maker's keys are made; then the key, pasted here. `onSave`: saved
- * right here (the dialog); else the caller saves it with its own button (the setup).
+ * The API key: who charges for it (a maker's key only: the agentes.chat key isn't paid to a provider; the row just
+ * chosen already names the panel), its maker by its mark, where that maker's keys are made, then the key, pasted
+ * here. `onSave`: saved right here (the dialog); else the caller saves it with its own button (the setup).
  */
 export function KeyPanel({
   draft,
@@ -464,11 +463,11 @@ export function KeyPanel({
   const pick = (next: ProviderId | "platform") => onDraft({ provider: next, apiKey });
   return (
     <Card as="section" className="ai-panel" aria-label={t("connectAi.key.title")}>
-      <PanelHead
-        lead={<ProviderStack ids={KEY_MARKS} />}
-        title={t("connectAi.key.title")}
-        sub={t("connectAi.key.sub")}
-      />
+      {keyOf && (
+        <p className="small muted" style={{ margin: 0 }}>
+          {t("connectAi.key.sub")}
+        </p>
+      )}
       {locked ? (
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (
@@ -504,8 +503,10 @@ export function KeyPanel({
                   </OpenPage>
                 }
               >
-                <b>{t("connectAi.key.create", providerGrammar(t, keyOf))}</b>
-                {maker.plans && <span>{t("connectAi.key.notPlan")}</span>}
+                <StepTitle
+                  title={t("connectAi.key.create", providerGrammar(t, keyOf))}
+                  hint={maker.plans ? t("connectAi.key.notPlan") : undefined}
+                />
               </Step>
               <Step n={2}>
                 <label htmlFor={fieldId}>

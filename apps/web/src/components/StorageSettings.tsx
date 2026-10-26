@@ -94,12 +94,9 @@ export function StorageSection() {
   const config = storage.data;
   return (
     <Card aria-labelledby="sec-storage">
-      <div className="stack-4" style={{ gap: 2 }}>
-        <h2 id="sec-storage" className="ac-card__title">
-          {t("storage.title")}
-        </h2>
-        <span className="small muted">{t("storage.subtitle")}</span>
-      </div>
+      <h2 id="sec-storage" className="ac-card__title">
+        {t("storage.title")}
+      </h2>
       {storage.isLoading && <LoadingCards count={2} />}
       {config && (
         <>

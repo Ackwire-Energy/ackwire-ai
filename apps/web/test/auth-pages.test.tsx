@@ -651,7 +651,11 @@ describe("Onboarding", () => {
     await throughImport(state);
     const card = button(/Computador deste servidor/);
     expect(card.getAttribute("aria-pressed")).toBe("true");
-    expect(card.textContent).toContain("com um usuário para cada agente");
+    expect(card.textContent).toContain("Onde o agentes.chat está instalado, um usuário por agente.");
+    expect(button(/^Outro computador/).textContent).toContain("Um Mac ou outro servidor, conectado com um código.");
+    expect(document.body.textContent).toContain(
+      "Os agentes trabalham num computador, e ações sensíveis continuam pedindo a sua aprovação.",
+    );
     expect(document.body.textContent).toContain("Os agentes escolhidos vão trabalhar no computador deste servidor.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
     await next();
@@ -832,14 +836,18 @@ describe("Onboarding", () => {
     await skip();
     await keepOnly("Theo · PM");
     await click(button(/Criar 1 agente/), 8);
-    const makers = within(screen().getByRole("region", { name: "Chave de API" })).getByRole("group", {
-      name: "Provedor",
-    });
+    const panel = screen().getByRole("region", { name: "Chave de API" });
+    const makers = within(panel).getByRole("group", { name: "Provedor" });
     const ours = within(makers).getByRole("button", { name: "agentes.chat" });
     // The makers' 30 px tile, so every tile is as tall.
     expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
+    const PAYS = "Você paga pelo uso, direto ao provedor.";
+    expect(panel.textContent).toContain(PAYS);
     await click(ours, 2);
     expect(screen().queryByLabelText("Cole aqui")).toBeNull();
+    // Our key isn't paid to a provider: its own line says what it is.
+    expect(panel.textContent).not.toContain(PAYS);
+    expect(panel.textContent).toContain("Sem chave sua: os agentes usam a chave do agentes.chat.");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
