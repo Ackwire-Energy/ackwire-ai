@@ -82,8 +82,26 @@ describe("route guards", () => {
     await renderApp(`/org/${ORG_ID}/threads`, { api: createFakeApi() });
     await settle();
     expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
+    expect(document.querySelector(".list-head__sub")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
     expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
+    // All teaches how a thread starts; the other tabs only say they're empty and lead back to All.
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Responda a uma mensagem para abrir uma thread.",
+    );
     cleanup();
+    for (const [tab, title] of [
+      ["working", "Nenhum agente trabalhando agora"],
+      ["closed", "Nada fechado por aqui"],
+      ["archived", "Nenhuma thread arquivada"],
+    ]) {
+      await renderApp(`/org/${ORG_ID}/threads?tab=${tab}`, { api: createFakeApi() });
+      await settle();
+      const empty = document.querySelector(".ac-empty") as HTMLElement;
+      expect(empty.querySelector(".ac-empty__title")?.textContent).toBe(title);
+      expect(empty.querySelector(".ac-empty__text")).toBeNull();
+      expect(screen().getByRole("button", { name: "Ver todas as threads" })).toBeTruthy();
+      cleanup();
+    }
     await renderApp(`/org/${ORG_ID}/threads/x`, { api: createFakeApi() });
     await settle();
     expect(screen().getByText("Thread não encontrada")).toBeTruthy();

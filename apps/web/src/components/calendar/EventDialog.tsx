@@ -242,7 +242,7 @@ export function EventDialog({
           <PeoplePicker
             label={t("calendar.form.participants")}
             searchLabel={t("calendar.form.participantsSearch")}
-            help={t("calendar.form.participantsHelp")}
+            hint={t("calendar.form.participantsHelp")}
             emptyText={t("calendar.form.participantsEmpty")}
             selected={picked}
             onChange={setPicked}
