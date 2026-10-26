@@ -131,8 +131,9 @@ function AddAccountFlow({
   const [sendFailed, setSendFailed] = useState(false);
   const [pasteFailed, setPasteFailed] = useState(false);
   const [copied, setCopied] = useState(false);
-  // The sign-in still running on the computer: stopped when this block goes away.
-  const running = useRef<string | null>(null);
+  // The sign-in still running and the computer it started on, where it's stopped when this block goes away: the
+  // block shows while its computer is still being prepared, with no computer yet.
+  const running = useRef<{ machineId: string; loginId: string } | null>(null);
   const gone = useRef(false);
   const reported = useRef(false);
   // With its own head, the dropdown that opened this block is gone: keyboard focus starts here. In a panel under a
@@ -159,7 +160,7 @@ function AddAccountFlow({
         void api.machines.cancelAccountLogin(org.id, machineId, l.loginId).catch(() => undefined);
         return null;
       }
-      running.current = l.loginId;
+      running.current = { machineId, loginId: l.loginId };
       setLogin(l);
       if (popup) sendPopup(popup, l.url);
       return l;
@@ -177,9 +178,9 @@ function AddAccountFlow({
     gone.current = false;
     return () => {
       gone.current = true;
-      const id = running.current;
+      const run = running.current;
       running.current = null;
-      if (id) void api.machines.cancelAccountLogin(org.id, machineId, id).catch(() => undefined);
+      if (run) void api.machines.cancelAccountLogin(org.id, run.machineId, run.loginId).catch(() => undefined);
     };
   }, []);
 

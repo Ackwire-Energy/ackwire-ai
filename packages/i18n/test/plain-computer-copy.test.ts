@@ -159,6 +159,7 @@ const SELFHOST_EXTRA = [
   "agentPage.computer.ownerPicks",
   ...["mine", "mineDesc", "cloud", "cloudDesc", "cloudReady"].map((k) => `onboarding.computer.${k}`),
   "onboarding.keyStep.leadNoComputer",
+  "onboarding.brain.failed",
   "connectAi.wait.connecting",
   ...["this", "thisText", "other", "otherText", "note"].map((k) => `connectAi.own.${k}`),
   "aiAccounts.connect.needs.keys",

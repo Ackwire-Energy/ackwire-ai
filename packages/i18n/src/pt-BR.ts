@@ -501,7 +501,7 @@ export const ptBR = {
     brain: {
       title: "Quem pensa",
       failed:
-        "O Claude Code ainda não está disponível no {{computer}}: os agentes seguem pelo modelo da API. Dá para trocar em cada agente.",
+        "Alguns agentes não conseguiram passar a usar a conta do {{brand}} no {{computer}}. Dá para trocar na página de cada um.",
     },
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organiza tarefas, resume conversas e cuida do fórum." },
@@ -985,7 +985,7 @@ export const ptBR = {
       forAll: "Todo agente sem plano pensa com ela.",
       saved: "Salva. Todo agente sem plano pensa com ela.",
       notPlan: "Use aqui uma chave de pagamento por uso. A chave de um plano de código vai na opção dele, acima.",
-      platform: "Chave do agentes.chat",
+      platform: "agentes.chat",
     },
     wait: {
       signIn: "Você entra aqui assim que ele ficar pronto.",

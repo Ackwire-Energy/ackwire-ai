@@ -292,8 +292,8 @@ describe("Aceitar convite", () => {
 });
 
 describe("Onboarding", () => {
-  const start = async () => {
-    const state = seedState();
+  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}) => {
+    const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
     state.authConfig = { workspaceComputer: false };
@@ -416,7 +416,7 @@ describe("Onboarding", () => {
     expect(site.getAttribute("href")).toBe("https://platform.claude.com/settings/keys");
     expect(site.className).toContain("ac-btn");
     // The platform key isn't offered by this server.
-    expect(within(makers).queryByRole("button", { name: "Chave do agentes.chat" })).toBeNull();
+    expect(within(makers).queryByRole("button", { name: "agentes.chat" })).toBeNull();
     // Nothing connected yet: Continue waits; "Conectar depois" is the way on without one.
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     // New agents start on "Automático".
@@ -559,6 +559,13 @@ describe("Onboarding", () => {
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
     expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
+    // Theo picked: another plan's tile keeps him while he has none.
+    const agent = () => screen().getByRole("combobox", { name: "Para qual agente" });
+    agent().focus();
+    await act(async () => fireEvent.keyDown(agent(), { key: "Enter" }));
+    await click(screen().getByRole("option", { name: "Theo" }));
+    await click(option(/^ChatGPT$/), 6);
+    expect(agent().textContent).toContain("Theo");
     await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
   });
@@ -616,7 +623,11 @@ describe("Onboarding", () => {
       "TheoSem IA",
     ]);
     expect(who.textContent).toContain("Cada plano pensa por um agente.");
-    await click(within(who).getByRole("button", { name: "Chave de API para Theo" }), 4);
+    const keyFor = within(who).getByRole("button", { name: "Chave de API para Theo" });
+    expect([...keyFor.querySelectorAll(".ac-brand-stack > .ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual(
+      ["claude", "openai"],
+    );
+    await click(keyFor, 4);
     expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
     // A plan is in: the step can be done now, the key or not.
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
@@ -651,6 +662,66 @@ describe("Onboarding", () => {
     expect(option(/^Claude$/).querySelector(".ac-brand--off")).toBeNull();
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+  });
+
+  test("the team made on a computer, then the Computer step skipped: the agents leave it, as the AI step says", async () => {
+    const { state, api } = await start();
+    const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    await throughImport(state);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id]);
+    // Back to the Computer step, and on without one this time.
+    await click(button("Voltar"), 4);
+    await click(button("Voltar"), 4);
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    await skip();
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args[2])).toEqual([host?.id, host?.id, null, null]);
+    await next();
+    // No computer for them now: the key first, the plans dimmed, and Claude's panel asks for one.
+    expect(option(/^Chave de API/).getAttribute("aria-pressed")).toBe("true");
+    await click(option(/^Claude$/), 6);
+    const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
+    expect(within(panel).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
+  });
+
+  test("a computer's own sign-in that some agents can't switch to: the toast names the plan and the computer", async () => {
+    const { state, api, services } = await start();
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    api.agents.setBrain = async () => {
+      throw new Error("offline");
+    };
+    await next();
+    await settle(4);
+    expect(document.body.textContent).toContain(
+      "Alguns agentes não conseguiram passar a usar a conta do Claude no MacBook do Walter. Dá para trocar na página de cada um.",
+    );
+  });
+
+  test("where the server offers its own key: a seventh maker, by our mark, and nothing to paste", async () => {
+    const { state } = await start({ platformKey: true });
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/Criar 1 agente/), 8);
+    const makers = within(screen().getByRole("region", { name: "Chave de API" })).getByRole("group", {
+      name: "Provedor",
+    });
+    const ours = within(makers).getByRole("button", { name: "agentes.chat" });
+    // The makers' 30 px tile, so every tile is as tall.
+    expect(ours.querySelector(".ac-brand--sm .ac-logo__mark")).not.toBeNull();
+    await click(ours, 2);
+    expect(screen().queryByLabelText("Cole aqui")).toBeNull();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
   test("an imported agent gets its own model back once a key that runs it is saved", async () => {

@@ -19,7 +19,7 @@ import {
 import { errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
-import { type AiChoice, defaultChoice, firstAgent, gateDims, kindOf } from "@agenteschat/client/lib/no-ai";
+import { type AiChoice, defaultChoice, firstAgent, gateDims, kindOf, planLabel } from "@agenteschat/client/lib/no-ai";
 import {
   addInvites,
   type InviteDraft,
@@ -465,7 +465,11 @@ export function OnboardingPage() {
           failed = true;
         });
       }
-      if (failed) toast.show(t("onboarding.brain.failed", { computer: machine?.name ?? "" }), "error");
+      if (failed)
+        toast.show(
+          t("onboarding.brain.failed", { brand: planLabel(t, choice), computer: machine?.name ?? "" }),
+          "error",
+        );
     },
   });
 
@@ -476,13 +480,16 @@ export function OnboardingPage() {
   // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
   const computerPoll = step.id === "computer" ? COMPUTER_POLL_MS : false;
-  const me = useQuery({ ...meQuery(api), refetchInterval: computerPoll, refetchOnWindowFocus: "always" });
   const setup = useComputerSetup(
     created?.orgId ?? "",
     Boolean(created),
     (data) => computerPoll || (setupPending(setupView(data)) ? COMPUTER_POLL_MS : false),
   );
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
+  const aiOpen = step.id === "agents" && agentsPhase === "ai";
+  // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.
+  const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
+  const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
@@ -500,7 +507,6 @@ export function OnboardingPage() {
   // The AI step. It opens on Claude's sign-in, or on the API key where no computer here can take a plan. Until
   // something is connected, the chosen agent's view and the accounts are asked again every few seconds (no socket
   // is open here), so a plan's panel turns on by itself once the computer is ready.
-  const aiOpen = step.id === "agents" && agentsPhase === "ai";
   const orgSummary = me.data?.organizations.find((o) => o.id === created?.orgId);
   const noComputer = edition === "selfhost" && (computer === null || computer === "cloud");
   const hasAi = (id: string) => planned[id] !== undefined || keySaved;
@@ -519,8 +525,9 @@ export function OnboardingPage() {
     });
   const pickAi = (next: AiChoice) => {
     setAiPicked(next);
-    // Another plan starts on the next agent with no AI.
-    if (next !== "key" && next !== choice) setAiAgent(firstAgent(crewAgents, hasAi)?.id);
+    // Another plan moves on to the next agent with no AI once this one thinks with a plan.
+    if (next !== "key" && next !== choice && aiAgentId !== undefined && planned[aiAgentId])
+      setAiAgent(firstAgent(crewAgents, hasAi)?.id);
   };
   // A computer the person connected: its own sign-in, unless they chose another account.
   const ownChosen =
@@ -540,17 +547,19 @@ export function OnboardingPage() {
         : null),
   }));
 
+  /** The Computer step left, `skipped` or with its choice. */
   const saveComputer = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (skipped: boolean) => {
       if (!created) return;
-      if (computer === "cloud" && sandbox.data?.available && !sandbox.data.enabled) {
+      if (!skipped && computer === "cloud" && sandbox.data?.available && !sandbox.data.enabled) {
         const saved = await api.sandbox.saveSettings(created.orgId, { enabled: true });
         qc.setQueryData(keys.sandboxSettings(created.orgId), saved);
       }
       // The agents come next and go to the connected computer when they are created; ones made already (back here
-      // from the AI step) move to it now.
-      if ((computer !== "machine" && computer !== "host") || !machine) return;
-      for (const c of crewAgents) await api.sandbox.setTarget(created.orgId, c.id, machine.id);
+      // from the AI step) follow the new choice now, off the computer they were on when there's none.
+      if (edition !== "selfhost") return;
+      const target = !skipped && (computer === "machine" || computer === "host") && machine ? machine.id : null;
+      for (const c of crewAgents) await api.sandbox.setTarget(created.orgId, c.id, target);
     },
   });
 
@@ -622,9 +631,10 @@ export function OnboardingPage() {
         }
         if (how !== "keyLater") await finishAi.mutateAsync();
       }
-      if (step.id === "computer") await saveComputer.mutateAsync();
+      if (step.id === "computer") await saveComputer.mutateAsync(false);
       if (step.id === "team") await sendInvites.mutateAsync();
     } else if (step.id === "computer") {
+      await saveComputer.mutateAsync(true);
       setComputer(null);
       setMachine(null);
     } else if (step.id === "import") {
