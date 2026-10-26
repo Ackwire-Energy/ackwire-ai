@@ -6457,9 +6457,11 @@ a.ac-list__row:focus-visible {
   color: var(--muted);
   max-width: 62ch;
 }
+/* Small text's own 13/18 line wherever it sits: a dialog's or a page's 22px line spreads a note's lines apart. */
 .ac-setnote {
   margin: 12px 0 0;
   font-size: 13px;
+  line-height: 18px;
   color: var(--muted);
 }
 .ac-setnote + .ac-setnote {

@@ -8031,9 +8031,10 @@ a.machine-row__name:hover {
   gap: 8px;
   margin: 4px 0;
 }
+/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel; a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 160px;
+  min-width: 120px;
 }
 .agp-addacct__code output {
   font-size: 24px;
@@ -8061,6 +8062,18 @@ a.machine-row__name:hover {
   }
   .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
     margin-left: 32px;
+  }
+}
+/* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
+   many lines follow the title. A touch screen's small button is the ruler's default step. */
+@media (min-width: 641px) {
+  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
+    margin-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+}
+@media (min-width: 641px) and (pointer: coarse) {
+  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
+    margin-top: calc((var(--control-h-md) - 20px) / 2);
   }
 }
 
@@ -9916,14 +9929,16 @@ html[data-menu-overlay] .shell {
   font-size: 13px;
   color: var(--ink-muted);
 }
+/* What went wrong and its button (Try again): the note in the button's middle, beside it or on the line above it. */
 .ai-panel__row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
 }
 .ai-panel__row > .ac-setnote {
   flex: 1 1 240px;
+  margin: 0;
 }
 @media (max-width: 640px) {
   .ai-panel__agent {

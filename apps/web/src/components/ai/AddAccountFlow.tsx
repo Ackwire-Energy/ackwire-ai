@@ -278,7 +278,8 @@ function AddAccountFlow({
     </span>
   );
   const keyHintId = `${codeId}-hint`;
-  const pasteRow = (label: string, placeholder: string, secret: boolean, valid: boolean) => (
+  // The field's buttons are its height (the ruler's default step), so the row reads as one line.
+  const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
         <Input
@@ -302,16 +303,10 @@ function AddAccountFlow({
             }
           }}
         />
-        <Button size="sm" icon="copy" disabled={sent} onClick={() => void paste()}>
+        <Button icon="copy" disabled={sent} onClick={() => void paste()}>
           {t("aiAccounts.add.paste")}
         </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          loading={sending}
-          disabled={!valid || sent || !ready}
-          onClick={() => void send()}
-        >
+        <Button variant="primary" loading={sending} disabled={!valid || sent || !ready} onClick={() => void send()}>
           {t("agentPage.work.brain.add.send", { computer })}
         </Button>
       </span>
@@ -377,7 +372,7 @@ function AddAccountFlow({
             htmlFor={codeId}
             hintId={keyHintId}
           />
-          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), "…", true, keyOk)}
+          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
           {key && !keyOk && (
             <SettingNote icon="alert">{t("aiAccounts.add.keyShape", { plan: plan.label })}</SettingNote>
           )}
@@ -506,7 +501,7 @@ function AddAccountFlow({
         </div>
       )}
       {ended ? (
-        <div className="agp-addacct__step">
+        <div className="ai-panel__row">
           <SettingNote icon="alert" live>
             {why}
           </SettingNote>

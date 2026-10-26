@@ -540,7 +540,7 @@ export function KeyPanel({
                     }}
                   />
                   {onSave && (
-                    <Button size="sm" variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
+                    <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
                       {t("settings.saveKey")}
                     </Button>
                   )}

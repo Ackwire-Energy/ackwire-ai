@@ -248,6 +248,10 @@ describe("Card", () => {
       expect(rule(row)).not.toContain("display:");
       expect(rule(row)).not.toContain("align-items:");
     }
+    // A note is small text on its own 13/18 line, as a panel's other small lines: never the 22px line of the dialog
+    // or the page it sits in, which spreads a note's lines apart.
+    expect(rule(".ac-setnote")).toContain("font-size: 13px");
+    expect(rule(".ac-setnote")).toContain("line-height: 18px");
   });
 });
 

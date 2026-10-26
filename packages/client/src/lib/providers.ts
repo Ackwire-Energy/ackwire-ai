@@ -3,7 +3,8 @@ import type { Credential, Model } from "../api/types";
 interface ProviderEntry {
   id: string;
   label: string;
-  placeholder: string;
+  /** How its keys start, as the key field's example; none where the provider publishes no prefix. */
+  placeholder?: string;
   /** What its keys look like: only to catch paste mistakes (loose where the provider publishes no format). */
   pattern: RegExp;
   /** Where the provider hands out keys. */
@@ -52,7 +53,6 @@ export const PROVIDERS = [
   {
     id: "zai",
     label: "Z.ai",
-    placeholder: "…",
     pattern: /^(?!sk-)[A-Za-z0-9._-]{16,}$/,
     site: "z.ai/manage-apikey/apikey-list",
     plans: true,
@@ -60,7 +60,6 @@ export const PROVIDERS = [
   {
     id: "minimax",
     label: "MiniMax",
-    placeholder: "…",
     // `sk-cp-` keys are its coding plan's.
     pattern: /^(?!sk-ant-|sk-cp-)[A-Za-z0-9._-]{16,}$/,
     site: "platform.minimax.io/user-center/basic-information/interface-key",
