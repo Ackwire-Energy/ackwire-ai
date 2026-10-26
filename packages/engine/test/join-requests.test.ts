@@ -180,6 +180,10 @@ describe("asking to join through a link", () => {
       })),
     );
     await expect(typed(token, "Late", "late@example.com")).rejects.toMatchObject({ code: "join.full" });
+    // Full, every typed address gets the same answer: a member's and a waiting one too.
+    for (const email of [f.owner.email, "p3@example.com"]) {
+      await expect(typed(token, "Eve", email)).rejects.toMatchObject({ code: "join.full" });
+    }
     await f.db
       .update(schema.organizationJoinRequests)
       .set({ expiresAt: later(-1) })

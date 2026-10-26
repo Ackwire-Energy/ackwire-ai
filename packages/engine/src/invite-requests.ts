@@ -151,7 +151,11 @@ export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinI
       .orderBy(desc(requests.createdAt))
       .limit(1);
     const waiting = latest && isWaiting(latest, now) ? latest : null;
+    const full = async () => (await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS;
+    const fullError = () => new ConflictError("This workspace has many requests waiting", "join.full");
     if (!user) {
+      // A full workspace answers the same for every address too, before anything about the address is read.
+      if (await full()) throw fullError();
       if (waiting || (latest && isKeptDenial(latest, now)) || (await addressIsMember(tx, orgId, email))) return null;
     } else {
       if (latest && isKeptDenial(latest, now)) throw new ConflictError("Your request wasn't approved", "join.denied");
@@ -159,9 +163,7 @@ export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinI
         await tx.update(requests).set({ userId: user.id, name, note }).where(eq(requests.id, waiting.id));
         return null;
       }
-    }
-    if ((await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) {
-      throw new ConflictError("This workspace has many requests waiting", "join.full");
+      if (await full()) throw fullError();
     }
     const values = {
       linkId: link.id,

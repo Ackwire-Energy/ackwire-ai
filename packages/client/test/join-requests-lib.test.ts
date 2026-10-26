@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AppNotification, JoinStatus } from "../src/api/types";
 import { askView } from "../src/lib/join-requests";
-import { openTarget } from "../src/lib/notifications";
+import { openTarget, sortWaiting } from "../src/lib/notifications";
 
 const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
   member: false,
@@ -43,7 +43,19 @@ describe("askView: an invitation link's page", () => {
   });
 });
 
-test("a request to join opens Members", () => {
-  const n = { kind: "join_request", source: { label: "Acme" }, actors: [] } as unknown as AppNotification;
-  expect(openTarget(n)).toEqual({ to: "/org/$orgId/settings/$section", params: { section: "members" } });
+const waiting = (id: string, kind: AppNotification["kind"], updatedAt = "2026-10-26T10:00:00.000Z") =>
+  ({ id, kind, waiting: true, source: { label: "Acme" }, actors: [], updatedAt }) as unknown as AppNotification;
+
+test("a request to join opens Members, and waits after what blocks someone's work", () => {
+  expect(openTarget(waiting("j", "join_request"))).toEqual({
+    to: "/org/$orgId/settings/$section",
+    params: { section: "members" },
+  });
+  const later = "2026-10-26T11:00:00.000Z";
+  const list = sortWaiting([
+    waiting("j", "join_request", later),
+    waiting("ap", "approval"),
+    waiting("q", "agent_question"),
+  ]);
+  expect(list.map((n) => n.id)).toEqual(["q", "ap", "j"]);
 });
