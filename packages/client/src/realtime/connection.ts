@@ -6,6 +6,8 @@ import { steerStore } from "./steer";
  * WebSocket client for `/api/ws?orgId=` (apps/server/src/realtime/ws.ts,
  * docs/adr/0010-realtime.md). One connection per organization:
  * - subscribes per channel (ref-counted) and re-subscribes after reconnects;
+ * - says when the server confirms a channel's subscription (`onSubscribed`): its
+ *   events arrive only from then on, so what a page read before may be behind;
  * - reconnects with backoff; tells listeners so they catch up over HTTP
  *   (real-time is best effort, the database is the source of truth);
  * - pings to keep the connection alive through proxies.
@@ -99,6 +101,7 @@ export class RealtimeConnection {
   private readonly listeners = new Map<string, Set<EventListener>>();
   private readonly statusListeners = new Set<(status: ConnectionStatus) => void>();
   private readonly reconnectListeners = new Set<() => void>();
+  private readonly subscribedListeners = new Set<(channelId: string) => void>();
   private readonly errorListeners = new Set<(code: string, channelId?: string) => void>();
   private readonly userListeners = new Set<(event: UserEvent) => void>();
   private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
@@ -186,6 +189,17 @@ export class RealtimeConnection {
     this.reconnectListeners.add(listener);
     return () => {
       this.reconnectListeners.delete(listener);
+    };
+  }
+
+  /**
+   * The server confirmed a channel's subscription (its first, and again after every reconnect): the channel's
+   * events reach us from now on. Whatever happened there before, after a page read it, is only over HTTP.
+   */
+  onSubscribed(listener: (channelId: string) => void) {
+    this.subscribedListeners.add(listener);
+    return () => {
+      this.subscribedListeners.delete(listener);
     };
   }
 
@@ -280,6 +294,8 @@ export class RealtimeConnection {
       const set = this.listeners.get(frame.channelId);
       if (!set) return;
       for (const l of [...set]) l(frame.event);
+    } else if (frame.type === "subscribed") {
+      for (const l of this.subscribedListeners) l(frame.channelId);
     } else if (frame.type === "error") {
       for (const l of this.errorListeners) l(frame.code, frame.channelId);
     }

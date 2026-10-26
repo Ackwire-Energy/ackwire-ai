@@ -644,16 +644,24 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   const { connection, streams } = useRealtime();
   const qc = useQueryClient();
   const api = useApi();
-  // On load and after every reconnect: drop live rows the server no longer runs.
+  // On load: drop live rows the server no longer runs. The channel's events reach us only once the server confirms
+  // its subscription (the first, and again after every reconnect), so then what the page read before is read again,
+  // after any read still on its way: an answer posted meanwhile (as the socket opened right after a page change)
+  // shows, and so does how its run ended.
   useEffect(() => {
     if (!connection || !enabled) return;
-    const check = () => {
-      void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
-        if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
-      });
-    };
-    check();
-    return connection.onReconnect(check);
+    void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
+      if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+    });
+    return connection.onSubscribed((id) => {
+      if (id !== channelId) return;
+      void reconcileChannelRuns(api, streams, orgId, channelId);
+      for (const queryKey of [keys.messages(orgId, channelId), ["org", orgId, "channel", channelId, "thread"]]) {
+        void qc
+          .refetchQueries({ queryKey, fetchStatus: "fetching" }, { cancelRefetch: false })
+          .then(() => qc.invalidateQueries({ queryKey }));
+      }
+    });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;

@@ -124,6 +124,28 @@ describe("receipts", () => {
     s = step(s, { type: "question.answered", threadId: null, question } as never);
     expect(receiptView(s.m1).status?.kind).toBe("claimed");
   });
+
+  test("a new read moves a confirmed receipt on, never back; the same read seeded again changes nothing", () => {
+    type Handled = NonNullable<Message["receipts"]>["handled"];
+    const read = (handled: Handled) =>
+      ({ ...person(["ada"]), receipts: { seenBy: ["ada"], pickedBy: ["ada"], handled, blocked: [] } }) as Message;
+    const starting = read([{ agentId: "ada", runId: "r1", status: "running" }]);
+    const noAi = read([{ agentId: "ada", runId: "r1", status: "failed", reason: "no_ai" }]);
+    // Read as her run started; it ended for want of an AI before the channel's events reached us.
+    let s = seedReceipt({}, starting);
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = seedReceipt(s, noAi);
+    expect(receiptView(s.m1).status).toEqual({ kind: "no_ai", agents: ["ada"] });
+    s = seedReceipt(s, read([{ agentId: "ada", runId: "r1", status: "running" }]));
+    expect(receiptView(s.m1).status).toEqual({ kind: "no_ai", agents: ["ada"] });
+    // "Responder agora" started her again; the list seeds again as each new message comes in, with that same read.
+    s = seedReceipt({}, noAi);
+    s = step(s, { type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r2" });
+    s = step(s, { type: "agent.run", triggerMessageId: "m1", runId: "r2", agentId: "ada", status: "running" });
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    s = seedReceipt(s, noAi);
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+  });
 });
 
 describe("server confirmation and the safety timeout", () => {

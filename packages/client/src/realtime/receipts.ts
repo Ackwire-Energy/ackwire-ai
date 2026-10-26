@@ -1,4 +1,4 @@
-import type { ChannelEvent, ConnectIntent, Message, RunStatus } from "../api/types";
+import type { ChannelEvent, ConnectIntent, Message, MessageReceipts, RunStatus } from "../api/types";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
 
@@ -29,6 +29,8 @@ export interface MessageReceipt {
   referenced?: string[];
   /** Routed to nobody: the organization has no AI connected (with the Connect step the message asked for). */
   noAi?: { intent?: ConnectIntent; provider?: string };
+  /** The list receipts last seeded: the same read again changes nothing, a new one moves the agents on. */
+  server?: MessageReceipts;
 }
 
 export type ReceiptsState = Record<string, MessageReceipt>;
@@ -108,7 +110,11 @@ function setForRun(
   return next;
 }
 
-/** Seeds a person's message: server receipts, else the agents it mentions (they will answer). */
+/**
+ * Seeds a person's message: server receipts, else the agents it mentions (they will answer). Server receipts
+ * replace a local guess. On a receipt the server already confirmed, a new read moves each agent on, never back:
+ * how a run ended shows even when its events were missed (sent before the channel's subscription was live).
+ */
 export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsState {
   if (message.author?.type !== "person") return state;
   const existing = state[message.id];
@@ -129,11 +135,12 @@ export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsSta
       ? s
       : { ...s, [message.id]: next };
   };
-  // Server receipts replace a local guess; otherwise keep what we have.
-  if (existing && (existing.confirmed || !r)) return withMentions(state);
-  let next: ReceiptsState = existing
-    ? { ...state, [message.id]: { routed: false, agents: [], ...(existing.runs ? { runs: existing.runs } : {}) } }
-    : state;
+  // The list seeds again each time it changes: a read already seeded changes nothing (events may be ahead of it).
+  if (existing && (!r || existing.server === r)) return withMentions(state);
+  let next: ReceiptsState =
+    existing && !existing.confirmed
+      ? { ...state, [message.id]: { routed: false, agents: [], ...(existing.runs ? { runs: existing.runs } : {}) } }
+      : state;
   if (r) {
     for (const id of r.seenBy) next = set(next, message.id, id, "seen");
     for (const id of r.pickedBy) next = set(next, message.id, id, "picked");
@@ -145,7 +152,13 @@ export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsSta
     const current = next[message.id] ?? { routed: false, agents: [] };
     return withMentions({
       ...next,
-      [message.id]: { ...current, routed: true, blocked: r.blocked ?? [], ...(r.noAi ? { noAi: {} } : {}) },
+      [message.id]: {
+        ...current,
+        routed: true,
+        blocked: r.blocked ?? [],
+        ...(r.noAi ? { noAi: current.noAi ?? {} } : {}),
+        server: r,
+      },
     });
   }
   // A mention: the server resolved it, so that agent will answer (unless the message only references it).

@@ -356,6 +356,46 @@ describe("receipts and the live block", () => {
     expect(receipt.textContent).toContain("Ninguém vai responder: falta uma IA ·");
     expect(receipt.textContent).not.toContain("Tentar de novo");
   });
+
+  test("her card and her run's end, posted while the socket still opened after a page change: they show once the channel's subscription is confirmed", async () => {
+    const state = seedState({ aiStatus: aiStatus(false, ADA_ID, ATLAS_ID) });
+    const asked = (handled: NonNullable<Message["receipts"]>["handled"]): Message => ({
+      id: "m-asked",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-walter" },
+      body: "@ada quem são os nossos concorrentes?",
+      mentionedAgentIds: [ADA_ID],
+      agentRunId: null,
+      createdAt: new Date(NOW.getTime() - 1000).toISOString(),
+      receipts: { seenBy: [ADA_ID], pickedBy: [ADA_ID], handled, blocked: [] },
+    });
+    state.messages.push(asked([{ agentId: ADA_ID, runId: "r-noai", status: "running" }]));
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    const check = () =>
+      receiptOf("quem são os nossos concorrentes?").querySelector(".ac-receipt__check") as HTMLElement;
+    // Read as her run started.
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
+    // She has no AI: her card and her run's end come before the socket is even open, so no event carries them.
+    state.messages = state.messages.map((m) =>
+      m.id === "m-asked" ? asked([{ agentId: ADA_ID, runId: "r-noai", status: "failed", reason: "no_ai" }]) : m,
+    );
+    state.messages.push(card());
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    expect(socket.sent).toContainEqual({ type: "subscribe", channelId: ENG_ID });
+    expect(cardRow()).toBeUndefined();
+    // The server confirms the subscription: the channel is read again.
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(cardRow().textContent).toContain("Ada não vai responder porque não tem uma IA conectada.");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ninguém vai responder: falta uma IA");
+    expect(receiptOf("quem são os nossos concorrentes?").textContent).toContain(
+      "Ninguém vai responder: falta uma IA ·",
+    );
+  });
 });
 
 describe("the dialog opens by itself only when Jev is sure, for the author, once", () => {
