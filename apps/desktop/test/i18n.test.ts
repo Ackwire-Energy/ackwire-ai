@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { join, relative } from "node:path";
+import { filesNamingMakers } from "../../../packages/i18n/test/maker-words";
 import { createDesktopI18n, pickLocale, withDesktopKeys } from "../src/i18n";
 import { desktopEn } from "../src/i18n/keys.en";
 import { desktopPtBR } from "../src/i18n/keys.pt-BR";
@@ -32,6 +34,11 @@ describe("desktop strings", () => {
       expect(s.trim().length).toBeGreaterThan(0);
       expect(s).not.toMatch(/\b(runner|MCP|protocol|protocolo|sidecar|Tauri|PGlite)\b/i);
     }
+  });
+
+  test("Claude and ChatGPT, not their makers, in what the app shows", () => {
+    const app = join(import.meta.dir, "..");
+    expect(filesNamingMakers([join(app, "src")]).map((f) => relative(app, f))).toEqual([]);
   });
 
   test("merged under desktop.* next to the shared strings", () => {

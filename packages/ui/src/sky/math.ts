@@ -35,6 +35,10 @@ export function mix(a: string, b: string, k: number): string {
   ).join("")}`;
 }
 
+/** An `rgba()` color as the solid "#rrggbb" it shows over `over`, for places with no alpha (classic Outlook). */
+export const opaque = (color: string, over: string) =>
+  mix(over, color, Number(/^rgba\(.*[,/]\s*([\d.]+)\s*\)$/.exec(color.trim())?.[1] ?? 1));
+
 /** A color as a little-endian RGBA pixel (for a Uint32Array over ImageData). */
 export function pixelOf(color: string): number {
   const [r, g, b] = parseColor(color);
@@ -121,6 +125,16 @@ export function lightAt(x: number, y: number, lx: number, ly: number, strength: 
   const dy = y - ly;
   return strength * Math.exp(-(dx * dx + dy * dy) * (1 / (radius * radius)));
 }
+
+/**
+ * The pointer light's center `dt` seconds on, from `from` toward the pointer at `to` (shares of the sky, held within
+ * 0.3 past its edges): 5% of the way each 60th of a second, so at the same pace whatever the frame rate.
+ */
+export const lightToward = (from: number, to: number, dt: number) =>
+  from + (Math.min(1.3, Math.max(-0.3, to)) - from) * (1 - 0.95 ** (dt * 60));
+
+/** A moving sky draws about 30 frames a second: the dither moves in whole cells, more frames only cost. */
+export const SKY_FRAME_MS = 32;
 
 /** A calm zone: [left, top, right, bottom] in sky pixels. */
 export type CalmZone = [left: number, top: number, right: number, bottom: number];

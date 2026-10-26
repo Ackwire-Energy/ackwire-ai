@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { setupDom } from "../testing/dom";
+import { canvasPage } from "../testing/frames";
 
 setupDom();
 
@@ -14,12 +15,14 @@ import {
   PixelSky,
   parseColor,
   pixelOf,
+  redrawSkies,
   SKY_TONES,
   SkyGlow,
   softTones,
   spriteTone,
   startSky,
 } from "../src";
+import { lightToward, opaque } from "../src/sky/math";
 
 afterEach(() => cleanup());
 
@@ -39,6 +42,13 @@ describe("sky tones", () => {
     expect(mix("#123456", "#abcdef", 0)).toBe("#123456");
     expect(mix("#123456", "#abcdef", 1)).toBe("#abcdef");
     expect(pixelOf("#0063d1")).toBe(0xffd16300);
+  });
+
+  test("an rgba token as the solid color it shows over a surface (the email palette's hairlines)", () => {
+    expect(opaque("rgba(23, 23, 22, 0.12)", "#ffffff")).toBe("#e3e3e3");
+    expect(opaque("rgba(255, 255, 255, 0.15)", "#1c1c1b")).toBe("#3e3e3d");
+    expect(opaque("rgba(23 23 22 / 0.07)", "#f3f3f0")).toBe("#e4e4e1");
+    expect(opaque("#151514", "#ffffff")).toBe("#151514");
   });
 
   test("an agent's sky goes from deep to light; sky is the landing's tones", () => {
@@ -65,6 +75,19 @@ describe("sky tones", () => {
       3;
     expect(light(spriteTone("rose"))).toBeLessThan(light(agentGradient("rose")[1]));
   });
+});
+
+test("the pointer light follows at the same pace at any frame rate: 5% of the way each 60th of a second", () => {
+  expect(lightToward(0, 1, 1 / 60)).toBeCloseTo(0.05, 10);
+  let at60 = 0;
+  for (let i = 0; i < 60; i++) at60 = lightToward(at60, 1, 1 / 60);
+  let at30 = 0;
+  for (let i = 0; i < 30; i++) at30 = lightToward(at30, 1, 1 / 30);
+  expect(at30).toBeCloseTo(at60, 10);
+  expect(at60).toBeCloseTo(1 - 0.95 ** 60, 10);
+  // The pointer far off the sky: the light stops 0.3 past its edge.
+  expect(lightToward(0, 5, 60)).toBeCloseTo(1.3, 10);
+  expect(lightToward(0, -5, 60)).toBeCloseTo(-0.3, 10);
 });
 
 describe("PixelSky", () => {
@@ -110,5 +133,62 @@ describe("EmptyState with sky", () => {
     const { container } = render(<EmptyState icon="alert">Falhou</EmptyState>);
     expect(container.querySelector(".ac-empty__icon")).not.toBeNull();
     expect(container.querySelector(".ac-sky")).toBeNull();
+  });
+});
+
+describe("the sky's loop", () => {
+  /**
+   * A sky on a page whose frames run by hand. The page's own frames asked for before (the other tests' skies) run
+   * first: the loop is one for the whole page.
+   */
+  async function skyPage(reduced: boolean) {
+    await new Promise((r) => setTimeout(r, 100));
+    const page = canvasPage({ width: 40, height: 40, reduced });
+    const stop = startSky(page.canvas, () => opts);
+    const close = page.close;
+    return Object.assign(page, {
+      close() {
+        stop();
+        page.frames(100);
+        close();
+      },
+    });
+  }
+
+  test("moving: about 30 frames a second while on screen, none and no loop off screen", async () => {
+    const page = await skyPage(false);
+    try {
+      expect(page.draws()).toBe(1);
+      page.frames(1000);
+      expect(page.draws()).toBeGreaterThanOrEqual(29);
+      expect(page.draws()).toBeLessThanOrEqual(32);
+      page.onScreen(false);
+      page.frames(50);
+      const drawn = page.draws();
+      page.frames(1000);
+      expect(page.draws()).toBe(drawn);
+      expect(page.pending()).toBe(0);
+      page.onScreen(true);
+      page.frames(500);
+      expect(page.draws()).toBeGreaterThan(drawn + 10);
+    } finally {
+      page.close();
+    }
+  });
+
+  test("with reduced motion: one still frame and no loop after it; asked again (a theme, new options), one more", async () => {
+    const page = await skyPage(true);
+    try {
+      expect(page.draws()).toBe(1);
+      page.frames(1000);
+      expect(page.draws()).toBe(1);
+      expect(page.pending()).toBe(0);
+      redrawSkies();
+      page.frames(1000);
+      expect(page.draws()).toBe(2);
+      expect(page.pending()).toBe(0);
+    } finally {
+      page.close();
+    }
   });
 });

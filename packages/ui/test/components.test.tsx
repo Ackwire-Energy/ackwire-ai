@@ -290,13 +290,15 @@ describe("links", () => {
     expect(rule(".ac-link")).toContain("text-underline-offset: 3px");
     expect(rule(".ac-link:hover")).toContain("text-decoration-color: currentColor");
     expect(rule(".ac-link--muted:hover")).toContain("color: var(--ink)");
-    // A link that is a button has no box of its own and keeps the link's weight.
+    // A link that is a button has no box of its own and the sentence's whole type (the browser's button font would
+    // drop the page's size adjustment and figures). It comes first, so `.ac-link`'s weight and size classes win.
     const button = rule(":where(button).ac-link");
     expect(button).toContain("border: 0");
     expect(button).toContain("background: none");
-    expect(button).toContain("font-size: inherit");
-    expect(button).not.toContain("font-weight");
-    expect(button).not.toMatch(/font:\s/);
+    expect(button).toContain("font: inherit");
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeGreaterThan(-1);
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeLessThan(css.indexOf("\n.ac-link {"));
+    expect(css.indexOf("\n:where(button).ac-link {")).toBeLessThan(css.indexOf("\n.ac-link--muted {"));
   });
 });
 

@@ -746,7 +746,7 @@ function HereSetup({
         {steps.map((step) => {
           const state = states[step];
           return (
-            <li key={step} data-state={state}>
+            <li key={step} className="ac-iconline" data-state={state}>
               <span className="dk-fr__stepmark" aria-hidden="true">
                 {state === "active" ? (
                   <PixelSpinner size={16} color="sky" />

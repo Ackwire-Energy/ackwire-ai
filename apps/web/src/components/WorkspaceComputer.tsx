@@ -99,9 +99,10 @@ export function SetupProgress({ view }: { view: SetupView }) {
       </div>
     );
   }
+  // The lines under it lead with 14px too, so every line's words start in one column.
   return (
     <p className="setup-progress setup-progress--line ac-iconline" role="status">
-      {view.phase === "preparing" ? <Spinner /> : <Icon name={PHASE_ICON[view.phase]} size={16} />}
+      {view.phase === "preparing" ? <Spinner size={14} /> : <Icon name={PHASE_ICON[view.phase]} size={14} />}
       <span>{t(view.textKey)}</span>
     </p>
   );

@@ -348,7 +348,7 @@ export const desktopPtBR = {
     claudeName: "Claude Code",
     claudeDesc: "Escreve e muda código nas pastas liberadas, com a sua conta do Claude.",
     codexName: "Codex",
-    codexDesc: "Escreve e muda código nas pastas liberadas, com a sua conta da OpenAI.",
+    codexDesc: "Escreve e muda código nas pastas liberadas, com a sua conta do ChatGPT.",
     notInstalled: "Não está instalado neste {{device}}. Se instalar depois, ele aparece aqui.",
     found: "Encontrado",
     notFound: "Não encontrado",
@@ -461,7 +461,7 @@ export const desktopPtBR = {
     },
     accounts: {
       titleClaude: "Contas do Claude",
-      titleCodex: "Contas do Codex",
+      titleCodex: "Contas do ChatGPT",
       org: "Organização",
       thisMac: "Conta deste {{device}}",
       thisMacHint: "A que está no {{tool}}",

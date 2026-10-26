@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ImportInput, SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
@@ -82,6 +82,21 @@ describe("Entrar (e-mail primeiro)", () => {
       { email: "marina@acme.com.br", password: "correct horse" },
     ]);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
+  });
+
+  test("signed in from an email's deep link: back on that page, its query and all", async () => {
+    const state = seedState({ me: null });
+    const signedIn = seedState().me;
+    const { auth } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
+    const { api } = authApi(ACCOUNT, { state });
+    const target = `/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=budget`;
+    const { router } = await renderApp(`/login?redirect=${encodeURIComponent(target)}`, { api, auth });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Senha", "correct horse");
+    await press(/^Entrar/);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
   });
 
   test("an account without a password: only the provider it signs in with", async () => {
@@ -365,26 +380,24 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.create")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     // Where to make the key reads as this page's own link.
-    expect(screen().getByRole("link", { name: /Crie a chave em console.anthropic.com/ }).className).toContain(
-      "ac-link",
-    );
+    expect(screen().getByRole("link", { name: /Crie a chave em platform.claude.com/ }).className).toContain("ac-link");
     // The key is required there; the platform key isn't offered by this server.
     expect(screen().queryByRole("button", { name: /Usar a chave do agentes.chat/ })).toBeNull();
     const save = () => button(/Salvar e criar 1 agente/);
     expect(save().hasAttribute("disabled")).toBe(true);
     // New agents start on "Automático".
     expect(document.body.textContent).toContain("Começa no Automático: escolhe o modelo e o esforço para cada tarefa.");
-    await type("Chave da API da Anthropic", "sk-errado");
-    await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Anthropic")));
-    expect(document.body.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
+    await type("Chave da API da Claude", "sk-errado");
+    await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Claude")));
+    expect(document.body.textContent).toContain("As chaves de API do Claude começam com sk-ant-.");
     await click(button("Avançado"), 1);
-    await type("ID do workspace da Anthropic", "wrkspc_01ABC");
-    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
+    await type("ID do workspace no Claude Console", "wrkspc_01ABC");
+    await type("Chave da API da Claude", "sk-ant-api03-abcdefghijklmnop");
     await click(save(), 6);
     await settle(4);
     expect(calls(state, "agents.addCredential")[0]?.args[1]).toEqual({
       provider: "anthropic",
-      label: "Anthropic",
+      label: "Claude",
       apiKey: "[redacted]",
       workspaceId: "wrkspc_01ABC",
     });
@@ -457,7 +470,7 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(document.body.textContent).toContain("Os agentes começam a responder quando uma IA estiver conectada.");
     // A key typed and then left for later isn't saved.
-    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
+    await type("Chave da API da Claude", "sk-ant-api03-abcdefghijklmnop");
     await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.addCredential")).toHaveLength(0);
     expect(calls(state, "agents.create")).toHaveLength(2);
@@ -692,7 +705,7 @@ describe("Onboarding", () => {
   };
   const keyAndCreate = async (count: RegExp) => {
     await next();
-    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
+    await type("Chave da API da Claude", "sk-ant-api03-abcdefghijklmnop");
     await click(button(count), 6);
     await settle(4);
   };

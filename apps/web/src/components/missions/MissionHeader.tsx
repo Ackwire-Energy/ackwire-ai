@@ -309,9 +309,11 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
         )}
       </div>
       {m.needsComputer && (
-        <div className="mh__note ac-iconline">
-          <Icon name="computer" size={14} />
-          <span>{m.role === "owner" ? t("missions.pinned.pickComputer") : t("missions.pinned.waitsComputer")}</span>
+        <div className="mh__note">
+          <span className="ac-iconline">
+            <Icon name="computer" size={14} />
+            <span>{m.role === "owner" ? t("missions.pinned.pickComputer") : t("missions.pinned.waitsComputer")}</span>
+          </span>
           {m.role === "owner" && <PickComputer mission={m} />}
         </div>
       )}

@@ -184,8 +184,9 @@ export function NewMissionDialog({
         </div>
         {none ? (
           <div className="mi-notes mi-agent-empty" role="status">
-            <span>
-              <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
+            <span className="ac-iconline">
+              <Icon name="computer" size={14} />
+              <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
             <span>{cloud ? waitWords : t("missions.new.noEligibleText")}</span>
             {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}

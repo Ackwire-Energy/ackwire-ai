@@ -17,6 +17,7 @@ import {
   sealSecret,
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import {
   accountLoginStatus,
   beginAccountLogin,
@@ -732,6 +733,29 @@ test("rename and remove: the owner renames; the owner or the pairer removes; off
   await removeMachineAccount(online.deps, f.owner.id, f.org.id, machineId, CODEX_ID);
   expect(online.calls.at(-1)).toEqual({ op: "account", action: "remove", kind: "codex", accountId: CODEX_ID });
   expect(await accountRow(CODEX_ID)).toBeNull();
+});
+
+test('the label migration: a ChatGPT account that kept its default name "Codex" is called "ChatGPT"; chosen names stay', async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  const id = (n: number) => `0193dddd-0000-4000-8000-00000000010${n}`;
+  await addAccount(machineId, id(1), "codex");
+  await addAccount(machineId, id(2), "codex", { label: "Codex Plus", plan: "plus" });
+  await addAccount(machineId, id(3), "codex", { label: "Codex do Rui", plan: "plus" });
+  await addAccount(machineId, id(4), "claude_code", { label: "Codex" });
+  // Its owner already has a "ChatGPT Pro": the old name stays, so the two still read apart.
+  await addAccount(machineId, id(5), "codex", { label: "Codex Pro", plan: "pro" });
+  await addAccount(machineId, id(6), "codex", { label: "ChatGPT Pro", plan: "pro" });
+  await runMigration(f.db, "claude_chatgpt_labels");
+  await runMigration(f.db, "claude_chatgpt_labels");
+  expect(Object.fromEntries((await accountRows(machineId)).map((r) => [r.id, r.label]))).toEqual({
+    [id(1)]: "ChatGPT",
+    [id(2)]: "ChatGPT Plus",
+    [id(3)]: "Codex do Rui",
+    [id(4)]: "Codex",
+    [id(5)]: "Codex Pro",
+    [id(6)]: "ChatGPT Pro",
+  });
 });
 
 test("on a computer nobody connected, an admin removes any account; a member only their own", async () => {

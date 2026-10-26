@@ -10,6 +10,8 @@ interface ProviderEntry {
   site: string;
   /** It also sells coding plans, whose keys only work in coding tools. */
   plans?: boolean;
+  /** Its name is masculine in Portuguese ("do Claude"); the others are feminine ("da OpenAI"). */
+  masculine?: boolean;
 }
 
 /**
@@ -19,10 +21,11 @@ interface ProviderEntry {
 export const PROVIDERS = [
   {
     id: "anthropic",
-    label: "Anthropic",
+    label: "Claude",
     placeholder: "sk-ant-…",
     pattern: /^sk-ant-[A-Za-z0-9_-]{16,}$/,
-    site: "console.anthropic.com/settings/keys",
+    site: "platform.claude.com/settings/keys",
+    masculine: true,
   },
   {
     id: "openai",
@@ -67,8 +70,12 @@ export const PROVIDERS = [
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
 
-/** A provider's entry; undefined for an id this client doesn't know (it then shows the id itself). */
-export const providerOf = (id: string): ProviderEntry | undefined => PROVIDERS.find((p) => p.id === id);
+/**
+ * A provider's entry by its id, or by its label (run errors name the provider by label); undefined for one
+ * this client doesn't know (it then shows what it was given).
+ */
+export const providerOf = (id: string): ProviderEntry | undefined =>
+  PROVIDERS.find((p) => p.id === id || p.label === id);
 export const providerLabel = (id: string) => providerOf(id)?.label ?? id;
 export const isProviderId = (id: string): id is ProviderId => PROVIDERS.some((p) => p.id === id);
 export const keyLooksValid = (provider: ProviderId, key: string) =>

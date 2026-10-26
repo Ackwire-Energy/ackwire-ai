@@ -796,7 +796,7 @@ function LiveTurn({ topic, active }: { topic: ForumTopicDetail; active: string[]
   if (now.kind === "person") {
     if (now.userId !== who.me)
       return (
-        <p className="forum-bskip" id="forum-live">
+        <p className="forum-bskip ac-iconline" id="forum-live">
           <SeatAvatar seat={{ type: "person", id: now.userId }} size="xs" />
           <span>{t("forum.liveTurn.waitsFor", { name: who.personName(now.userId) })}</span>
         </p>

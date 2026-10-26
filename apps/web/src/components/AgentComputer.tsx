@@ -210,9 +210,11 @@ function ComputerError({ life }: { life: Lifecycle }) {
   const { error } = life;
   if (!error) return null;
   return (
-    <p className="computer-error small ac-iconline" role="alert">
-      <Icon name="alert" size={16} />
-      <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
+    <p className="computer-error small" role="alert">
+      <span className="ac-iconline">
+        <Icon name="alert" size={16} />
+        <span>{t(`computer.failed.${error.action}`, { reason: error.message })}</span>
+      </span>
       <Button size="sm" variant="ghost" onClick={() => life.run(error.action)}>
         {t("computer.retry")}
       </Button>

@@ -484,17 +484,16 @@ a.mi-ref:hover code {
   align-items: center;
   gap: 4px;
 }
-.mh__strip {
-  display: flex;
-  align-items: center;
-}
 .mh__strip,
 .mh__note {
   grid-column: 2 / -1;
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   min-width: 0;
 }
+/* The words and their icon (an `.ac-iconline`) sit in the middle of the owner's button beside them. */
 .mh__note {
   font-size: 13px;
   color: var(--ink2);
@@ -1728,6 +1727,12 @@ a.mi-pr:hover {
   flex: 1 0 100%;
   flex-direction: column;
   gap: 4px;
+  padding-left: 22px;
+}
+/* The same request on this Mac: the button that shows it, under the line like the command (beside the words, the
+   taller button would sit below their middle). */
+.mi-evt__act {
+  flex: 1 0 100%;
   padding-left: 22px;
 }
 

@@ -12,7 +12,7 @@ import {
   serveBrowser,
 } from "../../runner/desktop-browser";
 import { RunnerError } from "../../runner/errors";
-import { removeDirs, tempDir, waitFor } from "./helpers";
+import { removeDirs, socketAnswer, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 const servers: Server[] = [];
@@ -50,21 +50,6 @@ function notes() {
   return { shown, note };
 }
 
-/** What the runner answers one connection that says `word`. */
-function answers(socket: string, word: string): Promise<string> {
-  return new Promise((resolve) => {
-    let got = "";
-    const conn = createConnection(socket);
-    conn.setEncoding("utf8");
-    conn.on("connect", () => conn.write(word));
-    conn.on("data", (chunk: string) => {
-      got += chunk;
-    });
-    conn.on("error", () => resolve(got));
-    conn.on("close", () => resolve(got));
-  });
-}
-
 test.if(posix)(
   "a click: the runner opens the agent's browser, and the launcher shows nothing when it's quick",
   async () => {
@@ -77,6 +62,21 @@ test.if(posix)(
     expect(await runDesktopBrowser(socket, { note: n.note })).toBe(0);
     expect(opened).toBe(1);
     expect(n.shown).toEqual([]);
+  },
+);
+
+test.if(posix)(
+  "a click that starts Chrome: the note says it is opening within a third of a second, and stays until the runner answers",
+  async () => {
+    const socket = socketIn();
+    // The runner answers once Chrome's window is on the desktop, seconds after a click that starts it.
+    await serve(socket, () => new Promise((r) => setTimeout(r, 700)));
+    const n = notes();
+    const run = runDesktopBrowser(socket, { note: n.note });
+    await new Promise((r) => setTimeout(r, 450));
+    expect(n.shown).toEqual([{ kind: "wait", text: "Opening the browser…", closed: false }]);
+    expect(await run).toBe(0);
+    expect(n.shown).toEqual([{ kind: "wait", text: "Opening the browser…", closed: true }]);
   },
 );
 
@@ -190,11 +190,11 @@ test.if(posix)("only `open` opens: anything else is dropped unanswered, and the 
   await serve(socket, async () => {
     opened++;
   });
-  expect(await answers(socket, "open https://elsewhere.example\n")).toBe("");
-  expect(await answers(socket, "--remote-debugging-address=0.0.0.0\n")).toBe("");
-  expect(await answers(socket, "OPEN\n")).toBe("");
+  expect(await socketAnswer(socket, "open https://elsewhere.example\n")).toBe("");
+  expect(await socketAnswer(socket, "--remote-debugging-address=0.0.0.0\n")).toBe("");
+  expect(await socketAnswer(socket, "OPEN\n")).toBe("");
   expect(opened).toBe(0);
-  expect(await answers(socket, "open\n")).toBe("ok\n");
+  expect(await socketAnswer(socket, "open\n")).toBe("ok\n");
   expect(opened).toBe(1);
 });
 
@@ -211,9 +211,9 @@ test.if(posix)(
         release = r;
       });
     });
-    const first = answers(socket, "open\n");
+    const first = socketAnswer(socket, "open\n");
     await waitFor(() => opened === 1);
-    expect(await answers(socket, "open\n")).toBe("busy\n");
+    expect(await socketAnswer(socket, "open\n")).toBe("busy\n");
     const n = notes();
     expect(await runDesktopBrowser(socket, { note: n.note })).toBe(0);
     expect(n.shown).toEqual([]);
@@ -221,7 +221,7 @@ test.if(posix)(
     expect(await first).toBe("installing\nok\n");
     expect(opened).toBe(1);
     // The next click is a new one.
-    const third = answers(socket, "open\n");
+    const third = socketAnswer(socket, "open\n");
     await waitFor(() => opened === 2);
     release();
     expect(await third).toBe("installing\nok\n");
@@ -237,12 +237,12 @@ test.if(posix)(
     (server as unknown as EventEmitter).on("connection", () => accepted++);
     const held = Array.from({ length: 4 }, () => createConnection(socket).on("error", () => undefined));
     await waitFor(() => accepted === 4);
-    expect(await answers(socket, "open\n")).toBe("");
+    expect(await socketAnswer(socket, "open\n")).toBe("");
     for (const conn of held) conn.destroy();
     let answer = "";
     for (let tries = 0; answer !== "ok\n" && tries < 100; tries++) {
       if (tries > 0) await new Promise((r) => setTimeout(r, 10));
-      answer = await answers(socket, "open\n");
+      answer = await socketAnswer(socket, "open\n");
     }
     expect(answer).toBe("ok\n");
   },
@@ -260,7 +260,7 @@ test.if(posix)("the socket: its folder's group may write to it, nobody else; clo
   closeBrowser(server, socket);
   expect(existsSync(socket)).toBe(false);
   await serve(socket, async () => {});
-  expect(await answers(socket, "open\n")).toBe("ok\n");
+  expect(await socketAnswer(socket, "open\n")).toBe("ok\n");
 });
 
 test("the note: a small terminal window, its text wrapped and indented with a row free above and below, no cursor", () => {
@@ -274,9 +274,10 @@ test("the note: a small terminal window, its text wrapped and indented with a ro
     "--hide-scrollbar",
   ];
   const show = "printf '\\033[?25l\\n'; printf '%s\\n' \"$1\" | fold -s -w 56 | sed 's/^/  /';";
-  // The wait has Browser's window class: the dock shows it on Browser.
+  // The wait has Browser's icon and a class of its own: with Browser's, docklike would show it on Browser, and a
+  // second click there would hide it instead of reaching the runner (told `busy`).
   expect(noteArgs("wait", "Opening the browser…")).toEqual([
-    ...head("agentes-browser", "org.xfce.webbrowser"),
+    ...head("agentes-wait", "org.xfce.webbrowser"),
     "--geometry=60x3",
     "-x",
     "/bin/sh",

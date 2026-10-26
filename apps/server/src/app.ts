@@ -235,6 +235,15 @@ export function createApp(options: AppOptions) {
       if (c.req.path.endsWith(".mjs")) res.headers.set("content-type", "text/javascript; charset=utf-8");
       return res;
     });
+    // Emails' pictures and font: fetched by mail clients and Gmail's image proxy, so readable without a
+    // session and from any origin; never the SPA when missing. A changed picture gets a new name.
+    app.get("/email/*", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "public, max-age=31536000, immutable");
+      res.headers.set("access-control-allow-origin", "*");
+      return res;
+    });
     // Hashed build files never change: the browser (and the Mac app's window) opens them from disk.
     // index.html is always revalidated, so a new deploy shows on the next open.
     app.use("/*", async (c, next) => {

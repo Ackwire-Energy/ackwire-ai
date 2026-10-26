@@ -59,7 +59,7 @@ describe("an API key in a message: nothing goes out until the person chooses", (
     await click(within(guard() as HTMLElement).getByRole("button", { name: "Salvar como chave" }));
     const add = screen().getByRole("dialog", { name: "Adicionar uma chave de API" });
     expect((within(add).getByLabelText("Chave da API") as HTMLInputElement).value).toBe(KEY);
-    expect(within(add).getByRole("combobox", { name: "Provedor" }).textContent).toContain("Anthropic");
+    expect(within(add).getByRole("combobox", { name: "Provedor" }).textContent).toContain("Claude");
     await click(within(add).getByRole("button", { name: "Salvar chave" }));
     expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
       provider: "anthropic",

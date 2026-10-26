@@ -12,7 +12,8 @@ Third-party software keeps its own license. The license texts are next to what t
 - apps/desktop/src-tauri/licenses/agent-browser: agent-browser (Apache-2.0), bundled with the
   desktop app, and axe-core (MPL-2.0), embedded in it.
 - apps/web/src/fonts, apps/web/public/email, apps/desktop/src/fonts, apps/mobile/assets/fonts:
-  the Doto and Funnel Display fonts (SIL Open Font License 1.1).
+  the Doto and Funnel Display fonts (SIL Open Font License 1.1); apps/web/public/email also has
+  the Source Sans 3 font (SIL Open Font License 1.1).
 - packages/engine/assets/fonts: the Onest and Martian Mono fonts (SIL Open Font License 1.1),
   embedded in exported PDFs.
 - apps/web/public/connectors: icons from Simple Icons (CC0 1.0).

@@ -27,6 +27,7 @@ import {
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
@@ -988,7 +989,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 leading: <ProviderLogo id={provider} size="sm" />,
                 description: available
                   ? modelDescription(t, i18n.language, m)
-                  : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
+                  : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
               })),
             ),
           ]}
@@ -1214,15 +1215,19 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
               ? [
                   {
                     value: CLOUD,
-                    leading:
-                      cloud === "none" ? (
-                        <Icon name="dash" size={20} />
-                      ) : (
-                        <ComputerPortrait
-                          kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
-                          state={workspace ? setupPortrait(workspace, false) : "online"}
-                        />
-                      ),
+                    // Portraits are as wide as their drawings: one column keeps the titles in line.
+                    leading: (
+                      <span className="machine-row__pic">
+                        {cloud === "none" ? (
+                          <Icon name="dash" size={20} />
+                        ) : (
+                          <ComputerPortrait
+                            kind={workspace ? WORKSPACE_COMPUTER_KIND : "cloud"}
+                            state={workspace ? setupPortrait(workspace, false) : "online"}
+                          />
+                        )}
+                      </span>
+                    ),
                     title: noComputer.label(cloud),
                     description: workspace
                       ? t(workspace.textKey)
@@ -1235,7 +1240,11 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
               : []),
             ...listed.map((m) => ({
               value: m.id,
-              leading: <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />,
+              leading: (
+                <span className="machine-row__pic">
+                  <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
+                </span>
+              ),
               title: m.name,
               description: `${status(m)} · ${offers(m)}`,
               children: note(m.id),

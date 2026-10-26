@@ -284,7 +284,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       {
         id: "cred-1",
         provider: "anthropic",
-        label: "Anthropic da Acme",
+        label: "Claude da Acme",
         keyHint: "7f2a",
         createdAt: minutesAgo(9999),
         revokedAt: null,

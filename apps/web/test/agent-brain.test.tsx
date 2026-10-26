@@ -427,15 +427,15 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     // The computer finishes the first sign-in as soon as the page asks.
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: codex });
     const d = await brainDialog();
-    await pick(d, "Conta do Codex", /^Adicionar conta/);
+    await pick(d, "Conta do ChatGPT", /^Adicionar conta/);
     await settle(8);
     expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
       ORG_ID,
       "machine_1",
       "codex",
     ]);
-    expect(within(d).queryByRole("region", { name: "Adicionar conta do Codex" })).toBeNull();
-    expect(within(d).getByRole("combobox", { name: "Conta do Codex" }).textContent).toContain("Pessoal · Plus");
+    expect(within(d).queryByRole("region", { name: "Adicionar conta do ChatGPT" })).toBeNull();
+    expect(within(d).getByRole("combobox", { name: "Conta do ChatGPT" }).textContent).toContain("Pessoal · Plus");
     expect(d.textContent).toContain("A conta Pessoal entrou no MacBook. Clique em Usar para salvar.");
     expect(state.calls.some((c) => c.method === "machines.cancelAccountLogin")).toBe(false);
     await click(within(d).getByRole("button", { name: "Usar" }));
@@ -453,6 +453,16 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     const d = await dialog("Mudar onde trabalha", "Onde a Ada trabalha?");
     const mac = within(d).getByRole("radio", { name: /^MacBook/ });
     expect(mac.textContent).toContain("Ligado · Claude Code · Codex · Navegador");
+    // Portraits are as wide as their drawings: each sits in the same column, so the names line up, and the drawing
+    // starts at the row's edge like any other lead.
+    const options = within(d).getAllByRole("radio");
+    expect(options.length).toBeGreaterThan(1);
+    for (const option of options)
+      expect(option.querySelector(".ac-optrow__lead > .machine-row__pic > canvas.ac-computer")).toBeTruthy();
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    const column = css.split("\n.machine-row__pic {")[1]?.split("}")[0] ?? "";
+    expect(column).toContain("width: 48px");
+    expect(column).not.toContain("center");
     await click(mac);
     await click(within(d).getByRole("button", { name: "Usar o MacBook" }));
     await settle(6);
