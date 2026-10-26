@@ -691,9 +691,16 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(signIn().disabled).toBe(true);
     // A plan for Ada, the guide, first; Theo is the other choice.
     expect(within(panel()).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
-    // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected.
+    // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
+    // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
     expect(interval("ai-accounts")).toBe(5000);
+    const meEvery = () =>
+      r.services.queryClient
+        .getQueryCache()
+        .find({ queryKey: keys.me })
+        ?.observers.map((o) => o.options.refetchInterval);
+    expect(meEvery()).toContain(5000);
     expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
     expect(screen().getByRole("button", { name: "Conectar depois" })).toBeTruthy();
 
@@ -714,8 +721,15 @@ describe("the onboarding where the workspace gets its own computer", () => {
     } finally {
       window.open = realOpen;
     }
+    const orgId = r.state.calls.find((c) => c.method === "agents.create")?.args[0];
     expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin").map((c) => c.args)).toEqual([
-      [r.state.calls.find((c) => c.method === "agents.create")?.args[0], "m-1", "claude_code"],
+      [orgId, "m-1", "claude_code"],
+    ]);
+    expect(meEvery()).not.toContain(5000);
+    // Left for later: the sign-in stops on the computer it started on.
+    await click(screen().getByRole("button", { name: "Conectar depois" }));
+    expect(r.state.calls.filter((c) => c.method === "machines.cancelAccountLogin").map((c) => c.args)).toEqual([
+      [orgId, "m-1", "login_1"],
     ]);
   });
 

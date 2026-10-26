@@ -493,7 +493,7 @@ export const en: Translations = {
     brain: {
       title: "Who thinks",
       failed:
-        "Claude Code isn't available on {{computer}} yet: your agents use the API model. You can switch each agent later.",
+        "Some agents couldn't switch to the {{brand}} account on {{computer}}. You can switch each one on its page.",
     },
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organizes tasks, summarizes conversations and runs the forum." },
@@ -973,7 +973,7 @@ export const en: Translations = {
       forAll: "Every agent without a plan thinks with it.",
       saved: "Saved. Every agent without a plan thinks with it.",
       notPlan: "Use a pay-as-you-go key here. A coding plan's key goes in its own option above.",
-      platform: "agentes.chat key",
+      platform: "agentes.chat",
     },
     wait: {
       signIn: "You sign in here as soon as it's ready.",

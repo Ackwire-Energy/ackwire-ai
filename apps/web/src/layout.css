@@ -135,6 +135,10 @@ p {
   grid-column: 1 / -1;
   align-items: flex-start;
 }
+/* Our own key after the six makers: a row of its own, so its name keeps its line beside the check. */
+.grid-options--plans > .ai-key__ours {
+  grid-column: 1 / -1;
+}
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
@@ -9873,6 +9877,11 @@ html[data-menu-overlay] .shell {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
   line-height: 20px;
+}
+/* Steps under a wait or a line about the computer: a hairline between them too, as under the head. */
+.ai-panel > :not(.ai-panel__head) + .agp-addacct {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 .ai-panel__title {
   flex: 1 1 180px;
