@@ -17,6 +17,7 @@ import {
   lookDock,
   lookFiles,
   lookId,
+  lookSettings,
   lookTheme,
 } from "../../runner/desktop-look";
 import { removeDirs, tempDir } from "./helpers";
@@ -483,6 +484,14 @@ test("the command line: the script and a few words, the files on its input (syst
     String(files.length),
   ]);
   expect(input.split("\n")).toEqual([...files.map((f) => `${f.path} ${f.data.toString("base64")}`), ""]);
+  // Live, on a desktop that runs: where its processes are listed, and its settings after the files, a line each.
+  const running = lookCommand(home, o, true);
+  expect(running.argv).toEqual([...argv, "/proc"]);
+  expect(running.id).toBe(lookId(home, o));
+  const settings = lookSettings(home, o).map((args) =>
+    Buffer.from(args.map((a) => `${a}\0`).join("")).toString("base64"),
+  );
+  expect(running.input).toBe(`${input}${settings.map((line) => `${line}\n`).join("")}`);
 });
 
 test("files that change come with a new LOOK_VERSION: desktops that have the look get it again only then", () => {
@@ -616,3 +625,209 @@ test("pipes left in the home (at a file's temporary name, at the marker) never h
   expect(statSync(path.join(home, LOOK_MARKER)).isFile()).toBe(true);
   expect(apply(home)).toBe(0);
 });
+
+test("its settings for a running session: every property its channels give a value, as xfconf-query sets it", () => {
+  const home = '/srv/a&b "c"/.agentes/home';
+  const o = look({ theme: "orchis", dock: "docklike" });
+  const settings = lookSettings(home, o);
+  const set = (channel: string, property: string, type: string, value: string) => [
+    "-c",
+    channel,
+    "-p",
+    property,
+    "-n",
+    "-t",
+    type,
+    "-s",
+    value,
+  ];
+  const ints = (...values: number[]) => values.flatMap((v) => ["-t", "int", "-s", String(v)]);
+  expect(settings).toContainEqual(["-c", "xfce4-panel", "-p", "/panels", "-n", "-a", ...ints(1)]);
+  expect(settings).toContainEqual([
+    "-c",
+    "xfce4-panel",
+    "-p",
+    "/panels/panel-1/plugin-ids",
+    "-n",
+    "-a",
+    ...ints(1, 2, 7),
+  ]);
+  expect(settings).toContainEqual(set("xfce4-panel", "/panels/panel-1/position", "string", "p=0;x=640;y=869"));
+  expect(settings).toContainEqual(set("xfce4-panel", "/plugins/plugin-1", "string", "applicationsmenu"));
+  // The values as written, read back from the file's XML.
+  expect(settings).toContainEqual(
+    set("xfce4-panel", "/plugins/plugin-1/button-icon", "string", `${home}/.local/share/agentes/mark.png`),
+  );
+  expect(settings).toContainEqual(set("xfce4-panel", "/plugins/plugin-7", "string", "docklike"));
+  expect(settings).toContainEqual([
+    "-c",
+    "xfce4-desktop",
+    "-p",
+    "/backdrop/screen0/monitorVNC-0/workspace0/rgba1",
+    "-n",
+    "-a",
+    ...["0.811765", "0.901961", "1.000000", "1.000000"].flatMap((v) => ["-t", "double", "-s", v]),
+  ]);
+  expect(settings).toContainEqual(set("xfwm4", "/general/theme", "string", "Orchis-Light"));
+  expect(settings).toContainEqual(set("xfwm4", "/general/margin_bottom", "int", "60"));
+  expect(settings).toContainEqual(set("xsettings", "/Net/ThemeName", "string", "Orchis-Light"));
+  expect(settings).toContainEqual(
+    set("xfce4-terminal", "/custom-command", "string", `'/bin/bash' --rcfile '${home}/.local/share/agentes/bashrc'`),
+  );
+  // Each property with a value once, in its own channel; a container (`empty`) is only part of a path.
+  for (const f of lookFiles(home, o).filter((file) => file.path.startsWith(`${XFCONF}/`))) {
+    const xml = f.data.toString();
+    const channel = /<channel name="([^"]+)"/.exec(xml)?.[1];
+    const valued = xml.match(/<property [^>]*type="(?!empty")/g) ?? [];
+    expect(settings.filter((args) => args[1] === channel && args.includes("-n"))).toHaveLength(valued.length);
+  }
+  expect(settings.flat()).not.toContain("empty");
+  // The wallpaper's setting unset first: its image keeps its path, and xfdesktop loads it again only on a change.
+  const wallpaper = "/backdrop/screen0/monitorVNC-0/workspace0/last-image";
+  expect(settings[0]).toEqual(["-c", "xfce4-desktop", "-p", wallpaper, "-r"]);
+  expect(settings).toContainEqual(
+    set("xfce4-desktop", wallpaper, "string", `${home}/.local/share/agentes/wallpaper.png`),
+  );
+  // The panel's own dock: a launcher's items too.
+  expect(lookSettings(home, look())).toContainEqual([
+    "-c",
+    "xfce4-panel",
+    "-p",
+    "/plugins/plugin-6/items",
+    "-n",
+    "-a",
+    "-t",
+    "string",
+    "-s",
+    "browser.desktop",
+  ]);
+});
+
+/**
+ * A computer for the look's live mode: its processes as `/proc` lists them (a folder each, its `comm` and its
+ * `environ`), and an `xfconf-query` that notes the bus it was given and its arguments, then exits with
+ * `$XFCONF_EXIT`.
+ */
+function liveComputer() {
+  const root = tempDir("look-live-");
+  dirs.push(root);
+  const bin = path.join(root, "bin");
+  const proc = path.join(root, "proc");
+  const calls = path.join(root, "calls");
+  mkdirSync(bin);
+  writeFileSync(
+    path.join(bin, "xfconf-query"),
+    [
+      "#!/bin/sh",
+      `{ printf '%s' "$DBUS_SESSION_BUS_ADDRESS"; for a; do printf ' [%s]' "$a"; done; echo; } >> "$CALLS"`,
+      'exit "$XFCONF_EXIT"',
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const process = (pid: number, comm: string, env?: Record<string, string>) => {
+    const dir = path.join(proc, String(pid));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "comm"), `${comm}\n`);
+    if (env) {
+      writeFileSync(
+        path.join(dir, "environ"),
+        Object.entries(env)
+          .map(([k, v]) => `${k}=${v}\0`)
+          .join(""),
+      );
+    }
+  };
+  /** The look's script, live, as the runner runs it on `display`'s desktop. */
+  const run = (home: string, o: LookOptions, display: string, exit = 0) => {
+    const { argv, input } = lookCommand(home, o, true);
+    const done = spawnSync(argv[0] as string, [...argv.slice(1, -1), proc], {
+      env: { PATH: `${bin}:/usr/bin:/bin`, DISPLAY: display, CALLS: calls, XFCONF_EXIT: String(exit) },
+      input,
+      timeout: 10_000,
+    });
+    return done.status;
+  };
+  const called = () => (existsSync(calls) ? readFileSync(calls, "utf8").split("\n").filter(Boolean) : []);
+  return { root, process, run, called };
+}
+
+/** What the fake `xfconf-query` notes for each setting given on `bus`. */
+const noted = (bus: string, settings: string[][]) =>
+  settings.map((args) => `${bus}${args.map((a) => ` [${a}]`).join("")}`);
+
+test.if(posix)(
+  "live, on a desktop that runs: the files, its settings through its own session's bus, then its panel starts over; another display's left alone",
+  async () => {
+    const c = liveComputer();
+    const home = path.join(c.root, "home");
+    const panel = Bun.spawn(["sleep", "30"]);
+    const other = Bun.spawn(["sleep", "30"]);
+    try {
+      const bus = "unix:path=/tmp/dbus-ada";
+      // Its session and panel; a program of its own that isn't XFCE's; another desktop's panel; a session whose
+      // environment can't be read (another user's).
+      c.process(1, "bash", { DISPLAY: ":77", DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/not-xfce" });
+      c.process(41, "xfce4-session", { DISPLAY: ":77", DBUS_SESSION_BUS_ADDRESS: bus });
+      c.process(panel.pid, "xfce4-panel", { DISPLAY: ":77", DBUS_SESSION_BUS_ADDRESS: bus, SESSION_MANAGER: "x" });
+      c.process(other.pid, "xfce4-panel", { DISPLAY: ":78", DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-ops" });
+      c.process(44, "xfce4-session");
+      const o = look({ dock: "docklike" });
+      expect(c.run(home, o, ":77")).toBe(0);
+      for (const f of lookFiles(home, o)) expect(readFileSync(path.join(home, f.path)).equals(f.data)).toBe(true);
+      expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId(home, o)}\n`);
+      expect(c.called()).toEqual(noted(bus, lookSettings(home, o)));
+      // The panel's own restart (SIGUSR1): it reads its settings, gtk.css and docklike's file again.
+      await panel.exited;
+      expect(panel.signalCode).toBe("SIGUSR1");
+      expect(other.exitCode).toBeNull();
+      expect(other.signalCode).toBeNull();
+    } finally {
+      panel.kill();
+      other.kill();
+    }
+  },
+);
+
+test.if(posix)(
+  "live, with the look already in its home: the files stay as a person left them, the settings and the panel's restart still go",
+  async () => {
+    const c = liveComputer();
+    const home = path.join(c.root, "home");
+    expect(apply(home)).toBe(0);
+    const css = path.join(home, ".config/gtk-3.0/gtk.css");
+    writeFileSync(css, "a person's own");
+    const panel = Bun.spawn(["sleep", "30"]);
+    try {
+      c.process(panel.pid, "xfce4-panel", { DISPLAY: ":77", DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-ada" });
+      expect(c.run(home, look(), ":77")).toBe(0);
+      expect(readFileSync(css, "utf8")).toBe("a person's own");
+      expect(c.called()).toEqual(noted("unix:path=/tmp/dbus-ada", lookSettings(home, look())));
+      await panel.exited;
+      expect(panel.signalCode).toBe("SIGUSR1");
+    } finally {
+      panel.kill();
+    }
+  },
+);
+
+test.if(posix)(
+  "live: no session on that display (2, after its files), a setting the session refuses (3, its panel left as it is)",
+  async () => {
+    const c = liveComputer();
+    const home = path.join(c.root, "home");
+    const panel = Bun.spawn(["sleep", "30"]);
+    try {
+      c.process(panel.pid, "xfce4-panel", { DISPLAY: ":77", DBUS_SESSION_BUS_ADDRESS: "unix:path=/tmp/dbus-ada" });
+      expect(c.run(home, look(), ":79")).toBe(2);
+      expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId(home, look())}\n`);
+      expect(c.called()).toEqual([]);
+      expect(c.run(home, look(), ":77", 1)).toBe(3);
+      expect(c.called()).toHaveLength(1);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(panel.signalCode).toBeNull();
+    } finally {
+      panel.kill();
+    }
+  },
+);

@@ -4,7 +4,7 @@ import { createConnection } from "node:net";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
-import { LOOK_MARKER, LOOK_SCRIPT, type LookOptions, lookFiles, lookId } from "../../runner/desktop-look";
+import { LOOK_MARKER, LOOK_SCRIPT, type LookOptions, lookCommand, lookFiles, lookId } from "../../runner/desktop-look";
 import {
   DesktopSessions,
   type DesktopSessionsOptions,
@@ -38,14 +38,14 @@ interface FakeProc {
 }
 
 const commandOf = (p: FakeProc) =>
-  p.argv.includes("agentes-look")
-    ? "agentes-look"
-    : p.argv.map((a) => path.basename(a)).find((a) => a === "sh" || a === "Xtigervnc" || a === "dbus-launch");
+  (["agentes-look", "agentes-xvnc"] as const).find((name) => p.argv.includes(name)) ??
+  p.argv.map((a) => path.basename(a)).find((a) => a === "sh" || a === "Xtigervnc" || a === "dbus-launch");
 
 /**
  * A computer with no X: the prepare script makes its folders, the look's
- * script only answers, "Xtigervnc" takes its display's lock and socket, and
- * every process lives until killed (`hangs`: the prepare's or the look's too).
+ * script and the one that sets Xtigervnc's flags only answer (`exits`),
+ * "Xtigervnc" takes its display's lock and socket, and every process lives
+ * until killed (`hangs`: the prepare's, the look's or the flags' too).
  */
 function fakeComputer(lockDir: string) {
   const procs: FakeProc[] = [];
@@ -54,7 +54,7 @@ function fakeComputer(lockDir: string) {
   const kills: [number, string][] = [];
   let nextPid = 4000;
   let xvncFails: string | null = null;
-  let lookFails = false;
+  const exits = new Map<string, number>();
   const files = new Set<string>();
   const hangs = new Set<string>();
   const system: DesktopSystem = {
@@ -84,8 +84,8 @@ function fakeComputer(lockDir: string) {
       const command = commandOf(p);
       if (hangs.has(command ?? "")) {
         // held up: it ends only when killed
-      } else if (command === "agentes-look") {
-        queueMicrotask(() => p.exit(lookFails ? 1 : 0));
+      } else if (command === "agentes-look" || command === "agentes-xvnc") {
+        queueMicrotask(() => p.exit(exits.get(command) ?? 0));
       } else if (command === "sh") {
         for (const dir of argv.slice(-4, -2)) mkdirSync(dir, { recursive: true });
         queueMicrotask(() => p.exit(0));
@@ -120,8 +120,10 @@ function fakeComputer(lockDir: string) {
       xvncFails = message;
     },
     failLook(fails: boolean) {
-      lookFails = fails;
+      exits.set("agentes-look", fails ? 1 : 0);
     },
+    /** What the look's script and the flags' exit with (default 0). */
+    exits,
     /** Files the computer has (`exists`). */
     files,
     /** Commands that never end by themselves ("sh": the prepare, "agentes-look"). */
@@ -423,6 +425,12 @@ test("the look: written as the agent into its desktop's HOME, after the prepare 
   ]);
   expect(look.opts).toMatchObject({ cwd: "/", env: { HOME: home } });
   expect(look.opts.input?.startsWith(".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml ")).toBe(true);
+  // What it has is recorded, so a later runner knows it needs nothing more (`refresh`).
+  const state = path.join(t.home, "desktop", "01a142cb.json");
+  expect(JSON.parse(readFileSync(state, "utf8"))).toMatchObject({
+    look: lookId(home, stock),
+    params: ["SendPrimary=0"],
+  });
   await t.desktops.stop(dev);
 
   // A computer with Orchis and gdk-pixbuf's SVG loader gets its theme; one with docklike, its dock.
@@ -504,6 +512,8 @@ test("a look that can't be written never stops the desktop: it starts as its HOM
   expect(await t.desktops.ensure(dev)).toMatchObject({ started: true });
   expect(t.desktops.status(dev).running).toBe(true);
   expect(t.logs.some((l) => l.includes("keeps the look its home has"))).toBe(true);
+  // Its session doesn't show this look: a sweep tries it in place.
+  expect(JSON.parse(readFileSync(path.join(t.home, "desktop", "01a142cb.json"), "utf8"))).not.toHaveProperty("look");
   t.desktops.close();
 });
 
@@ -655,6 +665,192 @@ test("restore: a desktop left running is taken back only when its pid is still t
   next.close();
 });
 
+/**
+ * The agent's desktop as an earlier runner left it running: its Xtigervnc without the flags added since, and
+ * nothing recorded of its flags or its look. Its `<id8>.json`.
+ */
+async function leftByEarlierRunner(t: ReturnType<typeof setup>, agent: AgentScope) {
+  const before = new DesktopSessions({ ...t.opts, system: gone(t.fake.system) });
+  await before.ensure(agent);
+  before.close();
+  const xvnc = t.fake.of("Xtigervnc").at(-1);
+  if (!xvnc) throw new Error("not started");
+  xvnc.argv = xvnc.argv.filter((a) => a !== "-SendPrimary=0");
+  const state = path.join(t.home, "desktop", `${agent.id.slice(0, 8)}.json`);
+  const { look: _look, params: _params, ...earlier } = JSON.parse(readFileSync(state, "utf8"));
+  writeFileSync(state, JSON.stringify(earlier));
+  return state;
+}
+
+/** The look written into a running session (`lookCommand`'s live mode). */
+const live = (p: FakeProc) => p.argv.at(-1) === "/proc";
+
+test("a desktop an earlier runner left running gets this runner's flags at once and its look once unused for a minute, as its agent, once", async () => {
+  const t = setup();
+  const state = await leftByEarlierRunner(t, dev);
+  const home = path.join(t.folders, "dev", ".agentes", "home");
+  const dir = path.join(t.home, "desktop", "01a142cb");
+  // Until the runner reaches the server its agents' users aren't known: the next sweep tries again.
+  let connected = false;
+  const next = new DesktopSessions({
+    ...t.opts,
+    user: async (agent) => {
+      if (!connected) throw new RunnerError("internal", "This runner isn't connected to a workspace");
+      return t.opts.user(agent);
+    },
+  });
+  next.restore();
+  await next.sweep();
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(0);
+  connected = true;
+  await next.sweep();
+
+  // Xtigervnc takes SendPrimary=0 while it runs, from the agent on its display; the look waits for a quiet minute.
+  const [flags] = t.fake.of("agentes-xvnc");
+  expect(flags?.argv.slice(-2)).toEqual(["agentes-xvnc", "SendPrimary=0"]);
+  expect(flags?.opts.env).toMatchObject({ DISPLAY: ":20", XAUTHORITY: path.join(dir, "Xauthority"), HOME: home });
+  expect(t.fake.of("agentes-look").filter(live)).toHaveLength(0);
+  expect(JSON.parse(readFileSync(state, "utf8"))).toMatchObject({ params: ["SendPrimary=0"] });
+  expect(t.logs).toContain("the desktop of dev took SendPrimary=0 while running");
+
+  t.clock.now += 60_000;
+  await next.sweep();
+  const want = lookCommand(home, await lookOf(t, dev), true);
+  const [look] = t.fake.of("agentes-look").filter(live);
+  expect(look?.argv).toEqual(want.argv);
+  expect(look?.opts.input).toBe(want.input);
+  expect(look?.opts.env).toMatchObject({ DISPLAY: ":20", HOME: home });
+  expect(JSON.parse(readFileSync(state, "utf8")).look).toBe(want.id);
+  expect(t.logs).toContain("the desktop of dev took this runner's look while running");
+
+  // Once: neither again, in this runner or the next; and nothing of it stopped or started the desktop.
+  t.clock.now += 60_000;
+  await next.sweep();
+  const after = new DesktopSessions(t.opts);
+  after.restore();
+  t.clock.now += 60_000;
+  await after.sweep();
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(1);
+  expect(t.fake.of("agentes-look").filter(live)).toHaveLength(1);
+  expect(t.fake.kills).toEqual([]);
+  expect(t.fake.of("Xtigervnc")).toHaveLength(1);
+  next.close();
+  after.close();
+});
+
+test("a running desktop's new look waits while someone watches it, its agent's browser is in use there, or a request touched it within the minute", async () => {
+  let chrome = false;
+  const t = setup({ inUse: () => chrome });
+  await leftByEarlierRunner(t, dev);
+  const next = new DesktopSessions(t.opts);
+  next.restore();
+  const looks = () => t.fake.of("agentes-look").filter(live).length;
+  const release = next.hold(dev.id);
+  t.clock.now += 2 * 60_000;
+  await next.sweep();
+  expect(looks()).toBe(0);
+  // The flags don't wait: setting them shows nothing.
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(1);
+  release?.();
+  chrome = true;
+  t.clock.now += 2 * 60_000;
+  await next.sweep();
+  expect(looks()).toBe(0);
+  chrome = false;
+  await next.ensure(dev);
+  t.clock.now += 30_000;
+  await next.sweep();
+  expect(looks()).toBe(0);
+  t.clock.now += 30_000;
+  await next.sweep();
+  expect(looks()).toBe(1);
+  next.close();
+});
+
+test("a running desktop that can't take the flags or the look keeps what it has, says why, and the next runner tries again", async () => {
+  const t = setup();
+  const state = await leftByEarlierRunner(t, dev);
+  t.fake.exits.set("agentes-xvnc", 1);
+  t.fake.exits.set("agentes-look", 2);
+  const next = new DesktopSessions(t.opts);
+  next.restore();
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(t.logs).toContain(
+    "the desktop of dev keeps its earlier SendPrimary until it starts again: setting it failed (exit 1)",
+  );
+  expect(t.logs).toContain("the desktop of dev keeps its earlier look until it starts again: its session wasn't found");
+  const saved = JSON.parse(readFileSync(state, "utf8"));
+  expect([saved.look, saved.params]).toEqual([undefined, undefined]);
+  // Not again from this runner.
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(1);
+  expect(t.fake.of("agentes-look").filter(live)).toHaveLength(1);
+  next.close();
+
+  // The next one tries again; one held up is stopped, and says so.
+  t.fake.exits.clear();
+  t.fake.hangs.add("agentes-look");
+  const after = new DesktopSessions({ ...t.opts, stepMs: 30 });
+  after.restore();
+  t.clock.now += 60_000;
+  await after.sweep();
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(2);
+  const [, held] = t.fake.of("agentes-look").filter(live);
+  expect(t.fake.kills).toContainEqual([held?.pid ?? 0, "SIGTERM"]);
+  expect(t.logs).toContain(
+    "the desktop of dev keeps its earlier look until it starts again: writing it was stopped after 0.03 s",
+  );
+  expect(after.status(dev).running).toBe(true);
+  after.close();
+});
+
+test("running desktops take a new look one after another; one renamed takes it again, one whose home moved keeps its own", async () => {
+  const t = setup();
+  // With bash, the look's terminal prompt says the agent's name.
+  const user = t.opts.user;
+  t.opts.user = async (agent) => {
+    const u = await user(agent);
+    return { ...u, env: { ...u.env, SHELL: "/bin/bash" } };
+  };
+  await leftByEarlierRunner(t, dev);
+  await leftByEarlierRunner(t, ops);
+  t.fake.hangs.add("agentes-look");
+  const next = new DesktopSessions(t.opts);
+  next.restore();
+  t.clock.now += 60_000;
+  const swept = next.sweep();
+  const looks = () => t.fake.of("agentes-look").filter(live);
+  await waitFor(() => looks().length === 1);
+  await new Promise((r) => setTimeout(r, 30));
+  expect(looks()).toHaveLength(1);
+  looks()[0]?.exit(0);
+  await waitFor(() => looks().length === 2);
+  looks()[1]?.exit(0);
+  await swept;
+  expect(t.logs.filter((l) => l.endsWith("took this runner's look while running"))).toHaveLength(2);
+  t.fake.hangs.clear();
+
+  // Renamed, dev's terminal prompt names it anew.
+  const renamed = { ...dev, name: "Dev Two" };
+  await next.ensure(renamed);
+  t.clock.now += 60_000;
+  await next.sweep();
+  const home = path.join(t.folders, "dev", ".agentes", "home");
+  expect(looks()[2]?.argv).toEqual(lookCommand(home, await lookOf(t, renamed), true).argv);
+
+  // Single-user mode moved ops's folder with its new handle: its session still has the old HOME.
+  await next.ensure({ ...ops, handle: "ops2", name: "Ops" });
+  t.clock.now += 60_000;
+  await next.sweep();
+  expect(looks()).toHaveLength(3);
+  expect(t.logs).toContain(
+    "the desktop of ops2 keeps its earlier look until it starts again: its home moved while it ran",
+  );
+  next.close();
+});
+
 test("a desktop stays on: a day with no viewer and no use, and it still runs; a viewer is counted", async () => {
   // Each viewer that comes or goes is told (system mode: the agent's worker learns it).
   const viewers: number[] = [];
@@ -668,11 +864,14 @@ test("a desktop stays on: a day with no viewer and no use, and it still runs; a 
   expect(viewers).toEqual([1, 0]);
   for (let hour = 0; hour < 24; hour++) {
     t.clock.now += 3_600_000;
-    t.desktops.sweep();
+    await t.desktops.sweep();
   }
   expect(t.desktops.status(dev).running).toBe(true);
   expect(t.fake.kills).toEqual([]);
   expect(t.fake.of("Xtigervnc")).toHaveLength(1);
+  // Started by this runner, it has this runner's flags and look: nothing is set again.
+  expect(t.fake.of("agentes-xvnc")).toHaveLength(0);
+  expect(t.fake.of("agentes-look")).toHaveLength(1);
   t.desktops.close();
 });
 
