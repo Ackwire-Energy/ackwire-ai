@@ -1,6 +1,7 @@
 import {
   acceptInvitation,
   addHostComputer,
+  announceMembers,
   appleSignInTokens,
   avatarFile,
   changeMemberRole,
@@ -679,7 +680,9 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
-      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role);
+      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role, {
+        pubsub: deps.adapters.pubsub,
+      });
       return c.body(null, 204);
     },
   );
@@ -801,6 +804,7 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const joined = await acceptInvitation(db, c.get("user"), c.req.valid("param").token);
+      await announceMembers(deps.adapters.pubsub, joined.orgId);
       // A request to join they had waiting closed as they joined: the admins' notice goes with the last one.
       await settleJoinRequests({ db, pubsub: deps.adapters.pubsub }, joined.orgId);
       return c.json(joined, 200);

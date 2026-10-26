@@ -23,6 +23,7 @@ import { adminIds } from "./gateway";
 import { oneLine } from "./mail/text";
 import { notify, resolveNotifications } from "./notifications";
 import {
+  announceMembers,
   assertInviting,
   can,
   findInviteLink,
@@ -481,6 +482,7 @@ export async function approveJoinRequest(
     }
     return approval;
   });
+  if (result.outcome === "joined") await announceMembers(deps.pubsub, orgId);
   await settleJoinRequests(deps, orgId, now);
   return result;
 }

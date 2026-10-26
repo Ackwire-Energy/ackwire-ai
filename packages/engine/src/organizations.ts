@@ -481,6 +481,10 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
   return row?.n ?? 0;
 }
 
+/** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
+export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
+
 /** Changes a member's role. Admins can't touch owners or make owners; nobody can demote the last owner. */
 export async function changeMemberRole(
   db: Database,
@@ -488,6 +492,7 @@ export async function changeMemberRole(
   orgId: string,
   targetUserId: string,
   role: MemberRole,
+  options: { pubsub?: PubSub } = {},
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
@@ -505,6 +510,7 @@ export async function changeMemberRole(
       .set({ role })
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
   });
+  await announceMembers(options.pubsub, orgId);
 }
 
 /** Removes a member (or lets a member leave). The last owner can't leave. */
@@ -543,6 +549,7 @@ export async function removeMember(
   await announceReleasedAccounts(options.pubsub, released);
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
+  await announceMembers(options.pubsub, orgId);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
   const { pauseRoutinesOfCreator } = await import("./routine-firing");
@@ -614,7 +621,10 @@ export async function deleteAccount(
     agents: released.agents.filter((a) => left.includes(a.orgId)),
   });
   // Their open WebSocket connections lose every subscription now.
-  for (const orgId of left) await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+  for (const orgId of left) {
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+    await announceMembers(options.pubsub, orgId);
+  }
   return { deletedOrgIds: deleted };
 }
 

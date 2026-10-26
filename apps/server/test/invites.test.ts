@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { orgTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -162,6 +163,29 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
     json: { role: "member" },
   });
   expect(await invited.json()).toMatchObject({ outcome: "invited" });
+});
+
+test("members' open apps hear whoever joins, changes role or leaves, to read the people again", async () => {
+  const { owner, orgId, token } = await start({ ALLOW_SIGNUP: "true" });
+  let heard = 0;
+  t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
+    if ((e as { event?: { type?: string } }).event?.type === "org.members") heard++;
+  });
+  const bia = browser(t);
+  await signUp(bia, "bia@example.com");
+  await t.db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.email, "bia@example.com"));
+  await ask(bia, token, {});
+  const [request] = await requests(owner, orgId);
+  await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: { role: "member" } });
+  expect(heard).toBe(1);
+  const cai = await joinByInvitation(t, owner, orgId, "cai@example.com");
+  expect(heard).toBe(2);
+  const { user } = (await (await cai("/api/app/me")).json()) as { user: { id: string } };
+  const member = `/api/app/organizations/${orgId}/members/${user.id}`;
+  expect((await owner(member, { method: "PATCH", json: { role: "admin" } })).status).toBe(204);
+  expect(heard).toBe(3);
+  expect((await owner(member, { method: "DELETE" })).status).toBe(204);
+  expect(heard).toBe(4);
 });
 
 test("only admins see and answer requests; asks must come from our own pages", async () => {

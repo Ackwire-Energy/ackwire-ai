@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { InvitationPreview, JoinRequest, JoinStatus, NotificationLatest } from "@agenteschat/client";
+import type { InvitationPreview, JoinRequest, JoinStatus, Member, NotificationLatest } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -268,6 +268,20 @@ describe("Members › Requests to join", () => {
     const dialog = screen().getByRole("dialog", { name: "Mande este link para Bruno Lima" });
     expect(dialog.textContent).toContain("Este servidor não manda e-mail. O link vale por 7 dias.");
     expect((within(dialog).getByRole("textbox") as HTMLInputElement).value).toBe("http://localhost:3000/invite/tok-r2");
+  });
+
+  test("someone let in elsewhere (another admin, another tab) shows at once: in the people and the sidebar's count", async () => {
+    const { state, sockets } = await members();
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
+    expect(sidebarCount()).toBe("2 membros · 2 agentes");
+    const joao = state.members[1] as Member;
+    state.members.push({ ...joao, userId: "u-carla", name: "Carla Dias", email: "carla@acme.com.br", handle: "carla" });
+    await act(async () => socket.push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(6);
+    expect(sidebarCount()).toBe("3 membros · 2 agentes");
+    expect(text()).toContain("Carla Dias");
   });
 
   test("deny: an optional reason they read in the email; someone else answering first is said", async () => {
