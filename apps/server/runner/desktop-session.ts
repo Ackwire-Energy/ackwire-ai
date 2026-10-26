@@ -14,6 +14,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import type { Server } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -26,11 +27,12 @@ import {
   type RunnerDesktopInfo,
 } from "@agenteschat/adapters/machine-protocol";
 import type { Launcher } from "./agent-users";
-import { lookCommand, lookTheme } from "./desktop-look";
+import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "./desktop-browser";
+import { desktopName, lookCommand, lookDock, lookTheme } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { readJson, writeJson } from "./json-file";
-import { hasBunTerminal, runtimeName } from "./launch";
+import { hasBunTerminal, runtimeName, thisRunner } from "./launch";
 import { tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
 import { KeyedQueue } from "./queue";
@@ -51,6 +53,8 @@ import { KeyedQueue } from "./queue";
  *   controllers.
  * - Its look (`desktop-look.ts`) is XFCE's settings in its HOME, written there
  *   as the agent before a start when the HOME's marker names another look.
+ *   Its Browser reaches the runner on a socket next to the password file
+ *   (`desktop-browser.ts`), open while the desktop runs.
  * - Started the first time it is needed (`ensure`: the agent's screen or
  *   browser, a person opening it), then left on: none stops for being idle,
  *   so what a person left open on it is still there later. Started again (at
@@ -112,6 +116,7 @@ const INSTALL = `sudo apt install --no-install-recommends ${[
   "adwaita-icon-theme",
   "elementary-xfce-icon-theme",
   "fonts-noto-core",
+  "fonts-noto-cjk",
 ].join(" ")}`;
 
 /**
@@ -365,6 +370,10 @@ export interface DesktopSessionsOptions {
   inUse?: (agentId: string) => boolean;
   /** A viewer of the agent's desktop came or went (`status().streams`). */
   onViewers?: (agentId: string) => void;
+  /** Browser on the agent's desktop was clicked (`desktop-browser.ts`); without it the desktop has no socket for it. */
+  openBrowser?: (agent: AgentScope, installing: () => void) => Promise<void>;
+  /** How this runner starts itself, which Browser runs (default: this process). */
+  runner?: string[];
 }
 
 /** What `<runner home>/desktop/<id8>.json` keeps of a running desktop. */
@@ -391,7 +400,12 @@ interface Desktop extends Saved {
   streams: number;
   /** Being stopped on purpose: its processes ending isn't a crash. */
   ending?: boolean;
+  /** Its Browser's socket, while it listens. */
+  browser?: Server;
 }
+
+/** Browser's socket: in the password file's folder, root's for the agent in system mode. */
+const browserSocket = (passwd: string) => path.join(path.dirname(passwd), BROWSER_SOCKET);
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isPid = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0;
@@ -424,12 +438,14 @@ export class DesktopSessions {
   private readonly dir: string;
   private readonly now: () => number;
   private readonly stepMs: number;
+  private readonly runner: string[];
 
   constructor(private readonly opts: DesktopSessionsOptions) {
     this.sys = opts.system ?? hostSystem();
     this.dir = path.join(opts.home, "desktop");
     this.now = opts.now ?? Date.now;
     this.stepMs = opts.stepMs ?? STEP_MS;
+    this.runner = opts.runner ?? thisRunner();
   }
 
   /** `hello.desktop`: whether this computer can run the agents' desktops, and what to install when it can't. */
@@ -603,7 +619,9 @@ export class DesktopSessions {
       const file = path.join(this.dir, name);
       const saved = parseSaved(readJson(file));
       if (saved && !this.desktops.has(saved.agent.id) && this.isXvnc(saved.pid, saved.display)) {
-        this.add({ ...saved, file, lastUsed: this.now(), streams: 0 });
+        const d: Desktop = { ...saved, file, lastUsed: this.now(), streams: 0 };
+        this.add(d);
+        void this.listenBrowser(d);
         this.opts.log(`the desktop of ${saved.agent.handle} on :${saved.display} is running; taken back`);
       } else {
         rmSync(file, { force: true });
@@ -706,10 +724,14 @@ export class DesktopSessions {
           );
         }
         // The agentes.chat look (desktop-look.ts), as the agent; without it the desktop starts as its HOME has it.
-        const look = lookCommand(
-          user.home,
-          lookTheme((f) => this.sys.exists(f)),
-        );
+        const exists = (file: string) => this.sys.exists(file);
+        const look = lookCommand(user.home, {
+          theme: lookTheme(exists),
+          dock: lookDock(exists),
+          agent,
+          shell: user.env.SHELL ?? "",
+          browser: [...this.runner, "desktop-browser", browserSocket(files.passwd)],
+        });
         const looked = await this.step(
           this.sys.spawn([...user.prefix, ...look.argv], { cwd: "/", env: user.env, input: look.input, log }),
         );
@@ -764,6 +786,7 @@ export class DesktopSessions {
         this.add(d);
         void x.exited.then(() => this.ended(d));
         void session.exited.then(() => this.ended(d));
+        await this.listenBrowser(d);
         this.opts.log(`the desktop of ${agent.handle} started on :${display}`);
         return d;
       } finally {
@@ -771,6 +794,32 @@ export class DesktopSessions {
       }
     } finally {
       if (display !== null) this.claimed.delete(display);
+    }
+  }
+
+  /**
+   * Browser on the desktop reaches the runner on its socket (`desktop-browser.ts`), for as long as the desktop runs.
+   * Why a click failed goes in the log: the desktop's note says it in a person's words.
+   */
+  private async listenBrowser(d: Desktop) {
+    const open = this.opts.openBrowser;
+    if (!open) return;
+    const socket = browserSocket(d.passwd);
+    try {
+      const server = await serveBrowser(socket, (installing) =>
+        open(d.agent, installing).catch((err: unknown) => {
+          this.opts.log(
+            `Browser on the desktop of ${d.agent.handle} didn't open: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw err;
+        }),
+      );
+      if (d.ending) closeBrowser(server, socket);
+      else d.browser = server;
+    } catch (err) {
+      this.opts.log(
+        `Browser on the desktop of ${d.agent.handle} can't reach the runner: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -871,6 +920,7 @@ export class DesktopSessions {
       while (this.isXvnc(d.pid, d.display) && Date.now() < deadline) await sleep(50);
       if (this.isXvnc(d.pid, d.display)) this.sys.kill(d.pid, "SIGKILL");
     }
+    if (d.browser) closeBrowser(d.browser, browserSocket(d.passwd));
     rmSync(d.file, { force: true });
     rmSync(d.passwd, { force: true });
     if (this.desktops.size === 0) this.close();
@@ -948,13 +998,6 @@ export class DesktopSessions {
     return FIRST_DISPLAY + slot;
   }
 }
-
-/** The name viewers see for the desktop. */
-const desktopName = (agent: AgentScope) =>
-  (agent.name || agent.handle)
-    .replace(/\p{Cc}/gu, " ")
-    .trim()
-    .slice(0, 60) || "agent";
 
 /**
  * Xtigervnc's flags (after `:N`): its fixed size; VNC only on the Unix

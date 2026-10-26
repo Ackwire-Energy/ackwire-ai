@@ -1,7 +1,7 @@
 # 0040. The agent browser on connected computers, built on `agent-browser`
 
 - Status: Accepted (2026-10-19)
-- Date: 2026-10-19. Revised 2026-10-21: an honest closed state and a first frame (§7), a person opening a site, facts in the hand back, the page hidden from others while a person is in control (§6), the browser always reachable from the agent (§9)
+- Date: 2026-10-19. Revised 2026-10-21: an honest closed state and a first frame (§7), a person opening a site, facts in the hand back, the page hidden from others while a person is in control (§6), the browser always reachable from the agent (§9). Revised 2026-10-25: the same browser from the agent's desktop (§4)
 - First slice of: ADR 0031 (computer use). Where the two disagree, this ADR wins for the browser.
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets), ADR 0032 (one engine, the runner MCP as a bridge), ADR 0036 (desktop app, access on the machine), ADR 0010 (realtime)
 - Out of scope for now: Daytona computers, the simulator (Maestro, its own ADR), the virtual desktop, the owner's desktop, video streaming (H.264/WebRTC), DOM replay (rrweb), several server replicas, intent tools with Jev, protected mode (ADR 0030)
@@ -72,6 +72,7 @@ Lessons from OpenMausBot's code (`server/browser-relay.ts`, `server/browser-live
 - Session `agent-<id8>`, persistent profile and downloads in the agent's folder (`<handle>-<id8>/.agentes/browser`), headless, idle shutdown after 15 minutes. A login done once stays until the site ends it.
 - The runner owns the Chrome process: it stops it after the idle time (not while a person watches or a help request is open), on `browser.stop`, on the agent's `close` and when it stops; a read never starts one. Pids go in `<runner home>/browser/chromes.json`, so Chromes a crashed runner left are stopped on its next start (only when the pid is still that Chrome on that profile).
 - Per agent, not shared: another agent signs in on its own. Per computer: an agent moved to another computer signs in again.
+- On a computer with the agents' desktops, the same Chrome and profile also open from Browser on the agent's desktop (ADR 0058 §7, added 2026-10-25): a person in control who signs in to a site there signs the agent in. The click brings no address; a page a person leaves it on is checked against the site list below before the agent reads it, as a page that moved by itself is.
 - The agent signs in to whatever account the person tells it to: it types a password only when it was given one through `request_secret`, otherwise it asks the person (§6). No rule about which accounts; the agent's page says only "The agent stays signed in to the sites it enters, on this computer". Real payments, deletions and sending on someone's behalf still go through an approval. Until protected mode exists, other unprotected agents and the owner can read that folder.
 - Optional site allowlist per agent, enforced by the runner: `agent-browser`'s `--allowed-domains` refuses persistent profiles, so the runner checks a navigation's URL before it goes and the page's URL after every action (going back when it left the list). Top-level pages only: sub-resources aren't filtered. `file://` and the owner's paths blocked.
 - Cap of live browsers per machine (owner setting, default from memory, about 300 MB each); over it the agent sees "waiting for the computer".

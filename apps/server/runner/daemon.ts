@@ -354,6 +354,8 @@ export class RunnerDaemon implements RequestObserver {
       // System mode: the agents' Chromes are their workers'.
       inUse: (agentId) => (this.session?.supervisor ?? this.session?.browser)?.onDesktopInUse(agentId) ?? false,
       onViewers: () => this.session?.supervisor?.stateChanged(),
+      openBrowser: (agent, installing) => this.openBrowser(agent, installing),
+      runner: this.self.command,
       get agentUsers() {
         return daemon.session?.agentUser != null;
       },
@@ -394,6 +396,29 @@ export class RunnerDaemon implements RequestObserver {
     const s = this.desktops.session(agent.id);
     if (!s) throw new RunnerError("desktop_unavailable", "The agent's desktop stopped; try again");
     return { ...started, xauthority: s.xauthority, home: s.home };
+  }
+
+  /**
+   * Browser on the agent's desktop (`desktop-browser.ts`): its own Chrome there, behind the switches that put it
+   * there (ADR 0058 §7), on a computer that isn't paused; in system mode its worker's (`Supervisor.showBrowser`).
+   */
+  async openBrowser(agent: AgentScope, installing: () => void): Promise<void> {
+    const session = this.session;
+    if (!session) {
+      throw new RunnerError(
+        "internal",
+        "This computer isn't connected to agentes.chat right now; try again in a minute",
+      );
+    }
+    const { tools } = this.access();
+    if (tools.browser !== true || tools.desktop !== true) {
+      throw new RunnerError("not_allowed", "The browser is turned off on this computer");
+    }
+    if (this.pauseState().paused) {
+      throw new RunnerError("paused", "This computer is paused; open the browser again once it resumes");
+    }
+    if (session.supervisor) return session.supervisor.showBrowser(agent, installing);
+    return session.browser.show(agent, await this.agentFolder(agent), installing);
   }
 
   /** As whom a terminal on the agent's computer runs, like its desktop. */
