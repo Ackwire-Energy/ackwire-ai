@@ -29,7 +29,7 @@ import {
   useThreadMission,
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
-import { issueTakenOf } from "@agenteschat/client/lib/issues";
+import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -412,7 +412,11 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             {
               kind: "marker",
               key: "started",
-              text: t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
+              // In a DM, with whom (its channel name is internal, "dm-…"); in a channel, where.
+              text:
+                info?.channelKind === "dm" || dm
+                  ? t("mobile.chat.startedWith", { name: dm?.with.name ?? "" })
+                  : t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
             },
             // The root as it started the thread (its mission card is pinned above already).
             {
@@ -444,7 +448,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...runRowsOf(openingRuns(shownRuns)),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, shownRuns, turnKeyOf, browsing, held, superseded, t]);
+  }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
@@ -795,20 +799,43 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // The header is glass over the conversation: the system's
   // back and "…" circles, and in the middle a pill with who or where, its sky and what the agent is doing.
   const info = thread.data;
-  const title = isThread ? (info ? threadTitle(info) : "") : dm ? dm.with.name : channel ? `#${channel.name}` : "";
+  // A task's work thread: its root was written by the server in one language ("Issue #1: …"); the card's
+  // number and title, in the reader's.
+  const rootWork = isThread ? issueWorkOf(list.find((m) => m.id === threadId)?.meta) : null;
+  const title = isThread
+    ? rootWork
+      ? t("issues.open", { number: rootWork.number, title: rootWork.title })
+      : info
+        ? threadTitle(info)
+        : ""
+    : dm
+      ? dm.with.name
+      : channel
+        ? `#${channel.name}`
+        : "";
   const agentsHere = (roster.data ?? []).filter((r) => r.type === "agent").length;
   const subtitle = isThread
     ? info
-      ? t(
-          mission
-            ? "mobile.chat.missionIn"
-            : info.state === "closed"
-              ? "mobile.chat.closedThreadIn"
-              : "mobile.chat.threadIn",
-          {
-            channel: info.channelName,
-          },
-        )
+      ? info.channelKind === "dm"
+        ? // A DM's channel name is internal ("dm-…"): the thread says who it is with.
+          t(
+            mission
+              ? "mobile.chat.missionWith"
+              : info.state === "closed"
+                ? "mobile.chat.closedThreadWith"
+                : "mobile.chat.threadWith",
+            { name: dm?.with.name ?? "" },
+          )
+        : t(
+            mission
+              ? "mobile.chat.missionIn"
+              : info.state === "closed"
+                ? "mobile.chat.closedThreadIn"
+                : "mobile.chat.threadIn",
+            {
+              channel: info.channelName,
+            },
+          )
       : undefined
     : dmAgentId
       ? dir.agentById.get(dmAgentId)?.role || undefined
@@ -1109,6 +1136,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             keyExtractor={rowKey}
             getItemType={rowType}
             renderItem={renderItem}
+            // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+            // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+            extraData={renderItem}
             estimatedItemSize={72}
             // Opens at the latest message, short conversations sit at the bottom like any chat.
             initialScrollAtEnd
