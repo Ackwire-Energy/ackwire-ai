@@ -590,6 +590,7 @@ export const en: Translations = {
       hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
       leadCloud: "On a computer just for this workspace, being set up now.",
       leadCloudReady: "On a computer just for this workspace. It's ready.",
+      leadCloudPaused: "On a computer just for this workspace, prepared once the workspace is working again.",
     },
     team: {
       title: "Who else works with you?",
@@ -8391,6 +8392,7 @@ export const en: Translations = {
       capacity: "Taking longer",
       problem: "Problem",
       ready: "Ready",
+      paused: "Paused",
     },
     step: {
       reserving: "Reserving the computer",
@@ -8414,6 +8416,7 @@ export const en: Translations = {
       capacity: "This is taking longer than usual. Nothing is lost.",
       problem: "Something went wrong while preparing it. We're on it: nothing to do on your side.",
       ready: "Ready. Your agents work on it.",
+      paused: "Not being prepared while the workspace is on hold.",
     },
     notice: {
       label: "The workspace's computer",

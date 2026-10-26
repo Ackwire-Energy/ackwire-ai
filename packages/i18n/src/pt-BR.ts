@@ -600,6 +600,7 @@ export const ptBR = {
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
       leadCloud: "Num computador só deste workspace, que está sendo preparado agora.",
       leadCloudReady: "Num computador só deste workspace, que já está pronto.",
+      leadCloudPaused: "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
     },
     team: {
       title: "Quem mais trabalha com você?",
@@ -8426,6 +8427,7 @@ export const ptBR = {
       capacity: "Demorando mais",
       problem: "Com problema",
       ready: "Pronto",
+      paused: "Pausado",
     },
     step: {
       reserving: "Reservando o computador",
@@ -8449,6 +8451,7 @@ export const ptBR = {
       capacity: "Está demorando mais que o normal. Nada se perde.",
       problem: "Algo deu errado ao preparar o computador. Já estamos cuidando: nada a fazer do seu lado.",
       ready: "Pronto. Os agentes trabalham nele.",
+      paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
     },
     notice: {
       label: "O computador do workspace",

@@ -79,21 +79,41 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
  */
 const STEADY_MS = 60_000;
 
+/** No computer on its way to tell of: where people connect their own (`pair`), or a workspace that isn't active. */
+const NO_WAIT = {
+  state: null,
+  step: null,
+  stage: null,
+  reason: null,
+  since: null,
+  requestedAt: null,
+  expectedReadyAt: null,
+  specs: null,
+  secondsLeft: null,
+  secondsSteady: null,
+  secondsWaited: null,
+} as const;
+
+/** What `setupStatus` reads of the workspace. */
+type SetupOrg = { createdAt: Date; standing: string };
+
 /**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
  * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
  * whether the owners get the ready email. After a report that moved the ready time later within a stage, the
- * seconds left are the ones it gave, still for `secondsSteady` of them, and counted down after that.
+ * seconds left are the ones it gave, still for `secondsSteady` of them, and counted down after that. A workspace
+ * on hold or suspended waits for no computer (`setOrgStanding`): no state at all, unless its computer is ready.
  */
-function setupStatus(row: ProvisioningRow | null, orgCreatedAt: Date, emails: boolean, now = Date.now()) {
+function setupStatus(row: ProvisioningRow | null, org: SetupOrg, emails: boolean, now = Date.now()) {
+  if (org.standing !== "active" && row?.state !== "ready") return { ...NO_WAIT, notifyByEmail: emails };
   const readyAt = row?.expectedReadyAt ?? null;
   const given = row?.delayedAt?.getTime() ?? now;
   const countsFrom = row?.delayedAt ? given + STEADY_MS : now;
   return {
-    ...provisioningStatus(row, orgCreatedAt),
+    ...provisioningStatus(row, org.createdAt),
     secondsLeft: readyAt ? Math.round((readyAt.getTime() - given - Math.max(0, now - countsFrom)) / 1000) : null,
     secondsSteady: readyAt ? Math.round(Math.max(0, countsFrom - now) / 1000) : null,
-    secondsWaited: Math.round((now - (row?.requestedAt ?? orgCreatedAt).getTime()) / 1000),
+    secondsWaited: Math.round((now - (row?.requestedAt ?? org.createdAt).getTime()) / 1000),
     notifyByEmail: emails,
   };
 }
@@ -106,14 +126,14 @@ async function publishProvisioning(
   machineId: string | null,
 ) {
   const [org] = await deps.db
-    .select({ createdAt: organizations.createdAt })
+    .select({ createdAt: organizations.createdAt, standing: organizations.standing })
     .from(organizations)
     .where(eq(organizations.id, orgId));
   if (!org) return;
   await publishOrgEvent(deps.pubsub, {
     type: "org.broadcast",
     orgId,
-    event: { type: "machine.provisioning", ...setupStatus(row, org.createdAt, deps.emails === true), machineId },
+    event: { type: "machine.provisioning", ...setupStatus(row, org, deps.emails === true), machineId },
   });
 }
 
@@ -224,7 +244,7 @@ function readyTime(input: ProvisioningInput, stored: Date | null, now: Date): Da
  * first hello, and stays until that computer is removed (`ConflictError` meanwhile). A wait said to take
  * over a minute (a ready time that far ahead, `waiting` or `problem`) promises the owners the ready email,
  * until it is ready. Only an active workspace waits for one (`OrgPausedError` otherwise): a report sent as it
- * was held would say again that a computer is on its way (`forgetProvisioning`). False: no such workspace.
+ * was held would say again that a computer is on its way. False: no such workspace.
  */
 export async function setProvisioning(
   deps: ProvisioningDeps,
@@ -232,43 +252,49 @@ export async function setProvisioning(
   input: ProvisioningInput,
 ): Promise<boolean> {
   const { db } = deps;
-  // Read here, not from the 5 s cache: a hold set in another process a moment ago counts.
-  const [org] = await db.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
-  if (!org) return false;
-  if (org.state !== "active") throw new OrgPausedError(org);
-  const [before] = await db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   const now = new Date();
   const step = input.state === "preparing" ? (input.step ?? null) : null;
   const stage = input.state === "preparing" ? (input.stage ?? null) : null;
   const reason = input.state === "waiting" ? currentReason(input.reason) : null;
-  const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
-  const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
-  // Within one step and stage, a ready time moved later is a part running long (STEADY_MS); one left where it was
-  // keeps counting down as it did.
-  const was = same && before?.stage === stage ? before.expectedReadyAt?.getTime() : undefined;
-  const at = expectedReadyAt?.getTime();
-  const delayedAt =
-    was === undefined || at === undefined || at < was ? null : at > was ? now : (before?.delayedAt ?? null);
-  const long =
-    input.state !== "preparing" ||
-    (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
-  const next = {
-    state: input.state,
-    step,
-    stage,
-    reason,
-    expectedReadyAt,
-    delayedAt,
-    emailWhenReady: long || before?.emailWhenReady === true,
-    specs: input.specs ?? before?.specs ?? null,
-    since: same && before ? before.since : now,
-    updatedAt: now,
-  };
-  const [row] = await db
-    .insert(machineProvisioning)
-    .values({ orgId, ...next })
-    .onConflictDoUpdate({ target: machineProvisioning.orgId, set: next, setWhere: notReady })
-    .returning();
+  const done = await db.transaction(async (tx) => {
+    // The standing as it is now, not the 5 s cache, under a lock its change waits for (`setOrgStanding` drops the
+    // wait in the same transaction): a hold set first refuses this report, one set meanwhile drops it.
+    const [org] = await tx.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId)).for("share");
+    if (!org) return null;
+    if (org.state !== "active") throw new OrgPausedError(org);
+    const [before] = await tx.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
+    const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
+    const expectedReadyAt = input.state === "preparing" ? readyTime(input, before?.expectedReadyAt ?? null, now) : null;
+    // Within one step and stage, a ready time moved later is a part running long (STEADY_MS); one left where it was
+    // keeps counting down as it did.
+    const was = same && before?.stage === stage ? before.expectedReadyAt?.getTime() : undefined;
+    const at = expectedReadyAt?.getTime();
+    const delayedAt =
+      was === undefined || at === undefined || at < was ? null : at > was ? now : (before?.delayedAt ?? null);
+    const long =
+      input.state !== "preparing" ||
+      (expectedReadyAt !== null && expectedReadyAt.getTime() - now.getTime() > READY_EMAIL_AFTER_MS);
+    const next = {
+      state: input.state,
+      step,
+      stage,
+      reason,
+      expectedReadyAt,
+      delayedAt,
+      emailWhenReady: long || before?.emailWhenReady === true,
+      specs: input.specs ?? before?.specs ?? null,
+      since: same && before ? before.since : now,
+      updatedAt: now,
+    };
+    const [row] = await tx
+      .insert(machineProvisioning)
+      .values({ orgId, ...next })
+      .onConflictDoUpdate({ target: machineProvisioning.orgId, set: next, setWhere: notReady })
+      .returning();
+    return { before, row, same };
+  });
+  if (!done) return false;
+  const { before, row, same } = done;
   if (!row) {
     throw new ConflictError(
       "This workspace's computer is ready: remove it first (DELETE …/machines/{machineId}) to prepare another one",
@@ -447,10 +473,12 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   };
   await removeMachine(deps, machine, { type: "system", id: null }, async (tx) => {
     await supersedeCodes(tx, machine.id, now);
+    // Locked as a report locks it (`setProvisioning`): a hold set meanwhile drops the wait this starts.
     const [org] = await tx
       .select({ state: organizations.standing })
       .from(organizations)
-      .where(eq(organizations.id, orgId));
+      .where(eq(organizations.id, orgId))
+      .for("share");
     if (org?.state !== "active") {
       await tx.delete(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
       return;
@@ -463,24 +491,6 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
   const [row] = await deps.db.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
   await publishProvisioning(deps, orgId, row ?? null, null);
   return true;
-}
-
-/**
- * The workspace left `active` (held, suspended, ended): it is no request (`listMachineRequests`), so what the
- * provisioner last said of its computer goes, and its people aren't told one is on its way. A ready computer
- * stays ready. Once active again it is a request like any other.
- */
-export async function forgetProvisioning(deps: ProvisioningDeps, orgId: string) {
-  const gone = await deps.db
-    .delete(machineProvisioning)
-    .where(and(eq(machineProvisioning.orgId, orgId), notReady))
-    .returning({ orgId: machineProvisioning.orgId });
-  if (gone.length === 0) return;
-  const [managed] = await deps.db
-    .select({ id: machines.id })
-    .from(machines)
-    .where(and(eq(machines.orgId, orgId), eq(machines.kind, "managed"), isNull(machines.deletedAt)));
-  await publishProvisioning(deps, orgId, null, managed?.id ?? null);
 }
 
 /** What the ready email needs besides the database (the server sends email). */
@@ -640,26 +650,14 @@ export async function computerSetup(
   emails = false,
 ) {
   await requirePermission(db, actorId, orgId, "read");
-  if (mode !== "external") {
-    return {
-      mode: "pair" as const,
-      state: null,
-      step: null,
-      stage: null,
-      reason: null,
-      since: null,
-      requestedAt: null,
-      expectedReadyAt: null,
-      specs: null,
-      secondsLeft: null,
-      secondsSteady: null,
-      secondsWaited: null,
-      notifyByEmail: false,
-      machineId: null,
-    };
-  }
+  if (mode !== "external") return { mode: "pair" as const, ...NO_WAIT, notifyByEmail: false, machineId: null };
   const [row] = await db
-    .select({ provisioning: machineProvisioning, machineId: machines.id, createdAt: organizations.createdAt })
+    .select({
+      provisioning: machineProvisioning,
+      machineId: machines.id,
+      createdAt: organizations.createdAt,
+      standing: organizations.standing,
+    })
     .from(organizations)
     .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
     .leftJoin(
@@ -669,7 +667,7 @@ export async function computerSetup(
     .where(eq(organizations.id, orgId));
   return {
     mode: "external" as const,
-    ...setupStatus(row?.provisioning ?? null, row?.createdAt ?? new Date(), emails),
+    ...setupStatus(row?.provisioning ?? null, row ?? { createdAt: new Date(), standing: "active" }, emails),
     machineId: row?.machineId ?? null,
   };
 }

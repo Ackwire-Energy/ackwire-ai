@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { runMigration } from "@agenteschat/db/testing";
 import {
   agentComputerInfo,
@@ -53,6 +53,61 @@ const machineRow = async (id: string) => {
   if (!row) throw new Error("no machine");
   return row;
 };
+/** What the provisioner last said of the workspace's computer, as stored; null: nothing. */
+const waitState = async (orgId = f.org.id) => {
+  const [row] = await f.db
+    .select({ state: schema.machineProvisioning.state })
+    .from(schema.machineProvisioning)
+    .where(eq(schema.machineProvisioning.orgId, orgId));
+  return row?.state ?? null;
+};
+
+/**
+ * `db` whose first select, in a transaction or not, says its rows came (`read`) and hands them over once `gate`
+ * opens: a report that reads the workspace's standing that way writes after whatever happens meanwhile.
+ */
+function readThenWait(db: Database, read: () => void, gate: Promise<void>): Database {
+  let first = true;
+  const late = <T extends object>(query: T): T =>
+    new Proxy(query, {
+      get(target, key) {
+        const value = Reflect.get(target, key);
+        if (key === "then") {
+          return (ok: (rows: unknown) => unknown, ko: (error: unknown) => unknown) =>
+            (target as unknown as PromiseLike<unknown>)
+              .then(async (rows) => {
+                read();
+                await gate;
+                return rows;
+              })
+              .then(ok, ko);
+        }
+        if (typeof value !== "function") return value;
+        return (...args: unknown[]) => {
+          const next = value.apply(target, args);
+          return next && typeof next === "object" ? late(next) : next;
+        };
+      },
+    });
+  const watched = <T extends object>(handle: T): T =>
+    new Proxy(handle, {
+      get(target, key) {
+        const value = Reflect.get(target, key);
+        if (typeof value !== "function") return value;
+        if (key === "transaction") {
+          return (run: (tx: object) => unknown, ...rest: unknown[]) =>
+            value.call(target, (tx: object) => run(watched(tx)), ...rest);
+        }
+        if (key !== "select" || !first) return value.bind(target);
+        return (...args: unknown[]) => {
+          first = false;
+          return late(value.apply(target, args));
+        };
+      },
+    });
+  return watched(db);
+}
+
 const agentMachine = async (agentId: string) => {
   const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
   return row?.machineId ?? null;
@@ -707,55 +762,116 @@ describe("external provisioning", () => {
   test("a workspace held, suspended or ended waits for no computer; active again, it is a request like any other", async () => {
     f = await setup();
     const events = heard("machine.provisioning");
-    const row = async (orgId = f.org.id) => {
-      const [r] = await f.db
-        .select()
-        .from(schema.machineProvisioning)
-        .where(eq(schema.machineProvisioning.orgId, orgId));
-      return r ?? null;
-    };
-    // Waiting for capacity, then ended before any computer came: the wait goes, and its people hear it.
-    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
-    expect((await row())?.state).toBe("waiting");
-    const end = { state: "hold", reason: "ended", notice: "shown" } as const;
-    await setOrgStanding(deps(), f.org.id, end);
-    expect(await row()).toBeNull();
-    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id)).toMatchObject({
-      state: "preparing",
-      since: null,
-    });
-    expect(events.at(-1)).toMatchObject({
-      type: "machine.provisioning",
-      state: "preparing",
+    const standings = heard("org.standing");
+    const nothing = {
+      mode: "external" as const,
+      state: null,
+      step: null,
+      stage: null,
       reason: null,
       since: null,
-    });
+      requestedAt: null,
+      expectedReadyAt: null,
+      specs: null,
+      secondsLeft: null,
+      secondsSteady: null,
+      secondsWaited: null,
+      notifyByEmail: true,
+      machineId: null,
+    };
+    // Waiting for capacity, then ended before any computer came: the wait goes, and its people are told of none
+    // (their apps ask again on `org.standing`).
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    expect(await waitState()).toBe("waiting");
+    const end = { state: "hold", reason: "ended", notice: "shown" } as const;
+    await setOrgStanding(deps(), f.org.id, end);
+    expect(await waitState()).toBeNull();
+    expect(standings.at(-1)).toMatchObject({ type: "org.standing", state: "hold" });
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id, true)).toEqual(nothing);
+    // Nothing reported before it was held either: no wait to tell of.
+    const bia = await addUser(f.db, "bia");
+    const other = (await createOrganization(f.db, bia.id, { name: "Other" })).organization.id;
+    await setOrgStanding(deps(), other, end);
+    expect(await computerSetup(f.db, "external", bia.id, other, true)).toEqual(nothing);
     // A report sent as it was held is refused, so nothing says a computer is on its way again.
     const late = await setProvisioning(deps(), f.org.id, { state: "preparing", step: "starting" }).catch((e) => e);
     expect(late).toBeInstanceOf(OrgPausedError);
     expect(late).toMatchObject({ code: "org.paused" });
-    expect(await row()).toBeNull();
-    // Set again (a retry): nothing left to drop, nothing heard.
-    const told = events.length;
-    await setOrgStanding(deps(), f.org.id, end);
-    expect(events).toHaveLength(told);
+    expect(await waitState()).toBeNull();
 
-    // Active again: a request like any other, and its reports count.
+    // Active again: a request like any other, waiting again, and its reports count.
     await setOrgStanding(deps(), f.org.id, { state: "active", reason: "reactivated", notice: "shown" });
     expect(await requested()).toEqual(["Acme"]);
     expect((await page()).requests[0]?.provisioning).toBeNull();
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id)).toMatchObject({
+      state: "preparing",
+      since: null,
+    });
     expect(await setProvisioning(deps(), f.org.id, { state: "preparing", step: "starting" })).toBe(true);
 
     // A ready computer stays ready while its workspace is held or suspended; taken away then, no wait starts.
     const { machineId, token } = await enrolled();
     await hello(token);
+    await setOrgStanding(deps(), f.org.id, end);
+    expect(await computerSetup(f.db, "external", f.owner.id, f.org.id)).toMatchObject({ state: "ready", machineId });
     await setOrgStanding(deps(), f.org.id, { state: "suspended", reason: "Abuse", notice: "silent" });
-    expect((await row())?.state).toBe("ready");
+    expect(await waitState()).toBe("ready");
     expect(await revokeManagedMachine(deps(), f.org.id, machineId)).toBe(true);
-    expect(await row()).toBeNull();
+    expect(await waitState()).toBeNull();
+    expect(events.at(-1)).toMatchObject({ type: "machine.provisioning", state: null, since: null, machineId: null });
     expect(await requested()).toEqual([]);
     await setOrgStanding(deps(), f.org.id, { state: "active", reason: "Reviewed", notice: "silent" });
     expect(await requested()).toEqual(["Acme"]);
+  });
+
+  test("a report sent as the workspace is held never brings the wait back", async () => {
+    f = await setup();
+    const waiting = { state: "waiting", reason: "capacity" } as const;
+    await setProvisioning(deps(), f.org.id, waiting);
+    let read = () => {};
+    const readIt = new Promise<void>((resolve) => {
+      read = resolve;
+    });
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // The report has read the workspace active when the hold comes, and writes once the hold is done or after a
+    // moment it holds the hold up: either the hold drops what the report wrote, or it waits for the report to.
+    const report = setProvisioning({ ...deps(), db: readThenWait(f.db, read, gate) }, f.org.id, waiting).catch(
+      (e) => e,
+    );
+    await readIt;
+    const hold = setOrgStanding(deps(), f.org.id, { state: "hold", reason: "ended", notice: "shown" });
+    await Promise.race([hold, Bun.sleep(200)]);
+    release();
+    await Promise.all([report, hold]);
+    expect(await waitState()).toBeNull();
+  });
+
+  test("a hold that can't drop the wait isn't set: nothing is left half done for a retry to finish", async () => {
+    f = await setup();
+    await setProvisioning(deps(), f.org.id, { state: "waiting", reason: "capacity" });
+    // The drop fails as a full disk would make it.
+    await f.db.execute(
+      sql.raw("create function refuse_delete() returns trigger language plpgsql as $$ begin raise 'disk full'; end $$"),
+    );
+    await f.db.execute(
+      sql.raw(
+        "create trigger refuse before delete on machine_provisioning for each row execute function refuse_delete()",
+      ),
+    );
+    const suspend = { state: "suspended", reason: "Abuse", notice: "silent" } as const;
+    await expect(setOrgStanding(deps(), f.org.id, suspend)).rejects.toThrow();
+    const [org] = await f.db
+      .select({ standing: schema.organizations.standing })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, f.org.id));
+    expect(org?.standing).toBe("active");
+    expect(await waitState()).toBe("waiting");
+    await f.db.execute(sql.raw("drop trigger refuse on machine_provisioning"));
+    expect(await setOrgStanding(deps(), f.org.id, suspend)).toMatchObject({ state: "suspended" });
+    expect(await waitState()).toBeNull();
   });
 
   test("the migration drops the waits of workspaces that weren't active before the server did it itself", async () => {

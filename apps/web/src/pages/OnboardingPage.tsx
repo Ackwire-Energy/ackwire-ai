@@ -858,7 +858,9 @@ export function OnboardingPage() {
                 t(
                   workspaceComputer.phase === "ready"
                     ? "onboarding.computer.leadCloudReady"
-                    : "onboarding.computer.leadCloud",
+                    : workspaceComputer.phase === "paused"
+                      ? "onboarding.computer.leadCloudPaused"
+                      : "onboarding.computer.leadCloud",
                 )
               ) : step.id === "import" ? (
                 // Its answer is long: the "skip" Theo says is the way out, right where it's said.
@@ -1679,7 +1681,7 @@ function WorkspaceComputerStep({
       )}
       {/* The team is made after this step: closing the page here would lose it. */}
       <SetupWait view={view} reader={reader} closeable={false} />
-      {view.phase !== "ready" && (
+      {setupPending(view) && (
         <p className="onb__status ac-iconline">
           <Icon name="check" />
           <span>{t("computerSetup.continue")}</span>
