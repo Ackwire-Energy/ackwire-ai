@@ -215,7 +215,7 @@ describe("the entry's status line, first match wins", () => {
     expect(entryState(facts({ held: true, handoff: request() }), NOW)).toEqual({ kind: "held" });
   });
 
-  test("the Cloud's wait: the time left, almost ready, or no time; longer than usual; a problem", () => {
+  test("the Cloud's wait: the time left, almost ready, or no time; waiting for a computer; a problem", () => {
     expect(entryState(preparing({ secondsLeft: 330 }), NOW)).toEqual({
       kind: "preparing",
       eta: { kind: "minutes", count: 6 },
@@ -229,7 +229,7 @@ describe("the entry's status line, first match wins", () => {
       eta: { kind: "almost" },
     });
     expect(entryState(preparing({}), NOW)).toEqual({ kind: "preparing", eta: null });
-    expect(entryState(preparing({ state: "waiting", reason: "capacity" }), NOW)).toEqual({ kind: "slow" });
+    expect(entryState(preparing({ state: "waiting", reason: "capacity" }), NOW)).toEqual({ kind: "waiting" });
     expect(entryState(preparing({ state: "problem" }), NOW)).toEqual({ kind: "problem" });
     // Ready, and the agent on it: no wait any more.
     const ready = { ...preparing({ state: "ready" }), machine: MAC, desktop: { available: true, reason: null } };
@@ -321,9 +321,11 @@ describe("the entry's status line, first match wins", () => {
         `agentComputer.status.preparingPlain · computerSetup.eta.${kind}`,
       );
     expect(line({ kind: "preparing", eta: null })).toBe("agentComputer.status.preparingPlain");
-    // "We'll email you" only where it was promised (owners).
-    expect(line({ kind: "slow" })).toBe("agentComputer.status.slowPlain");
-    expect(line({ kind: "slow" }, { emailPromised: true })).toBe("agentComputer.status.slow");
+    // Waiting for a computer, in the words every screen says it; "we'll email you" only where it was promised (owners).
+    expect(line({ kind: "waiting" })).toBe("computerSetup.status.capacity");
+    expect(line({ kind: "waiting" }, { emailPromised: true })).toBe(
+      "computerSetup.status.capacity · computerSetup.email.short",
+    );
     expect(line({ kind: "problem" })).toBe("agentComputer.status.problem");
     // The Cloud's computer isn't answering; a self-hoster's is offline since a time.
     expect(line({ kind: "offline" })).toBe("agentComputer.status.notAnswering");
@@ -367,6 +369,7 @@ describe("the entry's status line, first match wins", () => {
     expect(entryKind("selfhost", { kind: "connected", os: "darwin" })).toBe("mac");
     expect(entryPortrait({ kind: "preparing", eta: null }, null)).toBe("paused");
     expect(entryPortrait({ kind: "problem" }, setupView(external({ state: "problem" }), NOW))).toBe("offline");
+    expect(entryPortrait({ kind: "waiting" }, setupView(external({ state: "waiting" }), NOW))).toBe("paused");
     expect(entryPortrait({ kind: "offline" }, null)).toBe("offline");
     expect(entryPortrait({ kind: "held" }, null)).toBe("paused");
     expect(entryPortrait({ kind: "paused", until: null }, null)).toBe("paused");

@@ -93,7 +93,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     );
   });
 
-  test("a wait takes longer than usual, whatever reason it gives; problem and ready have their own words", () => {
+  test("a wait is for an available computer, whatever reason it gives; problem and ready have their own words", () => {
     expect(setupView(external({ state: "waiting", reason: "capacity", step: "starting" }))).toMatchObject({
       phase: "waiting",
       step: null,

@@ -142,7 +142,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     sub = t("agentComputer.sub.held");
     body = <Cover icon="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />;
   } else if (stage === "preparing" && f.setup) {
-    sub = t("agentComputer.sub.preparing");
+    sub = t(f.setup.chipKey);
     body = <SetupWait view={f.setup} agentName={name} />;
   } else if (stage === "page" || stage === "otherApp") {
     const controlled = f.handoff?.status === "active" && Boolean(f.handoff.controllerUserId);

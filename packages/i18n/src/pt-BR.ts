@@ -8292,7 +8292,7 @@ export const ptBR = {
     specs: "{{cpus}} CPUs · {{memoryGb}} GB de memória · {{diskGb}} GB de disco",
     chip: {
       preparing: "Sendo preparado",
-      capacity: "Demorando mais",
+      capacity: "Na fila",
       problem: "Com problema",
       ready: "Pronto",
       paused: "Pausado",
@@ -8315,7 +8315,7 @@ export const ptBR = {
     stepOf: "Passo {{n}} de {{total}} · {{step}}",
     status: {
       preparing: "Preparando o computador.",
-      capacity: "Está demorando mais que o normal.",
+      capacity: "Esperando um computador disponível",
       problem: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
       ready: "Pronto.",
       paused: "Não está sendo preparado enquanto o workspace estiver em espera.",
@@ -8342,6 +8342,8 @@ export const ptBR = {
     email: {
       you: "Avisamos você em {{email}} quando ele ficar pronto.",
       here: "Aparece aqui assim que ficar pronto.",
+      /** After the capacity wait's line, for owners. */
+      short: "avisamos por e-mail",
     },
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
@@ -8442,8 +8444,6 @@ export const ptBR = {
       unavailable: "A tela não pode ser mostrada agora",
       noScreen: "Não usa tela nem navegador",
       preparingPlain: "Sendo preparado",
-      slow: "Demorando mais que o normal · avisamos por e-mail",
-      slowPlain: "Demorando mais que o normal",
       problem: "Problema ao preparar · já estamos cuidando",
       notAnswering: "Sem resposta · já estamos cuidando",
       offline: "Offline desde {{time}}",
@@ -8461,7 +8461,6 @@ export const ptBR = {
       askedOther: "Ao vivo · {{article}} {{name}} pediu para {{person}}",
       held: "Em pausa por enquanto · dá para assistir",
       paused: "Pausado no {{computer}} · dá para assistir",
-      preparing: "Sendo preparado",
       notAnswering: "Sem resposta",
       offline: "Offline desde {{time}}",
     },

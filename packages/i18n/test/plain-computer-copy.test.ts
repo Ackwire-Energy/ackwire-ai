@@ -37,6 +37,7 @@ const SETUP_KEYS = [
   ...["minutes_one", "minutes_other", "underMinute", "almost", "late"].map((s) => `computerSetup.eta.${s}`),
   "computerSetup.email.you",
   "computerSetup.email.here",
+  "computerSetup.email.short",
   "computerSetup.plans",
   "computerSetup.title",
   "computerSetup.specs",

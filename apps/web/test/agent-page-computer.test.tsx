@@ -67,16 +67,18 @@ describe("the agent page's one entry: its status line", () => {
     expect(line(await entryOf({ setup: at(null), machine: null }))).toBe("Sendo preparado");
   });
 
-  test("Cloud, taking longer: owners are promised the email when the server sends it; nobody else is", async () => {
-    const slow = { state: "waiting" as const, reason: "capacity" as const, notifyByEmail: true };
-    expect(line(await entryOf({ setup: slow, machine: null }))).toBe(
-      "Demorando mais que o normal · avisamos por e-mail",
+  test("Cloud, waiting for a computer: owners are promised the email when the server sends it; nobody else is", async () => {
+    const wait = { state: "waiting" as const, reason: "capacity" as const, notifyByEmail: true };
+    expect(line(await entryOf({ setup: wait, machine: null }))).toBe(
+      "Esperando um computador disponível · avisamos por e-mail",
     );
     cleanup();
-    expect(line(await entryOf({ setup: slow, machine: null, role: "admin" }))).toBe("Demorando mais que o normal");
+    expect(line(await entryOf({ setup: wait, machine: null, role: "admin" }))).toBe(
+      "Esperando um computador disponível",
+    );
     cleanup();
-    expect(line(await entryOf({ setup: { ...slow, notifyByEmail: false }, machine: null }))).toBe(
-      "Demorando mais que o normal",
+    expect(line(await entryOf({ setup: { ...wait, notifyByEmail: false }, machine: null }))).toBe(
+      "Esperando um computador disponível",
     );
     cleanup();
     expect(line(await entryOf({ setup: { state: "problem" }, machine: null }))).toBe(

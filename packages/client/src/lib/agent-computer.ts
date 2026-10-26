@@ -46,7 +46,7 @@ export interface AgentComputerFacts {
 export type EntryState =
   | { kind: "held" }
   | { kind: "preparing"; eta: EtaView | null }
-  | { kind: "slow" }
+  | { kind: "waiting" }
   | { kind: "problem" }
   | { kind: "offline" }
   | { kind: "paused"; until: string | null }
@@ -76,7 +76,7 @@ export const asksMe = (h: BrowserHandoff, userId: string) =>
 export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryState {
   if (f.held) return { kind: "held" };
   if (waitsForWorkspace(f) && f.setup) {
-    if (f.setup.phase === "waiting") return { kind: "slow" };
+    if (f.setup.phase === "waiting") return { kind: "waiting" };
     if (f.setup.phase === "problem") return { kind: "problem" };
     return { kind: "preparing", eta: setupEta(f.setup, nowMs) };
   }
@@ -114,7 +114,7 @@ export const entryKind = (edition: Edition, machine: Pick<Machine, "kind" | "os"
 
 /** The portrait's light: dimmed while it is prepared, dark when it doesn't answer, paused while held or paused. */
 export function entryPortrait(s: EntryState, setup: SetupView | null): ComputerState {
-  if (s.kind === "preparing" || s.kind === "slow" || s.kind === "problem") {
+  if (s.kind === "preparing" || s.kind === "waiting" || s.kind === "problem") {
     return setup ? setupPortrait(setup, false) : "paused";
   }
   if (s.kind === "offline") return "offline";
@@ -154,8 +154,10 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
       return s.eta
         ? `${t("agentComputer.status.preparingPlain")} · ${lowerFirst(etaLine(t, s.eta), w.locale)}`
         : t("agentComputer.status.preparingPlain");
-    case "slow":
-      return w.emailPromised ? t("agentComputer.status.slow") : t("agentComputer.status.slowPlain");
+    case "waiting":
+      return w.emailPromised
+        ? `${t("computerSetup.status.capacity")} · ${t("computerSetup.email.short")}`
+        : t("computerSetup.status.capacity");
     case "problem":
       return t("agentComputer.status.problem");
     case "offline":

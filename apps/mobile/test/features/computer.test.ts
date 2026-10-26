@@ -281,14 +281,19 @@ describe("the profile's Computador entry on the phone", () => {
 });
 
 describe("the workspace's computer on its way, on Conversas", () => {
-  test("its notice: the time left, else where it is", async () => {
+  test("its notice: the time left, else where it is; waiting for a computer, the email for those who get it", async () => {
     const t = await translator("pt-BR");
     expect(t("computerSetup.notice.title", { org: "Acme" })).toBe("Preparando o computador da Acme");
     const view = viewOf();
-    expect(setupNoticeLine(t, view, setupEta(view, NOW))).toBe("Faltam uns 6 min");
-    const slow = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
-    expect(setupNoticeLine(t, slow, setupEta(slow, NOW))).toBe("Está demorando mais que o normal.");
+    expect(setupNoticeLine(t, view, setupEta(view, NOW), true)).toBe("Faltam uns 6 min");
+    const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
+    expect(setupNoticeLine(t, wait, setupEta(wait, NOW), false)).toBe("Esperando um computador disponível");
+    expect(setupNoticeLine(t, wait, setupEta(wait, NOW), true)).toBe(
+      "Esperando um computador disponível · avisamos por e-mail",
+    );
+    // The full screen's header says it as the chip does.
+    expect(t(wait.chipKey)).toBe("Na fila");
     // On hold no time is said: where it is instead.
-    expect(setupNoticeLine(t, view, null)).toBe("Instalando os programas");
+    expect(setupNoticeLine(t, view, null, false)).toBe("Instalando os programas");
   });
 });

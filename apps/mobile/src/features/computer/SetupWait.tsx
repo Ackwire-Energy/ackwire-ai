@@ -174,7 +174,7 @@ export function SetupNotice() {
   const wait = useSetupWait(view);
   if (!setupPending(view)) return null;
   const title = t("computerSetup.notice.title", { org: org?.name ?? "" });
-  const line = setupNoticeLine(t, view, wait.eta);
+  const line = setupNoticeLine(t, view, wait.eta, wait.emailed);
   return (
     <View style={styles.list}>
       <Pressable
