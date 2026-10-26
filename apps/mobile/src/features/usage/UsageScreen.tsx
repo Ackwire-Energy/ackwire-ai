@@ -288,7 +288,8 @@ const styles = StyleSheet.create({
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 6, columnGap: 14 },
   legendAgent: { flexDirection: "row", alignItems: "center", gap: 6 },
   // Narrower than the web's row: the tokens and the budget's share on one line under the name, the spend under it.
-  api: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
+  // The face at the top, beside the name (the lines under it run long).
+  api: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 10 },
   kind: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
   amount: { minWidth: 64, textAlign: "right" },
   budget: { gap: 6 },
