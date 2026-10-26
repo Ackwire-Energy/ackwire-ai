@@ -1,13 +1,6 @@
 import { type JoinRequest, useApproveJoinRequest, useDenyJoinRequest, useJoinRequests } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
-import { formatShortDate } from "@agenteschat/client/lib/format";
-import {
-  APPROVE_ROLES,
-  type ApproveRole,
-  approvalNews,
-  askedLabel,
-  JOIN_REASON_MAX,
-} from "@agenteschat/client/lib/join-requests";
+import { APPROVE_ROLES, type ApproveRole, approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requests";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -18,6 +11,7 @@ import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
+import { requestTimes } from "./logic";
 
 /**
  * Requests to join through the invitation link (ADR 0068), as a native form sheet: the web's Members › Requests on
@@ -114,11 +108,6 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
     }
   };
 
-  const meta = [
-    askedLabel(t, i18n.language, r.createdAt),
-    t("members.requests.via", { date: formatShortDate(i18n.language, r.expiresAt) }),
-  ].join(" · ");
-
   return (
     <View style={[styles.card, surface]}>
       <View
@@ -152,9 +141,13 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
           {t("members.requests.note", { note: r.note })}
         </Text>
       ) : null}
-      <Text variant="caption" tone="faint">
-        {meta}
-      </Text>
+      <View>
+        {requestTimes(t, i18n.language, r).map((line) => (
+          <Text key={line} variant="caption" tone="faint">
+            {line}
+          </Text>
+        ))}
+      </View>
       {denying ? (
         <>
           <View style={styles.field}>
