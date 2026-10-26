@@ -193,7 +193,13 @@ export function accountRoutes(deps: AppDeps) {
                   appearance: z.object({ color: z.string(), eyes: z.string(), accessory: z.string() }).nullable(),
                 }),
               )
-              .openapi({ description: "A few of the organization's agents (name and look)." }),
+              .openapi({ description: "The organization's first agents (name and look)." }),
+            moreAgents: z
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .openapi({ description: "How many more agents work there than `agents` names." }),
             closed: z
               .literal(true)
               .optional()

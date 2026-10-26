@@ -276,6 +276,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   const address = sent?.email ?? preview.you?.email ?? user?.email ?? "";
   const emailsGoOut = sent?.emailed ?? config.data?.passwordReset ?? true;
   const agents = preview.agents ?? [];
+  const more = preview.moreAgents ?? 0;
   const fix = user ? null : emailTypoFix(email);
   const ready = user !== null || (name.trim() !== "" && isEmail(email));
   const submit = (e: React.FormEvent) => {
@@ -366,9 +367,9 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               </AvatarStack>
               <span>
                 {t("invite.ask.agents", {
-                  count: agents.length,
+                  count: agents.length + more,
                   names: joinNames(
-                    agents.map((a) => a.name),
+                    [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])],
                     t("newAgent.and"),
                   ),
                 })}

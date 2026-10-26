@@ -194,6 +194,7 @@ export const ptBR = {
       leadNoName: "Um admin aprova cada pessoa nova.",
       agents_one: "{{names}} já trabalha lá.",
       agents_other: "{{names}} já trabalham lá.",
+      moreAgents: "mais {{count}}",
       name: "Seu nome",
       email: "Seu e-mail",
       emailHelp: "A resposta chega neste e-mail.",

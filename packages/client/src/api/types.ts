@@ -145,8 +145,10 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
-  /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
+  /** The organization's first agents ("Theo, Ada, Lia e Atlas já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
+  /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
+  moreAgents?: number;
   /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
   closed?: true;
   /** A link opened signed in: where that person stands. */

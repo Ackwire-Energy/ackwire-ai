@@ -838,22 +838,27 @@ export const inviteLinkOpen = (
   now = new Date(),
 ) => !found.link.revokedAt && found.link.expiresAt > now && found.standing.state === "active";
 
-/** How many of the organization's agents an invitation shows ("Ada, Theo e Lia já trabalham lá"). */
-const INVITE_AGENTS = 3;
+/** How many of the organization's agents an invitation names ("Theo, Ada, Lia e Atlas já trabalham lá"). */
+const INVITE_AGENTS = 4;
 
-/** The organization's first agents (not archived), for an invitation page: name and look only. */
+/**
+ * The organization's first agents (not archived), for an invitation page: name and look only, and how many more
+ * work there (`moreAgents`, when some do), so the page never reads as if those were all of them.
+ */
 async function inviteAgents(db: Database, orgId: string) {
-  return db
-    .select({ id: agents.id, name: agents.name, appearance: agents.appearance })
+  const rows = await db
+    .select({ id: agents.id, name: agents.name, appearance: agents.appearance, total: sql<number>`count(*) over ()` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .orderBy(asc(agents.createdAt))
     .limit(INVITE_AGENTS);
+  const more = Number(rows[0]?.total ?? 0) - rows.length;
+  return { agents: rows.map(({ total: _, ...agent }) => agent), ...(more > 0 ? { moreAgents: more } : {}) };
 }
 
 /**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
- * invited (their name), the role and a few of its agents. Only for a valid token, which reached the person.
+ * invited (their name), the role and its first agents. Only for a valid token, which reached the person.
  * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
@@ -894,7 +899,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
-      agents: await inviteAgents(db, link.link.orgId),
+      ...(await inviteAgents(db, link.link.orgId)),
     };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
@@ -904,7 +909,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
-    agents: await inviteAgents(db, row.orgId),
+    ...(await inviteAgents(db, row.orgId)),
   };
 }
 

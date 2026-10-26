@@ -150,6 +150,13 @@ describe("an invitation link asks to join", () => {
     expect(screen().queryByLabelText("Seu nome")).toBeNull();
   });
 
+  test("whoever works there is counted: the first four by name, then how many more", async () => {
+    const agents = ["Ada", "Atlas", "Lia", "Theo"].map((name, i) => ({ id: `a${i}`, name, appearance: null }));
+    await openLink({ ...LINK, agents, moreAgents: 2 });
+    expect(text()).toContain("Ada, Atlas, Lia, Theo e mais 2 já trabalham lá.");
+    expect(document.querySelectorAll(".invite-ask__agents .ac-avatar")).toHaveLength(4);
+  });
+
   test("a full workspace or too many asks: said in the form, which stays", async () => {
     for (const [error, words] of [
       [new ApiError(409, "join.full", "full"), "Este workspace tem muitos pedidos esperando."],

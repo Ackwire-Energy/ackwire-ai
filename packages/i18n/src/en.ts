@@ -187,6 +187,7 @@ export const en: Translations = {
       leadNoName: "An admin approves each new person.",
       agents_one: "{{names}} already works there.",
       agents_other: "{{names}} already work there.",
+      moreAgents: "{{count}} more",
       name: "Your name",
       email: "Your email",
       emailHelp: "We'll write here when they answer.",
