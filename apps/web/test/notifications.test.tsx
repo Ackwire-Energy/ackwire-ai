@@ -441,10 +441,10 @@ describe("its computer is ready: what comes next", () => {
     expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 
-  test("a plain click on the row does what Abrir does: it has nothing more to show in place", async () => {
-    const ready = notification({ id: "n-ready", kind: "computer_ready", source: { machineId: "m-9" } });
+  test("a plain click opens Connect an AI while no agent has one; then it picks the row, its actions in reach", async () => {
+    const ready = () => notification({ id: "n-ready", kind: "computer_ready", source: { machineId: "m-9" } });
     const noAi = { any: false, agents: [{ agentId: ADA_ID, state: "no_ai" as const, reason: "no_key" as const }] };
-    const state = seedState({ notifications: [ready], aiStatus: noAi });
+    const state = seedState({ notifications: [ready()], aiStatus: noAi });
     for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = "u-walter";
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "m-9" });
@@ -460,23 +460,44 @@ describe("its computer is ready: what comes next", () => {
     ]);
     cleanup();
 
-    const other = await go(seedState({ notifications: [ready] }));
+    // An agent thinks already: the click picks the row as any row's does, so Feito and Lembrar depois (shown by that
+    // tap on a phone) stay one tap away; Abrir still goes to the computer's page.
+    const other = await go(seedState({ notifications: [ready()] }));
     await click(row());
+    await settle(4);
+    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(row().classList.contains("is-cur")).toBe(true);
+    expect(other.state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
+      [ORG_ID, "n-ready", true],
+    ]);
+    for (const name of ["Feito", "Lembrar depois"]) expect(within(row()).getByRole("button", { name })).toBeTruthy();
+    await click(within(row()).getByRole("button", { name: "Abrir" }));
     await settle(4);
     expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 
-  test("its headline's line sits in the middle of the face beside it", async () => {
+  test("its headline's line sits in the middle of the face beside it, and its text as far from the top as the bottom", async () => {
     const css = (await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    const px = (selector: string, prop: string) =>
-      Number(new RegExp(`\\n${selector.replace(/[.()]/g, "\\$&")} \\{[^}]*\\b${prop}: (\\d+)px`).exec(css)?.[1]);
+    const phone = css.split("\n@media (max-width: 720px) {")[1]?.split("\n}")[0] ?? "";
+    const px = (selector: string, prop: string, sheet = css) =>
+      Number(
+        new RegExp(`\\n *${selector.replace(/[.()>:]/g, "\\$&")} \\{[^}]*\\b${prop}: (-?\\d+)(px)?;`).exec(sheet)?.[1],
+      );
     const face = px(".nt-sys", "height");
     expect(px(".nt-av28", "height")).toBe(face);
     const line = px(".nt-tags .ac-chip", "height");
-    expect(px(".nt-l1", "margin-top")).toBe(px(".nt-who", "padding-top") + (face - line) / 2);
+    const pad = px(".nt-who", "padding-top");
+    // A headline alone comes down to the face's middle.
+    expect(px(".nt-l1:only-child", "margin-top")).toBe(pad + (face - line) / 2);
+    // With lines under it the face goes up to the headline's, which keeps the row's padding; on a phone, where a
+    // headline wraps, in every row.
+    const up = (sheet: string, selector: string) => pad + px(selector, "margin-top", sheet) + face / 2;
+    expect(up(css, ".nt-item:has(> .nt-c > :nth-child(2)) > .nt-who")).toBe(line / 2);
+    expect(up(phone, ".nt-who")).toBe(line / 2);
+    expect(px(".nt-l1:only-child", "margin-top", phone)).toBe(0);
   });
 });
 

@@ -1483,12 +1483,14 @@ export function NotificationsPage() {
 
   const connect = useConnectAi();
   const aiStatus = useAiStatus(org.id);
+  // Its computer is ready and its agents have no AI yet: what comes next is connecting one.
+  const connectsAi = (n: AppNotification) => {
+    const ai = aiStatus.data;
+    return n.kind === "computer_ready" && connect !== null && ai !== undefined && !ai.any && ai.agents.length > 0;
+  };
   const openItem = (n: AppNotification) => {
     markRead(n);
-    // Its computer is ready and its agents have no AI yet: what comes next is connecting one.
-    const ai = aiStatus.data;
-    if (n.kind === "computer_ready" && connect && ai && !ai.any && ai.agents.length > 0)
-      return void connect.open({ ready: true });
+    if (connectsAi(n)) return void connect?.open({ ready: true });
     const target = openTarget(n);
     if (!target) return;
     // An agent asked for help in its browser: its card opens there, in control (no page of its own).
@@ -1629,8 +1631,9 @@ export function NotificationsPage() {
 
   const select = (n: AppNotification) => {
     setCur(n.id);
-    // Its computer being ready has nothing more to show in place: a click goes where Open does.
-    if (n.kind === "computer_ready") return openItem(n);
+    // Connecting an AI is the one next step there is: a click opens it, as Open does. Any other row stays put, so
+    // its actions (on a phone, shown by that tap) stay in reach.
+    if (connectsAi(n)) return openItem(n);
     markRead(n);
     // A grouped item opens its replies on the first tap.
     if (isExpandable(n) && !open.has(n.id) && !n.waiting) toggle(n);

@@ -375,16 +375,22 @@
 .nt-c {
   min-width: 0;
 }
-/* The headline's 22px line (its chips') sits in the middle of the 28px face beside it: the face's 1px, then
-   (28 - 22) / 2. */
+/* The headline's 22px line (its chips') and the 28px face beside it share a middle. A headline alone comes down
+   to the face's: the face's 1px, then (28 - 22) / 2. With lines under it (on a phone, where it wraps, always),
+   the face goes up to it instead, so the text keeps the row's padding above it as below it. */
 .nt-l1 {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);
+}
+.nt-l1:only-child {
+  margin-top: 4px;
+}
+.nt-item:has(> .nt-c > :nth-child(2)) > .nt-who {
+  margin-top: -4px;
 }
 .nt-what {
   min-width: 0;
@@ -915,6 +921,12 @@
   }
   .nt-l1 {
     align-items: flex-start;
+  }
+  .nt-l1:only-child {
+    margin-top: 0;
+  }
+  .nt-who {
+    margin-top: -4px;
   }
   .nt-what {
     white-space: normal;
