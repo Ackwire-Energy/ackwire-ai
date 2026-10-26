@@ -41,6 +41,7 @@ import { TOKEN_REFUSED_EXIT } from "./connection";
 import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
 import { DesktopManager } from "./desktop";
+import { runDesktopBrowser } from "./desktop-browser";
 import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
 import { RUNNER_VERSION } from "./errors";
 import { defaultHostState, HostComputer, readTokenFile, runnerChild } from "./host";
@@ -120,6 +121,8 @@ Usage:
       The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
   agentes-runner worker --agent <id> --dir <folder> --home <dir>
       System mode: one agent's work, as that agent's own user (started by the runner, not by people).
+  agentes-runner desktop-browser <socket>
+      Browser on an agent's desktop: the agent's own browser there (started by that desktop, not by people).
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
@@ -1095,6 +1098,12 @@ async function main(argv: string[]): Promise<number> {
     }
     case "worker":
       return worker(p);
+    case "desktop-browser":
+      if (!sub) {
+        console.error("Usage: agentes-runner desktop-browser <socket>");
+        return 1;
+      }
+      return runDesktopBrowser(sub);
     case "host":
       return host(p);
     case "task-wrapper": {

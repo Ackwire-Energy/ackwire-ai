@@ -1,9 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { createConnection } from "node:net";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
-import { LOOK_MARKER, LOOK_SCRIPT, lookFiles, lookId } from "../../runner/desktop-look";
+import { LOOK_MARKER, LOOK_SCRIPT, type LookOptions, lookFiles, lookId } from "../../runner/desktop-look";
 import {
   DesktopSessions,
   type DesktopSessionsOptions,
@@ -16,12 +17,14 @@ import {
   systemDesktopUser,
   vncPasswordFile,
 } from "../../runner/desktop-session";
+import { RunnerError } from "../../runner/errors";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
 
+const posix = process.platform !== "win32";
 const dev: AgentScope = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev", name: "Dev" };
 const ops: AgentScope = { id: "9f00aa11-0000-7000-8000-000000000000", handle: "ops" };
 const GiB = 1024 ** 3;
@@ -135,8 +138,11 @@ const gone = (system: DesktopSystem): DesktopSystem => ({
   },
 });
 
+const RUNNER = ["/opt/agentes-runner/agentes-runner"];
+
 function setup(over: Partial<DesktopSessionsOptions> = {}) {
-  const home = tempDir("desk-home-");
+  // Short: Browser's socket goes in the runner's home, and a Unix socket's path has at most 103 bytes on macOS.
+  const home = tempDir("dsk-");
   const lockDir = tempDir("desk-x-");
   const folders = tempDir("desk-ws-");
   dirs.push(home, lockDir, folders);
@@ -152,10 +158,39 @@ function setup(over: Partial<DesktopSessionsOptions> = {}) {
     // Plenty free: parking only where a test says memory runs short.
     memAvailable: () => 4 * GiB,
     now: () => clock.now,
+    runner: RUNNER,
     ...over,
   };
   const desktops = new DesktopSessions(opts);
   return { home, lockDir, folders, fake, logs, clock, opts, desktops };
+}
+
+/** The look a desktop of `agent` gets on this computer (single-user: Browser's socket in the runner's home). */
+async function lookOf(t: ReturnType<typeof setup>, agent: AgentScope, over: Partial<LookOptions> = {}) {
+  const user = await t.opts.user(agent);
+  return {
+    theme: "stock",
+    dock: "panel",
+    agent,
+    shell: user.env.SHELL ?? "",
+    browser: [...RUNNER, "desktop-browser", path.join(user.dir, "browser.sock")],
+    ...over,
+  } satisfies LookOptions;
+}
+
+/** What Browser's socket answers one click (`open`). */
+function click(socket: string): Promise<string> {
+  return new Promise((resolve) => {
+    let got = "";
+    const conn = createConnection(socket);
+    conn.setEncoding("utf8");
+    conn.on("connect", () => conn.write("open\n"));
+    conn.on("data", (chunk: string) => {
+      got += chunk;
+    });
+    conn.on("error", (err) => resolve(`${got}${err.message}`));
+    conn.on("close", () => resolve(got));
+  });
 }
 
 const flagValue = (argv: string[], flag: string) => argv[argv.indexOf(flag) + 1];
@@ -331,7 +366,7 @@ test("prepare: xfwm4 never waits for a vblank, in a fresh home and in the settin
   // The look's own xfwm4 settings came after, the vblank still off.
   expect(readFileSync(settings, "utf8")).toContain('name="margin_bottom"');
   const home = path.join(t.folders, "dev", ".agentes", "home");
-  expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId("stock", home)}\n`);
+  expect(readFileSync(path.join(home, LOOK_MARKER), "utf8")).toBe(`${lookId(home, await lookOf(t, dev))}\n`);
 
   // xfwm4 writes every setting it has on its first start; the next start changes that one only.
   const own = [
@@ -363,27 +398,98 @@ test("the look: written as the agent into its desktop's HOME, after the prepare 
   expect(t.fake.procs.indexOf(prepare)).toBeLessThan(t.fake.procs.indexOf(look));
   expect(t.fake.procs.indexOf(look)).toBeLessThan(t.fake.procs.indexOf(xvnc));
   const home = path.join(t.folders, "dev", ".agentes", "home");
-  const count = String(lookFiles(home, "stock").length);
+  const stock = await lookOf(t, dev);
+  // Browser runs this runner's own command, with the desktop's socket next to its cookie and password file.
+  expect(stock.browser).toEqual([
+    ...RUNNER,
+    "desktop-browser",
+    path.join(t.home, "desktop", "01a142cb", "browser.sock"),
+  ]);
   expect(look.argv).toEqual([
     "/bin/sh",
     "-c",
     LOOK_SCRIPT,
     "agentes-look",
     home,
-    lookId("stock", home),
+    lookId(home, stock),
     LOOK_MARKER,
-    count,
+    String(lookFiles(home, stock).length),
   ]);
   expect(look.opts).toMatchObject({ cwd: "/", env: { HOME: home } });
   expect(look.opts.input?.startsWith(".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml ")).toBe(true);
   await t.desktops.stop(dev);
 
-  // A computer with Orchis and gdk-pixbuf's SVG loader gets its theme.
+  // A computer with Orchis and gdk-pixbuf's SVG loader gets its theme; one with docklike, its dock.
   t.fake.files.add("/usr/share/themes/Orchis-Light/xfwm4/themerc");
   t.fake.files.add("/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader_svg.so");
   await t.desktops.ensure(dev);
-  expect(t.fake.of("agentes-look").at(-1)?.argv[5]).toBe(lookId("orchis", home));
+  expect(t.fake.of("agentes-look").at(-1)?.argv[5]).toBe(lookId(home, await lookOf(t, dev, { theme: "orchis" })));
+  await t.desktops.stop(dev);
+  t.fake.files.add("/usr/share/xfce4/panel/plugins/docklike.desktop");
+  t.fake.files.add("/usr/lib/x86_64-linux-gnu/xfce4/panel/plugins/libdocklike.so");
+  await t.desktops.ensure(dev);
+  expect(t.fake.of("agentes-look").at(-1)?.argv[5]).toBe(
+    lookId(home, await lookOf(t, dev, { theme: "orchis", dock: "docklike" })),
+  );
   t.desktops.close();
+});
+
+test.if(posix)(
+  "Browser on the desktop: a socket while the desktop runs, and a click on it asks the runner for that agent's browser",
+  async () => {
+    const asked: string[] = [];
+    let refusal: string | null = null;
+    const t = setup({
+      openBrowser: async (agent, installing) => {
+        asked.push(agent.handle);
+        if (refusal) throw new RunnerError("not_allowed", refusal);
+        if (agent.handle === "ops") installing();
+      },
+    });
+    await t.desktops.ensure(dev);
+    const socket = path.join(t.home, "desktop", "01a142cb", "browser.sock");
+    expect(statSync(socket).isSocket()).toBe(true);
+    expect(await click(socket)).toBe("ok\n");
+    expect(asked).toEqual(["dev"]);
+    // Refused: the launcher hears the code, the runner's log the reason.
+    refusal = "The browser is turned off on this computer";
+    expect(await click(socket)).toBe("error not_allowed\n");
+    expect(t.logs).toContain("Browser on the desktop of dev didn't open: The browser is turned off on this computer");
+    refusal = null;
+    asked.length = 0;
+    expect(await click(socket)).toBe("ok\n");
+    expect(asked).toEqual(["dev"]);
+    // Each desktop its own: ops's click is ops's.
+    await t.desktops.ensure(ops);
+    expect(await click(path.join(t.home, "desktop", "9f00aa11", "browser.sock"))).toBe("installing\nok\n");
+    expect(asked).toEqual(["dev", "ops"]);
+    // Gone with its desktop.
+    await t.desktops.stop(dev);
+    expect(existsSync(socket)).toBe(false);
+    t.desktops.close();
+    await t.desktops.stopAll();
+
+    // A runner that can't open the agent's browser makes no socket for it.
+    const none = setup();
+    await none.desktops.ensure(dev);
+    expect(existsSync(path.join(none.home, "desktop", "01a142cb", "browser.sock"))).toBe(false);
+    none.desktops.close();
+  },
+);
+
+test.if(posix)("a desktop taken back by the next runner gets its Browser's socket again", async () => {
+  const asked: string[] = [];
+  const t = setup();
+  const before = new DesktopSessions({ ...t.opts, system: gone(t.fake.system) });
+  await before.ensure(dev);
+  before.close();
+  const next = new DesktopSessions({ ...t.opts, openBrowser: async (agent) => void asked.push(agent.handle) });
+  next.restore();
+  const socket = path.join(t.home, "desktop", "01a142cb", "browser.sock");
+  await waitFor(() => existsSync(socket));
+  expect(await click(socket)).toBe("ok\n");
+  expect(asked).toEqual(["dev"]);
+  await next.stopAll();
 });
 
 test("a look that can't be written never stops the desktop: it starts as its HOME has it", async () => {
@@ -417,9 +523,10 @@ test("a step before X that is held up (a pipe in the HOME, a hung disk) is stopp
 
 test("system mode: every process as the agent, and the password file root's (readable by the agent's group only)", async () => {
   const root = tempDir("desk-sys-");
-  dirs.push(root);
+  // Root's own folder for the desktops (`/run/agentes-desktop`); short, as a socket's path has at most 103 bytes.
+  const runDir = tempDir("ads-");
+  dirs.push(root, runDir);
   const home = path.join(root, "home", "ag-01a142cb");
-  const runDir = path.join(root, "run", "agentes-desktop");
   const gid = process.getgid?.() ?? 0;
   const prefix = ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"];
   const user: DesktopUser = {
@@ -436,11 +543,22 @@ test("system mode: every process as the agent, and the password file root's (rea
     dir: path.join(home, ".agentes", "desktop"),
     ids: { uid: 21001, gid },
   };
-  const t = setup({ user: async () => user, runDir });
+  const asked: string[] = [];
+  const t = setup({ user: async () => user, runDir, openBrowser: async (agent) => void asked.push(agent.handle) });
   await t.desktops.ensure(dev);
   for (const p of t.fake.procs) expect(p.argv.slice(0, prefix.length)).toEqual(prefix);
   // The look goes into the agent's own home, written by the agent.
   expect(t.fake.of("agentes-look")[0]?.argv[prefix.length + 4]).toBe(home);
+  // Browser's socket is root's, next to the password file, where only the agent's group may write to it; the
+  // agent's own folders, which the agent could swap under root, have none.
+  const socket = path.join(runDir, "21001", "browser.sock");
+  const sock = statSync(socket);
+  expect([sock.isSocket(), sock.mode & 0o777, sock.gid]).toEqual([true, 0o660, gid]);
+  expect(existsSync(path.join(home, ".agentes", "desktop", "browser.sock"))).toBe(false);
+  if (posix) {
+    expect(await click(socket)).toBe("ok\n");
+    expect(asked).toEqual(["dev"]);
+  }
   const [xvnc] = t.fake.of("Xtigervnc");
   const passwd = path.join(runDir, "21001", "passwd");
   expect(flagValue(xvnc?.argv ?? [], "-PasswordFile")).toBe(passwd);
@@ -458,6 +576,7 @@ test("system mode: every process as the agent, and the password file root's (rea
 
   expect(await t.desktops.stop(dev)).toEqual({ stopped: true });
   expect(existsSync(passwd)).toBe(false);
+  expect(existsSync(socket)).toBe(false);
 });
 
 test("the controller's keyboard: setxkbmap as the agent on its display; a variant only when the layout has one", async () => {
