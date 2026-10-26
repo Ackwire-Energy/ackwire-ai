@@ -1,9 +1,10 @@
 import { type HelpBlock, helpDocument, helpInline, isHelpSlug } from "@agenteschat/i18n/help";
 import { Button, Logo, Segmented } from "@agenteschat/ui";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { type LocaleCode, setLocale, usePageT } from "@/i18n";
+import { useDocumentTitle } from "@/lib/desktop";
 import { Footer } from "@/pages/landing/Footer";
 import { useLandingTheme } from "@/pages/landing/hooks";
 import { LpIcon } from "@/pages/landing/icons";
@@ -22,9 +23,7 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
   const locale: LocaleCode = lang ?? (i18n.language === "en" ? "en" : "pt-BR");
   const t = usePageT(locale);
   const doc = isHelpSlug(slug) ? helpDocument(slug, locale) : null;
-  useEffect(() => {
-    if (doc) document.title = `${doc.title} · agentes.chat`;
-  }, [doc]);
+  useDocumentTitle(doc ? `${doc.title} · agentes.chat` : undefined);
   if (!doc) return <Navigate to="/" replace />;
 
   const switchTo = (code: LocaleCode) => {

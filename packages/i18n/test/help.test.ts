@@ -86,15 +86,16 @@ describe("help pages", () => {
   });
 
   test("a link to another help page lands on a page and a section that exist", () => {
-    for (const { doc } of pages())
-      for (const line of linesOf(doc))
-        for (const piece of helpInline(line)) {
-          if (piece.kind !== "link" || !piece.href.startsWith("/help/")) continue;
-          const [slug = "", id] = piece.href.slice("/help/".length).split("#");
-          expect({ href: piece.href, page: isHelpSlug(slug) }).toEqual({ href: piece.href, page: true });
-          const ids = isHelpSlug(slug) ? helpDocument(slug, "en").sections.map((s) => s.id) : [];
-          if (id) expect(ids).toContain(id);
-        }
+    expect(deadHelpLinks(pages().map((p) => p.doc))).toEqual([]);
+    // The check itself, on a page linking one place that exists and two that don't.
+    const probe: HelpDocument = {
+      title: "t",
+      summary: "s",
+      sections: [
+        { id: "a", heading: "h", blocks: ["[x](/help/memory#proposals), [y](/help/nope), [z](/help/memory#nope)"] },
+      ],
+    };
+    expect(deadHelpLinks([probe])).toEqual(["/help/nope", "/help/memory#nope"]);
   });
 
   test("the repository is linked only once the install page is listed: the two go public together", () => {
@@ -106,11 +107,54 @@ describe("help pages", () => {
   });
 });
 
+/** The links in these pages to a help page, or a section of one, that doesn't exist. */
+function deadHelpLinks(docs: HelpDocument[]): string[] {
+  return docs
+    .flatMap(linesOf)
+    .flatMap(helpInline)
+    .flatMap((piece) => {
+      if (piece.kind !== "link" || !piece.href.startsWith("/help/")) return [];
+      const [slug = "", id] = piece.href.slice("/help/".length).split("#");
+      const found = isHelpSlug(slug) && (!id || helpDocument(slug, "en").sections.some((s) => s.id === id));
+      return found ? [] : [piece.href];
+    });
+}
+
+/** The arguments of each `helpUrl(…)` call, split at the commas outside brackets and strings. */
+function helpUrlCalls(source: string): string[][] {
+  const calls: string[][] = [];
+  for (const m of source.matchAll(/\bhelpUrl\(/g)) {
+    const args: string[] = [];
+    let start = (m.index ?? 0) + m[0].length;
+    let depth = 0;
+    let quote = "";
+    for (let i = start; i < source.length; i++) {
+      const c = source.charAt(i);
+      if (quote) {
+        if (c === "\\") i++;
+        else if (c === quote) quote = "";
+      } else if (c === '"' || c === "'" || c === "`") quote = c;
+      else if ("([{".includes(c)) depth++;
+      else if (depth > 0) {
+        if (")]}".includes(c)) depth--;
+      } else if (c === "," || c === ")") {
+        args.push(source.slice(start, i).trim());
+        start = i + 1;
+        if (c === ")") break;
+      }
+    }
+    calls.push(args);
+  }
+  return calls;
+}
+
 /** The help pages the apps link to, as `[slug, section]`: `helpUrl("<slug>", …, "<section>")` and `<HelpLink …>`. */
 function linksIn(source: string): [string, string | undefined][] {
-  const calls = [...source.matchAll(/helpUrl\(\s*"([^"]+)"(?:\s*,[^,)]*,\s*"([^"]+)")?/g)].map(
-    (m) => [m[1] ?? "", m[2]] as [string, string | undefined],
-  );
+  const literal = (arg = "") => /^"([^"]+)"$/.exec(arg)?.[1];
+  const calls = helpUrlCalls(source).flatMap(([slug, , section]): [string, string | undefined][] => {
+    const page = literal(slug);
+    return page ? [[page, literal(section)]] : [];
+  });
   const tags = [...source.matchAll(/<HelpLink\b([^>]*)>/g)].map((m) => {
     const attrs = m[1] ?? "";
     return [/\bslug="([^"]+)"/.exec(attrs)?.[1] ?? "", /\bsection="([^"]+)"/.exec(attrs)?.[1]] as [
@@ -127,6 +171,13 @@ describe("links to the help pages", () => {
       ["run-on-your-computer", "who"],
     ]);
     expect(linksIn('Linking.openURL(helpUrl("memory", locale))')).toEqual([["memory", undefined]]);
+    // A language worked out in the call, over lines.
+    expect(linksIn('helpUrl("computers", lang(), "folders")')).toEqual([["computers", "folders"]]);
+    expect(
+      linksIn('helpUrl(\n  "computers",\n  locale.slice(0, 2) === "en" ? "en" : "pt-BR",\n  "folders",\n)'),
+    ).toEqual([["computers", "folders"]]);
+    // A page in a variable can't be read here: HelpLink's own call.
+    expect(linksIn("helpUrl(slug, i18n.language, section)")).toEqual([]);
     expect(linksIn('<HelpLink slug="import" section="other-apps">{t("x")}</HelpLink>')).toEqual([
       ["import", "other-apps"],
     ]);
