@@ -260,6 +260,8 @@ describe("asking to join through a link", () => {
 
     await typed(token, "Impostor", "dora@example.com", { note: "let me in" });
     const dora = await person("dora@example.com", { verified: true });
+    // Not hers until she asks: approving it now would send an invitation, not let her in.
+    expect(await joinStatus(f.db, dora, token, NOW)).toMatchObject({ request: null });
     expect(await signedIn(token, dora, "Dora from sales")).toMatchObject({ created: false });
     const [doraRow] = (await rows()).filter((r) => r.email === "dora@example.com");
     expect(doraRow).toMatchObject({ userId: dora.id, name: dora.name, note: "Dora from sales", status: "pending" });

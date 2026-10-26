@@ -2588,6 +2588,8 @@ export const ptBR = {
       asks: "<b>{{name}}</b> pede para entrar",
       label: "{{name}} pede para entrar",
       asked: "Pediu {{ago}}",
+      askedNow: "Pediu agora",
+      askedOn: "Pediu em {{date}}",
       confirmed: "E-mail confirmado: a pessoa entra quando você aprovar.",
       unconfirmed: "E-mail não confirmado: aprovar manda um convite para ele.",
       via: "Pelo link de convite · fecha em {{date}}",

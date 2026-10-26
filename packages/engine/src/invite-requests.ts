@@ -313,9 +313,10 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
  * What the link's page tells a signed-in person (ADR 0068): whether they are in the workspace (its id only then),
  * and, once they confirmed their address, the latest request for it with its answer. An unconfirmed account hears
  * nothing about requests, as a typed ask: anyone can sign up with an address that isn't theirs, and even whether
- * its own ask was filed would tell that the address already waited or was turned down. An approval counts while
- * it still means something: they are in, or the invitation it sent still waits for them. Null for a token that
- * isn't a link.
+ * its own ask was filed would tell that the address already waited or was turned down. A waiting request counts
+ * once it is the account's own: one typed for the address becomes theirs when they ask (`file`), and until then
+ * approving it would send an invitation instead of letting them in. An approval counts while it still means
+ * something: they are in, or the invitation it sent still waits for them. Null for a token that isn't a link.
  */
 export async function joinStatus(db: Database, user: { id: string }, token: string, now = new Date()) {
   const found = await findInviteLink(db, token);
@@ -339,7 +340,9 @@ export async function joinStatus(db: Database, user: { id: string }, token: stri
   const request = !row
     ? null
     : isWaiting(row, now)
-      ? { status: "pending" as const, reason: null }
+      ? row.userId === user.id
+        ? { status: "pending" as const, reason: null }
+        : null
       : row.status === "approved" && (member || invited)
         ? { status: "approved" as const, reason: null }
         : isKeptDenial(row, now)

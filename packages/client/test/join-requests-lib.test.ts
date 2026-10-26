@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { AppNotification, JoinStatus } from "../src/api/types";
-import { askView } from "../src/lib/join-requests";
+import { approvalNews, askedLabel, askView } from "../src/lib/join-requests";
 import { openTarget, sortWaiting } from "../src/lib/notifications";
 
 const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
@@ -41,6 +42,31 @@ describe("askView: an invitation link's page", () => {
       already: true,
     });
   });
+});
+
+describe("approving a request to join", () => {
+  test("in at once, or invited by email: said in a toast", () => {
+    expect(approvalNews({ outcome: "joined" })).toEqual({ said: "joined" });
+    expect(approvalNews({ outcome: "invited", url: "https://x/invite/t", emailed: true })).toEqual({ said: "invited" });
+  });
+
+  test("a server that sends no email hands the admin the link to send", () => {
+    expect(approvalNews({ outcome: "invited", url: "https://x/invite/t", emailed: false })).toEqual({
+      send: "https://x/invite/t",
+    });
+  });
+});
+
+test("when a request came in reads as a sentence: just now, some time ago, yesterday, or on a date", () => {
+  const t = ((key: string, o?: Record<string, unknown>) =>
+    o ? `${key} ${JSON.stringify(o)}` : key) as unknown as TFunction;
+  const now = new Date(2026, 9, 26, 12, 0);
+  const asked = (minutesAgo: number) =>
+    askedLabel(t, "en", new Date(now.getTime() - minutesAgo * 60_000).toISOString(), now);
+  expect(asked(0.5)).toBe("members.requests.askedNow");
+  expect(asked(180)).toBe(`members.requests.asked ${JSON.stringify({ ago: 'format.hoursAgo {"count":3}' })}`);
+  expect(asked(24 * 60)).toBe(`members.requests.asked ${JSON.stringify({ ago: "common.yesterday" })}`);
+  expect(asked(4 * 24 * 60)).toBe(`members.requests.askedOn ${JSON.stringify({ date: "Oct 22" })}`);
 });
 
 const waiting = (id: string, kind: AppNotification["kind"], updatedAt = "2026-10-26T10:00:00.000Z") =>

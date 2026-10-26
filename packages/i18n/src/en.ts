@@ -2572,6 +2572,8 @@ export const en: Translations = {
       asks: "<b>{{name}}</b> asks to join",
       label: "{{name}} asks to join",
       asked: "Asked {{ago}}",
+      askedNow: "Asked just now",
+      askedOn: "Asked on {{date}}",
       confirmed: "Email confirmed: they get in when you approve.",
       unconfirmed: "Email not confirmed: approving sends an invitation to it.",
       via: "Through the invitation link · closes {{date}}",

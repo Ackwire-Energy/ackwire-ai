@@ -40,6 +40,7 @@ function AppStack() {
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
   const setupSheet = useFormSheetOptions([0.7, 1]);
+  const requestsSheet = useFormSheetOptions([0.7, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -58,6 +59,7 @@ function AppStack() {
         options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }}
       />
       <Stack.Screen name="approval/[id]" options={approvalSheet} />
+      <Stack.Screen name="join-requests" options={requestsSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
       <Stack.Screen name="me" options={meSheet} />
