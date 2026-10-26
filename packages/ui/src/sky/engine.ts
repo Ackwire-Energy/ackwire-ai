@@ -19,6 +19,7 @@ import {
   ditherIndex,
   drawSprite,
   pixelOf,
+  SKY_FRAME_MS,
   type SkyBlob,
   type SkyFrame,
   spriteTone,
@@ -110,10 +111,8 @@ const live = new Set<Sky>();
 let raf = 0;
 let last = 0;
 const hasRaf = () => typeof requestAnimationFrame === "function";
-/** About 30 frames a second: the dither moves in whole cells, more frames only cost. */
-const FRAME_MS = 32;
 function tick(now: number) {
-  if (now - last >= FRAME_MS) {
+  if (now - last >= SKY_FRAME_MS) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     for (const s of live) s.step(dt);

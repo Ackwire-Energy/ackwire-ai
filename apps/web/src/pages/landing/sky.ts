@@ -8,10 +8,8 @@
  * browser holds its frames); with reduced motion, one frame (again when it resizes).
  */
 import { type AgentColor, SPRITE, spriteTone } from "@agenteschat/ui";
+import { lightToward, SKY_FRAME_MS } from "@agenteschat/ui/sky/math";
 import { GRAD } from "./data";
-
-/** About 30 frames a second, as the app's skies: the dither moves in whole cells, more frames only cost. */
-const FRAME_MS = 32;
 
 /** "#rrggbb" → a little-endian RGBA pixel for a Uint32Array over ImageData. */
 export const hex = (h: string) => {
@@ -155,10 +153,8 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
     const r = host.getBoundingClientRect();
     const tx = (pointer.x - r.left) / (r.width || 1);
     const ty = (pointer.y - r.top) / (r.height || 1);
-    // The light catches up with the pointer at the same pace at any frame rate: 5% of the way each 60th of a second.
-    const ease = 1 - 0.95 ** (dt * 60);
-    light.x += (Math.min(1.3, Math.max(-0.3, tx)) - light.x) * ease;
-    light.y += (Math.min(1.3, Math.max(-0.3, ty)) - light.y) * ease;
+    light.x = lightToward(light.x, tx, dt);
+    light.y = lightToward(light.y, ty, dt);
     const blobs = opts.blobs(t);
     const nb = blobs.length;
     const inv = 1 / h;
@@ -273,7 +269,7 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
   }
   /** The browser's frames, drawn about 30 times a second. */
   function tick(now: number) {
-    if (now - last >= FRAME_MS) frame(now);
+    if (now - last >= SKY_FRAME_MS) frame(now);
     else if (visible && raf$) raf = raf$(tick);
   }
 

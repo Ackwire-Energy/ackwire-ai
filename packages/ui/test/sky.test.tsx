@@ -22,7 +22,7 @@ import {
   spriteTone,
   startSky,
 } from "../src";
-import { opaque } from "../src/sky/math";
+import { lightToward, opaque } from "../src/sky/math";
 
 afterEach(() => cleanup());
 
@@ -75,6 +75,19 @@ describe("sky tones", () => {
       3;
     expect(light(spriteTone("rose"))).toBeLessThan(light(agentGradient("rose")[1]));
   });
+});
+
+test("the pointer light follows at the same pace at any frame rate: 5% of the way each 60th of a second", () => {
+  expect(lightToward(0, 1, 1 / 60)).toBeCloseTo(0.05, 10);
+  let at60 = 0;
+  for (let i = 0; i < 60; i++) at60 = lightToward(at60, 1, 1 / 60);
+  let at30 = 0;
+  for (let i = 0; i < 30; i++) at30 = lightToward(at30, 1, 1 / 30);
+  expect(at30).toBeCloseTo(at60, 10);
+  expect(at60).toBeCloseTo(1 - 0.95 ** 60, 10);
+  // The pointer far off the sky: the light stops 0.3 past its edge.
+  expect(lightToward(0, 5, 60)).toBeCloseTo(1.3, 10);
+  expect(lightToward(0, -5, 60)).toBeCloseTo(-0.3, 10);
 });
 
 describe("PixelSky", () => {
