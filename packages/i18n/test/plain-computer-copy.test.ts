@@ -217,6 +217,14 @@ describe("computer copy", () => {
       expect(hitsOf(values, cloud, () => CLOUD_BANNED[locale])).toEqual([]);
     });
 
+    test(`${locale}: no stage opens with a step's word, so the computer never reads as starting twice`, () => {
+      const values = valuesOf(strings);
+      const first = (k: string) => values.get(k)?.split(" ")[0];
+      const of = (prefix: string) => [...values.keys()].filter((k) => k.startsWith(prefix));
+      const steps = of("computerSetup.step.").map(first);
+      expect(of("computerSetup.stage.").filter((k) => steps.includes(first(k)))).toEqual([]);
+    });
+
     test(`${locale}: self-host never says the cloud, and its computer's dialog never says terminal`, () => {
       const values = valuesOf(strings);
       const { selfhost } = editionKeys(strings);

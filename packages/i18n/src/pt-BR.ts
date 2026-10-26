@@ -8326,7 +8326,7 @@ export const ptBR = {
     stage: {
       ordering: "Separando um computador novo",
       wiping: "Limpando para começar do zero",
-      booting: "Iniciando pela primeira vez",
+      booting: "Carregando o sistema",
       updating: "Atualizando o sistema",
       restarting: "Reiniciando depois da atualização",
       network: "Configurando a rede",

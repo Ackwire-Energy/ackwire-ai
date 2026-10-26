@@ -8291,7 +8291,7 @@ export const en: Translations = {
     stage: {
       ordering: "Getting a new computer",
       wiping: "Clearing it for a fresh start",
-      booting: "Starting it for the first time",
+      booting: "Loading the system",
       updating: "Updating the system",
       restarting: "Restarting after the update",
       network: "Setting up its network",
