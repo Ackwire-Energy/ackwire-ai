@@ -143,10 +143,14 @@ p {
   height: 48px;
   border-radius: 14px 14px 14px 4px;
 }
-/* Tailscale's icon in its own colors: its black file on light, its white file on dark (`ServerTile`). */
+/*
+ * Tailscale's icon in its own colors: its black file on light, its white file on dark (`ServerTile`). In its 48 px
+ * tile it has the proportions of Tailscale's own tile, the squircle of its press kit: the dots 4/7 of the tile, a dot
+ * and a half from each edge (their grid is 20.45 of this 24-unit drawing).
+ */
 .dk-tailscale {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   fill: #1e1e1f;
 }
 [data-theme="dark"] .dk-tailscale {
@@ -788,14 +792,18 @@ body[data-window="popover"] {
   font-size: 13px;
   font-weight: 600;
 }
+/* Its heading, tiles and buttons in the column's own edges, where the field and Connect above sit. */
 .dk-fr__found {
   margin-top: 20px;
+}
+.dk-fr__found .dk-ctitle {
+  margin-inline: 0;
 }
 .dk-fr__foundrow {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 4px;
+  padding: 9px 0;
 }
 .dk-fr__foundrow + .dk-fr__foundrow {
   border-top: 1px solid var(--line);

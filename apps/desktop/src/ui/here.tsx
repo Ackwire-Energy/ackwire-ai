@@ -20,9 +20,10 @@ const KIND_ICON: Record<Exclude<ServerKind, "tailnet">, IconName> = { cloud: "cl
 
 /**
  * A server's tile by where it runs. One on the person's Tailscale network shows Tailscale's own icon (its press
- * kit's black file, its white one on a dark theme) on a 48 px tile beside the server's name, never as a small icon
- * inside a line of text, which Tailscale's brand toolkit discourages. Lists that can show one draw every row's tile
- * at that size.
+ * kit's black file, its white one on a dark theme) on a tile beside the server's name, never as a small icon inside
+ * a line of text. Tailscale's brand toolkit asks for its logo at 48×48 px at least, with clear space around it; its
+ * press kit's tile (the squircle) is that logo's own edge, so the tile is 48 px and the mark sits in it as in the
+ * squircle (`.dk-tailscale`). Lists that can show one draw every row's tile at that size.
  */
 export function ServerTile({ kind }: { kind: ServerKind }) {
   return (

@@ -2,7 +2,8 @@
  * The desktop app's own strings (pt-BR, the primary locale), under `desktop.*`. `./index.ts` merges
  * them into the shared resources (`@agenteschat/i18n`); `keys.en.ts` has exactly the same shape.
  * Never "runner", "MCP" or "protocolo". `{{device}}` is this computer's name (`device.*`), filled in by
- * `./index.ts` for every string.
+ * `./index.ts` for every string. A path to a setting ("Preferências › Servidores") has no-break spaces around
+ * its `›` (`\u00a0`), so a line never breaks inside it.
  */
 export const desktopPtBR = {
   /** This computer's name in the copy: "este {{device}}", "neste {{device}}" (all masculine). */
@@ -244,7 +245,7 @@ export const desktopPtBR = {
     notRunning: "O agentes.chat está instalado neste {{device}}, mas não está rodando",
     notRunningText: "Ele foi instalado pelo terminal, em {{path}}. Inicie por lá e tente de novo.",
     running: "O agentes.chat já roda neste {{device}}",
-    runningText: "Este app roda ele, em {{url}}. Os ajustes ficam em Preferências › Servidores.",
+    runningText: "Este app roda ele, em {{url}}. Os ajustes ficam em Preferências\u00a0›\u00a0Servidores.",
     openIt: "Abrir",
     win: {
       title: "Rodar o agentes.chat neste PC",
@@ -307,7 +308,7 @@ export const desktopPtBR = {
     phoneOff: "Ligue o acesso primeiro.",
     showQr: "Mostrar o QR code",
     usageRestart: "Mudar reinicia o agentes.chat por um instante.",
-    usageBoth: "Desligado aqui ou em Configurações › Geral do agentes.chat, nada é enviado.",
+    usageBoth: "Desligado aqui ou em Configurações\u00a0›\u00a0Geral do agentes.chat, nada é enviado.",
     reachFailed: "O acesso pelos aparelhos não ligou: {{reason}}.",
     backup: "Fazer backup agora",
     backedUp: "Backup feito: {{file}}",

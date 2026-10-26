@@ -23,3 +23,14 @@ describe("equal side padding", () => {
     }
   });
 });
+
+describe("Connect's found servers", () => {
+  test("its heading, tiles and Use buttons sit in the column's edges, as the field and Connect above do", async () => {
+    const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".dk-fr__foundrow")).toContain("padding: 9px 0;");
+    // Section titles elsewhere (Preferences' cards) keep their inset; this one has none.
+    expect(rule(".dk-ctitle")).toContain("margin: 18px 4px 8px;");
+    expect(rule(".dk-fr__found .dk-ctitle")).toContain("margin-inline: 0;");
+  });
+});
