@@ -99,7 +99,7 @@ function ToolRow({
       <span className="tr-row__t">
         <span className="tr-row__nm">{tool.label}</span>
         {pending && (
-          <span className="tr-row__why">
+          <span className="tr-row__why ac-iconline">
             <SuggestSpark />
             <span>
               <Trans

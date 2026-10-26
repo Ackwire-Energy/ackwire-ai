@@ -213,6 +213,41 @@ describe("Card", () => {
     expect(container.querySelector(".ac-card__sub")).toBeNull();
     expect(container.querySelector(".ac-card__action")).toBeNull();
   });
+
+  test("the key and the foot's icon lead their first line; without an icon nothing is moved", async () => {
+    const { container } = render(
+      <>
+        <CardHeader
+          icon="wallet"
+          title="Limite de gastos por agente"
+          subtitle="Por mês"
+          action={<Button>US$</Button>}
+        />
+        <CardHeader title="Só título" />
+        <CardFooter>Ninguém gasta além disso</CardFooter>
+        <CardFooter icon={null}>Sem ícone</CardFooter>
+      </>,
+    );
+    const [withKey, plain] = [...container.querySelectorAll(".ac-card__head")];
+    expect(withKey?.className).toBe("ac-card__head ac-iconline");
+    expect(withKey?.firstElementChild?.className).toBe("ac-card__key");
+    expect(plain?.className).toBe("ac-card__head");
+    const [foot, bare] = [...container.querySelectorAll(".ac-card__foot")];
+    expect(foot?.className).toBe("ac-card__foot ac-iconline");
+    expect(foot?.firstElementChild?.tagName.toLowerCase()).toBe("svg");
+    expect(bare?.className).toBe("ac-card__foot");
+    // The key follows the title's 20px line, not the title and its quiet line; the action stays in the middle.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-card__head")).toContain("line-height: 20px");
+    expect(rule(".ac-card__head")).toContain("align-items: flex-start");
+    expect(rule(".ac-card__head:not(:has(.ac-card__sub))")).toContain("align-items: center");
+    expect(rule(".ac-card__action")).toContain("align-self: center");
+    for (const row of [".ac-card__foot", ".ac-setnote", ".ac-alert"]) {
+      expect(rule(row)).not.toContain("display:");
+      expect(rule(row)).not.toContain("align-items:");
+    }
+  });
 });
 
 describe("Composer", () => {

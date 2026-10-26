@@ -190,16 +190,6 @@ textarea.onb__big.ac-input {
 .onb__link:disabled {
   cursor: default;
 }
-/* A quiet line with its icon ("We sent a confirmation link to…"). */
-.onb__note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.onb__note > .ac-icon {
-  flex: none;
-  margin-top: 2px;
-}
 .onb__starters {
   display: flex;
   flex-wrap: wrap;
@@ -328,8 +318,6 @@ textarea.onb__big.ac-input {
   margin-bottom: 4px;
 }
 .onb__status {
-  display: flex;
-  align-items: center;
   gap: 10px;
   margin: 0;
   padding: 12px 14px;

@@ -76,7 +76,6 @@
   align-self: flex-start;
 }
 .vault-notice {
-  display: flex;
   gap: 10px;
   margin: 0;
   padding: 12px 14px;
@@ -85,10 +84,6 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
-}
-.vault-notice .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 .vault-reading {
   display: flex;
@@ -193,7 +188,6 @@
   list-style: none;
 }
 .vault-lines li {
-  display: flex;
   gap: 10px;
   padding: 9px 14px;
   border-top: 1px solid var(--line);
@@ -201,10 +195,6 @@
 }
 .vault-lines li:first-child {
   border-top: 0;
-}
-.vault-lines li .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 .vault-lines li[data-tone="ok"] .ac-icon {
   color: var(--ok, var(--ink2));

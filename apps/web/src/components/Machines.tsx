@@ -902,15 +902,15 @@ function OnThisComputerCard() {
         {t("computers.onIt.title")}
       </h2>
       <ul className="setup-facts setup-facts--stack">
-        <li>
+        <li className="ac-iconline">
           <Icon name="computer" size={14} />
           {t("computers.onIt.screens")}
         </li>
-        <li>
+        <li className="ac-iconline">
           <ProviderLogo id="claude_code" size="xs" />
           {t("computers.onIt.plans")}
         </li>
-        <li>
+        <li className="ac-iconline">
           <Icon name="key" size={14} />
           {t("computers.onIt.coding")}
         </li>

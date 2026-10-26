@@ -85,7 +85,7 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
   const host = useHost();
   const reason = t(REASON_TEXT[problem.reason]);
   return (
-    <span className="dk-honest dk-fr__problem" role="alert">
+    <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
       <Icon name="alert" size={16} />
       <span>
         {text === "fail" ? t("desktop.here.fail.reach", { reason }) : t("desktop.server.reachFailed", { reason })}

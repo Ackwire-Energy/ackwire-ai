@@ -54,7 +54,7 @@ export function EmailLetter({ email, full }: { email: ApprovalEmail; full?: bool
         </button>
       )}
       {email.original && (
-        <p className="email-letter__original">
+        <p className="email-letter__original ac-iconline">
           <Icon name="reply" size={14} />
           <span>
             <Trans

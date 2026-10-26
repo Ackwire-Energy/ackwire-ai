@@ -268,7 +268,7 @@ export function AccessMatrixSection() {
           ]}
         />
       </div>
-      <p className="level-note small muted">
+      <p className="level-note small muted ac-iconline">
         <Icon name="lock" />
         {t("access.matrixNote")}
       </p>

@@ -443,7 +443,7 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
           t("agentPage.work.steps.three"),
         )}
       </div>
-      <p className="brw-steps__done">
+      <p className="brw-steps__done ac-iconline">
         <Icon name="check" size={14} />
         {t("agentPage.work.steps.done")}
       </p>

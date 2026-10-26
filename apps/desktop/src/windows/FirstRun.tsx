@@ -332,7 +332,7 @@ function Own({ onBack, onConnect, onHere }: { onBack: () => void; onConnect: () 
 function ProblemLine({ problem, host }: { problem: ConnectProblem; host: string }) {
   const { t } = useTranslation();
   return (
-    <span className="dk-honest dk-fr__problem" role="alert">
+    <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
       <Icon name="alert" size={16} />
       <span>{t(PROBLEM_TEXT[problem], PROBLEM_HOSTLESS.has(problem) ? {} : { host })}</span>
     </span>
@@ -773,7 +773,7 @@ function HereSetup({
                 </span>
                 {state === "failed" && (
                   <span className="dk-fr__stepfail">
-                    <span className="dk-honest">
+                    <span className="dk-honest ac-iconline">
                       <Icon name="alert" size={16} />
                       {step === "account" ? t("desktop.here.fail.account") : t("desktop.here.fail.start")}
                     </span>

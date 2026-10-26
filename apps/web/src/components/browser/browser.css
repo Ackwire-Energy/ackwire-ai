@@ -465,7 +465,6 @@
 }
 .brw-log li > .ac-icon {
   color: var(--muted);
-  margin-top: 2px;
 }
 .brw-log li small {
   color: var(--faint);
@@ -1137,8 +1136,6 @@
   }
 }
 .brw-steps__done {
-  display: flex;
-  align-items: center;
   gap: 6px;
   margin: 0;
   color: var(--muted);

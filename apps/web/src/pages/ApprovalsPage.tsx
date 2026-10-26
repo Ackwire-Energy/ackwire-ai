@@ -542,7 +542,7 @@ function ApprovalOrigin({ approval }: { approval: Approval }) {
   if (!origin) return null;
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <p className="ap-origin">
+    <p className="ap-origin ac-iconline">
       <Icon name="routines" size={14} />
       <span>{tt(origin.key, origin.values)}</span>
     </p>
@@ -808,7 +808,7 @@ function RequestCard({
       <div className="ap-card__body">
         <ExactAction approval={a} max={4} />
         {why && (
-          <p className="ap-said">
+          <p className="ap-said ac-iconline">
             <AgentAvatar agentId={a.agentId} name={name} size="xs" />
             <span>
               <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} />

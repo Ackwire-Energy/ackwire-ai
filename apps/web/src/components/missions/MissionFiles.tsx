@@ -78,7 +78,7 @@ export function MissionFilesPanel({
       }
       closeLabel={t("common.close")}
       footer={
-        <div className="mi-files__foot">
+        <div className="mi-files__foot ac-iconline">
           <Icon name="info" size={14} />
           <span>{tab === "notes.md" ? t("missions.files.notesFoot", { executor }) : t("missions.files.foot")}</span>
         </div>

@@ -100,7 +100,7 @@ export function SetupProgress({ view }: { view: SetupView }) {
     );
   }
   return (
-    <p className="setup-progress setup-progress--line" role="status">
+    <p className="setup-progress setup-progress--line ac-iconline" role="status">
       {view.phase === "preparing" ? <Spinner /> : <Icon name={PHASE_ICON[view.phase]} size={16} />}
       <span>{t(view.textKey)}</span>
     </p>
@@ -123,7 +123,7 @@ export function SetupWaitLines({ view, reader }: { view: SetupView; reader: Wait
           {etaLine(t, eta)}
         </p>
       )}
-      <p className="setup-line">
+      <p className="setup-line ac-iconline">
         <Icon name={emailed ? "mail" : "bell"} size={14} />
         <span>{emailed ? t("computerSetup.email.you", { email: reader.email }) : t("computerSetup.email.here")}</span>
       </p>
@@ -137,12 +137,12 @@ export function SetupFacts({ view }: { view: SetupView }) {
   return (
     <ul className="setup-facts">
       {view.specs && (
-        <li>
+        <li className="ac-iconline">
           <Icon name="computer" size={14} />
           {t("computerSetup.specs", view.specs)}
         </li>
       )}
-      <li>
+      <li className="ac-iconline">
         <Icon name="members" size={14} />
         {t("computerSetup.users")}
       </li>
@@ -154,7 +154,7 @@ export function SetupFacts({ view }: { view: SetupView }) {
 export function SetupPlans() {
   const { t } = useTranslation();
   return (
-    <p className="setup-line">
+    <p className="setup-line ac-iconline">
       <ProviderLogo id="claude_code" size="xs" />
       <span>{t("computerSetup.plans")}</span>
     </p>
@@ -172,7 +172,7 @@ export function SetupWait({ view, reader, agentName }: { view: SetupView; reader
       <SetupProgress view={view} />
       <SetupWaitLines view={view} reader={reader} />
       {agentName && view.phase !== "ready" && (
-        <p className="setup-line">
+        <p className="setup-line ac-iconline">
           <Icon name="clock" size={14} />
           <span>{t("computerSetup.agentWaiting", agentGrammar(t, agentName))}</span>
         </p>

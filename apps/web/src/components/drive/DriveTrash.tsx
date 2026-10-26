@@ -35,7 +35,7 @@ export function DriveTrash() {
   }
   return (
     <>
-      <p className="drive-note">
+      <p className="drive-note ac-iconline">
         <Icon name="clock" size={16} />
         <span>{t("drive.trashNote")}</span>
       </p>

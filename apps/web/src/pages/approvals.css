@@ -341,19 +341,13 @@
 }
 /* What the agent said, after the action: its face, its name and its words. */
 .ap-said {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   font-size: 13.5px;
-  line-height: 1.5;
+  /* A length: the face sets its own font size, and its place on the first line reads the row's line. */
+  line-height: 20px;
   color: var(--ink2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.ap-said > :first-child {
-  flex: none;
-  margin-top: 1px;
 }
 .ap-said b {
   color: var(--ink);
@@ -367,17 +361,11 @@
 }
 /* Asked while nobody watched (a routine, or no one behind the run): one quiet line with its icon. */
 .ap-origin {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
   margin: 0;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--muted);
-}
-.ap-origin > svg {
-  flex: none;
-  margin-top: 2px;
 }
 .ap-traits {
   display: flex;

@@ -379,7 +379,7 @@ export function MissionFindings({ mission, agentName }: { mission: Mission; agen
         <li
           // biome-ignore lint/suspicious/noArrayIndexKey: findings have no id and never reorder
           key={i}
-          className={f.kind === "decision" ? "mi-finding mi-finding--decision" : "mi-finding"}
+          className={f.kind === "decision" ? "mi-finding mi-finding--decision ac-iconline" : "mi-finding ac-iconline"}
           data-kind={f.kind}
         >
           <Icon name={FINDING_ICONS[f.kind]} size={16} label={t(`missions.findings.${f.kind}`)} />
@@ -467,7 +467,7 @@ export function AutoApprovedLine({ messages }: { messages: Message[] }) {
       onError: (error) => toast.show(errorText(t, error), "error"),
     });
   return (
-    <div className="mi-evt mi-evt--auto" data-message-id={first.id}>
+    <div className="mi-evt mi-evt--auto ac-iconline" data-message-id={first.id}>
       <Icon name="check" size={14} />
       <span>
         {t("missions.auto.label")}:{" "}
@@ -682,7 +682,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
           <span className="mi-hint">{t("missions.decision.yourOpinion", { option: mine.option })}</span>
         )}
         <span className="mi-foot__grow" />
-        <span className="mi-hint">
+        <span className="mi-hint ac-iconline">
           <Icon name="document" size={14} />
           {t("missions.decision.goesTo")} <code>{DECISIONS_FILE}</code>
         </span>
@@ -887,7 +887,7 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
   // A newer delivery replaced this one: it says so in one quiet line.
   if (d.status === "superseded") {
     return (
-      <p className="mi-evt">
+      <p className="mi-evt ac-iconline">
         <Icon name="refresh" size={14} />
         <span>{t("missions.delivery.superseded")}</span>
       </p>
@@ -1070,7 +1070,7 @@ export function MissionPlanChangeLine({ message }: { message: Message }) {
   const shown = long ? parts.slice(0, PLAN_CHANGE_SHOWN - 1) : parts;
   const rest = parts.length - shown.length;
   return (
-    <div className="mi-evt" data-message-id={message.id}>
+    <div className="mi-evt ac-iconline" data-message-id={message.id}>
       <Icon name="edit" size={14} />
       <span className="mi-evt__text" title={before || (long ? parts.join("\n") : undefined)}>
         <b>{t("missions.planChange.title")}</b>
@@ -1125,7 +1125,7 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   const task = machineTaskOf(message.meta);
   const blocked = task?.blocked ?? [];
   return (
-    <div className="mi-evt" data-message-id={message.id}>
+    <div className="mi-evt ac-iconline" data-message-id={message.id}>
       <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
       <span>
         {t(`missions.notice.${notice.code}`, {
@@ -1421,12 +1421,12 @@ export function MissionSetupCard({ setup, threadId }: { setup: MissionSetupMeta;
         </pre>
       )}
       {state === "preparing" ? (
-        <p className="mi-hint mi-setup__now">
+        <p className="mi-hint mi-setup__now ac-iconline">
           <AgentSpinner agentId={m?.agentId} />
           {t("missions.setup.preparing")}
         </p>
       ) : state === "ready" ? (
-        <p className="mi-hint mi-setup__now">
+        <p className="mi-hint mi-setup__now ac-iconline">
           <Icon name="check" size={14} />
           {t("missions.setup.ready")}
         </p>

@@ -739,7 +739,7 @@ function NewAgentFlow() {
               });
             }}
           />
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="info" size={16} />
             <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
           </p>
@@ -831,7 +831,7 @@ function NewAgentFlow() {
             <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
           </Link>
         </Card>
-        <p className="newag__note">
+        <p className="newag__note ac-iconline">
           <Icon name="shield" size={16} />
           <span>
             <b>{t("newAgent.approvalsNote")}</b>{" "}
@@ -1083,7 +1083,7 @@ function NewAgentFlow() {
               </span>,
             )}
           </Card>
-          <p className="newag__note">
+          <p className="newag__note ac-iconline">
             <Icon name="shield" size={16} />
             <span>
               {ownerFirst ? t("newAgent.reviewNoteOwner", { name: ownerFirst }) : t("newAgent.reviewNoteAdmins")}

@@ -53,7 +53,7 @@ export function VaultCard({ reader }: { reader: ReturnType<typeof useVaultReader
             ))}
           </div>
           <VaultLines lines={vaultMapping(t, i18n.language, report).slice(0, 5)} />
-          <p className="vault-notice">
+          <p className="vault-notice ac-iconline">
             <Icon name="info" size={16} />
             <span>{t("onboarding.vault.when")}</span>
           </p>
