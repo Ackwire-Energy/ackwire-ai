@@ -48,6 +48,7 @@ import {
   isActiveStatus,
   isNotificationEvent,
   keys,
+  MESSAGES_PAGE,
   markStopping,
   type OpenConsult,
   RealtimeConnection,
@@ -63,6 +64,7 @@ import {
   seedReceipt,
   staleProvisional,
   stopTyping,
+  THREAD_PAGE,
   type TypingState,
   touchRun,
   typingThrottle,
@@ -569,6 +571,42 @@ export async function reconcileChannelRuns(
   return dropped;
 }
 
+/**
+ * Reads a channel's open lists again once its events reach us (`subscribed`). What they lack is added, never taken
+ * away: a message heard live while this read was on its way stays. The receipts move on with what it says. A read
+ * already on its way lands first, so it can't put an older list back over what this one adds.
+ */
+export async function catchUpChannel(
+  api: ApiClient,
+  qc: ReturnType<typeof useQueryClient>,
+  store: StreamsStore,
+  orgId: string,
+  channelId: string,
+) {
+  const prefix = ["org", orgId, "channel", channelId];
+  await qc.refetchQueries({ queryKey: prefix, fetchStatus: "fetching" }, { cancelRefetch: false });
+  const reads = qc
+    .getQueryCache()
+    .findAll({ queryKey: prefix, type: "active" })
+    .flatMap(({ queryKey: [, , , , list, rootId] }) =>
+      list === "messages"
+        ? [api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE })]
+        : list === "thread" && typeof rootId === "string"
+          ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
+          : [],
+    );
+  const fresh = (await Promise.all(reads).catch(() => [])).flat();
+  const known = new Set(
+    qc
+      .getQueriesData<Message[]>({ queryKey: prefix })
+      .flatMap(([[, , , , list], data]) =>
+        (list === "messages" || list === "thread") && Array.isArray(data) ? data.map((m) => m.id) : [],
+      ),
+  );
+  for (const m of fresh) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
+  store.seed(fresh);
+}
+
 let quiet: StreamsStore | null = null;
 const quietStore = () => {
   quiet ??= createStreamsStore();
@@ -645,9 +683,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   const qc = useQueryClient();
   const api = useApi();
   // On load: drop live rows the server no longer runs. The channel's events reach us only once the server confirms
-  // its subscription (the first, and again after every reconnect), so then what the page read before is read again,
-  // after any read still on its way: an answer posted meanwhile (as the socket opened right after a page change)
-  // shows, and so does how its run ended.
+  // its subscription (the first, and again after every reconnect): then the live rows are checked again, and what
+  // happened before, after the page read the channel (an answer posted while the socket opened, right after a page
+  // change), is read and added.
   useEffect(() => {
     if (!connection || !enabled) return;
     void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
@@ -656,11 +694,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     return connection.onSubscribed((id) => {
       if (id !== channelId) return;
       void reconcileChannelRuns(api, streams, orgId, channelId);
-      for (const queryKey of [keys.messages(orgId, channelId), ["org", orgId, "channel", channelId, "thread"]]) {
-        void qc
-          .refetchQueries({ queryKey, fetchStatus: "fetching" }, { cancelRefetch: false })
-          .then(() => qc.invalidateQueries({ queryKey }));
-      }
+      void catchUpChannel(api, qc, streams, orgId, channelId);
     });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {

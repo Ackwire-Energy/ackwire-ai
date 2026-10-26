@@ -522,3 +522,93 @@ describe("memory changes and proposals in the chat", () => {
     expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
   });
 });
+
+describe("caught up once the server confirms the channel's subscription", () => {
+  test("a message written before then is added; one heard live while that read was on its way stays", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // Each read is made when asked; its answer can be held back, as on a slow link.
+    let held: Promise<void> | null = null;
+    const read = api.chat.messages;
+    api.chat.messages = async (orgId, channelId, options) => {
+      const list = await read(orgId, channelId, options);
+      if (held) await held;
+      return list;
+    };
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    // Atlas wrote while the socket opened: no event carries it.
+    state.messages.push({
+      id: "m-before",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ATLAS_ID },
+      body: "Deploy das 9h revertido.",
+      mentionedAgentIds: [],
+      agentRunId: "r-before",
+      createdAt: new Date().toISOString(),
+    });
+    expect(rowsWith("Deploy das 9h revertido.")).toHaveLength(0);
+    let release = () => {};
+    held = new Promise<void>((r) => {
+      release = r;
+    });
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(2);
+    // Ada answers live while that read, made before her answer, is on its way.
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-live",
+      message: {
+        id: "m-live",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Login de volta ao normal.",
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        createdAt: new Date(Date.now() + 1000).toISOString(),
+      },
+    });
+    await settle();
+    expect(rowsWith("Login de volta ao normal.")).toHaveLength(1);
+    await act(async () => release());
+    await settle(4);
+    expect(rowsWith("Deploy das 9h revertido.")).toHaveLength(1);
+    expect(rowsWith("Login de volta ao normal.")).toHaveLength(1);
+  });
+
+  test("an open thread's replies too", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.threads.create(ORG_ID, {
+      id: "m-1",
+      channelId: ENG_ID,
+      firstMessageId: "m-1",
+      lastMessageId: "m-1",
+      title: "Login com 401",
+    } as Parameters<typeof api.threads.create>[1]);
+    const { sockets } = await renderApp(`/org/${ORG_ID}/threads/m-1`, { api });
+    await settle(8);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    state.messages.push({
+      id: "m-reply",
+      channelId: ENG_ID,
+      threadId: "m-1",
+      author: { type: "agent", id: ADA_ID },
+      body: "Corrigido: o refresh usa segundos agora.",
+      mentionedAgentIds: [],
+      agentRunId: "r-reply",
+      createdAt: new Date().toISOString(),
+    });
+    expect(rowsWith("Corrigido: o refresh usa segundos agora.")).toHaveLength(0);
+    await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
+    await settle(4);
+    expect(rowsWith("Corrigido: o refresh usa segundos agora.")).toHaveLength(1);
+  });
+});

@@ -287,12 +287,15 @@ export const useChannelMembers = (orgId: string, channelId: string, enabled = tr
 
 /** Messages per page: the latest page, then older pages on scroll-up. */
 export const MESSAGES_PAGE = 100;
+/** A thread's root and replies, in one read. */
+export const THREAD_PAGE = 200;
 
 /**
  * The latest page of a conversation. Cached per channel and fresh for 30 s
- * (real-time events keep it current), so switching back is instant; then it
- * revalidates in the background. Kept 30 min after leaving it, so going back
- * later still shows it at once.
+ * (real-time events keep it current, and what they missed before the
+ * channel's subscription was confirmed is added then), so switching back is
+ * instant; then it revalidates in the background. Kept 30 min after leaving
+ * it, so going back later still shows it at once.
  */
 export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
@@ -2328,7 +2331,7 @@ export function useThreadMessages(orgId: string, channelId: string | undefined, 
   const api = useApi();
   return useQuery({
     queryKey: keys.thread(orgId, channelId ?? "", rootId),
-    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: 200 }),
+    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: THREAD_PAGE }),
     enabled: Boolean(channelId),
     staleTime: 30_000,
   });
