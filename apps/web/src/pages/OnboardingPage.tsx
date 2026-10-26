@@ -1,7 +1,8 @@
-import type { Machine, Role } from "@agenteschat/client";
+import type { AiStatus, Machine, Role } from "@agenteschat/client";
 import {
   keys,
   meQuery,
+  useAiStatus,
   useAuthConfig,
   useComputerSetup,
   useConfirmDevice,
@@ -10,6 +11,8 @@ import {
 } from "@agenteschat/client";
 import {
   computerEdition,
+  computerName,
+  etaLine,
   type SetupView,
   setupPending,
   setupPortrait,
@@ -18,10 +21,18 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { computerKind, hostDescKey } from "@agenteschat/client/lib/machines";
-import { type AiChoice, defaultChoice, firstAgent, gateDims, kindOf } from "@agenteschat/client/lib/no-ai";
+import {
+  type ComputerKind,
+  type ComputerState,
+  computerKind,
+  computerState,
+  hostDescKey,
+} from "@agenteschat/client/lib/machines";
+import { firstMentioned } from "@agenteschat/client/lib/markdown";
+import { type AiChoice, aiStateOf, defaultChoice, firstAgent, gateDims, kindOf } from "@agenteschat/client/lib/no-ai";
 import {
   addInvites,
+  firstAskOrder,
   type InviteDraft,
   ONBOARDING_STEPS,
   type OnboardingStepId,
@@ -56,6 +67,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -80,7 +92,7 @@ import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton, useAgentsHere, useOrgName } from "@/components/ThisMac";
-import { SetupWait, type WaitReader } from "@/components/WorkspaceComputer";
+import { SetupWait, useSetupWait, type WaitReader } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
@@ -128,19 +140,35 @@ type Computer = "cloud" | "machine" | "host" | null;
 /** An agent created here (a preset or an imported one), for the later steps. */
 interface CrewMember {
   key: string;
+  id: string;
+  /** As the server made it, which the first message mentions. */
+  handle: string;
   name: string;
+  role?: string;
   appearance: AgentAppearance;
   initials?: string;
 }
 /**
- * An imported agent once created: its id (also its `key`: a source key can repeat a preset's), its handle, and the
+ * An imported agent once created: its id is also its `key` (a source key can repeat a preset's), and it keeps the
  * model it had where it came from (it starts on Automatic; a key that runs that model gives it back).
  */
 interface ImportedCrew extends CrewMember {
-  id: string;
-  handle: string;
   model: string | null;
 }
+/** Done's computer at the end of the faces: its portrait and what it says to someone pointing at it or reading. */
+interface ComputerPlate {
+  kind: ComputerKind;
+  state: ComputerState;
+  label: string;
+}
+/** Under the first message: whether the agent it names can start on it now. */
+interface AskLine {
+  state: AiState;
+  icon: IconName;
+  text: string;
+}
+type AiState = AiStatus["agents"][number]["state"];
+const LINE_ICON: Record<AiState, IconName> = { ready: "check", waiting: "clock", no_ai: "plug" };
 
 /** The guide's mood: writing while the person types, happy for a moment after a step. */
 function useGuideMood() {
@@ -213,6 +241,7 @@ export function OnboardingPage() {
   const [chosen, setChosen] = useState<Set<Preset>>(new Set(PRESETS));
   const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai">("pick");
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
+  const [handles, setHandles] = useState<Partial<Record<Preset, string>>>({});
   // The option picked (none: the default), the agent a plan is for, and the plans given so far (by agent).
   const [aiPicked, setAiPicked] = useState<AiChoice | null>(null);
   const [aiAgent, setAiAgent] = useState<string | undefined>(undefined);
@@ -231,6 +260,8 @@ export function OnboardingPage() {
   // Team
   const [invites, setInvites] = useState<InviteDraft[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
+  // Done: the first message, written for whoever asks it when the step opens (`team`: the crew it was written for).
+  const [firstAsk, setFirstAsk] = useState<{ team: string; asker: string; text: string } | null>(null);
 
   const step = ONBOARDING_STEPS[index] ?? ONBOARDING_STEPS[0];
   const total = ONBOARDING_STEPS.length;
@@ -254,7 +285,10 @@ export function OnboardingPage() {
   const crew: CrewMember[] = [
     ...createdPresets.map((p) => ({
       key: p,
+      id: agentIds[p] ?? "",
+      handle: handles[p] ?? p,
       name: presetInfo(p).name,
+      role: presetInfo(p).role,
       appearance: PRESET_LOOK[p],
       initials: p === "atlas" ? "At" : undefined,
     })),
@@ -374,6 +408,7 @@ export function OnboardingPage() {
         id: item.targetId,
         handle: item.renamedTo ?? agent.handle,
         name: agent.name,
+        role: agent.role,
         appearance: normalizeAppearance(agent.appearance),
         model: agent.model ?? null,
       });
@@ -407,6 +442,7 @@ export function OnboardingPage() {
     mutationFn: async () => {
       if (!created) return;
       const ids = { ...agentIds };
+      const named = { ...handles };
       for (const p of PRESETS) {
         if (!chosen.has(p) || ids[p]) continue;
         const info = presetInfo(p);
@@ -424,7 +460,9 @@ export function OnboardingPage() {
         });
         await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
         ids[p] = agent.id;
+        named[p] = agent.handle;
         setAgentIds({ ...ids });
+        setHandles({ ...named });
       }
       // Imported: one apply after the presets (a handle a preset took gets the next free one). A new workspace has
       // no key yet, so they start on Automático; saving one later gives back the models it runs.
@@ -570,9 +608,88 @@ export function OnboardingPage() {
     },
   });
 
+  // Done. The computer as it is now (it may have gone to sleep since it was picked), and whether it gives the agents
+  // a browser: a ready one does; one still being prepared and a Daytona sandbox don't.
+  const machinesNow = useMachines(created?.orgId ?? "", step.id === "done" && machine !== null);
+  const machineNow = machinesNow.data?.find((m) => m.id === machine?.id) ?? machine;
+  const browser = workspaceComputer
+    ? workspaceComputer.phase === "ready"
+    : (computer === "machine" || computer === "host") && machineNow !== null && computerState(machineNow) === "online";
+  const { eta } = useSetupWait(step.id === "done" ? workspaceComputer : null, hold !== null);
+  const plate: ComputerPlate | null = workspaceComputer
+    ? {
+        kind: WORKSPACE_COMPUTER_KIND,
+        state: setupPortrait(workspaceComputer, true),
+        label: [t("computerSetup.title", { org: orgName }), t(workspaceComputer.chipKey), eta && etaLine(t, eta)]
+          .filter(Boolean)
+          .join(" · "),
+      }
+    : computer === "cloud"
+      ? { kind: "cloud", state: "online", label: t("onboarding.computer.cloud") }
+      : (computer === "machine" || computer === "host") && machineNow
+        ? {
+            kind: computerKind(machineNow.os),
+            state: computerState(machineNow),
+            label: computer === "host" ? t("machines.host.label") : machineNow.name,
+          }
+        : computer === "machine"
+          ? {
+              kind: "mac",
+              state: "paused",
+              label: `${t("onboarding.stepNames.computer")} · ${t("onboarding.done.computerPending")}`,
+            }
+          : null;
+
+  // The first message: written as Done opens, so it never changes while it's read, and kept through edits and Back;
+  // written again only when the ready-made agents, who offer it, change (an import retried on Done keeps it).
+  const team = createdPresets.join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when Done opens, and when the team changes
+  useLayoutEffect(() => {
+    if (step.id !== "done" || firstAsk?.team === team) return;
+    const preset = firstAskOrder(browser).find((p) => agentIds[p]);
+    const asker = crew.find((c) => c.key === preset) ?? crew[0];
+    setFirstAsk(
+      asker
+        ? {
+            team,
+            asker: asker.key,
+            text: preset ? t(`onboarding.done.first.asks.${preset}`, { handle: asker.handle }) : "",
+          }
+        : null,
+    );
+  }, [step.id, team]);
+  const askText = firstAsk?.text ?? "";
+  const asking = askText.trim() !== "";
+  // Whoever the text mentions first speaks, and gets it; with nobody named, the router picks who answers.
+  const mentioned = firstMentioned(askText, crew);
+  const speaker = mentioned ?? crew.find((c) => c.key === firstAsk?.asker);
+  // No socket is open here: an agent waiting for its computer is asked about again until it can start.
+  const aiNow = useAiStatus(created?.orgId ?? "", step.id === "done" && speaker !== undefined, (status) =>
+    mentioned && aiStateOf(status, mentioned.id) === "waiting" ? COMPUTER_POLL_MS : false,
+  );
+  const lineState = !asking
+    ? undefined
+    : mentioned
+      ? aiStateOf(aiNow.data, mentioned.id)
+      : aiNow.data?.any === false
+        ? "no_ai"
+        : undefined;
+  const askLine: AskLine | null = lineState
+    ? {
+        state: lineState,
+        icon: LINE_ICON[lineState],
+        text: t(`onboarding.done.first.${lineState === "no_ai" ? (mentioned ? "noAi" : "noAiAny") : lineState}`, {
+          name: mentioned?.name,
+          computer: computerName(t, orgName, machineNow),
+        }),
+      }
+    : null;
+
   const finish = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (body: string | null) => {
       if (!created) return;
+      // A failed post stays on Done with its text: the app's toast says why.
+      if (body) await api.chat.post(created.orgId, created.generalChannelId, { body });
       sessionStore.remove(STORAGE_KEYS.confirmationSent);
       await qc.invalidateQueries({ queryKey: keys.me });
       await navigate({
@@ -603,7 +720,7 @@ export function OnboardingPage() {
   const advance = async (how?: "skip" | "keyLater") => {
     const skip = how === "skip";
     if (step.id === "done") {
-      await finish.mutateAsync();
+      await finish.mutateAsync(skip || !asking ? null : askText.trim());
       return;
     }
     if (!skip) {
@@ -724,7 +841,11 @@ export function OnboardingPage() {
 
   const primaryLabel =
     step.id === "done"
-      ? t("onboarding.done.open")
+      ? !asking
+        ? t("onboarding.done.open")
+        : mentioned
+          ? t("onboarding.done.first.send", { name: mentioned.name })
+          : t("onboarding.done.first.sendGeneral")
       : step.id === "agents" && agentsPhase === "pick" && joiningLeft > 0
         ? t("onboarding.actions.create", { count: joiningLeft })
         : aiOpen && keyPending
@@ -733,8 +854,10 @@ export function OnboardingPage() {
             ? t("onboarding.actions.invite", { count: toSend.length })
             : t("onboarding.actions.continue");
   // "Pular esta etapa" only on optional steps ("agents" never is, so its AI phase needs no exception); the
-  // computer is one only where it is a choice, shown once its setup has answered.
-  const showSkip = step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.optional;
+  // computer is one only where it is a choice, shown once its setup has answered. On Done the same place opens
+  // #general without the first message, while there is one.
+  const showSkip =
+    step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.id === "done" ? asking : step.optional;
   const back = () => {
     if (aiOpen) setAgentsPhase("pick");
     else go(index - 1);
@@ -1085,23 +1208,7 @@ export function OnboardingPage() {
             <DoneStep
               orgName={orgName}
               agents={crew}
-              computer={
-                workspaceComputer
-                  ? { status: t(workspaceComputer.chipKey), name: t("computerSetup.title", { org: orgName }) }
-                  : computer === "cloud"
-                    ? { name: t("onboarding.computer.cloud") }
-                    : computer === "host"
-                      ? { name: t("machines.host.label") }
-                      : computer === "machine" && machine
-                        ? { name: machine.name }
-                        : {
-                            status: t(
-                              computer === "machine"
-                                ? "onboarding.done.computerPending"
-                                : "onboarding.done.computerLater",
-                            ),
-                          }
-              }
+              computer={plate}
               invites={sent.size}
               wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
             />
@@ -1116,6 +1223,20 @@ export function OnboardingPage() {
                 }}
               />
             </Card>
+          )}
+          {step.id === "done" && speaker && (
+            <FirstAsk
+              speaker={speaker}
+              read={savedContext.trim() !== ""}
+              orgName={orgName}
+              value={askText}
+              onChange={(text) => setFirstAsk((a) => a && { ...a, text })}
+              onSend={() => {
+                if (!busy) void advance().catch(() => {});
+              }}
+              line={askLine}
+              typing={guide.typing}
+            />
           )}
 
           <div className="onb__actions">
@@ -1132,7 +1253,7 @@ export function OnboardingPage() {
             </Button>
             {showSkip && (
               <Button variant="ghost" onClick={skip} disabled={busy}>
-                {t("onboarding.skip")}
+                {step.id === "done" ? t("onboarding.done.first.skip") : t("onboarding.skip")}
               </Button>
             )}
             {aiOpen && (
@@ -1683,7 +1804,10 @@ function TeamStep({
   );
 }
 
-/** The last step: the welcome card on a small sky, the crew, and a short summary. */
+/**
+ * The last step's welcome, on a small sky: who is in #general, the invitations emailed and the wiki brought, if any,
+ * and the crew's faces with their computer at the end.
+ */
 function DoneStep({
   orgName,
   agents,
@@ -1693,11 +1817,10 @@ function DoneStep({
 }: {
   orgName: string;
   agents: CrewMember[];
+  computer: ComputerPlate | null;
+  invites: number;
   /** Pages imported from Obsidian; null while importing, undefined when none was brought. */
   wiki?: number | null;
-  /** How far it is ("Ready", "Later") in the tile's big type, and its name in words of its own. */
-  computer: { status?: string; name?: string };
-  invites: number;
 }) {
   const { t } = useTranslation();
   const text = useRef<HTMLDivElement>(null);
@@ -1705,56 +1828,119 @@ function DoneStep({
     agents.map((a) => a.name),
     t("newAgent.and"),
   );
+  const lead = [
+    agents.length === 1
+      ? t("onboarding.done.inGeneralOne", { names })
+      : agents.length > 1
+        ? t("onboarding.done.inGeneralMany", { names })
+        : t("onboarding.done.textNone"),
+    invites > 0 && t("onboarding.done.invited", { count: invites }),
+    wiki === null ? t("onboarding.done.wikiImporting") : wiki ? t("onboarding.done.wikiPages", { count: wiki }) : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <>
-      <section className="onb__welcome" aria-labelledby="onb-welcome-title">
-        <WelcomeSky calm={() => [text.current]} />
-        <div className="onb__welcome-text" ref={text}>
-          <p className="onb__eyebrow onb__eyebrow--sky">{t("onboarding.done.eyebrow")}</p>
-          <h1 id="onb-welcome-title" className="onb__welcome-title">
-            {t("onboarding.done.title", { org: orgName })}
-          </h1>
-          <p className="onb__welcome-lead">
-            {agents.length === 1
-              ? t("onboarding.done.textOne", { names })
-              : agents.length > 1
-                ? t("onboarding.done.textMany", { names })
-                : t("onboarding.done.textNone")}
+    <section className="onb__welcome" aria-labelledby="onb-welcome-title">
+      <WelcomeSky calm={() => [text.current]} />
+      <div className="onb__welcome-text" ref={text}>
+        <p className="onb__eyebrow onb__eyebrow--sky">{t("onboarding.done.eyebrow")}</p>
+        <h1 id="onb-welcome-title" className="onb__welcome-title">
+          {t("onboarding.done.title", { org: orgName })}
+        </h1>
+        <p className="onb__welcome-lead">{lead}</p>
+      </div>
+      {agents.length > 0 && (
+        // The faces are hidden from screen readers (the lead names them); the computer says what it is.
+        <div className="onb__crew">
+          {agents.map((a) => (
+            <AgentAvatar
+              key={a.key}
+              name={a.name}
+              initials={a.initials}
+              appearance={a.appearance}
+              size="lg"
+              title={a.role ? `${a.name} · ${a.role}` : a.name}
+            />
+          ))}
+          {computer && (
+            <span className="onb__crew-computer" title={computer.label}>
+              <ComputerPortrait kind={computer.kind} state={computer.state} label={computer.label} />
+            </span>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Done's first message: the agent best placed to start offers it in a speech bubble, the person can change it, and
+ * the big button sends it to #general.
+ */
+function FirstAsk({
+  speaker,
+  read,
+  orgName,
+  value,
+  onChange,
+  onSend,
+  line,
+  typing,
+}: {
+  speaker: CrewMember;
+  /** The person wrote about the company in the Context step. */
+  read: boolean;
+  orgName: string;
+  value: string;
+  onChange: (text: string) => void;
+  onSend: () => void;
+  line: AskLine | null;
+  typing: boolean;
+}) {
+  const { t } = useTranslation();
+  const said = useId();
+  return (
+    <section className="onb__answer" aria-labelledby={said}>
+      {/* Another speaker pops in, as each step's host does. */}
+      <div className="onb__ask" key={speaker.key}>
+        <span className="onb__host" data-fresh>
+          <AgentAvatar
+            name={speaker.name}
+            initials={speaker.initials}
+            appearance={speaker.appearance}
+            size="lg"
+            state={typing ? "writing" : undefined}
+            expression="happy"
+          />
+          <span className="onb__host-name">{speaker.name}</span>
+        </span>
+        <div className="onb__bubble">
+          <p id={said} className="onb__say">
+            {read ? t("onboarding.done.first.read", { org: orgName }) : t("onboarding.done.first.unread")}
           </p>
         </div>
-        {agents.length > 0 && (
-          <div className="onb__crew" aria-hidden="true">
-            {agents.map((a) => (
-              <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="lg" />
-            ))}
-          </div>
-        )}
-      </section>
-      <dl className="onb__summary">
-        <Card as="div">
-          <dt className="small muted">{t("onboarding.done.agents")}</dt>
-          <dd className="onb__stat">{agents.length}</dd>
-        </Card>
-        <Card as="div">
-          <dt className="small muted">{t("onboarding.done.computer")}</dt>
-          {computer.status && <dd className="onb__stat">{computer.status}</dd>}
-          {computer.name && (
-            <dd className={computer.status ? "onb__stat-of" : "onb__stat onb__stat--name"}>{computer.name}</dd>
-          )}
-        </Card>
-        <Card as="div">
-          <dt className="small muted">{t("onboarding.done.invites")}</dt>
-          <dd className="onb__stat">{invites}</dd>
-        </Card>
-        {wiki !== undefined && (
-          <Card as="div">
-            <dt className="small muted">{t("onboarding.done.wiki")}</dt>
-            <dd className="onb__stat">
-              {wiki === null ? t("onboarding.done.wikiImporting") : t("onboarding.done.wikiPages", { count: wiki })}
-            </dd>
-          </Card>
-        )}
-      </dl>
-    </>
+      </div>
+      <Textarea
+        autoGrow
+        rows={1}
+        className="onb__first-text"
+        aria-label={t("onboarding.done.first.label")}
+        placeholder={t("onboarding.done.first.placeholder")}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter sends and Shift+Enter starts a line; the page's own Enter handler is kept out.
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          onSend();
+        }}
+      />
+      {line && (
+        <p className="onb__help onb__first-line ac-iconline" role="status" data-state={line.state}>
+          <Icon name={line.icon} size={14} />
+          <span>{line.text}</span>
+        </p>
+      )}
+    </section>
   );
 }

@@ -442,6 +442,25 @@ describe("Onboarding", () => {
     ).toBe(true);
   };
 
+  /** … → (no computer) → these join Ada, with no AI yet ("Conectar depois") → Time skipped: Done. */
+  const toDone = async (state: ReturnType<typeof seedState>, ...keep: string[]) => {
+    await throughImport(state);
+    await skip();
+    await keepOnly(...keep);
+    await click(button(keep.length ? /^Criar \d+ agentes?$/ : "Continuar"), 8);
+    await click(button("Conectar depois"), 8);
+    await skip();
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+  };
+  /** Done: the welcome's sentences, the first message's box, who offers it, and the line under it. */
+  const welcome = () => document.querySelector(".onb__welcome-lead")?.textContent;
+  const ASK = "Sua primeira mensagem no #general";
+  const askBox = () => screen().getByRole("textbox", { name: ASK }) as HTMLTextAreaElement;
+  const asker = () => document.querySelector(".onb__answer .onb__host-name")?.textContent;
+  const askLine = () => document.querySelector(".onb__first-line")?.textContent ?? null;
+  const agentId = (state: ReturnType<typeof seedState>, name: string) =>
+    state.agents.find((a) => a.name === name)?.id ?? "";
+
   test("context: an Obsidian vault is read in the step and imported into the wiki on continue", async () => {
     const { state } = await start();
     await type("Nome", "Acme Saúde");
@@ -759,10 +778,17 @@ describe("Onboarding", () => {
     ]);
 
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Theo e Ada já estão no #general.");
-    expect(document.body.textContent).toContain("MacBook do Walter");
-    await click(button("Abrir o #general"), 8);
-    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+    expect(welcome()).toBe("Theo e Ada já estão no #general. Mandamos 1 convite por e-mail.");
+    // Their computer ends the row of faces, as it is.
+    expect(screen().getByRole("img", { name: "MacBook do Walter" }).getAttribute("data-state")).toBe("online");
+    // Lia, who'd browse on it, isn't on the team: Theo offers the first message, sent in one click.
+    expect(asker()).toBe("Theo");
+    await click(button("Enviar para Theo"), 8);
+    const posts = calls(state, "chat.post");
+    expect(posts.map((c) => c.args[2])).toEqual([
+      { body: "@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?" },
+    ]);
+    expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
   });
 
   test("optional steps can be skipped: no computer, no invites", async () => {
@@ -778,9 +804,10 @@ describe("Onboarding", () => {
     await skip();
     expect(calls(state, "orgs.invite")).toHaveLength(0);
     expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
-    const summary = document.querySelector(".onb__summary")?.textContent ?? "";
-    expect(summary).toContain("Depois");
-    expect(summary).toContain("Convites0");
+    // No cards repeating the rail and the faces, and nothing said of what was skipped: no invitations, no computer.
+    expect(document.querySelector(".onb__summary, .onb__stat, .onb__body > .ac-card")).toBeNull();
+    expect(welcome()).toBe("Theo e Ada já estão no #general.");
+    expect(document.querySelector(".onb__crew-computer")).toBeNull();
     // The rail marks the steps done and lets you go back.
     const steps = screen().getByRole("navigation", { name: "Passos para começar" });
     expect(steps.querySelectorAll("li[data-done]")).toHaveLength(6);
@@ -795,8 +822,217 @@ describe("Onboarding", () => {
     await skip();
     expect(progress()).toBe("Tudo certo");
     expect(sessionStorage.getItem("agentes.confirmation.sent")).toBe("walter@acme.com.br");
-    await click(button("Abrir o #general"), 8);
+    // The quiet way out opens #general and sends nothing.
+    await click(button("Abrir o #general sem enviar"), 8);
+    expect(calls(state, "chat.post")).toHaveLength(0);
     expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
+  });
+
+  test("Done: with no computer to browse on, Theo offers the first message, having read the context; Send posts it once and opens #general", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM", "Lia · Pesquisa");
+    expect(document.querySelector(".onb__summary, .onb__stat")).toBeNull();
+    expect(welcome()).toBe("Theo, Ada e Lia já estão no #general.");
+    // Lia's research needs a computer's browser: with none, Theo asks.
+    expect(asker()).toBe("Theo");
+    expect(
+      screen().getByRole("region", { name: "Li o que você escreveu sobre a Acme Saúde. Posso começar por isto?" }),
+    ).toBeTruthy();
+    expect(askBox().value).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
+    // Not focused: Enter anywhere does what the big button's ↵ says.
+    expect(document.activeElement).not.toBe(askBox());
+    expect(askLine()).toBe("Theo começa na hora, no #general.");
+    expect(document.querySelector(".onb__first-line")?.getAttribute("role")).toBe("status");
+    expect(button("Abrir o #general sem enviar")).toBeTruthy();
+    await click(button("Enviar para Theo"), 8);
+    const posts = calls(state, "chat.post");
+    expect(posts.map((c) => c.args[2])).toEqual([
+      { body: "@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?" },
+    ]);
+    expect(router.state.location.pathname).toBe(`/org/${posts[0]?.args[0]}/c/${posts[0]?.args[1]}`);
+  });
+
+  test("who asks first: Lia once a ready computer gives the agents a browser, its portrait after the faces; Ada when she's alone", async () => {
+    const first = await start();
+    fakeMachinesOf.get(first.api)?.pair({ name: "srv-1", kind: "host" });
+    await throughImport(first.state);
+    await next();
+    await keepOnly("Theo · PM", "Lia · Pesquisa");
+    await click(button(/^Criar 2 agentes$/), 8);
+    await click(button("Conectar depois"), 8);
+    await skip();
+    expect(asker()).toBe("Lia");
+    expect(askBox().value).toBe(
+      "@lia Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?",
+    );
+    expect(button("Enviar para Lia")).toBeTruthy();
+    expect(screen().getByRole("img", { name: "Computador deste servidor" }).getAttribute("data-state")).toBe("online");
+    // Each face says who it is under the pointer; screen readers have the lead's names instead.
+    const faces = [...document.querySelectorAll(".onb__crew .ac-avatar")];
+    expect(faces.map((f) => [f.getAttribute("title"), f.getAttribute("aria-hidden")])).toEqual([
+      ["Theo · PM", "true"],
+      ["Ada · Dev", "true"],
+      ["Lia · Pesquisa", "true"],
+    ]);
+    cleanup();
+
+    const alone = await start();
+    await toDone(alone.state);
+    expect(asker()).toBe("Ada");
+    expect(askBox().value).toBe("@ada O que você poderia construir ou automatizar para a gente primeiro?");
+    expect(button("Enviar para Ada")).toBeTruthy();
+  });
+
+  test("the first message as it's edited: whoever it names speaks and gets it; naming nobody, #general; emptied, nothing goes", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM", "Lia · Pesquisa");
+    await type(ASK, "@Lia e os preços deles?");
+    expect(asker()).toBe("Lia");
+    expect(button("Enviar para Lia")).toBeTruthy();
+    expect(askLine()).toBe("Lia começa na hora, no #general.");
+    // Naming nobody: the router picks who answers, and every agent here has an AI.
+    await type(ASK, "Bom dia, time");
+    expect(asker()).toBe("Theo");
+    expect(button("Enviar no #general")).toBeTruthy();
+    expect(askLine()).toBeNull();
+    // Emptied: only the way into #general, and nothing to open it "without sending".
+    await type(ASK, "  ");
+    expect(screen().queryByRole("button", { name: "Abrir o #general sem enviar" })).toBeNull();
+    expect(askLine()).toBeNull();
+    await click(button("Abrir o #general"), 8);
+    expect(calls(state, "chat.post")).toHaveLength(0);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("the first message's box: Enter sends and Shift+Enter doesn't; going Back keeps what was written", async () => {
+    const { state } = await start();
+    await toDone(state, "Theo · PM");
+    await type(ASK, "@theo o que fazemos hoje?");
+    await click(button("Voltar"), 4);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    await skip();
+    expect(askBox().value).toBe("@theo o que fazemos hoje?");
+    await act(async () => fireEvent.keyDown(askBox(), { key: "Enter", shiftKey: true }));
+    await settle(4);
+    expect(calls(state, "chat.post")).toHaveLength(0);
+    await act(async () => fireEvent.keyDown(askBox(), { key: "Enter" }));
+    await settle(8);
+    expect(calls(state, "chat.post").map((c) => c.args[2])).toEqual([{ body: "@theo o que fazemos hoje?" }]);
+  });
+
+  test("a first message that can't be posted stays on Done with its text, and says why", async () => {
+    const { state, router } = await start();
+    await toDone(state, "Theo · PM");
+    state.failPosts = true;
+    await click(button("Enviar para Theo"), 8);
+    expect(document.querySelector(".ac-toast")?.textContent).toContain("Try again");
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(askBox().value).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
+    state.failPosts = false;
+    await click(button("Enviar para Theo"), 8);
+    expect(calls(state, "chat.post")).toHaveLength(2);
+    expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("the welcome says what went out and came in: invitations once sent, the wiki while it arrives and once it's in", async () => {
+    const { api } = await start();
+    // The vault's notes take their time: Done opens before they're in.
+    let release = () => {};
+    const wikiImport = api.wiki.import;
+    api.wiki.import = async (...args: Parameters<typeof wikiImport>) => {
+      await new Promise<void>((done) => {
+        release = done;
+      });
+      return wikiImport(...args);
+    };
+    await type("Nome", "Acme Saúde");
+    await next();
+    const vault = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
+    await act(async () => {
+      fireEvent.change(within(vault).getByLabelText("Escolher .zip ou .md"), {
+        target: { files: [new File(["Veja [[Clientes]]."], "Início.md"), new File(["Lista."], "Clientes.md")] },
+      });
+    });
+    await settle(8);
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+    await next();
+    await skip();
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    await click(button("Conectar depois"), 8);
+    const emails = screen().getByLabelText("E-mails");
+    await act(async () => fireEvent.change(emails, { target: { value: "marina@acme.com.br, bia@acme.com.br" } }));
+    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    await click(button(/Convidar 2 pessoas/), 8);
+    expect(welcome()).toBe(
+      "Theo e Ada já estão no #general. Mandamos 2 convites por e-mail. As notas do Obsidian ainda estão chegando na wiki.",
+    );
+    // Nothing was written about the company: the offer doesn't say it was read.
+    expect(
+      screen().getByRole("region", { name: "Posso começar por isto? Pergunto o que precisar saber." }),
+    ).toBeTruthy();
+    await act(async () => release());
+    await settle(8);
+    expect(welcome()).toBe(
+      "Theo e Ada já estão no #general. Mandamos 2 convites por e-mail. A wiki tem 2 páginas do Obsidian.",
+    );
+  });
+
+  test("with no AI yet, the line says to send anyway: for the agent named, or, naming nobody, for every agent", async () => {
+    const { state } = await start();
+    await throughImport(state);
+    await skip();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    await click(button("Conectar depois"), 8);
+    state.aiStatus = {
+      any: false,
+      agents: state.agents.map((a) => ({ agentId: a.id, state: "no_ai" as const, reason: "no_key" as const })),
+    };
+    await skip();
+    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: Theo responde quando você conectar uma.");
+    expect(document.querySelector(".onb__first-line")?.getAttribute("data-state")).toBe("no_ai");
+    expect(button("Enviar para Theo")).toBeTruthy();
+    await type(ASK, "Bom dia, time");
+    expect(askLine()).toBe("Ainda sem IA conectada. Envie mesmo assim: os agentes respondem quando você conectar uma.");
+  });
+
+  test("an agent whose computer is away: the line waits for it, asked about again every 5 s, until it can start", async () => {
+    const { state, api, services } = await start();
+    await throughImport(state);
+    await click(button(/Outro computador/), 8);
+    const mac = fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    await next();
+    await keepOnly("Theo · PM");
+    await click(button(/^Criar 1 agente$/), 8);
+    // Its own sign-in thinks for them.
+    await next();
+    // The Mac went to sleep meanwhile.
+    const theo = agentId(state, "Theo");
+    state.aiStatus = { any: true, agents: [{ agentId: theo, state: "waiting" }] };
+    fakeMachinesOf.get(api)?.patch(mac?.id ?? "", { online: false });
+    await skip();
+    expect(screen().getByRole("img", { name: "MacBook do Walter" }).getAttribute("data-state")).toBe("offline");
+    expect(asker()).toBe("Theo");
+    expect(askLine()).toBe("Theo começa assim que o MacBook do Walter voltar.");
+    const interval = () => {
+      const query = services.queryClient
+        .getQueryCache()
+        .findAll()
+        .find((q) => q.queryKey.at(-1) === "ai-status" && q.getObserversCount() > 0);
+      const every = query?.observers[0]?.options.refetchInterval;
+      return typeof every === "function" && query ? every(query) : every;
+    };
+    expect(interval()).toBe(5000);
+    state.aiStatus = { any: true, agents: [{ agentId: theo, state: "ready" }] };
+    await act(async () => services.queryClient.invalidateQueries());
+    await settle(6);
+    expect(askLine()).toBe("Theo começa na hora, no #general.");
+    expect(interval()).toBe(false);
   });
 
   test('import: Theo\'s "pular" is the way out, and each app is shown by its official logo', async () => {
