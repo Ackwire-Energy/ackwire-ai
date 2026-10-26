@@ -983,12 +983,16 @@ export const useJoinRequests = (orgId: string, enabled = true) => {
   });
 };
 
-/** Whoever got in shows in the people; an invitation, in the pending list. Refetched after a refusal too. */
+/**
+ * Whoever got in shows in the people and in the workspace's counts (the sidebar's "2 members"); an invitation, in
+ * the pending list. Refetched after a refusal too.
+ */
 function refreshAnswered(qc: QC, orgId: string) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
     qc.invalidateQueries({ queryKey: keys.people(orgId) }),
     qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.overview(orgId) }),
   ]);
 }
 

@@ -1906,6 +1906,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         if (state.answerError) throw state.answerError;
         const request = state.joinRequests?.find((r) => r.id === requestId);
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
+        if (request?.confirmed && !state.approval)
+          state.members.push({
+            userId: `u-${requestId}`,
+            name: request.name,
+            email: request.email,
+            image: null,
+            role,
+            joinedAt: new Date().toISOString(),
+            handle: requestId,
+            timezone: "America/Sao_Paulo",
+          });
         return (
           state.approval ??
           (request?.confirmed

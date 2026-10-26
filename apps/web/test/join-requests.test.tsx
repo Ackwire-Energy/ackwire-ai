@@ -230,6 +230,8 @@ describe("Members › Requests to join", () => {
     expect(card("Bruno Lima").textContent).toContain("E-mail não confirmado: aprovar manda um convite para ele.");
     expect(card("Bruno Lima").querySelector(".ac-chip")?.textContent).toMatch(/^Pediu em \d/);
 
+    const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
+    expect(sidebarCount()).toBe("2 membros · 2 agentes");
     const role = within(ana).getByRole("combobox", { name: "Papel de Ana Souza" });
     role.focus();
     await act(async () => fireEvent.keyDown(role, { key: "Enter" }));
@@ -238,6 +240,8 @@ describe("Members › Requests to join", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", "admin"]);
     expect(text()).toContain("Ana Souza entrou.");
+    // She counts in the workspace's line too, without a reload.
+    expect(sidebarCount()).toBe("3 membros · 2 agentes");
 
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
     await settle(4);
