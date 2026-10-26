@@ -189,8 +189,18 @@ function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void
         </Text>
       </View>
       {admin ? (
-        <Pressable onPress={onAddress} accessibilityRole="button" accessibilityLabel={t("mobile.connectors.address")}>
-          <Icon name="globe" size={20} color={c.muted} />
+        // Spelled out: a globe alone didn't say it connects a service by its MCP address.
+        <Pressable
+          onPress={onAddress}
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.connectors.addressTitle")}
+          hitSlop={6}
+          style={styles.byAddress}
+        >
+          <Icon name="globe" size={16} color={c.muted} />
+          <Text variant="small" tone="muted" style={styles.bold}>
+            {t("mobile.connectors.byAddress")}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -321,6 +331,7 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  byAddress: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "center" },
   suggestions: { gap: 10, paddingHorizontal: 16 },
   filters: { paddingTop: 20 },
   card: {

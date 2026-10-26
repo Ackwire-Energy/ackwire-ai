@@ -165,6 +165,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message && !event.message.threadId)
         qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
+      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it.
+      if (event.message?.threadId)
+        void qc.invalidateQueries({ queryKey: ["org", orgId, "threads", "channel", channelId] });
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });

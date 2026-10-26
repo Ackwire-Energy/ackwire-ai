@@ -2,14 +2,20 @@ import type { Expression } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, useWindowDimensions, View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
-import Animated, { FadeIn } from "react-native-reanimated";
+import { KeyboardAvoidingView, useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
+import Animated, { FadeIn, interpolate, useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { Sky } from "@/sky/Sky";
 import { IconButton } from "../IconButton";
 import { Text } from "../Text";
 import { useTheme } from "../theme";
+
+/** The sky's height under the status bar while the keyboard is up: the agent and its margin. */
+const SKY_WITH_KEYBOARD = 100;
+
+/** A word joiner after each hyphen inside a word: the large title never breaks "e-mail" across two lines. */
+const unbrokenHyphens = (text: string) => text.replace(/([A-Za-zÀ-ÿ])-([A-Za-zÀ-ÿ])/g, "$1-\u2060$2");
 
 export interface AuthScaffoldProps {
   title: string;
@@ -40,6 +46,11 @@ export function AuthScaffold({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const skyHeight = Math.round(Math.min(300, height * 0.32));
+  // With the keyboard up the sky gives way down to the agent, so the answer's button stays above the keys.
+  const keyboard = useReanimatedKeyboardAnimation();
+  const skyStyle = useAnimatedStyle(() => ({
+    height: interpolate(keyboard.progress.value, [0, 1], [skyHeight + insets.top, insets.top + SKY_WITH_KEYBOARD]),
+  }));
   return (
     // The keyboard library's view: with its provider on, Android no longer resizes the window by itself.
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding">
@@ -47,11 +58,7 @@ export function AuthScaffold({
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
       >
-        <View
-          style={{ height: skyHeight + insets.top }}
-          accessibilityLabel={t("mobile.auth.skyLabel")}
-          accessibilityRole="image"
-        >
+        <Animated.View style={skyStyle} accessibilityLabel={t("mobile.auth.skyLabel")} accessibilityRole="image">
           <Sky
             color="sky"
             depth={0.9}
@@ -71,14 +78,14 @@ export function AuthScaffold({
               <IconButton icon="back" label={t("mobile.common.back")} onPress={onBack} plate />
             </View>
           ) : null}
-        </View>
+        </Animated.View>
         <Animated.View
           key={stepKey}
           entering={FadeIn.duration(220)}
           style={{ paddingHorizontal: 24, paddingTop: 8, flex: 1 }}
         >
           <Text variant="display" accessibilityRole="header" accessibilityLiveRegion="polite">
-            {title}
+            {unbrokenHyphens(title)}
           </Text>
           {subtitle ? (
             <Text variant="callout" tone="muted" style={{ marginTop: 6 }}>

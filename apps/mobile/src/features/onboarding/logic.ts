@@ -6,11 +6,11 @@ import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
  * agent of the team, a strip of sky on top that fills as you go. The web's steps without the computer, which
  * stays for the computer ("Depois, no computador"). Pure: no React Native imports.
  */
-export const STEPS = ["workspace", "context", "import", "agents", "team", "done"] as const;
+export const STEPS = ["workspace", "context", "import", "agents", "ai", "team", "done"] as const;
 export type StepId = (typeof STEPS)[number];
 
 /** Steps that can be skipped. */
-export const OPTIONAL: ReadonlySet<StepId> = new Set(["import", "team"]);
+export const OPTIONAL: ReadonlySet<StepId> = new Set(["import", "ai", "team"]);
 
 /** The presets of the web's onboarding, with the same looks and roles. */
 export const PRESETS = ["ada", "theo", "lia", "atlas"] as const;
@@ -40,6 +40,7 @@ export const HOST: Record<StepId, Preset> = {
   context: "lia",
   import: "theo",
   agents: "ada",
+  ai: "ada",
   team: "theo",
   done: "ada",
 };
@@ -93,4 +94,20 @@ export function phoneTimezone(): string | null {
 export function zoneCity(zone: string): string {
   const city = zone.split("/").pop() ?? zone;
   return city.replace(/_/g, " ");
+}
+
+/**
+ * The time zone as people read it, in their language ("Horário Padrão de Brasília"); its city ("Sao Paulo", from the
+ * id, without accents) where the platform has no name for it, or only an offset ("GMT-03:00").
+ */
+export function zoneLabel(zone: string, locale: string): string {
+  try {
+    const name = new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: "longGeneric" })
+      .formatToParts(new Date())
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (name && !/^(GMT|UTC)/.test(name)) return name;
+  } catch {
+    // An engine without generic zone names, or an unknown zone.
+  }
+  return zoneCity(zone);
 }

@@ -4,12 +4,14 @@ import {
   useAgentAccess,
   useAgentDetail,
   useAgentForYou,
+  useAiStatus,
   useApi,
   useMemoryAboutMe,
   useMemoryAction,
   useUsage,
 } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -35,6 +37,7 @@ import {
   useToast,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
+import { openConnectAi } from "../ai/NoAiCard";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -112,6 +115,7 @@ function Profile({ id }: { id: string }) {
   const knows = useMemoryAboutMe(orgId, id);
   const work = useWorkingNow().filter((w) => w.agentId === id);
   const asking = useWaitingApprovals().filter((a) => a.agentId === id);
+  const noAi = aiStateOf(useAiStatus(orgId).data, id) === "no_ai";
   const waitingNow = asking[0];
   const [allDid, setAllDid] = useState(false);
   const look = agentLook(agent);
@@ -252,6 +256,13 @@ function Profile({ id }: { id: string }) {
               leading={<Icon name="wait" size={15} color={c.amber} />}
               label={t("mobile.intentAgents.nowWaiting", { title: waitingNow.title })}
               onPress={() => router.push(`/approval/${waitingNow.id}`)}
+            />
+          ) : null}
+          {noAi ? (
+            <NowPill
+              leading={<Icon name="bolt" size={15} color={c.amber} />}
+              label={t("noAi.agent", { name: agent?.name ?? "" })}
+              onPress={() => openConnectAi()}
             />
           ) : null}
           {work.map((w) => (

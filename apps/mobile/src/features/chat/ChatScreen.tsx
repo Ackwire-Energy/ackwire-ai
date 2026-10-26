@@ -198,6 +198,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const dms = useDms(orgId);
   const channel = channels.data?.find((x) => x.id === channelId);
   const dm = dms.data?.find((d) => d.channelId === channelId);
+  // A conversation the loaded lists don't have yet (opened a moment ago, or reached by a link): they load
+  // again once, so the header gets its name.
+  const unlisted = channels.isSuccess && dms.isSuccess && !channel && !dm;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once each time the conversation goes missing
+  useEffect(() => {
+    if (!unlisted) return;
+    void channels.refetch();
+    void dms.refetch();
+  }, [unlisted]);
   const isThread = Boolean(threadId);
   const thread = useThreadInfo(orgId, threadId);
   const missionQ = useThreadMission(orgId, threadId);
@@ -801,7 +810,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     : dmAgentId
       ? dir.agentById.get(dmAgentId)?.role || undefined
       : channel && roster.data
-        ? t("mobile.chat.members", { count: roster.data.length, agents: agentsHere })
+        ? // People and agents counted apart: "1 pessoa · 3 agentes", never "4 membros · 3 agentes".
+          `${t("mobile.chat.people", { count: roster.data.length - agentsHere })} · ${t("mobile.chat.agentsHere", { count: agentsHere })}`
         : undefined;
   // An agent's DM while it works: the pill's quiet line says what it does ("Consultando o GitHub").
   const dmDoing = useMemo(() => {

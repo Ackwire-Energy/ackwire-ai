@@ -36,8 +36,9 @@ export const mobilePtBR = {
       backTo: "Voltar para {{host}}",
       now: "Agora em {{host}}",
       invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
-      unreachable:
-        "Não conseguimos falar com {{host}}. Se ele estiver no Tailscale, abra o app do Tailscale, conecte e tente de novo.",
+      unreachable: "Não conseguimos falar com {{host}}. Confira o endereço e a internet, e tente de novo.",
+      unreachableTailscale:
+        "Não conseguimos falar com {{host}}. Ele está no Tailscale: abra o app do Tailscale, conecte e tente de novo.",
       certificate: "O certificado de {{host}} não é válido. Fale com quem cuida do servidor.",
       notAgentes: "{{host}} não é um servidor agentes.chat. Confira o endereço.",
       serverTooOld: "{{host}} precisa de uma atualização para funcionar com este app.",

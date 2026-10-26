@@ -592,10 +592,10 @@ export const ptBR = {
     },
     removeInvite: "Remover {{email}}",
     done: {
-      title: "Bem-vindo à {{org}}",
+      title: "Boas-vindas à {{org}}",
       /** The phone's last step, which has no first message to send: it also says how to start. */
-      textOne: "{{names}} já está no #general. Diga oi com @ e peça a primeira tarefa.",
-      textMany: "{{names}} já estão no #general. Diga oi com @ e peça a primeira tarefa.",
+      textOne: "{{names}} já está no #general. Mande um oi e peça a primeira tarefa.",
+      textMany: "{{names}} já estão no #general. Mande um oi e peça a primeira tarefa.",
       inGeneralOne: "{{names}} já está no #general.",
       inGeneralMany: "{{names}} já estão no #general.",
       textNone: "O #general está pronto. Crie um agente quando quiser.",

@@ -50,6 +50,7 @@ export function Button({ variant, size = "md", icon, label, onPress, wide = fals
       onPress={onPress}
       disabled={disabled}
       sink
+      fill={false}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}

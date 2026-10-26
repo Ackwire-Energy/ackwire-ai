@@ -62,6 +62,7 @@ function AppStack() {
       <Stack.Screen name="join-requests" options={requestsSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
+      <Stack.Screen name="connect-ai" options={formSheet} />
       <Stack.Screen name="me" options={meSheet} />
       <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={formSheet} />

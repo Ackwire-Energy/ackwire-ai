@@ -10,14 +10,17 @@ import {
   progressAt,
   STEPS,
   zoneCity,
+  zoneLabel,
 } from "../../src/features/onboarding/logic";
 
-test("the phone's steps: no computer step; import and people are optional; the strip fills to the end", () => {
-  expect([...STEPS]).toEqual(["workspace", "context", "import", "agents", "team", "done"]);
-  expect([...OPTIONAL].sort()).toEqual(["import", "team"]);
+test("the phone's steps: no computer step; import, the AI and people are optional; the strip fills to the end", () => {
+  expect([...STEPS]).toEqual(["workspace", "context", "import", "agents", "ai", "team", "done"]);
+  expect([...OPTIONAL].sort()).toEqual(["ai", "import", "team"]);
   expect(progressAt("workspace")).toBe(0);
   expect(progressAt("done")).toBe(1);
-  expect(progressAt("agents")).toBeCloseTo(3 / 5, 5);
+  expect(progressAt("agents")).toBeCloseTo(3 / 6, 5);
+  expect(nextStep("agents")).toBe("ai");
+  expect(prevStep("team")).toBe("ai");
   expect(nextStep("team")).toBe("done");
   expect(prevStep("workspace")).toBeNull();
   expect(prevStep("done")).toBeNull();
@@ -29,6 +32,7 @@ test("each host says hi only the first time it appears", () => {
   expect(introducesAt("workspace")).toBe(true);
   expect(introducesAt("context")).toBe(true);
   expect(introducesAt("agents")).toBe(false);
+  expect(introducesAt("ai")).toBe(false);
   expect(introducesAt("team")).toBe(false);
 });
 
@@ -42,6 +46,9 @@ test("e-mails typed or pasted: lower-cased, no repeats, the wrong ones kept apar
 
 test("the time zone reads as its city; invitation tokens only url-safe", () => {
   expect(zoneCity("America/Sao_Paulo")).toBe("Sao Paulo");
+  // Its name in the person's language where the engine has one, else the city.
+  expect(zoneLabel("America/Sao_Paulo", "pt-BR")).toMatch(/Brasília|Sao Paulo/);
+  expect(zoneLabel("Not/A_Zone", "pt-BR")).toBe("A Zone");
   expect(isInviteToken("a".repeat(43))).toBe(true);
   expect(isInviteToken("../etc")).toBe(false);
   expect(isInviteToken(undefined)).toBe(false);

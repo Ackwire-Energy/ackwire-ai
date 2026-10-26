@@ -1,9 +1,10 @@
-import { useIssues, useMe } from "@agenteschat/client";
+import { useCredentials, useIssues, useMe } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, View } from "react-native";
 import Animated, { SlideInLeft, SlideInRight } from "react-native-reanimated";
 import { signOut } from "@/features/account";
 import { appHeaders, lastCookie } from "@/lib/auth";
@@ -54,6 +55,9 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const dir = useDirectory();
   const issues = useIssues(org.orgId);
+  const admin = can(org.org?.role, "manage_credentials");
+  const credentials = useCredentials(org.orgId, admin);
+  const liveKeys = (credentials.data ?? []).filter((k) => !k.revokedAt).length;
   const [stack, setStack] = useState<MePage[]>(["root"]);
   const [forward, setForward] = useState(true);
   const [push, setPush] = useState<boolean | null>(null);
@@ -234,6 +238,19 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
               chevron
               onPress={() => closeThenPush(onClose, "/connectors")}
             />
+            <GroupedRow
+              icon="brain"
+              label={t("mobile.ai.row")}
+              value={
+                admin && credentials.data
+                  ? liveKeys > 0
+                    ? t("mobile.ai.rowKeys", { count: liveKeys })
+                    : t("mobile.ai.rowNone")
+                  : undefined
+              }
+              chevron
+              onPress={() => closeThenPush(onClose, "/connect-ai")}
+            />
           </GroupedList>
           <GroupedHeader>{t("mobile.me.preferences")}</GroupedHeader>
           <GroupedList>
@@ -264,10 +281,19 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
             <GroupedRow
               icon="out"
               label={t("mobile.me.signOut")}
-              onPress={() => {
-                onClose();
-                void signOut();
-              }}
+              onPress={() =>
+                Alert.alert(t("mobile.me.signOutConfirm"), t("mobile.me.signOutConfirmText"), [
+                  { text: t("mobile.common.cancel"), style: "cancel" },
+                  {
+                    text: t("mobile.me.signOut"),
+                    style: "destructive",
+                    onPress: () => {
+                      onClose();
+                      void signOut();
+                    },
+                  },
+                ])
+              }
             />
           </GroupedList>
           {version ? <GroupedFooter>{t("mobile.me.version", { version })}</GroupedFooter> : null}

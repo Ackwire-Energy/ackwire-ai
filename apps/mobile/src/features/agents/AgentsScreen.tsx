@@ -1,6 +1,7 @@
-import { useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
+import { useAiStatus, useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -101,6 +102,9 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
   const when = useWhen();
   const now = useNow();
   const { agent: a, work: w, approval, computer } = l;
+  const ai = useAiStatus(useOrgId());
+  // An agent with nothing to think with says so where its role would be (the web's "Sem IA").
+  const noAi = !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   const busy = Boolean(approval || w);
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
   const sub = approval
@@ -111,7 +115,9 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       ? workTitle(t, w)
       : computer !== undefined
         ? t("mobile.outage.rowWaiting", { computer })
-        : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
+        : noAi
+          ? t("noAi.chip")
+          : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
   return (
     <ListRow
       onPress={() => router.push(`/agent/${a.id}`)}
@@ -166,6 +172,13 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
           <View style={styles.work}>
             <Icon name="clock" size={13} color={c.muted} />
             <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
+              {sub}
+            </Text>
+          </View>
+        ) : noAi ? (
+          <View style={styles.work}>
+            <Icon name="bolt" size={13} color={c.amber} />
+            <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.medium, styles.shrink]}>
               {sub}
             </Text>
           </View>

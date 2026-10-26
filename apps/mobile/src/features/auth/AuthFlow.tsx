@@ -2,10 +2,13 @@ import { ApiError, type SignInOptions, useApi, useAuthConfig } from "@agentescha
 import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { router } from "expo-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { openBrowserAsync } from "expo-web-browser";
+import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, Pressable, View } from "react-native";
+import { Linking, Pressable, type TextInput, View } from "react-native";
+import { useLaunched } from "@/features/launch/launched";
 import { authClient } from "@/lib/auth";
+import { readValueSync, writeValue } from "@/lib/storage";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
@@ -25,6 +28,9 @@ import { useTheme } from "@/ui/theme";
  * shut while a hidden password is typed, a wink when it's shown, a frown when it's wrong. On success the
  * session gate moves to the app.
  */
+/** The e-mail this phone last signed in with: the next sign-in starts with it (kept on signing out). */
+const LAST_EMAIL = "last-email";
+
 type Step = "email" | "password" | "social" | "name" | "newPassword" | "closed" | "forgot" | "sent";
 
 /** Where the back button goes from each step (`null`: leave the screen, if there is somewhere to go). */
@@ -44,7 +50,10 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const api = useApi();
   const config = useAuthConfig();
   const [step, setStep] = useState<Step>("email");
-  const [email, setEmail] = useState(initialEmail ?? "");
+  const [email, setEmail] = useState(initialEmail ?? readValueSync(LAST_EMAIL) ?? "");
+  // The e-mail takes the keyboard once the launch splash has left, not under it.
+  const launched = useLaunched();
+  const emailField = useRef<ComponentRef<typeof TextInput>>(null);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
@@ -94,6 +103,22 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     if (initialEmail && isEmail(initialEmail)) void lookUp(initialEmail);
   }, []);
 
+  // Mounted under the launch splash: the keyboard comes up once the splash leaves.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the splash leaves
+  useEffect(() => {
+    if (launched && step === "email" && !initialEmail) emailField.current?.focus();
+  }, [launched]);
+
+  /**
+   * What a throw means: only a request that never got an answer (fetch's "Network request failed") is
+   * "Sem conexão"; anything else in the app (the Keychain, a bug) reads as the generic failure.
+   */
+  const thrown = (error: unknown): number | undefined => {
+    if (error instanceof TypeError && /network|fetch/i.test(error.message)) return undefined;
+    console.warn("[auth]", error);
+    return -1;
+  };
+
   /** Better Auth's answer → the sentence to show (never the server's raw text). */
   const failed = (status: number | undefined) =>
     setError(
@@ -111,15 +136,19 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       const res = await authClient().signIn.email({ email: email.trim(), password });
       if (res.error) {
         haptics.warning();
-        if (res.error.status === 401) setWrong(true);
-        else if (res.error.code === ACCOUNT_BLOCKED) setError(t("auth.accountBlocked"));
+        if (res.error.status === 401) {
+          setWrong(true);
+          // The wrong password goes, so the next try starts on an empty field.
+          setPassword("");
+        } else if (res.error.code === ACCOUNT_BLOCKED) setError(t("auth.accountBlocked"));
         else failed(res.error.status);
         return;
       }
       haptics.success();
       rememberSignIn("email");
-    } catch {
-      failed(undefined);
+      void writeValue(LAST_EMAIL, email.trim());
+    } catch (error) {
+      failed(thrown(error));
     } finally {
       setPending(false);
     }
@@ -138,8 +167,9 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       }
       haptics.success();
       rememberSignIn("email");
-    } catch {
-      failed(undefined);
+      void writeValue(LAST_EMAIL, email.trim());
+    } catch (error) {
+      failed(thrown(error));
     } finally {
       setPending(false);
     }
@@ -155,8 +185,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       if (res.error) return failed(res.error.status);
       haptics.success();
       go("sent");
-    } catch {
-      failed(undefined);
+    } catch (error) {
+      failed(thrown(error));
     } finally {
       setPending(false);
     }
@@ -201,10 +231,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       : [t("auth.flow.password"), t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
-    newPassword: [
-      first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
-      t("auth.passwordHelp"),
-    ],
+    // The rule ("Pelo menos 8 caracteres.") is the meter's line under the field: not repeated on top.
+    newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"), ""],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
@@ -250,7 +278,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       }
     >
       {step !== "email" && step !== "forgot" && step !== "sent" ? (
-        <Who email={email.trim()} onChange={() => go("email")} />
+        // Where the e-mail can't sign up, "Usar outro e-mail" below already changes it: the chip only says which.
+        <Who email={email.trim()} onChange={step === "closed" ? undefined : () => go("email")} />
       ) : null}
 
       {step === "email" || step === "forgot" ? (
@@ -270,7 +299,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
             returnKeyType={step === "email" ? "next" : "send"}
             onSubmitEditing={submit}
             accessibilityLabel={t("auth.email")}
-            autoFocus={!initialEmail}
+            ref={emailField}
+            autoFocus={!initialEmail && launched}
           />
           {fix ? (
             <Pressable onPress={() => setEmail(fix)} accessibilityRole="button" hitSlop={6}>
@@ -364,7 +394,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
 }
 
 /** The e-mail being answered for, with "Trocar". */
-function Who({ email, onChange }: { email: string; onChange: () => void }) {
+function Who({ email, onChange }: { email: string; onChange?: () => void }) {
   const { t } = useTranslation();
   const { colors, shadows } = useTheme();
   return (
@@ -377,7 +407,7 @@ function Who({ email, onChange }: { email: string; onChange: () => void }) {
         maxWidth: "100%",
         minHeight: 32,
         paddingLeft: 10,
-        paddingRight: 4,
+        paddingRight: onChange ? 4 : 10,
         borderRadius: 10,
         backgroundColor: colors.raised,
         boxShadow: shadows.e1,
@@ -387,11 +417,13 @@ function Who({ email, onChange }: { email: string; onChange: () => void }) {
       <Text variant="subhead" numberOfLines={1} style={{ flexShrink: 1 }}>
         {email}
       </Text>
-      <Pressable onPress={onChange} accessibilityRole="button" hitSlop={8} style={{ paddingHorizontal: 8 }}>
-        <Text variant="subhead" style={{ fontWeight: "600" }}>
-          {t("auth.flow.change")}
-        </Text>
-      </Pressable>
+      {onChange ? (
+        <Pressable onPress={onChange} accessibilityRole="button" hitSlop={8} style={{ paddingHorizontal: 8 }}>
+          <Text variant="subhead" style={{ fontWeight: "600" }}>
+            {t("auth.flow.change")}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -413,7 +445,8 @@ function Terms({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl: string 
       variant="caption"
       tone="muted"
       style={{ textDecorationLine: "underline" }}
-      onPress={() => void Linking.openURL(url)}
+      // In a sheet over the app (Safari's view), not out to Safari: the sign-up stays where it was.
+      onPress={() => void openBrowserAsync(url).catch(() => Linking.openURL(url))}
     >
       {label}
     </Text>

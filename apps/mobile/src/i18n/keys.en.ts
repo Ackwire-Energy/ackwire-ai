@@ -34,7 +34,9 @@ export const mobileEn: MobileTranslations = {
       backTo: "Back to {{host}}",
       now: "Now on {{host}}",
       invalid: "Check the address, something like agentes.yourteam.ts.net.",
-      unreachable: "We can't reach {{host}}. If it's on Tailscale, open the Tailscale app, connect and try again.",
+      unreachable: "We can't reach {{host}}. Check the address and your connection, and try again.",
+      unreachableTailscale:
+        "We can't reach {{host}}. It's on Tailscale: open the Tailscale app, connect and try again.",
       certificate: "The certificate of {{host}} isn't valid. Talk to whoever runs the server.",
       notAgentes: "{{host}} isn't an agentes.chat server. Check the address.",
       serverTooOld: "{{host}} needs an update to work with this app.",

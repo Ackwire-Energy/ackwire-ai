@@ -42,7 +42,13 @@ export default function Server() {
     const check = await checkServer(server);
     if (check.ok) return switchTo(check.server);
     haptics.warning();
-    setError(t(PROBLEM_TEXT[check.problem], { host: serverHost(check.server) }));
+    const host = serverHost(check.server);
+    // Tailscale's own advice only for a Tailscale address (*.ts.net); any other host gets the plain one.
+    const text =
+      check.problem === "unreachable" && host.endsWith(".ts.net")
+        ? "mobile.auth.server.unreachableTailscale"
+        : PROBLEM_TEXT[check.problem];
+    setError(t(text, { host }));
     setBusy(false);
   };
 

@@ -583,8 +583,8 @@ export const en: Translations = {
     removeInvite: "Remove {{email}}",
     done: {
       title: "Welcome to {{org}}",
-      textOne: "{{names}} is already in #general. Say hi with @ and ask for the first task.",
-      textMany: "{{names}} are already in #general. Say hi with @ and ask for the first task.",
+      textOne: "{{names}} is already in #general. Say hi and ask for the first task.",
+      textMany: "{{names}} are already in #general. Say hi and ask for the first task.",
       inGeneralOne: "{{names}} is already in #general.",
       inGeneralMany: "{{names}} are already in #general.",
       textNone: "#general is ready. Create an agent whenever you like.",

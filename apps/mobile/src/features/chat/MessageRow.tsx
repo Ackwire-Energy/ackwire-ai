@@ -36,6 +36,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { MessageFiles } from "../files/MessageFiles";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
@@ -295,6 +296,7 @@ export const MessageRow = memo(function MessageRow({
         {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
+        {isAgent ? <NoAiCard message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
