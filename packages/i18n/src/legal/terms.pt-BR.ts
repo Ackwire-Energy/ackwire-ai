@@ -4,7 +4,7 @@ export const termsPtBR: LegalDocument = {
   title: "Termos de uso",
   summary:
     "O acordo para usar o agentes.chat: o seu espaço de trabalho, os seus agentes e pelo que cada lado responde.",
-  updated: "2026-10-23",
+  updated: "2026-10-26",
   sections: [
     {
       id: "agreement",
