@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { InvitationPreview, JoinRequest, JoinStatus } from "@agenteschat/client";
+import type { InvitationPreview, JoinRequest, JoinStatus, NotificationLatest } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -447,7 +447,7 @@ test("the admins' notice: who asks, a Members chip, and it opens Members", async
 });
 
 test("the admins' notice names the first two who asked and counts the rest", async () => {
-  for (const [latest, count, said] of [
+  const cases: [NotificationLatest, number, string][] = [
     [
       { title: "Carla Dias", names: ["Ana Souza", "Bruno Lima"] },
       3,
@@ -455,7 +455,8 @@ test("the admins' notice names the first two who asked and counts the rest", asy
     ],
     // Kept from before the notice held names: the newest one's, and how many more.
     [{ title: "Bruno Lima" }, 2, "Bruno Lima e mais 1 pedem para entrar"],
-  ] as const) {
+  ];
+  for (const [latest, count, said] of cases) {
     const state = seedState({
       notifications: [
         notification({ id: "n-join", kind: "join_request", waiting: true, count, source: { label: "Acme" }, latest }),

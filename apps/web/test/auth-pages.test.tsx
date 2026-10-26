@@ -5,7 +5,7 @@ setupDom();
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ApiError, type ImportInput, type SignInOptions } from "@agenteschat/client";
+import { ApiError, type ImportInput, type InvitationPreview, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -195,7 +195,14 @@ describe("Entrar (e-mail primeiro)", () => {
 });
 
 describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
-  const LINK = { orgName: "Acme", email: "", role: "member", kind: "link", invitedBy: null, agents: [] } as const;
+  const LINK: InvitationPreview = {
+    orgName: "Acme",
+    email: "",
+    role: "member",
+    kind: "link",
+    invitedBy: null,
+    agents: [],
+  };
   const at = (redirect: string, email?: string) =>
     `/login?${new URLSearchParams({ redirect, ...(email ? { email } : {}) })}`;
 

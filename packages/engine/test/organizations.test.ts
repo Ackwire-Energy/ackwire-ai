@@ -120,7 +120,7 @@ describe("invitations", () => {
     const { token } = await createInvitation(f.db, f.owner.id, f.org.id, { email: "bia@example.com", role: "member" });
     const names = async () => {
       const preview = await previewInvitation(f.db, token);
-      return [preview?.agents.map((a) => a.name), preview?.moreAgents];
+      return [preview?.agents.map((a) => a.name), preview && "moreAgents" in preview ? preview.moreAgents : undefined];
     };
     const start = Date.now();
     const hire = (name: string, i: number) =>
