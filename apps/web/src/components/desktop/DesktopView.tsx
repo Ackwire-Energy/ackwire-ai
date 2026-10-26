@@ -458,11 +458,13 @@ export function DesktopView({
       {inControl &&
         (handingBack ? (
           // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. Two lines that
-          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away.
+          // wrap, so a note stays in sight on a narrow screen, where one line scrolled its start away; Enter sends
+          // it, so a phone's keyboard shows its send key there.
           <div className="brw-ac__foot brw-ac__fail">
             <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
             <Textarea
               rows={2}
+              enterKeyHint="send"
               autoFocus
               value={backNote}
               onChange={(e) => setBackNote(e.target.value)}

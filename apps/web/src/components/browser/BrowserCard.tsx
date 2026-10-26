@@ -1059,11 +1059,13 @@ export function BrowserCard({
               </div>
             ) : handingBack ? (
               // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on two lines
-              // that wrap like the note of a failure above, so all of it stays in sight.
+              // that wrap like the note of a failure above, so all of it stays in sight. Enter sends it, so a phone's
+              // keyboard shows its send key there.
               <div className="brw-ac__foot brw-ac__fail">
                 <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
                 <Textarea
                   rows={2}
+                  enterKeyHint="send"
                   ref={backRef}
                   value={backNote}
                   onChange={(e) => setBackNote(e.target.value)}
