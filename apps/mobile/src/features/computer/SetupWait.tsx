@@ -15,7 +15,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
-import { useOrg } from "@/providers/org";
+import { useOrg, useOrgMaybe } from "@/providers/org";
 import { Button, Icon, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
@@ -28,13 +28,24 @@ export function useSetupView(): SetupView | null {
 }
 
 /**
+ * The workspace a wait is read about: `orgId` (the first run's, made before one is chosen in the app), else the
+ * one chosen. `name` stands in until `me` lists it.
+ */
+export interface WaitWorkspace {
+  orgId: string;
+  name: string;
+}
+
+/**
  * The time left now, on the clock every time line shares (`useEtaNow`), and whether "we'll email you" holds for
  * this person: only owners get the email. A workspace on hold shows neither: its provisioner waits too. `now`:
- * that clock's time, while it waits.
+ * that clock's time, while it waits. `org`: the workspace's name.
  */
-export function useSetupWait(view: SetupView | null) {
-  const { org } = useOrg();
-  const email = useMe().data?.user.email ?? "";
+export function useSetupWait(view: SetupView | null, workspace?: WaitWorkspace) {
+  const chosen = useOrgMaybe();
+  const me = useMe().data;
+  const orgId = workspace?.orgId ?? chosen?.orgId;
+  const org = me?.organizations.find((o) => o.id === orgId) ?? (orgId === chosen?.orgId ? chosen?.org : null);
   const live = view && setupPending(view) && org?.standing?.state !== "hold" ? view : null;
   const now = useEtaNow(live !== null);
   return {
@@ -43,7 +54,8 @@ export function useSetupWait(view: SetupView | null) {
     live: live !== null,
     eta: live ? setupEta(live, now) : null,
     emailed: live !== null && org?.role === "owner" && promisesEmail(live, now),
-    email,
+    email: me?.user.email ?? "",
+    org: org?.name ?? workspace?.name ?? "",
   };
 }
 
@@ -80,11 +92,19 @@ function Line({ icon, text }: { icon: IconName; text: string }) {
  * computador da Acme" with its ⓘ (one user per agent), the steps ("Passo 3 de 4 · Instalando os programas") or why
  * it waits, the time left, who hears when it's ready (owners, by email) and the size. Ready: its name.
  */
-export function SetupWait({ view, online = false }: { view: SetupView; online?: boolean }) {
+export function SetupWait({
+  view,
+  online = false,
+  workspace,
+}: {
+  view: SetupView;
+  online?: boolean;
+  /** The first run's workspace (no workspace is chosen in the app yet). */
+  workspace?: WaitWorkspace;
+}) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const wait = useSetupWait(view);
-  const orgName = org?.name ?? "";
+  const wait = useSetupWait(view, workspace);
+  const orgName = wait.org;
   const pending = setupPending(view);
   const name = t("computerSetup.title", { org: orgName });
   return (

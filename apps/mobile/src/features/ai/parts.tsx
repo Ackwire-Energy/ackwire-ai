@@ -1,8 +1,9 @@
+import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
 import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, StyleSheet, View } from "react-native";
-import { Button, Icon, type IconName, InfoHint, Text, useTheme } from "@/ui";
+import { Linking, StyleSheet, TextInput, View } from "react-native";
+import { Button, fieldText, Icon, type IconName, InfoHint, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -139,6 +140,73 @@ export function OpenPage({
   );
 }
 
+/**
+ * A step's field with "Colar" in it (a code, a plan's key, an API key), sunken inside the steps' white card.
+ * `onPasted`: what the clipboard had, trimmed (nothing when it was empty).
+ */
+export function PasteField({
+  value,
+  onChangeText,
+  onPasted,
+  label,
+  placeholder,
+  secret = false,
+  disabled = false,
+  returnKeyType = "done",
+  onSubmit,
+  onBlur,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  onPasted: (value: string) => void;
+  label: string;
+  placeholder?: string | undefined;
+  secret?: boolean;
+  disabled?: boolean;
+  returnKeyType?: "done" | "send";
+  onSubmit?: () => void;
+  onBlur?: () => void;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
+    <View style={[styles.inset, { backgroundColor: c.sunken, borderColor: c.line }]}>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={c.faint}
+        accessibilityLabel={label}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        spellCheck={false}
+        secureTextEntry={secret}
+        textContentType="none"
+        editable={!disabled}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmit}
+        onBlur={onBlur}
+        style={[styles.insetInput, { color: c.ink }]}
+      />
+      <Button
+        size="sm"
+        variant="secondary"
+        icon="copy"
+        label={t("aiAccounts.add.paste")}
+        disabled={disabled}
+        onPress={() =>
+          void Clipboard.getStringAsync()
+            .catch(() => "")
+            .then((v) => {
+              if (v.trim()) onPasted(v.trim());
+            })
+        }
+      />
+    </View>
+  );
+}
+
 /** "Esperando…" beside a step that waits on the computer. */
 export function Waiting({ label }: { label: string }) {
   const c = useColors();
@@ -164,4 +232,16 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   side: { marginTop: 6, flexDirection: "row", flexWrap: "wrap", gap: 8 },
   wait: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  inset: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 46,
+    marginTop: 6,
+    paddingLeft: 12,
+    paddingRight: 5,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  insetInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("callout") },
 });

@@ -4,7 +4,15 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { cleanup, render } from "@testing-library/react";
-import { PlanMeter, type PlanMeterText, type PlanMeterUsage, planState, planWindows } from "../src";
+import {
+  limitOffers,
+  type OfferAccount,
+  PlanMeter,
+  type PlanMeterText,
+  type PlanMeterUsage,
+  planState,
+  planWindows,
+} from "../src";
 
 afterEach(() => cleanup());
 
@@ -127,4 +135,40 @@ test("an agent's part: in full ink inside its window's bar, with its words; none
   expect(hours?.querySelector(".ac-planmeter__note")?.textContent).toBe("Ada ≈ 45%");
   expect(week?.querySelector(".ac-meter__part")).toBeNull();
   expect(week?.querySelector(".ac-planmeter__note")).toBeNull();
+});
+
+test("at the limit, the owner's other free accounts of the same kind and maker, most headroom first", () => {
+  const usage = (used: number): PlanMeterUsage => ({
+    windows: [{ kind: "five_hour", usedPercent: used, resetsAt: at(HOUR) }],
+    at: at(0),
+  });
+  const account = (id: string, over: Partial<OfferAccount> = {}): OfferAccount => ({
+    id,
+    kind: "claude_code",
+    provider: null,
+    mine: true,
+    status: "active",
+    usedBy: [],
+    usage: null,
+    ...over,
+  });
+  const accounts = [
+    account("now", { usage: usage(100), usedBy: ["Dev"] }),
+    account("busy", { usage: usage(10) }),
+    account("unknown"),
+    account("calm", { usage: usage(5) }),
+    account("full", { usage: usage(100) }),
+    account("theirs", { mine: false, usage: usage(0) }),
+    account("taken", { usedBy: ["Infra"], usage: usage(0) }),
+    account("out", { status: "signed_out", usage: usage(0) }),
+    account("codex", { kind: "codex", usage: usage(0) }),
+    account("glm", { provider: "zai", usage: usage(0) }),
+  ];
+  expect(limitOffers(accounts, "claude_code", "now", NOW).map((o) => [o.account.id, o.used])).toEqual([
+    ["calm", 5],
+    ["busy", 10],
+    ["unknown", null],
+  ]);
+  // A coding plan offers only that maker's other keys.
+  expect(limitOffers([...accounts, account("glm2")], "claude_code", "glm", NOW)).toEqual([]);
 });

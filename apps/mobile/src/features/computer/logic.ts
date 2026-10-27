@@ -82,15 +82,5 @@ export function setupNoticeLine(t: TFunction, view: SetupView, eta: EtaView | nu
     : t(view.textKey);
 }
 
-/**
- * Where the computer is, on the AI step where the whole wait doesn't show (the first run, before a workspace is
- * chosen): a line of its own, led by the orbit as work under way, or by the x of a problem. The clock leads only the
- * "as soon as it's ready" card under it.
- */
-export const setupLine = (t: TFunction, view: SetupView): { icon: "orbit" | "x"; text: string } => ({
-  icon: view.phase === "problem" ? "x" : "orbit",
-  text: t(view.textKey),
-});
-
 /** The full screen's header while the workspace's computer is on its way: the chip's word ("Na fila"). */
 export const setupSub = (t: TFunction, view: SetupView): string => t(view.chipKey);

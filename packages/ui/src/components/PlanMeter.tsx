@@ -3,6 +3,8 @@ import { PLAN_ALMOST, type PlanMeterText, type PlanMeterUsage, planState, planWi
 import { Meter } from "./Surfaces";
 
 export {
+  limitOffers,
+  type OfferAccount,
   PLAN_ALMOST,
   type PlanMeterText,
   type PlanMeterUsage,

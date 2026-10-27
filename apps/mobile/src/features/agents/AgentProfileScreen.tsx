@@ -38,6 +38,7 @@ import {
   useToast,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
+import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { chatHref } from "../links/logic";
@@ -395,9 +396,11 @@ function Profile({ id }: { id: string }) {
         {thinks ? (
           <Section title={t("mobile.intentAgents.thinks")}>
             <Card>
+              {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
               <Row
                 leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
                 title={thinks.text}
+                {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
               />
             </Card>
           </Section>
