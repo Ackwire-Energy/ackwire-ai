@@ -7,8 +7,8 @@ import {
   CATALOG_STEPS,
   catalogReviewTools,
   choicesOf,
-  chosenLevel,
   choose,
+  chosenLevel,
   confirm,
   emptyReview,
   firstStep,
@@ -103,9 +103,7 @@ describe("where the sheet is", () => {
       for (const key of Object.values(STEP_KEYS)) expect(t(key)).not.toBe(key);
     }
     const t = await translator("pt-BR");
-    expect(t("mobile.connectors.step", { n: 3, total: 4, label: t(STEP_KEYS.review) })).toBe(
-      "Passo 3 de 4: O que faz",
-    );
+    expect(t("mobile.connectors.step", { n: 3, total: 4, label: t(STEP_KEYS.review) })).toBe("Passo 3 de 4: O que faz");
     const en = await translator("en");
     expect(en("mobile.connectors.step", { n: 2, total: 3, label: en(STEP_KEYS.review) })).toMatch(/^Step 2 of 3: /);
   });

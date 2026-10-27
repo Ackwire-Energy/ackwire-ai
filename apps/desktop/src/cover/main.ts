@@ -4,7 +4,8 @@
  * only tells, while it shows, whether the server open now can be reached ("No internet connection…" or
  * "Can't reach {{host}}…"), and when it is back it asks to load the page again. Over the server here it says
  * that one's state instead (starting, updating, stopped, not starting, or Tailscale not connected), with the
- * buttons that fix it.
+ * buttons that fix it: a start or an update shows its time from 10 s, and Copy details once it takes longer than
+ * expected. A server out of reach offers another one.
  */
 
 import { isTailnet, serverHost } from "@agenteschat/client/lib/server";
@@ -15,12 +16,19 @@ import { invoke } from "@tauri-apps/api/core";
 import "@fontsource-variable/onest/index.css";
 import "../fonts.css";
 import "./cover.css";
-import { coverHere, isHereServer, type LocalServerStatus } from "../control/local-server";
+import {
+  coverHere,
+  isHereServer,
+  type LocalServerStatus,
+  STEP_SLOW_MS,
+  stepClock,
+  UPDATE_SLOW_MS,
+} from "../control/local-server";
 import { platformOf } from "../control/platform";
 import { SITE_URL } from "../control/version";
 import { DESKTOP_STRINGS, systemLocale } from "../i18n";
 import type { DesktopTranslations } from "../i18n/keys.pt-BR";
-import { fillIn } from "../ui/time";
+import { elapsedClock, fillIn } from "../ui/time";
 
 /** How long the cover waits before it asks whether the site can be reached, and how often after. */
 const CHECK_MS = 3000;
@@ -33,6 +41,7 @@ const platform = platformOf(navigator.userAgent);
 const device = strings.device[platform];
 const root = document.querySelector<HTMLElement>(".cover");
 const line = document.querySelector<HTMLElement>(".cover__line");
+const time = document.querySelector<HTMLElement>(".cover__time");
 const sky = document.querySelector<HTMLCanvasElement>(".cover__sky");
 const agent = document.querySelector<HTMLCanvasElement>(".cover__agent");
 const acts = document.querySelector<HTMLElement>(".cover__acts");
@@ -43,6 +52,8 @@ let shownAt = performance.now();
 let unreachable = false;
 /** The server here wasn't up: once it answers, the page loads again. */
 let hereWaiting = false;
+/** Since when the cover sees the server here starting or updating. */
+let waitSince: { state: "starting" | "migrating"; at: number } | null = null;
 
 if (sky) {
   // The same sky as the site's BootSplash (apps/web Sky.tsx), so the hand-over doesn't show.
@@ -106,11 +117,29 @@ function buttons(list: [string, () => void][]) {
   );
 }
 
+/**
+ * The wait's time from 10 s, and once it takes longer than expected (30 s starting, 2 minutes updating), that line
+ * with Copy details.
+ */
+function tick() {
+  if (!waitSince) {
+    if (time) time.textContent = "";
+    return;
+  }
+  const ms = performance.now() - waitSince.at;
+  const clock = stepClock(ms, waitSince.state === "migrating" ? UPDATE_SLOW_MS : STEP_SLOW_MS);
+  if (time)
+    time.textContent = clock.slow ? `${strings.here.slow} · ${elapsedClock(ms)}` : clock.time ? elapsedClock(ms) : "";
+  buttons(clock.slow ? [[words.copy, copyDiagnostics]] : []);
+}
+
 /** Shown again (cover.rs `show`): the sky fills again, nothing is said yet. */
 function shown() {
   shownAt = performance.now();
   unreachable = false;
+  waitSince = null;
   say("");
+  tick();
   buttons([]);
   root?.removeAttribute("data-fading");
   void check();
@@ -163,9 +192,14 @@ function showHere(state: NonNullable<ReturnType<typeof coverHere>>) {
   const start = () => void invoke("local_server_start").catch(() => {});
   const fill = (text: string) => fillIn(text, { device });
   if (state === "starting" || state === "migrating") {
+    if (waitSince?.state !== state) waitSince = { state, at: performance.now() };
     say(fill(state === "starting" ? words.starting : words.migrating));
-    buttons([]);
-  } else if (state === "stopped") {
+    tick();
+    return;
+  }
+  waitSince = null;
+  tick();
+  if (state === "stopped") {
     say(fill(words.stopped));
     buttons([[words.start, start]]);
   } else if (state === "failing") {
@@ -216,6 +250,7 @@ async function check() {
   if (!(await reachable(server))) {
     unreachable = true;
     say(unreachableText(server));
+    buttons([[words.otherServer, () => void invoke("show_window", { name: "welcome" }).catch(() => {})]]);
     return;
   }
   if (unreachable) {
@@ -228,3 +263,4 @@ async function check() {
 }
 
 setInterval(() => void check(), CHECK_MS);
+setInterval(tick, 1000);

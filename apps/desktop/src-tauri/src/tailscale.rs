@@ -3,10 +3,9 @@
 //! inside the tailnet only; never Funnel). The tool is looked up at the places it installs itself, never at a
 //! path from a page.
 
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -57,50 +56,11 @@ pub fn cli() -> Option<PathBuf> {
     fixed.iter().map(PathBuf::from).find(|p| p.is_file())
 }
 
-/// Runs the tool with `args`; see `run_program`.
+/// Runs the tool with `args`: whether it ended well, and what it printed (stdout, then stderr); None when it isn't
+/// there or couldn't start. Taking longer than `wait` stops it (what it printed so far is kept).
 fn run(args: &[&str], wait: Duration) -> Option<(bool, String)> {
-    run_program(&cli()?, args, wait)
-}
-
-/// Runs `program`; its exit status and what it printed (stdout, then stderr, 1 MB each at most), or None when
-/// it couldn't start. Taking longer than `wait` stops it (what it printed so far is kept). Its output is read
-/// while it runs: a pipe holds 64 KB, and `status --json` on a large tailnet prints more, so a reader after
-/// the exit would never see it end.
-fn run_program(program: &Path, args: &[&str], wait: Duration) -> Option<(bool, String)> {
-    let mut child = crate::no_console(&mut Command::new(program))
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .ok()?;
-    let reader = |pipe: Option<Box<dyn Read + Send>>| {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            if let Some(pipe) = pipe {
-                let _ = pipe.take(1024 * 1024).read_to_end(&mut bytes);
-            }
-            bytes
-        })
-    };
-    let stdout = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
-    let stderr = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
-    let started = Instant::now();
-    let ok = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status.success(),
-            Ok(None) if started.elapsed() <= wait => std::thread::sleep(Duration::from_millis(50)),
-            // Too long, or it can't be asked: stopped (the readers then reach the end).
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break false;
-            }
-        }
-    };
-    let mut out = String::from_utf8_lossy(&stdout.join().unwrap_or_default()).into_owned();
-    out.push_str(&String::from_utf8_lossy(&stderr.join().unwrap_or_default()));
-    Some((ok, out))
+    let ran = crate::run_program(Command::new(cli()?).args(args), wait, &|| false).ok()?;
+    Some((ran.code == Some(0), ran.out + &ran.err))
 }
 
 /// `tailscale status --json`, or None when the tool isn't there, fails or takes too long.
@@ -240,22 +200,6 @@ mod tests {
         assert_eq!(https_port(Some(&ours), device, target), 443);
         let other = json!({ "Web": { "ana-mac.tail1234.ts.net:443": { "Handlers": { "/": { "Proxy": "http://127.0.0.1:8080" } } } } });
         assert_eq!(https_port(Some(&other), device, target), 8443);
-    }
-
-    #[test]
-    fn output_larger_than_a_pipe_is_read_while_the_tool_runs() {
-        // About 1.4 KB per device in `status --json`: 200 KB is a tailnet of some 140 devices.
-        let script = "head -c 200000 /dev/zero | tr '\\000' a; echo done >&2";
-        let started = Instant::now();
-        let (ok, out) = run_program(Path::new("/bin/sh"), &["-c", script], Duration::from_secs(5)).unwrap();
-        assert!(ok, "it ended on its own, not stopped after the wait");
-        assert!(started.elapsed() < Duration::from_secs(4));
-        assert_eq!(out.len(), 200_000 + "done\n".len());
-        assert!(out.ends_with("adone\n"));
-        // Stopped after the wait, what it printed kept.
-        let (ok, out) = run_program(Path::new("/bin/sh"), &["-c", "echo early; exec sleep 5"], Duration::from_millis(300)).unwrap();
-        assert!(!ok);
-        assert_eq!(out, "early\n");
     }
 
     #[test]

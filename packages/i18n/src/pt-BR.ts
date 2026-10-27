@@ -303,29 +303,39 @@ export const ptBR = {
       otherName: "Outro app",
       agenteschatName: "Exportação do agentes.chat",
       where: {
-        openclaw:
-          "Arraste a pasta ~/.openclaw inteira (ela traz todos os agentes) ou só um workspace. No Mac, ⌘⇧. mostra as pastas ocultas na janela de escolher.",
-        hermes:
-          "No terminal, rode hermes profile export com o nome do perfil e solte o .tar.gz aqui. Ou arraste a pasta ~/.hermes para trazer todos os perfis.",
         openbotrun:
           "Solte o openbot-import.json (do Migrator by OpenBot) ou o openbot-transfer.json (da transferência da instância), ou o .zip em que ele veio.",
-        paperclip: "Arraste a pasta do pacote (a que tem o COMPANY.md), solte um .zip dela ou cole o link do GitHub.",
         openmausbot: "No OpenMausBot: clique com o botão direito no time → Compartilhar time… → Salvar arquivo.",
-        openbot:
-          "No OpenBot: arraste a pasta do tenant (agents.yaml, agents/, model.yaml, skills.yaml) ou cole o link do GitHub dela.",
+        hermes:
+          "No terminal, rode hermes profile export com o nome do perfil e solte o .tar.gz aqui. Ou arraste a pasta ~/.hermes para trazer todos os perfis.",
+        openclaw:
+          "Arraste a pasta ~/.openclaw inteira (ela traz todos os agentes) ou só um workspace. No Mac, ⌘⇧. mostra as pastas ocultas na janela de escolher.",
+        paperclip: "Arraste a pasta do pacote (a que tem o COMPANY.md), solte um .zip dela ou cole o link do GitHub.",
         agenteschat:
           "No outro workspace: Configurações → Importar e exportar → Baixar o arquivo. Depois é só soltar o .json aqui.",
       },
-      other: {
-        title: "Peça para o outro app exportar",
-        steps: {
-          copy: "Copie o pedido abaixo.",
+      request: {
+        "grok-bot": {
+          title: "Peça para o seu bot exportar",
+          paste: "Cole na conversa com o seu bot.",
+          back: "Ele responde com o JSON: copie a resposta inteira e cole no campo de baixo.",
+          copied: "Agora é só colar na conversa com o seu bot.",
+        },
+        "chatgpt-dots": {
+          title: "Peça para o seu dot exportar",
+          paste: "Cole num chat novo.",
+          back: "Baixe o arquivo que ele criar e solte aqui.",
+          copied: "Agora é só colar num chat novo.",
+        },
+        other: {
+          title: "Peça para o outro app exportar",
           paste: "Cole numa conversa nova no outro app.",
           back: "Traga o que ele devolver: solte o arquivo aqui ou cole a resposta no campo de baixo.",
+          copied: "Agora é só colar no outro app.",
         },
+        copyStep: "Copie o pedido abaixo.",
         prompt: "Pedido de exportação",
         copy: "Copiar o pedido",
-        copied: "Agora é só colar no outro app.",
         copyFailed: "Não deu para copiar. Clique no pedido, que ele fica todo selecionado, e copie com ⌘C ou Ctrl+C.",
         where: "Onde cada app entrega",
       },
@@ -492,7 +502,7 @@ export const ptBR = {
         link: "Não deu para ler esse link. Confira se o repositório é público e se o link aponta para o arquivo ou a pasta.",
         notGithub: "Por enquanto a gente só lê links do GitHub. De outro lugar, baixe a pasta ou o .zip e solte aqui.",
         unknownPasted:
-          "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou peça de novo com o pedido de Outro app.",
+          "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou copie o pedido de novo e peça outra vez.",
         invalidBundle:
           "O arquivo tem algo fora do formato que dá para importar. Se veio de outro app, peça a exportação de novo.",
         read: "Não deu para ler o arquivo. Tente de novo ou escolha outro.",

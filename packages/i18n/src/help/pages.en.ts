@@ -149,7 +149,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "other-apps",
         heading: "From another app",
         blocks: [
-          "Choose **Another app**, copy the request and paste it in a new conversation in that app. Then bring back what it returns: drop the file, or paste the whole reply. Where each app puts it:",
+          "Choose **Grok Bot**, **ChatGPT dots** or **Another app**. Copy the request, paste it in that app, then bring back what it returns: drop the file, or paste the whole reply. Where each app puts it:",
           {
             list: [
               "**Grok Bot**: in the chat with your bot. It replies with the JSON: copy the whole reply.",
@@ -157,6 +157,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
               "**Claude**: in a new conversation, or in your agents' project. Download the file it makes.",
               "**Manus**: in a new task. The file is in the task's results.",
               "**Rakazo**: send it to your agent. It replies with the JSON: copy the whole reply.",
+              "**OpenBot**: no request needed. Drag the tenant folder (agents.yaml, agents/, model.yaml, skills.yaml) or paste its GitHub link.",
             ],
           },
         ],
