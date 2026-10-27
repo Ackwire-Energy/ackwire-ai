@@ -1,6 +1,7 @@
 import {
   acceptInvitation,
   addHostComputer,
+  announceMembers,
   appleSignInTokens,
   avatarFile,
   changeMemberRole,
@@ -193,7 +194,13 @@ export function accountRoutes(deps: AppDeps) {
                   appearance: z.object({ color: z.string(), eyes: z.string(), accessory: z.string() }).nullable(),
                 }),
               )
-              .openapi({ description: "A few of the organization's agents (name and look)." }),
+              .openapi({ description: "The organization's first agents (name and look)." }),
+            moreAgents: z
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .openapi({ description: "How many more agents work there than `agents` names." }),
             closed: z
               .literal(true)
               .optional()
@@ -213,7 +220,10 @@ export function accountRoutes(deps: AppDeps) {
                   }),
               })
               .optional()
-              .openapi({ description: "A link opened signed in: where they stand." }),
+              .openapi({
+                description:
+                  "A link opened signed in: where they stand. On a link that no longer works, only a member's.",
+              }),
           }),
         ),
         404: errors[404],
@@ -223,11 +233,10 @@ export function accountRoutes(deps: AppDeps) {
       const token = c.req.valid("param").token;
       const invitation = await previewInvitation(db, token);
       if (!invitation) return apiError(c, 404, "not_found", "Invitation not found or expired");
-      const user =
-        invitation.kind === "link" && !("closed" in invitation)
-          ? await sessionUser(deps.auth, c.req.raw.headers)
-          : null;
-      const you = user ? await joinStatus(db, user, token) : null;
+      const user = invitation.kind === "link" ? await sessionUser(deps.auth, c.req.raw.headers) : null;
+      const status = user ? await joinStatus(db, user, token) : null;
+      // A link that no longer works still tells a member they're in; anyone else hears only that it doesn't work.
+      const you = "closed" in invitation && !status?.member ? null : status;
       return c.json({ ...invitation, ...(you ? { you } : {}) }, 200);
     },
   );
@@ -671,7 +680,9 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
-      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role);
+      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role, {
+        pubsub: deps.adapters.pubsub,
+      });
       return c.body(null, 204);
     },
   );
@@ -793,6 +804,7 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const joined = await acceptInvitation(db, c.get("user"), c.req.valid("param").token);
+      await announceMembers(deps.adapters.pubsub, joined.orgId);
       // A request to join they had waiting closed as they joined: the admins' notice goes with the last one.
       await settleJoinRequests({ db, pubsub: deps.adapters.pubsub }, joined.orgId);
       return c.json(joined, 200);

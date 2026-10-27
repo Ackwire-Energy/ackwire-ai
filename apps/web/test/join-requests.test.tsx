@@ -1,16 +1,20 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { InvitationPreview, JoinRequest, JoinStatus } from "@agenteschat/client";
+import type { InvitationPreview, JoinRequest, JoinStatus, Member, NotificationLatest } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  setSystemTime();
+  cleanup();
+});
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
@@ -72,6 +76,10 @@ describe("an invitation link asks to join", () => {
     expect(screen().getByLabelText("Seu e-mail").hasAttribute("aria-describedby")).toBe(false);
     // The answer goes to that address: a likely typo is offered first.
     await click(button("Você quis dizer ana@gmail.com?"));
+    // Signing in instead takes the address typed here along.
+    expect(screen().getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe(
+      "/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com",
+    );
     const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
     expect(note.getAttribute("placeholder")).toBe("Quem é você, ou quem mandou o link");
     expect(note.hasAttribute("aria-describedby")).toBe(false);
@@ -116,11 +124,15 @@ describe("an invitation link asks to join", () => {
 
   test("the answers: denied with the admin's note, approved by invitation, already in, a link that no longer works", async () => {
     await openLink(
-      { ...LINK, you: you({ request: { status: "denied", reason: "Só a equipe do estúdio" } }) },
+      { ...LINK, you: you({ request: { status: "denied", reason: "Só a <i>equipe</i> do estúdio" } }) },
       { signedIn: true },
     );
     expect(heading()).toBe("Seu pedido não foi aprovado");
-    expect(text()).toContain("Recado: Só a equipe do estúdio");
+    // As in the email: the label in bold, their words in quotes, as typed.
+    const note = document.querySelector(".invite-ask__reason");
+    expect(note?.textContent).toBe("Recado: “Só a <i>equipe</i> do estúdio”");
+    expect(note?.querySelector("b")?.textContent).toBe("Recado:");
+    expect(note?.querySelector("i")).toBeNull();
     expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você por e-mail.");
     cleanup();
 
@@ -148,6 +160,22 @@ describe("an invitation link asks to join", () => {
     expect(text()).toContain("Peça um novo a quem mandou.");
     expect(screen().queryByRole("button", { name: "Pedir um novo convite" })).toBeNull();
     expect(screen().queryByLabelText("Seu nome")).toBeNull();
+    cleanup();
+
+    // A member opening a link that no longer works: they're in, with the way there.
+    await openLink(
+      { ...LINK, invitedBy: null, agents: [], closed: true, you: you({ member: true, orgId: ORG_ID }) },
+      { signedIn: true },
+    );
+    expect(heading()).toBe("Você já está na Acme");
+    expect(button("Abrir Acme")).toBeTruthy();
+  });
+
+  test("whoever works there is counted: the first four by name, then how many more", async () => {
+    const agents = ["Ada", "Atlas", "Lia", "Theo"].map((name, i) => ({ id: `a${i}`, name, appearance: null }));
+    await openLink({ ...LINK, agents, moreAgents: 2 });
+    expect(text()).toContain("Ada, Atlas, Lia, Theo e mais 2 já trabalham lá.");
+    expect(document.querySelectorAll(".invite-ask__agents .ac-avatar")).toHaveLength(4);
   });
 
   test("a full workspace or too many asks: said in the form, which stays", async () => {
@@ -165,7 +193,10 @@ describe("an invitation link asks to join", () => {
   });
 });
 
-const REQUESTS: JoinRequest[] = [
+/** Mid-day: a request made 2 h ago is still today, so it reads "há 2 h" and never "ontem". */
+const MIDDAY = new Date(2026, 9, 21, 12);
+
+const requests = (): JoinRequest[] => [
   {
     id: "r1",
     name: "Ana Souza",
@@ -187,7 +218,8 @@ const REQUESTS: JoinRequest[] = [
 ];
 
 async function members(query = "", patch: Parameters<typeof seedState>[0] = {}) {
-  const state = seedState({ joinRequests: structuredClone(REQUESTS), ...patch });
+  setSystemTime(MIDDAY);
+  const state = seedState({ joinRequests: requests(), ...patch });
   const r = await renderApp(`/org/${ORG_ID}/settings/members${query}`, { api: createFakeApi(state) });
   await settle(6);
   return { ...r, state };
@@ -210,6 +242,8 @@ describe("Members › Requests to join", () => {
     expect(card("Bruno Lima").textContent).toContain("E-mail não confirmado: aprovar manda um convite para ele.");
     expect(card("Bruno Lima").querySelector(".ac-chip")?.textContent).toMatch(/^Pediu em \d/);
 
+    const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
+    expect(sidebarCount()).toBe("2 membros · 2 agentes");
     const role = within(ana).getByRole("combobox", { name: "Papel de Ana Souza" });
     role.focus();
     await act(async () => fireEvent.keyDown(role, { key: "Enter" }));
@@ -218,6 +252,8 @@ describe("Members › Requests to join", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", "admin"]);
     expect(text()).toContain("Ana Souza entrou.");
+    // She counts in the workspace's line too, without a reload.
+    expect(sidebarCount()).toBe("3 membros · 2 agentes");
 
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
     await settle(4);
@@ -239,6 +275,20 @@ describe("Members › Requests to join", () => {
     const dialog = screen().getByRole("dialog", { name: "Mande este link para Bruno Lima" });
     expect(dialog.textContent).toContain("Este servidor não manda e-mail. O link vale por 7 dias.");
     expect((within(dialog).getByRole("textbox") as HTMLInputElement).value).toBe("http://localhost:3000/invite/tok-r2");
+  });
+
+  test("someone let in elsewhere (another admin, another tab) shows at once: in the people and the sidebar's count", async () => {
+    const { state, sockets } = await members();
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
+    expect(sidebarCount()).toBe("2 membros · 2 agentes");
+    const joao = state.members[1] as Member;
+    state.members.push({ ...joao, userId: "u-carla", name: "Carla Dias", email: "carla@acme.com.br", handle: "carla" });
+    await act(async () => socket.push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(6);
+    expect(sidebarCount()).toBe("3 membros · 2 agentes");
+    expect(text()).toContain("Carla Dias");
   });
 
   test("deny: an optional reason they read in the email; someone else answering first is said", async () => {
@@ -279,7 +329,7 @@ describe("Members › Requests to join", () => {
 
 test("a name typed with markup reads as typed, in Members and in the inbox", async () => {
   const name = "Ana <strong>CEO</strong><br/>x";
-  await members("", { joinRequests: [{ ...(REQUESTS[0] as JoinRequest), name }] });
+  await members("", { joinRequests: [{ ...(requests()[0] as JoinRequest), name }] });
   const who = card(name).querySelector(".ac-approval__who b");
   expect(who?.textContent).toBe(name);
   expect(who?.children.length).toBe(0);
@@ -307,6 +357,15 @@ test("a name typed with markup reads as typed, in Members and in the inbox", asy
 });
 
 describe("Members › Invitation link", () => {
+  test("Turn off's word ends where Copy ends above it: the text button's padding hangs past the edge", async () => {
+    const read = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
+    expect(await read("../src/pages/members.css")).toMatch(
+      /\.jr-link__foot > \.ac-btn--ghost \{\s*margin: 0 calc\(-1 \* var\(--control-px-sm\)\) 0 auto;\s*\}/,
+    );
+    const ui = await read("../../../packages/ui/src/styles/components.css");
+    expect(ui.split("\n.ac-btn--sm {").at(-1)?.split("}")[0]).toContain("padding: 0 var(--control-px-sm);");
+  });
+
   test("the link to copy, what it does, turning it off with its requests, an earlier link, making a new one", async () => {
     const until = new Date(Date.now() + 20 * 86_400_000).toISOString();
     const { state } = await members("", {
@@ -341,6 +400,22 @@ describe("Members › Invitation link", () => {
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(
       "http://localhost:3000/invite/k3J",
     );
+    // Copied: the word and its icon both say it.
+    const writes: string[] = [];
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (s: string) => void writes.push(s) },
+    });
+    try {
+      await click(within(invite).getByRole("button", { name: "Copiar" }));
+    } finally {
+      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+    const copied = within(invite).getByRole("button", { name: "Copiado" });
+    expect(writes).toEqual(["http://localhost:3000/invite/k3J"]);
+    expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
     // Who can get in through a shared link stays on screen, not behind an ⓘ.
     const linkLine = within(invite).getByText(
       /^Quem tiver o link pode pedir para entrar, e um admin aprova cada pessoa · vale até \S+/,
@@ -375,17 +450,44 @@ test("the admins' notice: who asks, a Members chip, and it opens Members", async
         waiting: true,
         count: 2,
         source: { label: "Acme" },
-        latest: { title: "Bruno Lima" },
+        latest: { title: "Bruno Lima", names: ["Ana Souza", "Bruno Lima"] },
       }),
     ],
   });
   const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
   await settle(6);
   const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
-  expect(notice.getAttribute("aria-label")).toBe("Bruno Lima e outras pessoas pedem para entrar");
-  expect(notice.textContent).toContain("Bruno Lima e outras pessoas pedem para entrar");
+  // Two people: both by name, the first to ask first, as the notice's face and time are hers.
+  expect(notice.getAttribute("aria-label")).toBe("Ana Souza e Bruno Lima pedem para entrar");
+  expect(notice.textContent).toContain("Ana Souza e Bruno Lima pedem para entrar");
+  expect(notice.querySelector(".nt-face")?.textContent).toBe("AS");
   expect(notice.querySelector(".ac-chip")?.textContent).toBe("Membros");
   await click(within(notice).getByRole("button", { name: "Abrir" }));
   await settle(6);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
+});
+
+test("the admins' notice names the first two who asked and counts the rest", async () => {
+  const cases: [NotificationLatest, number, string][] = [
+    [
+      { title: "Carla Dias", names: ["Ana Souza", "Bruno Lima"] },
+      3,
+      "Ana Souza, Bruno Lima e mais 1 pedem para entrar",
+    ],
+    // Kept from before the notice held names: the newest one's, and how many more.
+    [{ title: "Bruno Lima" }, 2, "Bruno Lima e mais 1 pedem para entrar"],
+  ];
+  for (const [latest, count, said] of cases) {
+    const state = seedState({
+      notifications: [
+        notification({ id: "n-join", kind: "join_request", waiting: true, count, source: { label: "Acme" }, latest }),
+      ],
+    });
+    await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+    await settle(6);
+    const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
+    expect(notice.getAttribute("aria-label")).toBe(said);
+    expect(notice.querySelector(".nt-meta")?.textContent).toContain(said);
+    cleanup();
+  }
 });

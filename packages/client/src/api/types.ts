@@ -145,11 +145,13 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
-  /** A few of the organization's agents ("Ada, Theo e Lia já trabalham lá"). */
+  /** The organization's first agents ("Theo, Ada, Lia e Atlas já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
+  /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
+  moreAgents?: number;
   /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
   closed?: true;
-  /** A link opened signed in: where that person stands. */
+  /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
   you?: JoinStatus;
 }
 
@@ -3913,6 +3915,8 @@ export interface NotificationLatest {
   reason?: string;
   /** `approval`: asked while nobody watched, by a routine or an unattended run (ADR 0053 §8). */
   origin?: ApprovalOrigin;
+  /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
+  names?: string[];
 }
 
 export interface AppNotification {

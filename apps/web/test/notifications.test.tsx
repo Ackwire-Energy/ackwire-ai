@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentQuestion, AppNotification } from "@agenteschat/client";
+import type { Agent, AgentQuestion, AppNotification } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
@@ -180,6 +180,35 @@ describe("Notificações", () => {
     expect(within(region).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
     await click(within(region).getByRole("button", { name: "Recusar" }));
     expect(region.querySelector("textarea")).toBeTruthy();
+  });
+
+  test("who is stopped until I answer: up to three agents by name, then how many more", async () => {
+    const asking = (agentId: string, m: number) =>
+      notification({
+        id: `n-${agentId}`,
+        kind: "approval",
+        waiting: true,
+        actors: [{ type: "agent", id: agentId }],
+        source: { approvalId: `ap-${m}`, channelId: ENG_ID },
+        latest: { title: "Run deploy workflow" },
+        createdAt: ago(m),
+        updatedAt: ago(m),
+      });
+    const stopped = async (count: number) => {
+      const state = seedState();
+      const ada = state.agents[0] as Agent;
+      state.agents.push(
+        { ...ada, id: "00000000-0000-4000-8000-0000000000a3", name: "Lia", handle: "lia" },
+        { ...ada, id: "00000000-0000-4000-8000-0000000000a4", name: "Theo", handle: "theo" },
+      );
+      state.notifications = state.agents.slice(0, count).map((a, i) => asking(a.id, i + 1));
+      await go(state);
+      const text = screen().getByRole("region", { name: "Esperando você" }).querySelector(".nt-wh small")?.textContent;
+      cleanup();
+      return text;
+    };
+    expect(await stopped(2)).toBe("Ada e Atlas estão parados até você responder.");
+    expect(await stopped(4)).toBe("Ada, Atlas, Lia e mais 1 estão parados até você responder.");
   });
 
   test("Feito leaves at once (optimistic) and Desfazer brings it back", async () => {
@@ -439,6 +468,65 @@ describe("its computer is ready: what comes next", () => {
     await click(within(row()).getByRole("button", { name: "Abrir" }));
     await settle(4);
     expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+  });
+
+  test("a plain click opens Connect an AI while no agent has one; then it picks the row, its actions in reach", async () => {
+    const ready = () => notification({ id: "n-ready", kind: "computer_ready", source: { machineId: "m-9" } });
+    const noAi = { any: false, agents: [{ agentId: ADA_ID, state: "no_ai" as const, reason: "no_key" as const }] };
+    const state = seedState({ notifications: [ready()], aiStatus: noAi });
+    for (const a of state.agents) if (a.id === ADA_ID) a.ownerUserId = "u-walter";
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "m-9" });
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications`, { api });
+    await settle(8);
+    const row = () => document.querySelector('[data-n="n-ready"]') as HTMLElement;
+    await click(row().querySelector(".nt-what") as HTMLElement);
+    await settle(8);
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
+      [ORG_ID, "n-ready", true],
+    ]);
+    cleanup();
+
+    // An agent thinks already: the click picks the row as any row's does, so Feito and Lembrar depois (shown by that
+    // tap on a phone) stay one tap away; Abrir still goes to the computer's page.
+    const other = await go(seedState({ notifications: [ready()] }));
+    await click(row());
+    await settle(4);
+    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(row().classList.contains("is-cur")).toBe(true);
+    expect(other.state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
+      [ORG_ID, "n-ready", true],
+    ]);
+    for (const name of ["Feito", "Lembrar depois"]) expect(within(row()).getByRole("button", { name })).toBeTruthy();
+    await click(within(row()).getByRole("button", { name: "Abrir" }));
+    await settle(4);
+    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+  });
+
+  test("its headline's line sits in the middle of the face beside it, and its text as far from the top as the bottom", async () => {
+    const css = (await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("\n@media (max-width: 720px) {")[1]?.split("\n}")[0] ?? "";
+    const px = (selector: string, prop: string, sheet = css) =>
+      Number(
+        new RegExp(`\\n *${selector.replace(/[.()>:]/g, "\\$&")} \\{[^}]*\\b${prop}: (-?\\d+)(px)?;`).exec(sheet)?.[1],
+      );
+    const face = px(".nt-sys", "height");
+    expect(px(".nt-av28", "height")).toBe(face);
+    const line = px(".nt-tags .ac-chip", "height");
+    const pad = px(".nt-who", "padding-top");
+    // A headline alone comes down to the face's middle.
+    expect(px(".nt-l1:only-child", "margin-top")).toBe(pad + (face - line) / 2);
+    // With lines under it the face goes up to the headline's, which keeps the row's padding; on a phone, where a
+    // headline wraps, in every row.
+    const up = (sheet: string, selector: string) => pad + px(selector, "margin-top", sheet) + face / 2;
+    expect(up(css, ".nt-item:has(> .nt-c > :nth-child(2)) > .nt-who")).toBe(line / 2);
+    expect(up(phone, ".nt-who")).toBe(line / 2);
+    expect(px(".nt-l1:only-child", "margin-top", phone)).toBe(0);
   });
 });
 

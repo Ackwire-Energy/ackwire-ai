@@ -292,7 +292,8 @@ export function OnboardingPage() {
     role: t(`onboarding.presets.${p}.role`),
     desc: t(`onboarding.presets.${p}.desc`),
   });
-  const createdPresets = PRESETS.filter((p) => agentIds[p]);
+  // In the order they were made (`agentIds` keeps it), the order the workspace lists its agents in.
+  const createdPresets = (Object.keys(agentIds) as Preset[]).filter((p) => agentIds[p]);
   /** The imported agents to choose in "Agentes e IA": the ones the plan creates or updates. */
   const importAgents = (flow.planned?.items ?? []).flatMap((i) => {
     const agent = i.kind === "agent" && choosable(i) ? flow.planned?.bundle.agents.find((a) => a.key === i.key) : null;
@@ -311,15 +312,11 @@ export function OnboardingPage() {
     })),
     ...importedCrew,
   ];
-  /** The agents created so far, the guide first: whom a plan thinks for, and Who thinks' rows. */
-  const crewAgents = [
-    ...[GUIDE, ...PRESETS.filter((p) => p !== GUIDE)].flatMap((p) => {
-      const id = agentIds[p];
-      const initials = p === "atlas" ? "At" : undefined;
-      return id ? [{ id, name: presetInfo(p).name, appearance: PRESET_LOOK[p], initials }] : [];
-    }),
-    ...importedCrew.map((c) => ({ id: c.id, name: c.name, appearance: c.appearance, initials: c.initials })),
-  ];
+  /**
+   * The agents created so far, in the team's order: whom a plan thinks for (the first with no AI unless one is
+   * picked, as Connect an AI picks in the app) and Who thinks' rows.
+   */
+  const crewAgents = crew.map(({ id, name, appearance, initials }) => ({ id, name, appearance, initials }));
   /** Still to create when the team is kept, besides the guide (it is "already here" in the copy). */
   const joiningLeft =
     PRESETS.filter((p) => p !== GUIDE && chosen.has(p) && !agentIds[p]).length +
@@ -1177,38 +1174,44 @@ export function OnboardingPage() {
               {orgSummary && me.data ? (
                 // The workspace exists: its panels read it like any of its pages.
                 <OrgProvider org={orgSummary} me={me.data}>
-                  <AiPicker choice={choice} onPick={pickAi} dims={(c) => noComputer || gateDims(gates.gateOf(c))} />
-                  {choice === "key" ? (
-                    <>
-                      <KeyPanel draft={draft} onDraft={setDraft} platform={platform} saved={keySaved} />
-                      <BudgetCard
-                        value={budgetValue}
-                        invalid={!budgetOk}
-                        platform={draft.provider === "platform"}
-                        onChange={(v) => setBudget(v)}
-                      />
-                    </>
-                  ) : (
-                    <PlanPanel
-                      key={choice}
-                      choice={choice}
-                      gates={gates}
-                      agents={crewAgents}
-                      agentId={aiAgentId}
-                      onAgent={setAiAgent}
-                      own={{ chosen: own, onChoose: setOwn }}
-                      hostConnecting={computer === "host"}
-                      onKey={() => pickAi("key")}
-                      onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
-                      onDone={(agentId, account) => {
-                        // The panel stays on that agent, saying it's done; another tile moves on to the next one.
-                        setAiAgent(agentId);
-                        if (account)
-                          setPlanned((p) => ({
-                            ...p,
-                            [agentId]: { label: account.label, mark: account.provider ?? account.kind },
-                          }));
-                      }}
+                  <AiPicker
+                    choice={choice}
+                    onPick={pickAi}
+                    dims={(c) => noComputer || gateDims(gates.gateOf(c))}
+                    panel={
+                      choice === "key" ? (
+                        <KeyPanel draft={draft} onDraft={setDraft} platform={platform} saved={keySaved} />
+                      ) : (
+                        <PlanPanel
+                          key={choice}
+                          choice={choice}
+                          gates={gates}
+                          agents={crewAgents}
+                          agentId={aiAgentId}
+                          onAgent={setAiAgent}
+                          own={{ chosen: own, onChoose: setOwn }}
+                          hostConnecting={computer === "host"}
+                          onKey={() => pickAi("key")}
+                          onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
+                          onDone={(agentId, account) => {
+                            // The panel stays on that agent, saying it's done; another tile moves on to the next one.
+                            setAiAgent(agentId);
+                            if (account)
+                              setPlanned((p) => ({
+                                ...p,
+                                [agentId]: { label: account.label, mark: account.provider ?? account.kind },
+                              }));
+                          }}
+                        />
+                      )
+                    }
+                  />
+                  {choice === "key" && (
+                    <BudgetCard
+                      value={budgetValue}
+                      invalid={!budgetOk}
+                      platform={draft.provider === "platform"}
+                      onChange={(v) => setBudget(v)}
                     />
                   )}
                   {Object.keys(planned).length > 0 && crewAgents.length > 1 && (
@@ -1818,7 +1821,7 @@ function TeamStep({
             aria-describedby="invite-link-hint invite-link-help"
             style={{ flex: 1, minWidth: 0 }}
           />
-          <Button icon="copy" onClick={() => void copy()} disabled={!link.data}>
+          <Button icon={copied ? "check" : "copy"} onClick={() => void copy()} disabled={!link.data}>
             {copied ? t("common.copied") : t("common.copy")}
           </Button>
         </div>
@@ -1859,6 +1862,7 @@ function DoneStep({
 }) {
   const { t } = useTranslation();
   const text = useRef<HTMLDivElement>(null);
+  const crew = useRef<HTMLDivElement>(null);
   const names = joinNames(
     agents.map((a) => a.name),
     t("newAgent.and"),
@@ -1876,7 +1880,7 @@ function DoneStep({
     .join(" ");
   return (
     <section className="onb__welcome" aria-labelledby="onb-welcome-title">
-      <WelcomeSky calm={() => [text.current]} />
+      <WelcomeSky calm={() => [text.current]} clear={() => [crew.current]} />
       <div className="onb__welcome-text" ref={text}>
         <h1 id="onb-welcome-title" className="onb__welcome-title">
           {t("onboarding.done.title", { org: orgName })}
@@ -1885,7 +1889,7 @@ function DoneStep({
       </div>
       {agents.length > 0 && (
         // The faces are hidden from screen readers (the lead names them); the computer says what it is.
-        <div className="onb__crew">
+        <div className="onb__crew" ref={crew}>
           {agents.map((a) => (
             <AgentAvatar
               key={a.key}

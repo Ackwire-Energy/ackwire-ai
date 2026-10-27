@@ -33,7 +33,7 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -61,50 +61,78 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const view = brain.data;
   const row = ai.data?.computers.find((c) => c.machineId === view?.computer?.machineId);
+  // Once ready, the workspace's computer is every agent's: a view from before that still has none is asked again
+  // now with the accounts (a coding plan reads that computer's row there), not at their next poll. Until both
+  // answers are in, every plan reads as ready with its sign-in loading, as the rest of the page says ready.
+  const behind = edition === "cloud" && setup?.phase === "ready" && view !== undefined && !view.computer;
+  const [asking, setAsking] = useState(false);
+  const { refetch: brainAgain } = brain;
+  const { refetch: accountsAgain } = ai;
+  useEffect(() => {
+    if (!behind) return;
+    setAsking(true);
+    void Promise.allSettled([brainAgain(), accountsAgain()]).then(() => setAsking(false));
+  }, [behind, brainAgain, accountsAgain]);
+  const catching = behind || asking;
+  // A panel here waited for that computer: once it's ready, it says so whenever it shows again (another plan, another
+  // step and back).
+  const [waited, setWaited] = useState(false);
+  const markWaited = useCallback(() => setWaited(true), []);
   const gateOf = (choice: PlanChoice): PlanGate =>
-    planGate({
-      choice,
-      edition,
-      setup,
-      // A coding plan also needs to know whether that computer takes a plan's key.
-      brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
-      computer: row,
-    });
+    catching
+      ? { state: "ready" }
+      : planGate({
+          choice,
+          edition,
+          setup,
+          // A coding plan also needs to know whether that computer takes a plan's key.
+          brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
+          computer: row,
+        });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, failed: brain.isError && !view, edition };
+  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited, catching };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
 
-/** The six plans as tiles (one dims where it can't sign in; it still opens its panel), then the API key row. */
+/**
+ * The six plans as tiles (one dims where it can't sign in; it still opens its panel), then the API key row, with the
+ * chosen option's `panel` right under it: nothing comes between an option and its steps.
+ */
 export function AiPicker({
   choice,
   onPick,
   dims,
+  panel,
 }: {
   choice: AiChoice;
   onPick: (choice: AiChoice) => void;
   dims?: (choice: PlanChoice) => boolean;
+  panel: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
-    <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
-      {PLAN_CHOICES.map((c) => (
-        <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
-          <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
-          <span className="ac-option__title">{planLabel(t, c)}</span>
+    <>
+      {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+      <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
+        {PLAN_CHOICES.map((c) => (
+          <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
+            <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
+            <span className="ac-option__title">{planLabel(t, c)}</span>
+          </OptionCard>
+        ))}
+        {choice !== "key" && panel}
+        <p className="ai-picker__or">{t("connectAi.orPayGo")}</p>
+        <OptionCard pressed={choice === "key"} onClick={() => onPick("key")} className="ai-picker__key ac-iconline">
+          <ProviderStack ids={KEY_MARKS} />
+          <span className="ac-option__text">
+            <span className="ac-option__title">{t("connectAi.key.title")}</span>
+            <span className="ac-option__desc">{t("connectAi.key.makers")}</span>
+          </span>
         </OptionCard>
-      ))}
-      <p className="ai-picker__or">{t("connectAi.orPayGo")}</p>
-      <OptionCard pressed={choice === "key"} onClick={() => onPick("key")} className="ai-picker__key ac-iconline">
-        <ProviderStack ids={KEY_MARKS} />
-        <span className="ac-option__text">
-          <span className="ac-option__title">{t("connectAi.key.title")}</span>
-          <span className="ac-option__desc">{t("connectAi.key.makers")}</span>
-        </span>
-      </OptionCard>
-    </div>
+      </div>
+      {choice === "key" && panel}
+    </>
   );
 }
 
@@ -218,11 +246,12 @@ function PlanSteps({
   const [assigned, setAssigned] = useState<"saving" | "failed" | "done">("saving");
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
-  // It turns ready while the person watches, or they came because it did: said once, in place.
-  const [waited, setWaited] = useState(gate.state === "preparing" || justReady === true);
+  // It turns ready while the person watches, or they came because it did: said in place, and again on a way back.
+  const waited = gates.waited || justReady === true;
+  const { markWaited } = gates;
   useEffect(() => {
-    if (gate.state === "preparing") setWaited(true);
-  }, [gate.state]);
+    if (gate.state === "preparing") markWaited();
+  }, [gate.state, markWaited]);
 
   const computer =
     edition === "cloud" ? computerName(t, org.name, managedOf(machines.data)) : (view?.computer?.name ?? "");
@@ -412,6 +441,7 @@ function PlanSteps({
           askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
           local={view?.ownSignIn}
           ready={ready}
+          loading={gates.catching}
           note={!coding && <SettingNote icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</SettingNote>}
           onAdded={(a) => void assign(a)}
         />
@@ -530,7 +560,7 @@ export function KeyPanel({
                     }}
                   />
                   {onSave && (
-                    <Button size="sm" variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
+                    <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
                       {t("settings.saveKey")}
                     </Button>
                   )}

@@ -44,6 +44,8 @@ export interface AddAccountProps {
   local?: boolean;
   /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
   ready?: boolean;
+  /** It just got ready and the page is still asking about it: what starts there shows it's loading. */
+  loading?: boolean;
   /** Under the steps. */
   note?: ReactNode;
   /** Its own head, with Back; without it, the place that shows it says what it is. */
@@ -137,6 +139,7 @@ function AddAccountFlow({
   askEmail,
   local,
   ready = true,
+  loading = false,
   note,
   onBack,
   onAdded,
@@ -278,7 +281,8 @@ function AddAccountFlow({
     </span>
   );
   const keyHintId = `${codeId}-hint`;
-  const pasteRow = (label: string, placeholder: string, secret: boolean, valid: boolean) => (
+  // The field's buttons are its height (the ruler's default step), so the row reads as one line.
+  const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
         <Input
@@ -298,17 +302,16 @@ function AddAccountFlow({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              if (valid) void send();
+              if (valid && ready && !loading) void send();
             }
           }}
         />
-        <Button size="sm" icon="copy" disabled={sent} onClick={() => void paste()}>
+        <Button icon="copy" disabled={sent} onClick={() => void paste()}>
           {t("aiAccounts.add.paste")}
         </Button>
         <Button
-          size="sm"
           variant="primary"
-          loading={sending}
+          loading={sending || loading}
           disabled={!valid || sent || !ready}
           onClick={() => void send()}
         >
@@ -377,7 +380,7 @@ function AddAccountFlow({
             htmlFor={codeId}
             hintId={keyHintId}
           />
-          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), "…", true, keyOk)}
+          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
           {key && !keyOk && (
             <SettingNote icon="alert">{t("aiAccounts.add.keyShape", { plan: plan.label })}</SettingNote>
           )}
@@ -397,7 +400,14 @@ function AddAccountFlow({
             login ? (
               openAgain(login.url)
             ) : (
-              <Button size="sm" variant="primary" icon="external" loading={starting} disabled={!ready} onClick={start}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="external"
+                loading={starting || loading}
+                disabled={!ready}
+                onClick={start}
+              >
                 {t("agentPage.work.brain.add.open.codex")}
               </Button>
             )
@@ -411,7 +421,7 @@ function AddAccountFlow({
             <b>{t("agentPage.work.brain.add.deviceCode")}</b>
             <span className="agp-addacct__code">
               <output aria-label={t("agentPage.work.brain.add.deviceCode")}>{login.userCode}</output>
-              <Button size="sm" icon="copy" onClick={() => void copy()}>
+              <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
                 {copied ? t("common.copied") : t("common.copy")}
               </Button>
             </span>
@@ -437,7 +447,7 @@ function AddAccountFlow({
                 size="sm"
                 variant="primary"
                 icon="external"
-                loading={starting}
+                loading={starting || loading}
                 disabled={!emailOk || !ready}
                 onClick={start}
               >
@@ -506,7 +516,7 @@ function AddAccountFlow({
         </div>
       )}
       {ended ? (
-        <div className="agp-addacct__step">
+        <div className="ai-panel__row">
           <SettingNote icon="alert" live>
             {why}
           </SettingNote>

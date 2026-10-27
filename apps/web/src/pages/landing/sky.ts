@@ -7,7 +7,7 @@
  * draws about 30 frames a second while on screen (none while the page is hidden: the
  * browser holds its frames); with reduced motion, one frame (again when it resizes).
  */
-import { type AgentColor, SPRITE, spriteTone } from "@agenteschat/ui";
+import { type AgentColor, onScreenNow, SPRITE, spriteTone } from "@agenteschat/ui";
 import { lightToward, SKY_FRAME_MS } from "@agenteschat/ui/sky/math";
 import { GRAD } from "./data";
 
@@ -284,8 +284,8 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
     observers.push(ro);
   }
   if (typeof IntersectionObserver !== "undefined") {
-    const io = new IntersectionObserver(([e]) => {
-      visible = e?.isIntersecting ?? true;
+    const io = new IntersectionObserver((entries) => {
+      visible = onScreenNow(entries) ?? true;
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       if (visible && !reduced && raf$) {

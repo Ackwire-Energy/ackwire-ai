@@ -12,10 +12,11 @@ import type {
   Machine,
   SocketFactory,
 } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
-import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { useChannelRealtime } from "@/realtime/context";
+import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
 import { renderApp, renderPage, screen, settle } from "./render";
 
@@ -315,17 +316,50 @@ describe("the computer dialog, Cloud: the workspace's own computer", () => {
     expect(box().textContent).toContain("Tente de novo daqui a pouco.");
     expect(document.querySelector(".machine-command__code")).toBeNull();
     expect(view().getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
-    // A cover takes the screen's frame, its steps' line included: the screen that follows opens in place.
-    expect(box().querySelector(".cmp-body > .cmp-steps-row")).toBeTruthy();
+    // A cover takes the screen's frame, with nothing under it, as the screen that follows it opens.
+    expect(box().querySelector(".cmp-stage")).toBeTruthy();
+    expect(box().querySelector(".cmp-steps-row")).toBeNull();
   });
 });
 
 describe("the computer dialog, live", () => {
-  test("the steps' line stays under the screen, empty while the agent doesn't work: a run never resizes it", async () => {
+  test("watching while the agent doesn't work: nothing under the screen, no empty line for steps", async () => {
     await dialog();
-    const row = box().querySelector(".cmp-body > .cmp-steps-row");
-    expect(row?.textContent).toBe("");
-    expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
+    expect(box().querySelector(".dsk")).toBeTruthy();
+    expect(box().querySelector(".cmp-steps-row")).toBeNull();
+    expect(box().querySelector(".cmp-body")?.lastElementChild?.classList.contains("dsk")).toBe(true);
+  });
+
+  test("the steps' line comes under the screen while the agent works there, and goes with its run", async () => {
+    const b = await backend();
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    /** The conversation the agent works in, open in this tab: its runs come live. */
+    function Listening() {
+      useChannelRealtime(ORG_ID, ENG_ID, true);
+      return null;
+    }
+    await renderPage(
+      <>
+        <Listening />
+        <ComputerDialog agent={ada} open onClose={() => {}} />
+      </>,
+      { api: b.api, org: true, createSocket: b.sockets.factory },
+    );
+    await settle(8);
+    const socket = b.sockets.realtime.last();
+    await act(async () => socket.open());
+    const ev = (event: Record<string, unknown>) =>
+      act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
+    const run = { threadId: null, runId: "r-desktop", agentId: ADA_ID };
+    await ev({ type: "agent.thinking", ...run });
+    await ev({ type: "agent.tool", ...run, tool: "desktop_click", toolUseId: "c1" });
+    await settle(4);
+    const row = () => box().querySelector(".cmp-body > .cmp-steps-row");
+    expect(row()?.querySelectorAll("li")).toHaveLength(1);
+    expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row());
+    await ev({ type: "agent.run", ...run, status: "done" });
+    await settle(4);
+    expect(row()).toBeNull();
   });
 
   test("held with a ready computer: watching, under the pause's banner, with no take control", async () => {
@@ -348,6 +382,19 @@ describe("the computer dialog, live", () => {
     expect(box().querySelector(".cmp-asked")?.textContent).toBe("“Entrar no banco com o token da empresa”");
     expect(view().getByRole("button", { name: "Pronto" })).toBeTruthy();
     expect(view().getByRole("button", { name: "Não consegui" })).toBeTruthy();
+  });
+
+  test("Ajudar refused (someone got there first): said in the head for a moment, not in a toast over the window", async () => {
+    const t = await dialog({ handoff: screenAsk() });
+    t.api.browser.takeControl = async () => {
+      throw new ApiError(409, "conflict", "Someone else is in control");
+    };
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    const said = box().querySelector(".ac-dialog__sub > .cmp-said");
+    expect(said?.textContent).toBe("Outra pessoa já está ajudando.");
+    expect(said?.getAttribute("role")).toBe("alert");
+    expect(box().querySelector(".cmp-sub")?.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".ac-toast")).toBeNull();
   });
 
   test("full screen on the agent's page keeps the dialog's layout: only its screen goes alone", async () => {

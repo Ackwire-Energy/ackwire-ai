@@ -47,3 +47,29 @@ export function showsPicture(canvas: HTMLCanvasElement) {
   const pixels = ctx.getImageData(0, 0, PROBE.width, PROBE.height).data;
   return !oneColor(pixels) && blackShare(pixels) <= BLACK_MAX;
 }
+
+/** The class of a picture held over an element's canvas while what draws it is replaced (`holdPicture`). */
+const STILL = "dsk-still";
+
+/** The canvas drawn in `el`, under any picture held over it. */
+export const liveCanvas = (el: ParentNode) => el.querySelector<HTMLCanvasElement>(`canvas:not(.${STILL})`);
+
+/** The picture held over `el`'s canvas, if any. */
+export const heldPicture = (el: ParentNode) => el.querySelector<HTMLCanvasElement>(`.${STILL}`);
+
+/**
+ * Keeps what `el`'s canvas shows now over it, as a still copy, so the canvas can go and a new one draw under it.
+ * Whether a picture is held: none while the canvas shows none yet.
+ */
+export function holdPicture(el: HTMLElement) {
+  if (heldPicture(el)) return true;
+  const canvas = liveCanvas(el);
+  if (!canvas || !showsPicture(canvas)) return false;
+  const still = document.createElement("canvas");
+  still.className = STILL;
+  still.width = canvas.width;
+  still.height = canvas.height;
+  still.getContext("2d")?.drawImage(canvas, 0, 0);
+  el.append(still);
+  return true;
+}

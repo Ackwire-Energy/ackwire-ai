@@ -245,6 +245,18 @@ describe("Configurações → Importar e exportar", () => {
     }
   });
 
+  test("on a phone the link field stacks over Read and keeps its own height, as tall as Read", async () => {
+    const css = (await Bun.file(new URL("../src/components/import-flow.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("@media (max-width: 640px) {")[1]?.split("\n}")[0] ?? "";
+    expect(phone).toMatch(/\.imp-paste \{\s*flex-direction: column;/);
+    // A column's flex: 1 would size the field's height from nothing (27px of text under a 40px Read).
+    expect(css).toMatch(/\n\.imp-paste \.ac-input \{[^}]*flex: 1;/);
+    expect(phone).toMatch(/\.imp-paste \.ac-input \{\s*flex: none;/);
+  });
+
   test("a folder is recognized and planned on the server; unchecking an agent holds back what needs it; Importar applies and reports", async () => {
     const { state } = await go();
     // Every source has a card with where its file is; the drop zone reads any of them.

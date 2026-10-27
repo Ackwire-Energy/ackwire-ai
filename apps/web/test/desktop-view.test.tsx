@@ -4,7 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Agent, BrowserHandoff, DesktopStatus, SocketFactory } from "@agenteschat/client";
-import { keys } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
@@ -43,7 +44,8 @@ const keyText = (e: KeyboardEvent) =>
 
 /**
  * noVNC's RFB as the screen drives it: how it was set and what it pasted; `log` holds, in order, the key events
- * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events.
+ * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events. Like noVNC, it drops
+ * keys and pastes until its connection opens (`emit("connect")`).
  */
 class FakeRfb {
   static all: FakeRfb[] = [];
@@ -56,6 +58,7 @@ class FakeRfb {
   background = "";
   pasted: string[] = [];
   log: string[] = [];
+  connected = false;
   /** It took its socket in the tick the socket was made, before anything could arrive on it. */
   readonly onTime: boolean;
   /** Like noVNC, it draws into a canvas of its own inside the screen, and takes its keys there. */
@@ -71,7 +74,9 @@ class FakeRfb {
     this.canvas.width = 1280;
     this.canvas.height = 900;
     for (const type of ["keydown", "keyup"]) {
-      this.canvas.addEventListener(type, (e) => this.log.push(keyText(e as KeyboardEvent)));
+      this.canvas.addEventListener(type, (e) => {
+        if (this.connected) this.log.push(keyText(e as KeyboardEvent));
+      });
     }
     el.appendChild(this.canvas);
   }
@@ -79,13 +84,14 @@ class FakeRfb {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
   }
   emit(type: string, detail?: unknown) {
+    if (type === "connect") this.connected = true;
     for (const fn of this.listeners.get(type) ?? []) fn(new CustomEvent(type, { detail }));
   }
   clipboardPasteFrom(text: string) {
-    this.pasted.push(text);
+    if (this.connected) this.pasted.push(text);
   }
   sendKey(_keysym: number, code: string | null, down?: boolean) {
-    this.log.push(`send ${code} ${down ? "down" : "up"}`);
+    if (this.connected) this.log.push(`send ${code} ${down ? "down" : "up"}`);
   }
   focus() {}
   disconnect() {
@@ -193,6 +199,10 @@ async function controlled() {
 }
 /** The line under the screen in control: its words. */
 const line = () => document.querySelector(".dsk-line > .muted")?.textContent;
+/** What the clipboard just did, said in that line in its words' place. */
+const said = () => document.querySelector(".dsk-line > .dsk-said")?.textContent;
+/** The last picture the screen holds over its next connection. */
+const still = () => document.querySelector(".dsk-screen > .dsk-still");
 const pasteOn = (el: Element, text: string) =>
   act(
     async () =>
@@ -506,9 +516,15 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
-    // Two lines that wrap: a note stays in sight on a narrow screen, where one line scrolled its start away.
+    // One line in the middle of its field that grows as it wraps (its height set to its text): all of a note stays
+    // in sight, and there is no grip to drag.
     const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
-    expect([note.tagName, note.getAttribute("rows")]).toEqual(["TEXTAREA", "2"]);
+    expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
+      "TEXTAREA",
+      "1",
+      "ac-input brw-ac__note",
+    ]);
+    expect(note.style.height).not.toBe("");
     await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
     /** Whether the key is left to the note (a new line), not taken to hand back. */
     const enter = async (init: KeyboardEventInit = {}) => {
@@ -527,6 +543,129 @@ describe("the agent's screen in the computer dialog", () => {
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
+  });
+
+  test("taking control opens behind Abrindo, over no old picture: the keys reach the computer once it is connected", async () => {
+    const t = await dialog();
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
+    expect(sub()).toBe("Você no controle · a Ada espera");
+    // noVNC drops keys until its connection opens: nothing that looks ready meanwhile.
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    const field = view().getByRole("textbox", { name: "Digitar no computador da Ada" });
+    fireEvent.keyDown(field, { key: "a", code: "KeyA" });
+    expect(rfb().log).toEqual([]);
+    await connected();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    fireEvent.keyDown(field, { key: "b", code: "KeyB" });
+    expect(rfb().log).toEqual(["keydown b KeyB"]);
+  });
+
+  test("handing back keeps the last picture over the watching connection: the head says watching at once, never Abrindo", async () => {
+    const t = await controlled();
+    expect(still()).toBeNull();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
+    // Watching as soon as the server says so: no wait for the new connection's picture.
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    expect(still()).not.toBeNull();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(view().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    await connected();
+    expect(still()).toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("control taken again while a hand back's picture is still held: that picture goes, and control opens behind Abrindo", async () => {
+    const t = await controlled();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    expect(still()).not.toBeNull();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+  });
+
+  test("Take control refused: said in the head, in its line's place, not in a toast over the window's corner", async () => {
+    const t = await dialog();
+    await connected();
+    replaceOn(t.api.browser, "takeover", async () => {
+      throw new ApiError(409, "conflict", "Someone else is in control");
+    });
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    const said = document.querySelector(".ac-dialog__sub > .cmp-said");
+    expect(said?.textContent).toBe("Outra pessoa já está ajudando.");
+    expect(said?.getAttribute("role")).toBe("alert");
+    expect(document.querySelector(".cmp-sub")?.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+  });
+
+  test("a hand back that fails: said in the head, the note kept to send again", async () => {
+    const t = await controlled();
+    replaceOn(t.api.browser, "done", async () => {
+      throw new ApiError(500, "internal", "Something broke");
+    });
+    await click(view().getByRole("button", { name: "Devolver" }));
+    const note = () => view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    await act(async () => fireEvent.change(note(), { target: { value: "Deixei aberto" } }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(document.querySelector(".ac-dialog__sub > .cmp-said")?.textContent).toBe("Não deu certo. Tente de novo.");
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(note().value).toBe("Deixei aberto");
+  });
+
+  test("control ended on the server first (4410): it opens again as a watcher over the same picture; a drop then says so", async () => {
+    const t = await controlled();
+    const done = { ...(t.fake.handoffs.get("takeover-1") as BrowserHandoff), status: "done" as const };
+    t.fake.handoffs.set(done.id, done);
+    await act(async () => t.sockets.desktops.at(-1)?.serverClose(4410, "control_ended"));
+    await settle(6);
+    expect(still()).not.toBeNull();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
+    // The new connection drops before it draws: the cover says why, over no old picture.
+    await act(async () => t.sockets.desktops.at(-1)?.serverClose(4503, "offline"));
+    await settle(4);
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(screen().getByText("Tentando de novo…")).toBeTruthy();
+  });
+
+  test("a switch whose new connection hasn't drawn in 3 s lets go of the old picture and says it is opening", async () => {
+    const t = await controlled();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
+    expect(still()).not.toBeNull();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    await act(() => new Promise((r) => setTimeout(r, 3_100)));
+    expect(still()).toBeNull();
+    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(sub()).toBe("Abrindo…");
+    await connected();
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+  });
+
+  test("control taken over by someone else: their screen hidden at once, nothing of it kept under the cover", async () => {
+    const t = await controlled();
+    const mine = t.fake.handoffs.get("takeover-1") as BrowserHandoff;
+    t.fake.handoffs.set(mine.id, { ...mine, status: "done" });
+    const joao = controlOf(ADA_ID, "u-joao");
+    t.fake.handoffs.set(joao.id, joao);
+    await act(async () => t.sockets.desktops.at(-1)?.serverClose(4410, "control_ended"));
+    await settle(6);
+    expect(screen().getByText("João está no controle")).toBeTruthy();
+    expect(still()).toBeNull();
   });
 
   test("in control each key is replayed on noVNC's canvas, never seen by the page; a blur lets go of what is held", async () => {
@@ -575,12 +714,17 @@ describe("the agent's screen in the computer dialog", () => {
   test("a paste over 256 KB as it is sent, or with no text, sends nothing and says why", async () => {
     const t = await controlled();
     await pasteOn(t.field(), "");
-    expect(screen().getByText("No computador da Ada só dá para colar texto.")).toBeTruthy();
+    // In the line under the screen, where copy and paste are told, not a toast over the window's corner.
+    expect(said()).toBe("No computador da Ada só dá para colar texto.");
+    expect(document.querySelector(".dsk-said")?.getAttribute("role")).toBe("alert");
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(line()).toBeUndefined();
     // The limit is the computer's, in what noVNC sends: UTF-8, each line break as CRLF, and a NUL at the end.
     for (const text of ["x".repeat(262_144), "ã".repeat(131_072), "linha\n".repeat(40_000)]) {
       await pasteOn(t.field(), text);
     }
-    expect(screen().getByText("Grande demais para colar no computador da Ada. No máximo 256 KB.")).toBeTruthy();
+    expect(said()).toBe("Grande demais para colar no computador da Ada. No máximo 256 KB.");
+    expect(document.querySelector(".ac-toast")).toBeNull();
     expect(rfb().pasted).toEqual([]);
     expect(rfb().log).toEqual([]);
     // Up to the limit goes, a CRLF counted as the two bytes it is.
@@ -630,15 +774,10 @@ describe("the agent's screen in the computer dialog", () => {
     await act(async () => rfb().emit("clipboard", { text: "ls -la /tmp" }));
     await settle(2);
     expect(board.written).toEqual(["ls -la /tmp"]);
-    expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
-    // The toast's × is the toast's own, though the dialog is modal: the dialog stays, and control with it.
-    const dismiss = document.querySelector(".ac-toast button[aria-label='Fechar']") as HTMLElement;
-    await act(async () => {
-      fireEvent.pointerDown(dismiss);
-      fireEvent.click(dismiss);
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    await settle(2);
+    // Said in the line under the screen, in its words' place: the window fills the page, and a toast would land on
+    // its corner.
+    expect(said()).toBe("Copiado do computador da Ada.");
+    expect(document.querySelector(".dsk-said")?.getAttribute("role")).toBe("status");
     expect(document.querySelector(".ac-toast")).toBeNull();
     expect(t.closed()).toBe(0);
     expect(calls(t, "browser.done")).toEqual([]);
@@ -689,10 +828,35 @@ describe("the agent's screen in the computer dialog", () => {
     expect(line()).toBeUndefined();
     await click(view().getByRole("button", { name: "Copiar" }));
     expect(board.texts).toEqual(["ls -la /tmp"]);
-    expect(screen().getByText("Copiado do computador da Ada.")).toBeTruthy();
+    expect(said()).toBe("Copiado do computador da Ada.");
     expect(document.querySelector(".dsk-got")).toBeNull();
-    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+    expect(document.querySelector(".ac-toast")).toBeNull();
     expect(t.closed()).toBe(0);
+    // Handed back and taken again: the line starts with its own words, nothing said from before.
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    expect(said()).toBeUndefined();
+    expect(line()).toStartWith("Copiar e colar como sempre: Ctrl C, Ctrl V. ");
+  });
+
+  test("the newest copy speaks: one kept out right after a Copiado is offered at once, not under the older word", async () => {
+    clipboard();
+    const t = await controlled();
+    fireEvent.keyDown(t.field(), { key: "c", code: "KeyC", ctrlKey: true });
+    await act(async () => rfb().emit("clipboard", { text: "primeiro" }));
+    await settle(2);
+    expect(said()).toBe("Copiado do computador da Ada.");
+    clipboard({ refuses: true });
+    fireEvent.keyDown(t.field(), { key: "c", code: "KeyC", ctrlKey: true });
+    await act(async () => rfb().emit("clipboard", { text: "segundo" }));
+    await settle(2);
+    expect(said()).toBeUndefined();
+    expect(document.querySelector(".dsk-got q")?.textContent).toBe("segundo");
   });
 
   test("watching: no field, nothing pasted, nothing copied", async () => {
@@ -762,7 +926,13 @@ describe("the agent's screen in the computer dialog", () => {
   test("full screen is the page's and shows the computer alone; Esc leaves it, and Devolver works on its first click", async () => {
     const page = fullScreen();
     const t = await controlled();
+    /** The glyph the full-screen button draws. */
+    const glyph = (name: string) => view().getByRole("button", { name }).querySelector("path")?.getAttribute("d");
+    // Corners pulled apart to go in, pushed together to come out: never an external link's arrow.
+    expect(glyph("Tela cheia")).toBe(icons.expand[0]?.[1].d);
     await click(view().getByRole("button", { name: "Tela cheia" }));
+    expect(glyph("Sair da tela cheia")).toBe(icons.shrink[0]?.[1].d);
+    expect(view().getByRole("button", { name: "Sair da tela cheia" }).hasAttribute("aria-pressed")).toBe(false);
     // The page goes full screen, not the dialog: noVNC's capture layer on the page stays inside it.
     expect(page.requested).toEqual([document.documentElement]);
     expect(classes()).toEqual(expect.arrayContaining(["is-full", "is-screen-only"]));
@@ -936,7 +1106,7 @@ describe("the dialog's size (computer.css)", () => {
     expect(full).toContain("height: 100%");
   });
 
-  test("one frame for the screen, its covers and the agent's page, its steps' line kept while there are none", async () => {
+  test("one frame for the screen, its covers and the agent's page; with no line under the screen it ends 16 px under it and keeps its top", async () => {
     const text = await css();
     // The wait for the workspace's computer is as wide, so its screen opens in place.
     expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
@@ -945,6 +1115,14 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .brw-ac.is-surface))")).toContain(
       "height: calc(var(--cmp-screen) * 900 / 1280 + 130px)",
     );
+    // The same screen with nothing under it (no steps, no keys' line, no note, no tools of the page): 30 px shorter,
+    // its top where it was (the dialog is centred on 50%), so a line coming adds it below and the screen never moves.
+    const bare = rule(
+      text,
+      ".ac-dialog.cmp-dialog:where(\n  :has(.dsk, .cmp-stage, .brw-ac.is-surface):not(:has(.cmp-steps-row, .dsk-line, .brw-ac__foot))\n)",
+    );
+    expect(bare).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 100px)");
+    expect(bare).toContain("top: calc(50% - 15px)");
     expect(rule(text, ".cmp-steps-row")).toContain("height: 22px");
     // The page at 16:10 takes the most of its stage in the same frame, never a size of its own.
     expect(rule(text, ".cmp-body .brw-ac__page")).toContain("width: min(100cqw, 100cqh * 16 / 10)");
@@ -959,6 +1137,86 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(text, ".cmp-body:has(> .dsk.is-control) > .cmp-steps-row")).toContain("display: none");
     const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
     expect(rule(desk, ".dsk-line")).toContain("min-height: 22px");
+  });
+
+  test("a phone's Keyboard button leads the line with the words' first line on its middle", async () => {
+    const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
+    // Not a baseline: a button's is its icon's bottom edge, about 4 px under its label's.
+    const line = rule(desk, ".dsk-line");
+    expect(line).toContain("align-items: flex-start");
+    expect(line).toContain("line-height: 22px");
+    // The 22 px line's middle on the button's, a touch control as tall as the ruler's default step: (40 − 22) / 2.
+    expect(rule(desk, ".dsk-line > .ac-btn ~ *")).toContain("margin-top: calc((var(--control-h-md) - 22px) / 2)");
+    const kit = await Bun.file(
+      new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
+    ).text();
+    expect(kit).toContain("@media (pointer: coarse) {\n  .ac-btn--sm {\n    min-height: var(--control-h-md);");
+  });
+
+  /** The phone's head: a rule of `@media (max-width: 640px)`. */
+  const phoneRule = async (selector: string) =>
+    (await css()).split("@media (max-width: 640px) {")[1]?.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
+  /** On a phone, actions with words get the head's second row (`computer.css`). */
+  const OWN_ROW = ".cmp-dialog:not(.is-screen-only) .cmp-acts:has(> :not(.ac-btn--icon))";
+
+  test("a phone's head: the name and its line share a row with Close, actions with words get a row of their own", async () => {
+    const head = await phoneRule(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head");
+    expect(head).toContain("display: grid");
+    // The face, the name and its line, an icon alone, Close.
+    expect(head).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto");
+    expect(await phoneRule(OWN_ROW)).toContain("grid-area: 2 / 2 / 3 / 5");
+    expect(await phoneRule(".cmp-dialog:not(.is-screen-only) > .ac-dialog__head > :last-child")).toContain(
+      "grid-column: -2",
+    );
+  });
+
+  test("on a phone, full screen alone stays beside Close: no row of its own for one icon", async () => {
+    // Watching with no Take control: full screen is the head's only action.
+    await dialog({ ...RUNNING, canControl: false });
+    await connected();
+    const acts = () => document.querySelector(".cmp-acts") as HTMLElement;
+    expect([...acts().children].map((b) => b.getAttribute("aria-label"))).toEqual(["Tela cheia"]);
+    expect(document.querySelector(OWN_ROW)).toBeNull();
+    cleanup();
+    // With Take control, and in control with Devolver: the actions' row.
+    await dialog();
+    await connected();
+    expect(document.querySelector(OWN_ROW)).toBe(acts());
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    expect(view().getByRole("button", { name: "Devolver" })).toBeTruthy();
+    expect(document.querySelector(OWN_ROW)).toBe(acts());
+  });
+
+  test("a tablet keeps room for the Keyboard button: watching or in control, one screen size and place", async () => {
+    const text = await css();
+    const tablet = text.split("@media (pointer: coarse) and (min-width: 721px) {")[1] ?? "";
+    const inTablet = (selector: string) => tablet.split(`\n  ${selector} {`)[1]?.split("}")[0] ?? "";
+    // The 22 px line's room plus the 18 px a 40 px touch control adds to it.
+    expect(inTablet(".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))")).toContain(
+      "--cmp-screen: min(96vw - 32px, 1280px, (94dvh - 148px) * 1280 / 900)",
+    );
+    // In control those 18 px go below, the top where it was: centred on 50% + 9 px.
+    const control = inTablet(".ac-dialog.cmp-dialog:where(:has(.dsk-line))");
+    expect(control).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 148px)");
+    expect(control).toContain("top: calc(50% + 9px)");
+    // After the frame's own rules, which it outweighs at the same weight.
+    expect(text.indexOf("@media (pointer: coarse) and (min-width: 721px)")).toBeGreaterThan(
+      text.indexOf("height: calc(var(--cmp-screen) * 900 / 1280 + 100px)"),
+    );
+  });
+
+  test("the picture held over a hand back is only a picture: the pointer goes through it", async () => {
+    const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
+    expect(rule(desk, ".dsk-screen > .dsk-still")).toContain("pointer-events: none");
+  });
+
+  test("a note to the agent: one line in the middle of its field, growing up to four, with no grip", async () => {
+    const brw = await Bun.file(new URL("../src/components/browser/browser.css", import.meta.url).pathname).text();
+    const note = rule(brw, ".brw-ac__note.ac-input");
+    expect(note).toContain("resize: none");
+    expect(note).toContain("max-height: 110px");
   });
 
   test("full screen on the agent's screen: the screen alone on its ground, what floats over it hidden after a while", async () => {
@@ -996,6 +1254,22 @@ describe("the dialog's size (computer.css)", () => {
     expect(keep).toContain("opacity: 1");
     expect(keep).toContain("translate: none");
     expect(keep).toContain("pointer-events: auto");
+    // What the clipboard just did shows the line alone for a moment, after the rule that hides it at the same weight.
+    const said = rule(text, ".cmp-dialog:has(.dsk-said) .dsk-line");
+    expect(said).toContain("opacity: 1");
+    expect(said).not.toContain("pointer-events");
+    expect(text.indexOf("\n.cmp-dialog:has(.dsk-said) .dsk-line {")).toBeGreaterThan(
+      text.indexOf(
+        "\n.cmp-dialog.is-bar-hidden > .ac-dialog__head,\n.cmp-dialog.is-line-hidden :is(.cmp-asked, .dsk-line) {",
+      ),
+    );
+    // An action that failed brings the bar back, its buttons live, while the head says so.
+    const failed = rule(text, ".cmp-dialog:has(.cmp-said) > .ac-dialog__head");
+    expect(failed).toContain("opacity: 1");
+    expect(failed).toContain("pointer-events: auto");
+    expect(text.indexOf("\n.cmp-dialog:has(.cmp-said) > .ac-dialog__head {")).toBeGreaterThan(
+      text.indexOf("\n.cmp-dialog.is-bar-hidden > .ac-dialog__head,"),
+    );
     expect(text).not.toContain(":focus-within");
     // A cover over the screen (z-index 5) stays in the screen's own layer, under the bar.
     expect(rule(text, ".cmp-dialog.is-screen-only .dsk-stage")).toContain("isolation: isolate");

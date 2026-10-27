@@ -102,6 +102,15 @@ async function connect({
 }
 
 const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
+
+/** A stylesheet's text, its comments left out. */
+const stylesheet = async (path: string) =>
+  (await Bun.file(new URL(path, import.meta.url).pathname).text()).replace(/\/\*[\s\S]*?\*\//g, "");
+/** The body of the first rule whose selector is `selector`, at any indent (inside a media query too). */
+const ruleOf = (css: string, selector: string) =>
+  css.split(new RegExp(`\\n *${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{`))[1]?.split("}")[0] ?? "";
+/** What the media query `query` holds, its first time in the stylesheet. */
+const atMedia = (css: string, query: string) => css.split(`\n@media ${query} {`)[1]?.split("\n}")[0] ?? "";
 /** A Claude plan's account, as the computer reports it once the sign-in ends. */
 const claudeMax = account({ id: "acct_max", label: "Claude Max", provider: null, keyHint: null });
 
@@ -109,10 +118,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
   test("Settings › AI accounts opens the same picker: six plans, then the API key, Claude chosen with its sign-in", async () => {
     const { dialog, tile } = await connect();
     const group = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
-    const tiles = within(group)
-      .getAllByRole("button")
-      .map((b) => b.textContent);
-    expect(tiles).toEqual([
+    const options = [...group.querySelectorAll(":scope > .ac-option")];
+    expect(options.map((b) => b.textContent)).toEqual([
       "Claude",
       "ChatGPT",
       "GLM Coding",
@@ -122,14 +129,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Chave de APIClaude, OpenAI, DeepSeek, Kimi, Z.ai ou MiniMax",
     ]);
     // Each by its maker's mark; the key row by four of them, overlapped.
-    expect([...group.querySelectorAll(".ac-brand--sm")].map((m) => m.getAttribute("data-mark"))).toEqual([
-      "claude",
-      "openai",
-      "zai",
-      "kimi",
-      "minimax",
-      "opencode",
-    ]);
+    expect(
+      options.flatMap((o) => [...o.querySelectorAll(".ac-brand--sm")]).map((m) => m.getAttribute("data-mark")),
+    ).toEqual(["claude", "openai", "zai", "kimi", "minimax", "opencode"]);
     const stack = tile("Chave de API").querySelector(".ac-brand-stack");
     expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
       "claude",
@@ -140,6 +142,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.textContent).toContain("Ou pague pelo uso");
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    // Right under the plans: the API key row comes after Claude's steps, never between Claude and them.
+    expect(options[5]?.nextElementSibling).toBe(panel);
+    expect(panel.compareDocumentPosition(tile("Chave de API")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(panel.textContent).toContain("Pro, Max, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     // The sign-in step is its title, its ⓘ and its button: what to do on the wrong account and where the account
@@ -158,9 +163,34 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.querySelector(".ac-dialog__footer")).toBeNull();
   });
 
+  test("a tile's check sits on its name's line; the chosen plan's panel takes a row of its own, 12px under the plans", async () => {
+    const ui = await stylesheet("../../../packages/ui/src/styles/components.css");
+    const check = ruleOf(ui, '.ac-option[aria-pressed="true"]::after,\n.ac-option[data-state="checked"]::after');
+    expect(check).toContain("height: 18px");
+    const layout = await stylesheet("../src/layout.css");
+    // A one-line tile's in its middle.
+    expect(ruleOf(layout, ".grid-options--plans > .ac-option:not(.ai-picker__key)::after")).toContain(
+      "top: calc(50% - 9px)",
+    );
+    // The API key row has two lines: its check goes on the first, its name's, past the tile's padding.
+    expect(ruleOf(ui, ".ac-option")).toContain("padding: var(--space-3)");
+    expect(ruleOf(layout, ".grid-options--plans > .ac-option.ai-picker__key::after")).toContain(
+      "top: calc(var(--space-3) + 0.5lh - 9px)",
+    );
+    const panel = ruleOf(layout, ".grid-options--plans > .ai-panel");
+    expect(panel).toContain("grid-column: 1 / -1");
+    // The grid's 8px gap and 4px more: as far under the plans as the key's panel is under its row.
+    expect(ruleOf(layout, ".grid-options")).toContain("gap: var(--space-2)");
+    expect(panel).toContain("margin-top: 4px");
+  });
+
   test("a coding plan's key: its own key page, then the key sealed to the computer (in no request); the agent thinks with it", async () => {
     const { state, machines, dialog, tile } = await connect();
     machines?.endLogin("login_1", { state: "done", account: account() });
+    // A plan whose keys have a known start shows it as the field's example.
+    await click(tile("OpenCode Go"));
+    const opencode = within(dialog).getByRole("region", { name: "OpenCode Go" });
+    expect(within(opencode).getByLabelText("Chave do OpenCode Go").getAttribute("placeholder")).toBe("oc_sk_…");
     await click(tile("GLM Coding"));
     const panel = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
     expect(panel.textContent).toContain("Lite, Pro ou Max");
@@ -178,6 +208,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(within(panel).getByLabelText("Chave do GLM Coding").getAttribute("aria-describedby")).toBe(
       safe.button.getAttribute("aria-describedby"),
     );
+    // Z.ai publishes no prefix for its keys: no example in the field, never a bare "…". Its buttons are the field's
+    // height (the ruler's default step).
+    expect(within(panel).getByLabelText("Chave do GLM Coding").hasAttribute("placeholder")).toBe(false);
+    for (const name of ["Colar", "Enviar ao MacBook"])
+      expect(within(panel).getByRole("button", { name }).classList.contains("ac-btn--sm")).toBe(false);
     // Nothing starts on the computer until the key is there; a paste that isn't a key says so.
     expect(machines?.lastLogin()).toBeUndefined();
     const keyBox = within(panel).getByLabelText("Chave do GLM Coding");
@@ -275,7 +310,28 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.textContent).toContain(
       "Essa conta já está aqui (Trabalho). Para adicionar outra, saia do Claude na página que abriu",
     );
-    expect(within(dialog).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+    // What went wrong and its button on one row, the note in the button's middle.
+    const retry = within(dialog).getByRole("button", { name: "Tentar de novo" });
+    expect(retry.parentElement?.className).toBe("ai-panel__row");
+    expect(retry.parentElement?.querySelector(":scope > .ac-setnote")).not.toBeNull();
+  });
+
+  test("a step's number and title come down to the middle of the button beside it; a failure's note sits in its button's middle", async () => {
+    const layout = await stylesheet("../src/layout.css");
+    expect(ruleOf(layout, ".agp-addacct__step")).toContain("line-height: 20px");
+    const step = ".agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text)";
+    // Beside it only from 641px wide: narrower, the button goes under the words.
+    expect(ruleOf(atMedia(layout, "(min-width: 641px)"), step)).toContain(
+      "margin-top: calc((var(--control-h-sm) - 20px) / 2)",
+    );
+    // A touch screen's small button is the ruler's default step.
+    expect(ruleOf(atMedia(layout, "(min-width: 641px) and (pointer: coarse)"), step)).toContain(
+      "margin-top: calc((var(--control-h-md) - 20px) / 2)",
+    );
+    expect(ruleOf(layout, ".ai-panel__row")).toContain("align-items: center");
+    expect(ruleOf(layout, ".ai-panel__row > .ac-setnote")).toContain("margin: 0");
+    // A key's field can narrow to 112px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
+    expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 112px");
   });
 
   test("a computer the person connected: its own sign-in, saved for the agent at once; or another account", async () => {
@@ -432,6 +488,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dialog.textContent).toContain("Ada agora pensa com Claude Max.");
     await click(tile("Chave de API"));
     const panel = within(dialog).getByRole("region", { name: "Chave de API" });
+    // Right under its row, the picker's last; Claude's panel is gone from above it.
+    expect(tile("Chave de API").parentElement?.lastElementChild).toBe(tile("Chave de API"));
+    expect(tile("Chave de API").parentElement?.nextElementSibling).toBe(panel);
+    expect(within(dialog).queryByRole("region", { name: "Seu plano do Claude" })).toBeNull();
     // The row just chosen already names it: no head again, and who charges for it, once.
     expect(panel.querySelector(".ai-panel__head")).toBeNull();
     expect(shownText(panel).split("Você paga pelo uso, direto ao provedor.")).toHaveLength(2);
@@ -442,9 +502,15 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "A chave de um plano de código vai na opção dele, acima.",
     );
     expect(shownText(panel)).not.toContain("plano de código");
+    // A maker that publishes no prefix for its keys: no example in the field, never a bare "…".
+    await click(within(panel).getByRole("button", { name: "Z.ai" }));
+    expect(within(panel).getByLabelText("Cole aqui").hasAttribute("placeholder")).toBe(false);
     await click(within(panel).getByRole("button", { name: "Claude" }));
+    expect(within(panel).getByLabelText("Cole aqui").getAttribute("placeholder")).toBe("sk-ant-…");
     expect(within(panel).queryByRole("button", { name: /^Sobre Crie a sua chave/ })).toBeNull();
     expect(panel.textContent).not.toContain("Salva.");
+    // Save key is the field's height (the ruler's default step), not a small button beside a tall field.
+    expect(within(panel).getByRole("button", { name: "Salvar chave" }).classList.contains("ac-btn--sm")).toBe(false);
     await type(within(panel).getByLabelText("Cole aqui"), "sk-ant-api03-abcdefghijklmnop");
     await click(within(panel).getByRole("button", { name: "Salvar chave" }));
     await settle(4);

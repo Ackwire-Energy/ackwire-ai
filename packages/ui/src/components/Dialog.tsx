@@ -1,6 +1,7 @@
 import { Dialog as RDialog } from "radix-ui";
 import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
 import { cx } from "../cx";
+import { lastTabbable } from "../device";
 import { Button } from "./Button";
 import { SearchField } from "./Toolbar";
 
@@ -77,6 +78,22 @@ export function Dialog({
           className={cx("ac-dialog", className)}
           style={{ "--ac-dialog-width": `${width}px` } as CSSProperties}
           onEscapeKeyDown={onEscapeKeyDown}
+          // Focus starts on the dialog itself (the event's target), never on its first control, the head's ×: opened
+          // from a link or by itself, a ring would sit on × with nothing pressed. Tab reaches × first; a field that
+          // takes the focus on its own (autoFocus) keeps it, since Radix asks only when nothing inside has it.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.target as HTMLElement).focus();
+          }}
+          // From there, Shift+Tab goes round to the last control, as Tab from the last goes to the first (Radix wraps
+          // only from its first and last controls).
+          onKeyDown={(e) => {
+            if (e.key !== "Tab" || !e.shiftKey || e.target !== e.currentTarget) return;
+            const last = lastTabbable(e.currentTarget);
+            if (!last) return;
+            e.preventDefault();
+            last.focus();
+          }}
           onPointerDownOutside={(e) => {
             if (onToast.current) e.preventDefault();
           }}

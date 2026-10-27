@@ -123,6 +123,23 @@ p {
 .grid-options--plans .ac-option__title {
   font-size: 14px;
 }
+/* A one-line tile's check sits in its middle, as its mark and its name do. */
+.grid-options--plans > .ac-option:not(.ai-picker__key)::after {
+  top: calc(50% - 9px);
+}
+/* The API key row's two lines: its check sits on the first, its name's (the padding, then half the line). */
+.grid-options--plans > .ac-option.ai-picker__key::after {
+  /* Browsers without the lh unit: the page's 22px line. */
+  top: calc(var(--space-3) + 11px - 9px);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
+  top: calc(var(--space-3) + 0.5lh - 9px);
+}
+/* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
+   nothing comes between an option and its steps. */
+.grid-options--plans > .ai-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
 .ai-picker__or {
   grid-column: 1 / -1;
   margin: 6px 0 -2px;
@@ -1609,10 +1626,6 @@ p {
   border-bottom: 1px solid var(--line);
   padding-bottom: 12px;
 }
-.code-viewer .ac-btn[aria-pressed="true"] {
-  background: var(--plate);
-  color: var(--ink);
-}
 .code-viewer__body.ac-dialog__body {
   flex: 1 1 auto;
   padding: 12px 0 20px;
@@ -1705,10 +1718,6 @@ p {
   font-size: 12.5px;
   line-height: 17px;
   color: var(--faint);
-}
-.chart-card__top .ac-btn[aria-pressed="true"] {
-  background: var(--plate);
-  color: var(--ink);
 }
 .chart-card__body {
   padding: 8px 16px 16px;
@@ -6399,17 +6408,14 @@ a.machine-row__name:hover {
   min-width: 0;
   gap: 6px;
 }
-/* The facts line up under the name, past the portrait (96px + the 18px gap). */
+/*
+ * The facts start at the card's edge, under the portrait, as on Configurações → Computadores: a portrait is as wide
+ * as its drawing (a tower half a laptop's), so an indent past it lines up with nothing.
+ */
 .machine-page__facts {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-left: 114px;
-}
-@media (max-width: 640px) {
-  .machine-page__facts {
-    padding-left: 0;
-  }
 }
 /* Agents using the computer: one row each (face, name, what it may use), to its page. */
 .machine-page__agents {
@@ -8021,9 +8027,11 @@ a.machine-row__name:hover {
   gap: 8px;
   margin: 4px 0;
 }
+/* Narrow enough that Paste and "Send to {workspace}'s computer" stay on its line in a panel, in English and in
+   Portuguese, for a two-word name ("Enviar ao Computador da Costa Atelier"); a longer name wraps. */
 .agp-addacct__paste .ac-input {
   flex: 1;
-  min-width: 160px;
+  min-width: 112px;
 }
 .agp-addacct__code output {
   font-size: 24px;
@@ -8051,6 +8059,18 @@ a.machine-row__name:hover {
   }
   .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
     margin-left: 32px;
+  }
+}
+/* Beside its button, a step's number and title come down to the button's middle: the three share one line, however
+   many lines follow the title. A touch screen's small button is the ruler's default step. */
+@media (min-width: 641px) {
+  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
+    margin-top: calc((var(--control-h-sm) - 20px) / 2);
+  }
+}
+@media (min-width: 641px) and (pointer: coarse) {
+  .agp-addacct__step:has(> .ac-btn--sm) > :is(i, .agp-addacct__text) {
+    margin-top: calc((var(--control-h-md) - 20px) / 2);
   }
 }
 
@@ -9906,14 +9926,16 @@ html[data-menu-overlay] .shell {
   font-size: 13px;
   color: var(--ink-muted);
 }
+/* What went wrong and its button (Try again): the note in the button's middle, beside it or on the line above it. */
 .ai-panel__row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
 }
 .ai-panel__row > .ac-setnote {
   flex: 1 1 240px;
+  margin: 0;
 }
 @media (max-width: 640px) {
   .ai-panel__agent {
@@ -9947,12 +9969,6 @@ html[data-menu-overlay] .shell {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
-}
-.ai-accounts__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
 }
 .ai-accounts__row .ac-planmeter {
   margin-top: 4px;

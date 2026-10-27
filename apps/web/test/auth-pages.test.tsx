@@ -5,7 +5,7 @@ setupDom();
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ApiError, type ImportInput, type SignInOptions } from "@agenteschat/client";
+import { ApiError, type ImportInput, type InvitationPreview, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -189,6 +189,61 @@ describe("Entrar (e-mail primeiro)", () => {
       await type("Senha", "correct horse");
       await press(/^Entrar/);
       expect(screen().getByRole("alert").textContent).toContain(says);
+      cleanup();
+    }
+  });
+});
+
+describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
+  const LINK: InvitationPreview = {
+    orgName: "Acme",
+    email: "",
+    role: "member",
+    kind: "link",
+    invitedBy: null,
+    agents: [],
+  };
+  const at = (redirect: string, email?: string) =>
+    `/login?${new URLSearchParams({ redirect, ...(email ? { email } : {}) })}`;
+
+  test("from an invitation link's Sign in: its workspace, and the address typed there already filled in", async () => {
+    const { api } = authApi(ACCOUNT, { state: seedState({ me: null, previews: { lnk: LINK } }) });
+    await renderApp(at("/invite/lnk"), { api, auth: createFakeAuth().auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    expect(lead()).toBe("Para pedir para entrar na Acme.");
+    cleanup();
+
+    await renderApp(at("/invite/lnk", "marina@acme.com.br"), { api, auth: createFakeAuth().auth });
+    await settle(4);
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(lead()).toBe("Para pedir para entrar na Acme.");
+    expect(screen().getByText("marina@acme.com.br")).toBeTruthy();
+  });
+
+  test("an email invitation's: to join; the ready email's Connect your AI and Create an agent: to do that", async () => {
+    const { api } = authApi(ACCOUNT, { state: seedState({ me: null }) });
+    await renderApp(at("/invite/valid"), { api, auth: createFakeAuth().auth });
+    expect(lead()).toBe("Para entrar na Acme.");
+    cleanup();
+
+    await renderApp(at(`/org/${ORG_ID}?connect=ai`), { api, auth: createFakeAuth().auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    expect(lead()).toBe("Para conectar sua IA.");
+    cleanup();
+
+    await renderApp(at(`/org/${ORG_ID}/agents/new`), { api, auth: createFakeAuth().auth });
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+    expect(lead()).toBe("Para criar um agente.");
+  });
+
+  test("a link that no longer works, an unknown one, or anywhere else: the general line", async () => {
+    const { api } = authApi(ACCOUNT, {
+      state: seedState({ me: null, previews: { off: { ...LINK, closed: true } } }),
+    });
+    // The ready email's button to the workspace itself included: it leads nowhere in particular.
+    for (const redirect of ["/invite/off", "/invite/nope", `/org/${ORG_ID}/drive`, `/org/${ORG_ID}`]) {
+      await renderApp(at(redirect), { api, auth: createFakeAuth().auth });
+      expect(lead()).toBe("Vale para entrar ou para criar uma conta.");
       cleanup();
     }
   });
@@ -680,20 +735,21 @@ describe("Onboarding", () => {
     expect(document.querySelector(".onb__lead")?.textContent).toBe("Entre com o seu plano de IA: sem chave de API.");
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
-    expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
+    // For the first agent with no AI in the team's order (Theo, made first), as Connect an AI picks in the app.
+    expect(within(panel).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Theo");
     expect(screen().queryByRole("button", { name: "Avançado" })).toBeNull();
-    // Theo picked: another plan's tile keeps him while he has none.
+    // Ada picked: another plan's tile keeps her while she has none.
     const agent = () => screen().getByRole("combobox", { name: "Para qual agente" });
     agent().focus();
     await act(async () => fireEvent.keyDown(agent(), { key: "Enter" }));
-    await click(screen().getByRole("option", { name: "Theo" }));
+    await click(screen().getByRole("option", { name: "Ada" }));
     await click(option(/^ChatGPT$/), 6);
-    expect(agent().textContent).toContain("Theo");
+    expect(agent().textContent).toContain("Ada");
     await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
   });
 
-  test("a plan for Ada: she thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
+  test("a plan for Theo: he thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {
     const { state, api } = await start();
     const host = fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
     // The computer finishes the sign-in as soon as the code goes.
@@ -733,20 +789,19 @@ describe("Onboarding", () => {
       window.open = realOpen;
     }
     await settle(6);
-    // No "Usar" to click: Ada thinks with it as soon as it's in.
-    const ada = calls(state, "agents.create").findIndex((c) => (c.args[1] as { name: string }).name === "Ada");
+    // No "Usar" to click: Theo thinks with it as soon as it's in.
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
       { brain: "claude_code", account: "acct_max" },
     ]);
-    expect(ada).toBeGreaterThan(-1);
-    expect(document.body.textContent).toContain("Ada agora pensa com Claude Max.");
+    expect(document.body.textContent).toContain("Theo agora pensa com Claude Max.");
+    // In the team's order, as the workspace lists them.
     const who = screen().getByRole("region", { name: "Quem pensa" });
     expect([...who.querySelectorAll(".ai-who__row")].map((r) => r.textContent)).toEqual([
-      "AdaClaude Max",
-      "TheoSem IA",
+      "TheoClaude Max",
+      "AdaSem IA",
     ]);
     expect(who.textContent).toContain("Cada plano pensa por um agente.");
-    const keyFor = within(who).getByRole("button", { name: "Chave de API para Theo" });
+    const keyFor = within(who).getByRole("button", { name: "Chave de API para Ada" });
     expect([...keyFor.querySelectorAll(".ac-brand-stack > .ac-brand")].map((m) => m.getAttribute("data-mark"))).toEqual(
       ["claude", "openai"],
     );

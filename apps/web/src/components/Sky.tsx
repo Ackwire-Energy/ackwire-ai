@@ -14,7 +14,6 @@ import {
   parseColor,
   pixelBurst,
   pixelOf,
-  prefersReducedMotion,
   SKY_TONES,
   type SkyOptions,
   softTones,
@@ -25,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
 import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
 
@@ -74,6 +74,8 @@ export function ChannelWelcome({
   const [greeting] = useState(() => claimGreeting(org.id, channelId));
   const [closed, setClosed] = useState(greeting.closed ?? false);
   const text = useRef<HTMLDivElement>(null);
+  const faces = useRef<HTMLDivElement>(null);
+  const shut = useRef<HTMLButtonElement>(null);
   if (!greeting.show || greeting.channelId !== channelId || closed || !messages || greeting.last === null) return null;
   const close = () => {
     greeting.closed = true;
@@ -96,6 +98,7 @@ export function ChannelWelcome({
           palette: SKY_TONES,
           sprites: { area: 1100, max: 30 },
           calm: () => [text.current],
+          clear: () => [faces.current, shut.current],
           base: (u, v) => 0.9 - 0.38 * u - 0.5 * v,
           blobs: (tt) => [
             [0.2 + 0.05 * S(tt * 0.21), 0.25 + 0.05 * C(tt * 0.17), 0.12, 0.14],
@@ -122,13 +125,19 @@ export function ChannelWelcome({
         </p>
       </div>
       {crew.length > 0 && (
-        <div className="sky-welcome__crew" aria-hidden="true">
+        <div className="sky-welcome__crew" aria-hidden="true" ref={faces}>
           {crew.map((id) => (
             <AgentAvatar key={id} agentId={id} name={dir.agentById.get(id)?.name ?? ""} size="lg" />
           ))}
         </div>
       )}
-      <button type="button" className="sky-welcome__close" aria-label={t("sky.welcome.dismiss")} onClick={close}>
+      <button
+        type="button"
+        className="sky-welcome__close"
+        aria-label={t("sky.welcome.dismiss")}
+        onClick={close}
+        ref={shut}
+      >
         <Icon name="close" size={16} />
       </button>
     </section>
@@ -137,12 +146,25 @@ export function ChannelWelcome({
 
 /* ---------- Agent page: the cover in the agent's color ---------- */
 
+/** The faces and pills on a sky, which its pixel agents keep clear of (`SkyOptions.clear`). */
+type Clear = SkyOptions["clear"];
+
 /**
  * The agent page's cover: a sky in the
  * agent's own color, lighter behind the agent (at `at`, 0..1 across) so its
- * body reads; faster and busier while it works.
+ * body reads; faster and busier while it works. `clear`: its portrait and the buttons on it.
  */
-export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy: boolean; at?: number }) {
+export function AgentCover({
+  color,
+  busy,
+  at = 0.1,
+  clear,
+}: {
+  color: AgentColor;
+  busy: boolean;
+  at?: number;
+  clear?: Clear;
+}) {
   return (
     <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true">
       <PixelSky
@@ -153,6 +175,7 @@ export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy:
           speed: busy ? 2.6 : 1,
           rise: busy ? 2.4 : 1,
           sprites: busy ? { area: 520, max: 40 } : { area: 1100, max: 20 },
+          clear,
           light: 0,
           base: (u, v, tt) => {
             const dx = (u - at) * 2.2;
@@ -167,8 +190,8 @@ export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy:
   );
 }
 
-/** Behind an agent's computer while its screen opens: its sky, calm, filling the stage. */
-export function ComputerSky({ color }: { color: AgentColor }) {
+/** Behind an agent's computer while its screen opens: its sky, calm, filling the stage. `clear`: the words on it. */
+export function ComputerSky({ color, clear }: { color: AgentColor; clear?: Clear }) {
   return (
     <span className="cmp-sky" aria-hidden="true">
       <PixelSky
@@ -177,6 +200,7 @@ export function ComputerSky({ color }: { color: AgentColor }) {
           palette: agentTones(color),
           body: spriteTone(color),
           sprites: { area: 1400, max: 12 },
+          clear,
           light: 0,
           base: (u, v, tt) => 0.78 - 0.18 * u - 0.4 * v + 0.06 * S(u * 5 + tt * 0.5),
         }}
@@ -189,9 +213,10 @@ export function ComputerSky({ color }: { color: AgentColor }) {
 
 /**
  * The sign-in screen's horizon: soft tones rising from the page
- * at the bottom, a few agents passing. Calm, so the one question above stays the subject.
+ * at the bottom, a few agents passing. Calm, so the one question above stays the subject. `clear`: the form, where a
+ * short screen brings it down onto the horizon.
  */
-export function AuthHorizon() {
+export function AuthHorizon({ clear }: { clear?: Clear }) {
   const opts: SkyOptions = {
     pixel: 4,
     surface: "--bg",
@@ -201,6 +226,7 @@ export function AuthHorizon() {
     ceil: 0.3,
     light: 0.06,
     sprites: 6,
+    clear,
     base: (u, v, tt) => {
       const s = Math.max(0, (v - 0.2) / 0.8);
       const e = s * s * (3 - 2 * s);
@@ -291,6 +317,7 @@ export function ConnectorSky({ brand }: { brand: string | null }) {
 export function BootSplash() {
   const { t } = useTranslation();
   const [start] = useState(() => (typeof performance === "undefined" ? 0 : performance.now()));
+  const mark = useRef<HTMLDivElement>(null);
   return (
     <div className="sky-boot" role="status" aria-live="polite">
       <PixelSky
@@ -300,13 +327,14 @@ export function BootSplash() {
           sprites: { area: 700, max: 40 },
           rise: 2.2,
           light: 0.12,
+          clear: () => [mark.current],
           base: (u, v, tt) => {
             const fill = Math.min(1, (performance.now() - start) / 1800);
             return -0.3 + 1.15 * fill * (0.35 + 0.65 * v) + 0.05 * S(u * 6 + tt);
           },
         }}
       />
-      <div className="sky-boot__in">
+      <div className="sky-boot__in" ref={mark}>
         <Logo size={40} />
         <span>{t("sky.boot")}</span>
       </div>
@@ -379,14 +407,15 @@ export function AgentGlow({ color }: { color: AgentColor }) {
   );
 }
 
-/** The sky rising from the sidebar's bottom: fuller the more agents are working. */
-export function SidebarHorizon({ working, total }: { working: number; total: number }) {
+/** The sky rising from the sidebar's bottom: fuller the more agents are working. `clear`: the faces on it. */
+export function SidebarHorizon({ working, total, clear }: { working: number; total: number; clear?: Clear }) {
   const share = total > 0 ? Math.min(1, working / Math.min(total, 3)) : 0;
   const target = 0.2 + 0.6 * share;
-  // Eases toward the new level frame by frame (at once with reduced motion).
+  // Eases toward the new level frame by frame (at once with reduced motion, followed as it changes, as the sky does).
+  const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
   level.current.target = target;
-  if (prefersReducedMotion()) level.current.now = target;
+  if (reduced) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
     surface: "--side",
@@ -396,6 +425,7 @@ export function SidebarHorizon({ working, total }: { working: number; total: num
     ceil: 0.3,
     light: 0.06,
     sprites: Math.min(8, working * 2),
+    clear,
     base: (u, v, tt) => {
       const s = Math.max(0, (v - 0.1) / 0.9);
       const e = s * s * (3 - 2 * s);
@@ -449,9 +479,10 @@ export function MenuHorizon() {
  */
 export function OnboardingHorizon({ progress }: { progress: number }) {
   const target = 0.45 + 0.4 * Math.max(0, Math.min(1, progress));
+  const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
   level.current.target = target;
-  if (prefersReducedMotion()) level.current.now = target;
+  if (reduced) level.current.now = target;
   const opts: SkyOptions = {
     pixel: 4,
     surface: "--side",
@@ -488,9 +519,10 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
  */
 export function OnboardingProgress({ progress }: { progress: number }) {
   const target = Math.max(0, Math.min(1, progress));
+  const reduced = usePrefersReducedMotion();
   const level = useRef({ now: target, target });
   level.current.target = target;
-  if (prefersReducedMotion()) level.current.now = target;
+  if (reduced) level.current.now = target;
   const body = pixelOf(spriteTone("sky"));
   const eye = pixelOf(EYE);
   const opts: SkyOptions = {
@@ -532,7 +564,7 @@ export function OnboardingProgress({ progress }: { progress: number }) {
 /* ---------- Criar agente ---------- */
 
 /** The live preview's cover: the draft agent's own sky, lighter right behind it so the body reads. */
-export function AgentPreviewSky({ color }: { color: AgentColor }) {
+export function AgentPreviewSky({ color, clear }: { color: AgentColor; clear?: Clear }) {
   return (
     <PixelSky
       options={{
@@ -540,6 +572,7 @@ export function AgentPreviewSky({ color }: { color: AgentColor }) {
         palette: agentTones(color),
         body: spriteTone(color),
         sprites: 4,
+        clear,
         light: 0,
         base: (u, v, tt) => {
           const dx = (u - 0.5) * 1.6;
@@ -556,10 +589,12 @@ export function AgentBornSky({
   color,
   at,
   calm,
+  clear,
 }: {
   color: AgentColor;
   at: [number, number];
   calm: () => (Element | null)[];
+  clear?: Clear;
 }) {
   return (
     <PixelSky
@@ -569,6 +604,7 @@ export function AgentBornSky({
         body: spriteTone(color),
         sprites: { area: 1200, max: 18 },
         calm,
+        clear,
         base: (u, v, tt) => 0.72 - 0.2 * u - 0.42 * v + 0.05 * S(u * 6 + tt * 0.5) + 0.04 * C(v * 7 - tt * 0.3),
         blobs: () => [[at[0], at[1], 0.06, 0.42]],
       }}
@@ -576,8 +612,8 @@ export function AgentBornSky({
   );
 }
 
-/** The onboarding's last card: a small sky, calm behind its text. */
-export function WelcomeSky({ calm }: { calm: () => (Element | null)[] }) {
+/** The onboarding's last card: a small sky, calm behind its text, its agents off the faces (`clear`). */
+export function WelcomeSky({ calm, clear }: { calm: () => (Element | null)[]; clear?: Clear }) {
   return (
     <PixelSky
       options={{
@@ -585,6 +621,7 @@ export function WelcomeSky({ calm }: { calm: () => (Element | null)[] }) {
         palette: SKY_TONES,
         sprites: { area: 1300, max: 24 },
         calm,
+        clear,
         base: (u, v) => 0.95 - 0.4 * u - 0.45 * v,
         blobs: (tt) => [
           [0.2 + 0.05 * S(tt * 0.21), 0.25 + 0.05 * C(tt * 0.17), 0.12, 0.12],

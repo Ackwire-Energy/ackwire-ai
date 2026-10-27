@@ -809,8 +809,8 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(panel().textContent).not.toContain("Avisamos");
     const signIn = () => within(panel()).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement;
     expect(signIn().disabled).toBe(true);
-    // A plan for Ada, the guide, first; Theo is the other choice.
-    expect(within(panel()).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Ada");
+    // A plan for the first agent with no AI in the team's order, Theo, as Connect an AI picks; Ada is the other choice.
+    expect(within(panel()).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Theo");
     // No socket here: the agent's view and the accounts are asked again every 5 s until something is connected,
     // and so is a hold, which the panel would say instead.
     expect(interval("brain")).toBe(5000);
@@ -824,12 +824,17 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
     expect(screen().getByRole("button", { name: "Conectar depois" })).toBeTruthy();
 
-    // It turns ready while the person watches: said in place, and the sign-in comes on. Still nothing started.
+    // It turns ready while the person watches: said in place, and the sign-in comes on. Still nothing started. The
+    // news comes with the setup's own poll (the rail's): the panel follows it then, not at its view's next poll.
+    const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
     r.machines.setSetup({ state: "ready", machineId: "m-1", specs: SPECS, notifyByEmail: true });
     r.computer.ready = true;
-    await act(async () => r.services.queryClient.invalidateQueries());
+    await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.computerSetup(orgId) }));
     await settle(8);
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
     expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+    expect(panel().textContent).not.toContain("Você entra aqui assim que ele ficar pronto.");
     expect(signIn().disabled).toBe(false);
     expect(interval("computer-setup")).toBe(false);
     expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(0);
@@ -841,7 +846,6 @@ describe("the onboarding where the workspace gets its own computer", () => {
     } finally {
       window.open = realOpen;
     }
-    const orgId = r.state.calls.find((c) => c.method === "agents.create")?.args[0];
     expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin").map((c) => c.args)).toEqual([
       [orgId, "m-1", "claude_code"],
     ]);
@@ -851,6 +855,78 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(r.state.calls.filter((c) => c.method === "machines.cancelAccountLogin").map((c) => c.args)).toEqual([
       [orgId, "m-1", "login_1"],
     ]);
+    // Back to the step (the team, kept as it is, then the AI): the panel still says the computer it waited for is ready.
+    await click(screen().getByRole("button", { name: "Voltar" }));
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: /^Continuar/ }));
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+  });
+
+  test("the AI step as it turns ready, the agent's view and the accounts still on their way: ready, its sign-in loading, never a wait", async () => {
+    for (const plan of ["Claude", "GLM Coding"] as const) {
+      const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS });
+      await click(screen().getByRole("button", { name: "Continuar" }));
+      await keepOnly("Theo · PM");
+      await click(screen().getByRole("button", { name: "Criar 1 agente" }));
+      if (plan !== "Claude") {
+        const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
+        await click(within(picker).getByRole("button", { name: /^GLM Coding/ }));
+      }
+      const panel = () =>
+        screen().getByRole("region", { name: plan === "Claude" ? "Seu plano do Claude" : "GLM Coding Plan" });
+      const action = () =>
+        within(panel()).getByRole("button", { name: plan === "Claude" ? "Entrar com Claude" : /^Enviar ao/ });
+      // Asked again at ready, the agent's view and the accounts answer late, the view first: each says what was
+      // true when it was asked.
+      let viewIn = () => {};
+      let accountsIn = () => {};
+      const viewBack = new Promise<void>((done) => {
+        viewIn = done;
+      });
+      const accountsBack = new Promise<void>((done) => {
+        accountsIn = done;
+      });
+      const brain = r.api.agents.brain;
+      r.api.agents.brain = async (...args) => {
+        const answer = brain(...args);
+        await viewBack;
+        return answer;
+      };
+      const accounts = r.api.machines.aiAccounts;
+      r.api.machines.aiAccounts = async (...args) => {
+        const answer = accounts(...args);
+        await accountsBack;
+        return answer;
+      };
+      const orgId = String(r.state.calls.find((c) => c.method === "agents.create")?.args[0]);
+      r.machines.setSetup({ state: "ready", machineId: "m-1", specs: SPECS });
+      r.computer.ready = true;
+      await act(async () => r.services.queryClient.invalidateQueries({ queryKey: keys.computerSetup(orgId) }));
+      await settle(8);
+      // Whatever has come back, the panel says what the rail says, and no plan dims.
+      const saysReady = () => {
+        const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+        expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Pronto");
+        expect(panel().textContent).toContain("O Computador da Acme Saúde está pronto.");
+        expect(panel().textContent).not.toContain("assim que ele ficar pronto");
+        expect(panel().textContent).not.toContain("Ainda não está pronto");
+        expect(document.querySelectorAll(".grid-options--plans .ac-brand--off")).toHaveLength(0);
+      };
+      saysReady();
+      expect(action().getAttribute("aria-busy")).toBe("true");
+      viewIn();
+      await settle(8);
+      saysReady();
+      expect(action().getAttribute("aria-busy")).toBe("true");
+      accountsIn();
+      await settle(8);
+      saysReady();
+      expect(action().hasAttribute("aria-busy")).toBe(false);
+      if (plan === "Claude") expect((action() as HTMLButtonElement).disabled).toBe(false);
+      expect(r.state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(0);
+      cleanup();
+    }
   });
 
   test("the AI step while it waits for a computer or has a problem: the email in place of a time, no key button", async () => {
@@ -868,7 +944,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(lines.filter(leadsWithClock).map((l) => l.textContent)).toEqual([
         "Você entra aqui assim que ele ficar pronto.",
       ]);
-      // A key is the picker's own row, in view above the panel: no button for it in any wait.
+      // A key is the picker's own row, under the panel: no button for it in any wait.
       expect(within(panel).queryByRole("button", { name: "Usar uma chave de API agora" })).toBeNull();
       const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });
       await click(within(picker).getByRole("button", { name: /^Chave de API/ }));

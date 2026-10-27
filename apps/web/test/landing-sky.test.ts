@@ -39,6 +39,20 @@ describe("the landing's sky", () => {
     }
   });
 
+  test("off screen and back before the observer called: it moves again", () => {
+    const sky = heroSky(false);
+    try {
+      sky.onScreen(false);
+      sky.frames(500);
+      const drawn = sky.draws();
+      sky.onScreen(false, true);
+      sky.frames(500);
+      expect(sky.draws()).toBeGreaterThan(drawn + 10);
+    } finally {
+      sky.close();
+    }
+  });
+
   test("with reduced motion: one still frame, and no frame asked for after it", () => {
     const sky = heroSky(true);
     try {

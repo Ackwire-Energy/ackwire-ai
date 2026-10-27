@@ -35,6 +35,40 @@ describe("Dialog", () => {
     expect(within(dialog).getByRole("button", { name: "Fechar" })).toBeTruthy();
   });
 
+  test("opened with nothing pressed (from a link, by itself): the dialog holds the focus, not its close button", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar">
+        <Input aria-label="Chave" />
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    expect(document.activeElement).toBe(dialog);
+  });
+
+  test("from the dialog itself, Shift+Tab goes round to its last control that takes the focus", async () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Conectar uma IA" closeLabel="Fechar">
+        <Input aria-label="Chave" />
+        <DialogFooter>
+          <Button>Salvar chave</Button>
+          <Button disabled>Remover</Button>
+        </DialogFooter>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
+    await act(async () => fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true }));
+    expect(document.activeElement).toBe(body().getByRole("button", { name: "Salvar chave" }));
+  });
+
+  test("a field that takes the focus on its own keeps it", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Renomear" closeLabel="Fechar">
+        <Input aria-label="Nome" autoFocus />
+      </Dialog>,
+    );
+    expect(document.activeElement).toBe(body().getByRole("textbox", { name: "Nome" }));
+  });
+
   test("Escape closes it and focus returns to the trigger", async () => {
     render(<Harness />);
     const trigger = body().getByRole("button", { name: "Ajustar orçamento" });

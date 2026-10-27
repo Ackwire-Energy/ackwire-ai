@@ -53,9 +53,9 @@ export function AiAccountsSection() {
   const several = new Set(rows.map((r) => r.machineId)).size > 1;
   const meterText = planMeterText(t, i18n.language);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
-  // The same picker as everywhere an AI is connected.
+  // The same picker as everywhere an AI is connected, from the card's head as Provider keys' Add key is.
   const connect = connectAi && (
-    <Button size="sm" variant={rows.length ? "default" : "primary"} icon="plus" onClick={() => connectAi.open({})}>
+    <Button size="sm" icon="plus" onClick={() => connectAi.open({})}>
       {t("aiAccounts.page.connect")}
     </Button>
   );
@@ -77,7 +77,7 @@ export function AiAccountsSection() {
 
   return (
     <Card aria-labelledby="sec-plans">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
+      <div className="row" style={{ gap: 12 }}>
         <span className="ac-hintline" style={{ flex: "1 1 280px" }}>
           <h2 id="sec-plans" className="ac-card__title">
             {t("aiAccounts.page.title")}
@@ -86,16 +86,11 @@ export function AiAccountsSection() {
             {t("aiAccounts.page.hint")}
           </InfoHint>
         </span>
-        {rows.length > 0 && connect}
+        {connect}
       </div>
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
-      {ai.isSuccess && rows.length === 0 && (
-        <div className="ai-accounts__empty">
-          <p className="small muted">{t("aiAccounts.page.empty")}</p>
-          {connect}
-        </div>
-      )}
+      {ai.isSuccess && rows.length === 0 && <p className="small muted">{t("aiAccounts.page.empty")}</p>}
       {rows.length > 0 && (
         <List>
           {rows.map((a) => {

@@ -34,6 +34,8 @@ export interface CodingPlan {
   site: string;
   /** What its keys look like (a `RegExp` source): loose, only to catch a paste that isn't a key. */
   keyPattern: string;
+  /** How its keys start, as the key field's example; none where the maker publishes no prefix. */
+  placeholder?: string;
   claudeCode: {
     /** Its Anthropic Messages endpoint (Claude Code adds `/v1/messages`). */
     baseUrl: string;
@@ -101,6 +103,7 @@ export const CODING_PLANS = {
     maker: "OpenCode",
     site: "https://opencode.ai/console",
     keyPattern: "^oc_sk_[A-Za-z0-9._-]{8,256}$",
+    placeholder: "oc_sk_…",
     claudeCode: {
       baseUrl: "https://opencode.ai/inference/go/anthropic",
       tokenEnv: "ANTHROPIC_AUTH_TOKEN",
