@@ -29,6 +29,7 @@ import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
 import { agentFolderName, isInside } from "./paths";
+import type { Spawn } from "./scope-gate";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -559,10 +560,11 @@ export async function launchChrome(
   args: string[],
   profile: string,
   env?: Record<string, string>,
+  start: Spawn = spawn,
 ): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
   await rm(portFile, { force: true });
-  const child = spawn(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
+  const child = start(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
   let output = "";
   let started = false;
   // Read for as long as Chrome runs, since a full pipe would stall it; only what it says while starting is kept.

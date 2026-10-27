@@ -41,7 +41,7 @@ const BrowserTraffic = z
   .nullable()
   .openapi({
     description:
-      "What the agents' browsers on these computers sent and received over the last day, in MB (10^6 bytes), as their Chrome counts each request's headers and body; `hours` counted on average and how many of them said. Null when none did.",
+      "What the agents' browsers on these computers sent and received over the last day, in MB (10^6 bytes), as their Chrome counts each request's headers and body, with the `hours` counted on average and how many of them said. Null when none did.",
   });
 
 const Report = z
