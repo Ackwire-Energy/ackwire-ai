@@ -1314,6 +1314,11 @@ export const en: Translations = {
       unattended: "nobody watching",
     },
     said: "<b>{{name}}:</b> “{{text}}”",
+    /** A request in the conversation, as the agent asking (ApprovalAsk). */
+    askPlain: "I need your OK to go on:",
+    seeEmail: "See the email",
+    seeDetails: "See details",
+    notNow: "Not now",
     email: {
       from: "From",
       to: "To",
@@ -5469,7 +5474,7 @@ export const en: Translations = {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
-      held: "{{name}} reads it after your decision on the card",
+      held: "{{name}} reads it after your decision",
       read: "{{name}} read it",
       resolved: "{{name}} closed the help request",
     },
@@ -7478,6 +7483,15 @@ export const en: Translations = {
       steps_other: "{{count}} steps",
       none: "Answered without tools.",
       failed: "Couldn't load the steps.",
+      /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
+      block: "What {{pronoun}} did",
+      used_one: "Used {{count}} tool",
+      used_other: "Used {{count}} tools",
+      times: "×{{count}}",
+      erred: "Error while {{activity}}",
+      gave: "given",
+      answered: "answered",
+      error: "error",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {

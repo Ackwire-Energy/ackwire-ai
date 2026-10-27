@@ -1330,6 +1330,11 @@ export const ptBR = {
       unattended: "sem ninguém acompanhando",
     },
     said: "<b>{{name}}:</b> “{{text}}”",
+    /** A request in the conversation, as the agent asking (ApprovalAsk). */
+    askPlain: "Preciso do seu ok para seguir:",
+    seeEmail: "Ver o e-mail",
+    seeDetails: "Ver detalhes",
+    notNow: "Agora não",
     email: {
       from: "De",
       to: "Para",
@@ -5495,7 +5500,7 @@ export const ptBR = {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
-      held: "{{name}} lê depois da sua decisão no card",
+      held: "{{name}} lê depois da sua decisão",
       read: "{{name}} leu",
       resolved: "{{name}} encerrou o pedido de ajuda",
     },
@@ -7518,6 +7523,15 @@ export const ptBR = {
       steps_other: "{{count}} passos",
       none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
+      /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
+      block: "O que {{pronoun}} fez",
+      used_one: "Usou {{count}} ferramenta",
+      used_other: "Usou {{count}} ferramentas",
+      times: "×{{count}}",
+      erred: "Deu erro {{activity}}",
+      gave: "recebeu",
+      answered: "devolveu",
+      error: "erro",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
