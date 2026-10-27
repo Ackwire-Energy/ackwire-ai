@@ -75,7 +75,7 @@ describe("route guards", () => {
 
   test("an organization you're not in shows a designed state, not a crash", async () => {
     await renderApp("/org/someone-else/drive", { api: createFakeApi() });
-    expect(screen().getByRole("heading", { name: "Você não faz parte desta organização" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Você não faz parte deste workspace" })).toBeTruthy();
   });
 
   test("Threads: the page, and a thread that doesn't exist (designed states)", async () => {

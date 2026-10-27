@@ -296,7 +296,7 @@ describe("Membros", () => {
       emails: ["carla@acme.com.br", "joao@acme.com.br"],
       role: "member",
     });
-    expect(document.body.textContent).toContain("joao@acme.com.br já faz parte da organização.");
+    expect(document.body.textContent).toContain("joao@acme.com.br já faz parte do workspace.");
     expect((input as HTMLInputElement).value).toBe("joao@acme.com.br");
     const pending = screen().getByRole("region", { name: "Convites pendentes" });
     expect(pending.textContent).toContain("carla@acme.com.br");

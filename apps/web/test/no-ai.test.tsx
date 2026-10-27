@@ -183,12 +183,12 @@ describe("no AI connected: above the composer", () => {
     await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }), `agents/${ADA_ID}`);
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(work.textContent).toContain("Pensa comSem IA");
-    expect(work.textContent).not.toContain("o modelo da organização");
+    expect(work.textContent).not.toContain("o modelo do workspace");
     await click(within(work).getByRole("button", { name: "Conectar uma IA" }));
     expect(dialog("Conectar uma IA para a Ada")).not.toBeNull();
     cleanup();
     await open(seedState({ aiStatus: aiStatus(true, ATLAS_ID) }), `agents/${ADA_ID}`);
-    expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("o modelo da organização");
+    expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("o modelo do workspace");
   });
 });
 

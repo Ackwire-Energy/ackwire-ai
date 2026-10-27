@@ -37,12 +37,12 @@ const pick = async (dialog: HTMLElement, name: string) => {
   await click(within(pane).getByRole("button", { name: `Conectar ${name}` }));
 };
 
-describe("Configurações da organização", () => {
+describe("Configurações do workspace", () => {
   test("organization context saves by itself with PATCH /settings (no save button)", async () => {
     const { state } = await go();
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Salvar organização" })).toBeNull();
-    const field = screen().getByLabelText("Contexto da organização");
+    const field = screen().getByLabelText("Contexto do workspace");
     await type(field, "A Acme faz um app para clínicas.");
     await act(async () => fireEvent.blur(field));
     await settle(4);
@@ -53,7 +53,7 @@ describe("Configurações da organização", () => {
 
   test("Geral: each row is its label and control; what a setting means is behind its ⓘ", async () => {
     await go();
-    const org = screen().getByRole("region", { name: "Organização" });
+    const org = screen().getByRole("region", { name: "Workspace" });
     expect(org.querySelectorAll(".settings-row__help")).toHaveLength(0);
     expect(hintOf("Fuso horário", org)).toMatchObject({
       text: "As rotinas e os resumos usam este fuso.",
@@ -66,7 +66,7 @@ describe("Configurações da organização", () => {
     );
     expect(context.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
     // Each tile: the area's name and how it is now, nothing more.
-    const tiles = screen().getByRole("region", { name: "Tudo da organização" });
+    const tiles = screen().getByRole("region", { name: "Tudo do workspace" });
     expect(tiles.querySelectorAll(".settings-tile").length).toBeGreaterThan(0);
     expect(tiles.querySelector(".ac-card__sub")).toBeNull();
   });
@@ -342,7 +342,7 @@ describe("Configurações da organização", () => {
     expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
     expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");
     expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$ 92,00 pela API");
-    const api = screen().getByRole("region", { name: "API da organização" });
+    const api = screen().getByRole("region", { name: "API do workspace" });
     expect(api.textContent).toContain("23% do orçamento");
     expect(api.textContent).toContain("US$ 11,50 de US$ 50,00 (padrão do workspace)");
     expect(within(api).getByRole("meter", { name: "Orçamento usado de Atlas" }).getAttribute("aria-valuenow")).toBe(
@@ -394,7 +394,7 @@ describe("Configurações da organização", () => {
     await go(state, "settings/usage");
     const plans = screen().getByRole("region", { name: "Contas dos planos" });
     expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
-    expect(screen().getByRole("region", { name: "API da organização" }).textContent).toContain("23% do orçamento");
+    expect(screen().getByRole("region", { name: "API do workspace" }).textContent).toContain("23% do orçamento");
     expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
     expect(document.body.textContent).not.toContain("US$");
@@ -413,7 +413,7 @@ describe("Configurações da organização", () => {
       hidden: true,
     });
     expect(shownText(plans)).not.toContain("estimativa");
-    for (const card of [plans, screen().getByRole("region", { name: "API da organização" })])
+    for (const card of [plans, screen().getByRole("region", { name: "API do workspace" })])
       expect(card.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
     cleanup();
     const api = createFakeApi(seedState());

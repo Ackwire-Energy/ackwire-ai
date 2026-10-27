@@ -114,7 +114,7 @@ describe("agent page: tabs and the URL", () => {
     expect(within(cover).getByRole("button", { name: "Mais ações" })).toBeTruthy();
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
     expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
-    expect(work.textContent).toContain("o modelo da organização");
+    expect(work.textContent).toContain("o modelo do workspace");
   });
 });
 

@@ -459,15 +459,15 @@ describe("Configurações → Computadores", () => {
     expect(row.textContent).toContain("Computador deste servidor");
 
     const menu = await openMenu(within(row).getByRole("button", { name: "Ações de srv-1" }));
-    await click(within(menu).getByRole("menuitem", { name: "Parar de usar nesta organização" }));
+    await click(within(menu).getByRole("menuitem", { name: "Parar de usar neste workspace" }));
     const confirm = screen().getByRole("dialog", { name: "Parar de usar o computador deste servidor?" });
     expect(confirm.textContent).toContain("Dá para voltar a usar quando quiser");
-    await click(within(confirm).getByRole("button", { name: "Parar de usar nesta organização" }));
+    await click(within(confirm).getByRole("button", { name: "Parar de usar neste workspace" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);
 
     const off = document.querySelector(".machine-row") as HTMLElement;
-    expect(off.textContent).toContain("Esta organização não usa o computador deste servidor.");
+    expect(off.textContent).toContain("Este workspace não usa o computador deste servidor.");
     await click(within(off).getByRole("button", { name: "Usar o computador deste servidor" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "machines.hostOn")?.args).toEqual([ORG_ID]);

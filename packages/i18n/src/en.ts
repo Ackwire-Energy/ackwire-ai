@@ -42,7 +42,7 @@ export const en: Translations = {
     today: "Today",
     yesterday: "Yesterday",
     loadFailed: "Couldn't load this. Check your connection and try again.",
-    notAllowed: "You don't have permission for this. Ask an organization admin.",
+    notAllowed: "You don't have permission for this. Ask a workspace admin.",
   },
   roles: {
     owner: "Owner",
@@ -53,7 +53,7 @@ export const en: Translations = {
     memberLower: "member",
     memberDesc: "Chats, creates tasks, approves their own agents",
     adminDesc: "Also manages members, agents and keys",
-    ownerTitle: "An organization always has an owner",
+    ownerTitle: "A workspace always has an owner",
   },
   auth: {
     email: "Email",
@@ -111,7 +111,7 @@ export const en: Translations = {
       newPassword: "Now a password.",
       newPasswordNamed: "Great, {{name}}. Now a password.",
       closed: "This email has no account yet.",
-      closedLead: "Sign-up is closed. Ask whoever manages your organization for an invitation.",
+      closedLead: "Sign-up is closed. Ask whoever manages your workspace for an invitation.",
       otherEmail: "Use another email",
       forgot: "I'll send you a link to create a new password.",
       forgotLead: "Check the email:",
@@ -577,9 +577,14 @@ export const en: Translations = {
       hostConnecting: "The chosen agents will work on this server's computer. It connects within a minute.",
       leadCloud: "On a computer just for this workspace, always on.",
       leadCloudPaused: "On a computer just for this workspace, prepared once the workspace is working again.",
+      payment: {
+        title: "The workspace's computer comes with its agentes.chat plan",
+        body: "Choose an agentes.chat plan and the computer is ready in minutes, always on. You can go on and come back to this later.",
+      },
     },
     team: {
       title: "Who else works with you?",
+      payment: "You can invite your team once you choose an agentes.chat plan.",
       lead: "Invite them by email, or share the link.",
       emails: "Emails",
       placeholder: "name@company.com, other@company.com",
@@ -748,9 +753,9 @@ export const en: Translations = {
     soundPixel: "Pixel",
     soundOff: "Off",
     languageCurrent: "Language: {{name}}",
-    orgSettings: "Organization settings",
-    switchOrg: "Switch organization",
-    newOrg: "Create another organization",
+    orgSettings: "Workspace settings",
+    switchOrg: "Switch workspace",
+    newOrg: "Create another workspace",
     gallery: "Component gallery",
     unread_one: "{{count}} unread message",
     unread_other: "{{count}} unread messages",
@@ -817,7 +822,7 @@ export const en: Translations = {
       linear: "Linear",
       gdrive: "Google Drive",
       mail: "Email",
-      custom: "Organization tools",
+      custom: "Workspace tools",
     },
   },
   sky: {
@@ -963,6 +968,7 @@ export const en: Translations = {
     popoverTitle: "Agents",
     seenBy: "Seen by {{names}}",
     retry: "Try again",
+    platformCap: "Mention an agent with @ to have it answer.",
   },
   noAi: {
     banner: {
@@ -1046,7 +1052,7 @@ export const en: Translations = {
   },
   keyGuard: {
     title: "This looks like an API key",
-    text: "Everything in the chat is visible to people and agents. Save it as an organization key instead: it's encrypted and nobody sees it.",
+    text: "Everything in the chat is visible to people and agents. Save it as a workspace key instead: it's encrypted and nobody sees it.",
     textMember: "Everything in the chat is visible to people and agents. A key is like a password.",
     save: "Save as a key",
     remove: "Remove it",
@@ -1189,7 +1195,7 @@ export const en: Translations = {
     topicPlaceholder: "What is talked about here",
     visibility: "Who can join",
     public: "Public",
-    publicDesc: "Anyone in the organization sees and joins it.",
+    publicDesc: "Anyone in the workspace sees and joins it.",
     private: "Private",
     privateDesc: "Only who is added.",
     members: "Initial members",
@@ -1649,7 +1655,7 @@ export const en: Translations = {
       close: "Close",
       exact: "The exact action",
       builtIn: "agentes.chat tool",
-      orgConnector: "Your organization's connector",
+      orgConnector: "Your workspace's connector",
       bound: "Only for these values: any change needs a new approval.",
       why: "Why",
       trail: "How it got here",
@@ -1740,7 +1746,7 @@ export const en: Translations = {
       sentenceMember: "Thinks with <brain/><end>.</end>",
       sentenceCloud: "Thinks with <brain/> in the <computer/> and <browser/><end>.</end>",
       sentenceMachine: "Thinks with <brain/> on <computer/> and <browser/><end>.</end>",
-      orgModel: "the organization's model",
+      orgModel: "the workspace's model",
       cell: {
         label: "How it works",
         computer: "Works on",
@@ -1775,7 +1781,7 @@ export const en: Translations = {
       usePlan: { claude_code: "Use my Claude plan", codex: "Use my ChatGPT plan" },
       brain: {
         sub: "Applies to every conversation.",
-        model: "Organization's model",
+        model: "Workspace's model",
         modelText: "Through the API. Usage counts in {{name}}'s budget.",
         claude_codeText: "Uses your Claude plan",
         codexText: "Uses your ChatGPT plan",
@@ -1798,7 +1804,7 @@ export const en: Translations = {
         keyLabel: "API key",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
         fallbackHint:
-          "It uses the organization's model and counts in {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
+          "It uses the workspace's model and counts in {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
         effort: "Effort",
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortText: {
@@ -1848,8 +1854,8 @@ export const en: Translations = {
         offline: "Offline right now",
         browser: "Browser",
         browserPending: "Browser (needs turning on)",
-        onlyModel: "Only the organization's model",
-        alsoBrain: "Goes back to the organization's model ({{brain}} isn't there)",
+        onlyModel: "Only the workspace's model",
+        alsoBrain: "Goes back to the workspace's model ({{brain}} isn't there)",
         alsoBrowser: "Stops browsing websites",
         alsoOffline: "It's offline: until it's back, {{name}} waits",
         connect: "Connect another computer",
@@ -2431,8 +2437,8 @@ export const en: Translations = {
       help: { title: "Who to ask for help", desc: "When stuck", text: "When stuck, ask {{name}} in the channel." },
     },
     noInstructions: "Without instructions, {{name}} follows only the workspace context.",
-    connectedCount_one: "{{count}} connected by the organization",
-    connectedCount_other: "{{count}} connected by the organization",
+    connectedCount_one: "{{count}} connected by the workspace",
+    connectedCount_other: "{{count}} connected by the workspace",
     all: "All:",
     connectorsLabel: "Connectors and levels",
     connectOther: "Connect another app",
@@ -2549,7 +2555,7 @@ export const en: Translations = {
     people: "People",
     seen: "Active {{when}}",
     batch: {
-      already_member: "{{email}} is already in the organization.",
+      already_member: "{{email}} is already in the workspace.",
       already_invited: "{{email}} already has a pending invitation. Use Resend.",
       invalid_email: "{{email}} doesn't look like a valid email.",
     },
@@ -2607,23 +2613,23 @@ export const en: Translations = {
       title: "Direct message with {{name}}",
       text: "Direct messages haven't arrived yet. For now, talk with {{name}} in a channel.",
     },
-    forum: { title: "Forum", text: "Long discussions and organization announcements will live here." },
+    forum: { title: "Forum", text: "Long discussions and workspace announcements will live here." },
     search: {
       title: "Search the workspace",
       text: "Search across messages, tasks and files will show up here.",
       placeholder: "Search messages, tasks and files",
     },
     settings: {
-      title: "Organization settings",
-      text: "The organization's name, context, keys and connectors will live here.",
+      title: "Workspace settings",
+      text: "The workspace's name, context, keys and connectors will live here.",
     },
     soon: "Coming soon",
     goToChannel: "Go to #{{channel}}",
     notFoundTitle: "Page not found",
     notFoundText: "The address doesn't exist or has changed.",
     goHome: "Back to start",
-    noOrgTitle: "You're not part of this organization",
-    noOrgText: "Ask someone in the organization for an invitation, or go back to yours.",
+    noOrgTitle: "You're not part of this workspace",
+    noOrgText: "Ask someone in the workspace for an invitation, or go back to yours.",
   },
   scopes: {
     context_read: {
@@ -2677,7 +2683,7 @@ export const en: Translations = {
     },
     wiki_read: {
       label: "Read the wiki",
-      description: "Search and read the organization's wiki pages.",
+      description: "Search and read the workspace's wiki pages.",
     },
     wiki_write: {
       label: "Write to the wiki",
@@ -3150,7 +3156,7 @@ export const en: Translations = {
       failing_other: "Failing ({{count}} in a row)",
     },
     pausedReason: {
-      creator_left: "Paused: whoever created it left the organization",
+      creator_left: "Paused: whoever created it left the workspace",
       creator_no_access: "Paused: whoever created it can no longer post in that conversation",
       agent_archived: "Paused: the agent was archived",
       agent_not_in_channel: "Paused: the agent is no longer in the channel",
@@ -3223,7 +3229,7 @@ export const en: Translations = {
       deleted: "Stopped: the routine was deleted",
       paused: "Stopped: the routine was paused",
       lost: "Got lost on the way and didn't finish",
-      creator_left: "Stopped: whoever created it left the organization",
+      creator_left: "Stopped: whoever created it left the workspace",
       creator_no_access: "Couldn't tell: whoever created it can no longer post there",
       audience: "Didn't run: whoever created it can no longer talk to the agent",
       agent_not_in_channel: "Didn't run: the agent is no longer in the channel",
@@ -4627,7 +4633,7 @@ export const en: Translations = {
   forum: {
     title: "Forum",
     subtitle: "A question with a goal. The agents discuss it in rounds, one at a time, and close with a synthesis.",
-    guard: "Everyone in the organization can read it. Each turn is a normal run: tools and approvals apply.",
+    guard: "Everyone in the workspace can read it. Each turn is a normal run: tools and approvals apply.",
     new: "New topic",
     filters: "Filter topics",
     filter: { open: "In discussion", done: "Concluded", mine: "Mine" },
@@ -4777,7 +4783,7 @@ export const en: Translations = {
       readsCanEnter: "reads and can join",
       entered: "joined in round {{round}}",
       sits: "at the table",
-      orgReads: "the whole organization reads",
+      orgReads: "the whole workspace reads",
     },
     posts: {
       round: "Round {{n}}",
@@ -5029,7 +5035,7 @@ export const en: Translations = {
         "With a single agent, use a thread or “Ask {{name}}” on the task. The forum is for views that can disagree.",
       minAgents: "Pick at least 2 agents for a discussion.",
       people: "People notified",
-      peopleHint: "everyone in the organization can read it",
+      peopleHint: "everyone in the workspace can read it",
       meAlways: "you, always notified",
       seatMe: "I sit at the table",
       seatMeHint: "wait for me in the rounds",
@@ -5041,7 +5047,7 @@ export const en: Translations = {
       approvals: "Each turn is a normal run: approvals apply.",
       create: "Open topic",
       open: "Open forum",
-      created: "Topic opened. {{name}} speaks first; everyone in the organization can read it.",
+      created: "Topic opened. {{name}} speaks first, and everyone in the workspace can read it.",
     },
     participantsDialog: {
       title: "Participants",
@@ -5052,7 +5058,7 @@ export const en: Translations = {
       speaksAt: "speaks {{n}}",
       entered: "joined the discussion",
       notified: "was notified and can join",
-      org: "The whole organization",
+      org: "The whole workspace",
       orgReads: "reads the topic",
       note: "Changes to the table apply from the next round.",
       edit: "Edit",
@@ -5195,7 +5201,7 @@ export const en: Translations = {
     starter: "Suggested structure",
     starterPages: {
       overview: "Overview",
-      overviewBody: "What the organization does, who's who and where to start.",
+      overviewBody: "What the company does, who's who and where to start.",
       processes: "Processes",
       howWeWork: "How we work",
       howWeWorkBody: "Rituals, tools and agreements.",
@@ -5632,7 +5638,7 @@ export const en: Translations = {
     tooMany: "At most {{max}} domains.",
     preset: { python: "Python packages", node: "Node packages" },
     dailyMinutes: "Usage time per day (minutes)",
-    dailyMinutesHelp: "Adding up every agent in the organization.",
+    dailyMinutesHelp: "Adding up every agent in the workspace.",
     minutesInvalid: "Use 0 to 1440 minutes.",
     timeout: "Max time for each command (seconds)",
     timeoutHelp: "A command that goes past it is stopped. Up to {{max}} seconds.",
@@ -6814,6 +6820,9 @@ export const en: Translations = {
     downloadOnly: "No preview for this type of file. Download it to open.",
   },
   errors: {
+    org: {
+      membersFull: "This workspace has no room for more people right now. Let whoever invited you know.",
+    },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
       full: "This workspace has many requests waiting. Try again later, or ask someone there to invite you by email.",
@@ -6970,11 +6979,11 @@ export const en: Translations = {
       desc: "Where agentes.chat is installed.",
       descUsers: "Where agentes.chat is installed, one user per agent.",
       descShared: "The computer agentes.chat is installed on. Agents work as the person who installed it.",
-      stop: "Stop using it in this organization",
+      stop: "Stop using it in this workspace",
       stopTitle: "Stop using this server's computer?",
-      stopText: "This organization's agents stop using this computer now. You can use it again whenever you want.",
-      stopped: "This organization no longer uses this server's computer.",
-      offText: "This organization doesn't use this server's computer.",
+      stopText: "This workspace's agents stop using this computer now. You can use it again whenever you want.",
+      stopped: "This workspace no longer uses this server's computer.",
+      offText: "This workspace doesn't use this server's computer.",
       use: "Use this server's computer",
       used: "Done. It connects within a minute.",
     },
@@ -7166,9 +7175,9 @@ export const en: Translations = {
     warning: "Only confirm if you just opened this on your computer.",
     asked: "Asked {{when}}",
     near: "Near {{place}}",
-    org: "Organization",
+    org: "Workspace",
     orgHelp: "Its agents will be able to use this computer, once someone picks it.",
-    noOrgs: "You can't connect computers in any organization. Ask an admin.",
+    noOrgs: "You can't connect computers in any workspace. Ask an admin.",
     confirm: "Connect",
     deny: "It wasn't me",
     loading: "Looking up the computer…",
@@ -7192,7 +7201,7 @@ export const en: Translations = {
   settings: {
     nav: "Settings sections",
     group: {
-      org: "Organization",
+      org: "Workspace",
       agents: "Agents",
       costs: "Costs and data",
     },
@@ -7207,9 +7216,10 @@ export const en: Translations = {
       computers: "Computers",
       usage: "Budget and usage",
       import: "Import and export",
+      billing: "Plan and billing",
     },
     sectionText: {
-      general: "Name, time zone and what every agent knows about the organization.",
+      general: "Name, time zone and what every agent knows about the workspace.",
       members: "Who is in the workspace, and invitations.",
       access: "What each agent can use: one level per connector.",
       connectors: "Services connected once for the whole workspace.",
@@ -7218,12 +7228,13 @@ export const en: Translations = {
       storage: "Where the workspace's files live.",
       usage: "Budgets and what each agent spent this month.",
       import: "Bring agents from another app or workspace, and take this one wherever you want.",
+      billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
     },
     title: "Settings",
-    orgTitle: "Organization",
+    orgTitle: "Workspace",
     name: "Name",
     savedShort: "Saved",
-    context: "Organization context",
+    context: "Workspace context",
     contextTitle: "What agents know about {{name}}",
     contextSubtitle: "Every agent reads this before each conversation.",
     contextPlaceholder: "E.g. We are a travel agency for families. We serve customers on WhatsApp…",
@@ -7249,7 +7260,7 @@ export const en: Translations = {
       dialogTitle: "What is sent",
       dialogText: "Once a day. This is the next report, exactly.",
     },
-    tilesTitle: "Everything in the organization",
+    tilesTitle: "Everything in the workspace",
     tileState: {
       members_one: "{{count}} member",
       members_other: "{{count}} members",
@@ -7324,7 +7335,7 @@ export const en: Translations = {
     kinds: { agent: "Agents", router: "Router", embedding: "Search", summary: "Summaries", sandbox: "Sandbox" },
     usageCalls_one: "{{count}} call",
     usageCalls_other: "{{count}} calls",
-    usageHidden: "Only admins see the organization's usage.",
+    usageHidden: "Only admins see the workspace's usage.",
   },
   usageViews: {
     and: " and ",
@@ -7346,7 +7357,7 @@ export const en: Translations = {
       empty: "No agent thinks with a plan yet.",
     },
     api: {
-      title: "Organization API",
+      title: "Workspace API",
     },
     agent: {
       title: "{{name}}'s usage",
@@ -7818,7 +7829,7 @@ export const en: Translations = {
     },
     search_wiki: {
       label: "Search wiki",
-      description: "Searches the organization's wiki pages.",
+      description: "Searches the workspace's wiki pages.",
     },
     read_wiki_page: {
       label: "Read wiki page",
@@ -8234,6 +8245,8 @@ export const en: Translations = {
     paused: "Agents in this workspace are paused for review.",
     suspended: "This workspace is unavailable for now.",
     createRefused: "You can't create a workspace right now.",
+    createUnpaid:
+      "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another.",
     agentPaused: "This agent is paused for now.",
     onHold: "This workspace is on hold: {{reason}}",
     suspendedFor: "This workspace is suspended: {{reason}}",
@@ -8248,6 +8261,26 @@ export const en: Translations = {
       hold: "The workspace is on hold: its agents are paused",
       suspended: "The workspace was suspended",
       active: "The workspace is working again",
+      /** A hold the billing service set (ADR 0071): its code, never shown as it comes. */
+      billing: {
+        payment: "The workspace needs an agentes.chat plan",
+        unpaid: "The agentes.chat plan payment didn't go through",
+        ended: "The workspace's agentes.chat plan ended",
+      },
+    },
+    /** A hold the billing service set (ADR 0071), said in place of its code. */
+    billing: {
+      payment: "This workspace doesn't have an agentes.chat plan yet. Its agents start working once it does.",
+      unpaid: "This workspace's agentes.chat plan payment didn't go through, and its agents stopped.",
+      ended:
+        "This workspace's agentes.chat plan ended, and its agents stopped. Its conversations and files are still here to read and download.",
+      sub: "You can still read and write here. The agents come back once the agentes.chat plan is in order.",
+      cta: {
+        payment: "See agentes.chat plans",
+        unpaid: "Update payment",
+        ended: "Subscribe again",
+      },
+      askAdmin: "Whoever runs this workspace can sort this out.",
     },
   },
   /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */
@@ -8255,6 +8288,36 @@ export const en: Translations = {
     writeBefore: "Need help? Write to ",
     writeAfter: ".",
     ask: "Need help? Ask the people who run this server.",
+  },
+  /** The billing service (ADR 0071): this server shows no plan, price or currency, only the way there. */
+  billing: {
+    open: "Open plan and billing",
+    opening: "Opening…",
+    failed: "Couldn't open it now. Try again in a moment.",
+    adminsOnly: "Only the workspace's owners and admins manage its agentes.chat plan.",
+    seeOptions: "See options",
+    people: "People",
+    files: "Files",
+    usedOf: "{{used}} of {{limit}}",
+    noLimit: "No limit",
+    ownBucket: "On your own bucket, with no limit from us",
+  },
+  /** A workspace's limits, set by the billing service (ADR 0071): people and files. */
+  limits: {
+    members: {
+      full: "This workspace has {{members}} of {{limit}} people.",
+      fullOne: "This workspace's agentes.chat plan fits 1 person.",
+      fullAdmin: "To bring more people in, see the agentes.chat plan's options.",
+      fullMember: "Ask whoever runs the workspace to make room.",
+    },
+    storage: {
+      meter: "You've used {{used}} of {{limit}}.",
+      near: "You've used {{used}} of {{limit}}. Uploads pause at the limit, and nothing is deleted.",
+      full: "Uploads paused at {{limit}}. Nothing was deleted.",
+      fullAdmin:
+        "Change the agentes.chat plan, delete files you no longer use, or connect your own bucket in Settings\u00a0›\u00a0Storage.",
+      dailyFull: "Today's uploads reached {{limit}}. You can upload again in a few hours.",
+    },
   },
   computerSetup: {
     managedNotRemovable: "This is the workspace's own computer: it can't be removed.",

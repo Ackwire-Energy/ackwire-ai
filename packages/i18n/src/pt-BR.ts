@@ -49,7 +49,7 @@ export const ptBR = {
     today: "Hoje",
     yesterday: "Ontem",
     loadFailed: "Não foi possível carregar. Confira a conexão e tente de novo.",
-    notAllowed: "Você não tem permissão para isso. Peça a um admin da organização.",
+    notAllowed: "Você não tem permissão para isso. Peça a um admin do workspace.",
   },
   roles: {
     owner: "Dono",
@@ -60,7 +60,7 @@ export const ptBR = {
     memberLower: "membro",
     memberDesc: "Conversa, cria tarefas, aprova os próprios agentes",
     adminDesc: "Também gerencia membros, agentes e chaves",
-    ownerTitle: "Uma organização sempre tem um dono",
+    ownerTitle: "Um workspace sempre tem um dono",
   },
   auth: {
     email: "E-mail",
@@ -118,7 +118,7 @@ export const ptBR = {
       newPassword: "Agora uma senha.",
       newPasswordNamed: "Boa, {{name}}. Agora uma senha.",
       closed: "Esse e-mail ainda não tem conta.",
-      closedLead: "O cadastro está fechado. Peça um convite a quem administra a sua organização.",
+      closedLead: "O cadastro está fechado. Peça um convite a quem administra o seu workspace.",
       otherEmail: "Usar outro e-mail",
       forgot: "Te mando um link para criar outra senha.",
       forgotLead: "Confira o e-mail:",
@@ -587,9 +587,14 @@ export const ptBR = {
       hostConnecting: "Os agentes escolhidos vão trabalhar no computador deste servidor. Ele conecta em até um minuto.",
       leadCloud: "Num computador só deste workspace, sempre ligado.",
       leadCloudPaused: "Num computador só deste workspace, preparado quando o workspace voltar a funcionar.",
+      payment: {
+        title: "O computador do workspace vem com o plano do agentes.chat",
+        body: "Escolha um plano do agentes.chat e o computador fica pronto em minutos, sempre ligado. Dá para seguir e voltar a isso depois.",
+      },
     },
     team: {
       title: "Quem mais trabalha com você?",
+      payment: "Você convida a equipe depois de escolher o plano do agentes.chat.",
       lead: "Convide por e-mail ou compartilhe o link.",
       emails: "E-mails",
       placeholder: "nome@empresa.com, outra@empresa.com",
@@ -759,9 +764,9 @@ export const ptBR = {
     soundPixel: "Pixel",
     soundOff: "Sem som",
     languageCurrent: "Idioma: {{name}}",
-    orgSettings: "Configurações da organização",
-    switchOrg: "Trocar de organização",
-    newOrg: "Criar outra organização",
+    orgSettings: "Configurações do workspace",
+    switchOrg: "Trocar de workspace",
+    newOrg: "Criar outro workspace",
     gallery: "Galeria de componentes",
     unread_one: "{{count}} mensagem não lida",
     unread_other: "{{count}} mensagens não lidas",
@@ -828,7 +833,7 @@ export const ptBR = {
       linear: "Linear",
       gdrive: "Google Drive",
       mail: "Email",
-      custom: "Ferramentas da organização",
+      custom: "Ferramentas do workspace",
     },
   },
   sky: {
@@ -975,6 +980,7 @@ export const ptBR = {
     popoverTitle: "Agentes",
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
+    platformCap: "Mencione um agente com @ para ele responder.",
   },
   /** No AI connected (ADR 0061): the banner, the agent's card, its chip and the receipt under a message. */
   noAi: {
@@ -1062,7 +1068,7 @@ export const ptBR = {
   /** An API key pasted in a message, before it goes out. */
   keyGuard: {
     title: "Isso parece uma chave de API",
-    text: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Salve como chave da organização: ela fica cifrada e ninguém vê.",
+    text: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Salve como chave do workspace: ela fica cifrada e ninguém vê.",
     textMember: "Tudo o que vai no chat fica visível para as pessoas e os agentes. Uma chave é como uma senha.",
     save: "Salvar como chave",
     remove: "Tirar do texto",
@@ -1206,7 +1212,7 @@ export const ptBR = {
     topicPlaceholder: "Do que se fala aqui",
     visibility: "Quem pode entrar",
     public: "Público",
-    publicDesc: "Qualquer pessoa da organização vê e entra.",
+    publicDesc: "Qualquer pessoa do workspace vê e entra.",
     private: "Privado",
     privateDesc: "Só quem for adicionado.",
     members: "Membros iniciais",
@@ -1666,7 +1672,7 @@ export const ptBR = {
       close: "Fechar",
       exact: "A ação exata",
       builtIn: "Ferramenta do agentes.chat",
-      orgConnector: "Conector da organização",
+      orgConnector: "Conector do workspace",
       bound: "Só para estes valores: qualquer mudança precisa de nova aprovação.",
       why: "Por que",
       trail: "Como chegou aqui",
@@ -1757,7 +1763,7 @@ export const ptBR = {
       sentenceMember: "Pensa com <brain/><end>.</end>",
       sentenceCloud: "Pensa com <brain/> na <computer/> e <browser/><end>.</end>",
       sentenceMachine: "Pensa com <brain/> no <computer/> e <browser/><end>.</end>",
-      orgModel: "o modelo da organização",
+      orgModel: "o modelo do workspace",
       cell: {
         label: "Como trabalha",
         computer: "Trabalha no",
@@ -1792,7 +1798,7 @@ export const ptBR = {
       usePlan: { claude_code: "Usar meu plano do Claude", codex: "Usar meu plano do ChatGPT" },
       brain: {
         sub: "Vale para todas as conversas.",
-        model: "Modelo da organização",
+        model: "Modelo do workspace",
         modelText: "Pela API. O uso conta no orçamento {{of}} {{name}}.",
         claude_codeText: "Usa o seu plano do Claude",
         codexText: "Usa o seu plano do ChatGPT",
@@ -1816,7 +1822,7 @@ export const ptBR = {
         fallbackTitle: "Se o {{computer}} parar de responder, responder pela API",
         /** The switch's ⓘ: the same in both states. */
         fallbackHint:
-          "Usa o modelo da organização e conta no orçamento {{of}} {{name}}. Se não, {{article}} {{name}} avisa quem chamou e espera o computador voltar.",
+          "Usa o modelo do workspace e conta no orçamento {{of}} {{name}}. Se não, {{article}} {{name}} avisa quem chamou e espera o computador voltar.",
         effort: "Esforço",
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortText: {
@@ -1867,8 +1873,8 @@ export const ptBR = {
         offline: "Offline agora",
         browser: "Navegador",
         browserPending: "Navegador (falta ligar)",
-        onlyModel: "Só o modelo da organização",
-        alsoBrain: "Volta para o modelo da organização ({{brain}} não está lá)",
+        onlyModel: "Só o modelo do workspace",
+        alsoBrain: "Volta para o modelo do workspace ({{brain}} não está lá)",
         alsoBrowser: "Deixa de navegar em sites",
         alsoOffline: "Está offline: até ele voltar, {{article}} {{name}} espera",
         connect: "Conectar outro computador",
@@ -2456,8 +2462,8 @@ export const ptBR = {
       },
     },
     noInstructions: "Sem instruções, {{article}} {{name}} segue só o contexto do workspace.",
-    connectedCount_one: "{{count}} conectado pela organização",
-    connectedCount_other: "{{count}} conectados pela organização",
+    connectedCount_one: "{{count}} conectado pelo workspace",
+    connectedCount_other: "{{count}} conectados pelo workspace",
     all: "Todos:",
     connectorsLabel: "Conectores e níveis",
     connectOther: "Conectar outro app",
@@ -2574,7 +2580,7 @@ export const ptBR = {
     people: "Pessoas",
     seen: "Ativo {{when}}",
     batch: {
-      already_member: "{{email}} já faz parte da organização.",
+      already_member: "{{email}} já faz parte do workspace.",
       already_invited: "{{email}} já tem um convite pendente. Use Reenviar.",
       invalid_email: "{{email}} não parece um e-mail válido.",
     },
@@ -2637,7 +2643,7 @@ export const ptBR = {
     },
     forum: {
       title: "Fórum",
-      text: "Discussões longas e anúncios da organização vão morar aqui.",
+      text: "Discussões longas e anúncios do workspace vão morar aqui.",
     },
     search: {
       title: "Buscar no workspace",
@@ -2645,16 +2651,16 @@ export const ptBR = {
       placeholder: "Buscar em mensagens, tarefas e arquivos",
     },
     settings: {
-      title: "Configurações da organização",
-      text: "Nome, contexto, chaves e conectores da organização vão ficar aqui.",
+      title: "Configurações do workspace",
+      text: "Nome, contexto, chaves e conectores do workspace vão ficar aqui.",
     },
     soon: "Em breve",
     goToChannel: "Ir para o #{{channel}}",
     notFoundTitle: "Página não encontrada",
     notFoundText: "O endereço não existe ou mudou.",
     goHome: "Voltar ao início",
-    noOrgTitle: "Você não faz parte desta organização",
-    noOrgText: "Peça um convite a alguém da organização, ou volte para as suas.",
+    noOrgTitle: "Você não faz parte deste workspace",
+    noOrgText: "Peça um convite a alguém do workspace, ou volte para os seus.",
   },
   scopes: {
     context_read: { label: "Ler o contexto", description: "Buscar mensagens, resumos e fatos nos canais do agente." },
@@ -2705,7 +2711,7 @@ export const ptBR = {
     },
     wiki_read: {
       label: "Ler a wiki",
-      description: "Buscar e ler as páginas da wiki da organização.",
+      description: "Buscar e ler as páginas da wiki do workspace.",
     },
     wiki_write: {
       label: "Escrever na wiki",
@@ -3178,7 +3184,7 @@ export const ptBR = {
       failing_other: "Falhando ({{count}} seguidas)",
     },
     pausedReason: {
-      creator_left: "Pausada: quem criou saiu da organização",
+      creator_left: "Pausada: quem criou saiu do workspace",
       creator_no_access: "Pausada: quem criou não pode mais falar nessa conversa",
       agent_archived: "Pausada: o agente foi arquivado",
       agent_not_in_channel: "Pausada: o agente não está mais no canal",
@@ -3251,7 +3257,7 @@ export const ptBR = {
       deleted: "Parou: a rotina foi apagada",
       paused: "Parou: a rotina foi pausada",
       lost: "Se perdeu no caminho e não terminou",
-      creator_left: "Parou: quem criou saiu da organização",
+      creator_left: "Parou: quem criou saiu do workspace",
       creator_no_access: "Não pôde contar: quem criou não pode mais escrever ali",
       audience: "Não rodou: quem criou não pode mais falar com o agente",
       agent_not_in_channel: "Não rodou: o agente não está mais no canal",
@@ -4655,7 +4661,7 @@ export const ptBR = {
   forum: {
     title: "Fórum",
     subtitle: "Uma pergunta com objetivo. Os agentes discutem em rodadas, um de cada vez, e fecham com uma síntese.",
-    guard: "Todo mundo da organização lê. Cada vez é uma execução normal: ferramentas e aprovações valem.",
+    guard: "Todo mundo do workspace lê. Cada vez é uma execução normal: ferramentas e aprovações valem.",
     new: "Novo tópico",
     filters: "Filtrar tópicos",
     filter: { open: "Em discussão", done: "Concluídos", mine: "Meus" },
@@ -4804,7 +4810,7 @@ export const ptBR = {
       readsCanEnter: "lê e pode entrar",
       entered: "entrou na rodada {{round}}",
       sits: "senta à mesa",
-      orgReads: "toda a organização lê",
+      orgReads: "todo o workspace lê",
     },
     posts: {
       round: "Rodada {{n}}",
@@ -5056,7 +5062,7 @@ export const ptBR = {
       oneAgent: "Com um agente só, use uma thread ou “Pedir a {{name}}” na tarefa. O fórum é para quem pode discordar.",
       minAgents: "Escolha pelo menos 2 agentes para ter discussão.",
       people: "Pessoas avisadas",
-      peopleHint: "todo mundo da organização lê",
+      peopleHint: "todo mundo do workspace lê",
       meAlways: "você, sempre avisado",
       seatMe: "Eu sento à mesa",
       seatMeHint: "esperar por mim nas rodadas",
@@ -5068,7 +5074,7 @@ export const ptBR = {
       approvals: "Cada vez é uma execução normal: aprovações valem.",
       create: "Abrir tópico",
       open: "Abrir fórum",
-      created: "Tópico aberto. {{name}} fala primeiro; todo mundo da organização pode ler.",
+      created: "Tópico aberto. {{name}} fala primeiro, e todo mundo do workspace pode ler.",
     },
     participantsDialog: {
       title: "Participantes",
@@ -5079,7 +5085,7 @@ export const ptBR = {
       speaksAt: "fala em {{n}}º",
       entered: "entrou na discussão",
       notified: "foi avisada e pode entrar",
-      org: "Toda a organização",
+      org: "Todo o workspace",
       orgReads: "lê o tópico",
       note: "Mudanças na mesa valem a partir da próxima rodada.",
       edit: "Editar",
@@ -5222,7 +5228,7 @@ export const ptBR = {
     starter: "Estrutura sugerida",
     starterPages: {
       overview: "Visão geral",
-      overviewBody: "O que a organização faz, quem é quem e por onde começar.",
+      overviewBody: "O que a empresa faz, quem é quem e por onde começar.",
       processes: "Processos",
       howWeWork: "Como trabalhamos",
       howWeWorkBody: "Rituais, ferramentas e combinados.",
@@ -5660,7 +5666,7 @@ export const ptBR = {
     tooMany: "No máximo {{max}} domínios.",
     preset: { python: "Pacotes Python", node: "Pacotes Node" },
     dailyMinutes: "Tempo de uso por dia (minutos)",
-    dailyMinutesHelp: "Somando todos os agentes da organização.",
+    dailyMinutesHelp: "Somando todos os agentes do workspace.",
     minutesInvalid: "Use de 0 a 1440 minutos.",
     timeout: "Tempo máximo de cada comando (segundos)",
     timeoutHelp: "Um comando que passar disso é parado. Até {{max}} segundos.",
@@ -6844,6 +6850,9 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
+    org: {
+      membersFull: "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+    },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você por e-mail.",
@@ -7000,12 +7009,11 @@ export const ptBR = {
       desc: "Onde o agentes.chat está instalado.",
       descUsers: "Onde o agentes.chat está instalado, um usuário por agente.",
       descShared: "O computador onde o agentes.chat está instalado. Os agentes trabalham como a pessoa que o instalou.",
-      stop: "Parar de usar nesta organização",
+      stop: "Parar de usar neste workspace",
       stopTitle: "Parar de usar o computador deste servidor?",
-      stopText:
-        "Os agentes desta organização deixam de usar este computador agora. Dá para voltar a usar quando quiser.",
-      stopped: "Esta organização não usa mais o computador deste servidor.",
-      offText: "Esta organização não usa o computador deste servidor.",
+      stopText: "Os agentes deste workspace deixam de usar este computador agora. Dá para voltar a usar quando quiser.",
+      stopped: "Este workspace não usa mais o computador deste servidor.",
+      offText: "Este workspace não usa o computador deste servidor.",
       use: "Usar o computador deste servidor",
       used: "Pronto. Ele conecta em até um minuto.",
     },
@@ -7202,9 +7210,9 @@ export const ptBR = {
     warning: "Só confirme se você acabou de abrir isso no seu computador.",
     asked: "Pediu {{when}}",
     near: "Perto de {{place}}",
-    org: "Organização",
+    org: "Workspace",
     orgHelp: "Os agentes dela vão poder usar este computador, depois que alguém escolher.",
-    noOrgs: "Você não pode conectar computadores em nenhuma organização. Peça a um admin.",
+    noOrgs: "Você não pode conectar computadores em nenhum workspace. Peça a um admin.",
     confirm: "Conectar",
     deny: "Não fui eu",
     loading: "Buscando o computador…",
@@ -7228,7 +7236,7 @@ export const ptBR = {
   settings: {
     nav: "Seções das configurações",
     group: {
-      org: "Organização",
+      org: "Workspace",
       agents: "Agentes",
       costs: "Custos e dados",
     },
@@ -7243,9 +7251,10 @@ export const ptBR = {
       computers: "Computadores",
       usage: "Orçamento e uso",
       import: "Importar e exportar",
+      billing: "Plano e cobrança",
     },
     sectionText: {
-      general: "Nome, fuso e o que todo agente sabe da organização.",
+      general: "Nome, fuso e o que todo agente sabe do workspace.",
       members: "Quem está no workspace e os convites.",
       access: "O que cada agente pode usar: um nível por conector.",
       connectors: "Serviços conectados uma vez para o workspace inteiro.",
@@ -7254,12 +7263,13 @@ export const ptBR = {
       storage: "Onde ficam os arquivos do workspace.",
       usage: "Orçamentos e quanto cada agente gastou este mês.",
       import: "Traga agentes de outro app ou de outro workspace, e leve este para onde quiser.",
+      billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
     },
     title: "Configurações",
-    orgTitle: "Organização",
+    orgTitle: "Workspace",
     name: "Nome",
     savedShort: "Salvo",
-    context: "Contexto da organização",
+    context: "Contexto do workspace",
     contextTitle: "O que os agentes sabem da {{name}}",
     contextSubtitle: "Todo agente lê isto antes de cada conversa.",
     contextPlaceholder: "Ex.: Somos uma agência de viagens para famílias. Atendemos pelo WhatsApp…",
@@ -7286,7 +7296,7 @@ export const ptBR = {
       dialogTitle: "O que é enviado",
       dialogText: "Uma vez por dia. Este é o próximo envio, exatamente.",
     },
-    tilesTitle: "Tudo da organização",
+    tilesTitle: "Tudo do workspace",
     tileState: {
       members_one: "{{count}} membro",
       members_other: "{{count}} membros",
@@ -7362,7 +7372,7 @@ export const ptBR = {
     kinds: { agent: "Agentes", router: "Roteador", embedding: "Busca", summary: "Resumos", sandbox: "Sandbox" },
     usageCalls_one: "{{count}} chamada",
     usageCalls_other: "{{count}} chamadas",
-    usageHidden: "Só admins veem o uso da organização.",
+    usageHidden: "Só admins veem o uso do workspace.",
   },
   usageViews: {
     and: " e ",
@@ -7385,7 +7395,7 @@ export const ptBR = {
       empty: "Nenhum agente pensa com um plano ainda.",
     },
     api: {
-      title: "API da organização",
+      title: "API do workspace",
     },
     agent: {
       title: "Uso {{of}} {{name}}",
@@ -7858,7 +7868,7 @@ export const ptBR = {
     },
     search_wiki: {
       label: "Buscar na wiki",
-      description: "Procura páginas da wiki da organização.",
+      description: "Procura páginas da wiki do workspace.",
     },
     read_wiki_page: {
       label: "Ler página da wiki",
@@ -8276,6 +8286,8 @@ export const ptBR = {
     paused: "Os agentes deste workspace estão pausados para uma revisão.",
     suspended: "Este workspace está indisponível por enquanto.",
     createRefused: "Você não pode criar um workspace agora.",
+    createUnpaid:
+      "Você já tem um workspace esperando um plano do agentes.chat. Escolha o plano dele antes de criar outro.",
     agentPaused: "Este agente está pausado por enquanto.",
     onHold: "Este workspace está em espera: {{reason}}",
     suspendedFor: "Este workspace está suspenso: {{reason}}",
@@ -8291,6 +8303,27 @@ export const ptBR = {
       hold: "O workspace está em espera: os agentes estão pausados",
       suspended: "O workspace foi suspenso",
       active: "O workspace voltou a funcionar",
+      /** A hold the billing service set (ADR 0071): its code, never shown as it comes. */
+      billing: {
+        payment: "O workspace precisa de um plano do agentes.chat",
+        unpaid: "O pagamento do plano do agentes.chat não passou",
+        ended: "O plano do agentes.chat do workspace terminou",
+      },
+    },
+    /** A hold the billing service set (ADR 0071), said in place of its code. */
+    billing: {
+      payment:
+        "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
+      unpaid: "O pagamento do plano do agentes.chat deste workspace não passou, e os agentes pararam.",
+      ended:
+        "O plano do agentes.chat deste workspace terminou, e os agentes pararam. As conversas e os arquivos continuam aqui para ler e baixar.",
+      sub: "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
+      cta: {
+        payment: "Ver planos do agentes.chat",
+        unpaid: "Atualizar o pagamento",
+        ended: "Assinar de novo",
+      },
+      askAdmin: "Quem administra o workspace pode resolver isso.",
     },
   },
   /** Where people write to whoever runs this server (`SUPPORT_EMAIL`): a hold, a suspension, the workspace's computer. */
@@ -8298,6 +8331,36 @@ export const ptBR = {
     writeBefore: "Precisa de ajuda? Escreva para ",
     writeAfter: ".",
     ask: "Precisa de ajuda? Fale com quem cuida deste servidor.",
+  },
+  /** The billing service (ADR 0071): this server shows no plan, price or currency, only the way there. */
+  billing: {
+    open: "Abrir plano e cobrança",
+    opening: "Abrindo…",
+    failed: "Não deu para abrir agora. Tente de novo em instantes.",
+    adminsOnly: "Só quem é dono ou admin do workspace cuida do plano do agentes.chat.",
+    seeOptions: "Ver opções",
+    people: "Pessoas",
+    files: "Arquivos",
+    usedOf: "{{used}} de {{limit}}",
+    noLimit: "Sem limite",
+    ownBucket: "No seu próprio bucket, sem limite nosso",
+  },
+  /** A workspace's limits, set by the billing service (ADR 0071): people and files. */
+  limits: {
+    members: {
+      full: "Este workspace está com {{members}} de {{limit}} pessoas.",
+      fullOne: "No plano do agentes.chat deste workspace cabe 1 pessoa.",
+      fullAdmin: "Para chamar mais gente, veja as opções do plano do agentes.chat.",
+      fullMember: "Peça a quem administra o workspace para abrir espaço.",
+    },
+    storage: {
+      meter: "Vocês usaram {{used}} de {{limit}}.",
+      near: "Vocês usaram {{used}} de {{limit}}. Os envios pausam no limite, e nada é apagado.",
+      full: "Os envios pausaram em {{limit}}. Nada foi apagado.",
+      fullAdmin:
+        "Mude o plano do agentes.chat, apague arquivos que não usam mais ou conecte o seu próprio bucket em Configurações\u00a0›\u00a0Armazenamento.",
+      dailyFull: "Os envios de hoje chegaram a {{limit}}. Dá para enviar de novo em algumas horas.",
+    },
   },
   computerSetup: {
     managedNotRemovable: "Este é o computador do próprio workspace: ele não pode ser removido.",

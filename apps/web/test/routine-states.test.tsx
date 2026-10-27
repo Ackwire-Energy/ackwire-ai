@@ -130,7 +130,7 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
       routine({ id: "rt-gone", name: "Resumo diário", active: false, state: "paused", pausedReason: "creator_left" }),
     ]);
     const row = card("Resumo diário");
-    expect(row.textContent).toContain("Pausada: quem criou saiu da organização");
+    expect(row.textContent).toContain("Pausada: quem criou saiu do workspace");
     await click(within(row).getByRole("button", { name: "Assumir rotina" }));
     await settle(6);
     expect(calls).toEqual(["takeOver:rt-gone", "active:rt-gone:true"]);
