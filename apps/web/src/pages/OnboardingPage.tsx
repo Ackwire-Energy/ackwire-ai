@@ -3,6 +3,7 @@ import {
   keys,
   meQuery,
   newClientId,
+  useAgents,
   useAiStatus,
   useAuthConfig,
   useComputerSetup,
@@ -31,12 +32,16 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import {
+  type AgentAi,
   type AiChoice,
   aiStateOf,
+  allAgents,
   defaultChoice,
-  firstAgent,
+  defaultTarget,
   gateDims,
   kindOf,
+  onlyOwnerReplies,
+  type PlanChoice,
   planLabel,
 } from "@agenteschat/client/lib/no-ai";
 import {
@@ -256,10 +261,11 @@ export function OnboardingPage() {
   const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai">("pick");
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
   const [handles, setHandles] = useState<Partial<Record<Preset, string>>>({});
-  // The option picked (none: the default), the agent a plan is for, and the plans given so far (by agent).
+  // The option picked (none: the default), whom a plan is for (an agent, or all of them), and the plans given so
+  // far (by agent).
   const [aiPicked, setAiPicked] = useState<AiChoice | null>(null);
-  const [aiAgent, setAiAgent] = useState<string | undefined>(undefined);
-  const [planned, setPlanned] = useState<Record<string, { label: string; mark: string }>>({});
+  const [aiTarget, setAiTarget] = useState<string | undefined>(undefined);
+  const [planned, setPlanned] = useState<Record<string, { label: string; mark: string; choice: PlanChoice }>>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
   // The workspace key: a provider's key, or the platform key where the server offers one.
@@ -565,11 +571,16 @@ export function OnboardingPage() {
   // is open here), so a plan's panel turns on by itself once the computer is ready.
   const orgSummary = me.data?.organizations.find((o) => o.id === created?.orgId);
   const noComputer = edition === "selfhost" && (computer === null || computer === "cloud");
-  const hasAi = (id: string) => planned[id] !== undefined || keySaved;
-  const aiAgentId = aiAgent ?? firstAgent(crewAgents, hasAi)?.id;
+  const aiOf = (id: string): AgentAi => planned[id]?.choice ?? (keySaved ? "key" : null);
+  const hasAi = (id: string) => aiOf(id) !== null;
+  // The crew shares one computer here.
+  const setOf = (c: AiChoice) =>
+    c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
+  const aimed = { agents: crewAgents, hasAi, picked: aiTarget };
+  // With no set, the agent whose computer the panel reads, "All agents" too.
   const gates = usePlanGates(
     created?.orgId ?? "",
-    aiOpen ? aiAgentId : undefined,
+    aiOpen ? defaultTarget({ ...aimed, set: [] }) : undefined,
     aiOpen && Object.keys(planned).length === 0 && !keySaved ? COMPUTER_POLL_MS : false,
   );
   const choice =
@@ -579,11 +590,13 @@ export function OnboardingPage() {
       mayAddKey: true,
       claudeGate: noComputer ? { state: "missing" } : gates.gateOf("claude"),
     });
+  const aiAll = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
+  const target = defaultTarget({ ...aimed, set: aiAll });
   const pickAi = (next: AiChoice) => {
     setAiPicked(next);
-    // Another plan moves on to the next agent with no AI once this one thinks with a plan.
-    if (next !== "key" && next !== choice && aiAgentId !== undefined && planned[aiAgentId])
-      setAiAgent(firstAgent(crewAgents, hasAi)?.id);
+    // Another plan moves on to whoever still has no AI once a plan thinks for someone.
+    if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
+      setAiTarget(defaultTarget({ agents: crewAgents, hasAi, set: setOf(next) }));
   };
   // A computer the person connected: its own sign-in, unless they chose another account.
   const ownChosen =
@@ -1200,20 +1213,19 @@ export function OnboardingPage() {
                           choice={choice}
                           gates={gates}
                           agents={crewAgents}
-                          agentId={aiAgentId}
-                          onAgent={setAiAgent}
+                          all={aiAll}
+                          target={target}
+                          onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
                           hostConnecting={computer === "host"}
                           onKey={() => pickAi("key")}
                           onComputer={() => go(ONBOARDING_STEPS.findIndex((s) => s.id === "computer"))}
-                          onDone={(agentId, account) => {
-                            // The panel stays on that agent, saying it's done; another tile moves on to the next one.
-                            setAiAgent(agentId);
-                            if (account)
-                              setPlanned((p) => ({
-                                ...p,
-                                [agentId]: { label: account.label, mark: account.provider ?? account.kind },
-                              }));
+                          onDone={(ids, account) => {
+                            // The panel stays on whom it was for, saying it's done; another tile moves on.
+                            setAiTarget(target);
+                            if (!account) return;
+                            const thinks = { label: account.label, mark: account.provider ?? account.kind, choice };
+                            setPlanned((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, thinks])) }));
                           }}
                         />
                       )
@@ -1227,7 +1239,7 @@ export function OnboardingPage() {
                       onChange={(v) => setBudget(v)}
                     />
                   )}
-                  {Object.keys(planned).length > 0 && crewAgents.length > 1 && (
+                  {Object.keys(planned).length > 0 && crewAgents.some((a) => !hasAi(a.id)) && (
                     <WhoThinks rows={whoRows} onKey={() => pickAi("key")} />
                   )}
                 </OrgProvider>
@@ -1239,7 +1251,14 @@ export function OnboardingPage() {
 
           {step.id === "team" && created && (
             <div className="onb__answer">
-              <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+              <TeamStep
+                orgId={created.orgId}
+                viewerId={me.data?.user.id ?? ""}
+                invites={invites}
+                sent={sent}
+                onChange={setInvites}
+                agents={crew}
+              />
             </div>
           )}
 
@@ -1691,15 +1710,20 @@ function WorkspaceComputerStep({
   );
 }
 
-/** Who works with you: e-mails as chips (each with a role), and the invite link. */
+/**
+ * Who works with you: e-mails as chips (each with a role), and the invite link. While no agent would answer anyone
+ * else (each with an AI on its owner's plan), it says so first.
+ */
 function TeamStep({
   orgId,
+  viewerId,
   invites,
   sent,
   onChange,
   agents,
 }: {
   orgId: string;
+  viewerId: string;
   invites: InviteDraft[];
   sent: Set<string>;
   onChange: (list: InviteDraft[]) => void;
@@ -1717,6 +1741,13 @@ function TeamStep({
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
+  const rows = useAgents(orgId);
+  const status = useAiStatus(orgId);
+  const onlyYou = onlyOwnerReplies(
+    rows.data ?? [],
+    (id) => (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai",
+    viewerId,
+  );
   const roleOptions = [
     { value: "member" as Role, label: t("roles.member"), description: t("roles.memberDesc") },
     { value: "admin" as Role, label: t("roles.admin"), description: t("roles.adminDesc") },
@@ -1753,6 +1784,17 @@ function TeamStep({
   const invalid = invites.some((i) => !i.valid);
   return (
     <>
+      {onlyYou && (
+        <p className="setup-line ac-iconline">
+          <Icon name="audienceOwner" size={14} />
+          <span>
+            {t("members.agentsOnlyYou")}{" "}
+            <InfoHint name={t("common.about", { label: t("members.agentsOnlyYou") })}>
+              {t("members.agentsOnlyYouHint")}
+            </InfoHint>
+          </span>
+        </p>
+      )}
       <Card as="div">
         <span className="ac-hintline onb__label">
           <label htmlFor="invite-emails">{t("onboarding.team.emails")}</label>
