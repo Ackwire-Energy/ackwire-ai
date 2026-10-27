@@ -57,8 +57,11 @@ export function useUpdateCheck(auto: boolean): UpdateCheck {
     if (!version || !arch || !os) return null;
     setChecking(true);
     setFailed(false);
+    // A check that hasn't answered in 15 s failed. A timer, not `AbortSignal.timeout`, which macOS 11's WebKit lacks.
+    const quit = new AbortController();
+    const timer = setTimeout(() => quit.abort(), 15_000);
     try {
-      const res = await fetch(latestUrl(os, arch), { headers: { accept: "application/json" } });
+      const res = await fetch(latestUrl(os, arch), { headers: { accept: "application/json" }, signal: quit.signal });
       // 404: no release published yet (or the server can't read them): nothing to offer.
       const found = res.ok ? parseLatest(await res.json()) : null;
       if (!res.ok && res.status !== 404) throw new Error(String(res.status));
@@ -69,6 +72,7 @@ export function useUpdateCheck(auto: boolean): UpdateCheck {
       setFailed(true);
       return null;
     } finally {
+      clearTimeout(timer);
       setChecking(false);
     }
   }, [version, arch, os]);

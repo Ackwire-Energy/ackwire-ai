@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { siteLink } from "../control/browser";
 import {
-  elapsedClock,
   finishedOf,
   type NotchHelp,
   type NotchState,
@@ -25,6 +24,7 @@ import { agentOf } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
+import { elapsedClock } from "../ui/time";
 
 /** Each wing beside the notch. */
 const WING = 74;
