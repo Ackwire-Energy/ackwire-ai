@@ -1,6 +1,7 @@
-import { ApiError, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
+import { ApiError, invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
 import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
@@ -20,6 +21,9 @@ import { haptics } from "@/ui/haptics";
 import { Icon } from "@/ui/Icon";
 import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
+import { rememberConfirmationSent } from "./confirmation";
+import { pendingInvite } from "./invite";
+import { signInPurpose } from "./links";
 
 /**
  * Sign in and sign up in one flow (like the web's `AuthPage`): the e-mail
@@ -66,6 +70,12 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  // Where this sign-in leads, in place of the general line: the invitation opened before it (its workspace, by its
+  // token), as the web's sign-in says it.
+  const [waiting] = useState(pendingInvite);
+  const invitation = useQuery({ ...invitationQuery(api, waiting?.token ?? ""), enabled: waiting !== null });
+  const goal = signInPurpose(invitation.data);
+  const purpose = goal ? t(goal.key, { org: goal.org }) : null;
   const termsUrl = config.data?.termsUrl;
   const privacyUrl = config.data?.privacyUrl;
 
@@ -173,6 +183,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       haptics.success();
       rememberSignIn("email");
       void writeValue(LAST_EMAIL, email.trim());
+      // A server that sends email sent this address a link to confirm it: the first run says where it went.
+      if (canReset) rememberConfirmationSent(email);
     } catch (error) {
       failed(thrown(error));
     } finally {
@@ -228,8 +240,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const providerNames = linkedProviders.map((p) => t(`auth.provider.${p}`)).join(" · ");
   // Steps without a subtitle: their field and buttons say it (the new password's meter gives the minimum).
   const bubble: Record<Step, [string, string?]> = {
-    email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), t("auth.flow.emailLead")],
-    password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), t("auth.flow.passwordLead")],
+    email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), purpose ?? t("auth.flow.emailLead")],
+    password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), purpose ?? t("auth.flow.passwordLead")],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
     noPassword: [t("auth.flow.noPassword"), t("auth.flow.noPasswordLead")],
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],

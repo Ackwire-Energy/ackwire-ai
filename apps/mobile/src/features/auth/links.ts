@@ -14,9 +14,38 @@ export const storedInvite = (token: string, kind: InviteKind) => (kind === "link
  * a link's would be refused there and forgotten. Null for nothing, or anything malformed.
  */
 export function afterSignIn(stored: string | null): { accept: string } | { open: `/invite/${string}` } | null {
+  const invite = storedInviteOf(stored);
+  if (!invite) return null;
+  return invite.kind === "link" ? { open: `/invite/${invite.token}` } : { accept: invite.token };
+}
+
+/** A remembered invitation read back: its token and kind; null for nothing, or anything malformed. */
+export function storedInviteOf(stored: string | null): { token: string; kind: InviteKind } | null {
   if (!stored) return null;
   const link = stored.startsWith("link:");
   const token = link ? stored.slice("link:".length) : stored;
-  if (!isInviteToken(token)) return null;
-  return link ? { open: `/invite/${token}` } : { accept: token };
+  return isInviteToken(token) ? { token, kind: link ? "link" : "email" } : null;
+}
+
+/**
+ * Where a sign-in leads, said in place of its general line (the web's `signInFor`): asking to join a workspace through
+ * its link, or joining it by an invitation. The phone's sign-in leads nowhere else. Null with no invitation waiting,
+ * or one that no longer works.
+ */
+export function signInPurpose(
+  invitation: { orgName: string; kind?: InviteKind; closed?: true } | null | undefined,
+): { key: "auth.flow.toAsk" | "auth.flow.toJoin"; org: string } | null {
+  if (!invitation || invitation.closed) return null;
+  return { key: invitation.kind === "link" ? "auth.flow.toAsk" : "auth.flow.toJoin", org: invitation.orgName };
+}
+
+/**
+ * A translated sentence with its label in `<b>…</b>` ("<b>Their note:</b> “…”"), as parts to draw: the bold
+ * ones and the rest, in order. Run on the sentence before anyone's words go in, so those are never read as markup.
+ */
+export function boldParts(text: string): { text: string; bold: boolean }[] {
+  return text
+    .split(/<b>([^<]*)<\/b>/)
+    .map((part, i) => ({ text: part, bold: i % 2 === 1 }))
+    .filter((part) => part.text !== "");
 }

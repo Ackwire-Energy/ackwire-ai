@@ -19,12 +19,13 @@ import { signOut } from "@/features/account";
 import { agentLook, joinNames } from "@/features/shared/logic";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
-import { AgentAvatar, Button, haptics, LineIcon, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, haptics, InfoHint, LineIcon, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
 import { forgetInvite, rememberInvite } from "./invite";
+import { boldParts } from "./links";
 
 /**
  * An invitation's link opened in the app: who invited, the org, the
@@ -114,14 +115,13 @@ export function InviteScreen({ token }: { token: string }) {
 
   return (
     <AuthScaffold title={title} subtitle={t("mobile.invite.joinAs", { role })}>
-      <AgentsThere agents={invitation.agents ?? []} />
+      <AgentsThere agents={invitation.agents ?? []} more={invitation.moreAgents ?? 0} />
       <View style={[styles.locked, { backgroundColor: c.sunken }]}>
-        <Text variant="body" numberOfLines={1} style={styles.grow}>
-          {invitation.email}
-        </Text>
-        <Text variant="small" tone="muted" style={CENTER}>
-          {t("mobile.invite.onlyEmail")}
-        </Text>
+        <InfoHint name={t("common.about", { label: t("auth.email") })} text={t("invite.emailHelp")}>
+          <Text variant="body" numberOfLines={1}>
+            {invitation.email}
+          </Text>
+        </InfoHint>
       </View>
       {error ? (
         <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
@@ -190,8 +190,8 @@ function LeaveButton() {
 /** The faces leading "who already works there": as tall as that line, so they sit on it. */
 const FACE = 22;
 
-/** "Ada, Theo e Lia já trabalham lá", their faces leading the first line. */
-function AgentsThere({ agents }: { agents: NonNullable<InvitationPreview["agents"]> }) {
+/** "Ada, Theo, Lia e mais 2 já trabalham lá", their faces leading the first line. */
+function AgentsThere({ agents, more }: { agents: NonNullable<InvitationPreview["agents"]>; more: number }) {
   const { t } = useTranslation();
   if (agents.length === 0) return null;
   return (
@@ -206,10 +206,10 @@ function AgentsThere({ agents }: { agents: NonNullable<InvitationPreview["agents
         </View>
       </LineIcon>
       <Text variant="small" tone="muted" style={styles.grow}>
-        {t("mobile.invite.agentsThere", {
-          count: agents.length,
+        {t("invite.ask.agents", {
+          count: agents.length + more,
           names: joinNames(
-            agents.map((a) => a.name),
+            [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])],
             t("newAgent.and"),
           ),
         })}
@@ -333,7 +333,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       if (view.reason)
         body = (
           <>
-            <Said text={t("invite.ask.reason", { reason: view.reason })} />
+            <Said reason={view.reason} />
             <Text variant="callout" tone="muted" style={CENTER}>
               {t("invite.ask.deniedText", { org })}
             </Text>
@@ -357,7 +357,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
         : t("invite.ask.leadNoName", { org });
       body = (
         <>
-          <AgentsThere agents={preview.agents ?? []} />
+          <AgentsThere agents={preview.agents ?? []} more={preview.moreAgents ?? 0} />
           {user ? (
             <View style={styles.as}>
               <Text variant="subhead" tone="muted">
@@ -407,16 +407,21 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               </View>
             </>
           )}
-          <AuthField
-            value={note}
-            onChangeText={setNote}
-            placeholder={t("invite.ask.note")}
-            accessibilityLabel={t("invite.ask.note")}
-            maxLength={JOIN_NOTE_MAX}
-            multiline
-            textAlignVertical="top"
-            minHeight={84}
-          />
+          <View style={styles.field}>
+            <Text variant="subhead" tone="muted">
+              {t("invite.ask.note")}
+            </Text>
+            <AuthField
+              value={note}
+              onChangeText={setNote}
+              placeholder={t("invite.ask.noteHelp")}
+              accessibilityLabel={t("invite.ask.note")}
+              maxLength={JOIN_NOTE_MAX}
+              multiline
+              textAlignVertical="top"
+              minHeight={84}
+            />
+          </View>
           {error ? (
             <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
               {error}
@@ -435,7 +440,8 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               label={t("auth.signIn")}
               onPress={() => {
                 rememberInvite(token, "link");
-                router.push("/sign-in");
+                // The address typed here goes along, so the sign-in starts at the password.
+                router.push({ pathname: "/sign-in", params: isEmail(email) ? { email: email.trim() } : {} });
               }}
             />
           )}
@@ -458,12 +464,27 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   );
 }
 
-/** Someone else's words, as they wrote them (an admin's note to someone turned down). */
-function Said({ text }: { text: string }) {
+/** Stands in for the person's words while the sentence is split into its bold label and the rest. */
+const WORDS = "\u2063";
+
+/** Someone else's words, as they wrote them (an admin's note to someone turned down), after the label in bold. */
+function Said({ reason }: { reason: string }) {
+  const { t } = useTranslation();
   const { colors: c } = useTheme();
   return (
     <View style={[styles.said, { backgroundColor: c.sunken }]}>
-      <Text variant="body">{text}</Text>
+      <Text variant="body">
+        {boldParts(t("invite.ask.reasonSaid", { reason: WORDS })).map((part, i) =>
+          part.bold ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed sentence, in order
+            <Text key={i} variant="body" style={styles.link}>
+              {part.text.replace(WORDS, reason)}
+            </Text>
+          ) : (
+            part.text.replace(WORDS, reason)
+          ),
+        )}
+      </Text>
     </View>
   );
 }
