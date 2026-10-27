@@ -78,7 +78,8 @@ const KNOWN = {
   "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
   "plan.personal": "aiAccounts.errors.planPersonal",
   "org.create_refused": "standing.createRefused",
-  "org.create_unpaid": "standing.createUnpaid",
+  // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
+  "org.create_unpaid": "standing.createInactive",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",
@@ -156,6 +157,13 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   const key = KNOWN[error.code as keyof typeof KNOWN];
   return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
 }
+
+/**
+ * `knownErrorText` for the person an invitation is for: a full workspace says whom to tell, never its numbers,
+ * which are for its admins.
+ */
+export const invitedErrorText = (t: TFunction, error: unknown, locale?: string): string | null =>
+  errorCode(error) === "org.members_full" ? t("errors.org.membersFull") : knownErrorText(t, error, locale);
 
 /**
  * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`) in the person's words: too many

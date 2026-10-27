@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
-import type { AiStatus } from "@agenteschat/client";
+import { type AiStatus, ApiError } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { isInviteToken } from "../../src/features/auth/links";
 import {
   askLineOf,
@@ -189,4 +190,16 @@ test("invitations: each is sent once, and the ones that failed are what is left 
   expect(sent).toEqual(["ana@acme.com", "bia@acme", "caio@acme.com"]);
   expect(failed).toEqual(["bia@acme"]);
   expect(await inviteEach(["ana@acme.com"], async () => undefined)).toEqual([]);
+});
+
+test("a second workspace refused while one isn't active: the facts, with no plan or way to pay (store rules)", async () => {
+  const refused = new ApiError(403, "org.create_unpaid", "You already have a workspace waiting for a plan", {
+    orgId: "o1",
+  });
+  for (const lng of ["pt-BR", "en"] as const) {
+    const t = await translator(lng);
+    const said = knownErrorText(t, refused, lng);
+    expect(said).toBe(t("standing.createInactive"));
+    expect(said).not.toMatch(/plan|pag|pay|escolh|choose/i);
+  }
 });

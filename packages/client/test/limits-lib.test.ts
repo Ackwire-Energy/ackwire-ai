@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
 import type { WorkspaceLimits } from "../src/api/types";
-import { errorText } from "../src/lib/errors";
+import { errorText, invitedErrorText } from "../src/lib/errors";
 import { membersFull, storageLevel } from "../src/lib/limits";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
@@ -51,5 +51,14 @@ describe("a workspace's limits in words (ADR 0071)", () => {
     expect(errorText(t, new ApiError(409, "storage.full", "The workspace's file storage is full"))).toBe(
       "The workspace's file storage is full",
     );
+  });
+
+  test("the person an invitation is for reads whom to tell, never the numbers", () => {
+    const full = new ApiError(409, "org.members_full", "This workspace is full", { members: 10, limit: 10 });
+    expect(invitedErrorText(t, full)).toBe("errors.org.membersFull");
+    // Any other code as everywhere, and nothing for one it doesn't know.
+    const held = new ApiError(403, "org.paused", "This workspace is on hold: payment", { reason: "payment" });
+    expect(invitedErrorText(t, held)).toBe("standing.billing.payment");
+    expect(invitedErrorText(t, new ApiError(403, "forbidden", "This invitation was sent to a@b.c"))).toBeNull();
   });
 });

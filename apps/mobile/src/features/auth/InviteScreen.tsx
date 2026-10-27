@@ -7,7 +7,7 @@ import {
   useAuthConfig,
   useMe,
 } from "@agenteschat/client";
-import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { invitedErrorText } from "@agenteschat/client/lib/errors";
 import { ANSWER_POLL_MS, askView, JOIN_NAME_MAX, JOIN_NOTE_MAX } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -101,7 +101,10 @@ export function InviteScreen({ token }: { token: string }) {
       router.replace("/");
     } catch (e) {
       const wrong = e instanceof ApiError && e.status === 403;
-      setError(wrong ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed"));
+      setError(
+        invitedErrorText(t, e) ??
+          (wrong ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed")),
+      );
     } finally {
       setJoining(false);
     }
@@ -277,7 +280,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       haptics.warning();
       setError(
         e instanceof ApiError
-          ? (knownErrorText(t, e) ?? t("mobile.auth.errors.generic"))
+          ? (invitedErrorText(t, e) ?? t("mobile.auth.errors.generic"))
           : t("mobile.auth.errors.network"),
       );
       // A link turned off, or an answer already given, then shows as its own state.

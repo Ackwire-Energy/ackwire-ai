@@ -1,7 +1,7 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { ApiError, invitationQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { authErrorText, errorCode, errorText, knownErrorText } from "@agenteschat/client/lib/errors";
+import { authErrorText, errorCode, errorText, invitedErrorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { withHumanCheck } from "@agenteschat/client/lib/human-check";
@@ -53,14 +53,9 @@ export function InvitePage({ token }: { token: string }) {
       await qc.invalidateQueries({ queryKey: keys.me });
       await navigate({ to: "/org/$orgId", params: { orgId } });
     },
+    // A known code in the invited person's words (a hold's code never as it comes), else the server's own.
     onError: (e) =>
-      setError(
-        // Full: the person invited can only ask whoever invited them to make room.
-        errorCode(e) === "org.members_full"
-          ? t("errors.org.membersFull")
-          : // A known code in the person's words (a hold's code never as it comes), else the server's own.
-            (knownErrorText(t, e, i18n.language) ?? (e instanceof Error ? e.message : t("common.unknownError"))),
-      ),
+      setError(invitedErrorText(t, e, i18n.language) ?? (e instanceof Error ? e.message : t("common.unknownError"))),
   });
 
   // From the press on: the bot check may wait for its token, or for a click, before the sign-up goes out.

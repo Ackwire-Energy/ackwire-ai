@@ -8361,6 +8361,8 @@ export const ptBR = {
     createRefused: "Você não pode criar um workspace agora.",
     createUnpaid:
       "Você já tem um workspace esperando um plano do agentes.chat. Escolha o plano dele antes de criar outro.",
+    /** The same refusal with no call to pay, for the phone app: the stores allow paying only in their own flow. */
+    createInactive: "Você já tem um workspace que ainda não está ativo, então não dá para criar outro por enquanto.",
     agentPaused: "Este agente está pausado por enquanto.",
     onHold: "Este workspace está em espera: {{reason}}",
     suspendedFor: "Este workspace está suspenso: {{reason}}",

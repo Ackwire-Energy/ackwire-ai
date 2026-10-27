@@ -22,7 +22,7 @@ ADR 0056 already gives every hook but one: a hold stops a workspace's agents and
 
 ### 2. Creating a workspace
 
-- Billing holds on a person's workspaces never stop them creating another, with one exception: owning a workspace on a `payment` hold refuses a new one with `org.create_unpaid` (403, `params.orgId` the oldest such workspace), so a person has at most one workspace waiting for its first plan. The check runs in the create's transaction under a lock per person, so two creates at once start one. The app sends them to that workspace's plan instead.
+- Billing holds on a person's workspaces never stop them creating another, with one exception: owning a workspace on a `payment` hold refuses a new one with `org.create_unpaid` (403, `params.orgId` the oldest such workspace), so a person has at most one workspace waiting for its first plan. The check runs in the create's transaction under a lock per person, so two creates at once start one. The web app sends them to that workspace's plan instead, and the phone app only says that workspace isn't active yet.
 - A trust hold or a suspension on any workspace they are in still refuses (`org.create_refused`), and so does a blocked account.
 - With `BILLING_HOLD_NEW_WORKSPACES=true` a new workspace starts on a `payment` hold, written in the row's insert: no audit row and no notification, since nothing moved. The server refuses to start with it unless `BILLING_URL`, `BILLING_LINK_SECRET` and `OPERATOR_API_TOKEN` are set, because only the billing service lifts it. The computer provisioning keeps one reason (`capacity`): a workspace waiting for payment simply isn't a request.
 

@@ -37,11 +37,11 @@ describe("billing holds in words (ADR 0071)", () => {
     );
   });
 
-  test("creating another workspace while one waits for its plan", () => {
+  test("creating another workspace while one waits for its plan: the facts, never the web's call to pay", () => {
     const refused = new ApiError(403, "org.create_unpaid", "You already have a workspace waiting for a plan", {
       orgId: "o1",
     });
-    expect(errorText(t, refused)).toStartWith("standing.createUnpaid ");
+    expect(errorText(t, refused)).toStartWith("standing.createInactive ");
   });
 
   test("the notification's headline is the hold's, the plain hold's for a code it doesn't know", () => {

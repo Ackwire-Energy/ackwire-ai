@@ -1,5 +1,6 @@
 import { keys, newClientId, useAiStatus, useApi, useMe } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { AUTO } from "@agenteschat/client/lib/providers";
@@ -157,8 +158,8 @@ export function OnboardingFlow() {
     try {
       await work();
       setStep(typeof then === "function" ? then() : then);
-    } catch {
-      setError({ at: step, text: t("mobile.onb.failed") });
+    } catch (e) {
+      setError({ at: step, text: knownErrorText(t, e, i18n.language) ?? t("mobile.onb.failed") });
     } finally {
       setPending(false);
     }
