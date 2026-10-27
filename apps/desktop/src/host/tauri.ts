@@ -4,7 +4,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Candidate } from "../control/first-run";
-import type { LocalServerStatus, ReachResult, StepChange, Tailnet } from "../control/local-server";
+import type { LocalServerStatus, ReachResult, ReachStage, StepChange, Tailnet } from "../control/local-server";
 import { platformOf } from "../control/platform";
 import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -94,6 +94,8 @@ export function createTauriHost(): Host {
     stopLocalServer: (forget) => invoke<void>("local_server_stop", { forget }),
     restartLocalServer: () => invoke<void>("local_server_restart"),
     setLocalReach: (on) => invoke<ReachResult>("local_server_reach", { on }),
+    onLocalReach: (cb) => subscribe<ReachStage>("local-server://reach", cb),
+    stopLocalReach: () => invoke<void>("local_server_reach_stop"),
     setLocalUsage: (on) => invoke<void>("local_server_usage", { on }),
     backupLocalServer: () => invoke<string>("local_server_backup"),
     localDiagnostics: () => invoke<string>("local_server_diagnostics"),

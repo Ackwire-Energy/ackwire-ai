@@ -763,6 +763,7 @@ export const ptBR = {
   },
   openOnPhone: {
     qr: "QR code para entrar no app agentes",
+    making: "Gerando o código…",
     stepApp: "Instale o app agentes no celular (App Store ou Google Play).",
     stepTailscale: "Instale o Tailscale no celular e entre na mesma rede (tailnet) deste servidor.",
     stepScan: "Aponte a câmera do celular para o código.",

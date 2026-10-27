@@ -49,6 +49,7 @@ import {
 import {
   hereView,
   type LocalServerStatus,
+  type ReachStage,
   type SetupStep,
   type StepChange,
   setupSteps,
@@ -57,7 +58,7 @@ import {
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, useTailnet, writePref } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
-import { CopyDiagnostics, ReachProblem, ReachRow, ServerTile } from "../ui/here";
+import { CopyDiagnostics, ReachProblem, ReachProgress, ReachRow, ServerTile } from "../ui/here";
 import { hintFor, PrefRow } from "../ui/settings";
 import { shortPath } from "../ui/time";
 
@@ -714,8 +715,12 @@ function HereSetup({
   onContinue: () => void;
 }) {
   const { t } = useTranslation();
+  const host = useHost();
   const states = stepStates(steps, changes);
   const done = steps.filter((s) => states[s] === "done" || states[s] === "warn").length;
+  // Reach's own progress while its step runs: Tailscale's page for HTTPS shows as soon as Tailscale names it.
+  const [stage, setStage] = useState<ReachStage | null>(null);
+  useEffect(() => host.onLocalReach(setStage), [host]);
   const reachProblem = changes.find((c) => c.step === "reach" && c.state === "warn")?.reason;
   return (
     <>
@@ -760,6 +765,9 @@ function HereSetup({
                       </Button>
                     </span>
                   </span>
+                )}
+                {step === "reach" && state === "active" && stage && stage.stage !== "signingIn" && (
+                  <ReachProgress stage={stage} />
                 )}
                 {step === "reach" && reachProblem && <ReachProblem problem={reachProblem} text="fail" />}
               </span>

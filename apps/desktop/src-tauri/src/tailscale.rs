@@ -3,9 +3,10 @@
 //! inside the tailnet only; never Funnel). The tool is looked up at the places it installs itself, never at a
 //! path from a page.
 
-use std::io::Read;
+use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -13,8 +14,11 @@ use serde_json::Value;
 
 /// `status` gets this long to answer.
 const STATUS_WAIT: Duration = Duration::from_secs(2);
-/// `serve` may wait for the person to allow HTTPS in the tailnet's admin page: it is stopped after this.
+/// `serve` gets this long when it asks for nothing.
 const SERVE_WAIT: Duration = Duration::from_secs(20);
+/// Once `serve` asks for HTTPS to be allowed in the tailnet's admin page, it waits there for the person: this long
+/// in all, unless they stop waiting.
+const APPROVE_WAIT: Duration = Duration::from_secs(180);
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "state", rename_all = "camelCase")]
@@ -38,6 +42,20 @@ pub enum ServeError {
     Operator,
     /// Tailscale refused or isn't connected (the Mac App Store variant may never share).
     Serve,
+    /// The person stopped waiting for HTTPS to be allowed.
+    Stopped,
+    /// Tailscale shares it, but the server didn't answer again at its new address (not Tailscale's doing).
+    Start,
+}
+
+/// What a watched run does next, from what the tool printed so far.
+pub enum Watch {
+    /// Keeps waiting, up to the wait it was given.
+    Wait,
+    /// Keeps waiting, up to this long from its start.
+    WaitUpTo(Duration),
+    /// Stops it now.
+    Stop,
 }
 
 /// The tool at the places it installs itself.
@@ -63,10 +81,20 @@ fn run(args: &[&str], wait: Duration) -> Option<(bool, String)> {
 }
 
 /// Runs `program`; its exit status and what it printed (stdout, then stderr, 1 MB each at most), or None when
-/// it couldn't start. Taking longer than `wait` stops it (what it printed so far is kept). Its output is read
-/// while it runs: a pipe holds 64 KB, and `status --json` on a large tailnet prints more, so a reader after
-/// the exit would never see it end.
+/// it couldn't start. Taking longer than `wait` stops it (what it printed so far is kept).
 fn run_program(program: &Path, args: &[&str], wait: Duration) -> Option<(bool, String)> {
+    run_watched(program, args, wait, &mut |_| Watch::Wait)
+}
+
+/// `run_program`, with `watch` asked every 50 ms, given what the tool printed so far, whether to wait longer or
+/// stop it. Its output is read while it runs: a pipe holds 64 KB, and `status --json` on a large tailnet prints
+/// more, so a reader after the exit would never see it end.
+fn run_watched(
+    program: &Path,
+    args: &[&str],
+    wait: Duration,
+    watch: &mut dyn FnMut(&str) -> Watch,
+) -> Option<(bool, String)> {
     let mut child = crate::no_console(&mut Command::new(program))
         .args(args)
         .stdin(Stdio::null())
@@ -74,23 +102,49 @@ fn run_program(program: &Path, args: &[&str], wait: Duration) -> Option<(bool, S
         .stderr(Stdio::piped())
         .spawn()
         .ok()?;
-    let reader = |pipe: Option<Box<dyn Read + Send>>| {
+    let (sent, arrived) = mpsc::channel::<Vec<u8>>();
+    let reader = |pipe: Option<Box<dyn Read + Send>>, sent: mpsc::Sender<Vec<u8>>| {
         std::thread::spawn(move || {
             let mut bytes = Vec::new();
             if let Some(pipe) = pipe {
-                let _ = pipe.take(1024 * 1024).read_to_end(&mut bytes);
+                let mut pipe = pipe.take(1024 * 1024);
+                let mut chunk = [0u8; 8192];
+                loop {
+                    match pipe.read(&mut chunk) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            bytes.extend_from_slice(&chunk[..n]);
+                            let _ = sent.send(chunk[..n].to_vec());
+                        }
+                        Err(e) if e.kind() == ErrorKind::Interrupted => {}
+                        Err(_) => break,
+                    }
+                }
             }
             bytes
         })
     };
-    let stdout = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
-    let stderr = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
+    let stdout = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent.clone());
+    let stderr = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent);
     let started = Instant::now();
+    let mut limit = wait;
+    let mut so_far = String::new();
     let ok = loop {
+        while let Ok(chunk) = arrived.try_recv() {
+            so_far.push_str(&String::from_utf8_lossy(&chunk));
+        }
+        let stop = match watch(&so_far) {
+            Watch::Wait => false,
+            Watch::WaitUpTo(longer) => {
+                limit = limit.max(longer);
+                false
+            }
+            Watch::Stop => true,
+        };
         match child.try_wait() {
             Ok(Some(status)) => break status.success(),
-            Ok(None) if started.elapsed() <= wait => std::thread::sleep(Duration::from_millis(50)),
-            // Too long, or it can't be asked: stopped (the readers then reach the end).
+            Ok(None) if !stop && started.elapsed() <= limit => std::thread::sleep(Duration::from_millis(50)),
+            // Too long, stopped, or it can't be asked: stopped (the readers then reach the end).
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -146,13 +200,17 @@ fn https_port(serve: Option<&Value>, device: &str, target: &str) -> u16 {
     }
 }
 
+/// The tailnet's admin page `serve` named, where HTTPS (or Serve) is allowed.
+fn admin_url(out: &str) -> Option<String> {
+    out.split_whitespace()
+        .find(|w| w.starts_with("https://login.tailscale.com/"))
+        .map(|w| w.trim_end_matches(['.', ',', ')']).to_string())
+}
+
 /// Why `serve` failed, from what it printed.
 pub fn serve_error(out: &str) -> ServeError {
     let lower = out.to_ascii_lowercase();
-    let url = out
-        .split_whitespace()
-        .find(|w| w.starts_with("https://login.tailscale.com/"))
-        .map(|w| w.trim_end_matches(['.', ',', ')']).to_string());
+    let url = admin_url(out);
     if url.is_some() || lower.contains("https") && (lower.contains("not enabled") || lower.contains("certificate")) {
         ServeError::Https { url }
     } else if lower.contains("access denied") || lower.contains("operator") {
@@ -162,14 +220,40 @@ pub fn serve_error(out: &str) -> ServeError {
     }
 }
 
-/// Shares `http://127.0.0.1:<port>` on the tailnet over HTTPS; the address it answers at.
-pub fn serve(port: u16) -> Result<String, ServeError> {
+/// Shares `http://127.0.0.1:<port>` on the tailnet over HTTPS; the address it answers at. When HTTPS isn't
+/// allowed in the tailnet yet, Tailscale names its admin page and waits there until it is: `asks` gets that page
+/// at once, and `serve` goes on by itself once the person allowed it (up to `APPROVE_WAIT`), unless `stopped`.
+pub fn serve(port: u16, asks: &mut dyn FnMut(&str), stopped: &dyn Fn() -> bool) -> Result<String, ServeError> {
     let Tailnet::On { device } = tailnet() else { return Err(ServeError::Serve) };
     let target = format!("http://127.0.0.1:{port}");
     let current = run(&["serve", "status", "--json"], STATUS_WAIT).and_then(|(_, out)| serde_json::from_str(&out).ok());
     let https = https_port(current.as_ref(), &device, &target);
     let flag = format!("--https={https}");
-    match run(&["serve", "--bg", &flag, &target], SERVE_WAIT) {
+    let cli = cli().ok_or(ServeError::Serve)?;
+    let mut asked = false;
+    let mut gave_up = false;
+    let mut watch = |so_far: &str| {
+        if stopped() {
+            gave_up = true;
+            return Watch::Stop;
+        }
+        if !asked {
+            if let Some(url) = admin_url(so_far) {
+                asked = true;
+                asks(&url);
+            }
+        }
+        if asked {
+            Watch::WaitUpTo(APPROVE_WAIT)
+        } else {
+            Watch::Wait
+        }
+    };
+    let ran = run_watched(&cli, &["serve", "--bg", &flag, &target], SERVE_WAIT, &mut watch);
+    if gave_up {
+        return Err(ServeError::Stopped);
+    }
+    match ran {
         Some((true, _)) => Ok(if https == 443 { format!("https://{device}") } else { format!("https://{device}:{https}") }),
         Some((false, out)) => Err(serve_error(&out)),
         None => Err(ServeError::Serve),
@@ -256,6 +340,32 @@ mod tests {
         let (ok, out) = run_program(Path::new("/bin/sh"), &["-c", "echo early; exec sleep 5"], Duration::from_millis(300)).unwrap();
         assert!(!ok);
         assert_eq!(out, "early\n");
+    }
+
+    #[test]
+    fn a_watched_run_waits_longer_once_asked_and_stops_when_told() {
+        // It asks, then takes longer than the first wait: the watcher gives it more time.
+        let script = "echo 'visit https://login.tailscale.com/f/serve?node=abc'; sleep 1; echo done";
+        let mut seen = None;
+        let (ok, out) = run_watched(Path::new("/bin/sh"), &["-c", script], Duration::from_millis(300), &mut |so_far: &str| {
+            match admin_url(so_far) {
+                Some(url) => {
+                    seen.get_or_insert(url);
+                    Watch::WaitUpTo(Duration::from_secs(5))
+                }
+                None => Watch::Wait,
+            }
+        })
+        .unwrap();
+        assert!(ok, "it finished on its own");
+        assert!(out.ends_with("done\n"));
+        assert_eq!(seen.as_deref(), Some("https://login.tailscale.com/f/serve?node=abc"));
+        // Told to stop: it ends at once, well before its own end.
+        let started = Instant::now();
+        let (ok, _) = run_watched(Path::new("/bin/sh"), &["-c", "exec sleep 5"], Duration::from_secs(10), &mut |_| Watch::Stop)
+            .unwrap();
+        assert!(!ok);
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 
     #[test]

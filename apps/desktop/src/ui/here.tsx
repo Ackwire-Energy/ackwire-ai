@@ -3,10 +3,11 @@
  * Tailscale by what Tailscale is doing on this computer, why reach didn't turn on, and "Copy diagnostics";
  * and a server's tile by where it runs.
  */
-import { Button, Icon, type IconName, Switch } from "@agenteschat/ui";
+import { Button, Icon, type IconName, PixelSpinner, Switch } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
-import { REASON_TEXT, type ServeProblem, type Tailnet } from "../control/local-server";
+import { REASON_TEXT, type ReachStage, type ServeProblem, type Tailnet } from "../control/local-server";
 import type { ServerKind } from "../control/server";
 import { CommandCopy } from "./bits";
 import { hintFor, PrefRow } from "./settings";
@@ -47,7 +48,8 @@ export function ServerTile({ kind }: { kind: ServerKind }) {
 /**
  * "Reach it from your phone and teammates", what it does behind its ⓘ. While Tailscale is missing or not
  * connected the switch can't be used, and one line under the label says why, with what fixes it. `tailnet` null:
- * not read yet, so no line, and the switch waits unless reach is on already (turning it off needs no Tailscale).
+ * not read yet (it can take a couple of seconds), so the line says it is checking, and the switch waits unless
+ * reach is on already (turning it off needs no Tailscale).
  */
 export function ReachRow({
   tailnet,
@@ -66,35 +68,42 @@ export function ReachRow({
   const missing = tailnet?.state === "missing";
   // Not connected, and no Tailscale app to open: it connects from the terminal.
   const fromTerminal = !usable && !missing && host.platform !== "mac";
+  let line: ReactNode = null;
+  if (!tailnet && !on)
+    line = (
+      <span className="dk-reach-stage__line" aria-live="polite">
+        <PixelSpinner size={14} color="sky" />
+        <span className="dk-shimmer">{t("desktop.here.reachChecking")}</span>
+      </span>
+    );
+  else if (tailnet && !usable)
+    line = (
+      <span>
+        {missing
+          ? t("desktop.here.reachMissing")
+          : fromTerminal
+            ? t("desktop.here.reachOffTerminal")
+            : t("desktop.here.reachOff")}{" "}
+        {fromTerminal ? (
+          <CommandCopy command={TAILSCALE_UP} inline />
+        ) : (
+          <button
+            type="button"
+            className="ac-link dk-link"
+            onClick={() => void host.openTailscale(missing ? "download" : "app").catch(() => {})}
+          >
+            {missing ? t("desktop.here.getTailscale") : t("desktop.here.openTailscale")}
+          </button>
+        )}
+      </span>
+    );
   return (
     <PrefRow
       top
       title={t("desktop.here.reach")}
       hint={hintFor(t, t("desktop.here.reach"), t("desktop.here.reachText"))}
       htmlFor="here-reach"
-      desc={
-        tailnet &&
-        !usable && (
-          <span>
-            {missing
-              ? t("desktop.here.reachMissing")
-              : fromTerminal
-                ? t("desktop.here.reachOffTerminal")
-                : t("desktop.here.reachOff")}{" "}
-            {fromTerminal ? (
-              <CommandCopy command={TAILSCALE_UP} inline />
-            ) : (
-              <button
-                type="button"
-                className="ac-link dk-link"
-                onClick={() => void host.openTailscale(missing ? "download" : "app").catch(() => {})}
-              >
-                {missing ? t("desktop.here.getTailscale") : t("desktop.here.openTailscale")}
-              </button>
-            )}
-          </span>
-        )
-      }
+      desc={line}
       end={
         <Switch
           id="here-reach"
@@ -109,8 +118,37 @@ export function ReachRow({
 }
 
 /**
- * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, and the command to copy
- * where the terminal does.
+ * What turning reach on or off is doing while it takes, a line with the spinner. When Tailscale waits for HTTPS
+ * to be allowed in the tailnet, its page is a button away, and "Stop waiting" ends it there.
+ */
+export function ReachProgress({ stage }: { stage: ReachStage }) {
+  const { t } = useTranslation();
+  const host = useHost();
+  return (
+    <span className="dk-reach-stage" aria-live="polite">
+      <span className="dk-reach-stage__line">
+        <PixelSpinner size={14} color="sky" />
+        <span className={stage.stage === "approve" ? undefined : "dk-shimmer"}>
+          {t(`desktop.here.reachStage.${stage.stage}`)}
+        </span>
+      </span>
+      {stage.stage === "approve" && (
+        <span className="dk-reach-stage__acts">
+          <Button size="sm" variant="primary" onClick={() => void host.openTailscale("https").catch(() => {})}>
+            {t("desktop.here.approveOpen")}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void host.stopLocalReach().catch(() => {})}>
+            {t("desktop.here.approveStop")}
+          </Button>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, the command to copy
+ * where the terminal does, and "Copy diagnostics" when the server didn't answer again.
  */
 export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "fail" | "prefs" }) {
   const { t } = useTranslation();
@@ -139,6 +177,11 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
             {t("desktop.here.operatorRun")}
             <CommandCopy command={TAILSCALE_OPERATOR} />
           </>
+        )}
+        {problem.reason === "start" && (
+          <span className="dk-reach-stage__acts">
+            <CopyDiagnostics />
+          </span>
         )}
       </span>
     </span>

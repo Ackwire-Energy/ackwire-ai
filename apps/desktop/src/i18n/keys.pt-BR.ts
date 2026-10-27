@@ -193,6 +193,17 @@ export const desktopPtBR = {
     reachOff: "O Tailscale não está conectado.",
     reachOffTerminal: "O Tailscale não está conectado. Conecte pelo terminal:",
     reachMissing: "Precisa do Tailscale, que é grátis.",
+    reachChecking: "Vendo se o Tailscale está conectado…",
+    /** What turning access on or off is doing while it takes. */
+    reachStage: {
+      sharing: "Pedindo ao Tailscale para compartilhar…",
+      approve:
+        "O Tailscale pede para ligar o HTTPS na sua rede. Ligue na página dele: o resto continua sozinho quando você ligar.",
+      restarting: "Reiniciando o agentes.chat no endereço novo…",
+      signingIn: "Entrando de novo no endereço novo…",
+    },
+    approveOpen: "Abrir a página do Tailscale",
+    approveStop: "Parar de esperar",
     openTailscale: "Abrir o Tailscale",
     getTailscale: "Baixar o Tailscale",
     usage: "Enviar estatísticas de uso anônimas ao agentes.chat",
@@ -224,6 +235,8 @@ export const desktopPtBR = {
       https: "o HTTPS está desligado na sua rede do Tailscale",
       serve: "o Tailscale deste {{device}} não consegue compartilhar; instale o Tailscale pelo tailscale.com",
       operator: "o Tailscale precisa da sua permissão antes",
+      stopped: "você parou de esperar o HTTPS ser ligado",
+      start: "o agentes.chat não voltou a responder no endereço novo",
     },
     operatorRun: "Dê essa permissão uma vez, no terminal:",
     turnOn: "Ligar",

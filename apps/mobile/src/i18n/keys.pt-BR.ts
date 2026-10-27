@@ -53,6 +53,8 @@ export const mobilePtBR = {
       checking: "Conferindo o servidor…",
       notALink: "Este link não é de um servidor agentes.chat.",
       tokenFailed: "O código expirou ou já foi usado. Entre com seu e-mail, ou mostre um código novo no computador.",
+      signInSlow:
+        "Entrar está demorando mais que o normal. Entre com seu e-mail, ou mostre um código novo no computador.",
     },
     scan: {
       hint: "Aponte para o QR code que aparece no computador.",

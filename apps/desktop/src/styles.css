@@ -198,6 +198,28 @@ p {
 .dk-honest .ac-icon {
   color: var(--warn);
 }
+/* What turning reach on or off is doing while it takes (`ReachProgress`). */
+.dk-reach-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.dk-reach-stage__line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dk-reach-stage__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.dk-reach-stage .dk-reach-stage__acts {
+  margin-top: 0;
+}
 .dk-shimmer {
   background: linear-gradient(90deg, var(--faint) 0%, var(--ink2) 50%, var(--faint) 100%);
   background-size: 200% 100%;

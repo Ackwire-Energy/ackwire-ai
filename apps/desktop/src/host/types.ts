@@ -1,7 +1,7 @@
 import type { ServerCheck } from "@agenteschat/client/lib/server";
 import type { HelloLine } from "../control/client";
 import type { Candidate } from "../control/first-run";
-import type { LocalChoice, LocalServerStatus, ReachResult, StepChange, Tailnet } from "../control/local-server";
+import type { LocalChoice, LocalServerStatus, ReachResult, ReachStage, StepChange, Tailnet } from "../control/local-server";
 import type { Platform } from "../control/platform";
 import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -145,6 +145,10 @@ export interface Host {
   restartLocalServer(): Promise<void>;
   /** Reach from the person's other devices (Tailscale), on or off; the main window follows the address. */
   setLocalReach(on: boolean): Promise<ReachResult>;
+  /** What `setLocalReach` is doing while it takes. */
+  onLocalReach(cb: (stage: ReachStage) => void): () => void;
+  /** Stops waiting for HTTPS to be allowed in the tailnet (`setLocalReach` then answers `stopped`). */
+  stopLocalReach(): Promise<void>;
   /** The usage-statistics switch (`TELEMETRY` in its settings; it starts again). */
   setLocalUsage(on: boolean): Promise<void>;
   /** "Back up now": the file it wrote. */
