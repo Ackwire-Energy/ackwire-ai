@@ -2,7 +2,7 @@ import type { InlinePart } from "@agenteschat/adapters";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
 import { AGENT_GRADIENTS } from "@agenteschat/ui/agent/engine";
 import { initialsOf } from "@agenteschat/ui/names";
-import { opaque } from "@agenteschat/ui/sky/math";
+import { mix, opaque } from "@agenteschat/ui/sky/math";
 
 /** The languages emails are written in. */
 export type EmailLocale = "pt-BR" | "en";
@@ -73,6 +73,8 @@ const palette = (t: ThemeColors) => ({
   muted: t.muted,
   faint: t.faint,
   action: t.action,
+  /** The top of the primary button's gradient, as the app's `color-mix(in srgb, var(--ink) 82%, var(--bg))`. */
+  actionTop: mix(t.action, t.bg, 0.18),
   onAction: t.onAction,
   warnSoft: t.warnSoft,
   warn: t.warn,
@@ -139,6 +141,15 @@ const P = `font-family:${SANS};mso-line-height-rule:exactly`;
  * a label mid-word.
  */
 const PW = `${P};word-break:break-word`;
+/** `P` for a link button: classic Outlook clips a button whose line height is exact. */
+const PB = `font-family:${SANS};mso-line-height-rule:at-least`;
+/**
+ * The app's primary button (`.ac-btn--primary` in `packages/ui/src/styles/components.css`): its highlight, bottom
+ * edge and shadows. Every client that draws box-shadow reads rgba(). The app's dark highlight is .12, too close to
+ * matter on a 1 px line, so one value serves both themes.
+ */
+const LIFT =
+  "inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)";
 
 const cidOf = (file: string) => `${file.replace(/\.png$/, "")}@agentes.chat`;
 
@@ -207,11 +218,14 @@ function block(b: Block, src: (file: string) => string): string {
       )
       .join("")}</table>`;
   if ("button" in b) {
-    // A link button, clickable everywhere; classic Outlook gets its own spacers and draws it square.
-    const btn = `<a class="btn" href="${esc(b.url)}" target="_blank" style="display:inline-block;background:${L.action};border-radius:14px;color:${L.onAction};${P};font-size:16px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 24px;mso-padding-alt:0;text-underline-color:${L.action}"><!--[if mso]><i style="mso-font-width:150%;mso-text-raise:28pt" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:14pt;color:${L.onAction}">${esc(b.button)}</span><!--[if mso]><i style="mso-font-width:150%" hidden>&emsp;&#8203;</i><![endif]--></a>`;
-    // Four spaces too: classic Outlook ignores the span's width.
+    // A link button, clickable everywhere; classic Outlook gets its own spacers, in em at the 15 px label, and draws
+    // it square and flat. The colour comes before the shorthand: a client without gradients keeps the colour, and
+    // Gmail for Android breaks a gradient in an inline background-image.
+    const btn = `<a class="btn" href="${esc(b.url)}" target="_blank" style="display:inline-block;background-color:${L.action};background:${L.action} linear-gradient(180deg,${L.actionTop} 0%,${L.action} 100%);border-radius:14px;box-shadow:${LIFT};color:${L.onAction};${PB};font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 16px;mso-padding-alt:0;text-underline-color:${L.action}"><!--[if mso]><i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:93%;color:${L.onAction}">${esc(b.button)}</span><!--[if mso]><i style="mso-font-width:107%" hidden>&emsp;&#8203;</i><![endif]--></a>`;
+    // Four spaces too: classic Outlook ignores the span's width. The second label has no colour of its own, so the
+    // dark rules reach it through the link, and classic Outlook raises it like the button's.
     const also = b.also
-      ? `<span style="display:inline-block;width:20px">&nbsp;&nbsp;&nbsp;&nbsp;</span><a class="${b.also.danger ? "ln-d" : "ln"}" href="${esc(b.also.url)}" target="_blank" style="display:inline-block;padding:14px 0;color:${b.also.danger ? L.danger : L.ink};${P};font-size:16px;line-height:20px;font-weight:600;text-decoration:underline;text-decoration-color:${L.border};text-underline-offset:3px">${esc(b.also.label)}</a>`
+      ? `<span style="display:inline-block;width:16px;font-size:15px;line-height:20px">&nbsp;&nbsp;&nbsp;&nbsp;</span><a class="${b.also.danger ? "ln-d" : "ln"}" href="${esc(b.also.url)}" target="_blank" style="display:inline-block;padding:14px 0;color:${b.also.danger ? L.danger : L.ink};${PB};font-size:15px;line-height:20px;font-weight:600;text-decoration:underline;text-decoration-color:${L.border};text-underline-offset:3px;text-underline-color:${L.border}"><span style="mso-text-raise:93%">${esc(b.also.label)}</span></a>`
       : "";
     return `<table ${T("margin:8px 0 20px")}><tr><td>${btn}${also}</td></tr></table>`;
   }
@@ -248,6 +262,8 @@ export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: s
     `<img class="${cls}" src="${esc(src(file))}" width="${LOGO.width}" height="${LOGO.height}" alt="${LOGO.alt}" style="display:${display};border:0;outline:none;width:${LOGO.width}px;height:${LOGO.height}px;font-family:${SANS};font-size:20px;font-weight:600;line-height:${LOGO.height}px;color:${color}">`;
   // `light only` keeps the Gmail apps from converting it; `:root{color-scheme:light dark}` keeps Apple Mail
   // applying our dark design. Risky rules sit in blocks of their own, so a client that drops one keeps the rest.
+  // The dark button's gradient comes after the flat fill it paints over (the same specificity, so the later wins):
+  // a client that rejects it keeps the flat fill.
   const html = `<!doctype html>
 <html lang="${lang}" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -270,6 +286,9 @@ a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important
 </style>
 <style>
 ${DARK.map((r) => `[data-ogsc] ${r}[data-ogsb] ${r}`).join("\n")}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,${D.actionTop} 0%,${D.action} 100%)!important}}
 </style>
 ${art.base ? `<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;size-adjust:107%;src:url('${esc(`${art.base}${FONT}`)}') format('woff2')}</style><!--<![endif]-->` : ""}
 </head>
