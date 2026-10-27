@@ -87,8 +87,11 @@ const REQUESTS_PER_LINK = { limit: 20, windowMs: HOUR_MS };
 const group = (orgId: string) => `join_requests:${orgId}`;
 const closedLink = () => new NotFoundError("This link no longer works", "join.link_closed");
 const fullError = () => new ConflictError("This workspace has many requests waiting", "join.full");
+/** A link's hour used up, by asks or by codes: everyone asking through it shares it, unlike `join.rate_limited`. */
+export const linkBusy = () =>
+  new TooManyError("Many people asked through this link in the last hour. Try again later.", "join.link_busy");
 
-/** `rateLimiter`: counts a link's new requests (`spendLinkRequest`). */
+/** `rateLimiter` counts a link's new requests (`spendLinkRequest`): `askToJoin` requires it, the job never spends. */
 type Deps = { db: Database; pubsub?: PubSub; rateLimiter?: RateLimiter };
 type RequestRow = typeof requests.$inferSelect;
 
@@ -164,8 +167,7 @@ async function openLink(db: Executor, token: string, now: Date) {
 /** One of the link's new requests for the hour (`REQUESTS_PER_LINK`), in memory like every rate limit here. */
 async function spendLinkRequest(deps: Deps, linkId: string) {
   const spent = await deps.rateLimiter?.consume(`join-request:link:${linkId}`, REQUESTS_PER_LINK);
-  if (spent && !spent.allowed)
-    throw new TooManyError("Too many requests through this link. Try again in an hour.", "join.rate_limited");
+  if (spent && !spent.allowed) throw linkBusy();
 }
 
 const codeHash = (orgId: string, email: string, code: string) => sha256(`${orgId}:${email}:${code}`);
@@ -376,11 +378,16 @@ interface Ask {
  * confirmed (anyone can sign up with an address that isn't theirs), gets the same answer after the same work
  * whatever it is: nothing here depends on the address, so a link never tells who works there, who waits or who was
  * turned down, not even by how long the answer takes. A job files it (`fileJoinRequest`). A link takes 20 new
- * requests an hour (`join.rate_limited`): a proven ask counts only when it files one, an unproven ask whenever it
+ * requests an hour (`join.link_busy`): a proven ask counts only when it files one, an unproven ask whenever it
  * asks, so asks without a right code can't use up the hour for the people it was shared with. `created` is false
  * only when a request for the address already waited.
  */
-export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinInput, now = new Date()) {
+export async function askToJoin(
+  deps: Deps & { rateLimiter: RateLimiter },
+  publicUrl: string,
+  input: AskToJoinInput,
+  now = new Date(),
+) {
   const { db } = deps;
   const found = await openLink(db, input.token, now);
   const orgId = found.link.orgId;

@@ -8,6 +8,7 @@ import {
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
   JOIN_REASON_MAX,
+  linkBusy,
   listInviteLinks,
   listWaitingJoinRequests,
   requestLocale,
@@ -258,7 +259,8 @@ export function inviteRoutes(deps: AppDeps) {
       responses: {
         202: json(z.object({ email: z.string(), resendIn: z.number().int() }), "Sent"),
         429: errorResponse(
-          "Too many (`join.code_wait` with `retryIn`, `join.code_limit`, `join.rate_limited`, `rate_limited`)",
+          "Too many (`join.code_wait` with `retryIn`, `join.code_limit`, `join.rate_limited` from here, " +
+            "`join.link_busy` through the link, `rate_limited`)",
         ),
         ...errors,
       },
@@ -279,7 +281,7 @@ export function inviteRoutes(deps: AppDeps) {
       );
       if (refused) return apiError(c, 403, refused.code, refused.message);
       const link = await adapters.rateLimiter.consume(`join-code:link:${sha256(token)}`, CODES_PER_LINK);
-      if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
+      if (!link.allowed) throw linkBusy();
       if (adapters.email.delivers !== true) return apiError(c, 409, "join.no_email", "This server doesn't send email.");
       const { email } = c.req.valid("json");
       const user = await sessionUser(deps.auth, c.req.raw.headers);
@@ -356,7 +358,7 @@ export function inviteRoutes(deps: AppDeps) {
           "Already waiting",
         ),
         201: json(z.object({ status: z.literal("pending"), email: z.string(), emailed: z.boolean() }), "Sent"),
-        429: errorResponse("Too many requests (`join.rate_limited`)"),
+        429: errorResponse("Too many requests (`join.rate_limited` from here, `join.link_busy` through the link)"),
         ...errors,
       },
     }),

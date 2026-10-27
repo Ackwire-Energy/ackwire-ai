@@ -6858,6 +6858,7 @@ export const ptBR = {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você por e-mail.",
       rateLimited: "Muitos pedidos daqui. Tente de novo daqui a uma hora.",
+      linkBusy: "Muita gente pediu por este link na última hora. Tente de novo mais tarde.",
       member: "Você já está neste workspace.",
       denied: "Seu pedido não foi aprovado. Peça a alguém de lá para convidar você por e-mail.",
       answered: "Alguém já respondeu este pedido.",

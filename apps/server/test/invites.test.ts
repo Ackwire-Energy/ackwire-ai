@@ -192,7 +192,9 @@ test("codes are limited per IP (10 an hour) and per link (40 an hour), checks pe
   expect(await errorCode(limited)).toBe("join.rate_limited");
   for (const ip of ["203.0.113.2", "203.0.113.3", "203.0.113.4"])
     for (let i = 0; i < 10; i++) expect((await from(ip, i)).status).toBe(202);
-  expect((await from("203.0.113.5", 0)).status).toBe(429);
+  const busy = await from("203.0.113.5", 0);
+  expect(busy.status).toBe(429);
+  expect(await errorCode(busy)).toBe("join.link_busy");
 
   const check = (i: number) =>
     browser(t)(`/api/app/invitations/${token}/code/check`, {
@@ -239,14 +241,16 @@ test("asks are limited per IP (10 an hour) and per link (20 an hour)", async () 
   for (let i = 0; i < 10; i++) expect((await from("203.0.113.1", i)).status).toBe(201);
   const limited = await from("203.0.113.1", 10);
   expect(limited.status).toBe(429);
-  expect(((await limited.json()) as { error: { code: string } }).error.code).toBe("join.rate_limited");
+  expect(await errorCode(limited)).toBe("join.rate_limited");
   for (let i = 0; i < 10; i++) expect((await from("203.0.113.2", i)).status).toBe(201);
-  expect((await from("203.0.113.3", 0)).status).toBe(429);
+  const busy = await from("203.0.113.3", 0);
+  expect(busy.status).toBe(429);
+  expect(await errorCode(busy)).toBe("join.link_busy");
 });
 
 test("asks without a right code don't use up a link's hour: a person with a verified code still gets in", async () => {
   const { owner, orgId, link, token } = await start();
-  // 30 asks from 3 addresses, each within its own limit, half with no code and half with a wrong one.
+  // 30 asks from 3 IP addresses, each within its own limit, half with no code and half with a wrong one.
   for (const ip of ["198.51.100.1", "198.51.100.2", "198.51.100.3"]) {
     for (let i = 0; i < 10; i++) {
       const json = { name: "Eve", email: `eve${i}@example.com`, ...(i % 2 ? { code: "123456" } : {}) };
@@ -258,18 +262,20 @@ test("asks without a right code don't use up a link's hour: a person with a veri
   expect((await provenAsk(token, ana)).status).toBe(201);
   expect(await requests(owner, orgId)).toEqual([expect.objectContaining({ email: ana.email, verified: true })]);
 
-  // New requests still count, 20 an hour: an address already waiting asks again freely, the next new one waits,
-  // and its code still works an hour later.
+  // Only new requests count, 20 an hour. Ana's was the 1st and 18 more go: Ana asking again is free, Bo's is the
+  // 20th (were either 15 refused asks above counted, it would be past 20) and Cy's waits. Cy's code still works once
+  // the link's hour frees up (a fresh limiter stands in for that), within its 30 minutes.
   const hour = { limit: 20, windowMs: 3_600_000 };
-  for (let i = 0; i < 19; i++) await t.adapters.rateLimiter.consume(`join-request:link:${link.id}`, hour);
+  for (let i = 0; i < 18; i++) await t.adapters.rateLimiter.consume(`join-request:link:${link.id}`, hour);
   expect((await provenAsk(token, ana)).status).toBe(200);
-  const bo = browser(t);
-  const boAsk = { name: "Bo", email: "bo@example.com", code: await codeFor(bo, token, "bo@example.com") };
-  const waits = await ask(bo, token, boAsk);
+  expect((await provenAsk(token, { name: "Bo", email: "bo@example.com" })).status).toBe(201);
+  const cy = browser(t);
+  const cyAsk = { name: "Cy", email: "cy@example.com", code: await codeFor(cy, token, "cy@example.com") };
+  const waits = await ask(cy, token, cyAsk);
   expect(waits.status).toBe(429);
-  expect(await errorCode(waits)).toBe("join.rate_limited");
+  expect(await errorCode(waits)).toBe("join.link_busy");
   t.adapters.rateLimiter = createMemoryRateLimiter();
-  expect((await ask(bo, token, boAsk)).status).toBe(201);
+  expect((await ask(cy, token, cyAsk)).status).toBe(201);
 });
 
 test("signed in: a confirmed address joins at approval; an unconfirmed one gets an invitation", async () => {
