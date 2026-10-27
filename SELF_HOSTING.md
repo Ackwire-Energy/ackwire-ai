@@ -781,7 +781,7 @@ party only when you turn that service on:
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
 | Claude (Anthropic), OpenAI, DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
-| TypeSafe Jev | `TYPESAFE_API_KEY` | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
+| TypeSafe Jev | `TYPESAFE_API_KEY`: your own TypeSafe key, so TypeSafe bills your account. It wins over a key saved in Settings. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
@@ -939,7 +939,7 @@ agents can use their desktops there and, if not, what is missing and the command
 `agentes-runner desktop-check --agent <handle>` (with the runner stopped) times a look, an action, a
 screenshot and a close-up on that agent's desktop.
 
-With `TYPESAFE_API_KEY` (Jev), agents name targets in words, small ones are looked at again up close on
+With Jev (your own TypeSafe key, `TYPESAFE_API_KEY`), agents name targets in words, small ones are looked at again up close on
 the screenshot, and checks can look at the screen's image. Without it they act by the numbers on the
 screen and exact names, checks use the organization's cheap model on the screen's text, and nothing is
 found on images. Each step an agent takes shows on its message, and every app or file it opens is in
