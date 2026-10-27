@@ -4414,6 +4414,7 @@ export const en: Translations = {
     errors: {
       planOwnerOnly: "Only {{agentName}}'s owner can let more people talk to it: it thinks with their plan.",
       planTermsRequired: "Confirm the personal-plan warning before letting more people talk to it.",
+      planPersonal: "A plan is personal. On this workspace only its owner talks to agents that use it.",
     },
     add: {
       paste: "Paste",

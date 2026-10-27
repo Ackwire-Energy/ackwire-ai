@@ -10,7 +10,15 @@ import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agent
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
-import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
+import {
+  type AgentAudience,
+  answersOthers,
+  audienceOf,
+  OWNER_ONLY,
+  planSharing,
+  refusePersonalPlan,
+  storedAudience,
+} from "./audience";
 import { recordAudit } from "./audit";
 import { type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -367,7 +375,8 @@ export interface AgentBrainInput {
    * "Só responde a você" (ADR 0059 §5): true, only its owner talks to it;
    * false, on a plan everyone does, and on the API whoever did before a plan
    * made it its owner's only. Omitted = keep it; a switch onto a plan makes
-   * it its owner's only.
+   * it its owner's only. Where plans are personal, false on a plan is refused
+   * (`refusePersonalPlan`).
    */
   onlyOwner?: unknown;
   /**
@@ -399,7 +408,7 @@ function nextAudience(
   onlyOwner: boolean | undefined,
 ): { base: AgentAudience; to: AgentAudience } {
   const plan = isComputerBrain(brain);
-  const base = changed && plan ? OWNER_ONLY : audienceOf(agent);
+  const base = changed && plan ? OWNER_ONLY : storedAudience(agent);
   if (onlyOwner === undefined) return { base, to: base };
   if (onlyOwner) return { base, to: OWNER_ONLY };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
@@ -460,6 +469,7 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
+  if (input.onlyOwner === false) refusePersonalPlan({ name: agent.name, brain });
   const { base, to } = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
   const accepted = planSharing({ ...agent, brain }, userId, base, to, input.acceptPlanTerms === true);
   const audience = to.mode === agent.audienceMode ? null : to;
@@ -510,7 +520,8 @@ export async function setAgentBrain(
     return { row, released };
   });
   caches.agents.delete(`${orgId}:${agentId}`);
-  if (audience) caches.agents.delete(`${orgId}:team`);
+  // The team's cached rows carry the brain too, which the audience gate reads.
+  if (audience || changed) caches.agents.delete(`${orgId}:team`);
   forgetAgents(orgId, released);
   await recordAudit(deps.db, {
     orgId,
@@ -526,7 +537,7 @@ export async function setAgentBrain(
         effort: agent.brainEffort,
       },
       to: { brain, model, fallback, account, effort },
-      ...(audience ? { audience: { from: audienceOf(agent), to: audience } } : {}),
+      ...(audience ? { audience: { from: storedAudience(agent), to: audience } } : {}),
       ...(accepted ? { acceptedPlanTerms: true } : {}),
     },
   });

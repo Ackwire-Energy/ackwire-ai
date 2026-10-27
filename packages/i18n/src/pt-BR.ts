@@ -4441,6 +4441,7 @@ export const ptBR = {
     errors: {
       planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
       planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
+      planPersonal: "Um plano é pessoal. Neste workspace, só quem o conectou fala com os agentes que o usam.",
     },
     add: {
       paste: "Colar",
