@@ -50,8 +50,12 @@ export const storedAudience = (a: AudienceFields): AgentAudience => ({
   userIds: a.audienceMode === "everyone" ? [] : a.audienceUserIds,
 });
 
-/** Who the agent answers now: its stored audience, or only its owner while a personal plan thinks for it. */
-export const audienceOf = (a: GateFields): AgentAudience => (planKeepsItsOwn(a) ? OWNER_ONLY : storedAudience(a));
+/**
+ * Who the agent answers now: its stored audience, or only its owner while a personal plan thinks for it, the people
+ * it answered kept aside as `owner` keeps them (they come back once it moves to the API).
+ */
+export const audienceOf = (a: GateFields): AgentAudience =>
+  planKeepsItsOwn(a) ? { mode: "owner", userIds: storedAudience(a).userIds } : storedAudience(a);
 
 /** Whether `to` lets someone talk to the agent whom `from` didn't (its owner always can). */
 export function widensAudience(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {

@@ -739,7 +739,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
-      if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
+      // On the API it answers its stored audience: `view.onlyOwner` is the gate's, which a personal plan narrows.
+      if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
           label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),

@@ -333,4 +333,16 @@ describe("where plans are personal (the server provisions the workspaces' comput
     expect(again.notices ?? []).toEqual([]);
     expect((await runsOf(again.id)).length).toBe(1);
   });
+
+  test("on a plan, the people it answered are kept aside as only its owner keeps them: they come back on the API", async () => {
+    const { bia } = await world();
+    enablePersonalPlans();
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
+    await f.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, f.agent.id));
+    const [onPlan] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    if (!onPlan) throw new Error("no agent");
+    expect(audienceOf(onPlan)).toEqual({ mode: "owner", userIds: [bia.id] });
+    expect(canTalkTo(onPlan, bia.id)).toBe(false);
+    expect((await getAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id)).onlyOwner).toBe(true);
+  });
 });
