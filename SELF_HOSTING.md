@@ -658,6 +658,7 @@ ones a self-hosted instance usually touches:
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
+| `TYPESAFE_API_KEY` | | Your TypeSafe key for Jev (AI: plans and keys). Wins over the key added in Settings → AI accounts. |
 
 **Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai or
 MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
@@ -781,7 +782,7 @@ party only when you turn that service on:
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
 | Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
-| TypeSafe Jev | `TYPESAFE_API_KEY`, or a key the server's owner saves with `PUT /api/app/jev` (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, the organization's own model does the rest, and nothing guesses what to connect. |
+| TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role and description of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
 | Daytona | `DAYTONA_API_KEY` | Cloud computers for agents: the commands and code agents run, the files they put there and the output, on Daytona's cloud (or your own Daytona, `DAYTONA_API_URL`). |
@@ -942,14 +943,14 @@ agents can use their desktops there and, if not, what is missing and the command
 `agentes-runner desktop-check --agent <handle>` (with the runner stopped) times a look, an action, a
 screenshot and a close-up on that agent's desktop.
 
-With Jev (your own TypeSafe key, `TYPESAFE_API_KEY`), agents name targets in words, small ones are looked at again up close on
-the screenshot, and checks can look at the screen's image. Without it they act by the numbers on the
-screen and exact names, checks use the organization's cheap model on the screen's text, and nothing is
-found on images. Each step an agent takes shows on its message, and every app or file it opens is in
-the organization's audit log. Programs on one desktop aren't isolated from each other: code the agent
-runs there can see its screen and keys, so agents never type passwords into desktop apps; a person signs
-in with take control, and the sign-in stays in the agent's home. Mac and Windows computers have no
-desktop use.
+With Jev (**Settings → AI accounts**, or `TYPESAFE_API_KEY`), agents name targets in words, small ones
+are looked at again up close on the screenshot, and checks can look at the screen's image. Without it
+they act by the numbers on the screen and exact names, checks use the organization's small model on the
+screen's text when it has an API key, and nothing is found on images. Each step an agent takes shows on
+its message, and every app or file it opens is in the organization's audit log. Programs on one desktop
+aren't isolated from each other: code the agent runs there can see its screen and keys, so agents never
+type passwords into desktop apps; a person signs in with take control, and the sign-in stays in the
+agent's home. Mac and Windows computers have no desktop use.
 
 **This server as the agents' computer.** The machine agentes.chat runs on can be a computer too, for
 the organizations the installation's first account made and is an owner or an admin of. The setup
@@ -994,6 +995,15 @@ restarts.
 stored encrypted with a key derived from `AGENTES_SECRET`, never sent back to a browser, and every
 model call goes through the server, which records its usage and cost per agent.
 
+**Jev (optional).** Jev is a fast model by TypeSafe that agentes.chat asks small questions: who should
+answer a message nobody @mentioned, how a new memory relates to the old ones, where a button is on an
+agent's screen. With it, unmentioned messages are routed even when agents think only with plans,
+memory spots repeats said in other words, and agents find buttons from a description and on
+screenshots. The person who set up the server adds the key in **Settings → AI accounts** (the setup
+asks once), or puts it in `.env` as `TYPESAFE_API_KEY`, which wins. It is stored encrypted like
+provider keys and never sent back to a browser. TypeSafe bills your account: US$ 0.042 per million
+tokens read, about US$ 0.0001 per routed message. Without it, see https://agentes.chat/help/jev#without.
+
 **Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
 computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder
 on that computer, `<runner home>/accounts/<kind>/<id>` (`~/.agentes-runner/accounts/…` for a runner
@@ -1002,6 +1012,11 @@ name, email, plan, status and usage (how much of each limit is used, and when it
 there says it). The code pasted when signing in from a browser is encrypted there to a
 key made on the computer and relayed without being stored, so the server can't read it. A personal
 plan is meant for its owner: answering other people with it may go against the provider's terms.
+With no Jev and no API key that has a small model, a plan also picks who answers its owner's own
+messages that mention nobody: Claude Code or Codex reads the message and the few before it on that
+computer, with every tool off, in a few seconds, and only while nothing else runs on that sign-in. It
+never picks for other people's messages, a sign-in made with an API key never picks, and a Windows
+computer doesn't pick yet.
 
 **Coding plans.** A GLM Coding Plan, Kimi Code, MiniMax or OpenCode Go key thinks through Claude Code
 on that computer, in its own account folder: the key is encrypted in the browser to the computer and
