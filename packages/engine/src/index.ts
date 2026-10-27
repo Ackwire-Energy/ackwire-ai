@@ -15,6 +15,7 @@ export * from "./audit";
 export * from "./authority";
 export * from "./auto-model";
 export * from "./avatars";
+export * from "./billing-link";
 export * from "./brain-settings";
 export * from "./brains/claude-code";
 export * from "./brains/codex";
