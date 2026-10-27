@@ -28,7 +28,10 @@ const BLOCKED = new Set([
   "blocklist",
   "content_blocked",
 ]);
-/** Error codes worth retrying: overload, timeouts, and a function call the model wrote unreadably. */
+/**
+ * Error codes worth retrying: overload, timeouts, and a tool call the model sampled wrong (unreadable, undeclared or
+ * too many), which another sample rarely repeats. Not `missing_thought_signature`: our own request causes it.
+ */
 const RETRYABLE = new Set([
   "api_error",
   "service_unavailable",
@@ -39,6 +42,8 @@ const RETRYABLE = new Set([
   "aborted",
   "malformed_function_call",
   "malformed_tool_call",
+  "unexpected_tool_call",
+  "too_many_tool_calls",
 ]);
 
 /** One step of an interaction (`user_input`, `model_output`, `thought`, `function_call`, `function_result`…). */
@@ -81,7 +86,8 @@ interface Built {
  * - Usage: input less the cached part, cached as cache reads, thinking as output (Google bills it at that rate), no
  *   cache writes (caching is implicit). Read from the finished interaction, else the last step's running total,
  *   else estimated, so a call is never recorded as free.
- * - A blocked reply is a refusal. Mid-stream failures carry what was received (`ProviderError.partial`).
+ * - A blocked reply is a refusal. Mid-stream failures carry what was received (`ProviderError.partial`), and a call
+ *   stopped after Google created the interaction carries one even before its first words (the prompt is estimated).
  */
 export function createGeminiProvider(
   options: { /** Tests only: a scripted transport. */ fetch?: typeof fetch } = {},
@@ -102,6 +108,7 @@ export function createGeminiProvider(
       let status: string | undefined;
       let usage: Usage | undefined;
       let blocked = false;
+      let created = false;
       const out = (text: string) => {
         partial.outputChars += text.length;
       };
@@ -126,6 +133,7 @@ export function createGeminiProvider(
           const event = JSON.parse(data) as StreamEvent;
           const built = event.index === undefined ? undefined : steps[event.index];
           if (event.event_type === "interaction.created" || event.event_type === "interaction.completed") {
+            created = true;
             model = event.interaction?.model ?? model;
             if (event.event_type === "interaction.completed") {
               status = event.interaction?.status;
@@ -204,7 +212,10 @@ export function createGeminiProvider(
                 `could not read the model's reply: ${error instanceof Error ? error.message : String(error)}`,
                 true,
               );
-        if (partial.outputChars > 0 || usage) mapped.partial = { ...partial, ...(usage ? usageOf(usage) : {}) };
+        // Google bills nothing for a call that fails with a 400 or 500, but a stopped one may have thought for a
+        // while: the thinking comes before any words, and its signature only at the thought's end.
+        if (partial.outputChars > 0 || usage || (created && request.signal?.aborted))
+          mapped.partial = { ...partial, ...(usage ? usageOf(usage) : {}) };
         throw mapped;
       }
     },

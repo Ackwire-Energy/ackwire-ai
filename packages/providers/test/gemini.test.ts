@@ -52,6 +52,20 @@ function gemini(body: string, status = 200) {
 }
 const failure = (p: Promise<unknown>) => p.then(() => null).catch((e: unknown) => e as ProviderError);
 
+/** A transport that sends `events` and keeps the stream open until the call is aborted; `more` runs once they were read. */
+const hanging = (events: Record<string, unknown>[], more?: () => void) =>
+  (async (_url: string | URL | Request, init?: RequestInit) =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(sse(events, false)));
+          init?.signal?.addEventListener("abort", () => c.error(new DOMException("aborted", "AbortError")));
+        },
+        pull: more,
+      }),
+      { status: 200, headers: { "content-type": "text/event-stream" } },
+    )) as unknown as typeof fetch;
+
 describe("Gemini adapter (Interactions API, scripted transport)", () => {
   test("a full tool loop: the request's steps and settings, the reply's text streamed, its blocks and split usage", async () => {
     const thought = { type: "thought", signature: "sig-0" };
@@ -192,8 +206,36 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
     );
     const refused = await asEvent.provider.stream(request(), quiet);
     expect(refused).toMatchObject({ stopReason: "refusal", text: "Sure, " });
-    const asStatus = gemini(sse([created(), completed("failed", undefined, { errors: [{ code: "recitation" }] })]));
-    expect((await asStatus.provider.stream(request(), quiet)).stopReason).toBe("refusal");
+    for (const code of ["recitation", "content_blocked"]) {
+      const asStatus = gemini(sse([created(), completed("failed", undefined, { errors: [{ code }] })]));
+      expect((await asStatus.provider.stream(request(), quiet)).stopReason).toBe("refusal");
+    }
+  });
+
+  test("a tool call the model sampled wrong is retried, as an error event or a failed interaction; a missing thought signature isn't", async () => {
+    const errorFor = async (code: string, asEvent: boolean) => {
+      const failed = asEvent
+        ? { event_type: "error", error: { code } }
+        : completed("failed", undefined, { errors: [{ code }] });
+      const { provider } = gemini(sse([created(), start(0, { type: "thought" }), failed]));
+      const e = (await failure(provider.stream(request(), quiet))) as ProviderError;
+      return { message: e.message, retryable: e.retryable, partial: e.partial };
+    };
+    const retried = { message: "provider error", retryable: true, partial: undefined };
+    for (const code of [
+      "malformed_function_call",
+      "malformed_tool_call",
+      "unexpected_tool_call",
+      "too_many_tool_calls",
+    ]) {
+      expect(await errorFor(code, true)).toEqual(retried);
+      expect(await errorFor(code, false)).toEqual(retried);
+    }
+    expect(await errorFor("missing_thought_signature", false)).toEqual({
+      message: "provider rejected the request (missing_thought_signature)",
+      retryable: false,
+      partial: undefined,
+    });
   });
 
   test("HTTP errors: a bad key, no credit and no access aren't retried; limits and outages are, a daily quota isn't", async () => {
@@ -288,20 +330,9 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
 
   test("an aborted call: request aborted, not retried, with what streamed", async () => {
     const controller = new AbortController();
-    const fetcher = (async (_url: string | URL | Request, init?: RequestInit) => {
-      const body = new ReadableStream<Uint8Array>({
-        start(c) {
-          c.enqueue(
-            new TextEncoder().encode(
-              sse([created(), start(0, { type: "model_output" }), delta(0, { type: "text", text: "Hel" })], false),
-            ),
-          );
-          init?.signal?.addEventListener("abort", () => c.error(new DOMException("aborted", "AbortError")));
-        },
-      });
-      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
-    }) as unknown as typeof fetch;
-    const provider = createGeminiProvider({ fetch: fetcher });
+    const provider = createGeminiProvider({
+      fetch: hanging([created(), start(0, { type: "model_output" }), delta(0, { type: "text", text: "Hel" })]),
+    });
     const call = provider.stream(request({ signal: controller.signal }), {
       apiKey: "k",
       onDelta: () => controller.abort(),
@@ -309,6 +340,24 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
     const error = await failure(call);
     expect(error).toMatchObject({ message: "request aborted", retryable: false });
     expect(error?.partial?.outputChars).toBe(3);
+  });
+
+  test("a call stopped while the model thinks, before any words, still carries a partial so its prompt is billed", async () => {
+    const controller = new AbortController();
+    const provider = createGeminiProvider({
+      fetch: hanging([created("gemini-4-argon"), start(0, { type: "thought" })], () => controller.abort()),
+    });
+    const error = await failure(
+      provider.stream(request({ model: "gemini-4-argon", signal: controller.signal }), quiet),
+    );
+    expect(error).toMatchObject({ message: "request aborted", retryable: false });
+    expect(error?.partial).toEqual({
+      inputTokens: null,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: null,
+      outputChars: 0,
+    });
   });
 
   test("another provider's blocks are dropped; a result whose call isn't in the history goes without a name", async () => {
