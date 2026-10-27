@@ -93,14 +93,19 @@ samp {
   flex: none;
   /* Browsers without the lh unit: the page's 22px line. */
   translate: 0 calc(11px - var(--cap-mid) - 50%);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
-  translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+}
+/* Behind @supports, not a second `translate` in the rule: a declaration holding var() parses even where lh is
+   unknown, so it would replace the fallback there and then compute to none. */
+@supports (top: 1lh) {
+  .ac-iconline > :first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 /* A face keeps its initials' small type but takes the row's line, so its `lh` is the line it sits on. */
 .ac-iconline > .ac-avatar:first-child {
   line-height: inherit;
-  /* The initials' line, taller than the face, stays centred on it. */
-  place-content: center;
+  /* One row as tall as the face: a photo of any shape fills it, and the initials' taller line stays centred on it. */
+  grid-template-rows: 100%;
 }
 
 /* Button */
@@ -977,8 +982,11 @@ textarea.ac-input {
   vertical-align: top;
   /* Browsers without the lh unit: who asks' 18px line. */
   translate: 0 calc(9px - var(--cap-mid) - 50%);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with an 18px fallback for older browsers */
-  translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-approval__origin > svg {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-approval__action {
   min-width: 0;
@@ -3964,8 +3972,11 @@ a.ac-list__row:focus-visible {
   vertical-align: top;
   /* Browsers without the lh unit: the page's 22px line. */
   translate: 0 calc(11px - var(--cap-mid) - 7px);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
-  translate: 0 calc(0.5lh - var(--cap-mid) - 7px);
+}
+@supports (top: 1lh) {
+  .ac-hint {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 7px);
+  }
 }
 .ac-hint:hover,
 .ac-hint[data-state="open"] {

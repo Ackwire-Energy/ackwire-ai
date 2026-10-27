@@ -157,7 +157,10 @@ describe("an icon before text sits on the text's first line", () => {
   test("a lead and an ⓘ sit on the first line's capitals' middle (--cap-mid), a 22px-line fallback first", async () => {
     const rules = await allRules();
     const body = (selector: string) =>
-      rules.find(([file, s]) => file === "packages/ui/src/styles/components.css" && s === selector)?.[2] ?? "";
+      rules
+        .filter(([file, s]) => file === "packages/ui/src/styles/components.css" && s === selector)
+        .map(([, , b]) => b)
+        .join("\n");
     const tokens = await Bun.file(join(ROOT, "packages/ui/src/styles/tokens.css")).text();
     expect(tokens).toMatch(/--cap-mid:\s*[\d.]+ex;/);
     expect(body(".ac-iconline")).toContain("align-items: flex-start");
@@ -173,9 +176,24 @@ describe("an icon before text sits on the text's first line", () => {
       expect(fallback).toBeGreaterThan(-1);
       expect(lh).toBeGreaterThan(fallback);
     }
-    // A face keeps its initials' type but reads the row's line; a key centred with its title only rises.
+    // A face keeps its initials' type but reads the row's line, its one row as tall as the face so a photo of any
+    // shape fills it; a key centred with its title only rises.
     expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("line-height: inherit");
+    expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("grid-template-rows: 100%");
     expect(body(".ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key")).toContain("var(--cap-mid)");
+  });
+
+  // A declaration holding var() parses even where lh is unknown, so as the second of a pair it would replace the px
+  // fallback there and then compute to nothing.
+  test("the lh unit sits behind @supports (top: 1lh), so a browser without it keeps the px fallback", async () => {
+    const bare: string[] = [];
+    for (const file of SOURCES.flatMap((d) => files(join(ROOT, d), ".css"))) {
+      const css = (await Bun.file(file).text())
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/@supports\s*\(\s*top:\s*1lh\s*\)\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "");
+      for (const m of css.matchAll(/[^;{}]*\dlh\b[^;{}]*/g)) bare.push(`${relative(ROOT, file)}: ${m[0].trim()}`);
+    }
+    expect(bare).toEqual([]);
   });
 
   test("nothing beside text aims at the x-height's middle (part of an em under the line's middle)", async () => {
