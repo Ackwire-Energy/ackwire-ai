@@ -54,6 +54,10 @@ describe("DetailsDialog", () => {
     const link = within(dialog).getByRole("link", { name: "Abrir em página própria" });
     expect(link.getAttribute("href")).toBe("/issues/6");
     expect(link.className).toContain("ac-btn");
+    // Its buttons are one row of actions, close last: its icon on the head's padding line.
+    const acts = dialog.querySelector(".ac-details__actions") as HTMLElement;
+    expect(acts.classList.contains("ac-acts")).toBe(true);
+    expect(acts.lastElementChild?.getAttribute("aria-label")).toBe("Fechar");
     // One section pattern: an eyebrow title with its count, a region.
     const people = within(dialog).getByRole("region", { name: "Pessoas" });
     expect(people.className).toBe("ac-details__section");
