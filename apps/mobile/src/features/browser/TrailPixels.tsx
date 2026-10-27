@@ -40,8 +40,8 @@ function cellPaint(color: string): SkPaint {
 
 const hidden = { accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants" as const };
 
-/** Cell runs drawn at `cx` × `cy` points per cell, in a `width` × `height` box. */
-function Cells({
+/** Cell runs drawn at `cx` × `cy` points per cell, in a `width` × `height` box (also the agent's month). */
+export function CellCanvas({
   runs,
   width,
   height,
@@ -96,7 +96,7 @@ export const TrailStrip = memo(function TrailStrip({
   const h = STRIP_ROWS * TRAIL_CELL;
   return (
     <View style={{ width: w, height: h }} {...hidden}>
-      <Cells runs={runs} width={w} height={h} cx={TRAIL_CELL} />
+      <CellCanvas runs={runs} width={w} height={h} cx={TRAIL_CELL} />
     </View>
   );
 });
@@ -109,7 +109,7 @@ export const TrailMark = memo(function TrailMark({ kind, color }: { kind: Browse
   const h = STRIP_ROWS * TRAIL_CELL;
   return (
     <View style={{ width: w, height: h }} {...hidden}>
-      <Cells runs={runs} width={w} height={h} cx={TRAIL_CELL} />
+      <CellCanvas runs={runs} width={w} height={h} cx={TRAIL_CELL} />
     </View>
   );
 });
@@ -122,7 +122,7 @@ export function TrailSky({ color }: { color: AgentColorName }) {
   const onLayout = (e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width));
   return (
     <View style={{ height: 2 * SKY_CELL }} onLayout={onLayout} {...hidden}>
-      {width ? <Cells runs={runs} width={width} height={2 * SKY_CELL} cx={SKY_CELL} /> : null}
+      {width ? <CellCanvas runs={runs} width={width} height={2 * SKY_CELL} cx={SKY_CELL} /> : null}
     </View>
   );
 }
@@ -142,7 +142,7 @@ export const TrailPage = memo(function TrailPage({
   const runs = useMemo(() => pageCells(w, h, color, dark), [w, h, color, dark]);
   return (
     <View style={{ width, height }} {...hidden}>
-      <Cells runs={runs} width={width} height={height} cx={width / w} cy={height / h} />
+      <CellCanvas runs={runs} width={width} height={height} cx={width / w} cy={height / h} />
     </View>
   );
 });

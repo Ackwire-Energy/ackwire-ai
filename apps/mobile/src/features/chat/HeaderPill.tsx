@@ -20,6 +20,7 @@ export function HeaderPill({
   trailing,
   onPress,
   label,
+  extraActions = 0,
 }: {
   lead?: ReactNode;
   title: string;
@@ -32,6 +33,8 @@ export function HeaderPill({
   onPress?: () => void;
   /** What a screen reader says (name, state and what a tap does). */
   label: string;
+  /** Bar buttons beside "…" (an agent's computer): the centered pill gives up twice their 40 points each. */
+  extraActions?: number;
 }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
@@ -42,7 +45,7 @@ export function HeaderPill({
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : "header"}
       accessibilityLabel={label}
-      style={[styles.press, { maxWidth: Math.max(160, width - 136) }]}
+      style={[styles.press, { maxWidth: Math.max(160, width - 136 - extraActions * 80) }]}
     >
       {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
       <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
