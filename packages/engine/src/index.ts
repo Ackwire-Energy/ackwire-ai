@@ -43,6 +43,7 @@ export * from "./connectors/mcp";
 export * from "./connectors/oauth-mcp";
 export * from "./connectors/oauth-return";
 export * from "./connectors/presets";
+export * from "./connectors/server-icon";
 export * from "./consultations";
 export * from "./context";
 export * from "./context/consolidate";

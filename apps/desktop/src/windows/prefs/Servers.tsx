@@ -2,11 +2,11 @@ import { Button, Chip, Dialog, DialogFooter, Menu, MenuItem, Switch } from "@age
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
-import { isHereServer, type LocalServerStatus, type ServeProblem } from "../../control/local-server";
+import { isHereServer, type LocalServerStatus, type ReachStage, type ServeProblem } from "../../control/local-server";
 import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
 import { pairedHomes } from "../../control/store";
 import { useLocalServer, useOnShown, useTailnet } from "../../hooks";
-import { ReachProblem, ReachRow, ServerTile } from "../../ui/here";
+import { ReachProblem, ReachProgress, ReachRow, ServerTile } from "../../ui/here";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
@@ -198,6 +198,8 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
   const toast = useToast();
   const tailnet = useTailnet();
   const [reaching, setReaching] = useState(false);
+  // What turning reach on or off is doing, said while it takes (Tailscale, its HTTPS page, the restart).
+  const [stage, setStage] = useState<ReachStage | null>(null);
   const [reachProblem, setReachProblem] = useState<ServeProblem | null>(null);
   const [busy, setBusy] = useState<"restart" | "stop" | "start" | "usage" | "backup" | null>(null);
   const [stopping, setStopping] = useState(false);
@@ -215,12 +217,15 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
       setBusy(null);
     }
   };
+  useEffect(() => host.onLocalReach(setStage), [host]);
   const reach = async (on: boolean) => {
     setReaching(true);
+    setStage(null);
     setReachProblem(null);
     try {
       const result = await host.setLocalReach(on);
-      if (!result.ok) setReachProblem(result.problem);
+      // Stopped waiting by the person: nothing went wrong to say.
+      if (!result.ok && result.problem.reason !== "stopped") setReachProblem(result.problem);
     } catch {
       toast(t("desktop.common.error"), "alert");
     } finally {
@@ -263,6 +268,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
           }
         />
         <ReachRow tailnet={tailnet} on={local.reach} busy={reaching || !running} onChange={(on) => void reach(on)} />
+        {reaching && stage && <PrefRow desc={<ReachProgress stage={stage} />} />}
         {reachProblem && <PrefRow desc={<ReachProblem problem={reachProblem} text="prefs" />} />}
         <PrefRow
           title={t("desktop.server.phone")}

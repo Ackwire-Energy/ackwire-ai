@@ -79,7 +79,8 @@ export function ResourceIcon({
   name: string;
 }) {
   if (resource.connectionId) {
-    return <ConnectorIcon def={items.get(resource.connectionId)?.def ?? null} label={name} />;
+    const item = items.get(resource.connectionId);
+    return <ConnectorIcon def={item?.def ?? null} image={item?.image} label={name} />;
   }
   return (
     <span className="connector-icon connector-icon--mono" aria-hidden="true">

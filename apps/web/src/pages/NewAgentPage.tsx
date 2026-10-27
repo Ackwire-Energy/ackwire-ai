@@ -526,7 +526,7 @@ function NewAgentFlow() {
     const n = itemName(t, item);
     return (
       <span key={item.id} className="ac-chip">
-        <ConnectorIcon def={item.def} label={n} />
+        <ConnectorIcon def={item.def} image={item.image} label={n} />
         {t(levels[item.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", { name: n })}
       </span>
     );
@@ -596,7 +596,7 @@ function NewAgentFlow() {
                         <span className="newag__chips">
                           {kit.slice(0, 3).map((i) => (
                             <span key={i.id} className="ac-chip">
-                              <ConnectorIcon def={i.def} label={itemName(t, i)} />
+                              <ConnectorIcon def={i.def} image={i.image} label={itemName(t, i)} />
                               {itemName(t, i)}
                             </span>
                           ))}
@@ -800,7 +800,7 @@ function NewAgentFlow() {
                   return (
                     <LevelRow
                       key={item.id}
-                      icon={<ConnectorIcon def={item.def} label={n} />}
+                      icon={<ConnectorIcon def={item.def} image={item.image} label={n} />}
                       name={n}
                       description={item.account}
                       asks={level === "write" ? asksOf(item) : []}

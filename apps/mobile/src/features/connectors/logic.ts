@@ -124,6 +124,14 @@ export function iconUri(base: string, iconUrl: string | null): string | null {
   return iconUrl && ICON_URL.test(iconUrl) ? `${base}${iconUrl}` : null;
 }
 
+/** A server's own icon, as the backend keeps and serves it behind the session (never the server's URL). */
+const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
+
+/** That icon's address on the server, or null. */
+export function serverIconUri(base: string, image: string | null | undefined): string | null {
+  return image && SERVER_ICON.test(image) ? `${base}${image}` : null;
+}
+
 /** A brand color we can trust ("#rrggbb"), else null. */
 export const brandOf = (color: string | null) => (color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : null);
 

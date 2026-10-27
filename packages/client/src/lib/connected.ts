@@ -15,6 +15,8 @@ export interface ConnectedItem {
   label: string;
   /** The catalog entry (also the preset a custom server came from): icon, scopes. */
   def: ConnectorDef | null;
+  /** A server's own icon (`/api/app/connector-icons/…`), shown when the catalog has none for it. */
+  image?: string | null;
   /** "acme" (the account), or the server's host. */
   account: string | null;
   createdAt: string;
@@ -42,6 +44,7 @@ export function fromConnection(c: Connection, catalog: ConnectorDef[]): Connecte
     custom: false,
     label: def?.label ?? c.label,
     def,
+    image: null,
     account: c.accountLabel,
     createdAt: c.createdAt,
     tools: def?.tools.length ?? 0,
@@ -58,6 +61,7 @@ export function fromServer(s: CustomServer, catalog: ConnectorDef[]): ConnectedI
     custom: true,
     label: s.label,
     def: catalog.find((d) => d.kind === "remote_mcp" && sameServer(d.serverUrl, s.serverUrl)) ?? null,
+    image: s.iconUrl ?? null,
     account: host(s.serverUrl),
     createdAt: s.createdAt,
     tools: exposedTools(s).length,
