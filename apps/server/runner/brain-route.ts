@@ -12,7 +12,7 @@ import {
   ROUTE_LIMITS,
   ROUTE_TIMEOUT_MS,
 } from "@agenteschat/adapters/machine-protocol";
-import { accountEnv, planKeyOf } from "./accounts";
+import { accountEnv, planKeyOf, routesRunning, signInKey } from "./accounts";
 import { accountSettingsEnv } from "./brain";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -27,7 +27,8 @@ import { resolveCommand } from "./executors";
  *
  * A sign-in made with a key is refused: it is neither a plan nor free. One route per sign-in at a time, and
  * none while that sign-in has a process open (a turn, or the one kept after it): concurrent processes on one
- * sign-in race on its refresh token, so the answer is `busy` at once and the server tries another.
+ * sign-in race on its refresh token, so the answer is `busy` at once and the server tries another. For the
+ * same reason a turn or a task starting on a sign-in stops the route running there first.
  */
 
 /** Claude Code's argv for a route; the prompt goes on standard input. */
@@ -186,15 +187,16 @@ export interface RouteDeps {
   tmpDir?: string;
 }
 
-/** Sign-ins with a route running in this process. */
-const routing = new Set<string>();
 /** Codex's small model per sign-in, looked up at most hourly (each lookup starts the CLI). */
 const lunas = new Map<string, { model: string; at: number }>();
 const LUNA_TTL_MS = 3600_000;
 const KILL_GRACE_MS = 3000;
 const OUTPUT_MAX = 1 << 20;
 
-/** One `brain.route`; `busy` at once while that sign-in has a process open or another route. */
+/**
+ * One `brain.route`; `busy` at once while that sign-in has a process open or another route. A turn or a task
+ * starting on that sign-in meanwhile stops it (`yieldRoute`), so the route fails and the server's rules decide.
+ */
 export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Promise<BrainRouteReply> {
   if (process.platform === "win32") throw new RunnerError("not_allowed", "Plans don't pick who answers on Windows yet");
   if (!isAccountKind(req.kind)) throw new RunnerError("bad_request", "kind must be claude_code or codex");
@@ -212,26 +214,33 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   if (account !== null && !isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
   const home = account ? deps.accounts?.accountDir(req.kind, account) : null;
   if (account && !home) throw new RunnerError("not_found", "That account isn't on this computer anymore");
-  const key = `${req.kind}:${home ?? "own"}`;
+  const key = signInKey(req.kind, home);
   const open = req.kind === "codex" ? deps.codexApp : deps.brains;
   const cli = req.kind === "codex" ? "codex" : "claude";
   const task = account === null && deps.tasks?.runningTasks().some((t) => t.executor === cli);
-  if (routing.has(key) || open?.holds(account) || task) return { busy: true };
-  routing.add(key);
+  if (routesRunning.has(key) || open?.holds(account) || task) return { busy: true };
+  const stop = new AbortController();
+  const signal = deps.signal ? AbortSignal.any([deps.signal, stop.signal]) : stop.signal;
+  const done = route(req, { ...deps, signal }, home ?? null, key);
+  routesRunning.set(key, { stop, done });
   try {
-    if (home && (await planKeyOf(home))) {
-      throw new RunnerError("not_allowed", "A sign-in made with a key doesn't pick who answers");
-    }
-    const dir = mkdtempSync(path.join(deps.tmpDir ?? os.tmpdir(), "agentes-route-"));
-    try {
-      return req.kind === "codex"
-        ? await codexRoute(req, { ...deps, dir, home: home ?? null, key })
-        : await claudeRoute(req, { ...deps, dir, home: home ?? null });
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    return await done;
   } finally {
-    routing.delete(key);
+    routesRunning.delete(key);
+  }
+}
+
+async function route(req: BrainRouteRequest, deps: RouteDeps, home: string | null, key: string) {
+  if (home && (await planKeyOf(home))) {
+    throw new RunnerError("not_allowed", "A sign-in made with a key doesn't pick who answers");
+  }
+  const dir = mkdtempSync(path.join(deps.tmpDir ?? os.tmpdir(), "agentes-route-"));
+  try {
+    return req.kind === "codex"
+      ? await codexRoute(req, { ...deps, dir, home, key })
+      : await claudeRoute(req, { ...deps, dir, home });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 

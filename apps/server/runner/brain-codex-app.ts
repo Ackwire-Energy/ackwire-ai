@@ -5,7 +5,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile, CommandScope } from "@agenteschat/adapters/command-policy";
 import { type BrainSteerReply, type BrainSteerRequest, isBrainEffort } from "@agenteschat/adapters/machine-protocol";
-import { accountEnv } from "./accounts";
+import { accountEnv, yieldRoute } from "./accounts";
 import {
   type CodexAppRunner,
   type CodexBrainEvent,
@@ -651,6 +651,8 @@ export class CodexAppServers implements CodexAppRunner {
   private readonly running = new Map<string, AppLive>();
   /** Runs on `codex exec`, with the account each signs in with (null: the computer's own). */
   private readonly execRuns = new Map<string, string | null>();
+  /** Turns from their start to their end (an app-server's handshake too), with their account like `execRuns`. */
+  private readonly turns = new Map<string, string | null>();
   /** `<bin>@<version>` whose app-server didn't start: exec for it from then on. */
   private readonly broken = new Set<string>();
   private closed = false;
@@ -673,7 +675,7 @@ export class CodexAppServers implements CodexAppRunner {
   /** Whether a process of that sign-in is open: a turn, or an app-server kept after one (`null`: the computer's own). */
   holds(account: string | null): boolean {
     for (const l of this.live.values()) if (l.account === account && !l.client.exited) return true;
-    return [...this.execRuns.values()].includes(account);
+    return [...this.turns.values()].includes(account);
   }
 
   /** The process of an agent's session (tests). */
@@ -702,6 +704,22 @@ export class CodexAppServers implements CodexAppRunner {
   }
 
   async turn(
+    input: CodexTurnInput & { version: string },
+    opts: CodexTurnOptions,
+    exec: () => Promise<void>,
+  ): Promise<void> {
+    // Held from here, so no route starts beside it, and a route already on its sign-in stops first: two
+    // processes on one sign-in race on its refresh token.
+    this.turns.set(input.runId, input.account?.id ?? null);
+    try {
+      await yieldRoute("codex", input.account?.home);
+      await this.turnOn(input, opts, exec);
+    } finally {
+      this.turns.delete(input.runId);
+    }
+  }
+
+  private async turnOn(
     input: CodexTurnInput & { version: string },
     opts: CodexTurnOptions,
     exec: () => Promise<void>,

@@ -30,7 +30,7 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf, yieldRoute } from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
@@ -1313,6 +1313,9 @@ export class BrainManager {
     ctx: BrainTurnContext,
   ): Promise<WireBrainEvent> {
     if (ctx.signal?.aborted) return errorEvent("canceled", "The turn was canceled.", false);
+    // A route on this sign-in stops first: two processes on one sign-in race on its refresh token. Kept right
+    // before the process starts, since a route may begin during any await before it.
+    await yieldRoute("claude_code", ctx.accountHome);
     const sig = this.signature(cwd, req, ctx);
     let live = this.live.get(key);
     // A turn Claude Code runs by itself there (or one due): its output would read as this turn's. Wait for

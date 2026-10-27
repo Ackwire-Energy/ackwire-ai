@@ -233,40 +233,68 @@ test.skipIf(!posix)("killed past its time, with what it started; an answer that 
   expect(await errorCode(() => routeWithPlan(request({ prompt: "BAD_ROUTE" }), deps))).toBe("internal");
 });
 
-test.skipIf(!posix)(
-  "the agent's processes: a sign-in is held during a turn and while its process is kept",
-  async () => {
-    const { home } = folders();
-    const root = tempDir("route-brains-");
-    dirs.push(root);
-    const m = new BrainManager({
-      root,
-      claudeCommand: [process.execPath, FAKE_CLAUDE],
-      accounts: { accountDir: () => home },
-      mcp: { socketPath: path.join(root, "mcp.sock"), command: ["node", "runner.mjs"] },
-      deltaMs: 5,
-    });
-    managers.push(m);
-    expect(m.holds(ACCOUNT)).toBe(false);
-    const final = await m.turn(
+const AGENT = "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0000";
+const SESSION = "0193aaaa-0000-7000-8000-000000000001";
+
+/** Dev's brain processes, thinking with the account in `home`, and one turn of his there. */
+function devBrains(home: string) {
+  const root = tempDir("route-brains-");
+  dirs.push(root);
+  const m = new BrainManager({
+    root,
+    claudeCommand: [process.execPath, FAKE_CLAUDE],
+    accounts: { accountDir: () => home },
+    mcp: { socketPath: path.join(root, "mcp.sock"), command: ["node", "runner.mjs"] },
+    deltaMs: 5,
+  });
+  managers.push(m);
+  const turn = () =>
+    m.turn(
       {
         runId: "0193bbbb-0000-7000-8000-000000000001",
         kind: "claude_code",
-        session: { id: "0193aaaa-0000-7000-8000-000000000001", resume: false },
+        session: { id: SESSION, resume: false },
         cwd: "",
         system: "You are dev.",
         prompt: "hello",
         mcp: { token: `agr_${"t".repeat(24)}1` },
         account: ACCOUNT,
       },
-      { agent: { id: "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0000", handle: "dev" }, folder: root, emit: () => {} },
+      { agent: { id: AGENT, handle: "dev" }, folder: root, emit: () => {} },
     );
+  return { m, turn };
+}
+
+test.skipIf(!posix)(
+  "the agent's processes: a sign-in is held during a turn and while its process is kept",
+  async () => {
+    const { home } = folders();
+    const { m, turn } = devBrains(home);
+    expect(m.holds(ACCOUNT)).toBe(false);
+    const final = await turn();
     expect(final.type).toBe("done");
     // Kept for the next turn (10 minutes by default): busy for routes.
     expect(m.holds(ACCOUNT)).toBe(true);
     expect(m.holds(null)).toBe(false);
     m.close();
     expect(m.holds(ACCOUNT)).toBe(false);
+  },
+);
+
+test.skipIf(!posix)(
+  "a turn starting on that sign-in mid-route stops the route, and starts after it ended",
+  async () => {
+    const { home, deps, claude } = folders();
+    const { m, turn } = devBrains(home);
+    const route = routeWithPlan(request({ prompt: "SLOW_ROUTE" }), { ...deps, brains: m });
+    const ended = route.then(
+      () => Date.now(),
+      () => Date.now(),
+    );
+    for (let i = 0; i < 250 && !claude().some((l) => l.route); i++) await Bun.sleep(20);
+    expect((await turn()).type).toBe("done");
+    expect(await route.catch((e: unknown) => String(e))).toBe("RunnerError: Claude Code didn't answer: canceled");
+    expect(m.process(AGENT, SESSION)?.startedAt).toBeGreaterThanOrEqual(await ended);
   },
 );
 
