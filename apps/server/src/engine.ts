@@ -1,4 +1,10 @@
-import type { Adapters, BrainTurnRequest, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
+import {
+  type Adapters,
+  type BrainTurnRequest,
+  type S3Fetch,
+  type SandboxProvider,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
@@ -44,6 +50,7 @@ import {
   createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
+  createSessionScreening,
   createSetupToolSource,
   createSkillToolSource,
   createStreamBroker,
@@ -79,6 +86,9 @@ import {
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
 
+/** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
+export const NO_TERMINAL = "no_terminal";
+
 export interface EngineOptions {
   db: Database;
   config: Config;
@@ -113,6 +123,7 @@ export interface EngineOptions {
   toolsOnDemand?: boolean;
   /** Where emails get their pictures (`emailArtFor` at boot); default: linked from `PUBLIC_URL`'s `/email/`. */
   emailArt?: EmailArt;
+  log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
 /**
@@ -331,14 +342,22 @@ export function buildEngine(o: EngineOptions) {
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
   const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
   machineHub.setBrowserHooks(browserLive.hubHooks);
+  // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
+  const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;
   // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
-  // its access checked again while open; control changing hands closes the views it hides.
+  // its access checked again while open; control changing hands closes the views it hides. Where sessions are
+  // screened no terminal opens: a shell nobody screens would be the way around it.
   const streams = createStreamBroker({
     db,
     hub: machineHub,
-    authorize: (input) => authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
+    authorize: async (input) =>
+      sessions && input.request.kind === "terminal"
+        ? { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL }
+        : authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
     recheck: (stream) => recheckStream(db, stream),
-    onClosed: (stream) => streamClosed(db, stream),
+    onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
+    onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
+    log: o.log,
   });
   const desktops = createDesktopControl({ db, pubsub: adapters.pubsub, hub: machineHub, streams });
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
@@ -456,6 +475,8 @@ export function buildEngine(o: EngineOptions) {
     machineHub,
     browserLive,
     streams,
+    /** Screened sessions (ADR 0076), for the operator API's review door; null where nothing is screened. */
+    sessions,
     desktops,
     mail,
     talker,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createFakeEmailSender, type EmailSender } from "@agenteschat/adapters";
+import { createFakeEmailSender, createMemoryRateLimiter, type EmailSender } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   approveJoinRequest,
@@ -34,12 +34,15 @@ const MIN = 60_000;
 const DAY = 86_400_000;
 const at = (ms: number) => new Date(NOW.getTime() + ms);
 
+let limiter = createMemoryRateLimiter();
+
 async function start() {
   f = await setup();
+  limiter = createMemoryRateLimiter();
   return (await inviteLink(f.db, SECRET, f.owner.id, f.org.id, NOW)).token;
 }
 const fx = () => f as Fixture;
-const deps = () => ({ db: fx().db, pubsub: fx().pubsub });
+const deps = () => ({ db: fx().db, pubsub: fx().pubsub, rateLimiter: limiter });
 
 const codeEmails = async () =>
   (await fx().db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send")).orderBy(schema.outbox.id))

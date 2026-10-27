@@ -246,6 +246,8 @@ export function isNewWork(request: MachineRequest) {
     // Ending an agent's desktop, or asking about it (ADR 0058).
     case "desktop.session.stop":
     case "desktop.session.status":
+    // Screening a person still in control after a hold or a pause began (ADR 0076).
+    case "desktop.text":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove";

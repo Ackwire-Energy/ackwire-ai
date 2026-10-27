@@ -33,7 +33,7 @@ export interface HumanCheckStatus {
   blocked: number;
   /** Tokens Cloudflare passed in the last 10 minutes. A widget down for everyone makes them fall as `blocked` rises. */
   passed: number;
-  /** The secret is one of Cloudflare's test secrets, which pass every token: nothing is really checked. */
+  /** The secret is one of Cloudflare's test secrets: they refuse real tokens, and the one that passes takes a dummy token from anyone. */
   testing: boolean;
 }
 

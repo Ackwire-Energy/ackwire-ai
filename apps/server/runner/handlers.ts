@@ -42,9 +42,15 @@ import type { Terminals } from "./terminal";
 export const MAX_CONCURRENT_REQUESTS = 8;
 /**
  * Never refused as busy: a brain turn holds its slot for the whole turn, so a computer full of agents' work
- * would otherwise keep people from watching or taking control. Short, and capped per agent on both sides.
+ * would otherwise keep people from watching or taking control, or a person in control from being screened
+ * (`desktop.text`). Short, and capped per agent on both sides.
  */
-const PEOPLE_OPS: ReadonlySet<string> = new Set(["stream.open", "desktop.session.status", "desktop.session.stop"]);
+const PEOPLE_OPS: ReadonlySet<string> = new Set([
+  "stream.open",
+  "desktop.session.status",
+  "desktop.session.stop",
+  "desktop.text",
+]);
 export const MAX_LIST_ENTRIES = 5000;
 
 /** Ops that start new work: refused while the owner paused the computer (protocol 9). Reads of status, output and cancel still go. */
@@ -114,6 +120,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.act": "agent",
   "desktop.capture": "agent",
   "desktop.apps": "agent",
+  "desktop.text": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -429,7 +436,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     req.op === "desktop.look" ||
     req.op === "desktop.act" ||
     req.op === "desktop.capture" ||
-    req.op === "desktop.apps"
+    req.op === "desktop.apps" ||
+    req.op === "desktop.text"
   ) {
     return handleDesktopUse(ctx, req);
   }
@@ -525,11 +533,15 @@ function handleDesktop(
 /**
  * Protocol 21: the agent uses its own desktop (ADR 0062). That runs commands
  * as the agent (its desktop has a terminal), so it needs the machine's
- * desktop switch and its commands switch.
+ * desktop switch and its commands switch. Protocol 25's `desktop.text` goes
+ * through the same helper, behind the same switches.
  */
 function handleDesktopUse(
   ctx: HandlerContext,
-  req: Extract<MachineRequest, { op: "desktop.look" | "desktop.act" | "desktop.capture" | "desktop.apps" }>,
+  req: Extract<
+    MachineRequest,
+    { op: "desktop.look" | "desktop.act" | "desktop.capture" | "desktop.apps" | "desktop.text" }
+  >,
 ) {
   const desktop = ctx.desktopUse;
   if (!desktop) throw new RunnerError("desktop_unavailable", "This runner doesn't serve desktop use");
@@ -545,6 +557,8 @@ function handleDesktopUse(
       return desktop.capture(req.agent, req.region);
     case "desktop.apps":
       return desktop.apps(req.agent);
+    case "desktop.text":
+      return desktop.text(req.agent);
   }
 }
 
@@ -1005,7 +1019,8 @@ export class RequestRunner {
       req.op === "browser.input" ||
       req.op === "desktop.look" ||
       req.op === "desktop.act" ||
-      req.op === "desktop.capture";
+      req.op === "desktop.capture" ||
+      req.op === "desktop.text";
     const startedAt = Date.now();
     if (!timed) this.log(describeRequest(req));
     this.observe(() => this.observer?.started(id, req));

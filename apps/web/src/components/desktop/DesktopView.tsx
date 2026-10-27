@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, cx, Icon, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint, modKey, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -361,6 +361,24 @@ export function DesktopView({
             ? ""
             : t("agentComputer.sub.opening");
   const retrying = <span>{t("desktop.state.retrying")}</span>;
+  const notice = (
+    <span className="muted">
+      {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
+      {t("desktop.control.notice", g)}
+    </span>
+  );
+  // agentes.chat Cloud may screen the session (ADR 0076): said behind an ⓘ, so the line stays one line.
+  const controlLine =
+    edition === "cloud" ? (
+      <span className="ac-hintline">
+        {notice}
+        <InfoHint name={t("common.about", { label: t("desktop.session.check") })}>
+          {t("desktop.session.screening")}
+        </InfoHint>
+      </span>
+    ) : (
+      notice
+    );
   const again = (
     <Button size="sm" icon="refresh" onClick={retry}>
       {t("desktop.retry")}
@@ -550,10 +568,7 @@ export function DesktopView({
                 <span>{said.text}</span>
               </span>
             ) : got === null ? (
-              <span className="muted">
-                {touch ? "" : `${t("desktop.control.keys", { key: modKey() })} `}
-                {t("desktop.control.notice", g)}
-              </span>
+              controlLine
             ) : (
               <span className="dsk-got" role="status">
                 <span className="muted">{t("desktop.clipboard.got", g)}</span>

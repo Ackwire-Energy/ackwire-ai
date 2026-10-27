@@ -53,6 +53,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (config.MACHINE_PROVISIONING === "external" && !config.OPERATOR_API_TOKEN) {
     throw new ConfigError(["MACHINE_PROVISIONING=external needs OPERATOR_API_TOKEN"]);
   }
+  // The screen's text leaves only through the operator API's review door: without it nobody could read it.
+  if (config.SESSION_SCREENING && !config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["SESSION_SCREENING needs OPERATOR_API_TOKEN"]);
+  }
   if (config.MACHINE_PROVISIONING === "external" && config.HOST_COMPUTER_TOKEN) {
     throw new ConfigError([
       "HOST_COMPUTER_TOKEN can't be set with MACHINE_PROVISIONING=external: every workspace gets its own computer, and no other computer joins it",
