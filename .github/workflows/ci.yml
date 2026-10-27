@@ -268,6 +268,43 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # The desktop app's Rust tests (src-tauri): the server here's folder and secrets, its copies, what runs after an
+  # exit, the setup's limits and Cancel, where links and frames open, Tailscale's output. Unix tests, so Linux is
+  # enough (the Desktop workflow's server smoke covers the Windows stop). The build wants the web view's files, the
+  # icons and the two sidecars: stand-ins here.
+  test-desktop-rust:
+    name: Test (desktop, Rust)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - uses: useblacksmith/checkout@v1 # v7.0.1
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - *setup-bun
+      - *cache-bun
+      - *install
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+      - name: Stand-ins for what the app bundles
+        working-directory: apps/desktop
+        run: |
+          mkdir -p dist src-tauri/binaries
+          printf '<!doctype html>\n' > dist/index.html
+          for bin in agentes-runner agent-browser; do
+            install -m 755 /dev/null "src-tauri/binaries/$bin-x86_64-unknown-linux-gnu"
+          done
+          bun scripts/icons.ts
+          bun run tauri icon app-icon.png
+      - name: Rust tests
+        working-directory: apps/desktop/src-tauri
+        run: cargo test
+
   # Whole-history secret scan with the pinned gitleaks image (the GitHub action needs a license key
   # for organization repos; the CLI does not), and the boundaries check: no cloud/ or ee/ imports, no
   # internal notes in public files. Every change runs this job, docs included; the check needs no install.
@@ -572,7 +609,8 @@ jobs:
   done:
     name: CI result
     if: always() && github.event.pull_request.draft != true
-    needs: [changes, check, test-backend, test-web, secrets, compose, build, publish, release-install, release-native]
+    needs:
+      [changes, check, test-backend, test-web, test-desktop-rust, secrets, compose, build, publish, release-install, release-native]
     runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 2
     steps:
