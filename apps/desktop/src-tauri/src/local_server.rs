@@ -11,6 +11,10 @@
 //! `INSTALL_MODE=desktop`. Long-lived secrets never reach a web view: the owner key only buys one-time sign-ins
 //! (`/desktop/handover#token=…`) for the main window.
 //!
+//! A setup can be cancelled at every step, and one that doesn't finish leaves the computer as it was before: what
+//! it started stops, and a database it made goes. While it makes one, `setup-pending` marks the folder's database
+//! as nobody's until the last step is done (`discard_unowned`); the folder's settings and the server's copy stay.
+//!
 //! It starts the server with the app (at login too), restarts it after a crash (1 s doubling to 60 s), stops it
 //! gracefully on quit, and listens only on 127.0.0.1; reach from the person's other devices is Tailscale's
 //! `serve` (`tailscale.rs`), which also moves `PUBLIC_URL`, and is shared only while the server runs here.
@@ -25,6 +29,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -45,11 +50,13 @@ const ANSWER_WITHIN: Duration = Duration::from_secs(180);
 const STOP_GRACE: Duration = Duration::from_secs(25);
 /// Starts in a row that never answered before the app stops trying (and an update goes back).
 const MAX_FAILED_STARTS: u32 = 3;
+/// An update's `db dump` and `db restore`, each: never cut short in normal use, but a hung one ends.
+const MOVE_WAIT: Duration = Duration::from_secs(30 * 60);
 /// Stops this close together are worth a notification.
 const STOPS_WINDOW: Duration = Duration::from_secs(600);
 /// Database copies kept in `backups/` (besides "Back up now"'s, of which the two newest stay too).
 const KEEP_COPIES: usize = 2;
-/// The page's own lines and the server's, kept for "Copy diagnostics".
+/// The page's own lines and the server's (and the setup's timeline), kept for "Copy details".
 const STDERR_LINES: usize = 60;
 
 pub const STATUS_EVENT: &str = "local-server://status";
@@ -82,6 +89,10 @@ impl Folder {
     /// A terminal install's owner claim, while it waits for its owner (the setup's).
     pub fn claim(&self) -> PathBuf {
         self.0.join("owner-claim")
+    }
+    /// There while a setup makes the database, until its last step is done.
+    pub fn pending(&self) -> PathBuf {
+        self.0.join("setup-pending")
     }
     fn apps(&self) -> PathBuf {
         self.0.join("app")
@@ -564,10 +575,10 @@ impl Launch {
         command
     }
 
-    /// `agentes-server <args> --data <folder>` to the end (migrate, db dump/restore): its exit code and stderr.
-    pub fn run(&self, args: &[&str]) -> io::Result<(Option<i32>, String)> {
-        let out = self.command(args).output()?;
-        Ok((out.status.code(), String::from_utf8_lossy(&out.stderr).into_owned()))
+    /// `agentes-server <args> --data <folder>` to its end (migrate, db dump/restore), at most `wait` and until
+    /// `stop` says so.
+    pub fn run(&self, args: &[&str], wait: Duration, stop: &dyn Fn() -> bool) -> io::Result<crate::Ran> {
+        crate::run_program(&mut self.command(args), wait, stop)
     }
 
     pub fn spawn(&self) -> io::Result<Child> {
@@ -729,6 +740,27 @@ fn stop_leftover(app: &AppHandle, folder: &Folder) {
     }
 }
 
+/// A database a setup made and never finished (`setup-pending`) holds nothing of anyone's: it goes with `files/`,
+/// so the next setup makes it from the start. Never one without the mark, never while a server holds the folder.
+pub fn discard_unowned(folder: &Folder) {
+    if !folder.pending().is_file() || not_held(folder).is_err() {
+        return;
+    }
+    for part in [folder.db(), folder.0.join("files")] {
+        // Windows may keep a file in use a moment after its program ended.
+        for _ in 0..3 {
+            if !part.exists() || fs::remove_dir_all(&part).is_ok() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(300));
+        }
+    }
+    // Still there: the mark stays, and the next setup removes it first.
+    if !folder.db().exists() {
+        let _ = fs::remove_file(folder.pending());
+    }
+}
+
 // ───────────────────────────── what to do after an exit ─────────────────────────────
 
 /// After the child stopped or never answered.
@@ -829,6 +861,8 @@ struct Inner {
     https_url: Option<String>,
     /// Tailscale shares it now (with reach on); false once the server stopped here.
     served: bool,
+    /// It is being set up, since then (Copy details' timeline counts from it).
+    setting_up: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -836,10 +870,20 @@ pub struct LocalServer {
     inner: Mutex<Inner>,
     /// One long operation at a time (setting up, reach, a backup, a restart).
     busy: Mutex<()>,
+    /// Cancel, or the app quitting, while it is set up: every wait of the setup ends.
+    cancel: AtomicBool,
 }
 
 fn state(app: &AppHandle) -> std::sync::MutexGuard<'_, Inner> {
     app.state::<LocalServer>().inner().inner.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+pub fn cancelled(app: &AppHandle) -> bool {
+    app.state::<LocalServer>().cancel.load(SeqCst)
+}
+
+pub fn setting_up(app: &AppHandle) -> bool {
+    state(app).setting_up.is_some()
 }
 
 pub fn folder(app: &AppHandle) -> Option<Folder> {
@@ -1310,13 +1354,14 @@ fn upgrade(app: &AppHandle, from: Option<&str>) -> Result<(), String> {
     make_private_dir(&launch.folder.backups()).map_err(|e| e.to_string())?;
     let dump = launch.folder.backups().join(format!("upgrade-{from}-{}.sql", stamp()));
     let out = dump.to_string_lossy().into_owned();
-    let (code, err) = old.run(&["db", "dump", "--out", &out]).map_err(|e| e.to_string())?;
-    if code != Some(0) {
-        return Err(format!("dump: {err}"));
+    // A database move is never cut short by a click.
+    let ran = old.run(&["db", "dump", "--out", &out], MOVE_WAIT, &|| false).map_err(|e| e.to_string())?;
+    if ran.code != Some(0) {
+        return Err(format!("dump ended with {:?} ({:?}): {}", ran.code, ran.cut, ran.err.trim()));
     }
-    let (code, err) = launch.run(&["db", "restore", "--in", &out]).map_err(|e| e.to_string())?;
-    if code != Some(0) {
-        return Err(format!("restore: {err}"));
+    let ran = launch.run(&["db", "restore", "--in", &out], MOVE_WAIT, &|| false).map_err(|e| e.to_string())?;
+    if ran.code != Some(0) {
+        return Err(format!("restore ended with {:?} ({:?}): {}", ran.code, ran.cut, ran.err.trim()));
     }
     let _ = fs::remove_file(&dump);
     // The copy took its own time: the upgraded start gets the whole wait.
@@ -1396,12 +1441,12 @@ pub fn stop(app: &AppHandle, forget: bool) {
     emit_status(app);
 }
 
-/// Waits for a start to answer, or to give up; the phase it ended in.
+/// Waits for a start to answer, or to give up, or for Cancel (and quitting); the phase it ended in.
 fn wait_running(app: &AppHandle) -> Phase {
     let deadline = Instant::now() + ANSWER_WITHIN + Duration::from_secs(30);
     loop {
         let phase = state(app).phase.unwrap_or(Phase::Stopped);
-        if matches!(phase, Phase::Running | Phase::Failing) || Instant::now() > deadline {
+        if matches!(phase, Phase::Running | Phase::Failing) || Instant::now() > deadline || cancelled(app) {
             return phase;
         }
         std::thread::sleep(Duration::from_millis(200));
@@ -1445,8 +1490,10 @@ pub fn stop_by_hand(app: &AppHandle, forget: bool) {
     app.state::<crate::runners::Runners>().rescan(app);
 }
 
-/// Quitting, logging out, an update: the server finishes and stops (before the app goes).
+/// Quitting, logging out, an update: the server finishes and stops (before the app goes), and a setup under way
+/// stops waiting.
 pub fn shutdown(app: &AppHandle) {
+    app.state::<LocalServer>().cancel.store(true, SeqCst);
     let pid = {
         let mut inner = state(app);
         inner.on_purpose = true;
@@ -1499,21 +1546,44 @@ struct StepEvent {
 }
 
 fn step(app: &AppHandle, step: &'static str, state: &'static str) {
-    let _ = app.emit_to("welcome", STEP_EVENT, StepEvent { step, state, reason: None });
+    say_step(app, StepEvent { step, state, reason: None });
 }
 
-/// Makes the folder, starts the server, makes the owner, makes this computer the agents' computer, turns
-/// reach on when asked, then opens the main window there, signed in. Each step says when it starts and ends;
-/// reach failing never stops the rest. Err: the step that failed.
+/// A step's change on screen, and in Copy details' timeline.
+fn say_step(app: &AppHandle, event: StepEvent) {
+    let secs = state(app).setting_up.map_or(0.0, |since| since.elapsed().as_secs_f64());
+    note(app, format!("setup {secs:.1} s: {} {}", event.step, event.state));
+    let _ = app.emit_to("welcome", STEP_EVENT, event);
+}
+
+/// The setup's way out of a step: "cancelled" (no step event) after Cancel, else the step failed, said on screen
+/// and why in Copy details.
+fn ended(app: &AppHandle, name: &'static str, why: String) -> String {
+    if cancelled(app) {
+        return "cancelled".into();
+    }
+    note(app, why);
+    step(app, name, "failed");
+    name.to_string()
+}
+
+fn go_on(app: &AppHandle) -> Result<(), String> {
+    if cancelled(app) {
+        Err("cancelled".into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Makes the folder and the database, starts the server, makes the owner, makes this computer the agents'
+/// computer, turns reach on when asked, then opens the main window there, signed in. Each step says when it starts
+/// and ends; reach failing never stops the rest. Err: the step that failed, or "cancelled". Nothing of it is kept
+/// (`local-server.json`, the mark's removal, Open at login) until every step is done: `set_up` undoes the rest.
 fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     let server = app.state::<LocalServer>();
     let _busy = server.busy.lock().unwrap_or_else(|e| e.into_inner());
-    // A step that failed: why goes to the diagnostics, the step says so on screen.
-    let fail = |name: &'static str, why: String| {
-        note(app, why);
-        step(app, name, "failed");
-        name.to_string()
-    };
+    let fail = |name: &'static str, why: String| ended(app, name, why);
+    go_on(app)?;
     step(app, "database", "active");
     let folder = folder(app).ok_or_else(|| fail("database", "no home folder".into()))?;
     if installed(&folder) == Installed::Terminal {
@@ -1522,65 +1592,85 @@ fn install(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     let version = app.package_info().version.to_string();
     let bundle = bundle(app).ok_or_else(|| fail("database", "this build doesn't carry the server".into()))?;
     let bun = runner_binary().ok_or_else(|| fail("database", "the app's runner binary isn't there".into()))?;
+    // A setup that never finished (a crash, a power cut) left its database: it goes first.
+    discard_unowned(&folder);
     let first = prepare(&folder, choice.usage, free_port)
         .and_then(|_| install_version(&folder, &bundle, &version))
         .map_err(|e| fail("database", format!("setting up {}: {e}", folder.0.display())))?;
     if first == Copied::First || !folder.db().is_dir() {
+        if !folder.db().is_dir() {
+            write_private(&folder.pending(), b"", true)
+                .map_err(|e| fail("database", format!("the setup's mark: {e}")))?;
+        }
         let launch = Launch { bun, folder: folder.clone(), version: version.clone() };
-        match launch.run(&["migrate"]) {
-            Ok((Some(0), _)) => {}
-            Ok((code, err)) => return Err(fail("database", format!("migrate exited with {code:?}: {}", err.trim()))),
-            Err(e) => return Err(fail("database", format!("migrate: {e}"))),
+        let ran = launch
+            .run(&["migrate"], ANSWER_WITHIN, &|| cancelled(app))
+            .map_err(|e| fail("database", format!("migrate: {e}")))?;
+        if ran.code != Some(0) {
+            return Err(fail("database", format!("migrate ended with {:?} ({:?}): {}", ran.code, ran.cut, ran.err.trim())));
         }
     }
     // Reach left off this time: its address is this computer's again before it starts.
     if !choice.reach && reached(app) {
         address_here(app, &folder).map_err(|e| fail("database", format!("address: {e}")))?;
     }
+    go_on(app)?;
     step(app, "database", "done");
 
-    let was_run = {
+    {
         let mut inner = state(app);
-        let was = inner.here.run;
         inner.here.run = true;
         inner.failed = 0;
         inner.back_to = None;
         inner.on_purpose = false;
-        was
-    };
-    let owned = start_with_owner(app, &folder, choice, &fail);
-    if owned.is_err() && !was_run {
-        // Nothing stays running or shown after a first setup that stopped here; Start tries again.
-        stop(app, true);
     }
-    let port = owned?;
-    {
-        use tauri_plugin_autostart::ManagerExt;
-        let _ = app.autolaunch().enable();
-    }
+    let port = start_with_owner(app, &folder, choice, &fail)?;
+    go_on(app)?;
     step(app, "account", "done");
 
     step(app, "computer", "active");
     crate::host_sync::sync_now(app, &[]);
+    go_on(app)?;
     step(app, "computer", "done");
 
     if choice.reach {
         step(app, "reach", "active");
-        match reach_on(app) {
+        let reach = reach_on(app);
+        go_on(app)?;
+        match reach {
             Ok(_) => step(app, "reach", "done"),
-            Err(reason) => {
-                let _ = app.emit_to("welcome", STEP_EVENT, StepEvent { step: "reach", state: "warn", reason: Some(reason) });
+            Err(reason) => say_step(app, StepEvent { step: "reach", state: "warn", reason: Some(reason) }),
+        }
+    }
+
+    // Every step is done: it is kept, and nothing from here on undoes it.
+    let _ = fs::remove_file(folder.pending());
+    let here = state(app).here.clone();
+    save_here(app, &here);
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        let _ = app.autolaunch().enable();
+    }
+    emit_status(app);
+    // The main window opens signed in, or else on the server's sign-in page, whose "Continue on this Mac" signs the
+    // owner in: never a setup that ends in an error with every step done.
+    if let Some(origin) = public_url(app) {
+        let signed_in = owner_sign_in(&folder, port, None)
+            .map_err(|status| format!("the owner's sign-in: the server answered {status}"))
+            .and_then(|token| open_signed_in(app, &origin, &token));
+        if let Err(why) = signed_in {
+            note(app, why);
+            crate::servers::choose(app, &origin);
+            if let Ok(page) = origin.parse::<Url>() {
+                let _ = crate::main_window::show_url(app, page);
             }
         }
     }
-    let origin = public_url(app).ok_or("account")?;
-    let token = owner_sign_in(&folder, port, None).map_err(|_| "account")?;
-    open_signed_in(app, &origin, &token)?;
-    emit_status(app);
     Ok(())
 }
 
-/// The setup's start and account steps: the server answers as the app's own child, then its owner exists. Its port.
+/// The setup's start and account steps: the server answers as the app's own child, then its owner exists (kept
+/// in memory until the setup is done). Its port.
 fn start_with_owner(
     app: &AppHandle,
     folder: &Folder,
@@ -1595,6 +1685,7 @@ fn start_with_owner(
     if wait_running(app) != Phase::Running {
         return Err(fail("start", "it didn't answer".into()));
     }
+    go_on(app)?;
     step(app, "start", "done");
 
     step(app, "account", "active");
@@ -1602,12 +1693,7 @@ fn start_with_owner(
     let who = choice.name.as_deref().zip(choice.email.as_deref());
     owner_sign_in(folder, port, who)
         .map_err(|status| fail("account", format!("the owner's account: the server answered {status}")))?;
-    let here = {
-        let mut inner = state(app);
-        inner.here.owner = true;
-        inner.here.clone()
-    };
-    save_here(app, &here);
+    state(app).here.owner = true;
     Ok(port)
 }
 
@@ -1693,7 +1779,8 @@ fn backup(app: &AppHandle) -> Result<String, String> {
     }
 }
 
-/// What "Copy diagnostics" copies: versions and state, what the server said, the end of its log. No secret.
+/// What "Copy details" copies: versions and state, what the server and the setup said, the end of its log. No
+/// secret.
 fn diagnostics(app: &AppHandle) -> String {
     let status = status(app, false);
     let lines = state(app).lines.iter().cloned().collect::<Vec<_>>().join("\n");
@@ -1746,11 +1833,61 @@ pub async fn local_server_install(app: AppHandle, webview: tauri::Webview, choic
         return Err("bad name or email".into());
     }
     let app2 = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || install(&app2, &choice))
+    let result = tauri::async_runtime::spawn_blocking(move || set_up(&app2, &choice))
         .await
         .map_err(|e| e.to_string())?;
     emit_status(&app);
     result
+}
+
+/// `install`, and when it doesn't finish (Cancel, a failure, quitting) the computer as it was before Start: what
+/// it started stops, Tailscale shares nothing it didn't, and the database it made goes. Its window closed meanwhile
+/// (hidden): a notification when it failed, the window gone when it finished.
+fn set_up(app: &AppHandle, choice: &Choice) -> Result<(), String> {
+    let (was_run, reach_before) = (state(app).here.run, reached(app));
+    let folder = folder(app).ok_or("no home folder")?;
+    app.state::<LocalServer>().cancel.store(false, SeqCst);
+    state(app).setting_up = Some(Instant::now());
+    let result = install(app, choice);
+    if result.is_err() {
+        let pending = folder.pending().is_file();
+        if pending {
+            // Its owner lived in that database.
+            state(app).here.owner = false;
+        }
+        if !was_run {
+            // Stops it, unshares it and pauses its homes; `local-server.json` says it doesn't run here.
+            stop_by_hand(app, true);
+        }
+        if !reach_before && reached(app) {
+            let _ = address_here(app, &folder);
+        }
+        if pending {
+            discard_unowned(&folder);
+        }
+    }
+    if let Some(window) = app.get_webview_window("welcome").filter(|w| !w.is_visible().unwrap_or(true)) {
+        match &result {
+            Ok(()) => {
+                let _ = window.destroy();
+            }
+            Err(why) if why != "cancelled" => notify(app, "setupFailed", "setupFailedBody", None),
+            Err(_) => {}
+        }
+    }
+    state(app).setting_up = None;
+    app.state::<LocalServer>().cancel.store(false, SeqCst);
+    result
+}
+
+/// Cancel while it is set up (Esc too): every wait of the setup ends, and `set_up` undoes it.
+#[tauri::command]
+pub fn local_server_cancel(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
+    app_window(&webview, &["welcome"])?;
+    if setting_up(&app) {
+        app.state::<LocalServer>().cancel.store(true, SeqCst);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1775,6 +1912,10 @@ pub fn local_server_start(app: AppHandle, webview: tauri::Webview) -> Result<(),
 #[tauri::command]
 pub async fn local_server_stop(app: AppHandle, webview: tauri::Webview, forget: bool) -> Result<(), String> {
     app_window(&webview, &["popover", "prefs"])?;
+    // The popover's Stop during a setup is its Cancel.
+    if setting_up(&app) {
+        app.state::<LocalServer>().cancel.store(true, SeqCst);
+    }
     tauri::async_runtime::spawn_blocking(move || {
         stop_by_hand(&app, forget);
         if forget {
@@ -2003,6 +2144,60 @@ mod tests {
     }
 
     #[test]
+    fn a_setup_that_didnt_finish_leaves_no_database_and_one_that_did_is_never_touched() {
+        let folder = Folder(temp("pending").join(".agentes"));
+        prepare(&folder, true, || Some(4318)).unwrap();
+        let make_database = || {
+            fs::create_dir_all(folder.db()).unwrap();
+            fs::write(folder.db().join("PG_VERSION"), "17").unwrap();
+            fs::create_dir_all(folder.0.join("files")).unwrap();
+        };
+        // Never finished: the database and its files go, the folder's settings stay.
+        make_database();
+        fs::write(folder.pending(), "").unwrap();
+        discard_unowned(&folder);
+        assert!(!folder.db().exists() && !folder.0.join("files").exists() && !folder.pending().exists());
+        for kept in [folder.env(), folder.owner_key(), folder.host_token()] {
+            assert!(kept.is_file(), "{}", kept.display());
+        }
+        // One that finished has no mark: never touched.
+        make_database();
+        discard_unowned(&folder);
+        assert!(folder.db().join("PG_VERSION").is_file());
+        // Not while a server holds the folder: it goes once that server ended.
+        #[cfg(unix)]
+        {
+            fs::write(folder.pending(), "").unwrap();
+            let mut held = Command::new("sh").args(["-c", "sleep 30; :", "native.js"]).spawn().unwrap();
+            fs::write(folder.lock(), format!(r#"{{"pid":{}}}"#, held.id())).unwrap();
+            discard_unowned(&folder);
+            assert!(folder.db().is_dir() && folder.pending().is_file());
+            let _ = held.kill();
+            let _ = held.wait();
+            discard_unowned(&folder);
+            assert!(!folder.db().exists() && !folder.pending().exists());
+        }
+        fs::remove_dir_all(folder.0.parent().unwrap()).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn migrate_ends_at_its_limit_or_on_cancel() {
+        let root = temp("migrate");
+        let folder = Folder(root.join(".agentes"));
+        // The copy's entry is a shell script that never ends, with /bin/sh as Bun.
+        install_version(&folder, &fake_bundle(&root, "exec sleep 30"), "0.6.0").unwrap();
+        let launch = Launch { bun: "/bin/sh".into(), folder: folder.clone(), version: "0.6.0".into() };
+        let started = Instant::now();
+        let ran = launch.run(&["migrate"], Duration::from_millis(300), &|| false).unwrap();
+        assert_eq!((ran.code, ran.cut), (None, Some(crate::Cut::TooLong)));
+        let ran = launch.run(&["migrate"], ANSWER_WITHIN, &|| true).unwrap();
+        assert_eq!((ran.code, ran.cut), (None, Some(crate::Cut::Stopped)));
+        assert!(started.elapsed() < Duration::from_secs(3));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
     fn an_update_that_doesnt_start_goes_back_with_its_database() {
         let root = temp("back");
         let folder = Folder(root.join(".agentes"));
@@ -2157,8 +2352,8 @@ mod tests {
         assert_eq!(install_version(&folder, Path::new(&built), "0.0.1").unwrap(), Copied::First);
         let launch = Launch { bun: bun.into(), folder: folder.clone(), version: "0.0.1".into() };
         let started = Instant::now();
-        let (code, err) = launch.run(&["migrate"]).unwrap();
-        assert_eq!(code, Some(0), "migrate: {err}");
+        let ran = launch.run(&["migrate"], ANSWER_WITHIN, &|| false).unwrap();
+        assert_eq!(ran.code, Some(0), "migrate: {}", ran.err);
         eprintln!("migrated in {:?}", started.elapsed());
 
         let mut child = launch.spawn().unwrap();
@@ -2175,8 +2370,8 @@ mod tests {
         assert_eq!(ready_pid(&folder), Some(child.id()));
         assert_eq!(folder_server(&folder, &folder.ready()), Some(child.id()));
         // A second one on the same folder is refused (the lock): exit 3.
-        let second = launch.run(&[]).unwrap();
-        assert_eq!(second.0, Some(exit::LOCKED), "{}", second.1);
+        let second = launch.run(&[], ANSWER_WITHIN, &|| false).unwrap();
+        assert_eq!(second.code, Some(exit::LOCKED), "{}", second.err);
 
         // The owner: made once with no password, then a one-time sign-in on every call.
         let first = owner_sign_in(&folder, port, Some(("Ana Souza", "ana@example.com"))).unwrap();
