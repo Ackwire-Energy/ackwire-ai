@@ -16,13 +16,13 @@ permissions:
 
 jobs:
   publish:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
       id-token: write # OIDC for npm Trusted Publishing
     steps:
-      - uses: useblacksmith/checkout@v1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # A tag publishes exactly the version packages/setup declares; a tag that disagrees is refused.
       - name: Tag must match the package version
         if: github.ref_type == 'tag'
