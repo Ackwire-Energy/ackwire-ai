@@ -2,7 +2,7 @@ import { useAuthConfig } from "@agenteschat/client";
 import { createHumanCheck, type HumanAction, type HumanCheck } from "@agenteschat/client/lib/human-check";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BackHandler, Keyboard, Pressable, StyleSheet, View } from "react-native";
+import { BackHandler, Keyboard, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useServer } from "@/lib/server";
@@ -17,11 +17,17 @@ import {
   FRESH_PAGE,
   humanCheckEvent,
   humanCheckOrigins,
+  humanCheckStays,
   humanCheckUrl,
+  loadsAgain,
 } from "./human-check";
 
-/** Turnstile's checkbox is 65 px tall. */
+/** Turnstile's checkbox: 65 px tall, and at least 300 px wide at its `flexible` size. */
 const WIDGET_HEIGHT = 65;
+const WIDGET_MIN_WIDTH = 300;
+/** The open sheet's gap to the window's sides, and its padding. */
+const SHEET_INSET = 8;
+const SHEET_PADDING = 18;
 
 /**
  * The bot check of a public form (ADR 0075), when the server has a site key: Cloudflare Turnstile in a WebView on
@@ -34,6 +40,7 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
   const { t, i18n } = useTranslation();
   const { colors, shadows, scheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const server = useServer();
   const siteKey = useAuthConfig().data?.turnstileSiteKey ?? null;
   const url =
@@ -43,7 +50,8 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
   const page = useRef<CheckPage>(FRESH_PAGE);
   const [asking, setAsking] = useState(false);
   const [waiting, setWaiting] = useState(0);
-  // Bumped when the system ends the page's process (after a long while in the background): a new WebView loads it.
+  // Bumped for a new WebView: when the system ends the page's process (after a long while in the background), and
+  // when a press finds the page broken.
   const [life, setLife] = useState(0);
   const web = useRef<WebView<object>>(null);
   const cancels = useRef(new Set<() => void>());
@@ -65,6 +73,10 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
     () =>
       tokens && {
         token: () => {
+          if (loadsAgain(tokens, page.current)) {
+            page.current = FRESH_PAGE;
+            setLife((n) => n + 1);
+          }
           let cancel!: () => void;
           const cancelled = new Promise<never>((_, reject) => {
             cancel = () => reject(new CheckCancelled());
@@ -78,8 +90,7 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
         },
         reset: () => {
           tokens.reset();
-          if (page.current.broken) tokens.fail();
-          else web.current?.injectJavaScript("window.resetCheck?.(); true;");
+          web.current?.injectJavaScript("window.resetCheck?.(); true;");
         },
       },
     [tokens],
@@ -87,6 +98,8 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
 
   // Only while a call waits on Cloudflare's click: a page that asks before anyone presses stays out of the way.
   const open = asking && waiting > 0;
+  // A narrower phone would cut the checkbox at the sheet's padding: there it spans the sheet (304 px at 320 pt).
+  const narrow = width - 2 * (SHEET_INSET + SHEET_PADDING) < WIDGET_MIN_WIDTH;
   // biome-ignore lint/correctness/useExhaustiveDependencies: only while the sheet is open
   useEffect(() => {
     if (!open) return;
@@ -138,8 +151,9 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
           ref={web}
           source={{ uri: url }}
           originWhitelist={humanCheckOrigins(server)}
+          onShouldStartLoadWithRequest={(request) => humanCheckStays(server, request.url)}
           onMessage={(e) => {
-            const event = humanCheckEvent(e.nativeEvent.data);
+            const event = humanCheckEvent(server, e.nativeEvent);
             if (event) settle(checkEvent(tokens, page.current, event));
           }}
           onError={fail}
@@ -152,7 +166,7 @@ export function useHumanCheck(action: HumanAction | null): { check: HumanCheck |
           sharedCookiesEnabled
           scrollEnabled={false}
           style={styles.web}
-          containerStyle={open ? styles.widget : styles.pixel}
+          containerStyle={open ? [styles.widget, narrow && styles.edgeToEdge] : styles.pixel}
         />
         {open ? <Button variant="secondary" wide label={t("mobile.common.cancel")} onPress={stop} /> : null}
       </View>
@@ -165,7 +179,15 @@ const styles = StyleSheet.create({
   // One invisible pixel in the window, so the page runs the challenge while the person types.
   hidden: { position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0 },
   pixel: { flex: 0, width: 1, height: 1 },
-  sheet: { position: "absolute", left: 8, right: 8, borderRadius: 34, padding: 18, gap: 14 },
+  sheet: {
+    position: "absolute",
+    left: SHEET_INSET,
+    right: SHEET_INSET,
+    borderRadius: 34,
+    padding: SHEET_PADDING,
+    gap: 14,
+  },
   widget: { flex: 0, height: WIDGET_HEIGHT, alignSelf: "stretch" },
+  edgeToEdge: { marginHorizontal: -SHEET_PADDING },
   web: { backgroundColor: "transparent" },
 });
