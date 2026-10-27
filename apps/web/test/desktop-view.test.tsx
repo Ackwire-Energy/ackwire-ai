@@ -1112,10 +1112,15 @@ describe("the dialog's size (computer.css)", () => {
     const frame = rule(text, ".ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface))");
     expect(frame).toContain("width: calc(var(--cmp-screen) + 32px)");
     expect(frame).toContain("height: calc(var(--cmp-screen) * 900 / 1280 + 130px)");
-    // The wait fills that box, its words in the middle (on a phone it is as tall as its words).
+    // The wait fills that box, its words in the middle (on a phone it is as tall as its words). Auto margins centre
+    // them, so a box shorter than the words starts them at its top and scrolls all of them: `justify-content: center`
+    // would push their top out of reach.
     const prep = rule(text, ".cmp-prep");
     expect(prep).toContain("flex: 1 1 0");
-    expect(prep).toContain("justify-content: center");
+    expect(prep).toContain("overflow-y: auto");
+    expect(prep).not.toContain("justify-content");
+    expect(rule(text, ".cmp-prep > :first-child")).toContain("margin-top: auto");
+    expect(rule(text, ".cmp-prep > :last-child")).toContain("margin-bottom: auto");
     // The same screen with nothing under it (no steps, no keys' line, no note, no tools of the page): 30 px shorter,
     // its top where it was (the dialog is centred on 50%), so a line coming adds it below and the screen never moves.
     const bare = rule(

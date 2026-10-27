@@ -412,12 +412,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 12px;
   padding: 24px 16px;
   overflow-y: auto;
   border-radius: 12px;
   background: var(--sunken);
+}
+/* Centred by auto margins, not justify-content: taller than the box (a short window), its words start at the top and
+   all of them scroll, where centring would put their top out of reach. */
+.cmp-prep > :first-child {
+  margin-top: auto;
+}
+.cmp-prep > :last-child {
+  margin-bottom: auto;
 }
 .cmp-prep__title {
   font-size: 16px;

@@ -836,10 +836,10 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* A face beside a name with a line under it (a DM with an agent): both start at one top, the name's capitals at the
-   face's (`.ac-captop` on the name), whatever else the header holds. */
-.channel__header > .ac-avatar:has(+ div > .channel__topic),
-.channel__header > .ac-avatar + div:has(> .channel__topic) {
+/* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
+   whatever else the header holds. A name that doesn't rise stays centred on the face. */
+.channel__header > .ac-avatar:has(+ div > .ac-captop),
+.channel__header > .ac-avatar + div:has(> .ac-captop) {
   align-self: flex-start;
 }
 /* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
@@ -1028,15 +1028,16 @@ p {
 }
 /*
  * A list row led by a face beside its two lines (a member: the name, the email): the face on the name's 22px line, as
- * an `.ac-iconline` lead (its own line is its initials'); what ends the row stays in its middle.
+ * an `.ac-iconline` lead (its own line is its initials'); what ends the row stays in its middle. A name alone (an
+ * agent in Settings › Computers) stays centred with the rest of the row.
  */
-.ac-list__row:has(> .ac-avatar:first-child + .list-col) {
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
   align-items: flex-start;
 }
-.ac-list__row > .ac-avatar:first-child:has(+ .list-col) {
+.ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
   translate: 0 calc(11px - var(--cap-mid) - 50%);
 }
-.ac-list__row:has(> .ac-avatar:first-child + .list-col) > :not(.ac-avatar, .list-col) {
+.ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) > :not(.ac-avatar, .list-col) {
   align-self: center;
 }
 
