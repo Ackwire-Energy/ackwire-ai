@@ -313,7 +313,9 @@ export function connectorRoutes(deps: AppDeps) {
     if (!isCustom(connection)) return;
     const connect = deps.extras?.mcpConnect ?? connectOverHttp;
     const judge = deps.extras?.context?.judge;
-    await syncCustomTools({ ...connectorDeps, connect, judge }, connection).catch(() => {});
+    await syncCustomTools({ ...connectorDeps, connect, judge, blobs: adapters.platformBlobs }, connection).catch(
+      () => {},
+    );
     if (presetForServer(connection.serverUrl)) {
       await acceptCustomSuggestion({ ...connectorDeps, connect }, userId, connection.orgId, connection.id).catch(
         () => {},

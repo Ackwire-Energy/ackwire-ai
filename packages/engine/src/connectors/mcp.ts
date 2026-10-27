@@ -6,6 +6,7 @@ import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
 import { classifiedTools, customScope, isCustom, type ToolAccess } from "./custom";
+import type { McpServerInfo } from "./server-icon";
 
 /** A tool as an MCP server lists it. */
 export interface McpTool {
@@ -27,6 +28,8 @@ export interface McpCallResult {
 export interface McpSession {
   listTools(): Promise<McpTool[]>;
   callTool(name: string, args: Record<string, unknown>): Promise<McpCallResult>;
+  /** Who the server said it is in `initialize` (name, title, icons); null when it said nothing. */
+  serverInfo?(): McpServerInfo | null;
   close(): Promise<void>;
 }
 
@@ -67,6 +70,7 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
       if (parts.length === 0 && res.structuredContent !== undefined) parts.push(JSON.stringify(res.structuredContent));
       return { content: parts.join("\n"), isError: res.isError === true };
     },
+    serverInfo: () => (client.getServerVersion() as McpServerInfo | undefined) ?? null,
     close: () => client.close(),
   };
 }
