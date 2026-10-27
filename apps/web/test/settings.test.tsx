@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { setNavigateAway } from "@/lib/navigate";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -403,6 +404,34 @@ describe("Configurações do workspace", () => {
     await go(state, "settings/storage");
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
     expect(document.querySelector("#sec-storage")).toBeNull();
+  });
+
+  test("Plano e cobrança: only where a billing service runs, for owners and admins, opened there signed in", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const nav = () => within(screen().getByRole("navigation", { name: "Seções das configurações" }));
+    await go();
+    expect(nav().queryByRole("link", { name: "Plano e cobrança" })).toBeNull();
+    cleanup();
+
+    const state = seedState();
+    state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
+    await go(state, "settings/billing");
+    expect(nav().getByRole("link", { name: "Plano e cobrança" }).getAttribute("aria-current")).toBe("page");
+    expect(screen().getByRole("heading", { level: 2, name: "Plano e cobrança" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
+    );
+    await click(screen().getByRole("button", { name: "Abrir plano e cobrança" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "orgs.billingLink")?.args).toEqual([ORG_ID, "settings"]);
+    expect(left).toEqual(["https://billing.example.com/link?t=settings"]);
+    cleanup();
+
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go(state, "settings/billing");
+    expect(nav().queryByRole("link", { name: "Plano e cobrança" })).toBeNull();
+    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
   });
 
   test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {

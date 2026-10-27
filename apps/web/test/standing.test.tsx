@@ -3,8 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { OrgStanding } from "@agenteschat/client";
-import { act, cleanup, within } from "@testing-library/react";
+import { ApiError, type OrgStanding, type Role } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { setNavigateAway } from "@/lib/navigate";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -14,12 +15,20 @@ const STATUS = "Status do workspace";
 const OTHER_ID = "00000000-0000-4000-8000-0000000000b2";
 
 /** #eng of Acme with the standing `/me` says, and its socket open to push what the operator changes. */
-async function open(standing?: OrgStanding, other = false, supportEmail: string | null = null) {
-  const state = seedState();
-  state.authConfig = { ...state.authConfig, supportEmail };
+async function open(
+  standing?: OrgStanding,
+  other = false,
+  supportEmail: string | null = null,
+  {
+    role = "owner",
+    billingUrl = null,
+    state = seedState(),
+  }: { role?: Role; billingUrl?: string | null; state?: ReturnType<typeof seedState> } = {},
+) {
+  state.authConfig = { ...state.authConfig, supportEmail, billingUrl };
   if (state.me) {
     state.me.organizations = [
-      { id: ORG_ID, name: "Acme", role: "owner", ...(standing ? { standing } : {}) },
+      { id: ORG_ID, name: "Acme", role, ...(standing ? { standing } : {}) },
       ...(other ? [{ id: OTHER_ID, name: "Beta", role: "member" as const }] : []),
     ];
   }
@@ -37,7 +46,7 @@ async function open(standing?: OrgStanding, other = false, supportEmail: string 
     await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
     await settle(4);
   };
-  return { ...r, set, channel };
+  return { ...r, state, set, channel };
 }
 
 describe("on hold: a line on top of the work area", () => {
@@ -93,6 +102,68 @@ describe("on hold: a line on top of the work area", () => {
     const alert = screen().getByRole("alert");
     expect(alert.textContent).toBe("Ada não respondeu. Este workspace está em espera: verificação de pagamento");
     expect(document.body.textContent).not.toContain("This workspace is on hold");
+  });
+});
+
+describe("a billing hold (ADR 0071): its own words, and its fix for whoever runs the workspace", () => {
+  const BILLING = "https://billing.example.com";
+
+  test("owners and admins get the button of its code: it opens the billing service, signed in", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const { state, set } = await open({ state: "hold", reason: "payment" }, false, null, { billingUrl: BILLING });
+    const banner = () => screen().getByRole("region", { name: STATUS });
+    expect(banner().textContent).toContain(
+      "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
+    );
+    expect(banner().textContent).toContain(
+      "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
+    );
+    expect(banner().textContent).not.toContain("payment");
+    await act(async () =>
+      fireEvent.click(within(banner()).getByRole("button", { name: "Ver planos do agentes.chat" })),
+    );
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "orgs.billingLink")?.args).toEqual([ORG_ID, "hold"]);
+    expect(left).toEqual(["https://billing.example.com/link?t=hold"]);
+
+    await set({ state: "hold", reason: "unpaid" });
+    expect(within(banner()).getByRole("button", { name: "Atualizar o pagamento" })).toBeTruthy();
+    await set({ state: "hold", reason: "ended" });
+    expect(banner().textContent).toContain("O plano do agentes.chat deste workspace terminou, e os agentes pararam.");
+    expect(within(banner()).getByRole("button", { name: "Assinar de novo" })).toBeTruthy();
+  });
+
+  test("a link that can't be made says so; members read who can fix it, with no button", async () => {
+    const state = seedState();
+    state.billingLinkError = new ApiError(500, "internal_error", "Something went wrong on our side");
+    await open({ state: "hold", reason: "unpaid" }, false, null, { billingUrl: BILLING, state });
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Atualizar o pagamento" })));
+    await settle(4);
+    expect(document.body.textContent).toContain("Não deu para abrir agora. Tente de novo em instantes.");
+
+    cleanup();
+    await open({ state: "hold", reason: "unpaid" }, false, null, { billingUrl: BILLING, role: "member" });
+    const banner = screen().getByRole("region", { name: STATUS });
+    expect(banner.textContent).toContain("Quem administra o workspace pode resolver isso.");
+    expect(within(banner).queryByRole("button")).toBeNull();
+  });
+
+  test("a refused run says the hold's words, never its code", async () => {
+    const { channel } = await open({ state: "hold", reason: "payment" }, false, null, { billingUrl: BILLING });
+    const run = { threadId: null, runId: "r-billing", agentId: ADA_ID };
+    await channel({ type: "agent.thinking", ...run });
+    await channel({
+      type: "run.finished",
+      ...run,
+      status: "failed",
+      error: "This workspace is on hold: payment",
+      errorCode: "run.org_paused",
+      errorParams: { reason: "payment" },
+    });
+    expect(screen().getByRole("alert").textContent).toBe(
+      "Ada não respondeu. Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
+    );
   });
 });
 

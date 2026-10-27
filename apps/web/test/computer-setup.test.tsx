@@ -8,6 +8,7 @@ import { keys } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { setNavigateAway } from "@/lib/navigate";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -751,6 +752,33 @@ describe("the onboarding where the workspace gets its own computer", () => {
       (screen().getByRole("textbox", { name: "Sua primeira mensagem no #general" }) as HTMLTextAreaElement).value,
     ).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
     expect(screen().getByRole("button", { name: "Enviar para Theo" })).toBeTruthy();
+  });
+
+  test("a new workspace waiting for its first plan: its computer comes with it, the way there, and go on", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const r = await toComputerStep({ state: null });
+    r.state.authConfig = { ...r.state.authConfig, billingUrl: "https://billing.example.com" };
+    const me = r.state.me;
+    if (!me) throw new Error("no me");
+    r.state.me = {
+      ...me,
+      organizations: me.organizations.map((o) => ({ ...o, standing: { state: "hold", reason: "payment" } })),
+    };
+    await r.reported({ state: null });
+    expect(
+      screen().getByRole("heading", { name: "O computador do workspace vem com o plano do agentes.chat" }),
+    ).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Escolha um plano do agentes.chat e o computador fica pronto em minutos, sempre ligado. Dá para seguir e voltar a isso depois.",
+    );
+    // The lead said it: the card doesn't say the hold again.
+    expect(document.querySelector(".onb__workspace-computer")?.textContent).not.toContain("plano");
+    await click(screen().getByRole("button", { name: "Ver planos do agentes.chat" }));
+    expect(r.state.calls.find((c) => c.method === "orgs.billingLink")?.args.slice(1)).toEqual(["onboarding"]);
+    expect(left).toEqual(["https://billing.example.com/link?t=onboarding"]);
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
   });
 
   test("on hold before its computer is made: the lead says when it gets prepared, not that it's always on", async () => {

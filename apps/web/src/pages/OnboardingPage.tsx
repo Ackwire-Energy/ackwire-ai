@@ -1,5 +1,6 @@
 import type { AiStatus, Machine, Role } from "@agenteschat/client";
 import {
+  ApiError,
   keys,
   meQuery,
   newClientId,
@@ -10,6 +11,7 @@ import {
   useMachines,
   useSandboxSettings,
 } from "@agenteschat/client";
+import { billingHoldOf } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
   computerName,
@@ -20,7 +22,7 @@ import {
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { errorText, holdText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import {
   type ComputerKind,
@@ -95,6 +97,7 @@ import {
   type WhoRow,
   WhoThinks,
 } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { OrgProvider } from "@/components/org-context";
@@ -347,6 +350,11 @@ export function OnboardingPage() {
   }, [step.id, agentsPhase]);
 
   const saveWorkspace = useMutation({
+    // Owning a workspace that waits for its first plan is said in place, with the way to that plan.
+    meta: { silent: true },
+    onError: (e) => {
+      if (errorCode(e) !== "org.create_unpaid") toast.show(errorText(t, e), "error");
+    },
     mutationFn: async () => {
       let target = created;
       if (!target) {
@@ -543,8 +551,18 @@ export function OnboardingPage() {
   const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
-  const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);
-  const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
+  const server = useAuthConfig().data;
+  const edition = computerEdition(setup.data, server?.workspaceComputer);
+  const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
+  const hold = holdText(t, standing);
+  // A new workspace waiting for its first plan (ADR 0071): its computer and its invitations come with the plan.
+  const unpaid = billingHoldOf(standing) === "payment";
+  // Creating another refused while one waits for its plan: the way to that one's plan.
+  const refused = saveWorkspace.error;
+  const unpaidElsewhere =
+    refused instanceof ApiError && refused.code === "org.create_unpaid" && typeof refused.params?.orgId === "string"
+      ? refused.params.orgId
+      : null;
   // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);
   const leaveTo = others.find((o) => o.id === storage.get(STORAGE_KEYS.lastOrg)) ?? others[0];
@@ -844,20 +862,22 @@ export function OnboardingPage() {
             title: t("onboarding.keyStep.title"),
             lead: t(noComputer ? "onboarding.keyStep.leadNoComputer" : "onboarding.keyStep.lead"),
           }
-        : {
-            title:
-              step.id === "agents" && importAgents.length
-                ? t("onboarding.agents.importedTitle")
-                : t(`onboarding.${step.id}.title`),
-            lead:
-              step.id === "computer" && workspaceComputer
-                ? t(
-                    workspaceComputer.phase === "paused"
-                      ? "onboarding.computer.leadCloudPaused"
-                      : "onboarding.computer.leadCloud",
-                  )
-                : t(`onboarding.${step.id}.lead`),
-          };
+        : step.id === "computer" && workspaceComputer && unpaid
+          ? { title: t("onboarding.computer.payment.title"), lead: t("onboarding.computer.payment.body") }
+          : {
+              title:
+                step.id === "agents" && importAgents.length
+                  ? t("onboarding.agents.importedTitle")
+                  : t(`onboarding.${step.id}.title`),
+              lead:
+                step.id === "computer" && workspaceComputer
+                  ? t(
+                      workspaceComputer.phase === "paused"
+                        ? "onboarding.computer.leadCloudPaused"
+                        : "onboarding.computer.leadCloud",
+                    )
+                  : t(`onboarding.${step.id}.lead`),
+            };
   const intro = metAt[host] === undefined || metAt[host] === step.id ? t(`onboarding.hosts.${host}`) : null;
 
   const primaryLabel =
@@ -1037,6 +1057,21 @@ export function OnboardingPage() {
                 onSaved={() => setLogoOpen(false)}
                 onRemoved={() => setLogoOpen(false)}
               />
+              {unpaidElsewhere && (
+                <>
+                  <p className="onb__status ac-iconline" role="alert">
+                    <Icon name="pause" size={14} />
+                    <span>{t("standing.createUnpaid")}</span>
+                  </p>
+                  {server?.billingUrl && (
+                    <div className="row">
+                      <BillingLinkButton orgId={unpaidElsewhere} from="new_workspace" icon="external">
+                        {t("standing.billing.cta.payment")}
+                      </BillingLinkButton>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -1091,8 +1126,15 @@ export function OnboardingPage() {
                 view={workspaceComputer}
                 orgName={orgName}
                 reader={{ owner: true, email, held: hold !== null }}
-                hold={hold}
+                hold={unpaid ? null : hold}
               />
+              {unpaid && server?.billingUrl && (
+                <div className="row">
+                  <BillingLinkButton orgId={created.orgId} from="onboarding" icon="external">
+                    {t("standing.billing.cta.payment")}
+                  </BillingLinkButton>
+                </div>
+              )}
             </div>
           )}
 
@@ -1239,7 +1281,11 @@ export function OnboardingPage() {
 
           {step.id === "team" && created && (
             <div className="onb__answer">
-              <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+              {unpaid ? (
+                <p className="onb__help">{t("onboarding.team.payment")}</p>
+              ) : (
+                <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
+              )}
             </div>
           )}
 

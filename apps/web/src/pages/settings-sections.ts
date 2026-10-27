@@ -1,4 +1,4 @@
-import type { Role } from "@agenteschat/client";
+import type { AuthConfig, Role } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import type { IconName } from "@agenteschat/ui";
 
@@ -15,16 +15,17 @@ export type SettingsSection =
   | "storage"
   | "computers"
   | "usage"
+  | "billing"
   | "import";
 
 export type SettingsGroup = "org" | "agents" | "costs";
 
-/** The settings sub-nav, in order and in groups, with who can open each. */
+/** The settings sub-nav, in order and in groups, with who can open each on this server. */
 export const SETTINGS_SECTIONS: {
   id: SettingsSection;
   icon: IconName;
   group: SettingsGroup;
-  allowed: (role: Role) => boolean;
+  allowed: (role: Role, server: AuthConfig | undefined) => boolean;
 }[] = [
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
@@ -38,6 +39,13 @@ export const SETTINGS_SECTIONS: {
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
+  // Only where a billing service runs (ADR 0071), for who may open it.
+  {
+    id: "billing",
+    icon: "coin",
+    group: "costs",
+    allowed: (r, server) => !!server?.billingUrl && can(r, "manage_billing"),
+  },
   { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
 ];
 

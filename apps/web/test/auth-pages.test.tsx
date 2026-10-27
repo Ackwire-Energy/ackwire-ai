@@ -7,6 +7,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { ApiError, type ImportInput, type InvitationPreview, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { setNavigateAway } from "@/lib/navigate";
 import { ADA_ID, createFakeApi, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
@@ -395,11 +396,11 @@ describe("Aceitar convite", () => {
 });
 
 describe("Onboarding", () => {
-  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}) => {
+  const start = async (patch: Partial<ReturnType<typeof seedState>> = {}, billingUrl: string | null = null) => {
     const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
-    state.authConfig = { workspaceComputer: false };
+    state.authConfig = { workspaceComputer: false, billingUrl };
     const api = createFakeApi(state);
     // Each agent's view as the server makes it: the computer it was given (none until then), and that computer's
     // own sign-in where whoever connected it owns the agent (this server's own computer has nobody).
@@ -667,6 +668,46 @@ describe("Onboarding", () => {
       "Confira os e-mails marcados: eles não recebem convite.",
     );
     expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint invite-emails-help");
+  });
+
+  test("a new workspace waiting for its first plan: its people are invited once it has one", async () => {
+    const { api, state } = await start();
+    const create = api.orgs.create;
+    api.orgs.create = async (input) => {
+      const made = await create(input);
+      const org = state.me?.organizations.find((o) => o.id === made.organization.id);
+      if (org) org.standing = { state: "hold", reason: "payment" };
+      return made;
+    };
+    await throughAgents(state);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(document.body.textContent).toContain("Você convida a equipe depois de escolher o plano do agentes.chat.");
+    expect(screen().queryByLabelText("E-mails")).toBeNull();
+    expect(calls(state, "invites.createLink")).toHaveLength(0);
+    await next();
+    expect(calls(state, "orgs.invite")).toHaveLength(0);
+  });
+
+  test("owning a workspace that waits for its plan: another is refused, with the way to that one's plan", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const { api, state } = await start({}, "https://billing.example.com");
+    api.orgs.create = async () => {
+      throw new ApiError(403, "org.create_unpaid", "You already have a workspace waiting for a plan", {
+        orgId: "org-unpaid",
+      });
+    };
+    await type("Nome", "Beta");
+    await next();
+    expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
+    const said =
+      "Você já tem um workspace esperando um plano do agentes.chat. Escolha o plano dele antes de criar outro.";
+    expect(screen().getByRole("alert").textContent).toBe(said);
+    // Said once, in place: no toast says it again.
+    expect(document.body.textContent?.split(said)).toHaveLength(2);
+    await click(button("Ver planos do agentes.chat"), 6);
+    expect(calls(state, "orgs.billingLink")[0]?.args).toEqual(["org-unpaid", "new_workspace"]);
+    expect(left).toEqual(["https://billing.example.com/link?t=new_workspace"]);
   });
 
   test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
