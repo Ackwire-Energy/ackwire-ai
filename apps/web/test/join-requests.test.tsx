@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -11,7 +11,10 @@ import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  setSystemTime();
+  cleanup();
+});
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
@@ -190,7 +193,10 @@ describe("an invitation link asks to join", () => {
   });
 });
 
-const REQUESTS: JoinRequest[] = [
+/** Mid-day: a request made 2 h ago is still today, so it reads "há 2 h" and never "ontem". */
+const MIDDAY = new Date(2026, 9, 21, 12);
+
+const requests = (): JoinRequest[] => [
   {
     id: "r1",
     name: "Ana Souza",
@@ -212,7 +218,8 @@ const REQUESTS: JoinRequest[] = [
 ];
 
 async function members(query = "", patch: Parameters<typeof seedState>[0] = {}) {
-  const state = seedState({ joinRequests: structuredClone(REQUESTS), ...patch });
+  setSystemTime(MIDDAY);
+  const state = seedState({ joinRequests: requests(), ...patch });
   const r = await renderApp(`/org/${ORG_ID}/settings/members${query}`, { api: createFakeApi(state) });
   await settle(6);
   return { ...r, state };
@@ -322,7 +329,7 @@ describe("Members › Requests to join", () => {
 
 test("a name typed with markup reads as typed, in Members and in the inbox", async () => {
   const name = "Ana <strong>CEO</strong><br/>x";
-  await members("", { joinRequests: [{ ...(REQUESTS[0] as JoinRequest), name }] });
+  await members("", { joinRequests: [{ ...(requests()[0] as JoinRequest), name }] });
   const who = card(name).querySelector(".ac-approval__who b");
   expect(who?.textContent).toBe(name);
   expect(who?.children.length).toBe(0);
