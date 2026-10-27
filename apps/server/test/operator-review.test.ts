@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import { DESKTOP_TEXT_PROTOCOL } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
-import { enableOperatorEvents, grantScopes, REVIEW_MAX_BYTES, type ToolSource } from "@agenteschat/engine";
+import {
+  createSessionScreening,
+  enableOperatorEvents,
+  grantScopes,
+  REVIEW_MAX_BYTES,
+  SESSION_KEEP_MS,
+  type Stream,
+  type ToolSource,
+} from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp } from "../src/operator/app";
 import { type Browser, browser, createTestServer, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
@@ -257,12 +266,87 @@ test("a task's review: what it was asked and what it printed, credentials masked
   expect(viewed.at(-1)).toMatchObject({ data: { ref: `task:${task.id}`, reason: "report", operator: "ana" } });
 });
 
+test("a screened session's review: its first and latest screens, credentials masked, gone 10 minutes after it ends", async () => {
+  // A person in control of Dev's screen, read by a computer the test plays, on the test's own clock.
+  let now = Date.now();
+  const reads: (() => Promise<void>)[] = [];
+  const screens = [
+    "Banco Exemplo · Entrar na sua conta",
+    ...Array.from({ length: 6 }, (_, i) => `Tela ${i} ${"conta ".repeat(600)}`),
+    `$ export TOKEN=${SECRETS.anthropic}\n$ curl -H "Authorization: Bearer ${SECRETS.bearer}" https://example.com`,
+  ];
+  const sessions = createSessionScreening({
+    db: t.db,
+    hub: {
+      call: async () => ({ text: screens.shift() ?? "" }),
+      status: async () => ({ protocol: DESKTOP_TEXT_PROTOCOL }),
+    } as unknown as Parameters<typeof createSessionScreening>[0]["hub"],
+    now: () => now,
+    later: (_ms, run) => {
+      reads.push(run);
+      return () => {};
+    },
+  });
+  const [user] = await t.db.select({ id: schema.users.id }).from(schema.users);
+  const stream = {
+    id: "control-1",
+    userId: user?.id,
+    orgId: org.orgId,
+    agentId: org.agentId,
+    request: { kind: "desktop", mode: "control" },
+    machineId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0c",
+    closed: false,
+  } as unknown as Stream;
+  await sessions.ready(stream);
+  for (let i = 0; i < 8; i++) {
+    now += 30_000;
+    await reads.shift()?.();
+  }
+  await sessions.closed(stream);
+  const [ended] = (await feed()).events.filter((e) => e.type === "desktop_control.ended");
+  expect(ended?.data).toMatchObject({ agentId: org.agentId, screens: 8 });
+  const id = String(ended?.data.segmentId);
+
+  const app = createOperatorApp(
+    { db: t.db, config: t.config, version: "test", log: createLogger("error"), sessions },
+    TOKEN,
+  );
+  const read = () =>
+    app.request(`/api/operator/v1/review/session/${id}?reason=sample&operator=monitor`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+  const block = await body<{ kind: string; id: string; orgId: string; agentId: string; text: string }>(await read());
+  expect(block).toMatchObject({ kind: "session", id, orgId: org.orgId, agentId: org.agentId });
+  const { text } = block;
+  expect(text).toContain(`Session ${id}: person ${user?.id} in control of the screen of agent ${org.agentId}`);
+  expect(text).toContain("8 screen(s) read, 8 kept");
+  expect(text).toContain("Banco Exemplo · Entrar na sua conta");
+  expect(text).toContain("$ export TOKEN=***");
+  expect(text).toContain("Authorization: Bearer ***");
+  expect(text).toContain("Tela 5");
+  expect(text).not.toContain("Tela 0");
+  expectNoSecret(text);
+  expect(text.match(/<external_data source="screen">/g)?.length).toBe(text.match(/<\/external_data>/g)?.length);
+  expect(Buffer.byteLength(text)).toBeLessThanOrEqual(REVIEW_MAX_BYTES);
+  expect(text).toMatch(/\[\d+ more part\(s\) left out: the block holds at most 12000 bytes\]$/);
+  const viewed = (await feed()).events.filter((e) => e.type === "content.viewed");
+  expect(viewed.at(-1)).toMatchObject({ orgId: org.orgId, data: { ref: `session:${id}`, operator: "monitor" } });
+  expect(JSON.stringify(viewed)).not.toContain("Banco");
+
+  // 10 minutes after the segment ended its text is gone: nothing left to read, and no trail of a read.
+  now += SESSION_KEEP_MS;
+  expect((await read()).status).toBe(404);
+  expect((await feed()).events.filter((e) => e.type === "content.viewed")).toHaveLength(viewed.length);
+});
+
 test("no review without a reason and who reads; an unknown id is a 404 and leaves no trail", async () => {
   const id = "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b";
   const views = async () => (await feed()).events.filter((e) => e.type === "content.viewed").length;
   const before = await views();
   expect((await review(`run/${id}`)).status).toBe(404);
   expect((await review(`task/${id}`)).status).toBe(404);
+  // This server screens no session: there is never one to read.
+  expect((await review(`session/${id}`)).status).toBe(404);
   for (const query of ["", "reason=x", "operator=y", "reason=%20&operator=y"]) {
     expect({ query, status: (await review(`run/${id}`, query)).status }).toEqual({ query, status: 400 });
   }

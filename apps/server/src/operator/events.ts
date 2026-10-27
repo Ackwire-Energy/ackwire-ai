@@ -17,7 +17,7 @@ const Event = z
     at: z.string(),
     type: z.string().openapi({
       description:
-        "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1.",
+        "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1.",
     }),
     orgId: z.uuid().nullable(),
     userId: z.string().nullable().openapi({ description: "The person the event is about or who acted." }),
@@ -42,9 +42,11 @@ const EventQuery = z.object({
   limit: z.coerce.number().int().min(1).max(OPERATOR_EVENTS_PAGE_MAX).default(100),
 });
 
+const REVIEW_KINDS = ["run", "task", "session"] as const;
+
 const Review = z
   .object({
-    kind: z.enum(["run", "task"]),
+    kind: z.enum(REVIEW_KINDS),
     id: z.uuid(),
     orgId: z.uuid(),
     agentId: z.uuid(),
@@ -53,7 +55,7 @@ const Review = z
   .openapi("OperatorReview");
 
 const ReviewParams = z.object({
-  kind: z.enum(["run", "task"]).openapi({ param: { name: "kind", in: "path" } }),
+  kind: z.enum(REVIEW_KINDS).openapi({ param: { name: "kind", in: "path" } }),
   id: z.uuid().openapi({ param: { name: "id", in: "path" } }),
 });
 
@@ -72,7 +74,7 @@ const ReviewQuery = z.object({
     .openapi({ description: "Who reads it: an operator, or the service that samples." }),
 });
 
-export function registerOperatorEvents(api: OpenAPIHono, { db }: OperatorDeps) {
+export function registerOperatorEvents(api: OpenAPIHono, { db, sessions }: OperatorDeps) {
   api.openapi(
     createRoute({
       method: "get",
@@ -95,15 +97,15 @@ export function registerOperatorEvents(api: OpenAPIHono, { db }: OperatorDeps) {
       method: "get",
       path: "/review/{kind}/{id}",
       tags,
-      summary: "What one run or task did, as one redacted text block",
+      summary: "What one run, task or screened session did, as one redacted text block",
       description:
-        "The only content this API gives: the request, the tool calls with their results, the reply (a run), or the prompt, command and output (a task). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
+        "The only content this API gives: the request, the tool calls with their results, the reply (a run), the prompt, command and output (a task), or the text a person in control of an agent's screen had on it (a session of `desktop_control.ended`, on a server with `SESSION_SCREENING`: from memory only, until 10 minutes after the segment ended, then 404). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
       request: { params: ReviewParams, query: ReviewQuery },
       responses: { 200: json(Review), ...errors },
     }),
     async (c) => {
       const { kind, id } = c.req.valid("param");
-      const review = await operatorReview(db, kind, id, c.req.valid("query"));
+      const review = await operatorReview(db, kind, id, c.req.valid("query"), sessions);
       if (!review) return apiError(c, 404, "not_found", `No ${kind} with this id`);
       return c.json(review, 200);
     },

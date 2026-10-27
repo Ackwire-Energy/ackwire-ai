@@ -1,6 +1,6 @@
 # 0058. The agent's computer as a desktop people watch and control, and a terminal
 
-- Status: Accepted (2026-10-24). Superseded in part by ADR 0059 (§4: in system mode, only the agent's owner controls its desktop or opens its terminal while its user holds the owner's sign-in) and by ADR 0065 (§1: a desktop stays on once started, parked only when memory runs short; §6: no terminal view; §13: one dialog). Amended 2026-10-24 by §14 (system mode puts the agent's Chrome on its desktop too), 2026-10-25 by §15 (the desktops' agentes.chat look), again 2026-10-25 by §7's Browser on the desktop and §15's third look (each app's windows on its own launcher, the apps menu's names, the terminal's prompt), and 2026-10-26 by §16 (keys, the clipboard and full screen in control; it supersedes §5's last bullet and §13's keyboard and "Colar texto" bullets) and by §15's and §16's running desktops (a new look and the flags a running server takes reach a desktop that runs, without a restart)
+- Status: Accepted (2026-10-24). Superseded in part by ADR 0059 (§4: in system mode, only the agent's owner controls its desktop or opens its terminal while its user holds the owner's sign-in) and by ADR 0065 (§1: a desktop stays on once started, parked only when memory runs short; §6: no terminal view; §13: one dialog). Amended 2026-10-24 by §14 (system mode puts the agent's Chrome on its desktop too), 2026-10-25 by §15 (the desktops' agentes.chat look), again 2026-10-25 by §7's Browser on the desktop and §15's third look (each app's windows on its own launcher, the apps menu's names, the terminal's prompt), and 2026-10-26 by §16 (keys, the clipboard and full screen in control; it supersedes §5's last bullet and §13's keyboard and "Colar texto" bullets) and by §15's and §16's running desktops (a new look and the flags a running server takes reach a desktop that runs, without a restart). Amended 2026-10-27 by ADR 0076 (§4, §6, §12: agentes.chat Cloud screens the text on a screen a person controls)
 - Date: 2026-10-24
 - Builds on: ADR 0025 (connected computers), ADR 0030 (isolation), ADR 0031 (computer use), ADR 0036 (switches on the machine), ADR 0040 (the agent browser and its handoffs), ADR 0054 (the screen layer computer use reuses), ADR 0057 (system mode: each agent its own OS user)
 - Changes: ADR 0031 §6 (on a connected Linux computer the virtual display is an Xtigervnc desktop per agent, §1) and §8 (a person drives a desktop over RFB, not frames and injected input, §5); ADR 0031 §10 and ADR 0030 level 3 (system mode gives each agent its own OS user, §10)
@@ -70,6 +70,7 @@ noVNC in the web app ⇄ `wss /api/desktop` ⇄ the server ⇄ one data WebSocke
 - Nobody turns a desktop on or off (ADR 0065 §2): whoever may watch it starts it by opening it, and it stays on.
 - Access is checked again every 30 s on open streams; an open control stream also keeps its holder's control alive, and when it closes the 2 minutes of grace start. In a suspended workspace (ADR 0056 §8) nobody has a stream, as every permission check refuses there; on hold (or with the agent held), people still watch a desktop that runs, while taking control, opening a terminal and starting a desktop that isn't running are new work, refused like the agents' own.
 - In control or in the terminal a person can do whatever that OS user can do: that is the point, and why the rule is narrow. X11 has no input isolation: while a person is in control, any process of that user with the cookie (the agent's tasks, a brain's shell) can read the screen and the keys. The take-control text says so.
+- On agentes.chat Cloud the take-control line has an ⓘ: the screen's text may be checked for abuse (ADR 0076).
 
 ### 5. Control is a handoff on the `desktop` screen
 
@@ -86,6 +87,7 @@ Superseded by ADR 0065 §1: the apps have no terminal view (in control, the desk
 - A `Bun.Terminal` PTY with the login shell as the agent's OS user, never root (system mode: `systemd-run --scope --slice=agents-<uid>.slice -- runuser -u ag-<id8> -- bash -l`). Its folder is the agent's; its environment has none of the agent's secrets and `TERM=xterm-256color`.
 - A resize is a text frame. Output beyond a 1 MB backlog is dropped, followed by `[output skipped: too fast]` (`Bun.Terminal` can't pause).
 - Closed after 30 idle minutes, and after 12 hours at most. No history is kept, and reconnecting opens a new shell: nobody types into a shell they didn't see start.
+- Where session screening is on, the server refuses the terminal socket (ADR 0076).
 
 ### 7. The agent's browser on its desktop
 
@@ -157,7 +159,7 @@ MachineErrorCode += desktop_unavailable | desktop_off | desktop_busy | terminal_
 
 ### 12. Audit, nothing stored
 
-Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.controlled` and `terminal.session` keep the machine, the seconds and the bytes. No frames, keys or terminal output are stored, and nothing is recorded (ADR 0040 §8). A click on Browser on the desktop (§7) stays on the computer, in the runner's log: the server never hears of it. An audit row for it (`desktop.browser_opened`, by the person in control of that desktop then) would need a runner frame that says so, a protocol change.
+Handoff rows record control. `audit_log` rows `desktop.watched`, `desktop.controlled` and `terminal.session` keep the machine, the seconds and the bytes. No frames, keys or terminal output are stored, and nothing is recorded (ADR 0040 §8). On agentes.chat Cloud with session screening on, the screen's text is read during control and held in memory for up to 20 minutes, never stored (ADR 0076). A click on Browser on the desktop (§7) stays on the computer, in the runner's log: the server never hears of it. An audit row for it (`desktop.browser_opened`, by the person in control of that desktop then) would need a runner frame that says so, a protocol change.
 
 ### 13. In the app
 

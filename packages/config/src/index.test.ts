@@ -97,6 +97,15 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
   });
 
+  test("session screening is off by default and needs the operator API, its only reader", () => {
+    expect(loadConfig(valid).SESSION_SCREENING).toBe(false);
+    expect(() => loadConfig({ ...valid, SESSION_SCREENING: "true" })).toThrow(
+      /SESSION_SCREENING needs OPERATOR_API_TOKEN/,
+    );
+    const on = { ...valid, SESSION_SCREENING: "true", OPERATOR_API_TOKEN: "t".repeat(32) };
+    expect(loadConfig(on).SESSION_SCREENING).toBe(true);
+  });
+
   test("the usage report is on unless TELEMETRY says off (on/off, or any yes/no word)", () => {
     expect(loadConfig(valid).TELEMETRY).toBe("on");
     expect(loadConfig(valid).TELEMETRY_URL).toBe("https://telemetry.agentes.chat/v1/report");

@@ -593,7 +593,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /**
      * Usage of a non-model service called for an org (e.g. the Jev router):
-     * recorded like every call, with its kind and provider, billed to the platform.
+     * recorded like every call, with its kind and provider, billed to the server's own key (`platform`).
      */
     async recordExternalUsage(input: {
       orgId: string;

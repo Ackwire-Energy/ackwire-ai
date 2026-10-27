@@ -116,21 +116,24 @@ function socketsFor() {
   return { factory, desktops };
 }
 
-/** Ada on a Linux computer of the workspace's, which serves screens; self-host. */
-async function backend(desktop: Partial<DesktopStatus>) {
+/** Ada on a Linux computer of the workspace's, which serves screens; self-host, or with `cloud` the Cloud's own. */
+async function backend(desktop: Partial<DesktopStatus>, cloud = false) {
   const state = seedState();
   const api = createFakeApi(state);
   const fake = fakeBrowserOf.get(api);
   const machines = fakeMachinesOf.get(api);
   if (!fake || !machines) throw new Error("no fakes");
-  const m = machines.pair({ name: "Servidor de casa", os: "linux", mode: "system" });
+  const m = cloud
+    ? machines.pair({ name: "Computador da Acme", kind: "managed", os: "linux", mode: "system" })
+    : machines.pair({ name: "Servidor de casa", os: "linux", mode: "system" });
+  if (cloud) machines.setSetup({ state: "ready", machineId: m.id });
   await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
   fake.desktops.set(ADA_ID, desktop);
   return { state, api, fake, machines, machine: m, sockets: socketsFor() };
 }
 
-async function dialog(desktop: Partial<DesktopStatus> = RUNNING) {
-  const b = await backend(desktop);
+async function dialog(desktop: Partial<DesktopStatus> = RUNNING, cloud = false) {
+  const b = await backend(desktop, cloud);
   const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
   let closed = 0;
   const r = await renderPage(<ComputerDialog agent={ada} open onClose={() => closed++} />, {
@@ -186,8 +189,8 @@ const edgeTime = () => act(() => new Promise((r) => setTimeout(r, 600)));
 const pointerAt = (clientY: number) => act(async () => void fireEvent.pointerMove(document.body, { clientY }));
 
 /** Ada's screen in this person's control, live: the field over it has the person's keys. */
-async function controlled() {
-  const t = await dialog();
+async function controlled(cloud = false) {
+  const t = await dialog(RUNNING, cloud);
   await connected();
   await click(view().getByRole("button", { name: "Assumir o controle" }));
   await settle(4);
@@ -543,6 +546,34 @@ describe("the agent's screen in the computer dialog", () => {
     expect(calls(t, "browser.done")).toEqual([[ORG_ID, "takeover-1", "Deixei o arquivo na mesa"]]);
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toContain("mode=watch");
+  });
+
+  test("on the Cloud the line in control has an ⓘ: the screen's text may be checked; never while watching", async () => {
+    await dialog(RUNNING, true);
+    await connected();
+    const about = () => view().queryByRole("button", { name: "Sobre Verificações de segurança" });
+    expect(about()).toBeNull();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    await connected();
+    // The line's words stay as they are, the ⓘ on their first line.
+    const hintLine = document.querySelector(".dsk-line > .ac-hintline") as HTMLElement;
+    expect(hintLine.querySelector(":scope > .muted")?.textContent).toBe(
+      "Copiar e colar como sempre: Ctrl C, Ctrl V. Os programas do computador da Ada podem ver a tela e o que você digita ou cola.",
+    );
+    const hint = about() as HTMLElement;
+    expect(hintLine.contains(hint)).toBe(true);
+    const words =
+      "Podemos verificar o texto desta tela para impedir abuso. Guardamos só o resultado. O que a tela não mostra, como uma senha num prompt, nunca é capturado.";
+    expect(document.getElementById(hint.getAttribute("aria-describedby") ?? "")?.textContent).toBe(words);
+    await click(hint);
+    expect(screen().getByRole("tooltip").textContent).toBe(words);
+  });
+
+  test("self-hosted, the line in control has no ⓘ: nothing there is screened", async () => {
+    await controlled();
+    expect(view().queryByRole("button", { name: "Sobre Verificações de segurança" })).toBeNull();
+    expect(document.querySelector(".dsk-line .ac-hint, .dsk-line .ac-hintline")).toBeNull();
   });
 
   test("taking control opens behind Abrindo, over no old picture: the keys reach the computer once it is connected", async () => {
