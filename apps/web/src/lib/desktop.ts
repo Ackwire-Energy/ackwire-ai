@@ -168,7 +168,7 @@ export function routeNewWindowLinks(root: HTMLElement): () => void {
   const onClick = (e: MouseEvent) => {
     if (e.defaultPrevented || e.button !== 0) return;
     const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
-    if (!link || link.target !== "_blank" || !/^(https?|mailto|tel):$/.test(link.protocol)) return;
+    if (link?.target !== "_blank" || !/^(https?|mailto|tel):$/.test(link.protocol)) return;
     e.preventDefault();
     e.stopPropagation();
     window.open(link.href, "_blank", "noopener");

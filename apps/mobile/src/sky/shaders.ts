@@ -233,4 +233,5 @@ float field(float u, float v, float x, float y) {
 };
 
 /** The full SkSL source of one drawing. */
-export const shaderSource = (kind: DitherKind) => `${PRELUDE}${FIELDS[kind]}${OVERLAID.has(kind) ? MAIN_OVERLAY : MAIN}`;
+export const shaderSource = (kind: DitherKind) =>
+  `${PRELUDE}${FIELDS[kind]}${OVERLAID.has(kind) ? MAIN_OVERLAY : MAIN}`;

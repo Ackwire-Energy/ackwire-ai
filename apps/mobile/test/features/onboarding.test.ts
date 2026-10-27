@@ -145,9 +145,7 @@ test("the line under the first message: whether the agent it names can start, or
     text: "Theo starts right away, in #general.",
   });
   expect(line({ status: status("waiting") })?.text).toBe("Theo starts as soon as Acme's computer is back.");
-  expect(line({ status: status("no_ai") })?.text).toBe(
-    "No AI connected yet: Theo answers once you connect one.",
-  );
+  expect(line({ status: status("no_ai") })?.text).toBe("No AI connected yet: Theo answers once you connect one.");
   // Nobody named: only that no agent has an AI, else nothing.
   expect(line({ mentioned: undefined, status: status("no_ai", false) })?.text).toBe(
     "No AI connected yet: your agents answer once you connect one.",

@@ -102,7 +102,7 @@ function tone(out: Float32Array, o: ToneOptions) {
 
 type Filter = "lp" | "hp" | "bp";
 /** A biquad (RBJ cookbook) in place. */
-function biquad(x: Float32Array, type: Filter, fc: number, q = 0.707) {
+function biquad(x: Float32Array, type: Filter, fc: number, q = Math.SQRT1_2) {
   const w = (2 * Math.PI * Math.min(fc, SR * 0.45)) / SR;
   const cs = Math.cos(w);
   const al = Math.sin(w) / (2 * q);
