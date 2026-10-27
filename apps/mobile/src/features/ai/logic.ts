@@ -13,3 +13,14 @@ export const offersKeyNow = (gate: PlanGate, held: boolean) =>
   gate.state === "preparing"
     ? gate.view !== null && !held
     : gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported";
+
+/** How often a plan's page asks again while it waits (the web's first run asks as often). */
+export const PLAN_POLL_MS = 5000;
+
+/**
+ * Whether the plan shown waits on something no event may bring (the first run opens no socket): the workspace's
+ * computer on its way, the agent's computer offline, or the views not in yet. Ready, missing, unsupported or
+ * locked stay put until the person does something.
+ */
+export const pollsPlan = (state: PlanGate["state"]) =>
+  state === "preparing" || state === "offline" || state === "loading";

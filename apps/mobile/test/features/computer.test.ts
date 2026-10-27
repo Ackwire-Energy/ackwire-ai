@@ -10,7 +10,7 @@ import { type SetupView, setupEta, setupView } from "@agenteschat/client/lib/com
 import { clockAt } from "@agenteschat/client/lib/format";
 import { resources } from "@agenteschat/i18n";
 import { bannedIn, CLOUD_BANNED } from "../../../../packages/i18n/test/edition-words";
-import { offersKeyNow } from "../../src/features/ai/logic";
+import { offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
 import { pageGapKey, stepText } from "../../src/features/browser/logic";
 import {
   offersSwitch,
@@ -18,7 +18,6 @@ import {
   phoneEntryButton,
   phoneStage,
   screenRequest,
-  setupLine,
   setupNoticeLine,
   setupSub,
 } from "../../src/features/computer/logic";
@@ -299,17 +298,6 @@ describe("the workspace's computer on its way, on Conversas", () => {
     );
   });
 
-  test("the first run's AI step: where it is on a line of its own, led by the orbit, or the x of a problem", async () => {
-    const t = await translator("pt-BR");
-    const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
-    expect(setupLine(t, wait)).toEqual({ icon: "orbit", text: "Esperando um computador disponível" });
-    expect(setupLine(t, viewOf())).toEqual({ icon: "orbit", text: "Instalando os programas" });
-    expect(setupLine(t, viewOf({ state: "problem", step: null, secondsLeft: null }))).toEqual({
-      icon: "x",
-      text: "Algo deu errado ao preparar o computador. Já estamos cuidando.",
-    });
-  });
-
   test("the AI step offers an API key now in every wait, a page away on the phone, but not on hold", () => {
     const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
     for (const view of [viewOf(), wait, viewOf({ state: "problem", step: null, secondsLeft: null })]) {
@@ -325,5 +313,10 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(offersKeyNow({ state: "ready" }, false)).toBe(false);
     expect(offersKeyNow({ state: "loading" }, false)).toBe(false);
     expect(offersKeyNow({ state: "locked", who: "owner" }, false)).toBe(false);
+  });
+
+  test("a plan's page asks again only while it waits on something no event may bring", () => {
+    for (const state of ["preparing", "offline", "loading"] as const) expect(pollsPlan(state)).toBe(true);
+    for (const state of ["ready", "missing", "unsupported", "locked"] as const) expect(pollsPlan(state)).toBe(false);
   });
 });

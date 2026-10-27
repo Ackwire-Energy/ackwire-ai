@@ -43,6 +43,8 @@ export interface AddAccountProps {
   local?: boolean;
   /** False while the computer isn't ready: nothing starts there yet, but the fields and the makers' pages work. */
   ready?: boolean;
+  /** It just got ready and the page is still asking about it: what starts there waits, with the spinner. */
+  loading?: boolean;
   /** Under the steps. */
   note?: ReactNode;
   onAdded: (account: MachineAccount) => void;
@@ -64,6 +66,7 @@ function AddAccountFlow({
   askEmail,
   local,
   ready = true,
+  loading = false,
   note,
   onAdded,
   onRetry,
@@ -177,7 +180,7 @@ function AddAccountFlow({
   };
 
   const waiting = <Waiting label={t("agentPage.work.brain.add.waiting")} />;
-  const pasteRow = (label: string, placeholder: string, secret: boolean, valid: boolean) => (
+  const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <View style={[styles.inset, { backgroundColor: c.sunken, borderColor: c.line }]}>
         <TextInput
@@ -198,7 +201,7 @@ function AddAccountFlow({
           editable={!sent}
           returnKeyType="send"
           onSubmitEditing={() => {
-            if (valid) void send();
+            if (valid && ready && !loading) void send();
           }}
           style={[styles.insetInput, { color: c.ink }]}
         />
@@ -216,7 +219,7 @@ function AddAccountFlow({
           variant="primary"
           wide
           label={sending ? t("mobile.ai.saving") : t("agentPage.work.brain.add.send", { computer })}
-          disabled={!valid || sent || !ready || sending}
+          disabled={!valid || sent || !ready || loading || sending}
           onPress={() => void send()}
         />
       </View>
@@ -257,7 +260,7 @@ function AddAccountFlow({
       variant="primary"
       icon="out"
       label={label}
-      disabled={disabled || starting}
+      disabled={disabled || starting || loading}
       onPress={() => void start()}
     />
   );
@@ -285,7 +288,7 @@ function AddAccountFlow({
           {provider === "zai" ? <StepText>{t("connectAi.zaiTeam")}</StepText> : null}
         </Step>
         <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={sent ? waiting : undefined}>
-          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), "…", true, keyOk)}
+          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
           {key && !keyOk ? <Note icon="x">{t("aiAccounts.add.keyShape", { plan: plan.label })}</Note> : null}
           <StepText>{t("aiAccounts.add.keySafe", { computer })}</StepText>
         </Step>
@@ -410,7 +413,7 @@ function AddAccountFlow({
       ) : (
         <StepsCard>{steps}</StepsCard>
       )}
-      {starting ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
+      {starting || loading ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
       {note}
     </View>
   );

@@ -93,9 +93,10 @@ export function ProviderStack({ ids, label }: { ids: readonly string[]; label?: 
 
 /**
  * A group of makers in one tile the size of the others (`sm`): four marks 2 × 2 (the plans of code, the API key's
- * makers). Hidden from screen readers unless given `label`: the row's words name the group.
+ * makers). Hidden from screen readers unless given `label`: the row's words name the group. `off`: dimmed, as
+ * `ProviderLogo`'s.
  */
-export function ProviderQuad({ ids, label }: { ids: readonly string[]; label?: string }) {
+export function ProviderQuad({ ids, label, off = false }: { ids: readonly string[]; label?: string; off?: boolean }) {
   const { colors, scheme } = useTheme();
   const [box] = LOGO_SIZES.sm;
   const cell = 10;
@@ -115,6 +116,7 @@ export function ProviderQuad({ ids, label }: { ids: readonly string[]; label?: s
         justifyContent: "center",
         gap: 2,
         paddingHorizontal: (box - cell * 2 - 2) / 2,
+        opacity: off ? 0.5 : 1,
       }}
     >
       {ids.slice(0, 4).map((id) => {

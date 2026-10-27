@@ -22,6 +22,3 @@ export function useAiOrg(): AiOrg {
   const chosen = useOrgMaybe();
   return given ?? { orgId: chosen?.orgId ?? "", org: chosen?.org ?? null };
 }
-
-/** Whether the app has chosen a workspace (screens that need it, like the computer's wait, show only then). */
-export const useInWorkspace = () => useOrgMaybe() !== null;
