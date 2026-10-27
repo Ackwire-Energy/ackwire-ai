@@ -8,17 +8,18 @@ import {
 import { useNetworkState } from "expo-network";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { signOut } from "@/features/account";
 import { SERVER_STUCK_MS, serverDownOf } from "@/lib/org-choice";
 import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthLink } from "@/ui/auth/AuthLink";
+import { CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
-import { useTheme } from "@/ui/theme";
+import { Text } from "@/ui/Text";
 import { problemText } from "./index";
 
-/** While the screen is up, the account is asked for again this often (the app opens on its own once it answers). */
+/** While it waits, the account is asked for again this often (the app opens on its own once it answers). */
 const RETRY_EVERY_MS = 15_000;
 
 export interface ServerDown {
@@ -83,39 +84,44 @@ export function useServerDown(active: boolean): ServerDown | null {
 }
 
 /**
- * The server doesn't answer: say so, with the reason when the server's check found one, try again (also on its
- * own, and when the app comes back to the front), or Sair to sign in elsewhere ("Trocar" under the sign-in).
- * It covers the app like the suspended workspace's screen.
+ * Under the launch splash's name while the server doesn't answer (`LaunchSplash`'s `waiting`): what happened, with
+ * the reason when the server's check found one, Tentar de novo (it also tries on its own, and when the app comes
+ * back to the front) and Sair, to sign in elsewhere ("Trocar" under the sign-in).
  */
-export function ServerDownScreen({ down }: { down: ServerDown }) {
+export function ServerDownPanel({ down }: { down: ServerDown }) {
   const { t } = useTranslation();
-  const { colors } = useTheme();
   const network = useNetworkState();
   const offline = network.isConnected === false || network.isInternetReachable === false;
   const host = serverHost(down.server);
   // Off a tailnet, "unreachable" here is a server that worked before: down, not a wrong address.
-  const subtitle = offline
+  const plain = !offline && down.problem === "unreachable" && !isTailnet(down.server);
+  const line = offline
     ? t("mobile.auth.errors.network")
-    : down.problem === "unreachable" && !isTailnet(down.server)
-      ? t("mobile.auth.server.down.text", { host })
+    : plain
+      ? t("mobile.auth.server.down.line", { host })
       : t(problemText(down.problem, down.server), { host });
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} accessibilityViewIsModal>
-      <AuthScaffold
-        title={t("mobile.auth.server.down.title")}
-        subtitle={subtitle}
-        agentMode={down.checking ? "run" : "idle"}
-        expression={down.checking ? undefined : "closed"}
-      >
-        <Button
-          variant="primary"
-          wide
-          label={down.checking ? t("mobile.auth.server.checking") : t("mobile.common.retry")}
-          disabled={down.checking}
-          onPress={down.retry}
-        />
-        <Button variant="ghost" wide label={t("mobile.org.signOut")} onPress={() => void signOut()} />
-      </AuthScaffold>
+    <View style={{ gap: 10 }} accessibilityLiveRegion="polite">
+      <View style={{ gap: 4, marginBottom: 8 }}>
+        <Text variant="body" style={[CENTER, { fontWeight: "600" }]}>
+          {line}
+        </Text>
+        {plain ? (
+          <Text variant="subhead" style={CENTER}>
+            {t("mobile.auth.server.down.text")}
+          </Text>
+        ) : null}
+      </View>
+      <Button
+        variant="primary"
+        wide
+        label={down.checking ? t("mobile.auth.server.checking") : t("mobile.common.retry")}
+        disabled={down.checking}
+        onPress={down.retry}
+      />
+      <View style={{ paddingTop: 8 }}>
+        <AuthLink label={t("mobile.org.signOut")} onPress={() => void signOut()} />
+      </View>
     </View>
   );
 }

@@ -42,8 +42,8 @@ export const mobileEn: MobileTranslations = {
       serverTooOld: "{{host}} needs an update to work with this app.",
       appTooOld: "Update the agentes app to use {{host}}.",
       down: {
-        title: "Your server isn't answering",
-        text: "{{host}} didn't answer. It may be down or outside your network. The app opens on its own as soon as it's back.",
+        line: "{{host}} didn't answer.",
+        text: "It may be down or outside your network. The app opens on its own once it's back.",
       },
     },
     connect: {

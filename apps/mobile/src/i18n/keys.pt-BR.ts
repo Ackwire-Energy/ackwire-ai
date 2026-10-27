@@ -44,8 +44,8 @@ export const mobilePtBR = {
       serverTooOld: "{{host}} precisa de uma atualização para funcionar com este app.",
       appTooOld: "Atualize o app agentes para usar {{host}}.",
       down: {
-        title: "Sem resposta do servidor",
-        text: "{{host}} não respondeu. Ele pode estar fora do ar ou fora da sua rede. Assim que voltar, o app abre sozinho.",
+        line: "{{host}} não respondeu.",
+        text: "Ele pode estar fora do ar ou fora da sua rede. O app abre sozinho quando ele voltar.",
       },
     },
     connect: {

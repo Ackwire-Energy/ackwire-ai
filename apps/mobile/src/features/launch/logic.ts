@@ -21,6 +21,10 @@ export const LAUNCH = {
   sky: 0.5,
   /** How far the agent lifts with it (points). */
   lift: 26,
+  /** Waiting on something the person can act on (a server that doesn't answer): the agent's height, as a share of the screen. */
+  waitingAgent: 0.3,
+  /** And the sky's level then (its top just under the name). */
+  waitingSky: 0.56,
 } as const;
 
 /** The native launch image (assets/images/splash-icon.png, 512 px with the body at 56–456) is 120 pt wide. */
@@ -69,15 +73,16 @@ export const SPRITES = [
 ] as const;
 
 /**
- * Where a sprite is (share of the height from the top) with the sky at `level`: it rises from near the bottom
- * to a little under the sky's top and starts again; null while the sky is too low to hold it.
+ * Where a sprite is (share of the height from the top) with the sky at `level`: it rises from `bottom` (near the
+ * screen's bottom, or above what the splash shows there) to a little under the sky's top and starts again; null
+ * while the sky is too low to hold it.
  */
-export function spriteY(sprite: (typeof SPRITES)[number], t: number, level: number): number | null {
+export function spriteY(sprite: (typeof SPRITES)[number], t: number, level: number, bottom = 0.95): number | null {
   "worklet";
-  const travel = level - 0.11;
+  const travel = bottom - (1 - level) - 0.06;
   if (travel <= 0.04) return null;
   const k = t * sprite.speed + sprite.phase * travel;
-  return 0.95 - (k - travel * Math.floor(k / travel));
+  return bottom - (k - travel * Math.floor(k / travel));
 }
 
 /** A sprite blinks for a moment every 3.6 s. */
