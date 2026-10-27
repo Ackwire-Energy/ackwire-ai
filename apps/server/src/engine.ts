@@ -419,6 +419,10 @@ export function buildEngine(o: EngineOptions) {
     email: adapters.email,
     emailArt: o.emailArt ?? emailArtAt(config.PUBLIC_URL),
     push: adapters.push,
+    // Browsers (ADR 0071): full text, encrypted to the browser.
+    webPush: adapters.webPush,
+    // A push not waiting on the person holds while they have the app open (ADR 0071 §7).
+    presence: adapters.presence,
     storage,
     artifacts,
     sandbox,

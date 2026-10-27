@@ -343,6 +343,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
     },
+    push: {
+      webKey: async () =>
+        (await nullOn(404, () => request<{ publicKey: string }>("/api/app/push/web")))?.publicKey ?? null,
+      register: (input) => request<void>("/api/app/push/devices", { json: input }),
+      unregister: (token) => request<void>("/api/app/push/devices/forget", { json: { token } }),
+      stale: async (ids) => (await request<{ stale: string[] }>("/api/app/push/stale", { json: { ids } })).stale,
+    },
     orgs: {
       create: (input) =>
         request<{ organization: Organization; generalChannelId: string }>("/api/app/organizations", { json: input }),

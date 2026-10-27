@@ -25,7 +25,7 @@ import {
   isExpandable,
   MENTION_RE,
   NOTIFICATION_FILTERS,
-  openTarget,
+  opensConnectAi,
   replyTarget,
   snoozeTimes,
   sortWaiting,
@@ -55,15 +55,14 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
-import { requestBrowserCard } from "@/components/browser/open";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
+import { useNotificationOpener } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -1378,7 +1377,6 @@ export function NotificationsPage() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const channels = useChannels(org.id);
-  const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
   const live = useLiveStore();
@@ -1492,44 +1490,13 @@ export function NotificationsPage() {
 
   const connect = useConnectAi();
   const aiStatus = useAiStatus(org.id);
+  const openNotification = useNotificationOpener();
   // Its computer is ready and its agents have no AI yet: what comes next is connecting one.
-  const connectsAi = (n: AppNotification) => {
-    const ai = aiStatus.data;
-    return n.kind === "computer_ready" && connect !== null && ai !== undefined && !ai.any && ai.agents.length > 0;
-  };
+  const connectsAi = (n: AppNotification) => connect !== null && opensConnectAi(n, aiStatus.data);
+  /** "Abrir": the same place a click on its browser notification goes (`useNotificationOpener`). */
   const openItem = (n: AppNotification) => {
     markRead(n);
-    if (connectsAi(n)) return void connect?.open({ ready: true });
-    const target = openTarget(n);
-    if (!target) return;
-    // An agent asked for help in its browser: its card opens there, in control (no page of its own).
-    if (n.kind === "browser_handoff" && n.source.handoffId) requestBrowserCard({ handoffId: n.source.handoffId });
-    const orgId = org.id;
-    switch (target.to) {
-      case "/org/$orgId/threads/$threadId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/c/$channelId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params }, search: target.search ?? {} });
-      case "/org/$orgId/dm/agent/$agentId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/dm/person/$userId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/issues/$number":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/forum/$topicId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/threads":
-        return void navigate({ to: target.to, params: { orgId }, search: target.search });
-      case "/org/$orgId/settings/computers/$machineId":
-        return void navigate({ to: target.to, params: { orgId, ...target.params } });
-      case "/org/$orgId/settings/$section":
-        return void navigate({ to: target.to, params: { orgId, ...target.params }, search: {} });
-      case "/org/$orgId/routines":
-        // A routine's trouble opens it in Rotinas, its state and fix in view.
-        return void navigate({ to: target.to, params: { orgId }, search: target.search ?? {} });
-      default:
-        return void navigate({ to: target.to, params: { orgId } });
-    }
+    openNotification(n, org.id, { ai: aiStatus.data });
   };
 
   const startReply = (n: AppNotification) => {

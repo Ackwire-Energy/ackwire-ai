@@ -8,6 +8,8 @@ export const keys = {
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   phoneSignIn: ["phone-sign-in"] as const,
+  /** The server's Web Push key (ADR 0071); `null` = Web Push off on this server. */
+  webPushKey: ["push", "web-key"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
