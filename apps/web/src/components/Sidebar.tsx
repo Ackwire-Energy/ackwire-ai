@@ -91,7 +91,7 @@ import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /** The chosen item's sky: both themes, the CSS picks one. */
@@ -277,6 +277,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
       <div className="sidebar__top">
+        <WorkspaceSky part="side" rail={rail} />
         <div className="sidebar__org">
           <WorkspaceMenu
             summary={
@@ -987,7 +988,7 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
         anchor={trigger}
         closeLabel={t("common.close")}
         backdrop={<MenuHorizon />}
-        mark={<OrgMark logo={org.logo} size={64} />}
+        mark={<OrgMark logo={org.logo} size={82} />}
         title={org.name}
         meta={
           <>

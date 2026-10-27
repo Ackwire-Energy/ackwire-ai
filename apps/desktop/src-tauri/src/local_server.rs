@@ -1192,6 +1192,7 @@ fn watch(app: &AppHandle, mut child: Child, generation: u64, port: u16, folder: 
                 }
                 set_phase(app, Phase::Running);
                 crate::host_sync::trigger(app);
+                crate::cover::server_here_ready(app);
                 let app = app.clone();
                 std::thread::spawn(move || ensure_served(&app));
             } else if since.elapsed() > ANSWER_WITHIN && current(app) {
@@ -1359,6 +1360,7 @@ pub fn ensure_served(app: &AppHandle) {
     let Some(port) = folder(app).and_then(|f| port_of(&f)) else { return };
     if crate::tailscale::serve(port).is_ok_and(|now| now == url) && is_running(app) {
         state(app).served = true;
+        crate::cover::server_here_ready(app);
     }
 }
 

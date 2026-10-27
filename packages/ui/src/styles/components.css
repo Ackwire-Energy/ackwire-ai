@@ -6907,17 +6907,22 @@ label.ac-setrow__title {
   align-items: center;
   gap: var(--space-4);
 }
+/* As tall as the name and the line under it (52 + 6 + 24). */
 .ac-mo__mark {
   flex: none;
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: 82px;
+  height: 82px;
 }
-/* Photos and marks at the header's size (an xl avatar is bigger). */
+/* Photos and marks at the header's size (an xl avatar is bigger; a mark comes at its own size). */
+.ac-mo__mark > .ac-avatar,
+.ac-mo__mark > img,
+.ac-mo__mark > svg {
+  width: 82px;
+  height: 82px;
+}
 .ac-mo__mark > .ac-avatar {
-  width: 64px;
-  height: 64px;
-  font-size: 24px;
+  font-size: 30px;
 }
 .ac-mo__titles {
   min-width: 0;
@@ -7062,6 +7067,13 @@ label.ac-setrow__title {
   .ac-mo__title {
     font-size: 36px;
     line-height: 40px;
+  }
+  .ac-mo__mark,
+  .ac-mo__mark > .ac-avatar,
+  .ac-mo__mark > img,
+  .ac-mo__mark > svg {
+    width: 70px;
+    height: 70px;
   }
 }
 .ac-mo__group > hr.ac-menu__separator {

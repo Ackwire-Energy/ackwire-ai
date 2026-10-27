@@ -72,6 +72,7 @@ pub fn show(app: &AppHandle, min: Duration) {
         let _ = cover.eval("window.__coverShown?.()");
     }
     let _ = cover.show();
+    main_window::keep_lights(app);
     // Typing goes to what shows, not to the page loading behind it.
     if window_is_key(app) {
         let _ = cover.set_focus();
@@ -110,12 +111,33 @@ pub fn hide(app: &AppHandle) {
             shown.since = None;
         }
         let _ = cover.hide();
+        // Hiding a web view lays the window out anew, the buttons back at the title bar's top.
+        main_window::keep_lights(&app);
         if window_is_key(&app) {
             if let Some(site) = app.get_webview(main_window::LABEL) {
                 let _ = site.set_focus();
             }
         }
     });
+}
+
+/// The server here answers now at the address the window opens (local_server.rs: it came up, or Tailscale
+/// shares it again). The window opens with the app, before that server is up: its first load was refused and
+/// left nothing to reload, and the cover's own checks then find the server up and wait for a page that never
+/// comes, so while the site hasn't painted, the window asks for it again.
+pub fn server_here_ready(app: &AppHandle) {
+    if lock(app).since.is_none() {
+        return; // the site painted already
+    }
+    let Some(site) = main_window::site(app) else { return };
+    let origin = site.origin().ascii_serialization();
+    if !crate::local_server::is_here(app, &origin) || !crate::local_server::answers_within(app, &origin, Duration::ZERO)
+    {
+        return;
+    }
+    if let Some(page) = app.get_webview(main_window::LABEL) {
+        let _ = page.navigate(site);
+    }
 }
 
 /// The site, once it painted its first screen (apps/web `pageReady`).
