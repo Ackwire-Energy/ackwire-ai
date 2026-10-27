@@ -2,7 +2,7 @@ import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AiChoice,
   firstAgent,
@@ -19,7 +19,6 @@ import {
 import { isPlanId, PLAN_IDS } from "@agenteschat/client/lib/plans";
 import { keyLooksValid, PROVIDERS, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Clipboard from "expo-clipboard";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -29,12 +28,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  TextInput,
   View,
 } from "react-native";
 import {
   Button,
-  fieldText,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
@@ -54,7 +51,7 @@ import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { offersKeyNow, PLAN_POLL_MS, pollsPlan } from "./logic";
 import { useAiOrg } from "./org";
-import { Note, openPage } from "./parts";
+import { Note, OpenPage, PasteField, Step, StepsCard } from "./parts";
 
 /*
  * "Conectar uma IA" on the phone (ConectarIA A · Ajustes, approved 2026-10-26): the web's content and rules
@@ -601,11 +598,15 @@ function PlanSteps({
   );
 }
 
-/** The API key's page: whose key (a radio list), where it is made, then the key; saved by its button. */
+/**
+ * The API key's page: whose key (a radio list; paid per use, straight to its maker), then the web's two numbered
+ * steps: create the key on the maker's page, paste it here. Saved by its button.
+ */
 function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const [touched, setTouched] = useState(false);
+  const [opened, setOpened] = useState(false);
   const maker = providerOf(form.provider);
   const clean = form.key.trim();
   const valid = keyLooksValid(form.provider, clean);
@@ -622,6 +623,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
       </View>
     );
   }
+  const site = maker ? new URL(`https://${maker.site}`) : null;
   return (
     <View>
       <GroupedHeader>{t("mobile.ai.whose")}</GroupedHeader>
@@ -636,83 +638,73 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
           />
         ))}
       </GroupedList>
-      {maker ? (
-        <>
-          <GroupedHeader>
-            {t(maker.masculine ? "mobile.ai.keyOfM" : "mobile.ai.keyOfF", { provider: maker.label })}
-          </GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              icon="out"
-              label={t("mobile.ai.createKey")}
-              sub={maker.site}
-              onPress={() => openPage(`https://${maker.site}`)}
+      <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
+      {maker && site ? (
+        <View style={styles.keySteps}>
+          <StepsCard>
+            <Step
+              n={1}
+              state={opened || clean ? "done" : "now"}
+              title={t("connectAi.key.create", providerGrammar(t, form.provider))}
+              hint={"plans" in maker && maker.plans ? t("connectAi.key.notPlan") : undefined}
+              side={
+                <OpenPage
+                  href={site.href}
+                  primary={!clean}
+                  label={t("aiAccounts.add.openKeys", { site: site.host })}
+                  onOpened={() => setOpened(true)}
+                />
+              }
             />
-            <View style={styles.keyField}>
-              <TextInput
+            <Step n={2} divider title={t("connectAi.key.paste")}>
+              <PasteField
                 value={form.key}
                 onChangeText={form.setKey}
+                onPasted={form.setKey}
                 onBlur={() => setTouched(true)}
+                label={t("connectAi.key.paste")}
                 placeholder={maker.placeholder}
-                placeholderTextColor={c.faint}
-                accessibilityLabel={t("connectAi.key.paste")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                spellCheck={false}
-                secureTextEntry
-                textContentType="none"
-                returnKeyType="done"
-                onSubmitEditing={() => {
+                secret
+                onSubmit={() => {
                   setTouched(true);
                   if (valid && keyButton) onSaveKey?.();
                 }}
-                style={[styles.keyInput, { color: c.ink }]}
               />
-              <Button
-                size="sm"
-                variant="secondary"
-                label={t("aiAccounts.add.paste")}
-                onPress={() =>
-                  void Clipboard.getStringAsync().then((v) => {
-                    if (v.trim()) form.setKey(v.trim());
-                  })
-                }
-              />
-            </View>
-          </GroupedList>
-          {wrong ? (
-            <View style={styles.foot}>
-              <Text variant="footnote" tone="danger" accessibilityLiveRegion="polite">
-                {t(`onboarding.keyInvalid.${form.provider}`)}
-              </Text>
-              {others.length > 0 ? (
+              {wrong ? (
                 <View style={styles.others}>
-                  <Text variant="footnote" tone="faint">
-                    {t("onboarding.keyFromOther")}
+                  <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+                    {t(`onboarding.keyInvalid.${form.provider}`)}
                   </Text>
-                  {others.map((p) => (
-                    <Pressable
-                      key={p.id}
-                      onPress={() => form.setProvider(p.id)}
-                      accessibilityRole="button"
-                      style={[styles.other, { backgroundColor: c.chip }]}
-                    >
-                      <ProviderLogo id={p.id} size="xs" />
-                      <Text variant="footnote" tone="ink" style={styles.bold}>
-                        {p.label}
+                  {others.length > 0 ? (
+                    <>
+                      <Text variant="small" tone="faint">
+                        {t("onboarding.keyFromOther")}
                       </Text>
-                    </Pressable>
-                  ))}
+                      {others.map((p) => (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => form.setProvider(p.id)}
+                          accessibilityRole="button"
+                          style={[styles.other, { backgroundColor: c.chip }]}
+                        >
+                          <ProviderLogo id={p.id} size="xs" />
+                          <Text variant="footnote" tone="ink" style={styles.bold}>
+                            {p.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </>
+                  ) : null}
                 </View>
               ) : null}
-            </View>
-          ) : form.failed ? (
-            <GroupedFooter>{t("mobile.ai.failed")}</GroupedFooter>
+            </Step>
+          </StepsCard>
+          {form.failed ? (
+            <Note icon="x" live>
+              {t("mobile.ai.failed")}
+            </Note>
           ) : (
-            <GroupedFooter>
-              {"plans" in maker && maker.plans ? t("connectAi.key.notPlan") : t("connectAi.key.forAll")}
-            </GroupedFooter>
+            <Note icon="info">{t("connectAi.key.forAll")}</Note>
           )}
           {keyButton ? (
             <View style={styles.save}>
@@ -725,7 +717,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               />
             </View>
           ) : null}
-        </>
+        </View>
       ) : null}
     </View>
   );
@@ -741,10 +733,8 @@ const styles = StyleSheet.create({
   hero: { alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 4 },
   done: { alignItems: "center", gap: 12, paddingVertical: 28, paddingHorizontal: 10 },
   info: { borderRadius: 14, padding: 14, gap: 10 },
-  keyField: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52, paddingLeft: 14, paddingRight: 8 },
-  keyInput: { flex: 1, minWidth: 0, paddingVertical: 12, ...fieldText("body") },
-  foot: { paddingTop: 7, paddingHorizontal: 16, gap: 8 },
-  others: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  keySteps: { marginTop: 16, gap: 10 },
+  others: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 },
   other: {
     flexDirection: "row",
     alignItems: "center",
@@ -753,5 +743,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
   },
-  save: { marginTop: 16 },
+  save: { marginTop: 6 },
 });

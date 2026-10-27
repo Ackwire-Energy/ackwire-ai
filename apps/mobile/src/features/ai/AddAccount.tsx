@@ -13,7 +13,7 @@ import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { Button, fieldText, Text, useTheme } from "@/ui";
 import { useAiOrg } from "./org";
-import { Note, OpenPage, openPage, Step, StepsCard, StepText, Waiting } from "./parts";
+import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waiting } from "./parts";
 
 /*
  * "Adicionar conta" as on the web (ADR 0041 §2, ADR 0059): the computer starts the provider's own sign-in and its
@@ -165,9 +165,7 @@ function AddAccountFlow({
     }
   };
 
-  const paste = async () => {
-    const text = (await Clipboard.getStringAsync().catch(() => "")).trim();
-    if (!text) return;
+  const pasted = (text: string) => {
     setCode(text);
     setSendFailed(false);
     if (!plan && login && isSignInCode(text, login.url)) void send(text);
@@ -182,38 +180,22 @@ function AddAccountFlow({
   const waiting = <Waiting label={t("agentPage.work.brain.add.waiting")} />;
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
-      <View style={[styles.inset, { backgroundColor: c.sunken, borderColor: c.line }]}>
-        <TextInput
-          value={code}
-          onChangeText={(v) => {
-            setCode(v);
-            setSendFailed(false);
-          }}
-          placeholder={placeholder}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={label}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          spellCheck={false}
-          secureTextEntry={secret}
-          textContentType="none"
-          editable={!sent}
-          returnKeyType="send"
-          onSubmitEditing={() => {
-            if (valid && ready && !loading) void send();
-          }}
-          style={[styles.insetInput, { color: c.ink }]}
-        />
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="copy"
-          label={t("aiAccounts.add.paste")}
-          disabled={sent}
-          onPress={() => void paste()}
-        />
-      </View>
+      <PasteField
+        value={code}
+        onChangeText={(v) => {
+          setCode(v);
+          setSendFailed(false);
+        }}
+        onPasted={pasted}
+        label={label}
+        placeholder={placeholder}
+        secret={secret}
+        disabled={sent}
+        returnKeyType="send"
+        onSubmit={() => {
+          if (valid && ready && !loading) void send();
+        }}
+      />
       <View style={styles.send}>
         <Button
           variant="primary"
@@ -431,18 +413,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     ...fieldText("callout"),
   },
-  inset: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 46,
-    marginTop: 6,
-    paddingLeft: 12,
-    paddingRight: 5,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  insetInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("callout") },
   send: { marginTop: 10 },
   code: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginVertical: 4 },
   codeText: { fontWeight: "700", letterSpacing: 2 },
