@@ -241,4 +241,35 @@ describe("Contas de IA: a plan with a login per agent", () => {
     // Each took it: the dialog closes.
     expect(screen().queryByRole("dialog")).toBeNull();
   });
+
+  test("Replace the key, one login failing: Try again sends the key only to that login", async () => {
+    const { state, api, rows } = await page(LOGINS);
+    const machines = fakeMachinesOf.get(api);
+    const [ada, theo, lia] = LOGINS as [Row, Row, Row];
+    machines?.endLogin("login_1", { state: "done", account: ada });
+    machines?.endLogin("login_2", { state: "done", account: theo });
+    machines?.endLogin("login_3", { state: "failed" });
+    machines?.endLogin("login_4", { state: "done", account: lia });
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Trocar a chave" }));
+    const dialog = screen().getByRole("dialog", { name: "GLM Coding" });
+    const send = async () => {
+      await act(async () =>
+        fireEvent.change(within(dialog).getByLabelText("Chave do GLM Coding"), {
+          target: { value: "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp" },
+        }),
+      );
+      await click(within(dialog).getByRole("button", { name: "Enviar ao MacBook" }));
+      await settle(12);
+    };
+    await send();
+    await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
+    await send();
+    expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin").map((c) => c.args[3])).toEqual([
+      { accountId: "acct_ada", provider: "zai" },
+      { accountId: "acct_theo", provider: "zai" },
+      { accountId: "acct_lia", provider: "zai" },
+      { accountId: "acct_lia", provider: "zai" },
+    ]);
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
 });

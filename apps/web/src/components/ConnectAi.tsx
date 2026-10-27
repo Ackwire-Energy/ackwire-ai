@@ -160,9 +160,12 @@ function ConnectAiDialog({
   const setOf = (c: AiChoice) => (c === "key" ? [] : allAgents({ choice: c, agents, aiOf, machineOf }));
   // Only a pick is kept; else whom it's for is worked out on each render (a link opens this before the agents load).
   const [pickedTarget, setPickedTarget] = useState<string>();
+  // Held once a sign-in starts (`onStart`): every move it makes gives an agent an AI, which would move the default.
+  const [heldReader, setHeldReader] = useState<string>();
   const aimed = { agents, hasAi, asked: request.agentId, picked: pickedTarget };
   // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
-  const gates = usePlanGates(org.id, defaultTarget({ ...aimed, set: [] }));
+  const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
+  const gates = usePlanGates(org.id, reader);
   const [picked, setPicked] = useState<AiChoice | null>(null);
   const choice =
     picked ??
@@ -236,8 +239,10 @@ function ConnectAiDialog({
             choice={choice}
             onPick={(next) => {
               setPicked(next);
+              if (next === choice) return;
+              setHeldReader(undefined);
               // Another plan moves on to whoever still has no AI once this one's agents think with a plan from here.
-              if (next !== "key" && next !== choice && Object.keys(linked).length > 0)
+              if (next !== "key" && Object.keys(linked).length > 0)
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
             dims={(c) => agents.length > 0 && gateDims(gates.gateOf(c))}
@@ -260,7 +265,14 @@ function ConnectAiDialog({
                   agents={agents}
                   all={all}
                   target={target}
-                  onTarget={setPickedTarget}
+                  onTarget={(next) => {
+                    setPickedTarget(next);
+                    setHeldReader(undefined);
+                  }}
+                  onStart={() => {
+                    setPickedTarget(target);
+                    setHeldReader(reader);
+                  }}
                   locked={locked}
                   onKey={() => setPicked("key")}
                   onComputer={() => {

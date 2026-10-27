@@ -195,6 +195,11 @@ export interface PlanPanelProps {
   onComputer: () => void;
   /** These agents think with the plan now: the account they signed in (null: the computer's own sign-in). */
   onDone: (agentIds: string[], account: MachineAccount | null) => void;
+  /**
+   * A key or a code went to the computer, or an agent is being moved onto the plan: whom the panel is for, and whose
+   * computer it reads, must hold from here, though the agents it moves get an AI meanwhile.
+   */
+  onStart?: () => void;
 }
 
 /** A plan's panel: what it covers and for whom, its steps or what they wait for, then who the agents answer. */
@@ -281,6 +286,7 @@ function PlanSteps({
   onKey,
   onComputer,
   onDone,
+  onStart,
 }: PlanPanelProps & {
   forWhom: PlanSetAgent[];
   /** The agent it's for, or the first of "All agents". */
@@ -306,6 +312,8 @@ function PlanSteps({
   const [saving, setSaving] = useState(0);
   const [failed, setFailed] = useState<{ agentId: string; account: MachineAccount } | null>(null);
   const [sent, setSent] = useState(false);
+  // Of "All agents", those whose login ended without signing in: none runs for them until the key goes again.
+  const [missed, setMissed] = useState<string[]>([]);
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
   // It turns ready while the person watches, or they came because it did: said in place, and again on a way back.
@@ -331,6 +339,7 @@ function PlanSteps({
   };
   // A sign-in ended: its agent thinks with that account right away (no confirming click).
   const assign = async (agentId: string, a: MachineAccount) => {
+    onStart?.();
     setFailed(null);
     setSaving((n) => n + 1);
     try {
@@ -388,7 +397,8 @@ function PlanSteps({
   );
 
   if (gates.failed) return <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>;
-  if (allDone) {
+  // Done, or nothing to do: every agent of "All agents" already thought with this plan.
+  if (allDone || (everyone && todo.length === 0)) {
     return (
       <>
         <SettingNote icon="check" live>
@@ -398,7 +408,7 @@ function PlanSteps({
                   forWhom.map((a) => a.name),
                   t("newAgent.and"),
                 ),
-                label: account?.label ?? "",
+                label: account?.label ?? brand,
               })
             : t("aiAccounts.done.savedAgent", { agent: agent.name, label: account?.label ?? "" })}
         </SettingNote>
@@ -544,7 +554,7 @@ function PlanSteps({
   const turn = everyone && !coding ? todo.find((a) => !assigned[a.id]) : undefined;
   const sameAs = Object.values(assigned).find((a) => a.email)?.email ?? undefined;
   const stateOf = (a: PlanSetAgent) =>
-    a.done || assigned[a.id] ? "done" : (coding ? sent : a.id === turn?.id) ? "now" : "next";
+    a.done || assigned[a.id] ? "done" : !missed.includes(a.id) && (coding ? sent : a.id === turn?.id) ? "now" : "next";
   return (
     <>
       {wait}
@@ -621,7 +631,12 @@ function PlanSteps({
           privacy={false}
           {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
           {...(everyone && coding ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
-          onSent={() => setSent(true)}
+          onSent={() => {
+            setSent(true);
+            setMissed([]);
+            onStart?.();
+          }}
+          onFailed={(id) => setMissed((m) => [...m, id])}
           onAdded={(a, id) => void assign(id ?? turn?.id ?? agent.id, a)}
         />
       )}

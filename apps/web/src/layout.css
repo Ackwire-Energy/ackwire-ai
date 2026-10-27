@@ -10061,6 +10061,20 @@ html[data-menu-overlay] .shell {
   flex: 1 1 240px;
   margin: 0;
 }
+/* Its two actions (the wrong account's): one under the other when they don't fit, and a long email ends in "…"
+   (the note above says it whole). */
+.ai-panel__row > .ac-acts {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  min-width: 0;
+}
+.ai-panel__row > .ac-acts > .ac-btn {
+  max-width: 100%;
+}
+.ai-panel__use {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @media (max-width: 640px) {
   .ai-panel__agent {
     flex-basis: 100%;

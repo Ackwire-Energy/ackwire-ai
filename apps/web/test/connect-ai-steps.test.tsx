@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, AiComputer, ComputerSetup, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AgentBrainLine, AiComputer, ComputerSetup, MachineAccount } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { LOGIN_PER_AGENT } from "@agenteschat/client/lib/plans";
 import { icons } from "@agenteschat/ui";
@@ -120,6 +120,30 @@ async function connect({
 }
 
 const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
+
+/**
+ * As the server answers a move: the agent's row says what it thinks with and the AI status says it's ready, so the
+ * agents a panel would open on by default change while it signs them in.
+ */
+function serverMoves(
+  state: ReturnType<typeof seedState>,
+  api: ReturnType<typeof createFakeApi>,
+  brain: AgentBrainLine,
+) {
+  const setBrain = api.agents.setBrain;
+  api.agents.setBrain = async (orgId, agentId, input) => {
+    const view = await setBrain(orgId, agentId, input);
+    const row = state.agents.find((a) => a.id === agentId);
+    if (row) row.brain = brain;
+    state.aiStatus = {
+      any: true,
+      agents: (state.aiStatus?.agents ?? []).map((a) => (a.agentId === agentId ? { agentId, state: "ready" } : a)),
+    };
+    return view;
+  };
+}
+const GLM: AgentBrainLine = { kind: "claude_code", model: null, provider: "zai" };
+const GLM_KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
 
 const LIA_ID = "00000000-0000-4000-8000-0000000000a3";
 /** Whether an icon is drawn as `name` (its shape's first path). */
@@ -775,6 +799,86 @@ describe("All agents: one plan for the team, a login per agent", () => {
     ]);
     await click(within(dialog).getByRole("button", { name: "Fechar" }));
     expect(calls(state, "machines.cancelAccountLogin").map((c) => c.args[2])).toEqual(["login_2", "login_3"]);
+  });
+
+  test("GLM for all as the server moves each agent: whom it's for and its steps hold while the logins land a poll apart", async () => {
+    const { state, api, machines, dialog, tile, services } = await connect({ crew: true });
+    serverMoves(state, api, GLM);
+    const land = (n: number) =>
+      machines?.endLogin(`login_${n}`, { state: "done", account: account({ id: `acct_${n}` }) });
+    land(1);
+    await click(tile("GLM Coding"));
+    const panel = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    const forWhom = () => within(panel).getByRole("combobox").textContent;
+    const who = () => [...panel.querySelectorAll(".ai-panel__who > li")].map((li) => li.getAttribute("data-state"));
+    await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
+    await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
+    await settle(12);
+    // Ada has an AI now, the first that had none: the panel stays on everyone, the key sent once.
+    expect(forWhom()).toBe("Todos os agentes");
+    expect(who()).toEqual(["done", "now", "now"]);
+    expect((within(panel).getByLabelText("Chave do GLM Coding") as HTMLInputElement).disabled).toBe(true);
+    for (const n of [2, 3]) {
+      land(n);
+      const poll = keys.accountLogin(ORG_ID, "machine_1", `login_${n}`);
+      await act(() => services.queryClient.invalidateQueries({ queryKey: poll }));
+      await settle(12);
+      expect(forWhom()).toBe("Todos os agentes");
+    }
+    expect(shownText(panel)).toContain("Ada, Atlas e Lia agora pensam com GLM Coding.");
+    expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([ADA_ID, ATLAS_ID, LIA_ID]);
+    expect(calls(state, "machines.cancelAccountLogin")).toHaveLength(0);
+  });
+
+  test("GLM for all, one login failing: that agent waits, and Try again signs in only that one", async () => {
+    const { state, api, machines, dialog, tile } = await connect({ crew: true });
+    serverMoves(state, api, GLM);
+    machines?.endLogin("login_1", { state: "done", account: account({ id: "acct_1" }) });
+    machines?.endLogin("login_2", { state: "done", account: account({ id: "acct_2" }) });
+    machines?.endLogin("login_3", { state: "failed" });
+    await click(tile("GLM Coding"));
+    const panel = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    const who = () => [...panel.querySelectorAll(".ai-panel__who > li")].map((li) => li.getAttribute("data-state"));
+    const send = async () => {
+      await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
+      await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
+      await settle(12);
+    };
+    await send();
+    expect(shownText(panel)).toContain("Não deu para entrar nessa conta. Tente de novo.");
+    // Lia's login ended without her: nothing signs her in until the key goes again.
+    expect(who()).toEqual(["done", "done", "next"]);
+    machines?.endLogin("login_4", { state: "done", account: account({ id: "acct_4" }) });
+    await click(within(panel).getByRole("button", { name: "Tentar de novo" }));
+    await send();
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(4);
+    expect(calls(state, "agents.setBrain").map((c) => [c.args[1], (c.args[2] as { account: string }).account])).toEqual(
+      [
+        [ADA_ID, "acct_1"],
+        [ATLAS_ID, "acct_2"],
+        [LIA_ID, "acct_4"],
+      ],
+    );
+    expect(shownText(panel)).toContain("Ada, Atlas e Lia agora pensam com GLM Coding.");
+  });
+
+  test("every agent already on the plan: All agents says so, with no key to send", async () => {
+    const { state, dialog, tile, services } = await connect({ crew: true });
+    const crew = [ADA_ID, ATLAS_ID, LIA_ID];
+    for (const a of state.agents) if (crew.includes(a.id)) a.brain = GLM;
+    state.aiStatus = { any: true, agents: crew.map((agentId) => ({ agentId, state: "ready" })) };
+    await act(async () => {
+      await services.queryClient.invalidateQueries({ queryKey: keys.agents(ORG_ID) });
+      await services.queryClient.invalidateQueries({ queryKey: keys.aiStatus(ORG_ID) });
+    });
+    await settle(4);
+    await click(tile("GLM Coding"));
+    const panel = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    await click((await openFor(panel))[0] as HTMLElement);
+    expect(within(panel).getByRole("combobox").textContent).toBe("Todos os agentes");
+    expect(shownText(panel)).toContain("Ada, Atlas e Lia agora pensam com GLM Coding.");
+    expect(within(panel).queryByLabelText("Chave do GLM Coding")).toBeNull();
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(0);
   });
 
   test("ChatGPT for all, once one login per agent holds: one sign-in at a time, the who row ticking", async () => {

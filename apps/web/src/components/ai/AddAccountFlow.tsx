@@ -64,12 +64,28 @@ export interface AddAccountProps {
   onAdded: (account: MachineAccount, target?: string) => void;
   /** The code or the key went to the computer. */
   onSent?: () => void;
+  /** A `fanOut` target's login ended without signing in (failed or expired). */
+  onFailed?: (target: string) => void;
 }
 
 export function AddAccount(props: AddAccountProps) {
-  // "Tentar de novo" starts over with a new sign-in.
+  // "Tentar de novo" starts over with a new sign-in: of a `fanOut`, only for the targets that didn't sign in, so no
+  // login is left on the computer with none to think for.
   const [attempt, setAttempt] = useState(0);
-  return <AddAccountFlow key={attempt} {...props} onRetry={() => setAttempt((n) => n + 1)} />;
+  const [signedIn, setSignedIn] = useState<string[]>([]);
+  const { fanOut, onAdded } = props;
+  return (
+    <AddAccountFlow
+      key={attempt}
+      {...props}
+      {...(fanOut ? { fanOut: fanOut.filter((x) => !signedIn.includes(x.id)) } : {})}
+      onAdded={(account, target) => {
+        if (target) setSignedIn((s) => [...s, target]);
+        onAdded(account, target);
+      }}
+      onRetry={() => setAttempt((n) => n + 1)}
+    />
+  );
 }
 
 /** A numbered step: its number on the title's line, the text under it, its button at the side. */
@@ -160,6 +176,7 @@ function AddAccountFlow({
   onBack,
   onAdded,
   onSent,
+  onFailed,
   onRetry,
 }: AddAccountProps & { onRetry: () => void }) {
   const { t } = useTranslation();
@@ -260,9 +277,12 @@ function AddAccountFlow({
     if (fanEnded.current.has(loginId)) return;
     fanEnded.current.add(loginId);
     running.current = running.current.filter((r) => r.loginId !== loginId);
-    if (end.state === "done" && end.account)
-      onAdded(end.account, fanned.current.find((f) => f.loginId === loginId)?.id);
-    else setFanFailed((first) => first ?? end);
+    const target = fanned.current.find((f) => f.loginId === loginId)?.id;
+    if (end.state === "done" && end.account) onAdded(end.account, target);
+    else {
+      setFanFailed((first) => first ?? end);
+      if (target) onFailed?.(target);
+    }
   };
 
   const shown = fanFailed ?? result;
@@ -599,7 +619,7 @@ function AddAccountFlow({
               {t("common.retry")}
             </Button>
             <Button size="sm" onClick={() => onAdded(other)}>
-              {t("connectAi.useAnyway", { email: other.email })}
+              <span className="ai-panel__use">{t("connectAi.useAnyway", { email: other.email })}</span>
             </Button>
           </span>
         </div>
