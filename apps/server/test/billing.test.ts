@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { browser, createTestServer, joinByInvitation, signUp, type TestServer } from "./harness";
+import { setOrgLimits } from "@agenteschat/engine";
+import { type Browser, browser, createTestServer, joinByInvitation, signUp, type TestServer } from "./harness";
 
 let t: TestServer | undefined;
 afterEach(async () => {
@@ -70,5 +71,40 @@ describe("the billing link", () => {
     const again = await owner("/api/app/organizations", { json: { name: "Beta" } });
     expect(again.status).toBe(403);
     expect(await again.json()).toMatchObject({ error: { code: "org.create_unpaid", params: { orgId } } });
+  });
+});
+
+describe("the workspace's limits", () => {
+  test("any member reads people, files and today's uploads against them; a full workspace invites nobody", async () => {
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const { owner, orgId } = await ownerWithWorkspace(t);
+    const member = await joinByInvitation(t, owner, orgId, "member@example.com");
+    const read = async (who: Browser) => {
+      const res = await who(`/api/app/organizations/${orgId}/limits`);
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+    expect(await read(member)).toEqual({
+      members: { used: 2, limit: null },
+      storage: { usedBytes: 0, limitBytes: null, ownStorage: false },
+      uploads: { usedBytes24h: 0, limitBytesPerDay: null },
+    });
+    await setOrgLimits(t.db, orgId, { members: 2, storageBytes: 1000, uploadBytesPerDay: 500, platformUsdPerMonth: 3 });
+    expect(await read(owner)).toEqual({
+      members: { used: 2, limit: 2 },
+      storage: { usedBytes: 0, limitBytes: 1000, ownStorage: false },
+      uploads: { usedBytes24h: 0, limitBytesPerDay: 500 },
+    });
+    const stranger = browser(t);
+    await signUp(stranger, "eve@example.com");
+    expect((await stranger(`/api/app/organizations/${orgId}/limits`)).status).toBe(403);
+
+    const invited = await owner(`/api/app/organizations/${orgId}/invitations`, {
+      json: { email: "new@example.com", role: "member" },
+    });
+    expect(invited.status).toBe(409);
+    expect(await invited.json()).toMatchObject({
+      error: { code: "org.members_full", params: { members: 2, limit: 2 } },
+    });
   });
 });

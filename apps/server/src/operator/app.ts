@@ -6,6 +6,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
 import { registerOperatorEvents } from "./events";
+import { registerOperatorLimits } from "./limits";
 import { registerOperatorMachines } from "./machines";
 import { registerOperatorOrgs } from "./orgs";
 import { registerOperatorStanding } from "./standing";
@@ -47,6 +48,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
   });
   registerOperatorOrgs(api, deps);
   registerOperatorStanding(api, deps);
+  registerOperatorLimits(api, deps);
   registerOperatorEvents(api, deps);
   registerOperatorMachines(api, deps);
   api.doc31("/openapi.json", {
@@ -55,7 +57,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, billing holds and limits, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056, ADR 0071).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

@@ -1,4 +1,4 @@
-import { BILLING_FROM, mintBillingLink } from "@agenteschat/engine";
+import { BILLING_FROM, mintBillingLink, orgLimitsView } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError } from "../../http/errors";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -6,8 +6,8 @@ import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSe
 const tags = ["Billing"];
 
 /**
- * The workspace's way to the billing service (ADR 0071): this server knows no plan, price or currency, only a
- * link that opens the service signed in as the person asking.
+ * The workspace's way to the billing service, and its limits (ADR 0071): this server knows no plan, price or
+ * currency, only a link that opens the service signed in as the person asking and the numbers the service set.
  */
 export function billingRoutes(deps: AppDeps) {
   const { db, config } = deps;
@@ -47,6 +47,40 @@ export function billingRoutes(deps: AppDeps) {
       });
       return c.json({ url: link.url, expiresAt: link.expiresAt.toISOString() }, 200);
     },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/limits",
+      tags,
+      security,
+      summary: "People, files and today's uploads against the workspace's limits",
+      description:
+        "Any member. A limit null: none (a self-hosted server never sets any). `storage.ownStorage`: new files go to the workspace's own bucket, which no limit counts.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            members: z.object({ used: z.number().int(), limit: z.number().int().nullable() }),
+            storage: z.object({
+              usedBytes: z
+                .number()
+                .int()
+                .openapi({ description: "Files on this server's storage, the trash left out." }),
+              limitBytes: z.number().int().nullable(),
+              ownStorage: z.boolean(),
+            }),
+            uploads: z.object({
+              usedBytes24h: z.number().int().openapi({ description: "Written to this server's storage in 24 hours." }),
+              limitBytesPerDay: z.number().int().nullable(),
+            }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await orgLimitsView(db, c.get("user").id, c.req.valid("param").orgId), 200),
   );
 
   return app;

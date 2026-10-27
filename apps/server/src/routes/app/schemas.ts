@@ -275,6 +275,9 @@ const MessageBase = z.object({
         .literal(true)
         .optional()
         .openapi({ description: "Routed to nobody: the organization had no AI connected." }),
+      platformCap: z.literal(true).optional().openapi({
+        description: "Routed to nobody: the workspace used up its platform AI for the month; @mentions still answer.",
+      }),
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),

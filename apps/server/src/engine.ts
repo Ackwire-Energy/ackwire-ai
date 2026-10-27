@@ -61,6 +61,7 @@ import {
   messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
+  platformCapJudge,
   prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
@@ -153,18 +154,22 @@ export function buildEngine(o: EngineOptions) {
     },
   };
   // Semantic judgments (stop requests, hand-offs, permission changes): Jev when its platform key is
-  // set, with the org's cheap model as fallback; the cheap model alone otherwise.
+  // set, with the org's cheap model as fallback (also past a workspace's platform AI for the month, ADR 0071);
+  // the cheap model alone otherwise.
   if (!context.judge) {
     const llmJudge = createLlmJudge({ gateway, resolveModel: (orgId) => resolveSummaryModel(context, orgId) });
     context.judge = config.TYPESAFE_API_KEY
       ? withJudgeFallback(
-          createJevJudge({
-            apiKey: config.TYPESAFE_API_KEY,
-            gateway,
-            timeoutMs: config.JEV_TIMEOUT_MS,
-            visionModel: config.JEV_VISION_MODEL,
-            fetch: o.jevFetch,
-          }),
+          platformCapJudge(
+            db,
+            createJevJudge({
+              apiKey: config.TYPESAFE_API_KEY,
+              gateway,
+              timeoutMs: config.JEV_TIMEOUT_MS,
+              visionModel: config.JEV_VISION_MODEL,
+              fetch: o.jevFetch,
+            }),
+          ),
           llmJudge,
         )
       : llmJudge;
