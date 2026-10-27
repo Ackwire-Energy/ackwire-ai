@@ -5277,7 +5277,7 @@ button.ac-tools__row:focus-visible {
   border-radius: var(--radius-item);
   background: var(--card-well, var(--sunken));
   box-shadow: inset 0 0 0 1px var(--line);
-  font: 12px/1.55 var(--font-mono, ui-monospace, monospace);
+  font: 12px / 1.55 var(--font-mono, ui-monospace, monospace);
   color: var(--muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
