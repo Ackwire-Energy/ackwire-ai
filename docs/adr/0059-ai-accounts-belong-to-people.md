@@ -34,6 +34,8 @@ People also asked for more providers than Anthropic and OpenAI (DeepSeek, Kimi, 
 
 *Amended 2026-10-27:* one login (a row and its folder) still serves at most one agent, and an account may have one login per agent where `LOGIN_PER_AGENT` (`packages/providers/src/plans.ts`) allows it. "All agents" then signs each agent in with the same account, back to back, and a coding plan's key is pasted once and sealed to each login. The coding plans allow it now: a key has no refresh token, so its copies never sign each other out, and several agents of one person are still one user of the plan. Claude's and ChatGPT's sign-ins stay one agent per account until several sign-ins of one account are seen to hold through their refreshes. Users report that a new Claude sign-in can sign the account's other sign-ins out (anthropics/claude-code #20310, #40419, #80292), and OpenAI documents one `auth.json` per runner or serialized job stream. Each turns on by flipping its value.
 
+The plan's panel says whom it is for ("For [All agents ▾]"). "All agents" means the person's agents with no AI on one computer, and those already on that plan. An agent on the API key stays out, since a plan would make it answer only its owner, and one on another plan keeps it. The setup opens on "All agents" where the plan allows it. Elsewhere the panel opens on the agent it was opened for, else on "All agents" while two or more have no AI, else on the first with no AI. One key fanned out to many agents counts each login against the ten sign-ins a person starts per computer every 15 minutes.
+
 ### 3. A plan only serves its owner's agents
 
 A personal plan thinks only for agents owned by the plan's owner. This is checked when an account is chosen, when an agent changes owner (the plan is cleared), when an account goes away (the agent goes back to the API, or waits with no AI), and at run time (`plan_not_owner`, which also covers an owner who left). Runs never slip onto someone else's plan.
@@ -52,6 +54,8 @@ Automatic names are the maker and the plan, numbered per owner: "Claude Max", "C
 - With sharing on, anyone who can talk to the agent can make it use the owner's plan and, on a computer where agents share one OS user, reach its sign-in.
 
 *Amended 2026-10-27:* where the server provisions the workspaces' computers (`MACHINE_PROVISIONING=external`, the Cloud), the service runs the plans' CLIs for its customers, and the providers' conditions for platforms that do want each person on their own plan ("Each end user must authenticate with their own Anthropic API key, Claude subscription plan credentials, or 3P inference provider credential", code.claude.com/docs/en/legal-and-compliance). There an agent on a plan answers only its owner whatever its stored audience, and nobody can widen it (`plan.personal`). An agent shared before narrows, and answers its stored audience again once it moves to the API key. A self-host keeps the switch and the warning: whoever runs it carries the terms.
+
+The apps say it where it matters. The plan's panel ends with who the agents answer ("On your plan, Ada only replies to you."). Where every agent with an AI answers only the person setting up, the setup's Team step says so before anyone is invited, since someone invited then has no agent to talk to. On the Cloud the agent's page shows "Only replies to you" as a fixed line, with no switch.
 
 ### 6. The sign-in code never passes through our servers in the clear
 
