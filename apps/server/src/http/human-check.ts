@@ -40,7 +40,7 @@ export async function checkHumanCheckAtBoot(check: HumanCheck | null | undefined
     log.error("bot check: Cloudflare can't be reached, requests go through until it answers");
   else if (check.status().testing)
     log.warn(
-      "bot check: TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets, so every token passes. Anywhere but a test server, copy the widget's secret key from Cloudflare's dashboard.",
+      "bot check: TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets. They refuse real tokens, so people can't pass, and the one that passes takes a public dummy token from anyone. Anywhere but a test server, copy the widget's secret key from Cloudflare's dashboard.",
     );
   else log.info("bot check on (Cloudflare Turnstile)");
 }
