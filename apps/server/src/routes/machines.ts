@@ -1,3 +1,4 @@
+import { limitIp } from "@agenteschat/adapters";
 import {
   ARTIFACT_LIMITS,
   authenticateMachine,
@@ -29,7 +30,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { installScript } from "../../runner/install-script";
-import { limitIp, requestIp, requestLimitIp } from "../http/client-ip";
+import { requestIp, requestLimitIp } from "../http/client-ip";
 import { apiError, domainErrorResponse, errorResponse } from "../http/errors";
 import {
   type AppDeps,

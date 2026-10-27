@@ -67,7 +67,8 @@ test("Cloudflare's test keys pass on any host; a real answer passes only for its
   expect(await check.verify(TOKEN, "sign-in", "203.0.113.7")).toBe("human_check");
   answer = { success: true, hostname: "agentes.chat.evil.example", action: "sign-up" };
   expect(await check.verify(TOKEN, "sign-up", "203.0.113.7")).toBe("human_check");
-  expect(check.status().state).toBe("ok");
+  // Three tokens passed. The last answers carry no test secret's mark, so `testing` is off.
+  expect(check.status()).toMatchObject({ state: "ok", passed: 3, testing: false });
 });
 
 test("a token Cloudflare refuses (wrong, expired or already spent): human_check", async () => {
@@ -128,30 +129,51 @@ test("a page that couldn't make a token: blocked while Cloudflare answers us, th
     [TURNSTILE_VERIFY_URL, TOKEN],
     [TURNSTILE_SCRIPT_URL, undefined],
   ]);
-  expect(check.status()).toMatchObject({ state: "ok", blocked: 2 });
+  expect(check.status()).toMatchObject({ state: "ok", blocked: 1, passed: 0 });
   expect(logs).toEqual([]);
 
   // The widget's script stops loading from here too: a minute after the last probe, Cloudflare is asked again.
   up = false;
   advance(59_000);
-  expect(await check.verify("unavailable", "sign-in", "203.0.113.7")).toBe("human_check_blocked");
+  expect(await check.verify("unavailable", "sign-in", "198.51.100.9")).toBe("human_check_blocked");
   advance(1_000);
-  expect(await check.verify("unavailable", "sign-in", "203.0.113.7")).toBeNull();
-  expect(check.status()).toMatchObject({ state: "unreachable", blocked: 3 });
+  expect(await check.verify("unavailable", "sign-in", "203.0.113.8")).toBeNull();
+  expect(check.status()).toMatchObject({ state: "unreachable", blocked: 2 });
   expect(logs.map((l) => l.data)).toEqual([{ reason: "unreachable", action: "sign-in" }]);
 
-  // Counted for 10 minutes.
-  advance(10 * 60_000);
+  // Counted for 10 minutes after each network's last refusal.
+  advance(9 * 60_000);
+  expect(check.status().blocked).toBe(1);
+  advance(60_000);
   expect(check.status().blocked).toBe(0);
 });
 
-test("a site key Turnstile refuses shows as pages' unavailable codes, logged", async () => {
-  const { check, logs } = setup(() => json({ success: false, "error-codes": ["invalid-input-response"] }));
+test("blocked counts networks, an IPv6 one by its /64, so one client claiming its page couldn't load the check counts once", async () => {
+  const { check, advance } = setup(() => json({ success: false, "error-codes": ["invalid-input-response"] }));
+  for (let i = 1; i <= 30; i++) {
+    expect(await check.verify("unavailable", "email-lookup", "203.0.113.7")).toBe("human_check_blocked");
+    expect(await check.verify("unavailable", "sign-in", `2001:db8:1:2::${i.toString(16)}`)).toBe("human_check_blocked");
+  }
+  expect(check.status().blocked).toBe(2);
+  expect(await check.verify("unavailable", "sign-in", "2001:db8:1:3::1")).toBe("human_check_blocked");
+  expect(check.status().blocked).toBe(3);
+  // A network asking again stays counted 10 minutes from then.
+  advance(9 * 60_000);
+  expect(await check.verify("unavailable", "sign-in", "203.0.113.7")).toBe("human_check_blocked");
+  advance(60_000);
+  expect(check.status().blocked).toBe(1);
+});
+
+test("a site key Turnstile refuses shows as pages' unavailable codes, logged at most once a minute", async () => {
+  const { check, logs, advance } = setup(() => json({ success: false, "error-codes": ["invalid-input-response"] }));
   for (const code of ["110100", "400020", "110200"]) {
     expect(await check.verify(`unavailable:${code}`, "waitlist", "203.0.113.7")).toBe("human_check_blocked");
   }
-  expect(logs.map((l) => l.data?.code)).toEqual(["110100", "400020", "110200"]);
+  expect(logs.map((l) => l.data?.code)).toEqual(["110100"]);
   expect(logs[0]?.message).toContain("TURNSTILE_SITE_KEY");
+  advance(60_000);
+  expect(await check.verify("unavailable:110200", "waitlist", "203.0.113.7")).toBe("human_check_blocked");
+  expect(logs.map((l) => l.data?.code)).toEqual(["110100", "110200"]);
 });
 
 test("the probe: a real secret refuses the dummy token, a wrong one is refused itself; since moves only with the state", async () => {
@@ -170,8 +192,11 @@ test("the probe: a real secret refuses the dummy token, a wrong one is refused i
   expect(await check.probe()).toBe("secret_refused");
   expect(check.status().since).toEqual(new Date(now() - 5_000));
 
+  // One of Cloudflare's test secrets passes even the dummy token: ok, and said so.
+  expect(check.status().testing).toBe(false);
   answer = () => json(TESTING);
   expect(await check.probe()).toBe("ok");
+  expect(check.status().testing).toBe(true);
 });
 
 test("while Cloudflare fails, reading the status asks again once a minute, and follows its return", async () => {

@@ -106,11 +106,15 @@ test("401 without the right bearer token, on every path under the prefix", async
   expect((await op("/nope")).status).toBe(404);
 });
 
-test("health, with the bot check: off without its keys, else its state, since when, and the pages it refused", async () => {
-  const off = await body<{ ok: boolean; version: string; botCheck: { state: string; since: string; blocked: number } }>(
+test("health, with the bot check: off without its keys, else its state, since when, the networks it refused and the tokens it passed", async () => {
+  const off = await body<{ ok: boolean; version: string; botCheck: Record<string, unknown> & { since: string } }>(
     await op("/health"),
   );
-  expect(off).toEqual({ ok: true, version: "test", botCheck: { state: "off", since: off.botCheck.since, blocked: 0 } });
+  expect(off).toEqual({
+    ok: true,
+    version: "test",
+    botCheck: { state: "off", since: off.botCheck.since, blocked: 0, passed: 0, testing: false },
+  });
   expect(off.botCheck.since).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
 
   const since = new Date("2026-10-27T12:00:00.000Z");
@@ -118,14 +122,14 @@ test("health, with the bot check: off without its keys, else its state, since wh
     siteKey: "1x00000000000000000000AA",
     verify: async () => null,
     probe: async () => "unreachable" as const,
-    status: () => ({ state: "unreachable" as const, since, blocked: 21 }),
+    status: () => ({ state: "unreachable" as const, since, blocked: 21, passed: 3, testing: false }),
   };
   const app = createOperatorApp({ ...deps, humanCheck }, TOKEN);
   const res = await app.request("/api/operator/v1/health", { headers: { authorization: BEARER } });
   expect(await body(res)).toEqual({
     ok: true,
     version: "test",
-    botCheck: { state: "unreachable", since: "2026-10-27T12:00:00.000Z", blocked: 21 },
+    botCheck: { state: "unreachable", since: "2026-10-27T12:00:00.000Z", blocked: 21, passed: 3, testing: false },
   });
 });
 

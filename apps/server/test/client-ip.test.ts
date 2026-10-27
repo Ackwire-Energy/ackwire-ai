@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
+import { limitIp } from "@agenteschat/adapters";
 import { loadConfig } from "@agenteschat/config";
-import { clientIp, limitIp } from "../src/http/client-ip";
+import { clientIp } from "../src/http/client-ip";
 
 test("a public client behind a proxy that appends its own internal hop", () => {
   expect(clientIp("203.0.113.7, 100.64.0.2", undefined, undefined)).toBe("203.0.113.7");

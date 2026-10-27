@@ -56,10 +56,19 @@
           "blocked": {
             "type": "integer",
             "minimum": 0,
-            "description": "Requests refused in the last 10 minutes because their page couldn't load the check (`human_check_blocked`)."
+            "description": "Networks refused in the last 10 minutes because their page couldn't load the check (`human_check_blocked`), each counted once: an IPv4 address, or an IPv6 /64. Any client can claim its page couldn't load it, so read it beside `passed`."
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tokens Cloudflare passed in the last 10 minutes. When the widget is down for everyone, `blocked` rises while this falls. Clients claiming it is down don't move it."
+          },
+          "testing": {
+            "type": "boolean",
+            "description": "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets, which pass every token, so nothing is really checked. Right only on a test server."
           }
         },
-        "required": ["state", "since", "blocked"],
+        "required": ["state", "since", "blocked", "passed", "testing"],
         "description": "The bot check before public forms (ADR 0075)."
       },
       "Error": {

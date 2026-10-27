@@ -1,3 +1,5 @@
+import { isIPv6 } from "node:net";
+
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
@@ -34,4 +36,23 @@ export function createMemoryRateLimiter(now: () => number = Date.now): RateLimit
       };
     },
   };
+}
+
+/**
+ * The part of an address a rate limit counts: an IPv4 address whole, an IPv6 one by its /64, which one customer
+ * usually holds whole (each of its 2^64 addresses would get a fresh count otherwise), as Better Auth counts its own.
+ */
+export function limitIp(ip: string): string {
+  const address = ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, "");
+  if (!isIPv6(address)) return address;
+  const [head = "", tail] = (address.split("%")[0] ?? "").toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  // An IPv4 tail (`64:ff9b::192.0.2.1`) takes two groups' room.
+  const room = 8 - left.length - right.reduce((n, group) => n + (group.includes(".") ? 2 : 1), 0);
+  const groups = tail === undefined ? left : [...left, ...Array<string>(room).fill("0"), ...right];
+  return `${groups
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group, 16).toString(16))
+    .join(":")}::/64`;
 }

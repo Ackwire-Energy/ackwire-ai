@@ -8,16 +8,19 @@ import { type Browser, browser, createTestServer, seedOrg, type TestServer } fro
 /** What Cloudflare's test site keys hand out, and its test secret passes. */
 const TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
-/** Cloudflare as its test secret answers: the dummy token passes on any host, anything else is refused. */
+/**
+ * Cloudflare as its test secret answers: the dummy token passes on any host, anything else is refused. Without
+ * `testSecret`, as a real secret answers the dummy token: refused.
+ */
 function cloudflare() {
-  const state = { up: true, secretRefused: false };
+  const state = { up: true, secretRefused: false, testSecret: true };
   const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     if (!state.up) throw new Error("connect ECONNREFUSED");
     if (String(input) === TURNSTILE_SCRIPT_URL) return new Response("/* api.js */");
     const { response } = JSON.parse(String(init?.body)) as { response: string };
     if (state.secretRefused) return Response.json({ success: false, "error-codes": ["invalid-input-secret"] });
     return Response.json(
-      response === TOKEN
+      response === TOKEN && state.testSecret
         ? { success: true, hostname: "example.com", metadata: { result_with_testing_key: true } }
         : { success: false, "error-codes": ["invalid-input-response"] },
     );
@@ -146,6 +149,11 @@ test("a page that couldn't make a token: blocked while Cloudflare answers this s
     error: { code: "human_check_blocked", message: "The bot check didn't load. Try another browser or network." },
   });
   expect(t.adapters.humanCheck?.status()).toMatchObject({ state: "ok", blocked: 1 });
+  // Counted once per network: two addresses of one IPv6 /64, asking twice each, are one more.
+  for (const ip of ["2001:db8:1:2::1", "2001:db8:1:2::2", "2001:db8:1:2::1", "2001:db8:1:2::2"]) {
+    expect((await ask({ "x-captcha-response": "unavailable", "x-forwarded-for": ip })).status).toBe(403);
+  }
+  expect(t.adapters.humanCheck?.status()).toMatchObject({ state: "ok", blocked: 2 });
 
   // Cloudflare goes down for this server too (probed now rather than a minute later).
   cf.state.up = false;
@@ -155,9 +163,14 @@ test("a page that couldn't make a token: blocked while Cloudflare answers this s
   expect(await codeOf(await ask(passing))).toBe("join.code_wait");
 });
 
-test("at boot, a secret Cloudflare refuses stops the server; Cloudflare out of reach doesn't", async () => {
+test("at boot, a secret Cloudflare refuses stops the server; Cloudflare out of reach doesn't, nor a test secret, which warns", async () => {
   const lines: string[] = [];
-  const log = { ...createLogger("error"), error: (m: string) => lines.push(m), info: (m: string) => lines.push(m) };
+  const log = {
+    ...createLogger("error"),
+    error: (m: string) => lines.push(m),
+    warn: (m: string) => lines.push(m),
+    info: (m: string) => lines.push(m),
+  };
   await expect(checkHumanCheckAtBoot(null, log)).resolves.toBeUndefined();
   expect(lines).toEqual([]);
 
@@ -172,8 +185,26 @@ test("at boot, a secret Cloudflare refuses stops the server; Cloudflare out of r
   await expect(checkHumanCheckAtBoot(turnstile(cf.fetch), log)).resolves.toBeUndefined();
   expect(lines.at(-1)).toContain("Cloudflare can't be reached");
   cf.state.up = true;
+  // Cloudflare's test secret passes even the dummy token: every token would pass.
+  await checkHumanCheckAtBoot(turnstile(cf.fetch), log);
+  expect(lines.at(-1)).toContain("TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets, so every token passes");
+  cf.state.testSecret = false;
   await checkHumanCheckAtBoot(turnstile(cf.fetch), log);
   expect(lines.at(-1)).toContain("bot check on");
+});
+
+test("refused bots don't spend a link's codes: a person asking through it still gets one", async () => {
+  const { token } = await start(turnstile(cloudflare().fetch));
+  const ask = (ip: string, headers: Record<string, string> = {}) =>
+    browser(t)(`/api/app/invitations/${token}/code`, {
+      json: { email: `${ip}@example.com` },
+      headers: { "x-forwarded-for": ip, ...headers },
+    });
+  // As many tokenless asks as the link allows in an hour, from 4 addresses within their own limit.
+  for (const ip of ["198.51.100.1", "198.51.100.2", "198.51.100.3", "198.51.100.4"]) {
+    for (let i = 0; i < 10; i++) expect(await codeOf(await ask(ip))).toBe("human_check");
+  }
+  expect((await ask("203.0.113.50", passing)).status).toBe(202);
 });
 
 test("an IPv6 network is one address for the limits: its /64 shares one count", async () => {

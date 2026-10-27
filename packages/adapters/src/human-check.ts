@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { limitIp } from "./rate-limiter";
 
 /**
  * A bot check before public forms (ADR 0075): Cloudflare Turnstile, on only when both of its keys are set. Pages
@@ -20,6 +21,22 @@ export type HumanCheckState = "ok" | "unreachable" | "secret_refused";
  */
 export type HumanCheckRefusal = "human_check" | "human_check_blocked";
 
+/** What the operator API's `/health` reports as `botCheck`. */
+export interface HumanCheckStatus {
+  state: HumanCheckState;
+  /** When it took this state. */
+  since: Date;
+  /**
+   * Networks refused `human_check_blocked` in the last 10 minutes, an IPv6 one by its /64. Each counts once however
+   * often it asks, since any client can claim its page couldn't make a token.
+   */
+  blocked: number;
+  /** Tokens Cloudflare passed in the last 10 minutes. A widget down for everyone makes them fall as `blocked` rises. */
+  passed: number;
+  /** The secret is one of Cloudflare's test secrets, which pass every token: nothing is really checked. */
+  testing: boolean;
+}
+
 export interface HumanCheck {
   /** The widget's site key, for pages. */
   readonly siteKey: string;
@@ -27,8 +44,7 @@ export interface HumanCheck {
   verify(token: string | null | undefined, action: HumanAction, ip: string): Promise<HumanCheckRefusal | null>;
   /** Whether Cloudflare answers and takes the secret: at boot, and again when a page couldn't make a token. */
   probe(): Promise<HumanCheckState>;
-  /** The state since it last changed, and the `human_check_blocked` answers of the last 10 minutes. */
-  status(): { state: HumanCheckState; since: Date; blocked: number };
+  status(): HumanCheckStatus;
 }
 
 export const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -42,7 +58,10 @@ const MAX_TOKEN = 2048;
 const TIMEOUT_MS = 5_000;
 /** A page's `unavailable` asks Cloudflare again once the last probe is this old. */
 const PROBE_EVERY_MS = 60_000;
-const BLOCKED_MINUTES = 10;
+/** What `status` counts over. */
+const WINDOW_MINUTES = 10;
+/** Any client can send a site-key code, so a wrong key is logged at most this often. */
+const SITE_KEY_LOG_EVERY_MS = 60_000;
 /** Turnstile's client error codes for a site key it refuses (110100, 400020) and a host it doesn't allow (110200). */
 const SITE_KEY_CODES = new Set(["110100", "400020", "110200"]);
 const SECRET_REFUSED = new Set(["missing-input-secret", "invalid-input-secret"]);
@@ -79,8 +98,12 @@ export function createTurnstileCheck(options: {
   let current: { state: HumanCheckState; since: Date } = { state: "ok", since: new Date(now()) };
   let probedAt = Number.NEGATIVE_INFINITY;
   let probing: Promise<HumanCheckState> | null = null;
-  /** `human_check_blocked` answers per minute (minutes since the epoch). */
-  const blocked = new Map<number, number>();
+  let testing = false;
+  let siteKeyLoggedAt = Number.NEGATIVE_INFINITY;
+  /** Networks refused `human_check_blocked`, with when, oldest first. */
+  const blocked = new Map<string, number>();
+  /** Tokens passed per minute (minutes since the epoch). */
+  const passed = new Map<number, number>();
 
   const become = (state: HumanCheckState) => {
     if (state !== current.state) current = { state, since: new Date(now()) };
@@ -105,7 +128,10 @@ export function createTurnstileCheck(options: {
         });
         if (res.status >= 500) continue;
         const answer = (await res.json()) as Siteverify;
-        if (!answer["error-codes"]?.includes("internal-error")) return answer;
+        if (answer["error-codes"]?.includes("internal-error")) continue;
+        // Only Cloudflare's test secrets mark their answers so.
+        testing = answer.metadata?.result_with_testing_key === true;
+        return answer;
       } catch {
         // Another try, then unreachable.
       }
@@ -143,17 +169,21 @@ export function createTurnstileCheck(options: {
     return probing;
   };
 
-  /** The last 10 minutes' count, older minutes dropped. */
-  const recentBlocked = () => {
-    const minute = Math.floor(now() / 60_000);
-    for (const key of blocked.keys()) if (key <= minute - BLOCKED_MINUTES) blocked.delete(key);
-    return { minute, count: [...blocked.values()].reduce((sum, n) => sum + n, 0) };
+  /** Drops what is older than the last 10 minutes. */
+  const prune = () => {
+    const at = now();
+    for (const [network, when] of blocked) {
+      if (when > at - WINDOW_MINUTES * 60_000) break;
+      blocked.delete(network);
+    }
+    for (const minute of passed.keys()) if (minute <= Math.floor(at / 60_000) - WINDOW_MINUTES) passed.delete(minute);
   };
 
   /** A page that couldn't make a token: through only while this server can't reach Cloudflare either. */
-  const unavailable = async (token: string, action: HumanAction): Promise<HumanCheckRefusal | null> => {
+  const unavailable = async (token: string, action: HumanAction, ip: string): Promise<HumanCheckRefusal | null> => {
     const code = token.slice(HUMAN_CHECK_UNAVAILABLE.length + 1);
-    if (SITE_KEY_CODES.has(code)) {
+    if (SITE_KEY_CODES.has(code) && now() - siteKeyLoggedAt >= SITE_KEY_LOG_EVERY_MS) {
+      siteKeyLoggedAt = now();
       logError("bot check: Turnstile refuses TURNSTILE_SITE_KEY on this page (wrong key, or a host it doesn't allow)", {
         code,
         action,
@@ -164,8 +194,11 @@ export function createTurnstileCheck(options: {
       logError("bot check unavailable, request let through", { reason: current.state, action });
       return null;
     }
-    const { minute } = recentBlocked();
-    blocked.set(minute, (blocked.get(minute) ?? 0) + 1);
+    prune();
+    const network = limitIp(ip);
+    // Deleted first, so the map stays oldest first.
+    blocked.delete(network);
+    blocked.set(network, now());
     return "human_check_blocked";
   };
 
@@ -173,7 +206,7 @@ export function createTurnstileCheck(options: {
     siteKey: options.siteKey,
     async verify(token, action, ip) {
       if (token === HUMAN_CHECK_UNAVAILABLE || token?.startsWith(`${HUMAN_CHECK_UNAVAILABLE}:`)) {
-        return unavailable(token, action);
+        return unavailable(token, action, ip);
       }
       if (!token || token.length > MAX_TOKEN) return "human_check";
       const answer = await siteverify(token, ip);
@@ -183,14 +216,20 @@ export function createTurnstileCheck(options: {
         return null;
       }
       if (!answer.success) return "human_check";
-      if (answer.metadata?.result_with_testing_key === true) return null;
-      return answer.action === action && options.hostnames.includes(answer.hostname ?? "") ? null : "human_check";
+      const ours = answer.action === action && options.hostnames.includes(answer.hostname ?? "");
+      if (!ours && answer.metadata?.result_with_testing_key !== true) return "human_check";
+      prune();
+      const minute = Math.floor(now() / 60_000);
+      passed.set(minute, (passed.get(minute) ?? 0) + 1);
+      return null;
     },
     probe,
     status() {
       // The operator API reads it often: while Cloudflare fails, a read notices its return even with no traffic.
       if (current.state !== "ok" && now() - probedAt >= PROBE_EVERY_MS) void probe();
-      return { ...current, blocked: recentBlocked().count };
+      prune();
+      const passes = [...passed.values()].reduce((sum, n) => sum + n, 0);
+      return { ...current, blocked: blocked.size, passed: passes, testing };
     },
   };
 }

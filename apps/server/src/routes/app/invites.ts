@@ -271,8 +271,7 @@ export function inviteRoutes(deps: AppDeps) {
         CODES_PER_IP,
       );
       if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
-      const link = await adapters.rateLimiter.consume(`join-code:link:${sha256(token)}`, CODES_PER_LINK);
-      if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
+      // Before the link's count, so refused bots don't spend what everyone asking through it shares.
       const refused = await humanCheckRefusal(
         adapters.humanCheck,
         c.req.raw.headers,
@@ -280,6 +279,8 @@ export function inviteRoutes(deps: AppDeps) {
         config.TRUSTED_PROXIES,
       );
       if (refused) return apiError(c, 403, refused.code, refused.message);
+      const link = await adapters.rateLimiter.consume(`join-code:link:${sha256(token)}`, CODES_PER_LINK);
+      if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
       if (adapters.email.delivers !== true) return apiError(c, 409, "join.no_email", "This server doesn't send email.");
       const { email } = c.req.valid("json");
       const user = await sessionUser(deps.auth, c.req.raw.headers);

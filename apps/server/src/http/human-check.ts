@@ -25,7 +25,8 @@ export async function humanCheckRefusal(
 
 /**
  * At boot, like a half pair of keys, a secret Cloudflare refuses stops the server (a `ConfigError`): the check
- * would otherwise let everything through unseen. Unreachable, the server starts and lets requests through.
+ * would otherwise let everything through unseen. Unreachable, the server starts and lets requests through. One of
+ * Cloudflare's test secrets starts it with a warning, since a test server runs one on purpose.
  */
 export async function checkHumanCheckAtBoot(check: HumanCheck | null | undefined, log: Logger) {
   if (!check) return;
@@ -37,5 +38,9 @@ export async function checkHumanCheckAtBoot(check: HumanCheck | null | undefined
   }
   if (state === "unreachable")
     log.error("bot check: Cloudflare can't be reached, requests go through until it answers");
+  else if (check.status().testing)
+    log.warn(
+      "bot check: TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets, so every token passes. Anywhere but a test server, copy the widget's secret key from Cloudflare's dashboard.",
+    );
   else log.info("bot check on (Cloudflare Turnstile)");
 }
