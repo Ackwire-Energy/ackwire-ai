@@ -50,6 +50,16 @@ const RUNNER = {
 
 const base = () => `ws://127.0.0.1:${server.port}`;
 
+/** The test server again, where sessions are screened. */
+async function screenedServer() {
+  await Promise.race([server.stop(true), Bun.sleep(500)]);
+  await t.close();
+  t = await createTestServer({
+    env: { ALLOW_SIGNUP: "true", SESSION_SCREENING: "true", OPERATOR_API_TOKEN: "operator-".padEnd(40, "x") },
+  });
+  server = listen(t);
+}
+
 async function until(done: () => boolean | Promise<boolean>, what = "condition") {
   for (let i = 0; i < 250; i++) {
     if (await done()) return;
@@ -238,12 +248,7 @@ test("a terminal: the resize reaches the computer and the shell's exit the perso
 test("where sessions are screened no terminal opens: refused as not found, nothing asked of the computer", async () => {
   // Without the switch nothing is screened, and a terminal opens (above).
   expect(t.engine.sessions).toBeNull();
-  await Promise.race([server.stop(true), Bun.sleep(500)]);
-  await t.close();
-  t = await createTestServer({
-    env: { ALLOW_SIGNUP: "true", SESSION_SCREENING: "true", OPERATOR_API_TOKEN: "operator-".padEnd(40, "x") },
-  });
-  server = listen(t);
+  await screenedServer();
   expect(t.engine.sessions).not.toBeNull();
   const { owner, machine, terminal } = await seeded();
   const runner = await connectRunner(machine.token);
@@ -432,6 +437,32 @@ test("bun run smoke --desktop-agent: signed in as who paired the computer, one f
     await session.signOut();
     expect(await sessions()).toBe(before);
     await expect(signInForDesktop(where, "nobody")).rejects.toThrow("No agent nobody");
+  } finally {
+    runner.stop();
+    xvnc.close();
+    removeDirs([dir]);
+  }
+});
+
+test("bun run smoke --desktop-agent where sessions are screened: the desktop, then the terminal's refusal, which passes", async () => {
+  await screenedServer();
+  const { machine } = await seeded();
+  const dir = tempDir("smoke-desktop-");
+  const xvnc = await fakeXvnc(dir);
+  const runner = runnerOn(machine.token, dir, xvnc.socketPath, () => {
+    throw new Error("no shell opens where sessions are screened");
+  });
+  try {
+    await until(() => runner.online, "the runner");
+    const where = { db: t.db, auth: t.auth, base: `http://127.0.0.1:${server.port}`, origin: ORIGIN };
+    const session = await signInForDesktop(where, "@dev");
+    const lines: string[] = [];
+    await checkDesktop(session, (line) => lines.push(line));
+    expect(lines).toEqual([
+      expect.stringContaining('desktop: RFB 003.008, security None, 1280×800 "Dev"'),
+      "terminal: refused on this server, sessions are screened",
+    ]);
+    await session.signOut();
   } finally {
     runner.stop();
     xvnc.close();

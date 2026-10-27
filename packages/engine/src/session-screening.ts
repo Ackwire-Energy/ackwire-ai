@@ -21,7 +21,7 @@ export const SESSION_KEEP_MS = 10 * 60_000;
 export const SESSION_SEGMENT_MAX_BYTES = 48_000;
 /** A capture, tesseract's 10 s at most, and the desktop helper's start after a while unused. */
 const READ_TIMEOUT_MS = 30_000;
-/** A computer that answers one of these can't read that screen at all: it isn't asked again for that stream. */
+/** Refusals that say a computer can't read its screen (no tesseract, desktop use off, its desktop helper down). */
 const CANT_READ = new Set(["desktop_unavailable", "not_allowed", "exec_disabled"]);
 
 export interface ScreenText {
@@ -150,6 +150,8 @@ export function createSessionScreening(deps: SessionScreeningDeps) {
   }
 
   function schedule(w: Watch) {
+    // The stream can close while a read waits for the ended segment's event: no read after the close.
+    if (!watches.has(w.stream.id)) return;
     w.cancel = later(SESSION_SCREEN_MS, () => {
       w.cancel = null;
       w.reading = read(w).finally(() => {
@@ -168,11 +170,11 @@ export function createSessionScreening(deps: SessionScreeningDeps) {
       );
       if ("text" in reply) keep(w.segment, reply.text);
     } catch (error) {
+      // A failure misses this screen only, and the reads go on: a refusal can pass (the desktop helper starts again
+      // on the next use), and only a read ends a segment on time.
       if (error instanceof MachineRequestError && CANT_READ.has(error.code)) {
         tell(w.machineId, "session screening: this computer can't read its screens", error.message.slice(0, 300));
-        return;
       }
-      // Any other failure misses this screen only.
     }
     // Closed meanwhile: the close ends the segment, with what this read kept.
     if (!watches.has(w.stream.id)) return;

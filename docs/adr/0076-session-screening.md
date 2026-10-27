@@ -20,7 +20,7 @@ A person in control of an agent's screen acts as the agent's OS user (ADR 0058 �
 7. **No terminal socket where sessions are screened.** `/api/terminal` closes with 4404 (`no_terminal`) before the computer is asked anything: a shell nobody screens would be the way around it.
 8. **Cost.** About US$ 0.0002 a judged segment, 0.1 cent an hour of a drawn session. The CPU is the computer's: one OCR of a screen that changed, every 30 s.
 9. **What people see.** On agentes.chat Cloud the take-control line keeps its words and gets an ⓘ: "We may check the text on this screen for abuse. We keep only the result. What the screen doesn't show, like a password at a prompt, is never captured." It says "may", so it holds whether or not the switch is on, and no field tells the apps. Self-hosted computers show no ⓘ. The phone and the desktop app open no control stream of their own.
-10. **Older computers.** A runner older than protocol 25, or a computer that can't read its screens (no tesseract, desktop use off), gets no segment, logged once per computer.
+10. **Older computers, and refusals.** A runner older than protocol 25 gets no segment, logged once per computer. A computer that refuses a read (no tesseract, desktop use off, its desktop helper stopped) is logged once too and asked again 30 s later. A refusal never stops the reads, so a segment still ends after 10 minutes, and one that read nothing ends without an event.
 
 ## Consequences
 

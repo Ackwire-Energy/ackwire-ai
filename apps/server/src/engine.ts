@@ -86,6 +86,9 @@ import {
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
 
+/** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
+export const NO_TERMINAL = "no_terminal";
+
 export interface EngineOptions {
   db: Database;
   config: Config;
@@ -349,11 +352,12 @@ export function buildEngine(o: EngineOptions) {
     hub: machineHub,
     authorize: async (input) =>
       sessions && input.request.kind === "terminal"
-        ? { refused: STREAM_CLOSE.notFound, reason: "no_terminal" }
+        ? { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL }
         : authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
     recheck: (stream) => recheckStream(db, stream),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
+    log: o.log,
   });
   const desktops = createDesktopControl({ db, pubsub: adapters.pubsub, hub: machineHub, streams });
   // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's

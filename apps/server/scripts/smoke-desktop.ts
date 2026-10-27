@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
+import { STREAM_CLOSE } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { computerDrivers } from "@agenteschat/engine";
 import { ByteReader } from "../runner/rfb";
 import type { Auth } from "../src/auth";
 import { desktopChallenge, HANDOFF_PREFIX } from "../src/desktop-sign-in";
+import { NO_TERMINAL } from "../src/engine";
 import { STREAM_PATHS } from "../src/realtime/streams";
 import { UUID } from "../src/realtime/ws";
 
@@ -93,8 +95,8 @@ export async function signInForDesktop(
 /**
  * The agent's desktop watched as noVNC would until its first framebuffer
  * update (RFB 3.8, security None, shared; opening it starts one that isn't
- * running), and its terminal asked who it runs as (never root). Throws on the
- * first failure.
+ * running), and its terminal asked who it runs as (never root), or refused
+ * where sessions are screened. Throws on the first failure.
  */
 export async function checkDesktop(s: DesktopSmokeSession, step: (line: string) => void) {
   const headers = { cookie: s.cookie, origin: s.origin };
@@ -122,6 +124,10 @@ export async function checkDesktop(s: DesktopSmokeSession, step: (line: string) 
     `desktop: RFB 003.008, security None, ${rfb.width}×${rfb.height} "${rfb.name}"; its version after ${rfb.versionMs} ms, a framebuffer update after ${rfb.updateMs} ms`,
   );
   const shell = await terminalUser(socket(STREAM_PATHS.terminal, { cols: "80", rows: "24" }), headers);
+  if (!shell) {
+    step("terminal: refused on this server, sessions are screened");
+    return;
+  }
   if (shell.user === "root") throw new Error(`@${s.handle}'s terminal runs as root`);
   step(`terminal: as ${shell.user}; the shell's first output after ${shell.firstMs} ms`);
 }
@@ -188,7 +194,10 @@ async function watchDesktop(url: string, headers: Record<string, string>) {
   }
 }
 
-/** Who the agent's terminal runs as (its shell's `id -un`), and how soon the shell first printed. */
+/**
+ * Who the agent's terminal runs as (its shell's `id -un`), and how soon the shell first printed; null where the
+ * server opens no terminal (sessions are screened).
+ */
 async function terminalUser(url: string, headers: Record<string, string>) {
   const started = performance.now();
   const ws = openSocket(url, headers);
@@ -196,6 +205,7 @@ async function terminalUser(url: string, headers: Record<string, string>) {
   let out = "";
   let firstMs: number | null = null;
   let ended: string | null = null;
+  let screened = false;
   let wake = () => {};
   ws.onmessage = (e) => {
     // Text frames are the stream's own (the shell's exit).
@@ -206,6 +216,7 @@ async function terminalUser(url: string, headers: Record<string, string>) {
   };
   ws.onclose = (e) => {
     ended = `${e.code} ${e.reason}`;
+    screened = e.code === STREAM_CLOSE.notFound && e.reason === NO_TERMINAL;
     wake();
   };
   const until = async <T>(found: () => T | null | undefined, what: string): Promise<T> => {
@@ -222,7 +233,11 @@ async function terminalUser(url: string, headers: Record<string, string>) {
     }
   };
   try {
-    const first = await until(() => firstMs, "output from the shell");
+    const first = await until(() => firstMs, "output from the shell").catch((error: unknown) => {
+      if (screened) return null;
+      throw error;
+    });
+    if (first === null) return null;
     // Quoted apart, so the shell's echo of the line never matches what it prints.
     ws.send(new TextEncoder().encode(`echo "SMOKE""USER=$(id -un)"\r`));
     const user = await until(() => /SMOKEUSER=([\w.$-]+)/.exec(out)?.[1], "answer to id -un");

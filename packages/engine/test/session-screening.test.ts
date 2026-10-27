@@ -241,16 +241,64 @@ test("a runner too old to read, or a computer without tesseract: no segment, sai
   const unavailable = new MachineRequestError("desktop_unavailable", "Reading the screen's text needs tesseract");
   for (const stream of [t.stream(), t.stream()]) {
     await t.s.ready(stream);
-    t.machine.answer(unavailable);
+    t.machine.answer(unavailable, unavailable, unavailable);
     await t.time.advance(3 * SESSION_SCREEN_MS);
     await t.s.closed(stream);
   }
-  // One try per stream, and no segment or event.
-  expect(t.machine.calls).toHaveLength(2);
+  // Asked every 30 s all the same, and no segment or event.
+  expect(t.machine.calls).toHaveLength(6);
   expect(await t.events()).toEqual([]);
   expect(t.logged).toEqual([
     { message: expect.stringContaining("can't read"), data: { machineId: MACHINE, reason: unavailable.message } },
   ]);
+});
+
+test("a refusal in the middle of control stops nothing: the reads go on and the segment still ends at 10 minutes", async () => {
+  const t = await screening();
+  const control = t.stream();
+  await t.s.ready(control);
+  const stopped = new MachineRequestError(
+    "desktop_unavailable",
+    "The desktop helper stopped; it starts again on the next use",
+  );
+  t.machine.answer(SECRET_TEXT, stopped, "after");
+  await t.time.advance(3 * SESSION_SEGMENT_MS);
+  const [event, ...more] = await t.events();
+  expect(more).toEqual([]);
+  expect(event?.data).toMatchObject({ screens: 2 });
+  const lasted = Date.parse(String(event?.data.endedAt)) - Date.parse(String(event?.data.startedAt));
+  expect(lasted).toBeLessThanOrEqual(SESSION_SEGMENT_MS);
+  expect(t.s.segment(String(event?.data.segmentId))).toBeNull();
+  expect(t.machine.calls).toHaveLength((3 * SESSION_SEGMENT_MS) / SESSION_SCREEN_MS);
+  expect(t.logged).toEqual([
+    { message: expect.stringContaining("can't read"), data: { machineId: MACHINE, reason: stopped.message } },
+  ]);
+  await t.s.closed(control);
+});
+
+test("a stream that closes while its ended segment's event is written is read no more", async () => {
+  const t = await screening();
+  const control = t.stream();
+  let closing: Promise<void> | undefined;
+  const s = createSessionScreening({
+    db: t.f.db,
+    hub: t.machine.hub,
+    now: t.time.now,
+    // An ended segment's drop is set before its event is written: the close lands in between.
+    later: (ms, run) => {
+      if (ms === SESSION_KEEP_MS) closing ??= s.closed(control);
+      return t.time.later(ms, run);
+    },
+  });
+  await s.ready(control);
+  t.machine.answer("screen");
+  await t.time.advance(SESSION_SEGMENT_MS);
+  expect(closing).toBeDefined();
+  await closing;
+  const reads = t.machine.calls.length;
+  await t.time.advance(3 * SESSION_SCREEN_MS);
+  expect(t.machine.calls).toHaveLength(reads);
+  expect(await t.events()).toHaveLength(1);
 });
 
 test("a screen that fails to come is missed, and the next read goes on", async () => {
