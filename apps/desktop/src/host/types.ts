@@ -1,7 +1,14 @@
 import type { ServerCheck } from "@agenteschat/client/lib/server";
 import type { HelloLine } from "../control/client";
 import type { Candidate } from "../control/first-run";
-import type { LocalChoice, LocalServerStatus, ReachResult, ReachStage, StepChange, Tailnet } from "../control/local-server";
+import type {
+  LocalChoice,
+  LocalServerStatus,
+  ReachResult,
+  ReachStage,
+  StepChange,
+  Tailnet,
+} from "../control/local-server";
 import type { Platform } from "../control/platform";
 import type { ServerList } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
