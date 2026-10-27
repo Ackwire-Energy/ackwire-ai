@@ -116,6 +116,23 @@ describe("Anthropic-compatible providers (scripted transport)", () => {
     }
   });
 
+  test("effort none: DeepSeek Flash and MiniMax M3 think not at all with no effort; GLM-5.3 Flash can't, so low", async () => {
+    for (const [id, model, thinking, effort] of [
+      ["deepseek", "deepseek-flash", { type: "disabled" }, undefined],
+      ["minimax", "MiniMax-M3", { type: "disabled" }, undefined],
+      ["zai", "glm-5.3-flash", undefined, "low"],
+    ] as const) {
+      const { provider, requests } = compat(
+        id,
+        sse([start(model), ...text(0, "{}"), ...end("end_turn", { output_tokens: 2 })]),
+      );
+      await provider.stream(request({ model, effort: "none" }), quiet);
+      const body = requests[0]?.body;
+      expect(body?.thinking).toEqual(thinking);
+      expect(body?.output_config).toEqual(effort ? { effort } : undefined);
+    }
+  });
+
   test("thinking replays unchanged to the provider that wrote it; another provider's is left out", async () => {
     const { provider, requests } = compat(
       "moonshot",

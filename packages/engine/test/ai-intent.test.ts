@@ -14,7 +14,7 @@ import {
   postPersonMessage,
   type RouterStrategy,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
@@ -230,6 +230,9 @@ test("the organization has AI: the strategy decides, and nobody asks Jev about c
 test("only a plan on a computer and the LLM router: mention an agent (mention_needed), not no_ai", async () => {
   const fx = await setup({ judge: intentJudge });
   f = fx;
+  // Someone else in #general: a person alone with one agent would reach it by the rule.
+  const bruna = await addMember(fx.db, fx.org.id, "member", "Bruna");
+  await fx.db.insert(schema.channelMembers).values({ orgId: fx.org.id, channelId: fx.general.id, userId: bruna.id });
   const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, { name: "MacBook" });
   await fx.db
     .update(schema.agents)

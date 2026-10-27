@@ -21,6 +21,7 @@ import type { AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
+import { routeWithPlan } from "./brain-route";
 import type { BrowserManager } from "./browser";
 import type { DesktopManager } from "./desktop";
 import type { DesktopSessions } from "./desktop-session";
@@ -55,6 +56,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "push",
   "task.start",
   "brain.turn",
+  "brain.route",
   "git.sync",
   "browser.act",
   "browser.batch",
@@ -88,6 +90,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "task.output": "agent",
   "brain.turn": "agent",
   "brain.steer": "agent",
+  // As the agent's own user: the account folder is lent to it, as for a turn.
+  "brain.route": "agent",
   "git.sync": "agent",
   "mission.worktree": "agent",
   "access.request": "machine",
@@ -433,6 +437,17 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   switch (req.op) {
     case "brain.turn":
       return doBrainTurn(ctx, req, scope, secrets);
+    case "brain.route":
+      // Never the agent's secrets: the route reads other people's messages.
+      requireTool(ctx, req.kind === "codex" ? "codex" : "claude");
+      if (!req.agent) throw new RunnerError("bad_request", "A route runs for an agent");
+      return routeWithPlan(req, {
+        accounts: ctx.accounts ?? ctx.codex?.accounts,
+        brains: ctx.brains,
+        codexApp: ctx.codex?.app,
+        tasks: ctx.tasks,
+        signal: scope.signal,
+      });
     case "git.sync":
       // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed.
       if (!req.agent) throw new RunnerError("bad_request", "A git sync belongs to an agent");
@@ -887,6 +902,9 @@ function describeOp(req: MachineRequest): string {
     case "brain.steer":
       // Never the text: how many messages, for which run.
       return `brain.steer ${String(req.runId ?? "")} (${Array.isArray(req.messages) ? req.messages.length : 0} messages)`;
+    case "brain.route":
+      // Never the prompt: other people's messages.
+      return `brain.route (${String(req.kind ?? "")}${req.account ? ", an account" : ""})`;
     case "git.sync": {
       const repos = Array.isArray(req.repos) ? req.repos.map((r) => String(r?.repo ?? "")).join(", ") : "";
       return `git.sync ${repos || "(existing checkouts)"}`;

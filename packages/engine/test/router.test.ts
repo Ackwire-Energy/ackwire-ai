@@ -12,6 +12,7 @@ import {
   listMessages,
   parseRouterOutput,
   postPersonMessage,
+  RouterOutputError,
   type RouterStrategy,
   type RoutingCandidate,
   routeMessage,
@@ -74,7 +75,7 @@ describe("selectAgents (policy)", () => {
 });
 
 describe("parseRouterOutput", () => {
-  test("keeps well-formed scores and tolerates garbage", () => {
+  test("keeps well-formed scores; an answer that isn't JSON is a failure, so the next step decides", () => {
     expect(
       parseRouterOutput('{"needs_agent":0.8,"scores":[{"handle":"dev","score":0.9},{"x":1}],"reason":"r"}'),
     ).toEqual({
@@ -82,7 +83,9 @@ describe("parseRouterOutput", () => {
       scores: [{ handle: "dev", score: 0.9 }],
       reason: "r",
     });
-    expect(parseRouterOutput("not json").scores).toEqual([]);
+    expect(parseRouterOutput('```json\n{"needs_agent":0}\n```').needs_agent).toBe(0);
+    expect(() => parseRouterOutput("not json")).toThrow(RouterOutputError);
+    expect(() => parseRouterOutput("[1]")).toThrow(RouterOutputError);
   });
 });
 
@@ -333,40 +336,33 @@ describe("routeMessage", () => {
     expect(seen).toHaveLength(0);
   });
 
-  test("transient strategy errors retry; permanent ones are stored and pick nobody", async () => {
+  test("a failing strategy never goes back to the outbox: it is recorded, and the rules decide", async () => {
     f = await setup();
-    const message = await post("hi");
     const failing = (error: Error): RouterStrategy => ({ name: "boom", decide: async () => Promise.reject(error) });
-    await expect(
-      routeMessage(
-        { db: f.db, strategy: failing(new ProviderError("overloaded", true)), policy },
-        {
-          orgId: f.org.id,
-          messageId: message.id,
-        },
-      ),
-    ).rejects.toThrow("overloaded");
-    expect(await f.db.select().from(schema.routingDecisions)).toHaveLength(0);
+    // Ana is alone in #general with Dev: the rule sends it there.
+    const alone = await post("hi");
     const result = await routeMessage(
-      { db: f.db, strategy: failing(new ProviderError("bad key", false)), policy },
-      { orgId: f.org.id, messageId: message.id },
+      { db: f.db, strategy: failing(new ProviderError("overloaded", true)), policy },
+      { orgId: f.org.id, messageId: alone.id },
     );
-    expect(result.runs).toEqual([]);
+    expect(result).toMatchObject({ selected: [f.agent.id], decidedBy: { step: "rule", rule: "only_agent" } });
     const [decision] = await f.db.select().from(schema.routingDecisions);
-    expect(decision?.error).toBe("bad key");
+    expect(decision).toMatchObject({ strategy: "rule:only_agent", error: "boom: overloaded" });
   });
 });
 
 describe("LLM strategy (end to end through the outbox)", () => {
   test("a message without mentions is routed by the router model; the picked agent replies", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
     f = await setup({
-      reply: (req) =>
-        req.outputSchema
-          ? {
-              chunks: ['{"needs_agent":0.9,"scores":[{"handle":"dev","score":0.88}],"reason":"build question"}'],
-              usage: { inputTokens: 300, outputTokens: 20 },
-            }
-          : { chunks: ["On it."] },
+      reply: (req) => {
+        if (!req.outputSchema) return { chunks: ["On it."] };
+        signals.push(req.signal);
+        return {
+          chunks: ['{"needs_agent":0.9,"scores":[{"handle":"dev","score":0.88}],"reason":"build question"}'],
+          usage: { inputTokens: 300, outputTokens: 20 },
+        };
+      },
     });
     const handlers = createJobHandlers({ ...f.jobDeps, router: { enabled: true, model: "claude-haiku-5-5" } });
     await post("why is the build failing?");
@@ -374,7 +370,11 @@ describe("LLM strategy (end to end through the outbox)", () => {
 
     const routerCall = f.provider.calls[0]?.request;
     expect(routerCall?.model).toBe("claude-haiku-5-5");
-    expect(routerCall?.effort).toBe("low");
+    // The least thinking Haiku allows, a short answer, and 8 s at most.
+    expect(routerCall?.effort).toBe("none");
+    expect(routerCall?.maxTokens).toBe(512);
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(systemText(routerCall?.system ?? "")).toContain("Answer at once, without deliberating.");
     expect(JSON.stringify(routerCall?.outputSchema)).toContain('"enum":["dev"]');
     expect(textOf(routerCall?.messages[0]?.content ?? "")).toContain("<message>\n[ana]: why is the build failing?");
 
@@ -387,7 +387,12 @@ describe("LLM strategy (end to end through the outbox)", () => {
       ["router", null],
     ]);
     const [decision] = await f.db.select().from(schema.routingDecisions);
-    expect(decision).toMatchObject({ strategy: "llm", needsAgentScore: 0.9, reason: "build question" });
+    expect(decision).toMatchObject({
+      strategy: "llm:claude-haiku-5-5",
+      needsAgentScore: 0.9,
+      reason: "model: build question",
+      error: null,
+    });
     expect(decision?.usageRecordId).toBe(usage.find((u) => u.kind === "router")?.id ?? "");
   });
 

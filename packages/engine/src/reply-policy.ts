@@ -75,11 +75,12 @@ export function replyPolicyFor(
 }
 
 /**
- * The router's decision for the trigger kept the person with the agent they were talking to
- * (router.ts writes "follow-up" in `routing_decisions.reason`): that agent was addressed.
+ * The router's decision for the trigger kept the person with the agent they were talking to: that agent was
+ * addressed. Only code starts `routing_decisions.reason` with the marker (router.ts `FOLLOW_UP`): a step's own
+ * words come after its name, so a model can't take an agent's right to stay quiet.
  */
 const followUpSql = sql<boolean>`exists (select 1 from ${routingDecisions} d
-  where d.message_id = ${agentRuns.triggerMessageId} and d.reason like '%follow-up%')`;
+  where d.message_id = ${agentRuns.triggerMessageId} and d.reason like 'follow-up%')`;
 
 /** `replyPolicyFor` from the database (the run, its trigger, the router's decision): one read. */
 export async function loadReplyPolicy(db: Executor, orgId: string, runId: string): Promise<ReplyPolicy | null> {

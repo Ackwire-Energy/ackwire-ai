@@ -20,6 +20,7 @@ import {
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   orgAiStatus,
+  orgRouting,
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
@@ -269,9 +270,9 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/ai-status",
       tags,
       security,
-      summary: "Whether each agent has an AI to think with, and whether the organization has any",
+      summary: "Whether each agent has an AI to think with, whether the organization has any, and who picks the agents",
       description:
-        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. Computed on each request; no key is read.",
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -284,6 +285,13 @@ export function agentRoutes(deps: AppDeps) {
                 reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
               }),
             ),
+            routing: z.object({
+              by: z.enum(["jev", "model", "plans", "rules", "off"]),
+              mine: z.enum(["jev", "model", "plan", "rules", "off"]),
+              model: z.string().nullable(),
+              noSmallModel: z.string().nullable(),
+            }),
+            apiKey: z.boolean(),
           }),
         ),
         ...errors,
@@ -291,8 +299,14 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      await requirePermission(db, c.get("user").id, orgId, "read");
-      return c.json(await orgAiStatus(aiStatusDeps(deps), orgId), 200);
+      const userId = c.get("user").id;
+      await requirePermission(db, userId, orgId, "read");
+      const status = aiStatusDeps(deps);
+      const [ai, routing] = await Promise.all([
+        orgAiStatus(status, orgId),
+        orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
+      ]);
+      return c.json({ ...ai, ...routing }, 200);
     },
   );
 

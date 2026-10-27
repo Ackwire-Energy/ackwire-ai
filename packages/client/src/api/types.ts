@@ -455,6 +455,32 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** Who picked the agents for it (ADR 0074); absent on a decision from before. */
+  decidedBy?: DecidedBy;
+  /** No step could read it and no rule fit: only a mention reaches an agent. */
+  reason?: "mention_needed";
+}
+
+/**
+ * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule.
+ */
+export type DecidedBy =
+  | { step: "jev" }
+  | { step: "model"; model: string; provider: string }
+  | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+
+/**
+ * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
+ * the person asking (a plan picks only for its owner's own messages). `off`: only mentions. `model`: the small
+ * model while it picks. `noSmallModel`: with `rules`, the default key's provider, which has none (Kimi).
+ */
+export interface AiRouting {
+  by: "jev" | "model" | "plans" | "rules" | "off";
+  mine: "jev" | "model" | "plan" | "rules" | "off";
+  model: string | null;
+  noSmallModel: string | null;
 }
 
 /** What a person who met "no AI" asked for (Jev): a Connect dialog step; `any` and `task` open its first step. */
@@ -464,6 +490,10 @@ export type ConnectIntent = "claude" | "chatgpt" | "api_key" | "any" | "task";
 export interface AiStatus {
   /** An agent that isn't archived is ready, or waits for its computer. */
   any: boolean;
+  /** Who picks the agents (absent from an older server). */
+  routing?: AiRouting;
+  /** The organization has a key of its own, or the server's own Claude key. */
+  apiKey?: boolean;
   agents: {
     agentId: string;
     /** `waiting`: its computer is away for now (not "no AI"). */
@@ -680,13 +710,20 @@ export type ChannelEvent =
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
-      /** `no_ai`: the organization has no AI connected; `mention_needed`: only a mention gets an answer. */
+      /**
+       * `no_ai`: the organization has no AI connected. `mention_needed`: no step could pick an agent (no Jev, no
+       * small model, no plan of the author, no rule): a mention still calls one.
+       */
       reason?: string;
+      /** Who picked (ADR 0074). */
+      decidedBy?: DecidedBy;
       /** With `no_ai`: the Connect step the message asked for, and whether it opens by itself (Jev ≥ 0.9). */
       intent?: ConnectIntent;
       provider?: string;
       autoOpen?: boolean;
     }
+  /** The author's own plan is picking who answers (seconds): until `message.routed`. */
+  | { type: "message.routing"; channelId: string; messageId: string; step: "plan" }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId?: string }
   | {
       type: "message.handled";

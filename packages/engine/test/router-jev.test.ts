@@ -8,10 +8,16 @@ import {
   createLlmJudge,
   drainOutbox,
   insertMessage,
+  JevOffError,
   jevCostNanoUsd,
   messageRouter,
   postPersonMessage,
+  RouterChainEnd,
+  RouterSkip,
+  type RouterStrategy,
   type RoutingCandidate,
+  type RoutingInput,
+  routeChain,
   selectAgents,
   standingJudge,
   withJudgeFallback,
@@ -49,6 +55,55 @@ describe("policy in code", () => {
     expect(
       selectAgents([cand("a"), cand("b")], { agents: [{ agentId: "a", score: 0.4 }], needsAgent: 0.4 }, policy),
     ).toEqual([]);
+  });
+});
+
+describe("routeChain", () => {
+  const input = { orgId: "o", candidates: [cand("a")] } as unknown as RoutingInput;
+  const step = (name: string, decide: RouterStrategy["decide"]): RouterStrategy => ({ name, decide });
+  const decides = (name: string) => step(name, async () => ({ agents: [{ agentId: "a", score: 0.9 }] }));
+  const fails = (name: string, message: string) => step(name, async () => Promise.reject(new Error(message)));
+  const skips = (name: string, error: Error) => step(name, async () => Promise.reject(error));
+
+  test("the first step that decides wins, under its own name, with the failures before it; a skip leaves no trace", async () => {
+    const timings: unknown[][] = [];
+    const chain = routeChain(
+      [
+        skips("jev", new JevOffError()),
+        fails("llm", "no answer in 8 s"),
+        skips("x", new RouterSkip()),
+        decides("plan"),
+      ],
+      {
+        onTiming: (name, ms, attrs) => {
+          if (name === "router_step_ms" && ms >= 0) timings.push([attrs.step, attrs.outcome]);
+        },
+      },
+    );
+    expect(await chain.decide(input)).toEqual({
+      agents: [{ agentId: "a", score: 0.9 }],
+      strategy: "plan",
+      failures: ["llm: no answer in 8 s"],
+    });
+    expect(timings).toEqual([
+      ["jev", "skipped"],
+      ["llm", "failed"],
+      ["x", "skipped"],
+      ["plan", "decided"],
+    ]);
+    // The first step decides: no failures at all.
+    expect(await routeChain([decides("jev"), fails("llm", "never asked")]).decide(input)).toEqual({
+      agents: [{ agentId: "a", score: 0.9 }],
+      strategy: "jev",
+    });
+  });
+
+  test("no step decides: what failed goes to the rules", async () => {
+    const error = await routeChain([fails("jev", "TypeSafe answered 529"), skips("llm", new RouterSkip())])
+      .decide(input)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RouterChainEnd);
+    expect((error as RouterChainEnd).failures).toEqual(["jev: TypeSafe answered 529"]);
   });
 });
 
@@ -150,8 +205,11 @@ describe("Jev strategy end to end", () => {
     await post(f, "help with the build?");
     await drainOutbox(f.db, handlers);
     const [decision] = await f.db.select().from(schema.routingDecisions);
-    expect(decision?.strategy).toStartWith("llm (fallback:");
-    expect(decision?.selectedAgentIds).toEqual([f.agent.id]);
+    expect(decision).toMatchObject({
+      strategy: "llm:claude-haiku-5-5",
+      error: "jev: TypeSafe answered 529",
+      selectedAgentIds: [f.agent.id],
+    });
   });
 
   test("conversation continuity: a follow-up without a mention goes to the agent just spoken to", async () => {
@@ -206,7 +264,7 @@ describe("Jev strategy end to end", () => {
     await post(f, "help with the build?");
     await drainOutbox(f.db, handlers);
     const [decision] = await f.db.select().from(schema.routingDecisions);
-    expect(decision).toMatchObject({ strategy: "llm", selectedAgentIds: [f.agent.id] });
+    expect(decision).toMatchObject({ strategy: "llm:claude-haiku-5-5", error: null, selectedAgentIds: [f.agent.id] });
     expect(jev.requests).toEqual([]);
   });
 
@@ -259,11 +317,12 @@ describe("Jev strategy end to end", () => {
     await post(f, "and now?");
     await drainOutbox(f.db, handlers);
     expect(calls).toBe(2);
-    const strategies = (await f.db.select().from(schema.routingDecisions)).map((d) => d.strategy);
-    expect(strategies.sort()).toEqual([
-      "llm",
-      "llm (fallback: TypeSafe answered 402)",
-      "llm (fallback: TypeSafe answered 402)",
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    expect(decisions.map((d) => d.strategy)).toEqual(Array(3).fill("llm:claude-haiku-5-5"));
+    expect(decisions.map((d) => d.error).sort()).toEqual([
+      "jev: TypeSafe answered 402",
+      "jev: TypeSafe answered 402",
+      null,
     ]);
   });
 
