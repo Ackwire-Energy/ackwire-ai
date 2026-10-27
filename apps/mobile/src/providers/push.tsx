@@ -86,7 +86,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       const orgId = data.orgId;
       if (orgId) setOrgRef.current?.(orgId);
       // The computer being ready opens Connect an AI while no agent has one: its AI status is asked first.
-      const ai =
+      const ai: Promise<AiStatus | undefined> =
         data.kind === "computer_ready" && orgId
           ? qc
               .fetchQuery({
@@ -94,7 +94,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
                 queryFn: () => api.agents.aiStatus(orgId),
                 staleTime: 30_000,
               })
-              .catch((): AiStatus | undefined => undefined)
+              .catch(() => undefined)
           : Promise.resolve(undefined);
       void ai.then((status) => {
         const href = hrefForPush(data, status);
