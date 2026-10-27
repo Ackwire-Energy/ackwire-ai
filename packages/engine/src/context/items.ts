@@ -43,7 +43,8 @@ export const looksLikeSecret = (text: string) => SECRET_PATTERNS.some((p) => p.t
 
 /** Refuses content that must never become context: credentials (by their format). */
 export function checkContent(text: string) {
-  if (looksLikeSecret(text)) throw new ValidationError("This looks like a credential; it can't be stored as context");
+  if (looksLikeSecret(text))
+    throw new ValidationError("This looks like a credential, so it can't be stored as context.");
 }
 
 /**
@@ -58,7 +59,7 @@ export async function checkPermissionText(judge: Judge | undefined, orgId: strin
   const changes = await triesToChangePermissions(judge, { orgId, text }).catch(() => false);
   if (changes) {
     throw new ValidationError(
-      "Context can't change permissions or approvals; ask an admin to change scopes instead",
+      "Context can't change permissions or approvals. Ask an admin to change scopes instead.",
       "context.changes_permissions",
     );
   }

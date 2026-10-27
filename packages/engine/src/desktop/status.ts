@@ -2,6 +2,7 @@ import { DESKTOP_USE_PROTOCOL } from "@agenteschat/adapters";
 import type { Database } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import type { MachineCaller } from "../machine-hub";
+import { REMOVED_COMPUTER_MESSAGE } from "../machines";
 
 /** Why the agent can't use its desktop, as a code (for the app) and a sentence (for the agent). */
 export type DesktopUseUnavailable =
@@ -68,7 +69,7 @@ export function desktopUseUnavailableText(s: Extract<AgentDesktopUseStatus, { av
     case "no_machine":
       return "Your desktop only runs on a connected computer, and you don't use one. Ask your owner or an admin to choose one for you.";
     case "machine_removed":
-      return "Your connected computer was removed; ask an admin or your owner to choose another one.";
+      return REMOVED_COMPUTER_MESSAGE;
     case "outdated":
       return `The runner on ${on} is too old for using your desktop. Tell the person: its owner should update it.`;
     case "switched_off":

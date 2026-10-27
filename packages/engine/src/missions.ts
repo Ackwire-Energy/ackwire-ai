@@ -2572,7 +2572,8 @@ export async function updatePlan(
       })
       .onConflictDoNothing()
       .returning({ version: missionPlanVersions.version });
-    if (!inserted) throw new ConflictError("The plan changed at the same time; send it again", "mission.plan_conflict");
+    if (!inserted)
+      throw new ConflictError("The plan changed at the same time. Send it again.", "mission.plan_conflict");
     // An item changing state is progress: the stuck-loop guard starts over.
     const moved = change.added.length > 0 || change.changed.some((c) => c.from !== c.to);
     await tx

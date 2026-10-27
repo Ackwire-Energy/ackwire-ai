@@ -162,7 +162,7 @@ export function machineAccountRoutes(deps: AppDeps) {
         limit: 10,
         windowMs: 15 * 60_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many sign-ins started; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many sign-ins started. Try again later.");
       const login = await beginAccountLogin(withHub(), userId, orgId, machineId, kind, accountId, email, provider);
       return c.json(login, 201);
     },

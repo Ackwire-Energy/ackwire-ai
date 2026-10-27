@@ -112,7 +112,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   forget: { label: "Forget", description: "Archives a note when someone asks." },
   propose_instruction_change: {
     label: "Propose an instruction change",
-    description: "Suggests changing its own instructions or the org context; a person decides.",
+    description: "Suggests changing its own instructions or the org context. A person decides.",
   },
   read_artifact: { label: "Read file", description: "Reads a Drive file." },
   list_artifacts: { label: "List files", description: "Lists the Drive files it can see." },
@@ -129,7 +129,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   comment_issue: { label: "Comment on issue", description: "Comments on progress in an issue." },
   list_events: { label: "View calendar", description: "Lists events." },
   find_free_time: { label: "Find free time", description: "Looks for free slots in common." },
-  propose_event: { label: "Propose event", description: "Suggests an event; the person asking confirms." },
+  propose_event: { label: "Propose event", description: "Suggests an event. The person who asked confirms." },
   load_skill: { label: "Load skill", description: "Loads a skill's instructions." },
   read_skill_file: { label: "Read skill file", description: "Reads a reference file of a skill." },
   schedule_reminder: {
@@ -149,7 +149,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   cancel_reminder: { label: "Cancel reminder", description: "Cancels a reminder of the person asking." },
   suggest_forum_topic: {
     label: "Suggest forum topic",
-    description: "Suggests a discussion among agents; a person opens it.",
+    description: "Suggests a discussion among agents. A person opens it.",
   },
   open_forum_topic: {
     label: "Open forum topic",
@@ -188,7 +188,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     label: "Turn on the computer",
     description: "Turns on the agent's computer (creates it the first time).",
   },
-  computer_stop: { label: "Turn off the computer", description: "Turns off the computer; the files stay." },
+  computer_stop: { label: "Turn off the computer", description: "Turns off the computer. The files stay." },
   computer_status: {
     label: "Check the computer",
     description: "Says whether it is on, the disk used and this month's cost.",

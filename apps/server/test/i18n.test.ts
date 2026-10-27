@@ -58,6 +58,10 @@ test("run failures, approvals and memory updates carry codes", async () => {
     errorParams: { provider: "Claude" },
   });
   expect(runErrorDetail("Interrupted by a server update")).toMatchObject({ errorCode: "run.interrupted" });
+  expect(runErrorDetail("This agent's API key was revoked. Pick another one in the agent's settings.")).toEqual({
+    errorCode: "run.credential_revoked",
+  });
+  // Older rows keep the earlier wording, joined by a semicolon.
   expect(runErrorDetail("This agent's API key was revoked; pick another one in the agent's settings")).toEqual({
     errorCode: "run.credential_revoked",
   });

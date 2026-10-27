@@ -357,7 +357,7 @@ describe("install.sh", () => {
     expect(planned).toContain("▀");
     expect(planned).toContain("┌   agentes.chat  install plan (--plan: nothing runs)\n│\n◇  Linux on x64\n");
     expect(planned).toEndWith(
-      `●  Docker needs root here: running this installer again as root\n│  $ sudo sh ${SCRIPT} --yes\n│\n└  With --plan it stops here; as root, --plan shows the rest.\n`,
+      `●  Docker needs root here: running this installer again as root\n│  $ sudo sh ${SCRIPT} --yes\n│\n└  With --plan it stops here. As root, --plan shows the rest.\n`,
     );
   });
 
@@ -468,7 +468,7 @@ describe("install.sh", () => {
         "●  Docker needs root here: running this installer again as root",
         `   $ sudo sh ${SCRIPT} --yes --dir /srv/agentes --network local`,
         "",
-        "With --plan it stops here; as root, --plan shows the rest.",
+        "With --plan it stops here. As root, --plan shows the rest.",
         "",
       ].join("\n"),
     );

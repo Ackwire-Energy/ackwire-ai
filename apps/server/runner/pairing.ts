@@ -122,7 +122,7 @@ export async function requestDeviceCode(
       res.status === 429 ? "network" : "internal",
       errorMessage(res.json) ??
         (res.status === 429
-          ? "Too many connection attempts from this network; try again in a few minutes"
+          ? "Too many connection attempts from this network. Try again in a few minutes."
           : `The server refused to start the connection (HTTP ${res.status})`),
     );
   }
@@ -218,7 +218,7 @@ export async function pollDeviceToken(
     } else if (word === "access_denied") {
       throw new PairingError("denied", "The connection was refused on the site");
     } else if (word === "expired_token") {
-      throw new PairingError("expired", "The code expired; start again");
+      throw new PairingError("expired", "The code expired. Start again.");
     } else if (res.status >= 500) {
       lastNetwork = `The server answered HTTP ${res.status}`;
     } else {
@@ -227,7 +227,7 @@ export async function pollDeviceToken(
     if (now() >= deadline) {
       throw lastNetwork
         ? new PairingError("network", lastNetwork)
-        : new PairingError("expired", "The code expired; start again");
+        : new PairingError("expired", "The code expired. Start again.");
     }
   }
 }
@@ -287,7 +287,7 @@ export async function redeemIssuedCode(
   } catch (err) {
     if (!(err instanceof PairingError)) throw err;
     if (err.code === "expired") {
-      throw new PairingError("expired", "The enrollment code expired or was already used; issue a new one");
+      throw new PairingError("expired", "The enrollment code expired or was already used. Issue a new one.");
     }
     if (err.code === "denied") {
       throw new PairingError(

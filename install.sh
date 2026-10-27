@@ -45,7 +45,7 @@ main() {
       --yes | -y) YES=1 ;;
       --native)
         die "This installer can't run agentes.chat without Docker yet (--native)." \
-          "On a Mac, the agentes.chat app runs it with no Docker (Use your own server, then Run agentes.chat on this Mac). Or use Docker: on a Mac, Docker Desktop, OrbStack or Colima; on Linux, this installer sets it up."
+          "On a Mac, the agentes.chat app runs it without Docker (Use your own server, then Run agentes.chat on this Mac). Or use Docker: Docker Desktop, OrbStack or Colima on a Mac. On Linux, this installer sets it up."
         ;;
       --dir)
         [ "$n" -gt 0 ] || die "--dir needs a folder, like --dir /srv/agentes."
@@ -418,7 +418,7 @@ as_root() {
   t_shell "sudo sh $script $*"
   if [ "$PLAN" = 1 ]; then
     t_gap
-    t_end "With --plan it stops here; as root, --plan shows the rest."
+    t_end "With --plan it stops here. As root, --plan shows the rest."
     exit 0
   fi
   if [ "$script" = "$0" ]; then rm -rf "$WORK"; fi
