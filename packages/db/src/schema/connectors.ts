@@ -35,6 +35,8 @@ export const connectorConnections = pgTable(
     reviewedAt: timestamp({ withTimezone: true }),
     /** MCP-native OAuth: the client registered with the server's authorization server (`oauth_clients`). */
     oauthClientId: uuid(),
+    /** Custom servers: the server's own icon, kept by us (`/api/app/connector-icons/…`); null = a monogram. */
+    icon: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
