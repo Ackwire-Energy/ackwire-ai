@@ -16,6 +16,7 @@
     "allow-local-server-status",
     "allow-local-server-install",
     "allow-local-server-cancel",
+    "allow-local-server-reach-stop",
     "allow-local-server-start",
     "allow-local-server-diagnostics",
     "allow-tailscale-status",

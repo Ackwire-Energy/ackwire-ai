@@ -53,6 +53,7 @@ import {
   failedStep,
   hereView,
   type LocalServerStatus,
+  type ReachStage,
   type SetupStep,
   type StepChange,
   setupSteps,
@@ -62,7 +63,7 @@ import {
 import { appServer, serverKind, serverName } from "../control/server";
 import { readPref, useOnShown, useTailnet, writePref } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
-import { CopyDetails, ReachProblem, ReachRow, ServerTile } from "../ui/here";
+import { CopyDetails, ReachProblem, ReachProgress, ReachRow, ServerTile } from "../ui/here";
 import { hintFor, PrefRow } from "../ui/settings";
 import { elapsedClock, shortPath } from "../ui/time";
 
@@ -759,6 +760,9 @@ function HereSetup({
   // Never every step done and no button: an error with no failed step ends on the step under way.
   const failed = end === "failed" ? failedStep(steps, states) : null;
   const done = steps.filter((s) => states[s] === "done" || states[s] === "warn").length;
+  // Reach's own progress while its step runs: Tailscale's page for HTTPS shows as soon as Tailscale names it.
+  const [stage, setStage] = useState<ReachStage | null>(null);
+  useEffect(() => host.onLocalReach(setStage), [host]);
   const reachProblem = changes.find((c) => c.step === "reach" && c.state === "warn")?.reason;
   const clock = stepClock(now - activeAt);
   // Screen readers start where they are, at every run.
@@ -813,7 +817,8 @@ function HereSetup({
                       </span>
                     )}
                   </span>
-                  {state === "active" && clock.slow && (
+                  {/* Waiting on the person to allow HTTPS isn't slow. */}
+                  {state === "active" && clock.slow && !(step === "reach" && stage?.stage === "approve") && (
                     <span className="dk-fr__stepline">
                       {t("desktop.here.slow")} · <CopyDetails as="link" />
                     </span>
@@ -822,6 +827,9 @@ function HereSetup({
                     <span className="dk-honest">
                       {t(FAIL_TEXT[step])} <CopyDetails as="link" />
                     </span>
+                  )}
+                  {step === "reach" && state === "active" && stage && stage.stage !== "signingIn" && (
+                    <ReachProgress stage={stage} />
                   )}
                   {step === "reach" && reachProblem && <ReachProblem problem={reachProblem} text="fail" />}
                 </span>

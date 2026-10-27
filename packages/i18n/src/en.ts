@@ -768,6 +768,7 @@ export const en: Translations = {
   },
   openOnPhone: {
     qr: "QR code to sign in to the agentes app",
+    making: "Making the code…",
     stepApp: "Install the agentes app on your phone (App Store or Google Play).",
     stepTailscale: "Install Tailscale on your phone and join this server's network (tailnet).",
     stepScan: "Point your phone's camera at the code.",
