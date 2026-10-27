@@ -267,7 +267,7 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
   await signUp(cris, "cris@example.com");
   expect(await errorCode(await ask(cris, token, {}))).toBe("join.code_needed");
   const code = await codeFor(cris, token);
-  expect(mailTo("cris@example.com").at(-1)?.subject).toStartWith(code);
+  expect(mailTo("cris@example.com").filter((m) => m.subject.startsWith(code))).toHaveLength(1);
   expect((await ask(cris, token, { code })).status).toBe(201);
   const [unconfirmed] = await requests(owner, orgId);
   expect(unconfirmed).toMatchObject({ email: "cris@example.com", verified: true, confirmed: false });
