@@ -4,6 +4,7 @@ import {
   type CustomDeps,
   connectCustomServer,
   connectOverHttp,
+  connectorIconFile,
   listCustomServers,
   MCP_PRESETS,
   mcpPreset,
@@ -37,6 +38,10 @@ const CustomServer = z
     serverUrl: z.string(),
     label: z.string(),
     authType: z.enum(["oauth", "api_key"]),
+    iconUrl: z
+      .string()
+      .nullable()
+      .openapi({ description: "The server's own icon (`/api/app/connector-icons/…`); null = a monogram." }),
     tools: z.array(
       z.object({
         name: z.string(),
@@ -82,6 +87,7 @@ export function customConnectorRoutes(deps: AppDeps) {
   const { db, config, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
+  app.use("/connector-icons/*", requireSession(deps.auth));
   const custom: CustomDeps = {
     db,
     keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
@@ -91,7 +97,28 @@ export function customConnectorRoutes(deps: AppDeps) {
     resolveHost: deps.extras?.resolveHost,
     connect: deps.extras?.mcpConnect ?? connectOverHttp,
     judge: deps.extras?.context?.judge,
+    blobs: adapters.platformBlobs,
   };
+
+  // A server's icon, for the org's members (content-hash names: cached for good).
+  app.get("/connector-icons/:orgId/:connectionId/:file", async (c) => {
+    const file = await connectorIconFile(
+      { db, blobs: adapters.platformBlobs },
+      c.get("user").id,
+      c.req.param("orgId"),
+      c.req.param("connectionId"),
+      c.req.param("file"),
+    );
+    return new Response(file.body, {
+      status: 200,
+      headers: {
+        "content-type": file.contentType,
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "sandbox",
+        "cache-control": "private, max-age=31536000, immutable",
+      },
+    });
+  });
 
   app.openapi(
     createRoute({

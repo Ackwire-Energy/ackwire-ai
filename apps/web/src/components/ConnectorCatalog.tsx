@@ -35,19 +35,24 @@ export function authKind(d: ConnectorDef): "oneClick" | "oauthOrKey" | "key" {
 
 /** Only our own icons (`/connectors/{name}.svg`), never an arbitrary URL in CSS. */
 const ICON_URL = /^\/connectors\/[a-z0-9-]+\.svg$/;
+/** A server's own icon, as the backend keeps and serves it (never the server's URL). */
+const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
 
 /**
  * The service's brand icon (Simple Icons, CC0) drawn as a mask in its brand
- * color (the ink for near-black brands); a monogram when there is none.
+ * color (the ink for near-black brands); else the icon a server connected
+ * by address gave (`image`, in its own colors); else a monogram.
  */
 export function ConnectorIcon({
   def,
   label,
   size = "md",
+  image,
 }: {
   def: Pick<ConnectorDef, "iconUrl" | "brandColor"> | null;
   label: string;
   size?: "md" | "lg";
+  image?: string | null;
 }) {
   const cls = `connector-icon${size === "lg" ? " connector-icon--lg" : ""}`;
   if (def?.iconUrl && ICON_URL.test(def.iconUrl)) {
@@ -58,6 +63,13 @@ export function ConnectorIcon({
     return (
       <span className={`${cls} connector-icon--brand`} aria-hidden="true">
         <span className="connector-icon__mark" style={style} />
+      </span>
+    );
+  }
+  if (image && SERVER_ICON.test(image)) {
+    return (
+      <span className={`${cls} connector-icon--brand`} aria-hidden="true">
+        <img className="connector-icon__img" src={image} alt="" />
       </span>
     );
   }

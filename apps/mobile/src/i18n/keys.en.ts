@@ -55,6 +55,8 @@ export const mobileEn: MobileTranslations = {
       checking: "Checking the server…",
       notALink: "This link isn't from an agentes.chat server.",
       tokenFailed: "The code expired or was already used. Sign in with your email, or show a new code on the computer.",
+      signInSlow:
+        "Signing in is taking longer than it should. Sign in with your email, or show a new code on the computer.",
     },
     scan: {
       hint: "Point at the QR code on the computer.",
