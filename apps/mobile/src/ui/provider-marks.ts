@@ -11,14 +11,17 @@ export const MARK_GRADIENT = "mark";
 /**
  * A maker's mark as drawn on the phone (pure, so it is unit-tested): its shapes in order, each in the maker's
  * colors for this scheme. The main shape takes the brand's color, its gradient, or `ink` for a one-color mark;
- * the parts (Kimi's dot, OpenCode's block) keep their own colors. Null for an id with no mark.
+ * the parts (Kimi's dot, OpenCode's block) keep their own colors. An image mark has no shapes: `ProviderLogo`
+ * draws the phone's own copy of its file. Null for an id with no mark.
  */
 export function markShapes(id: string, scheme: Scheme, ink: string) {
   const key = markOf(id);
   if (!key) return null;
   const mark = PROVIDER_MARKS[key];
+  if ("image" in mark) return { key, image: true, gradient: null, shapes: [] };
   return {
     key,
+    image: false,
     gradient: mark.gradient ?? null,
     shapes: [
       { d: mark.path, fill: mark.gradient ? `url(#${MARK_GRADIENT})` : (mark.color ?? ink) },

@@ -1011,10 +1011,51 @@ body[data-window="popover"] {
 .dk-fr__end[data-near] {
   margin-top: 24px;
 }
-/* Run here's steps as they run, each mark an `.ac-iconline` lead on its name's line. */
+/* Setting it up, in the window's middle: this computer's portrait, the title, then one 440 px column whose steps,
+   bar and buttons share its two edges. The middle sits a hair above the window's (the eye reads it there). */
+.dk-fr__setup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 16px;
+}
+/* Centered by auto margins, not justify-content: a block taller than the window scrolls from its top. */
+.dk-fr__setup > :first-child {
+  margin-top: auto;
+}
+.dk-fr__setup > :last-child {
+  margin-bottom: auto;
+}
+.dk-fr__setup > .ac-computer {
+  margin-bottom: 20px;
+}
+.dk-fr__setup > h1 {
+  text-align: center;
+}
+/* Focused for screen readers when the setup starts, never by the keyboard (tabIndex -1). */
+.dk-fr__setup > h1:focus {
+  outline: none;
+}
+.dk-fr__run {
+  width: min(100%, 440px);
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+}
+.dk-fr__run .dk-bar {
+  margin-top: 24px;
+}
+.dk-fr__runacts {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* The steps as they run, each mark an `.ac-iconline` lead on its name's line. */
 .dk-fr__steps {
   list-style: none;
-  margin: 24px 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -1052,7 +1093,7 @@ body[data-window="popover"] {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .dk-fr__stepname {
   display: flex;
@@ -1067,27 +1108,30 @@ body[data-window="popover"] {
   color: var(--faint);
   font-size: 12px;
 }
-.dk-fr__stepfail {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* The step under way's time, on its name's line at the column's right edge. */
+.dk-fr__steptime {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
-.dk-fr__stepacts {
-  display: flex;
-  gap: 8px;
+.dk-fr__stepline {
+  font-size: 12.5px;
+  color: var(--muted);
 }
 .dk-fr__steps .dk-fr__problem {
   margin: 0;
 }
-.dk-fr__bar {
-  margin-top: 28px;
+/* A progress bar (setting it up, an update's download), placed by its context. */
+.dk-bar {
   height: 6px;
   border-radius: 3px;
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
-.dk-fr__bar span {
+.dk-bar span {
   display: block;
   height: 100%;
   border-radius: 3px;
@@ -1095,7 +1139,7 @@ body[data-window="popover"] {
   transition: width 0.4s var(--out);
 }
 @media (prefers-reduced-motion: reduce) {
-  .dk-fr__bar span {
+  .dk-bar span {
     transition: none;
   }
 }
@@ -1506,6 +1550,26 @@ body[data-window="popover"] {
 /* Alone in its card: no space above the button. */
 .dk-ver__acts:first-child {
   margin-top: 0;
+}
+/* An update downloading: what it does and Cancel on a line as tall as the button, so Installing… keeps the card's
+   height, then the bar. */
+.dk-upd {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dk-upd__line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+.dk-upd__label {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.dk-upd__cancel {
+  margin-left: auto;
 }
 .dk-steps-list {
   margin: 0;

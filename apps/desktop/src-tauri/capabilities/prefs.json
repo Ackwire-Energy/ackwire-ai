@@ -22,6 +22,7 @@
     "allow-autostart-get",
     "allow-autostart-set",
     "allow-update-install",
+    "allow-update-cancel",
     "allow-dock-set",
     "allow-local-server-status",
     "allow-local-server-start",

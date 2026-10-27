@@ -14,7 +14,8 @@
  * went back), `?run=0` (it stopped running here, its data kept), `?usage=0` (usage statistics off),
  * `?tailscale=` (on, off, missing), `?installed=terminal` (one from the terminal; `&claim=1` waits for its owner,
  * `&serving=0` isn't running), `?fail=` (database, start, account, reach: that setup step fails), `?hold=<step>`
- * (setting up stops there).
+ * (setting up stops there). Cancel ends a setup at once, held or not (it rejects with "cancelled", as the app's
+ * does). An update downloads in about 1.5 s with its progress, and Cancel drops it.
  */
 import { CLOUD_SERVER, readInstance, type ServerCheck } from "@agenteschat/client/lib/server";
 import type { Candidate } from "../control/first-run";
@@ -53,6 +54,8 @@ export interface HereOptions {
   /** Why reach didn't turn on (`?reason=`; HTTPS off by default). */
   reason?: ServeProblem["reason"];
   hold?: SetupStep;
+  /** Each setup step's time in ms (the tests' 10); a little over a second by default. */
+  pace?: number;
 }
 
 const LOCAL_URL = "http://127.0.0.1:4310";
@@ -151,6 +154,9 @@ export function createFakeHost(
     for (const l of reachListeners) l(stage);
   };
   let reachStopped = false;
+  const progressListeners = new Set<(got: number, total: number | null) => void>();
+  let cancelSetup: (() => void) | null = null;
+  let dropUpdate: (() => void) | null = null;
   const setLocal = (next: Partial<LocalServerStatus>) => {
     local = { ...local, ...next };
     for (const l of localListeners) l(local);
@@ -333,10 +339,29 @@ export function createFakeHost(
     notify: async (title, body) => {
       console.info("[fake] notification:", title, "—", body);
     },
-    installUpdate: async () => {
-      console.info("[fake] install update and relaunch");
-      await wait(1500);
-      return false;
+    // Nothing installs in a browser: once downloaded, the manual way.
+    installUpdate: () =>
+      new Promise<boolean>((resolve, reject) => {
+        const total = 48_000_000;
+        let got = 0;
+        const timer = setInterval(() => {
+          got = Math.min(total, got + total / 10);
+          for (const l of progressListeners) l(got, total);
+          if (got < total) return;
+          clearInterval(timer);
+          dropUpdate = null;
+          setTimeout(() => resolve(false), 300);
+        }, 150);
+        dropUpdate = () => {
+          clearInterval(timer);
+          dropUpdate = null;
+          reject("cancelled");
+        };
+      }),
+    cancelUpdate: async () => dropUpdate?.(),
+    onUpdateProgress: (cb) => {
+      progressListeners.add(cb);
+      return () => progressListeners.delete(cb);
     },
     setNotch: async (on) => {
       console.info("[fake] notch:", on ? "on" : "off");
@@ -357,10 +382,16 @@ export function createFakeHost(
       const say = (change: StepChange) => {
         for (const l of stepListeners) l(change);
       };
+      const cancelled = new Promise<never>((_, reject) => {
+        cancelSetup = () => reject("cancelled");
+      });
+      cancelled.catch(() => {});
       for (const step of setupSteps(choice.reach)) {
         say({ step, state: "active" });
-        if (here.hold === step) await new Promise(() => {});
-        await wait(step === "database" ? 1400 : 800);
+        await Promise.race([
+          cancelled,
+          here.hold === step ? new Promise(() => {}) : wait(here.pace ?? (step === "database" ? 1400 : 800)),
+        ]);
         if (step === "reach" && (here.fail === "reach" || tailnet.state !== "on")) {
           const reason: ServeProblem =
             here.reason === "operator" || here.reason === "serve"
@@ -387,8 +418,10 @@ export function createFakeHost(
         usage: choice.usage,
         version: "1.4.0",
       });
+      cancelSetup = null;
       await host.chooseServer(local.publicUrl ?? LOCAL_URL, "/desktop/handover#token=fake");
     },
+    cancelLocalSetup: async () => cancelSetup?.(),
     startLocalServer: async () => {
       setLocal({ run: true, phase: "starting", backTo: null });
       await wait(1200);

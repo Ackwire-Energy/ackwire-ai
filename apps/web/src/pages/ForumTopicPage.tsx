@@ -61,10 +61,10 @@ import {
   useStanceText,
 } from "@/components/Forum";
 import { ErrorState, LoadingPage } from "@/components/Loading";
-import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { SaveToWikiDialog } from "@/components/SaveToWiki";
 import { isStoppable, StopButton, useStopRun } from "@/components/StopRun";
+import { SavedTools } from "@/components/ToolCalls";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
@@ -682,7 +682,7 @@ function Post({
             <Markdown source={p.body} variant="message" wikiLink={wikiLink} />
           </div>
           {stopped && <p className="forum-post__stop">{t("forum.posts.stopped")}</p>}
-          {p.agentRunId && <MessageWork runId={p.agentRunId} meta={p.meta} agentName={name} />}
+          {p.agentRunId && <SavedTools runId={p.agentRunId} meta={p.meta} agentName={name} />}
         </div>
       </article>
     );

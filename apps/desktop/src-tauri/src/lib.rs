@@ -22,8 +22,10 @@ mod tailscale;
 mod tray;
 mod window_state;
 
+use std::io::{self, Read};
 use std::path::Path;
-use std::sync::Mutex;
+use std::process::{Command, Stdio};
+use std::sync::{mpsc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -141,9 +143,11 @@ fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, Stri
 /// The launch argument start at login passes, so a login start stays in the menu bar.
 const AUTOSTART_ARG: &str = "--autostart";
 
-/// "Open the app": the main window on the server open now, or the first run while there is none.
+/// "Open the app": the main window on the server open now, or the first run while there is none. A setup whose
+/// window was closed comes back where it is (still running, or on the step that failed).
 pub(crate) fn open_app(app: &AppHandle) {
-    if servers::current(app).is_some() {
+    let hidden_setup = app.get_webview_window("welcome").is_some_and(|w| !w.is_visible().unwrap_or(true));
+    if servers::current(app).is_some() && !hidden_setup {
         let _ = main_window::open(app, None);
     } else {
         let _ = present(app, "welcome");
@@ -191,6 +195,108 @@ pub(crate) fn no_console(command: &mut std::process::Command) -> &mut std::proce
         command.creation_flags(CREATE_NO_WINDOW);
     }
     command
+}
+
+/// How a program the app waited on ended: its exit code (None when the app ended it), what it printed (1 MB of
+/// each at most), and why the app ended it, if it did.
+pub(crate) struct Ran {
+    pub code: Option<i32>,
+    pub out: String,
+    pub err: String,
+    pub cut: Option<Cut>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum Cut {
+    /// It ran past its limit.
+    TooLong,
+    /// Cancel, or the app quitting.
+    Stopped,
+}
+
+/// What `run_watched` does next, from what the program printed so far.
+pub(crate) enum Watch {
+    /// Keeps waiting, up to the wait it was given.
+    Wait,
+    /// Keeps waiting, up to this long from its start.
+    WaitUpTo(Duration),
+    /// Ends it now (`Cut::Stopped`).
+    Stop,
+}
+
+/// The one way the app waits on a program (Tailscale, the server's `migrate` and database moves, `host --once`):
+/// until it ends, `wait` passes or `stop` says so, checked every 50 ms; a cut kills it. Its output is read while
+/// it runs: a pipe holds 64 KB, and `tailscale status --json` on a large tailnet prints more, so a reader after
+/// the exit would never see it end. A program it started that outlives it keeps the pipes open until it ends too.
+pub(crate) fn run_program(command: &mut Command, wait: Duration, stop: &dyn Fn() -> bool) -> io::Result<Ran> {
+    run_watched(command, wait, &mut |_| if stop() { Watch::Stop } else { Watch::Wait })
+}
+
+/// `run_program`, with `watch` asked every 50 ms, given what the program printed so far (both outputs, as they
+/// came), whether to wait longer or end it: `tailscale serve` names the page for allowing HTTPS and then waits
+/// there until it is allowed.
+pub(crate) fn run_watched(
+    command: &mut Command,
+    wait: Duration,
+    watch: &mut dyn FnMut(&str) -> Watch,
+) -> io::Result<Ran> {
+    let mut child = no_console(command)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let (sent, arrived) = mpsc::channel::<Vec<u8>>();
+    let reader = |pipe: Option<Box<dyn Read + Send>>, sent: mpsc::Sender<Vec<u8>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(pipe) = pipe {
+                let mut pipe = pipe.take(1024 * 1024);
+                let mut chunk = [0u8; 8192];
+                loop {
+                    match pipe.read(&mut chunk) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            bytes.extend_from_slice(&chunk[..n]);
+                            let _ = sent.send(chunk[..n].to_vec());
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                        Err(_) => break,
+                    }
+                }
+            }
+            String::from_utf8_lossy(&bytes).into_owned()
+        })
+    };
+    let out = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent.clone());
+    let err = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent);
+    let started = Instant::now();
+    let mut so_far = String::new();
+    let (code, cut) = loop {
+        while let Ok(chunk) = arrived.try_recv() {
+            so_far.push_str(&String::from_utf8_lossy(&chunk));
+        }
+        let cut = match child.try_wait() {
+            Ok(Some(status)) => break (status.code(), None),
+            Ok(None) => match watch(&so_far) {
+                Watch::Stop => Cut::Stopped,
+                Watch::Wait if started.elapsed() <= wait => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                Watch::WaitUpTo(longer) if started.elapsed() <= wait.max(longer) => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                _ => Cut::TooLong,
+            },
+            // It can't be asked.
+            Err(_) => Cut::TooLong,
+        };
+        let _ = child.kill();
+        let _ = child.wait();
+        break (None, Some(cut));
+    };
+    Ok(Ran { code, out: out.join().unwrap_or_default(), err: err.join().unwrap_or_default(), cut })
 }
 
 /// Graceful quit: the children stop, then the app exits.
@@ -328,8 +434,15 @@ fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Downloads and installs the newer version (signed with the key built into the app, checked by
-/// the plugin), stops the runners and relaunches. `false`: nothing newer to install.
+/// The update being checked for or downloaded now: Cancel drops it (nothing is installed until it is whole).
+#[derive(Default)]
+struct UpdateDownload(Mutex<Option<Box<dyn Fn() + Send>>>);
+
+const UPDATE_PROGRESS_EVENT: &str = "update://progress";
+
+/// Downloads the newer version, with its progress to Preferences, then installs it (signed with the key built
+/// into the app, checked by the plugin), stops the runners and relaunches. `false`: nothing newer to install.
+/// Err "cancelled": Cancel dropped the check or the download.
 #[tauri::command]
 async fn update_install(app: AppHandle) -> Result<bool, String> {
     // Windows runs the installer and ends the app at once, and the installer can't replace the files of a
@@ -338,19 +451,55 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
     let before_exit = app.clone();
     let updater = app
         .updater_builder()
+        .timeout(Duration::from_secs(30))
+        // The plugin's requests never time out by themselves: a download that receives nothing for a minute
+        // fails, while a slow one that still moves goes on (the limit resets on every read).
+        .configure_client(|client| client.read_timeout(Duration::from_secs(60)))
         .on_before_exit(move || {
             stop_children(&before_exit);
             before_exit.cleanup_before_exit();
         })
         .build()
         .map_err(|e| e.to_string())?;
-    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
-        return Ok(false);
+    let progress = app.clone();
+    // The check and the download are one task: Preferences shows Cancel from the click, and the check can take
+    // its 30 s.
+    let task = tauri::async_runtime::spawn(async move {
+        let Some(mut update) = updater.check().await? else {
+            return Ok(None);
+        };
+        // The 30 s are the check's: a download of any length is fine while it keeps moving.
+        update.timeout = None;
+        let (mut got, mut said) = (0u64, None::<u64>);
+        let on_chunk = move |chunk: usize, total: Option<u64>| {
+            got += chunk as u64;
+            // Once per percent, or per MB without a size: never once per chunk.
+            let step = total.map_or(got / 1_048_576, |t| got * 100 / t.max(1));
+            if said != Some(step) {
+                said = Some(step);
+                let _ = progress.emit_to("prefs", UPDATE_PROGRESS_EVENT, (got, total));
+            }
+        };
+        let bytes = update.download(on_chunk, || {}).await?;
+        Ok::<_, tauri_plugin_updater::Error>(Some((update, bytes)))
+    });
+    let abort = task.inner().abort_handle();
+    let download = app.state::<UpdateDownload>();
+    if let Ok(mut current) = download.0.lock() {
+        *current = Some(Box::new(move || abort.abort()));
+    }
+    let done = task.await;
+    if let Ok(mut current) = download.0.lock() {
+        *current = None;
+    }
+    let (update, bytes) = match done {
+        Ok(Ok(Some(found))) => found,
+        Ok(Ok(None)) => return Ok(false),
+        Ok(Err(e)) => return Err(e.to_string()),
+        Err(_) => return Err("cancelled".into()),
     };
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(|e| e.to_string())?;
+    // Windows: the installer runs and the app ends here.
+    update.install(bytes).map_err(|e| e.to_string())?;
     // The runners and the server here finish their work first, as when quitting; then the new app opens
     // (and starts the server here's new version, `local_server`).
     tauri::async_runtime::spawn_blocking(move || {
@@ -358,6 +507,14 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
         app.restart();
     });
     Ok(true)
+}
+
+/// Preferences' Cancel while an update downloads.
+#[tauri::command]
+fn update_cancel(download: tauri::State<'_, UpdateDownload>) {
+    if let Some(abort) = download.0.lock().ok().and_then(|mut current| current.take()) {
+        abort();
+    }
 }
 
 /// Turns the notch on or off (Preferences › General; the popover applies the saved choice at start).
@@ -437,6 +594,7 @@ pub fn run() {
         .manage(dock::Dock::default())
         .manage(menus::MenuParts::default())
         .manage(window_state::LastSaved::default())
+        .manage(UpdateDownload::default())
         .invoke_handler(tauri::generate_handler![
             runners_list,
             runner_send,
@@ -454,6 +612,7 @@ pub fn run() {
             autostart_set,
             notify,
             update_install,
+            update_cancel,
             notch_set,
             notch_info,
             notch_place,
@@ -464,6 +623,7 @@ pub fn run() {
             deep_link::link_take,
             local_server::local_server_status,
             local_server::local_server_install,
+            local_server::local_server_cancel,
             local_server::local_server_start,
             local_server::local_server_stop,
             local_server::local_server_restart,
@@ -501,6 +661,14 @@ pub fn run() {
             }
             WindowEvent::Focused(false) if window.label() == main_window::LABEL => {
                 main_window::keep_lights(window.app_handle());
+            }
+            // Closing it while agentes.chat is being set up only hides it: the setup goes on (Cancel stops it).
+            WindowEvent::CloseRequested { api, .. }
+                if window.label() == "welcome" && local_server::setting_up(window.app_handle()) =>
+            {
+                api.prevent_close();
+                let _ = window.hide();
+                sync_dock(window.app_handle());
             }
             // Welcome and Preferences really close (made again when they open).
             WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {}
@@ -618,5 +786,72 @@ mod tests {
         assert!(is_help_page("https://agentes.chat/help/run-on-your-computer?lang=en#who"));
         assert!(!is_help_page("https://agentes.chat.evil.com/help/x"));
         assert!(!is_help_page("https://agentes.chat/helpdesk"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_program_ends_on_its_own_runs_out_of_time_or_is_stopped() {
+        use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
+        let sh = |script: &str| {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", script]);
+            command
+        };
+        // On its own: its code and both outputs, read while it runs (more than a pipe holds).
+        let ran = run_program(
+            &mut sh("head -c 200000 /dev/zero | tr '\\000' a; echo done >&2; exit 3"),
+            Duration::from_secs(5),
+            &|| false,
+        )
+        .unwrap();
+        assert_eq!((ran.code, ran.cut, ran.out.len(), ran.err.as_str()), (Some(3), None, 200_000, "done\n"));
+        // Out of time: ended, what it printed kept.
+        let started = Instant::now();
+        let ran = run_program(&mut sh("echo early; exec sleep 5"), Duration::from_millis(300), &|| false).unwrap();
+        assert_eq!((ran.code, ran.cut, ran.out.as_str()), (None, Some(Cut::TooLong), "early\n"));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        // Stopped (Cancel, quitting): at once, whatever its limit.
+        let stop = AtomicBool::new(false);
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                std::thread::sleep(Duration::from_millis(150));
+                stop.store(true, SeqCst);
+            });
+            let started = Instant::now();
+            let ran = run_program(&mut sh("exec sleep 5"), Duration::from_secs(60), &|| stop.load(SeqCst)).unwrap();
+            assert_eq!(ran.cut, Some(Cut::Stopped));
+            assert!(started.elapsed() < Duration::from_secs(2));
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_watched_run_waits_longer_once_asked_and_stops_when_told() {
+        let sh = |script: &str| {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", script]);
+            command
+        };
+        // It names a page, then takes longer than the first wait: the watcher gives it more time.
+        let script = "echo 'visit https://login.tailscale.com/f/serve?node=abc'; sleep 1; echo done";
+        let mut seen = None;
+        let ran = run_watched(&mut sh(script), Duration::from_millis(300), &mut |so_far: &str| {
+            match so_far.split_whitespace().find(|w| w.starts_with("https://")) {
+                Some(url) => {
+                    seen.get_or_insert(url.to_string());
+                    Watch::WaitUpTo(Duration::from_secs(5))
+                }
+                None => Watch::Wait,
+            }
+        })
+        .unwrap();
+        assert_eq!((ran.code, ran.cut), (Some(0), None), "it finished on its own");
+        assert!(ran.out.ends_with("done\n"));
+        assert_eq!(seen.as_deref(), Some("https://login.tailscale.com/f/serve?node=abc"));
+        // Told to stop: it ends at once, well before its own end.
+        let started = Instant::now();
+        let ran = run_watched(&mut sh("exec sleep 5"), Duration::from_secs(10), &mut |_| Watch::Stop).unwrap();
+        assert_eq!(ran.cut, Some(Cut::Stopped));
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 }

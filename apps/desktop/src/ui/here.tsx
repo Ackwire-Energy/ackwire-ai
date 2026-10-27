@@ -1,6 +1,6 @@
 /**
  * The server here's own controls, shared by the first run, Preferences and the popover: reach through
- * Tailscale by what Tailscale is doing on this computer, why reach didn't turn on, and "Copy diagnostics";
+ * Tailscale by what Tailscale is doing on this computer, why reach didn't turn on, and "Copy details";
  * and a server's tile by where it runs.
  */
 import { Button, Icon, type IconName, PixelSpinner, Switch } from "@agenteschat/ui";
@@ -147,18 +147,23 @@ export function ReachProgress({ stage }: { stage: ReachStage }) {
 }
 
 /**
- * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, the command to copy
- * where the terminal does, and "Copy diagnostics" when the server didn't answer again.
+ * Why reach didn't turn on, with "Turn it on" where the tailnet's admin page fixes it, the command to copy where
+ * the terminal does, "Copy details" when the server didn't answer again, and where to get Tailscale when it can't
+ * share. Under the setup's step its mark already says it: the alert icon is Preferences' only.
  */
 export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "fail" | "prefs" }) {
   const { t } = useTranslation();
   const host = useHost();
   const reason = t(REASON_TEXT[problem.reason]);
   return (
-    <span className="dk-honest dk-fr__problem ac-iconline" role="alert">
-      <Icon name="alert" size={16} />
+    <span
+      className={text === "prefs" ? "dk-honest dk-fr__problem ac-iconline" : "dk-honest dk-fr__problem"}
+      role="alert"
+    >
+      {text === "prefs" && <Icon name="alert" size={16} />}
       <span>
         {text === "fail" ? t("desktop.here.fail.reach", { reason }) : t("desktop.server.reachFailed", { reason })}
+        {problem.reason === "serve" && ` ${t("desktop.here.serveFix")}`}
         {problem.reason === "https" && (
           <>
             {" "}
@@ -179,33 +184,37 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
           </>
         )}
         {problem.reason === "start" && (
-          <span className="dk-reach-stage__acts">
-            <CopyDiagnostics />
-          </span>
+          <>
+            {" "}
+            <CopyDetails as="link" />
+          </>
         )}
       </span>
     </span>
   );
 }
 
-/** Copies what the app knows about the server here (versions, its state, the end of its log). */
-export function CopyDiagnostics({ size = "sm" }: { size?: "sm" | "md" }) {
+/**
+ * Copies what the app knows about the server here (versions, its state, the setup's steps, the end of its log): a
+ * button, or a link on the line of the problem it describes.
+ */
+export function CopyDetails({ as = "button", size = "sm" }: { as?: "button" | "link"; size?: "sm" | "md" }) {
   const { t } = useTranslation();
   const host = useHost();
   const toast = useToast();
-  return (
-    <Button
-      size={size}
-      icon="copy"
-      onClick={() =>
-        void host
-          .localDiagnostics()
-          .then((text) => navigator.clipboard.writeText(text))
-          .then(() => toast(t("desktop.common.copied"), "check"))
-          .catch(() => toast(t("desktop.common.error"), "alert"))
-      }
-    >
-      {t("desktop.here.copyDiagnostics")}
+  const copy = () =>
+    void host
+      .localDiagnostics()
+      .then((text) => navigator.clipboard.writeText(text))
+      .then(() => toast(t("desktop.common.copied"), "check"))
+      .catch(() => toast(t("desktop.common.error"), "alert"));
+  return as === "link" ? (
+    <button type="button" className="ac-link dk-link" onClick={copy}>
+      {t("desktop.here.copyDetails")}
+    </button>
+  ) : (
+    <Button size={size} icon="copy" onClick={copy}>
+      {t("desktop.here.copyDetails")}
     </Button>
   );
 }

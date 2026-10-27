@@ -64,6 +64,7 @@ describe("the marks as the phone draws them", () => {
     // Claude for the `anthropic` provider, in Clay.
     expect(markShapes("anthropic", "light", INK)).toEqual({
       key: "claude",
+      image: false,
       gradient: null,
       shapes: [{ d: PROVIDER_MARKS.claude.path, fill: "#D97757" }],
     });
@@ -79,6 +80,23 @@ describe("the marks as the phone draws them", () => {
     // A one-color mark takes the ink it is given, with no color of its own.
     expect(markShapes("codex", "light", INK)?.shapes).toEqual([{ d: PROVIDER_MARKS.openai.path, fill: INK }]);
     expect(markShapes("newplan", "light", INK)).toBeNull();
+  });
+
+  test("an image mark has no shapes: ProviderLogo draws the phone's own copy of the web's file", async () => {
+    const images = Object.entries(PROVIDER_MARKS).flatMap(([id, mark]) =>
+      "image" in mark ? [{ id, image: mark.image }] : [],
+    );
+    expect(images).toEqual([{ id: "gemini", image: "/brands/gemini.png" }]);
+    const source = await Bun.file(new URL("../src/ui/ProviderLogo.tsx", import.meta.url).pathname).text();
+    for (const { id, image } of images) {
+      expect(markShapes(id, "dark", INK)).toEqual({ key: id, image: true, gradient: null, shapes: [] });
+      const file = image.slice("/brands/".length);
+      const phone = await Bun.file(new URL(`../assets/images/brands/${file}`, import.meta.url).pathname).bytes();
+      const web = await Bun.file(new URL(`../../web/public${image}`, import.meta.url).pathname).bytes();
+      expect(phone).toEqual(web);
+      // Bundled under the mark's id: the file just compared.
+      expect(source).toContain(`${id}: require("../../assets/images/brands/${file}")`);
+    }
   });
 
   test("a stack: 20 pt chips with a 12 pt mark, in the order given, each over the one before", () => {

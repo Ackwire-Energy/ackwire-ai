@@ -296,29 +296,39 @@ export const en: Translations = {
       otherName: "Another app",
       agenteschatName: "agentes.chat export",
       where: {
-        openclaw:
-          "Drag the whole ~/.openclaw folder (it brings every agent) or just one workspace. On a Mac, ⌘⇧. shows hidden folders in the file picker.",
-        hermes:
-          "In a terminal, run hermes profile export with the profile's name and drop the .tar.gz here. Or drag the ~/.hermes folder to bring every profile.",
         openbotrun:
           "Drop openbot-import.json (from Migrator by OpenBot) or openbot-transfer.json (from the instance transfer), or the .zip it came in.",
-        paperclip: "Drag the package folder (the one with COMPANY.md), drop a .zip of it or paste its GitHub link.",
         openmausbot: "In OpenMausBot: right-click the team → Share team… → Save file.",
-        openbot:
-          "In OpenBot: drag the tenant folder (agents.yaml, agents/, model.yaml, skills.yaml) or paste its GitHub link.",
+        hermes:
+          "In a terminal, run hermes profile export with the profile's name and drop the .tar.gz here. Or drag the ~/.hermes folder to bring every profile.",
+        openclaw:
+          "Drag the whole ~/.openclaw folder (it brings every agent) or just one workspace. On a Mac, ⌘⇧. shows hidden folders in the file picker.",
+        paperclip: "Drag the package folder (the one with COMPANY.md), drop a .zip of it or paste its GitHub link.",
         agenteschat:
           "In the other workspace: Settings → Import and export → Download the file. Then drop the .json here.",
       },
-      other: {
-        title: "Ask the other app to export",
-        steps: {
-          copy: "Copy the request below.",
+      request: {
+        "grok-bot": {
+          title: "Ask your bot to export",
+          paste: "Paste it in the chat with your bot.",
+          back: "It replies with the JSON: copy the whole reply and paste it in the field below.",
+          copied: "Now paste it in the chat with your bot.",
+        },
+        "chatgpt-dots": {
+          title: "Ask your dot to export",
+          paste: "Paste it in a new chat.",
+          back: "Download the file it makes and drop it here.",
+          copied: "Now paste it in a new chat.",
+        },
+        other: {
+          title: "Ask the other app to export",
           paste: "Paste it in a new conversation in the other app.",
           back: "Bring back what it returns: drop the file here or paste the reply in the field below.",
+          copied: "Now paste it in the other app.",
         },
+        copyStep: "Copy the request below.",
         prompt: "Export request",
         copy: "Copy the request",
-        copied: "Now paste it in the other app.",
         copyFailed: "Couldn't copy. Click the request, which selects all of it, and copy with ⌘C or Ctrl+C.",
         where: "Where each app puts it",
       },
@@ -485,7 +495,7 @@ export const en: Translations = {
         notGithub:
           "For now we only read GitHub links. From anywhere else, download the folder or the .zip and drop it here.",
         unknownPasted:
-          "We don't recognize that text. Paste the other app's whole reply, with the JSON, or ask again with the request under Another app.",
+          "We don't recognize that text. Paste the other app's whole reply, with the JSON, or copy the request again and ask once more.",
         invalidBundle:
           "The file has something outside the format we can import. If it came from another app, ask it to export again.",
         read: "Couldn't read the file. Try again or choose another one.",
@@ -1305,6 +1315,11 @@ export const en: Translations = {
       unattended: "nobody watching",
     },
     said: "<b>{{name}}:</b> “{{text}}”",
+    /** A request in the conversation, as the agent asking (ApprovalAsk). */
+    askPlain: "I need your OK to go on:",
+    seeEmail: "See the email",
+    seeDetails: "See details",
+    notNow: "Not now",
     email: {
       from: "From",
       to: "To",
@@ -5460,7 +5475,7 @@ export const en: Translations = {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
-      held: "{{name}} reads it after your decision on the card",
+      held: "{{name}} reads it after your decision",
       read: "{{name}} read it",
       resolved: "{{name}} closed the help request",
     },
@@ -7230,7 +7245,7 @@ export const en: Translations = {
     telemetry: {
       title: "Usage statistics",
       label: "Send anonymous usage statistics to agentes.chat",
-      help: "Counts such as people, agents, machine sizes and AI tokens used. Never messages, files or names.",
+      help: "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites.",
       envOff: "Turned off in this server's settings (TELEMETRY=off).",
       envOffDesktop: "Turned off in the agentes.chat app on this server's computer (Preferences\u00a0›\u00a0Servers).",
       see: "See what is sent",
@@ -7469,6 +7484,15 @@ export const en: Translations = {
       steps_other: "{{count}} steps",
       none: "Answered without tools.",
       failed: "Couldn't load the steps.",
+      /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
+      block: "What {{pronoun}} did",
+      used_one: "Used {{count}} tool",
+      used_other: "Used {{count}} tools",
+      times: "×{{count}}",
+      erred: "Error while {{activity}}",
+      gave: "given",
+      answered: "answered",
+      error: "error",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
@@ -7526,6 +7550,7 @@ export const en: Translations = {
         offeringConnectAi: "Offered to connect an AI",
         askingAgent: "Asked another agent",
         tellingAgent: "Told another agent",
+        findingTools: "Looked for tools",
         usingTool: "Used the {{tool}} tool",
         thinking: "Thought",
         typing: "Wrote",
@@ -7590,6 +7615,7 @@ export const en: Translations = {
       offeringConnectAi: "getting an AI ready to connect",
       askingAgent: "asking another agent",
       tellingAgent: "telling another agent",
+      findingTools: "looking for tools",
       usingTool: "using a tool",
     },
     tokens: "{{value}} tokens",

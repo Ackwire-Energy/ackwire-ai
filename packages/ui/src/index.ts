@@ -178,6 +178,7 @@ export { OptionList, type OptionListItem, type OptionListProps } from "./compone
 export {
   PixelDone,
   type PixelDoneProps,
+  PixelFail,
   PixelStop,
   type PixelStopProps,
   pixelCell,
@@ -296,6 +297,13 @@ export {
 } from "./components/ToolPixels";
 export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
+export {
+  ToolBlock,
+  type ToolBlockHead,
+  type ToolBlockItem,
+  type ToolBlockLine,
+  type ToolBlockState,
+} from "./components/ToolBlock";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
 export { hoverPointer, onScreenKeyboard, onScreenNow } from "./device";
@@ -320,6 +328,7 @@ export {
   type TextEdit,
   wrapSelection,
 } from "./format";
+export { useNow } from "./hooks/useNow";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export { initialsOf } from "./names";
 export {

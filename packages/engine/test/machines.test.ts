@@ -303,6 +303,31 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(row).toMatchObject({ online: false, connectedReplica: null });
   });
 
+  test("a pong's browser traffic is stored with when it came, with or without a load (protocol 23)", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const row = async () =>
+      (await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId)))[0];
+    const browserTraffic = { up: 4096, down: 1_250_000, hours: 0.2 };
+    const before = Date.now();
+    await runner.frame({ type: "pong", at: 1, browserTraffic });
+    const stored = await row();
+    expect(stored?.browserTraffic).toEqual({ ...browserTraffic, at: expect.any(String) });
+    expect(Date.parse(stored?.browserTraffic?.at ?? "")).toBeGreaterThanOrEqual(before - 1000);
+    expect(stored?.load).toBeNull();
+
+    const load = { loadAvg: 0.1, loadPeak: 0.5, memoryAvg: 0.3, memoryPeak: 0.4, hours: 0.2 };
+    const more = { up: 8192, down: 2_000_000, hours: 0.3 };
+    await runner.frame({ type: "pong", at: 2, load, browserTraffic: more });
+    expect(await row()).toMatchObject({ load: { ...load, at: expect.any(String) }, browserTraffic: more });
+    // A pong without either keeps what the last one said; one out of bounds says nothing.
+    await runner.frame({ type: "pong", at: 3, browserTraffic: { ...more, up: -5 } });
+    expect((await row())?.browserTraffic).toMatchObject(more);
+  });
+
   test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {
     f = await setup({ machines: true });
     const hub = f.machineHub as MachineHub;

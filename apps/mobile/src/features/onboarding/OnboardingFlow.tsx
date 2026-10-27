@@ -45,9 +45,9 @@ import {
   firstAskOf,
   GUIDE,
   HOST,
+  IMPORT_BRAND,
   IMPORT_ROWS,
   type ImportRow,
-  importRowName,
   introducesAt,
   inviteEach,
   joiningLeft,
@@ -543,54 +543,41 @@ export function OnboardingFlow() {
 /** How often Done asks again about an agent waiting for its computer (no socket is open here), as the web does. */
 const AI_POLL_MS = 5000;
 
-/** Each source's official logo (assets/images/brands/README.md); a dark file where the maker has one. */
-const IMPORT_LOGO: Record<Exclude<ImportRow, "other">, { light: number; dark?: number }> = {
-  openclaw: { light: require("../../../assets/images/brands/openclaw.png") },
-  hermes: {
-    light: require("../../../assets/images/brands/hermes.png"),
-    dark: require("../../../assets/images/brands/hermes-dark.png"),
+/** Each app's official logo (assets/images/brands/README.md); a dark file where the maker has one. */
+const IMPORT_LOGO: Record<ImportRow, { light: number; dark?: number }> = {
+  "grok-bot": {
+    light: require("../../../assets/images/brands/grok-bot.png"),
+    dark: require("../../../assets/images/brands/grok-bot-dark.png"),
   },
+  "chatgpt-dots": { light: require("../../../assets/images/brands/chatgpt-dots.png") },
   openbotrun: { light: require("../../../assets/images/brands/openbotrun.png") },
-  paperclip: {
-    light: require("../../../assets/images/brands/paperclip.png"),
-    dark: require("../../../assets/images/brands/paperclip-dark.png"),
-  },
-  openmausbot: { light: require("../../../assets/images/brands/openmausbot.png") },
-  openbot: { light: require("../../../assets/images/brands/openbot.png") },
-  agenteschat: { light: require("../../../assets/images/brands/agenteschat.png") },
 };
 
-/** Trazer agentes: every app the web brings agents from, each with where its file is behind the ⓘ. */
+/**
+ * Trazer agentes: the three most used apps the web brings agents from, with where the file is behind the ⓘ. Grok Bot
+ * and ChatGPT dots have none: on the web they answer a request, not a file.
+ */
 function ImportStep() {
   const { t } = useTranslation();
   const { colors: c, scheme } = useTheme();
   return (
     <>
       {IMPORT_ROWS.map((row) => {
-        const name = importRowName(t, row);
-        const logo = row === "other" ? null : IMPORT_LOGO[row];
+        const logo = IMPORT_LOGO[row];
         return (
           <Line
             key={row}
             lead={
               <View style={[styles.logoTile, { backgroundColor: c.sunken, borderColor: c.line }]}>
-                {logo ? (
-                  <Image
-                    source={scheme === "dark" ? (logo.dark ?? logo.light) : logo.light}
-                    contentFit="contain"
-                    style={styles.logo}
-                  />
-                ) : (
-                  <Icon name="more" size={16} color={c.muted} />
-                )}
+                <Image
+                  source={scheme === "dark" ? (logo.dark ?? logo.light) : logo.light}
+                  contentFit="contain"
+                  style={styles.logo}
+                />
               </View>
             }
-            title={name}
-            hint={
-              row === "other"
-                ? undefined
-                : { name: t("common.about", { label: name }), text: t(`onboarding.import.where.${row}`) }
-            }
+            title={IMPORT_BRAND[row]}
+            hint={row === "openbotrun" ? t("onboarding.import.where.openbotrun") : undefined}
           />
         );
       })}
@@ -893,10 +880,11 @@ function Line({
   title: string;
   sub?: string;
   end?: string | undefined;
-  /** An ⓘ after the title, its text under the row's words. */
-  hint?: { name: string; text: string } | undefined;
+  /** An ⓘ after the title ("About <title>"), this text under the row's words. */
+  hint?: string | undefined;
   onPress?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation();
   const { colors: c } = useTheme();
   const name = (
     <Text variant="body" style={styles.bold}>
@@ -908,7 +896,7 @@ function Line({
       <View style={styles.lead}>{lead}</View>
       <View style={styles.grow}>
         {hint ? (
-          <InfoHint name={hint.name} text={hint.text} variant="body">
+          <InfoHint name={t("common.about", { label: title })} text={hint} variant="body">
             {name}
           </InfoHint>
         ) : (

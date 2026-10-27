@@ -6,7 +6,6 @@ import {
   HEARTBEAT_MS,
   HELLO_TIMEOUT_MS,
   type MachineErrorCode,
-  type MachineLoad,
   type MachineOp,
   type MachineReplies,
   type MachineRequest,
@@ -646,16 +645,25 @@ export function createMachineHub(deps: MachineHubDeps) {
       );
   }
 
-  /** A `pong`: `last_seen_at` at most every 40 s, and the day's load whenever the runner has a new one (protocol 22). */
-  async function touch(conn: MachineConnection, load?: MachineLoad) {
+  /**
+   * A `pong`: `last_seen_at` at most every 40 s, and the day's load (protocol 22) or its agents' browsers'
+   * traffic (protocol 23) whenever the runner has a new one.
+   */
+  async function touch(conn: MachineConnection, { load, browserTraffic }: Extract<RunnerFrame, { type: "pong" }>) {
     conn.lastPong = Date.now();
     if (!conn.machineId) return;
-    if (!load && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)) return;
+    if (!load && !browserTraffic && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)) return;
     conn.lastSeenWrite = Date.now();
     const now = new Date();
+    const at = now.toISOString();
     await db
       .update(machines)
-      .set({ lastSeenAt: now, online: true, ...(load ? { load: { ...load, at: now.toISOString() } } : {}) })
+      .set({
+        lastSeenAt: now,
+        online: true,
+        ...(load ? { load: { ...load, at } } : {}),
+        ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
+      })
       .where(and(eq(machines.id, conn.machineId), eq(machines.connectedReplica, replicaId)))
       .catch(() => undefined);
   }
@@ -982,7 +990,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       // The agent browser's live view (ADR 0040): straight to the viewers in memory.
       else if (frame.type === "browser.frame") browserHooks.frame?.(conn.machineId, frame);
       else if (frame.type === "browser.stream.ended") browserHooks.streamEnded?.(conn.machineId, frame);
-      else if (frame.type === "pong") await touch(conn, frame.load);
+      else if (frame.type === "pong") await touch(conn, frame);
       else if (frame.type === "task.event") {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
       } else if (frame.type === "mcp.call") {

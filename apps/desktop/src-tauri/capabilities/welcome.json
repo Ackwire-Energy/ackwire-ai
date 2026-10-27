@@ -1,6 +1,6 @@
 {
   "identifier": "welcome",
-  "description": "The first run and \"Add a server…\": the servers this app opens, what discovery found, the link waiting, choosing a server (the main window opens there), and running agentes.chat on this computer (setting it up, Tailscale's state for reach).",
+  "description": "The first run and \"Add a server…\": the servers this app opens, what discovery found, the link waiting, choosing a server (the main window opens there), and running agentes.chat on this computer (setting it up and cancelling it, Tailscale's state for reach).",
   "windows": ["welcome"],
   "permissions": [
     "core:default",
@@ -15,6 +15,7 @@
     "allow-app-info",
     "allow-local-server-status",
     "allow-local-server-install",
+    "allow-local-server-cancel",
     "allow-local-server-reach-stop",
     "allow-local-server-start",
     "allow-local-server-diagnostics",

@@ -496,7 +496,7 @@ computer and opens agentes.chat, signed in.
   (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
   and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
   brings both back.
-- **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
+- **Something went wrong?** **Copy details** copies what the app knows, the setup's steps and the end of
   `~/.agentes/logs/server.log`.
 - A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
   offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
@@ -722,11 +722,12 @@ which removes the file as soon as it is read. Leave it `off` and people connect 
 <summary><b>Optional services and what they receive</b></summary>
 
 **The usage report.** The instance sends agentes.chat anonymous usage statistics: counts such as people,
-agents, machine sizes and AI tokens used, never messages, files or names. The first goes about an hour
-after the server first starts, then one a day at that time, restarts or not (one that came due while
-the server was off goes about 10 minutes after it starts again), as JSON in a POST to `TELEMETRY_URL`
-(`https://telemetry.agentes.chat/v1/report`). A send that fails is tried again three times within
-about 2.5 hours, then dropped: the next day's report replaces it. These are all its fields:
+agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive, never
+messages, files, names or sites. The first goes about an hour after the server first starts, then one a
+day at that time, restarts or not (one that came due while the server was off goes about 10 minutes
+after it starts again), as JSON in a POST to `TELEMETRY_URL` (`https://telemetry.agentes.chat/v1/report`).
+A send that fails is tried again three times within about 2.5 hours, then dropped: the next day's
+report replaces it. These are all its fields:
 
 | Field | What it is |
 | --- | --- |
@@ -740,16 +741,17 @@ about 2.5 hours, then dropped: the next day's report replaces it. These are all 
 | `organizations` | How many workspaces. |
 | `people` | How many accounts (`total`), and how many used the server in the last 1, 7 and 30 days (`active1d`, `active7d`, `active30d`). |
 | `agents` | How many agents, archived ones aside. |
-| `computers` | The computers connected to the server and seen in the last 30 days, with agents or not (this server's own, once for all the workspaces it serves; the ones people connected; one given by a provisioner), one line for each `kind` (`host`, `connected`, `managed`), `os`, `arch` and `size` (as above; `null` when their runner is too old to say), with how many computers are alike (`count`), how many `agents` use them, and their last day's `load` (as above, their averages averaged and the highest peaks; `null` when none said how busy it got in the last day). The 50 lines with the most computers. |
+| `computers` | The computers connected to the server and seen in the last 30 days, with agents or not (this server's own, once for all the workspaces it serves, plus the ones people connected and one given by a provisioner), one line for each `kind` (`host`, `connected`, `managed`), `os`, `arch` and `size` (as above, or `null` when their runner is too old to say), with how many computers are alike (`count`), how many `agents` use them, their last day's `load` (as above, their averages averaged and the highest peaks, or `null` when none said how busy it got in the last day), and `browserTraffic`: what the agents' browsers on them sent and received over the last day, as their Chrome counts each request's headers and body (`upMb`, `downMb`, in MB), the `hours` counted and how many of the line's computers said (`computers`), `null` when none did. Only the agents' browsers are counted, never the rest of the computer. The 50 lines with the most computers. |
 | `lastDay.runs`, `lastDay.toolCalls` | Agent runs started, and tool calls they made, in the last 24 hours. |
 | `lastDay.desktopMinutes`, `lastDay.terminalMinutes` | Minutes people watched or controlled agents' desktops, and had terminals open, in the last 24 hours. |
 | `lastDay.models` | For each AI provider and model used in the last 24 hours (the 50 most used): `provider`, `model`, `calls`, `inputTokens` (cached ones included) and `outputTokens`. A model that isn't in agentes.chat's model list (a name someone typed, a deployment, a fine-tune) goes as `other`. |
 
-It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, or ids of
-workspaces, people or computers (the request itself comes from your server's address, as any request
-does). `docker compose run --rm agentes telemetry` (without Docker, `agentes-server telemetry`) prints
-exactly the next report, whether it is on or off, and sends nothing; in the app, **Settings → General →
-Usage statistics → See what is sent** shows the same. Turn it off either way:
+It never holds messages, files, names, emails, hostnames, paths, prompts, IP addresses, the sites agents'
+browsers visit, or ids of workspaces, people or computers (the request itself comes from your server's
+address, as any request does). `docker compose run --rm agentes telemetry` (without Docker,
+`agentes-server telemetry`) prints exactly the next report, whether it is on or off, and sends nothing.
+In the app, **Settings → General → Usage statistics → See what is sent** shows the same. Turn it off
+either way:
 
 - `TELEMETRY=off` in `.env`, then `docker compose up -d` (the server reads it when it starts); without
   Docker, in `~/.agentes/.env`, then start it again. This wins over the switch below.

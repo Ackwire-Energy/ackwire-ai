@@ -303,29 +303,39 @@ export const ptBR = {
       otherName: "Outro app",
       agenteschatName: "Exportação do agentes.chat",
       where: {
-        openclaw:
-          "Arraste a pasta ~/.openclaw inteira (ela traz todos os agentes) ou só um workspace. No Mac, ⌘⇧. mostra as pastas ocultas na janela de escolher.",
-        hermes:
-          "No terminal, rode hermes profile export com o nome do perfil e solte o .tar.gz aqui. Ou arraste a pasta ~/.hermes para trazer todos os perfis.",
         openbotrun:
           "Solte o openbot-import.json (do Migrator by OpenBot) ou o openbot-transfer.json (da transferência da instância), ou o .zip em que ele veio.",
-        paperclip: "Arraste a pasta do pacote (a que tem o COMPANY.md), solte um .zip dela ou cole o link do GitHub.",
         openmausbot: "No OpenMausBot: clique com o botão direito no time → Compartilhar time… → Salvar arquivo.",
-        openbot:
-          "No OpenBot: arraste a pasta do tenant (agents.yaml, agents/, model.yaml, skills.yaml) ou cole o link do GitHub dela.",
+        hermes:
+          "No terminal, rode hermes profile export com o nome do perfil e solte o .tar.gz aqui. Ou arraste a pasta ~/.hermes para trazer todos os perfis.",
+        openclaw:
+          "Arraste a pasta ~/.openclaw inteira (ela traz todos os agentes) ou só um workspace. No Mac, ⌘⇧. mostra as pastas ocultas na janela de escolher.",
+        paperclip: "Arraste a pasta do pacote (a que tem o COMPANY.md), solte um .zip dela ou cole o link do GitHub.",
         agenteschat:
           "No outro workspace: Configurações → Importar e exportar → Baixar o arquivo. Depois é só soltar o .json aqui.",
       },
-      other: {
-        title: "Peça para o outro app exportar",
-        steps: {
-          copy: "Copie o pedido abaixo.",
+      request: {
+        "grok-bot": {
+          title: "Peça para o seu bot exportar",
+          paste: "Cole na conversa com o seu bot.",
+          back: "Ele responde com o JSON: copie a resposta inteira e cole no campo de baixo.",
+          copied: "Agora é só colar na conversa com o seu bot.",
+        },
+        "chatgpt-dots": {
+          title: "Peça para o seu dot exportar",
+          paste: "Cole num chat novo.",
+          back: "Baixe o arquivo que ele criar e solte aqui.",
+          copied: "Agora é só colar num chat novo.",
+        },
+        other: {
+          title: "Peça para o outro app exportar",
           paste: "Cole numa conversa nova no outro app.",
           back: "Traga o que ele devolver: solte o arquivo aqui ou cole a resposta no campo de baixo.",
+          copied: "Agora é só colar no outro app.",
         },
+        copyStep: "Copie o pedido abaixo.",
         prompt: "Pedido de exportação",
         copy: "Copiar o pedido",
-        copied: "Agora é só colar no outro app.",
         copyFailed: "Não deu para copiar. Clique no pedido, que ele fica todo selecionado, e copie com ⌘C ou Ctrl+C.",
         where: "Onde cada app entrega",
       },
@@ -492,7 +502,7 @@ export const ptBR = {
         link: "Não deu para ler esse link. Confira se o repositório é público e se o link aponta para o arquivo ou a pasta.",
         notGithub: "Por enquanto a gente só lê links do GitHub. De outro lugar, baixe a pasta ou o .zip e solte aqui.",
         unknownPasted:
-          "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou peça de novo com o pedido de Outro app.",
+          "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou copie o pedido de novo e peça outra vez.",
         invalidBundle:
           "O arquivo tem algo fora do formato que dá para importar. Se veio de outro app, peça a exportação de novo.",
         read: "Não deu para ler o arquivo. Tente de novo ou escolha outro.",
@@ -1321,6 +1331,11 @@ export const ptBR = {
       unattended: "sem ninguém acompanhando",
     },
     said: "<b>{{name}}:</b> “{{text}}”",
+    /** A request in the conversation, as the agent asking (ApprovalAsk). */
+    askPlain: "Preciso do seu ok para seguir:",
+    seeEmail: "Ver o e-mail",
+    seeDetails: "Ver detalhes",
+    notNow: "Agora não",
     email: {
       from: "De",
       to: "Para",
@@ -5486,7 +5501,7 @@ export const ptBR = {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
-      held: "{{name}} lê depois da sua decisão no card",
+      held: "{{name}} lê depois da sua decisão",
       read: "{{name}} leu",
       resolved: "{{name}} encerrou o pedido de ajuda",
     },
@@ -7265,7 +7280,7 @@ export const ptBR = {
     telemetry: {
       title: "Estatísticas de uso",
       label: "Enviar estatísticas de uso anônimas ao agentes.chat",
-      help: "Contagens como pessoas, agentes, tamanho das máquinas e tokens de IA usados. Nunca mensagens, arquivos ou nomes.",
+      help: "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
       envOff: "Desligado nas configurações deste servidor (TELEMETRY=off).",
       envOffDesktop:
         "Desligado no app do agentes.chat no computador deste servidor (Preferências\u00a0›\u00a0Servidores).",
@@ -7509,6 +7524,15 @@ export const ptBR = {
       steps_other: "{{count}} passos",
       none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
+      /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
+      block: "O que {{pronoun}} fez",
+      used_one: "Usou {{count}} ferramenta",
+      used_other: "Usou {{count}} ferramentas",
+      times: "×{{count}}",
+      erred: "Deu erro {{activity}}",
+      gave: "recebeu",
+      answered: "devolveu",
+      error: "erro",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
@@ -7566,6 +7590,7 @@ export const ptBR = {
         offeringConnectAi: "Ofereceu conectar uma IA",
         askingAgent: "Perguntou a outro agente",
         tellingAgent: "Avisou outro agente",
+        findingTools: "Procurou ferramentas",
         usingTool: "Usou a ferramenta {{tool}}",
         thinking: "Pensou",
         typing: "Escreveu",
@@ -7630,6 +7655,7 @@ export const ptBR = {
       offeringConnectAi: "preparando a conexão de uma IA",
       askingAgent: "perguntando a outro agente",
       tellingAgent: "avisando outro agente",
+      findingTools: "procurando ferramentas",
       usingTool: "usando uma ferramenta",
     },
     tokens: "{{value}} tokens",

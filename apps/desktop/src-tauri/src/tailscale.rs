@@ -3,14 +3,14 @@
 //! inside the tailnet only; never Funnel). The tool is looked up at the places it installs itself, never at a
 //! path from a page.
 
-use std::io::{ErrorKind, Read};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
+
+use crate::{Cut, Watch};
 
 /// `status` gets this long to answer.
 const STATUS_WAIT: Duration = Duration::from_secs(2);
@@ -48,16 +48,6 @@ pub enum ServeError {
     Start,
 }
 
-/// What a watched run does next, from what the tool printed so far.
-pub enum Watch {
-    /// Keeps waiting, up to the wait it was given.
-    Wait,
-    /// Keeps waiting, up to this long from its start.
-    WaitUpTo(Duration),
-    /// Stops it now.
-    Stop,
-}
-
 /// The tool at the places it installs itself.
 pub fn cli() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
@@ -75,86 +65,11 @@ pub fn cli() -> Option<PathBuf> {
     fixed.iter().map(PathBuf::from).find(|p| p.is_file())
 }
 
-/// Runs the tool with `args`; see `run_program`.
+/// Runs the tool with `args`: whether it ended well, and what it printed (stdout, then stderr); None when it isn't
+/// there or couldn't start. Taking longer than `wait` stops it (what it printed so far is kept).
 fn run(args: &[&str], wait: Duration) -> Option<(bool, String)> {
-    run_program(&cli()?, args, wait)
-}
-
-/// Runs `program`; its exit status and what it printed (stdout, then stderr, 1 MB each at most), or None when
-/// it couldn't start. Taking longer than `wait` stops it (what it printed so far is kept).
-fn run_program(program: &Path, args: &[&str], wait: Duration) -> Option<(bool, String)> {
-    run_watched(program, args, wait, &mut |_| Watch::Wait)
-}
-
-/// `run_program`, with `watch` asked every 50 ms, given what the tool printed so far, whether to wait longer or
-/// stop it. Its output is read while it runs: a pipe holds 64 KB, and `status --json` on a large tailnet prints
-/// more, so a reader after the exit would never see it end.
-fn run_watched(
-    program: &Path,
-    args: &[&str],
-    wait: Duration,
-    watch: &mut dyn FnMut(&str) -> Watch,
-) -> Option<(bool, String)> {
-    let mut child = crate::no_console(&mut Command::new(program))
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .ok()?;
-    let (sent, arrived) = mpsc::channel::<Vec<u8>>();
-    let reader = |pipe: Option<Box<dyn Read + Send>>, sent: mpsc::Sender<Vec<u8>>| {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            if let Some(pipe) = pipe {
-                let mut pipe = pipe.take(1024 * 1024);
-                let mut chunk = [0u8; 8192];
-                loop {
-                    match pipe.read(&mut chunk) {
-                        Ok(0) => break,
-                        Ok(n) => {
-                            bytes.extend_from_slice(&chunk[..n]);
-                            let _ = sent.send(chunk[..n].to_vec());
-                        }
-                        Err(e) if e.kind() == ErrorKind::Interrupted => {}
-                        Err(_) => break,
-                    }
-                }
-            }
-            bytes
-        })
-    };
-    let stdout = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent.clone());
-    let stderr = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent);
-    let started = Instant::now();
-    let mut limit = wait;
-    let mut so_far = String::new();
-    let ok = loop {
-        while let Ok(chunk) = arrived.try_recv() {
-            so_far.push_str(&String::from_utf8_lossy(&chunk));
-        }
-        let stop = match watch(&so_far) {
-            Watch::Wait => false,
-            Watch::WaitUpTo(longer) => {
-                limit = limit.max(longer);
-                false
-            }
-            Watch::Stop => true,
-        };
-        match child.try_wait() {
-            Ok(Some(status)) => break status.success(),
-            Ok(None) if !stop && started.elapsed() <= limit => std::thread::sleep(Duration::from_millis(50)),
-            // Too long, stopped, or it can't be asked: stopped (the readers then reach the end).
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break false;
-            }
-        }
-    };
-    let mut out = String::from_utf8_lossy(&stdout.join().unwrap_or_default()).into_owned();
-    out.push_str(&String::from_utf8_lossy(&stderr.join().unwrap_or_default()));
-    Some((ok, out))
+    let ran = crate::run_program(Command::new(cli()?).args(args), wait, &|| false).ok()?;
+    Some((ran.code == Some(0), ran.out + &ran.err))
 }
 
 /// `tailscale status --json`, or None when the tool isn't there, fails or takes too long.
@@ -231,10 +146,8 @@ pub fn serve(port: u16, asks: &mut dyn FnMut(&str), stopped: &dyn Fn() -> bool) 
     let flag = format!("--https={https}");
     let cli = cli().ok_or(ServeError::Serve)?;
     let mut asked = false;
-    let mut gave_up = false;
     let mut watch = |so_far: &str| {
         if stopped() {
-            gave_up = true;
             return Watch::Stop;
         }
         if !asked {
@@ -249,14 +162,15 @@ pub fn serve(port: u16, asks: &mut dyn FnMut(&str), stopped: &dyn Fn() -> bool) 
             Watch::Wait
         }
     };
-    let ran = run_watched(&cli, &["serve", "--bg", &flag, &target], SERVE_WAIT, &mut watch);
-    if gave_up {
-        return Err(ServeError::Stopped);
-    }
-    match ran {
-        Some((true, _)) => Ok(if https == 443 { format!("https://{device}") } else { format!("https://{device}:{https}") }),
-        Some((false, out)) => Err(serve_error(&out)),
-        None => Err(ServeError::Serve),
+    let mut command = Command::new(cli);
+    command.args(["serve", "--bg", flag.as_str(), target.as_str()]);
+    let ran = crate::run_watched(&mut command, SERVE_WAIT, &mut watch).map_err(|_| ServeError::Serve)?;
+    match ran.cut {
+        Some(Cut::Stopped) => Err(ServeError::Stopped),
+        _ if ran.code == Some(0) => {
+            Ok(if https == 443 { format!("https://{device}") } else { format!("https://{device}:{https}") })
+        }
+        _ => Err(serve_error(&(ran.out + &ran.err))),
     }
 }
 
@@ -324,48 +238,6 @@ mod tests {
         assert_eq!(https_port(Some(&ours), device, target), 443);
         let other = json!({ "Web": { "ana-mac.tail1234.ts.net:443": { "Handlers": { "/": { "Proxy": "http://127.0.0.1:8080" } } } } });
         assert_eq!(https_port(Some(&other), device, target), 8443);
-    }
-
-    #[test]
-    fn output_larger_than_a_pipe_is_read_while_the_tool_runs() {
-        // About 1.4 KB per device in `status --json`: 200 KB is a tailnet of some 140 devices.
-        let script = "head -c 200000 /dev/zero | tr '\\000' a; echo done >&2";
-        let started = Instant::now();
-        let (ok, out) = run_program(Path::new("/bin/sh"), &["-c", script], Duration::from_secs(5)).unwrap();
-        assert!(ok, "it ended on its own, not stopped after the wait");
-        assert!(started.elapsed() < Duration::from_secs(4));
-        assert_eq!(out.len(), 200_000 + "done\n".len());
-        assert!(out.ends_with("adone\n"));
-        // Stopped after the wait, what it printed kept.
-        let (ok, out) = run_program(Path::new("/bin/sh"), &["-c", "echo early; exec sleep 5"], Duration::from_millis(300)).unwrap();
-        assert!(!ok);
-        assert_eq!(out, "early\n");
-    }
-
-    #[test]
-    fn a_watched_run_waits_longer_once_asked_and_stops_when_told() {
-        // It asks, then takes longer than the first wait: the watcher gives it more time.
-        let script = "echo 'visit https://login.tailscale.com/f/serve?node=abc'; sleep 1; echo done";
-        let mut seen = None;
-        let (ok, out) = run_watched(Path::new("/bin/sh"), &["-c", script], Duration::from_millis(300), &mut |so_far: &str| {
-            match admin_url(so_far) {
-                Some(url) => {
-                    seen.get_or_insert(url);
-                    Watch::WaitUpTo(Duration::from_secs(5))
-                }
-                None => Watch::Wait,
-            }
-        })
-        .unwrap();
-        assert!(ok, "it finished on its own");
-        assert!(out.ends_with("done\n"));
-        assert_eq!(seen.as_deref(), Some("https://login.tailscale.com/f/serve?node=abc"));
-        // Told to stop: it ends at once, well before its own end.
-        let started = Instant::now();
-        let (ok, _) = run_watched(Path::new("/bin/sh"), &["-c", "exec sleep 5"], Duration::from_secs(10), &mut |_| Watch::Stop)
-            .unwrap();
-        assert!(!ok);
-        assert!(started.elapsed() < Duration::from_secs(2));
     }
 
     #[test]

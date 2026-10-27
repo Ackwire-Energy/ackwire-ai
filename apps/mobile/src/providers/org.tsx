@@ -16,12 +16,26 @@ interface OrgGate {
   loading: boolean;
   /** Signed in but in no organization yet. */
   none: boolean;
+  /**
+   * `me` failed and nothing is cached (the server is down or out of reach): not "no organization", which would
+   * open the first run.
+   */
+  unreachable: boolean;
+  /** Asks for `me` again (the unreachable screen's "Tentar de novo"). */
+  retry: () => Promise<unknown>;
   state: OrgState | null;
   /** Makes an organization the current one (an invitation accepted, a workspace created in the first run). */
   choose: (orgId: string) => void;
 }
 
-const OrgContext = createContext<OrgGate>({ loading: true, none: false, state: null, choose: () => {} });
+const OrgContext = createContext<OrgGate>({
+  loading: true,
+  none: false,
+  unreachable: false,
+  retry: async () => {},
+  state: null,
+  choose: () => {},
+});
 
 /** The current organization: remembered in SecureStore, switched by `setOrgId` (and by a push's `orgId`). */
 export function OrgProvider({ children }: { children: ReactNode }) {
@@ -45,17 +59,20 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
   const orgs = me.data?.organizations ?? [];
   const orgId = remembered === undefined ? null : chooseOrg(orgs, remembered);
+  const unreachable = me.isError && me.data === undefined;
+  const retry = me.refetch;
   const value = useMemo<OrgGate>(() => {
+    const base = { unreachable, retry, choose: setOrgId };
     const loading = me.isPending || remembered === undefined;
-    if (loading) return { loading, none: false, state: null, choose: setOrgId };
-    if (!orgId) return { loading: false, none: true, state: null, choose: setOrgId };
+    if (loading || unreachable) return { ...base, loading, none: false, state: null };
+    if (!orgId) return { ...base, loading: false, none: true, state: null };
     return {
+      ...base,
       loading: false,
       none: false,
       state: { orgId, org: orgs.find((o) => o.id === orgId) ?? null, orgs, setOrgId },
-      choose: setOrgId,
     };
-  }, [me.isPending, remembered, orgId, orgs, setOrgId]);
+  }, [me.isPending, unreachable, retry, remembered, orgId, orgs, setOrgId]);
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
 }
