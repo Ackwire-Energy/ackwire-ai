@@ -197,6 +197,7 @@ describe("org storage", () => {
     for (let i = 0; i <= 1000; i++) await put(`orgs/${f.org.id}/artifacts/a${i}/v1`);
     await put(`org-logos/${f.org.id}/logo.png`);
     await put(`orgs/${second.id}/skills/s/SKILL.md`);
+    await put(`orgs/${second.id}/connector-icons/c/0123456789abcdef.png`);
     const kept = [`orgs/${hers.id}/artifacts/b/v1`, `org-logos/${hers.id}/logo.png`, `avatars/${bia.id}/me.png`];
     for (const key of kept) await put(key);
     const purges = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, ORG_FILES_PURGE_JOB));

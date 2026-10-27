@@ -470,9 +470,9 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
 }
 
 /**
- * Job `org.files.purge` (ADR 0019): a deleted workspace's files leave platform storage, its Drive and skills
- * (`orgs/{orgId}/`) and its logo (`org-logos/{orgId}/`), up to `limit` keys of each per run. True when a page
- * came back full, so more may be left. A bucket the workspace brought is its own and stays as it is.
+ * Job `org.files.purge` (ADR 0019): a deleted workspace's files leave platform storage, its Drive, skills and
+ * connector icons (`orgs/{orgId}/`) and its logo (`org-logos/{orgId}/`), up to `limit` keys of each per run. True
+ * when a page came back full, so more may be left. A bucket the workspace brought is its own and stays as it is.
  */
 export async function purgeOrgFiles(deps: StorageDeps, orgId: string, limit = 1000): Promise<boolean> {
   // Irreversible: never for a workspace that still exists.
