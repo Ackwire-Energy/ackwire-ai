@@ -218,8 +218,11 @@ export interface ApiClient {
   };
   account: {
     authConfig(): Promise<AuthConfig>;
-    /** Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). */
-    signInOptions(input: { email: string }): Promise<SignInOptions>;
+    /**
+     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `humanCheck`: the
+     * bot check's token, when the server has one (`human_check` 403 without it).
+     */
+    signInOptions(input: { email: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
@@ -952,9 +955,9 @@ export interface ApiClient {
     turnOff(orgId: string, linkId: string): Promise<void>;
     /**
      * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
-     * `join.code_wait` (429) with `retryIn` seconds right after another.
+     * `join.code_wait` (429) with `retryIn` seconds right after another. `humanCheck`: the bot check's token.
      */
-    sendCode(token: string, input: { email?: string }): Promise<JoinCodeSent>;
+    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<JoinCodeSent>;
     /** Checks the code from the email: right, the address can ask for 30 minutes. */
     checkCode(token: string, input: { email?: string; code: string }): Promise<{ verified: true }>;
     /**
@@ -1103,7 +1106,8 @@ export interface ApiClient {
   };
   /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
   waitlist: {
-    join(input: { email: string; locale: string }): Promise<void>;
+    /** `humanCheck`: the bot check's token, when the server has one. */
+    join(input: { email: string; locale: string }, humanCheck?: string): Promise<void>;
     /** The link in the confirmation email (`?confirm=`); `invalid_token` when unknown or expired. */
     confirm(input: { token: string }): Promise<void>;
   };

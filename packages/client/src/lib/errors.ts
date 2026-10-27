@@ -91,6 +91,8 @@ const KNOWN = {
   "join.code_wait": "errors.join.codeWait",
   "join.code_needed": "errors.join.codeNeeded",
   "invitation.ask_to_join": "errors.invitation.askToJoin",
+  human_check: "errors.humanCheck",
+  human_check_blocked: "errors.humanCheckBlocked",
 } as const;
 
 /** Refusals by the workspace's standing (ADR 0056 §8): the plain words, and the words with the reason told. */
@@ -142,6 +144,17 @@ export function knownErrorText(t: TFunction, error: unknown): string | null {
   if (standing) return standing;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
+}
+
+/**
+ * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`) in the person's words: too many
+ * tries, a blocked account and the bot check by their codes, else its own message.
+ */
+export function authErrorText(t: TFunction, refusal: { status: number; code?: string; message: string }): string {
+  if (refusal.status === 429) return t("auth.tooManyTries");
+  if (refusal.code === ACCOUNT_BLOCKED) return t("auth.accountBlocked");
+  const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message));
+  return known ?? (refusal.message || t("common.unknownError"));
 }
 
 /** Translated text for a failed request. */

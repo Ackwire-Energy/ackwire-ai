@@ -773,8 +773,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     waitlist: {
-      join: async (input) => {
-        log("waitlist.join", input);
+      join: async (input, humanCheck) => {
+        state.calls.push({ method: "waitlist.join", args: humanCheck === undefined ? [input] : [input, humanCheck] });
         if (state.waitlistError) throw state.waitlistError;
       },
       confirm: async (input) => {
@@ -790,8 +790,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         landing: true,
         ...state.authConfig,
       }),
-      signInOptions: async () =>
-        state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true },
+      signInOptions: async (input, humanCheck) => {
+        if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
+        return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
+      },
       me: async () => state.me,
       updateMe: async (input) => {
         log("account.updateMe", input);
@@ -1912,8 +1914,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.calls.push({ method: "invites.turnOff", args: [orgId, linkId] });
         state.inviteLinks = (state.inviteLinks ?? []).filter((l) => l.id !== linkId);
       },
-      sendCode: async (token, input) => {
-        state.calls.push({ method: "invites.sendCode", args: [token, input] });
+      sendCode: async (token, input, humanCheck) => {
+        state.calls.push({
+          method: "invites.sendCode",
+          args: humanCheck === undefined ? [token, input] : [token, input, humanCheck],
+        });
         if (state.sendCodeError) throw state.sendCodeError;
         return { email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), resendIn: 60 };
       },

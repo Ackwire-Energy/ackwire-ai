@@ -9,6 +9,7 @@ import { ApiError, type ImportInput, type InvitationPreview, type SignInOptions 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
+import { installTurnstile, removeTurnstile } from "./fake-turnstile";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -391,6 +392,187 @@ describe("Aceitar convite", () => {
     await renderApp("/invite/valid", { api: createFakeApi() });
     expect(screen().getByRole("status").textContent).toContain("Este convite foi enviado para marina@acme.com.br");
     expect(screen().getByRole("button", { name: "Sair" })).toBeTruthy();
+  });
+});
+
+describe("A verificação contra robôs (agentes.chat Cloud)", () => {
+  const SITE_KEY = "1x00000000000000000000BB";
+  afterEach(removeTurnstile);
+
+  /** A fake API with the bot check on, and the sign-in options' calls recorded with their token. */
+  const checkedApi = (options: SignInOptions, refuse?: ApiError) => {
+    const state = seedState({ me: null, authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true } });
+    const api = createFakeApi(state);
+    api.account.signInOptions = async (input, humanCheck) => {
+      state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
+      if (refuse) throw refuse;
+      return options;
+    };
+    return { api, state };
+  };
+  const lookups = (state: { calls: { method: string; args: unknown[] }[] }) =>
+    state.calls.filter((c) => c.method === "account.signInOptions").map((c) => c.args);
+
+  test("no site key: nothing loads from Cloudflare, and calls go without a token", async () => {
+    installTurnstile();
+    const { api, state } = authApi(NEW);
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/signup", { api, auth });
+    await type("E-mail", "walter@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Seu nome", "Walter");
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "senha-longa");
+    await press(/Criar conta/);
+    expect(document.querySelector('script[src*="challenges.cloudflare.com"]')).toBeNull();
+    expect(document.querySelector(".human-check")).toBeNull();
+    expect(lookups(state)).toEqual([[{ email: "walter@acme.com.br" }]]);
+    expect(calls.find((c) => c.method === "signUp")?.args.length).toBe(1);
+  });
+
+  test("with a site key: Cloudflare's script once, a widget per step for its action, its token on each call, then a fresh one", async () => {
+    const cf = installTurnstile();
+    const { api, state } = checkedApi(ACCOUNT);
+    const { auth, calls } = createFakeAuth({ signIn: { ok: false, status: 401, message: "Invalid" } });
+    await renderApp("/login", { api, auth });
+    await settle();
+    expect(cf.scripts().map((s) => s.getAttribute("src"))).toEqual([
+      "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
+    ]);
+    expect(cf.widgets[0]?.options).toMatchObject({
+      sitekey: SITE_KEY,
+      action: "email-lookup",
+      appearance: "interaction-only",
+      size: "flexible",
+      language: "pt-br",
+      "refresh-expired": "auto",
+      "response-field": false,
+    });
+
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(lookups(state)).toEqual([[{ email: "marina@acme.com.br" }, "w1-1"]]);
+    // A token passes one check: the widget was reset. The password step has its own, for signing in.
+    expect(cf.resets).toEqual(["w1"]);
+    expect(cf.widgets.map((w) => [w.options.action, w.removed])).toEqual([
+      ["email-lookup", true],
+      ["sign-in", false],
+    ]);
+    await type("Senha", "senha-errada");
+    await press(/^Entrar/);
+    expect(calls.at(-1)?.args).toEqual([{ email: "marina@acme.com.br", password: "senha-errada" }, "w2-1"]);
+    expect(cf.resets).toEqual(["w1", "w2"]);
+    await type("Senha", "senha-certa");
+    await press(/^Entrar/);
+    expect(calls.at(-1)?.args[1]).toBe("w2-2");
+    // Still one script for the whole page.
+    expect(cf.scripts().length).toBe(1);
+  });
+
+  test("the script doesn't load (a blocker): the call says so, and the server's refusal reads plainly", async () => {
+    installTurnstile({ loads: false });
+    const blocked = new ApiError(
+      403,
+      "human_check_blocked",
+      "The bot check didn't load. Try another browser or network.",
+    );
+    const { api, state } = checkedApi(ACCOUNT, blocked);
+    await renderApp("/login", { api, auth: createFakeAuth().auth });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    // Sent once: another try can't load the check either.
+    expect(lookups(state)).toEqual([[{ email: "marina@acme.com.br" }, "unavailable"]]);
+    expect(screen().getByRole("alert").textContent).toContain(
+      "A verificação não carregou. Tente outro navegador ou outra rede.",
+    );
+    expect(heading()).toBe("Oi. Qual é o seu e-mail?");
+  });
+
+  test("sign-up refused by the check: tried once more with a fresh token, then said plainly, never as a closed sign-up", async () => {
+    const cf = installTurnstile();
+    const { api } = checkedApi(NEW);
+    const { auth, calls } = createFakeAuth({
+      signUp: { ok: false, status: 403, code: "human_check", message: "Couldn't confirm a person is asking." },
+    });
+    await renderApp("/signup", { api, auth });
+    await type("E-mail", "walter@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Seu nome", "Walter");
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "senha-longa");
+    await press(/Criar conta/);
+    expect(calls.filter((c) => c.method === "signUp").map((c) => c.args[1])).toEqual(["w2-1", "w2-2"]);
+    expect(screen().getByRole("alert").textContent).toContain(
+      "Não conseguimos confirmar que você é uma pessoa. Tente de novo.",
+    );
+    expect(heading()).toBe("Boa, Walter. Agora uma senha.");
+    expect(cf.widgets.at(-1)?.options.action).toBe("sign-up");
+  });
+
+  test("too many tries reads in the person's words, not the server's", async () => {
+    installTurnstile();
+    const { api } = checkedApi(NEW);
+    const { auth } = createFakeAuth({ signUp: { ok: false, status: 429, message: "Too many requests" } });
+    await renderApp("/signup", { api, auth });
+    await type("E-mail", "walter@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Seu nome", "Walter");
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "senha-longa");
+    await press(/Criar conta/);
+    expect(screen().getByRole("alert").textContent).toContain(
+      "Muitas tentativas. Espere alguns minutos e tente de novo.",
+    );
+  });
+
+  test("an email invitation's sign-up, and an invitation link's code, carry the token", async () => {
+    installTurnstile();
+    const state = seedState({ me: null, authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true } });
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/invite/valid", { api: createFakeApi(state), auth });
+    await settle();
+    expect(document.querySelector(".invite-card .human-check")).toBeTruthy();
+    await type("Seu nome", "Marina");
+    await type("Crie uma senha", "senha-exemplo");
+    await press("Aceitar e entrar na Acme");
+    expect(calls.find((c) => c.method === "signUp")?.args[1]).toBe("w1-1");
+    cleanup();
+    removeTurnstile();
+
+    const cf = installTurnstile();
+    state.previews = { lnk: { orgName: "Acme", email: "", role: "member", kind: "link", invitedBy: "Marina" } };
+    await renderApp("/invite/lnk", { api: createFakeApi(state) });
+    await settle();
+    await type("Seu e-mail", "walter@acme.com.br");
+    await press("Verificar");
+    expect(state.calls.find((c) => c.method === "invites.sendCode")?.args).toEqual([
+      "lnk",
+      { email: "walter@acme.com.br" },
+      "w1-1",
+    ]);
+    expect(cf.widgets.map((w) => w.options.action)).toEqual(["ask-code"]);
+  });
+
+  test("an email invitation's sign-up is busy while the check waits for its token: a second press signs up nobody", async () => {
+    const cf = installTurnstile({ gives: false });
+    const state = seedState({ me: null, authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true } });
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/invite/valid", { api: createFakeApi(state), auth });
+    await settle();
+    await type("Seu nome", "Marina");
+    await type("Crie uma senha", "senha-exemplo");
+    await press("Aceitar e entrar na Acme");
+    const accept = screen().getByRole("button", { name: "Aceitar e entrar na Acme" });
+    expect(accept.getAttribute("aria-busy")).toBe("true");
+    expect(accept.hasAttribute("disabled")).toBe(true);
+    // A submit that reaches the form anyway, as Enter would.
+    await act(async () => fireEvent.submit(accept.closest("form") as HTMLFormElement));
+    expect(calls.filter((c) => c.method === "signUp")).toEqual([]);
+
+    cf.give("w1");
+    await settle(6);
+    expect(calls.filter((c) => c.method === "signUp").map((c) => c.args[1])).toEqual(["w1-1"]);
+    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation").length).toBe(1);
   });
 });
 

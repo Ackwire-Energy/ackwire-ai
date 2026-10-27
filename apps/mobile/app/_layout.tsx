@@ -10,6 +10,7 @@ import { forgetInvite, loadPendingInvite } from "@/features/auth/invite";
 import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
+import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
@@ -48,7 +49,9 @@ function Gate() {
   const navigationTheme = useNavigationTheme();
   const signedIn = session.signedIn;
   const inApp = signedIn || session.pending;
-  const ready = fontsReady && !session.pending && (!signedIn || !org.loading);
+  // The server down or out of reach (a self-hosted one, often): the splash stays and says so, never the first run.
+  const down = useServerDown(signedIn && !session.pending);
+  const ready = fontsReady && !session.pending && (!signedIn || !org.loading) && down === null;
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
 
   // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
@@ -62,6 +65,12 @@ function Gate() {
   useEffect(() => {
     if (ready) hideNative();
   }, [ready, hideNative]);
+  // The server stops answering after the splash left, or while it was leaving (just signed in, nothing cached):
+  // it comes back to say so.
+  const isDown = down !== null;
+  useEffect(() => {
+    if (isDown && !launching) setLaunching(true);
+  }, [isDown, launching]);
 
   // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in.
   const [entering, setEntering] = useState(false);
@@ -87,11 +96,11 @@ function Gate() {
     // The native bars (headers, back button tint, interface style) read React Navigation's theme: ours.
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      {/* Under the suspended screen the app stays mounted, out of screen readers' reach. */}
+      {/* Under the suspended screen or the waiting splash the app stays mounted, out of screen readers' reach. */}
       <View
         style={{ flex: 1 }}
-        accessibilityElementsHidden={suspended !== null}
-        importantForAccessibility={suspended ? "no-hide-descendants" : "auto"}
+        accessibilityElementsHidden={suspended !== null || down !== null}
+        importantForAccessibility={suspended || down ? "no-hide-descendants" : "auto"}
       >
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Protected guard={inApp} redirectTo="/sign-in">
@@ -110,7 +119,16 @@ function Gate() {
       ) : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
       {org.state && suspended ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
-      {launching ? <LaunchSplash ready={ready} fontsReady={fontsReady} onShown={hideNative} onDone={launched} /> : null}
+      {launching ? (
+        <LaunchSplash
+          ready={ready}
+          fontsReady={fontsReady}
+          onShown={hideNative}
+          onDone={launched}
+          waiting={down ? <ServerDownPanel down={down} /> : null}
+          eyesClosed={down !== null && !down.checking}
+        />
+      ) : null}
     </NavigationThemeProvider>
   );
 }

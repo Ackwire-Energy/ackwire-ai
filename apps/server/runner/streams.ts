@@ -5,6 +5,41 @@ import {
   type StreamControl,
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
+import { writeJson } from "./json-file";
+
+/** System mode: what root relayed for the Cloud's guard, read from `<runner home>/relayed.json`. */
+export const RELAYED_FILE = "relayed.json";
+
+/**
+ * System mode: the payload bytes the root runner relayed since it started, per stream (`up` toward the
+ * server), without TLS: the agents' desktops and terminals on their data sockets, and the live view of
+ * their browsers on the `browser.frame`s it passes on (`down`: the input people sent it). The Cloud's
+ * guard reads `relayed.json` as `{startedAt, desktop, terminal, browserView}`.
+ */
+export class RelayCount {
+  readonly startedAt = Date.now();
+  readonly desktop = { up: 0, down: 0 };
+  readonly terminal = { up: 0, down: 0 };
+  readonly browserView = { up: 0, down: 0 };
+  private saved = "";
+
+  /** Written whole and renamed, only when it changed. */
+  save(file: string) {
+    const counts = {
+      startedAt: this.startedAt,
+      desktop: this.desktop,
+      terminal: this.terminal,
+      browserView: this.browserView,
+    };
+    const text = JSON.stringify(counts);
+    if (text === this.saved) return;
+    writeJson(file, counts);
+    this.saved = text;
+  }
+}
+
+const sizeOf = (data: string | ArrayBuffer | ArrayBufferView) =>
+  typeof data === "string" ? Buffer.byteLength(data) : data.byteLength;
 
 /** What one side of a stream on the computer hears from its data socket. */
 export interface DataListener {
@@ -62,6 +97,8 @@ export function openDataSocket(opts: {
   signal?: AbortSignal;
   timeoutMs?: number;
   onClosed?: () => void;
+  /** The stream's bytes once it is ready, as they go `up` to the server and come `down`. */
+  count?: (way: "up" | "down", bytes: number) => void;
 }): Promise<DataSocket> {
   return new Promise((resolve, reject) => {
     if (typeof WebSocket === "undefined") {
@@ -81,7 +118,11 @@ export function openDataSocket(opts: {
       else listener?.control?.(frame);
     };
     const socket: DataSocket = {
-      send: (data) => quietly(() => ws.send(data)),
+      send: (data) =>
+        quietly(() => {
+          ws.send(data);
+          opts.count?.("up", sizeOf(data));
+        }),
       close: (code = STREAM_CLOSE.normal, reason = "") => {
         try {
           ws.close(code, reason);
@@ -132,6 +173,9 @@ export function openDataSocket(opts: {
         resolve(socket);
         return;
       }
+      if (typeof data === "string" || data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+        opts.count?.("down", sizeOf(data));
+      }
       let frame: Frame | null = null;
       if (typeof data === "string") frame = parseStreamControl(data);
       else if (data instanceof ArrayBuffer) frame = new Uint8Array(data);
@@ -162,14 +206,23 @@ export function openDataSocket(opts: {
 export class DataSockets {
   private readonly open = new Set<DataSocket>();
 
-  constructor(private readonly opts: { url: string; token: string; timeoutMs?: number }) {}
+  constructor(private readonly opts: { url: string; token: string; timeoutMs?: number; relayed?: RelayCount }) {}
 
-  async dial(streamId: string, signal?: AbortSignal): Promise<DataSocket> {
+  async dial(streamId: string, kind: "desktop" | "terminal", signal?: AbortSignal): Promise<DataSocket> {
+    const { relayed, ...dial } = this.opts;
+    const bytes = relayed?.[kind];
     let socket: DataSocket | null = null;
     socket = await openDataSocket({
-      ...this.opts,
+      ...dial,
       streamId,
       ...(signal ? { signal } : {}),
+      ...(bytes
+        ? {
+            count: (way: "up" | "down", n: number) => {
+              bytes[way] += n;
+            },
+          }
+        : {}),
       onClosed: () => {
         if (socket) this.open.delete(socket);
       },

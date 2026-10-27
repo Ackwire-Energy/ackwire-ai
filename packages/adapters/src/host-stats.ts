@@ -1,17 +1,21 @@
 /**
  * How big this computer is and how busy it gets, for the usage report: the server samples its own host,
- * and the runner its computer (protocol 22). Node's `os` and `fs` only, so the runner bundle can use it.
+ * and the runner its computer (protocol 22) and its agents' browsers' traffic (protocol 23). Node's `os`
+ * and `fs` only, so the runner bundle can use it.
  */
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, statfsSync } from "node:fs";
 import os from "node:os";
 import { promisify } from "node:util";
-import { LOAD_SAMPLE_MS, type MachineLoad, type MachineSize } from "./machine-protocol";
+import { type BrowserTraffic, LOAD_SAMPLE_MS, type MachineLoad, type MachineSize } from "./machine-protocol";
 
 const GIB = 2 ** 30;
 const DAY_MS = 24 * 3600_000;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const halfGb = (bytes: number) => Math.round((bytes / GIB) * 2) / 2;
+const round1 = (n: number) => Math.round(n * 10) / 10;
+/** The hours `n` samples cover, at most a day. */
+const hoursOf = (n: number) => Math.min(24, round1((n * LOAD_SAMPLE_MS) / 3600_000));
 const execFileAsync = promisify(execFile);
 
 /**
@@ -113,7 +117,7 @@ export class LoadWindow {
       loadPeak: peak((s) => s.load),
       memoryAvg: avg((s) => s.memory),
       memoryPeak: peak((s) => s.memory),
-      hours: Math.min(24, Math.round(((n * LOAD_SAMPLE_MS) / 3600_000) * 10) / 10),
+      hours: hoursOf(n),
     };
   }
 
@@ -133,6 +137,47 @@ export function combineLoads(loads: readonly (MachineLoad | null)[]): MachineLoa
     loadPeak: round2(peak((l) => l.loadPeak)),
     memoryAvg: round2(mean((l) => l.memoryAvg)),
     memoryPeak: round2(peak((l) => l.memoryPeak)),
-    hours: Math.round(mean((l) => l.hours) * 10) / 10,
+    hours: round1(mean((l) => l.hours)),
+  };
+}
+
+/**
+ * The last day of what the agents' browsers sent and received, a sample every `LOAD_SAMPLE_MS` (an
+ * empty one too, so `hours` says how long it was counted); `summary()` is the same object until the
+ * next sample.
+ */
+export class TrafficWindow {
+  private kept: { at: number; up: number; down: number }[] = [];
+  private last: BrowserTraffic | null = null;
+
+  add(bytes: { up: number; down: number }, at = Date.now()) {
+    this.kept = [...this.kept, { at, up: bytes.up, down: bytes.down }].filter((s) => s.at > at - DAY_MS);
+    const sum = (pick: (s: { up: number; down: number }) => number) => this.kept.reduce((n, s) => n + pick(s), 0);
+    this.last = { up: sum((s) => s.up), down: sum((s) => s.down), hours: hoursOf(this.kept.length) };
+  }
+
+  summary(): BrowserTraffic | null {
+    return this.last;
+  }
+}
+
+/** Computers' browser traffic as the usage report has it: MB (10^6 bytes), the hours counted, how many said. */
+export interface CombinedTraffic {
+  upMb: number;
+  downMb: number;
+  hours: number;
+  computers: number;
+}
+
+/** Several computers' browser traffic as one: the bytes summed, their hours averaged; null when none said. */
+export function combineTraffic(traffic: readonly (BrowserTraffic | null)[]): CombinedTraffic | null {
+  const known = traffic.filter((t): t is BrowserTraffic => t !== null);
+  if (known.length === 0) return null;
+  const sum = (pick: (t: BrowserTraffic) => number) => known.reduce((n, t) => n + pick(t), 0);
+  return {
+    upMb: Math.round(sum((t) => t.up) / 1e6),
+    downMb: Math.round(sum((t) => t.down) / 1e6),
+    hours: round1(sum((t) => t.hours) / known.length),
+    computers: known.length,
   };
 }

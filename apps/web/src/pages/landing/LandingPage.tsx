@@ -1,4 +1,10 @@
 import { ApiError } from "@agenteschat/client";
+import {
+  HUMAN_CHECK_BLOCKED,
+  HUMAN_CHECK_REFUSED,
+  type HumanCheck,
+  withHumanCheck,
+} from "@agenteschat/client/lib/human-check";
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -159,17 +165,19 @@ export function LandingPage() {
     );
     void navigate({ to: "/", search: {}, replace: true });
   }, [api, confirmToken, hop, navigate]);
-  const join = async (email: string): Promise<JoinResult> => {
+  const join = async (email: string, check: HumanCheck | null): Promise<JoinResult> => {
     busy.current = true;
     clearTimeout(typingTimer.current);
     setGiantState("thinking");
     try {
-      await api.waitlist.join({ email, locale });
+      await withHumanCheck(check, (token) => api.waitlist.join({ email, locale }, token));
     } catch (error) {
       busy.current = false;
       setGiantState("idle");
       if (error instanceof ApiError) {
         if (error.code === "invalid_email") return "invalid";
+        if (error.code === HUMAN_CHECK_REFUSED) return "human";
+        if (error.code === HUMAN_CHECK_BLOCKED) return "blocked";
         if (error.status === 429 || error.code === "rate_limited") return "rate";
       }
       return "failed";

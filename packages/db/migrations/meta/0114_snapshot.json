@@ -1,6 +1,6 @@
 {
-  "id": "63069de9-7363-4542-91f5-7a522790e705",
-  "prevId": "4f4d0d31-d47e-4cb4-96ae-8791a4e0c57a",
+  "id": "6b2df309-95fa-4d4b-a1b0-70d225376ad0",
+  "prevId": "49f95e33-7d3b-4bb4-8cd1-e2cfc61f9b2c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6262,6 +6262,12 @@
         },
         "load": {
           "name": "load",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "browser_traffic": {
+          "name": "browser_traffic",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
