@@ -60,6 +60,7 @@ import {
   spendOf,
   usesOf,
 } from "./logic";
+import { MonthPixels } from "./MonthPixels";
 import { workTitle } from "./work";
 
 /** Rows of "O que fez por você" before "Ver tudo". */
@@ -312,6 +313,19 @@ function Profile({ id }: { id: string }) {
               <Text variant="small" tone="muted" style={styles.lead}>
                 {t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })}
               </Text>
+            ) : null}
+            {/* Its month, day by day, in its own tones (the web's Atividade tab). */}
+            {detail.data && detail.data.runsThisMonth > 0 ? (
+              <View style={styles.pixels}>
+                <MonthPixels
+                  perDay={detail.data.runsByDay}
+                  color={look.color}
+                  label={t("agentPage.activity.chartLabel", {
+                    count: detail.data.runsThisMonth,
+                    month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(new Date()),
+                  })}
+                />
+              </View>
             ) : null}
             {did.length > 0 ? (
               <Card>
@@ -639,6 +653,7 @@ const styles = StyleSheet.create({
   },
   nowText: { flexShrink: 1, fontWeight: "500" },
   lead: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },
+  pixels: { paddingHorizontal: 4, marginBottom: 12 },
   monthCards: { gap: 10 },
   foot: { paddingHorizontal: 4, marginTop: 8 },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
