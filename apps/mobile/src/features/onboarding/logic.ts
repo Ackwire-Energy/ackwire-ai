@@ -1,3 +1,6 @@
+import type { AiStatus } from "@agenteschat/client";
+import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
 import { isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
@@ -14,8 +17,8 @@ export type StepId = (typeof STEPS)[number];
 /** Steps that can be skipped. */
 export const OPTIONAL: ReadonlySet<StepId> = new Set(["import", "ai", "team"]);
 
-/** The presets of the web's onboarding, with the same looks and roles. */
-export const PRESETS = ["ada", "theo", "lia", "atlas"] as const;
+/** The presets of the web's onboarding, in its order (the order they are created in), with the same looks and roles. */
+export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;
 export type Preset = (typeof PRESETS)[number];
 
 export const PRESET_LOOK: Record<Preset, { color: AgentColorName; eyes: EyeStyle; accessory: string }> = {
@@ -33,8 +36,51 @@ export const PRESET_ROLE: Record<Preset, "pm" | "dev" | "ops" | null> = {
   atlas: "ops",
 };
 
-/** The guide: always on the team ("Eu já estou aqui"), and the DM the onboarding ends in. */
+/** The guide: always on the team ("Eu já estou aqui"), so the count of agents to create leaves her out. */
 export const GUIDE: Preset = "ada";
+
+/** The agents step's rows: the guide first (she is already here), then the others in the team's order. */
+export const PRESET_ROWS: readonly Preset[] = [GUIDE, ...PRESETS.filter((p) => p !== GUIDE)];
+
+/** Who is on the team at first: everyone, as on the web. */
+export const DEFAULT_TEAM: readonly Preset[] = PRESETS;
+
+/** "Criar N agentes": the chosen ones still to create, besides the guide (as on the web). */
+export const joiningLeft = (chosen: ReadonlySet<Preset>, created: Partial<Record<Preset, string>>) =>
+  PRESETS.filter((p) => p !== GUIDE && chosen.has(p) && !created[p]).length;
+
+/**
+ * The apps the import step names, in the web's order (its `IMPORT_CARDS`): each with its maker's logo, then any other
+ * app. The phone can't read their files; it names them and says where on the web they come in.
+ */
+export const IMPORT_ROWS = [
+  "openclaw",
+  "hermes",
+  "openbotrun",
+  "paperclip",
+  "openmausbot",
+  "openbot",
+  "agenteschat",
+  "other",
+] as const;
+export type ImportRow = (typeof IMPORT_ROWS)[number];
+
+/** Brand names, not translated (the web's `SOURCE_NAME`). */
+const IMPORT_BRAND: Record<Exclude<ImportRow, "agenteschat" | "other">, string> = {
+  openclaw: "OpenClaw",
+  hermes: "Hermes Agent",
+  openbotrun: "OpenBot.Run",
+  paperclip: "Paperclip",
+  openmausbot: "OpenMausBot",
+  openbot: "OpenBot",
+};
+
+/** A row's name: the brand, or the web's words for our own export and for any other app. */
+export function importRowName(t: TFunction, row: ImportRow): string {
+  if (row === "other") return t("onboarding.import.otherName");
+  if (row === "agenteschat") return t("onboarding.import.agenteschatName");
+  return IMPORT_BRAND[row];
+}
 
 /** Who hosts each step (introducing itself the first time it appears). */
 export const HOST: Record<StepId, Preset> = {
@@ -54,7 +100,12 @@ export const HOST: Record<StepId, Preset> = {
 export function stepText(
   t: TFunction,
   step: StepId,
-  { org, chosen, aiSaved }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean },
+  {
+    org,
+    chosen,
+    aiSaved,
+    invited = 0,
+  }: { org: string; chosen: ReadonlySet<Preset>; aiSaved: boolean; invited?: number },
 ): [title: string, lead?: string] {
   switch (step) {
     case "workspace":
@@ -71,15 +122,70 @@ export function stepText(
       return [t("onboarding.team.title")];
     case "done": {
       const names = PRESETS.filter((p) => chosen.has(p)).map((p) => t(`onboarding.presets.${p}.name`));
-      const lead =
+      const inGeneral =
         names.length === 0
           ? t("onboarding.done.textNone")
           : t(names.length === 1 ? "onboarding.done.inGeneralOne" : "onboarding.done.inGeneralMany", {
               names: joinNames(names, t("newAgent.and")),
             });
+      // The invitations emailed on the team step, as the web's welcome says.
+      const lead = invited > 0 ? `${inGeneral} ${t("onboarding.done.invited", { count: invited })}` : inGeneral;
       return [t("onboarding.done.title", { org }), lead];
     }
   }
+}
+
+/** An agent of the team once created: what Done's first message mentions and who it is from. */
+export interface CrewMember {
+  key: Preset;
+  id: string;
+  /** As the server made it: the first message mentions it. */
+  handle: string;
+  name: string;
+}
+
+/**
+ * Done's first message, written for whoever is best placed to start (`firstAskOrder`: the phone sets up no
+ * computer, so no browser is counted on): the asker and the text it offers. Null with nobody on the team.
+ */
+export function firstAskOf(t: TFunction, crew: readonly CrewMember[]): { asker: Preset; text: string } | null {
+  const preset = firstAskOrder(false).find((p) => crew.some((c) => c.key === p));
+  const asker = crew.find((c) => c.key === preset) ?? crew[0];
+  if (!asker) return null;
+  return {
+    asker: asker.key,
+    text: preset ? t(`onboarding.done.first.asks.${preset}`, { handle: asker.handle }) : "",
+  };
+}
+
+/** Whether the agent the first message names can start on it now. */
+export type AskState = AiStatus["agents"][number]["state"];
+const LINE_ICON = { ready: "check", waiting: "clock", no_ai: "brain" } as const satisfies Record<AskState, string>;
+
+/**
+ * The line under the first message: the agent it names starts at once, waits for its computer, or has no AI yet;
+ * with nobody named, only whether no agent has an AI. Null while there is nothing to say (or no text).
+ */
+export function askLineOf(
+  t: TFunction,
+  {
+    text,
+    mentioned,
+    status,
+    computer,
+  }: {
+    text: string;
+    mentioned?: { id: string; name: string } | undefined;
+    status: AiStatus | undefined;
+    computer: string;
+  },
+): { state: AskState; icon: (typeof LINE_ICON)[AskState]; text: string } | null {
+  if (text.trim() === "") return null;
+  const state = mentioned ? aiStateOf(status, mentioned.id) : status?.any === false ? "no_ai" : undefined;
+  if (!state) return null;
+  const key = state === "no_ai" ? (mentioned ? "noAi" : "noAiAny") : state;
+  const line = t(`onboarding.done.first.${key}`, { name: mentioned?.name, computer });
+  return { state, icon: LINE_ICON[state], text: line };
 }
 
 /** Sends each invitation in turn; the addresses whose invitation failed, in order. */

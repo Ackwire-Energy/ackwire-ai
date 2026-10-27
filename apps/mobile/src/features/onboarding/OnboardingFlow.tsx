@@ -1,36 +1,60 @@
-import { keys, useApi } from "@agenteschat/client";
-import type { AiChoice } from "@agenteschat/client/lib/no-ai";
+import { keys, newClientId, useAiStatus, useApi, useMe } from "@agenteschat/client";
+import { computerName } from "@agenteschat/client/lib/computer";
+import { firstMentioned } from "@agenteschat/client/lib/markdown";
+import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { type ComponentProps, type ReactNode, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Share, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useConnectKey } from "@/features/ai/ConnectAi";
+import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Sky } from "@/sky/Sky";
-import { AgentAvatar, Button, fieldText, Icon, IconButton, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import {
+  AgentAvatar,
+  Button,
+  fieldText,
+  Icon,
+  IconButton,
+  type IconName,
+  InfoHint,
+  LineIcon,
+  Text,
+  useTheme,
+} from "@/ui";
+import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { TextArea } from "../shared/TextArea";
 import { AiStep } from "./AiStep";
 import {
+  askLineOf,
+  type CrewMember,
+  DEFAULT_TEAM,
   emailsFrom,
+  firstAskOf,
   GUIDE,
   HOST,
+  IMPORT_ROWS,
+  type ImportRow,
+  importRowName,
   introducesAt,
   inviteEach,
+  joiningLeft,
   OPTIONAL,
   PRESET_LOOK,
   PRESET_ROLE,
+  PRESET_ROWS,
   PRESETS,
   type Preset,
   phoneTimezone,
@@ -47,14 +71,15 @@ import {
  * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
  * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
- * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto, which opens the DM with Ada.
- * No computer step.
+ * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto: the team's welcome and the
+ * first message, offered by the agent best placed to start, sent to #general. No computer step.
  */
 export function OnboardingFlow() {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
   const gate = useOrgGate();
+  const me = useMe();
   const { colors: c } = useTheme();
   const [step, setStep] = useState<StepId>("workspace");
   const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
@@ -62,11 +87,13 @@ export function OnboardingFlow() {
   const [logo, setLogo] = useState<{ base64: string; type: "image/jpeg" | "image/png" | "image/webp" } | null>(null);
   const [context, setContext] = useState("");
   const [savedContext, setSavedContext] = useState("");
-  const [chosen, setChosen] = useState<ReadonlySet<Preset>>(() => new Set<Preset>(["ada", "theo", "lia"]));
+  const [chosen, setChosen] = useState<ReadonlySet<Preset>>(() => new Set<Preset>(DEFAULT_TEAM));
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
+  const [handles, setHandles] = useState<Partial<Record<Preset, string>>>({});
   const [emails, setEmails] = useState<string[]>([]);
   const [typing, setTyping] = useState("");
   const [bad, setBad] = useState<string[]>([]);
+  const [invited, setInvited] = useState(0);
   const [pending, setPending] = useState(false);
   // A failure belongs to the step it happened on: going on or back leaves it there.
   const [error, setError] = useState<{ at: StepId; text: string } | null>(null);
@@ -78,6 +105,51 @@ export function OnboardingFlow() {
   const [aiShown, setAiShown] = useState<AiChoice | null>(null);
   const [planned, setPlanned] = useState<string[]>([]);
   const [aiSaved, setAiSaved] = useState(false);
+  // Done's first message, written for whoever asks it when the step opens (`team`: the crew it was written for).
+  // Its `clientId` changes with its text: sent again after an answer that never came back, it's posted once.
+  const [firstAsk, setFirstAsk] = useState<{ team: string; asker: Preset; text: string; clientId: string } | null>(
+    null,
+  );
+
+  // The address this sign-up was emailed a link to confirm (features/auth/confirmation.ts): the first step says
+  // where it went, until `me` says it's confirmed.
+  const email = me.data?.user.email ?? "";
+  const unconfirmed =
+    email !== "" && confirmationSentTo() === email.toLowerCase() && me.data?.user.emailVerified !== true;
+
+  // The agents created so far, in the team's order: who Done shows and who may offer the first message.
+  const crew: CrewMember[] = PRESETS.flatMap((p) => {
+    const id = agentIds[p];
+    const presetName = t(`onboarding.presets.${p}.name`);
+    return id ? [{ key: p, id, handle: handles[p] ?? handleFrom(presetName), name: presetName }] : [];
+  });
+  const team = crew.map((m) => m.key).join(" ");
+  const askText = firstAsk?.text ?? "";
+  const asking = askText.trim() !== "";
+  // Whoever the text mentions first speaks, and gets it; with nobody named, the router picks who answers.
+  const mentioned = firstMentioned(askText, crew);
+  const speaker = mentioned ?? crew.find((m) => m.key === firstAsk?.asker);
+  // No socket is open here: an agent waiting for its computer is asked about again until it can start.
+  const aiNow = useAiStatus(created?.orgId ?? "", step === "done" && speaker !== undefined, (status) =>
+    mentioned && aiStateOf(status, mentioned.id) === "waiting" ? AI_POLL_MS : false,
+  );
+  const askLine = askLineOf(t, {
+    text: askText,
+    mentioned,
+    status: aiNow.data,
+    computer: computerName(t, orgName, null),
+  });
+
+  // Done: the AI status is asked again (one connected on the way counts), and the first message is written once for
+  // the team it opens with, kept through edits.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when Done opens, and when the team changes
+  useEffect(() => {
+    if (step !== "done" || !created) return;
+    void qc.invalidateQueries({ queryKey: keys.aiStatus(created.orgId) });
+    if (firstAsk?.team === team) return;
+    const offer = firstAskOf(t, crew);
+    setFirstAsk(offer ? { team, ...offer, clientId: newClientId() } : null);
+  }, [step, team]);
 
   const run = async (work: () => Promise<void>, then: StepId | (() => StepId)) => {
     setPending(true);
@@ -123,6 +195,7 @@ export function OnboardingFlow() {
       async () => {
         if (!created) return;
         const ids = { ...agentIds };
+        const named = { ...handles };
         for (const p of PRESETS) {
           if (!chosen.has(p) || ids[p]) continue;
           const role = PRESET_ROLE[p];
@@ -139,7 +212,10 @@ export function OnboardingFlow() {
           });
           await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
           ids[p] = agent.id;
+          // As the server made it (a taken handle gets another): the first message mentions this one.
+          named[p] = agent.handle;
           setAgentIds({ ...ids });
+          setHandles({ ...named });
         }
         // The AI step only when the agents have nothing to think with yet (a platform key on Cloud, a key
         // saved going back and forth).
@@ -165,6 +241,7 @@ export function OnboardingFlow() {
     setError(null);
     const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email, role: "member" }));
     setPending(false);
+    setInvited((n) => n + emails.length - failed.length);
     setEmails(failed);
     if (failed.length) setError({ at: "team", text: t("mobile.onb.invitesFailed") });
     else setStep("done");
@@ -200,32 +277,34 @@ export function OnboardingFlow() {
     setTyping(invalid.join(" "));
   };
 
-  /** Pronto: the workspace becomes the current one and the conversation with Ada opens. */
-  const finish = async () => {
+  /**
+   * Pronto: the first message goes to #general (if there is one), the workspace becomes the current one and
+   * #general opens. A failed post stays on Done with its text.
+   */
+  const finish = async (message: { body: string; clientId: string } | null) => {
     if (!created) return;
     setPending(true);
+    setError(null);
+    try {
+      if (message) await api.chat.post(created.orgId, created.generalChannelId, message);
+    } catch {
+      setPending(false);
+      setError({ at: "done", text: t("mobile.app.failed") });
+      return;
+    }
+    forgetConfirmationSent();
     await qc.invalidateQueries({ queryKey: keys.me });
     gate.choose(created.orgId);
-    const adaId = agentIds[GUIDE];
-    const channelId = adaId
-      ? await api.dms
-          .open(created.orgId, { agentId: adaId })
-          .then((r) => r.channelId)
-          .catch(() => null)
-      : null;
-    // The lists were loaded (prefetched) before this DM existed: the conversation finds it in them for its
+    // The lists were loaded (prefetched) before the first message: the conversation finds #general in them for its
     // header. Pushed over the tabs, so its back button leads home.
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: keys.dms(created.orgId), refetchType: "all" }),
-      qc.invalidateQueries({ queryKey: keys.channels(created.orgId), refetchType: "all" }),
-    ]).catch(() => {});
+    await qc.invalidateQueries({ queryKey: keys.channels(created.orgId), refetchType: "all" }).catch(() => {});
     setPending(false);
-    router.push(channelId ? chatHref(channelId) : chatHref(created.generalChannelId));
+    router.push(chatHref(created.generalChannelId));
   };
 
   const host = HOST[step];
-  const count = [...chosen].filter((p) => !agentIds[p]).length;
-  const [title, lead] = stepText(t, step, { org: orgName, chosen, aiSaved });
+  const count = joiningLeft(chosen, agentIds);
+  const [title, lead] = stepText(t, step, { org: orgName, chosen, aiSaved, invited });
 
   const primary: Partial<Record<StepId, { label: string; onPress: () => void; ready: boolean }>> = {
     workspace: {
@@ -262,8 +341,12 @@ export function OnboardingFlow() {
         }
       : {}),
     done: {
-      label: t("mobile.onb.talk", { name: t(`onboarding.presets.${GUIDE}.name`) }),
-      onPress: () => void finish(),
+      label: !asking
+        ? t("onboarding.done.open")
+        : mentioned
+          ? t("onboarding.done.first.send", { name: mentioned.name })
+          : t("onboarding.done.first.sendGeneral"),
+      onPress: () => void finish(asking && firstAsk ? { body: askText.trim(), clientId: firstAsk.clientId } : null),
       ready: true,
     },
   };
@@ -275,7 +358,7 @@ export function OnboardingFlow() {
       step={step}
       title={title}
       lead={lead}
-      host={host}
+      head={step === "done" ? <TeamFaces crew={crew} /> : <Host host={host} intro={introducesAt(step)} />}
       onBack={back && !pending ? () => setStep(back) : undefined}
       footer={
         <>
@@ -302,6 +385,16 @@ export function OnboardingFlow() {
           {step === "team" ? (
             <Button variant="ghost" wide label={t("mobile.onb.later")} onPress={() => setStep("done")} />
           ) : null}
+          {/* On Done the quiet way opens #general without the first message, while there is one. */}
+          {step === "done" && asking ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("onboarding.done.first.skip")}
+              disabled={pending}
+              onPress={() => void finish(null)}
+            />
+          ) : null}
         </>
       }
     >
@@ -323,6 +416,7 @@ export function OnboardingFlow() {
             onPress={() => void pickLogo()}
           />
           {zone ? <Note icon="clock" text={t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} /> : null}
+          {unconfirmed ? <ConfirmationNote email={email} /> : null}
         </>
       ) : null}
 
@@ -377,10 +471,7 @@ export function OnboardingFlow() {
         <AiStep
           orgId={created.orgId}
           orgName={orgName}
-          agents={PRESETS.flatMap((p) => {
-            const id = agentIds[p];
-            return id ? [{ id, name: t(`onboarding.presets.${p}.name`) }] : [];
-          })}
+          agents={crew.map((m) => ({ id: m.id, name: m.name }))}
           form={ai}
           planned={planned}
           onPlanned={(id) => setPlanned((l) => (l.includes(id) ? l : [...l, id]))}
@@ -429,33 +520,80 @@ export function OnboardingFlow() {
           <Note icon="shield" text={t("mobile.onb.shareNote")} />
         </>
       ) : null}
+
+      {step === "done" && speaker ? (
+        <FirstAsk
+          speaker={speaker}
+          said={
+            !asking
+              ? t("onboarding.done.first.empty")
+              : savedContext
+                ? t("onboarding.done.first.read", { org: orgName })
+                : t("onboarding.done.first.unread")
+          }
+          value={askText}
+          onChange={(text) => setFirstAsk((a) => a && { ...a, text, clientId: newClientId() })}
+          line={askLine}
+        />
+      ) : null}
     </StepFrame>
   );
 }
 
-/** Each source's official logo (assets/images/brands/README.md). */
-const IMPORT_LOGO = {
-  OpenMausBot: require("../../../assets/images/brands/openmausbot.png"),
-  OpenBot: require("../../../assets/images/brands/openbot.png"),
-} as const;
+/** How often Done asks again about an agent waiting for its computer (no socket is open here), as the web does. */
+const AI_POLL_MS = 5000;
 
-/** Trazer agentes: the two sources it brings from (on the web: the lead says where). */
+/** Each source's official logo (assets/images/brands/README.md); a dark file where the maker has one. */
+const IMPORT_LOGO: Record<Exclude<ImportRow, "other">, { light: number; dark?: number }> = {
+  openclaw: { light: require("../../../assets/images/brands/openclaw.png") },
+  hermes: {
+    light: require("../../../assets/images/brands/hermes.png"),
+    dark: require("../../../assets/images/brands/hermes-dark.png"),
+  },
+  openbotrun: { light: require("../../../assets/images/brands/openbotrun.png") },
+  paperclip: {
+    light: require("../../../assets/images/brands/paperclip.png"),
+    dark: require("../../../assets/images/brands/paperclip-dark.png"),
+  },
+  openmausbot: { light: require("../../../assets/images/brands/openmausbot.png") },
+  openbot: { light: require("../../../assets/images/brands/openbot.png") },
+  agenteschat: { light: require("../../../assets/images/brands/agenteschat.png") },
+};
+
+/** Trazer agentes: every app the web brings agents from, each with where its file is behind the ⓘ. */
 function ImportStep() {
   const { t } = useTranslation();
-  const { colors: c } = useTheme();
+  const { colors: c, scheme } = useTheme();
   return (
     <>
-      {(["OpenMausBot", "OpenBot"] as const).map((source) => (
-        <Line
-          key={source}
-          lead={
-            <View style={[styles.logoTile, { backgroundColor: c.sunken, borderColor: c.line }]}>
-              <Image source={IMPORT_LOGO[source]} contentFit="contain" style={styles.logo} />
-            </View>
-          }
-          title={t(`mobile.onb.import${source}`)}
-        />
-      ))}
+      {IMPORT_ROWS.map((row) => {
+        const name = importRowName(t, row);
+        const logo = row === "other" ? null : IMPORT_LOGO[row];
+        return (
+          <Line
+            key={row}
+            lead={
+              <View style={[styles.logoTile, { backgroundColor: c.sunken, borderColor: c.line }]}>
+                {logo ? (
+                  <Image
+                    source={scheme === "dark" ? (logo.dark ?? logo.light) : logo.light}
+                    contentFit="contain"
+                    style={styles.logo}
+                  />
+                ) : (
+                  <Icon name="more" size={16} color={c.muted} />
+                )}
+              </View>
+            }
+            title={name}
+            hint={
+              row === "other"
+                ? undefined
+                : { name: t("common.about", { label: name }), text: t(`onboarding.import.where.${row}`) }
+            }
+          />
+        );
+      })}
     </>
   );
 }
@@ -474,7 +612,7 @@ function AgentsStep({
   const { colors: c } = useTheme();
   return (
     <>
-      {PRESETS.map((p) => {
+      {PRESET_ROWS.map((p) => {
         const locked = p === GUIDE || Boolean(created[p]);
         const on = chosen.has(p);
         return (
@@ -510,12 +648,118 @@ function AgentsStep({
   );
 }
 
+/** Done's welcome: the team's faces, each with its name and role (the screen reader reads them from the lead). */
+function TeamFaces({ crew }: { crew: CrewMember[] }) {
+  const { t } = useTranslation();
+  if (crew.length === 0) return null;
+  return (
+    <View style={styles.faces} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {crew.map((m) => (
+        <View key={m.key} style={styles.face}>
+          <AgentAvatar agent={{ ...PRESET_LOOK[m.key], id: m.id }} size={48} expression="happy" />
+          <Text variant="caption" style={styles.bold} numberOfLines={1}>
+            {m.name}
+          </Text>
+          <Text variant="caption" tone="faint" numberOfLines={1}>
+            {t(`onboarding.presets.${m.key}.role`)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Done's first message: the agent best placed to start offers it in a bubble, the person can change it, and the big
+ * button sends it to #general. Under it, whether the agent it names can start now.
+ */
+function FirstAsk({
+  speaker,
+  said,
+  value,
+  onChange,
+  line,
+}: {
+  speaker: CrewMember;
+  said: string;
+  value: string;
+  onChange: (text: string) => void;
+  line: { icon: IconName; text: string } | null;
+}) {
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  return (
+    <>
+      {/* Another speaker pops in, as each step's host does. */}
+      <Animated.View key={speaker.key} entering={FadeIn.duration(220)} style={styles.host}>
+        <AgentAvatar agent={{ ...PRESET_LOOK[speaker.key], id: speaker.id }} size={44} expression="happy" />
+        <View style={[styles.bubble, { backgroundColor: c.raised, borderColor: c.line }]}>
+          <Text variant="small">{said}</Text>
+        </View>
+      </Animated.View>
+      <TextArea
+        value={value}
+        onChangeText={onChange}
+        placeholder={t("onboarding.done.first.placeholder")}
+        accessibilityLabel={t("onboarding.done.first.label")}
+        minHeight={52}
+      />
+      {line ? <Note icon={line.icon} text={line.text} live /> : null}
+    </>
+  );
+}
+
+/**
+ * The workspace step's note that the sign-up's confirmation link went to the person's address, with a new link a
+ * tap away; gone once `me` says the address is confirmed.
+ */
+function ConfirmationNote({ email }: { email: string }) {
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const [sent, setSent] = useState<"no" | "sending" | "sent" | "failed">("no");
+  const resend = async () => {
+    setSent("sending");
+    const res = await authClient()
+      .sendVerificationEmail({ email })
+      .catch(() => null);
+    setSent(res && !res.error ? "sent" : "failed");
+  };
+  return (
+    <View style={styles.note} accessibilityLiveRegion="polite">
+      <LineIcon name="mail" size={14} color={c.faint} variant="small" />
+      <View style={styles.grow}>
+        <Text variant="small" tone="muted">
+          {sent === "sent" ? t("auth.newLinkSent", { email }) : t("onboarding.confirmation.sent", { email })}
+        </Text>
+        {sent === "sent" ? null : (
+          <Pressable
+            onPress={() => void resend()}
+            disabled={sent === "sending"}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={styles.linkButton}
+          >
+            <Text variant="small" style={styles.bold}>
+              {t("auth.sendNewLink")}
+            </Text>
+          </Pressable>
+        )}
+        {sent === "failed" ? (
+          <Text variant="small" tone="danger">
+            {t("mobile.app.failed")}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 /** The frame of every step: the strip of sky on top, the host, the question, the answer, the buttons. */
 function StepFrame({
   step,
   title,
   lead,
-  host,
+  head,
   onBack,
   footer,
   children,
@@ -523,7 +767,8 @@ function StepFrame({
   step: StepId;
   title: string;
   lead?: string | undefined;
-  host: Preset;
+  /** Above the question: the step's host, or Done's team. */
+  head: ReactNode;
   onBack?: (() => void) | undefined;
   footer: ReactNode;
   children: ReactNode;
@@ -551,7 +796,7 @@ function StepFrame({
       </View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Animated.View key={step} entering={FadeIn.duration(220)} style={styles.stack}>
-          <Host host={host} intro={introducesAt(step)} happy={done} />
+          {head}
           <Text variant="display" accessibilityRole="header">
             {title}
             {OPTIONAL.has(step) ? (
@@ -597,16 +842,12 @@ function Strip({ progress }: { progress: number }) {
 }
 
 /** The step's host: says hi the first time, then its name and role. */
-function Host({ host, intro, happy }: { host: Preset; intro: boolean; happy: boolean }) {
+function Host({ host, intro }: { host: Preset; intro: boolean }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   return (
     <View style={styles.host}>
-      <AgentAvatar
-        agent={{ ...PRESET_LOOK[host], id: host }}
-        size={52}
-        {...(happy ? { expression: "happy" as const } : {})}
-      />
+      <AgentAvatar agent={{ ...PRESET_LOOK[host], id: host }} size={52} />
       {intro ? (
         <View style={[styles.bubble, { backgroundColor: c.raised, borderColor: c.line }]}>
           <Text variant="small">{t(`onboarding.hosts.${host}`)}</Text>
@@ -645,22 +886,34 @@ function Line({
   title,
   sub,
   end,
+  hint,
   onPress,
 }: {
   lead: ReactNode;
   title: string;
   sub?: string;
   end?: string | undefined;
+  /** An ⓘ after the title, its text under the row's words. */
+  hint?: { name: string; text: string } | undefined;
   onPress?: (() => void) | undefined;
 }) {
   const { colors: c } = useTheme();
+  const name = (
+    <Text variant="body" style={styles.bold}>
+      {title}
+    </Text>
+  );
   const content = (
     <>
       <View style={styles.lead}>{lead}</View>
       <View style={styles.grow}>
-        <Text variant="body" style={styles.bold}>
-          {title}
-        </Text>
+        {hint ? (
+          <InfoHint name={hint.name} text={hint.text} variant="body">
+            {name}
+          </InfoHint>
+        ) : (
+          name
+        )}
         {sub ? (
           <Text variant="small" tone="muted">
             {sub}
@@ -687,10 +940,21 @@ function Line({
   );
 }
 
-function Note({ icon, text, danger = false }: { icon: IconName; text: string; danger?: boolean }) {
+function Note({
+  icon,
+  text,
+  danger = false,
+  live = false,
+}: {
+  icon: IconName;
+  text: string;
+  danger?: boolean;
+  /** Said as it changes (Done's line under the first message). */
+  live?: boolean;
+}) {
   const { colors: c } = useTheme();
   return (
-    <View style={styles.note}>
+    <View style={styles.note} {...(live ? { accessibilityLiveRegion: "polite" as const } : {})}>
       <LineIcon name={icon} size={14} color={danger ? c.danger : c.faint} variant="small" />
       <Text variant="small" tone={danger ? "danger" : "muted"} style={styles.grow}>
         {text}
@@ -761,4 +1025,7 @@ const styles = StyleSheet.create({
   logo: { width: 22, height: 22 },
   box: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  linkButton: { alignSelf: "flex-start", marginTop: 2 },
+  faces: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 6 },
+  face: { width: 68, alignItems: "center", gap: 2 },
 });
