@@ -386,9 +386,29 @@ export async function invokeWithChip(
     toolUseId: use.id,
     ...(code ? { code } : {}),
   });
+  // The end names its call and whether the tool answered with an error, or didn't run because it waits on a
+  // person (an approval, a question, a secret): the chat marks that line.
+  const ended = (end: { failed?: boolean; held?: boolean }) =>
+    publishChannelEvent(deps.pubsub, {
+      type: "agent.tool",
+      ...where,
+      tool: null,
+      toolUseId: use.id,
+      ...(end.failed ? { failed: true } : {}),
+      ...(end.held ? { held: true } : {}),
+    });
   return scope.tools
     .invoke(ctx, { toolUseId: use.id, name: use.name, input: (use.input ?? {}) as Record<string, unknown> })
-    .finally(() => publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null }));
+    .then(
+      async (outcome) => {
+        await ended(outcome.type === "result" ? { failed: outcome.output.isError === true } : { held: true });
+        return outcome;
+      },
+      async (error: unknown) => {
+        await ended({ failed: true });
+        throw error;
+      },
+    );
 }
 
 type Located = { ctx: ToolContext; run: AgentRun | null };
