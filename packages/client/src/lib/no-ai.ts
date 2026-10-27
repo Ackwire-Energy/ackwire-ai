@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type {
+  Agent,
   AgentBrain,
   AiComputer,
   AiStatus,
@@ -8,8 +9,9 @@ import type {
   Edition,
   MachineAccountKind,
 } from "../api/types";
+import { answersOthers, audienceOf } from "./audience";
 import { type SetupView, setupPending } from "./computer";
-import { CODING_PLANS, isPlanId, PLAN_IDS, type PlanId } from "./plans";
+import { CODING_PLANS, isPlanId, loginPerAgent, PLAN_IDS, type PlanId } from "./plans";
 
 /**
  * No AI connected (ADR 0061): an agent's card when it can't answer, and the Connect step a person who
@@ -159,3 +161,73 @@ export const firstAgent = <A extends { id: string }>(
   hasAi: (id: string) => boolean,
   asked?: string,
 ) => agents.find((a) => a.id === asked) ?? agents.find((a) => !hasAi(a.id)) ?? agents[0];
+
+/** A plan signs in once per agent with the same account (`LOGIN_PER_AGENT`), so it can think for all of them. */
+export const signsInPerAgent = (choice: PlanChoice) => loginPerAgent(kindOf(choice), choice);
+
+/** What an agent thinks with now: a plan, the workspace's API key (`key`), or nothing yet (null). */
+export type AgentAi = AiChoice | null;
+
+/** The "For" select's choice that signs a plan in for every agent of `allAgents`. */
+export const ALL_AGENTS = "all";
+
+/**
+ * "All agents" for a plan: the viewer's agents on the first one's computer that have no AI yet, and those already
+ * on this plan (they read as done). An agent on the API key stays out, since a plan makes an agent answer only its
+ * owner and one on the key may be answering the team. One on another plan keeps it. Empty where the plan signs in
+ * for one agent per account, and below two agents, where the choice is that one agent.
+ */
+export function allAgents<A extends { id: string }>({
+  choice,
+  agents,
+  aiOf,
+  machineOf,
+}: {
+  choice: PlanChoice;
+  /** The viewer's agents, in team order. */
+  agents: readonly A[];
+  aiOf: (agentId: string) => AgentAi;
+  /** The computer an agent works on; null or undefined while it has none. */
+  machineOf: (agentId: string) => string | null | undefined;
+}): A[] {
+  if (!signsInPerAgent(choice)) return [];
+  const open = agents.filter((a) => {
+    const ai = aiOf(a.id);
+    return ai === null || ai === choice;
+  });
+  const machine = open[0] ? (machineOf(open[0].id) ?? null) : null;
+  const set = open.filter((a) => (machineOf(a.id) ?? null) === machine);
+  return set.length >= 2 ? set : [];
+}
+
+/**
+ * Whom a plan's panel opens on: the agent asked for, all of `set` (`allAgents`) when two or more of them have no AI
+ * yet, else the first agent with no AI, else the first.
+ */
+export function defaultTarget<A extends { id: string }>({
+  agents,
+  set,
+  hasAi,
+  asked,
+}: {
+  agents: readonly A[];
+  set: readonly { id: string }[];
+  hasAi: (agentId: string) => boolean;
+  asked?: string;
+}): string | undefined {
+  if (asked && agents.some((a) => a.id === asked)) return asked;
+  if (set.filter((a) => !hasAi(a.id)).length >= 2) return ALL_AGENTS;
+  return firstAgent(agents, hasAi)?.id;
+}
+
+/**
+ * Every agent with an AI is the viewer's and answers only them, so someone invited now has no agent to talk to (the
+ * note before inviting). False while no agent has an AI.
+ */
+export function onlyOwnerReplies(agents: readonly Agent[], hasAi: (agentId: string) => boolean, viewerId: string) {
+  const thinking = agents.filter((a) => hasAi(a.id));
+  return (
+    thinking.length > 0 &&
+    thinking.every((a) => a.ownerUserId === viewerId && !answersOthers(audienceOf(a), a.ownerUserId))
+  );
+}

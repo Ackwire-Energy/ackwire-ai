@@ -1,17 +1,24 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentBrain, AiComputer, ComputerSetup } from "../src/api/types";
+import type { Agent, AgentAudience, AgentBrain, AiComputer, ComputerSetup } from "../src/api/types";
 import { setupView } from "../src/lib/computer";
 import {
+  type AgentAi,
   type AiChoice,
+  ALL_AGENTS,
+  allAgents,
   defaultChoice,
+  defaultTarget,
   firstAgent,
   gateDims,
   kindOf,
+  onlyOwnerReplies,
   PLAN_CHOICES,
   type PlanChoice,
   type PlanGate,
   planGate,
+  signsInPerAgent,
 } from "../src/lib/no-ai";
+import { LOGIN_PER_AGENT } from "../src/lib/plans";
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -197,5 +204,92 @@ describe("the agent a plan starts on, and the order of the plans", () => {
       "claude_code",
       "claude_code",
     ]);
+  });
+});
+
+describe("All agents: one login per agent, the key pasted once", () => {
+  test("the coding plans sign in once per agent; Claude and ChatGPT stay one agent per account", () => {
+    expect(LOGIN_PER_AGENT).toEqual({ claude_code: false, codex: false, key: true });
+    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["zai", "kimi", "minimax", "opencode"]);
+  });
+
+  /** Ada and Theo have no AI, Lia is on GLM Coding, Bo on the API key, Cy on Claude, Di on the other computer. */
+  const team = ["ada", "theo", "lia", "bo", "cy", "di"].map((id) => ({ id }));
+  const ai: Record<string, AgentAi> = { ada: null, theo: null, lia: "zai", bo: "key", cy: "claude", di: null };
+  const machines: Record<string, string> = { di: "m2" };
+  const set = (choice: PlanChoice, agents = team, aiOf = (id: string) => ai[id] ?? null) =>
+    allAgents({ choice, agents, aiOf, machineOf: (id) => machines[id] ?? "m1" }).map((a) => a.id);
+
+  test("the agents with no AI on the first one's computer and those on this plan; never one on the key or another plan", () => {
+    expect(set("zai")).toEqual(["ada", "theo", "lia"]);
+    expect(set("kimi")).toEqual(["ada", "theo"]);
+    // The first one's computer decides: with Di first, Di's, where nobody else fits.
+    expect(set("zai", [...team.filter((a) => a.id === "di"), ...team.filter((a) => a.id !== "di")])).toEqual([]);
+    // No computer yet (the Cloud's on its way) is one place for all of them.
+    expect(
+      allAgents({ choice: "zai", agents: team, aiOf: () => null, machineOf: () => null }).map((a) => a.id),
+    ).toEqual(["ada", "theo", "lia", "bo", "cy", "di"]);
+  });
+
+  test("none for Claude or ChatGPT, and none for a single agent", () => {
+    expect(set("claude")).toEqual([]);
+    expect(set("chatgpt")).toEqual([]);
+    expect(set("zai", [{ id: "ada" }, { id: "bo" }])).toEqual([]);
+  });
+
+  test("the panel opens on the agent asked for, then all of them while two have no AI, then the first with no AI", () => {
+    const agents = team;
+    const all = allAgents({
+      choice: "zai",
+      agents,
+      aiOf: (id) => ai[id] ?? null,
+      machineOf: (id) => machines[id] ?? "m1",
+    });
+    const hasAi = (id: string) => ai[id] !== null;
+    expect(defaultTarget({ agents, set: all, hasAi, asked: "theo" })).toBe("theo");
+    expect(defaultTarget({ agents, set: all, hasAi })).toBe(ALL_AGENTS);
+    expect(defaultTarget({ agents, set: all, hasAi, asked: "someone-else" })).toBe(ALL_AGENTS);
+    // One left with no AI, or no set at all (Claude): the first with no AI.
+    expect(defaultTarget({ agents, set: all, hasAi: (id) => id !== "theo" })).toBe("theo");
+    expect(defaultTarget({ agents, set: [], hasAi })).toBe("ada");
+    expect(defaultTarget({ agents: [], set: [], hasAi })).toBeUndefined();
+  });
+});
+
+describe("the note before inviting: no agent would answer anyone else", () => {
+  const ME = "u_ana";
+  const ONLY_ME: AgentAudience = { mode: "owner", userIds: [] };
+  const agent = (id: string, audience: AgentAudience, ownerUserId: string | null = ME): Agent => ({
+    id,
+    name: id,
+    handle: id,
+    role: "",
+    instructions: "",
+    model: "auto",
+    ownerUserId,
+    hasCredential: false,
+    createdAt: "2026-10-27T10:00:00.000Z",
+    audience,
+  });
+  const everyone: AgentAudience = { mode: "everyone", userIds: [] };
+
+  test("every agent with an AI is mine and answers only me", () => {
+    const team = [agent("ada", ONLY_ME), agent("theo", ONLY_ME), agent("lia", everyone)];
+    // Lia has no AI yet: she answers nobody, whatever her audience says.
+    expect(onlyOwnerReplies(team, (id) => id !== "lia", ME)).toBe(true);
+  });
+
+  test("not while one on the API key answers everyone, one answers some people, or someone else's agent thinks", () => {
+    const hasAi = () => true;
+    expect(onlyOwnerReplies([agent("ada", ONLY_ME), agent("bo", everyone)], hasAi, ME)).toBe(false);
+    expect(
+      onlyOwnerReplies([agent("ada", ONLY_ME), agent("bo", { mode: "people", userIds: ["u_bia"] })], hasAi, ME),
+    ).toBe(false);
+    expect(onlyOwnerReplies([agent("ada", ONLY_ME), agent("bo", ONLY_ME, "u_bia")], hasAi, ME)).toBe(false);
+  });
+
+  test("not while no agent has an AI", () => {
+    expect(onlyOwnerReplies([agent("ada", ONLY_ME)], () => false, ME)).toBe(false);
+    expect(onlyOwnerReplies([], () => true, ME)).toBe(false);
   });
 });
