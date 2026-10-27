@@ -102,6 +102,37 @@ const chipOf = (title: string) => row(title).querySelector(".imp-row__chip")?.te
 /** A line led by an icon that `.ac-iconline` puts on the line's first row. */
 const iconLine = (line: Element | null) =>
   !!line?.classList.contains("ac-iconline") && !!line.firstElementChild?.matches("svg.ac-icon");
+/** What an app given `EXPORT_PROMPT` writes, naming itself `app`. */
+const exportReply = (app: string, name: string) => ({
+  format: "agenteschat.bundle",
+  version: 1,
+  source: { app, ref: "my-bots", name, files: [] },
+  agents: [
+    {
+      key: "news",
+      name: "Newsy",
+      handle: "news",
+      role: "Notícias do dia",
+      instructions: "Resume as notícias do dia em cinco tópicos.",
+      model: null,
+      appearance: {},
+      skills: [],
+    },
+  ],
+  skills: [],
+  channels: [],
+  routines: [],
+  notes: [],
+  todo: [],
+  leftOut: [],
+});
+/** A reply pasted in the link field as an app answers in its chat: some words, then the JSON in a code block. */
+const pasteReply = async (reply: object) => {
+  const field = screen().getByLabelText("Ou cole um link do GitHub ou a resposta do outro app");
+  const pasted = `Aqui está:\n\`\`\`json\n${JSON.stringify(reply, null, 2)}\n\`\`\``;
+  await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => pasted } }));
+  await settle(10);
+};
 /** `imports.apply` answering with `plan` for the dry run (and the default fake otherwise). */
 const withPlan = (api: ApiClient, state: State, plan: (input: ImportInput) => ImportItemResult[]) => {
   const fake = api.imports.apply;
@@ -151,37 +182,45 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().queryByRole("region", { name: "Exportar este workspace" })).toBeNull();
   });
 
-  test("each app by its official logo, in the maker's own dark file when the app (not the system) is dark", async () => {
+  test("the most used apps first, each by its official logo, in the maker's own dark file when the app (not the system) is dark", async () => {
     const device = domWindow().happyDOM.settings.device;
     const logos = () =>
-      Object.fromEntries(
-        [...document.querySelectorAll(".imp-source")].map((card) => [
-          card.querySelector(".ac-option__title")?.textContent,
-          card.querySelector(".imp-mark img")?.getAttribute("src") ?? null,
-        ]),
-      );
+      [...document.querySelectorAll(".imp-source")].map((card) => [
+        card.querySelector(".ac-option__title")?.textContent,
+        card.querySelector(".imp-mark img")?.getAttribute("src") ?? null,
+      ]);
     try {
       // The system is dark, but the app is set to light: the light files.
       device.prefersColorScheme = "dark";
       localStorage.setItem("agentes.theme", "light");
       await go();
-      expect(logos()["Hermes Agent"]).toBe("/brands/hermes.svg");
-      expect(logos().Paperclip).toBe("/brands/paperclip.svg");
+      expect(logos()).toEqual([
+        ["Grok Bot", "/brands/grok-bot.svg"],
+        ["ChatGPT dots", "/brands/chatgpt-dots.svg"],
+        ["OpenBot.run", "/brands/openbotrun.svg"],
+        ["OpenMausBot", "/brands/openmausbot.svg"],
+        ["Hermes Agent", "/brands/hermes.svg"],
+        ["OpenClaw", "/brands/openclaw.svg"],
+        ["Paperclip", "/brands/paperclip.svg"],
+        ["Exportação do agentes.chat", "/favicon.svg"],
+        // It names many apps: no one maker's logo fits.
+        ["Outro app", null],
+      ]);
       cleanup();
-      // The app set to dark: Hermes and Paperclip by their dark files, the others read on both.
+      // The app set to dark: Grok Bot, Hermes and Paperclip by their dark files, the others read on both.
       localStorage.setItem("agentes.theme", "dark");
       await go();
-      expect(logos()).toEqual({
-        OpenClaw: "/brands/openclaw.svg",
-        "Hermes Agent": "/brands/hermes-dark.svg",
-        "OpenBot.Run": "/brands/openbotrun.svg",
-        Paperclip: "/brands/paperclip-dark.svg",
-        OpenMausBot: "/brands/openmausbot.svg",
-        OpenBot: "/brands/openbot.png",
-        "Exportação do agentes.chat": "/favicon.svg",
-        // It names many apps: no one maker's logo fits.
-        "Outro app": null,
-      });
+      expect(logos()).toEqual([
+        ["Grok Bot", "/brands/grok-bot-dark.svg"],
+        ["ChatGPT dots", "/brands/chatgpt-dots.svg"],
+        ["OpenBot.run", "/brands/openbotrun.svg"],
+        ["OpenMausBot", "/brands/openmausbot.svg"],
+        ["Hermes Agent", "/brands/hermes-dark.svg"],
+        ["OpenClaw", "/brands/openclaw.svg"],
+        ["Paperclip", "/brands/paperclip-dark.svg"],
+        ["Exportação do agentes.chat", "/favicon.svg"],
+        ["Outro app", null],
+      ]);
     } finally {
       device.prefersColorScheme = "light";
       localStorage.removeItem("agentes.theme");
@@ -259,10 +298,14 @@ describe("Configurações → Importar e exportar", () => {
 
   test("a folder is recognized and planned on the server; unchecking an agent holds back what needs it; Importar applies and reports", async () => {
     const { state } = await go();
-    // Every source has a card with where its file is; the drop zone reads any of them.
-    for (const name of ["OpenClaw", "Hermes Agent", "OpenBot.Run", "Paperclip", "OpenMausBot", "OpenBot"]) {
+    // Each app the parsers read has a card with where its file is, but OpenBot, which few use: the drop zone reads
+    // any of them, and the help behind Outro app says where OpenBot's files are.
+    for (const name of ["OpenBot.run", "OpenMausBot", "Hermes Agent", "OpenClaw", "Paperclip"]) {
       expect(button(new RegExp(`^${name.replace(".", "\\.")}$`))).toBeTruthy();
     }
+    expect(screen().queryByRole("button", { name: /^OpenBot$/ })).toBeNull();
+    await click(button(/^OpenBot\.run$/), 1);
+    expect(text()).toContain("Solte o openbot-import.json");
     await click(button(/^Exportação do agentes\.chat/), 1);
     expect(text()).toContain("Configurações → Importar e exportar → Baixar o arquivo");
 
@@ -450,36 +493,50 @@ describe("Configurações → Importar e exportar", () => {
     expect(within(other).getByRole("button", { name: "Copiado" })).toBeTruthy();
     expect(within(other).getByRole("status").textContent).toBe("Agora é só colar no outro app.");
 
-    const reply = {
-      format: "agenteschat.bundle",
-      version: 1,
-      source: { app: "grok-bot", ref: "my-bots", name: "Minhas automações", files: [] },
-      agents: [
-        {
-          key: "news",
-          name: "Newsy",
-          handle: "news",
-          role: "Notícias do dia",
-          instructions: "Resume as notícias do dia em cinco tópicos.",
-          model: null,
-          appearance: {},
-          skills: [],
-        },
-      ],
-      skills: [],
-      channels: [],
-      routines: [],
-      notes: [],
-      todo: [],
-      leftOut: [],
-    };
-    const field = screen().getByLabelText("Ou cole um link do GitHub ou a resposta do outro app");
-    const pasted = `Aqui está:\n\`\`\`json\n${JSON.stringify(reply, null, 2)}\n\`\`\``;
-    await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => pasted } }));
-    await settle(10);
+    await pasteReply(exportReply("claude", "Minhas automações"));
     expect(screen().getByRole("heading", { name: "Minhas automações" })).toBeTruthy();
-    expect(text()).toContain("Veio do Grok Bot");
+    expect(text()).toContain("Veio do Claude");
+    expect(document.querySelector(".imp-head .imp-mark img")).toBeNull();
     expect(screen().getByRole("checkbox", { name: "Trazer Newsy" }).getAttribute("aria-checked")).toBe("true");
+    await click(button("Trocar arquivo"), 2);
+    expect(button(/^Outro app/).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("Grok Bot and ChatGPT dots: the same request in each app's own words, and a reply lands on its own card", async () => {
+    await go();
+    await click(button("Grok Bot"), 2);
+    const grok = screen().getByRole("region", { name: "Peça para o seu bot exportar" });
+    expect([...grok.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Copie o pedido abaixo.",
+      "Cole na conversa com o seu bot.",
+      "Ele responde com o JSON: copie a resposta inteira e cole no campo de baixo.",
+    ]);
+    expect((within(grok).getByLabelText("Pedido de exportação") as HTMLTextAreaElement).value).toBe(EXPORT_PROMPT);
+    // Its steps say where: the help page's list is for any other app.
+    expect(within(grok).queryByRole("link")).toBeNull();
+
+    await click(button("ChatGPT dots"), 2);
+    const dots = screen().getByRole("region", { name: "Peça para o seu dot exportar" });
+    expect([...dots.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Copie o pedido abaixo.",
+      "Cole num chat novo.",
+      "Baixe o arquivo que ele criar e solte aqui.",
+    ]);
+    expect((within(dots).getByLabelText("Pedido de exportação") as HTMLTextAreaElement).value).toBe(EXPORT_PROMPT);
+
+    // A Grok Bot reply pasted with any card picked: from Grok Bot, by its logo, and its card picked after.
+    await click(button(/^Outro app/), 2);
+    await pasteReply(exportReply("grok-bot", "Minhas automações"));
+    expect(text()).toContain("Veio do Grok Bot");
+    expect(document.querySelector(".imp-head .imp-mark img")?.getAttribute("src")).toBe("/brands/grok-bot.svg");
+    await click(button("Trocar arquivo"), 2);
+    expect(button("Grok Bot").getAttribute("aria-pressed")).toBe("true");
+
+    // The file a dot makes, dropped.
+    const file = new File([JSON.stringify(exportReply("chatgpt-dots", "Meu dot"))], "agentes-chat-export.json");
+    await drop({ files: [file], items: [] });
+    expect(text()).toContain("Veio do ChatGPT dots");
+    expect(document.querySelector(".imp-head .imp-mark img")?.getAttribute("src")).toBe("/brands/chatgpt-dots.svg");
   });
 
   test("what went wrong says what to do next, with Tentar de novo only where trying again helps", async () => {

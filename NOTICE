@@ -24,13 +24,14 @@ Third-party software keeps its own license. The license texts are next to what t
   and OpenCode; apps/desktop/src/ui/here.tsx: Tailscale's icon. Each is drawn from its maker's
   own files (a press kit, a brand page or the maker's repository), named in the code beside it.
 - apps/web/public/brands, apps/mobile/assets/images/brands and
-  apps/web/test/fixtures/agent-import: logos and sample files of OpenBot (MIT, Copyright (c)
-  2026 CopilotKit), OpenMausBot (Apache-2.0, "OpenMausBot, Copyright 2026 Milind Soni and
-  OpenMausBot contributors"), OpenClaw (MIT, Copyright (c) 2026 OpenClaw Foundation), Hermes
-  Agent (MIT, Copyright (c) 2025 Nous Research) and Paperclip (MIT, Copyright (c) 2025
-  Paperclip AI; its logo is Lucide's paperclip icon, ISC), and OpenBot.Run's logo, without any
-  of that project's code. The README in apps/web/public/brands gives each logo's source, and
-  the license texts are in apps/web/test/fixtures/agent-import.
+  apps/web/test/fixtures/agent-import: the logos of Grok Bot (SpaceXAI LLC), ChatGPT dots
+  (OpenAI) and OpenBot.run, without any of their code. Logos and sample files of OpenMausBot
+  (Apache-2.0, "OpenMausBot, Copyright 2026 Milind Soni and OpenMausBot contributors"), Hermes
+  Agent (MIT, Copyright (c) 2025 Nous Research), OpenClaw (MIT, Copyright (c) 2026 OpenClaw
+  Foundation) and Paperclip (MIT, Copyright (c) 2025 Paperclip AI. Its logo is Lucide's
+  paperclip icon, ISC), and sample files of OpenBot (MIT, Copyright (c) 2026 CopilotKit). The
+  README in apps/web/public/brands gives each logo's source, and the license texts are in
+  apps/web/test/fixtures/agent-import.
 - Packages installed from npm and crates.io: the license in each package. The container
   image is built on the oven/bun image (Debian and Bun), whose parts keep their licenses.
 

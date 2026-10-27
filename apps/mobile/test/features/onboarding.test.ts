@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readdirSync } from "node:fs";
 import type { AiStatus } from "@agenteschat/client";
 import { isInviteToken } from "../../src/features/auth/links";
 import {
@@ -8,8 +9,8 @@ import {
   emailsFrom,
   firstAskOf,
   HOST,
+  IMPORT_BRAND,
   IMPORT_ROWS,
-  importRowName,
   introducesAt,
   inviteEach,
   joiningLeft,
@@ -68,39 +69,23 @@ test("the time zone reads as its city; invitation tokens only url-safe", () => {
   expect(isInviteToken(undefined)).toBe(false);
 });
 
-test("the import step names every app the web brings agents from, in its order, with its logo", async () => {
-  const en = await translator("en");
-  expect(IMPORT_ROWS.map((r) => importRowName(en, r))).toEqual([
-    "OpenClaw",
-    "Hermes Agent",
-    "OpenBot.Run",
-    "Paperclip",
-    "OpenMausBot",
-    "OpenBot",
-    "agentes.chat export",
-    "Another app",
-  ]);
-  const phone = (name: string) => Bun.file(new URL(`../../assets/images/brands/${name}`, import.meta.url).pathname);
-  const web = (name: string) => Bun.file(new URL(`../../../web/public/${name}`, import.meta.url).pathname);
-  // OpenBot has no vector logo: its raster, byte for byte.
-  expect(Buffer.from(await phone("openbot.png").arrayBuffer())).toEqual(
-    Buffer.from(await web("brands/openbot.png").arrayBuffer()),
-  );
-  // Every other mark is the web's SVG (a dark one where the maker has one), rendered for the phone at 96 px (the PNG
-  // header's width and height).
+test("the import step names the three most used apps, in the web's order, each by its logo", async () => {
+  expect(IMPORT_ROWS.map((r) => IMPORT_BRAND[r])).toEqual(["Grok Bot", "ChatGPT dots", "OpenBot.run"]);
+  const brands = new URL("../../assets/images/brands/", import.meta.url).pathname;
+  const web = (name: string) => Bun.file(new URL(`../../../web/public/brands/${name}`, import.meta.url).pathname);
+  // Each mark is the web's SVG (a dark one where the maker has one), rendered for the phone at 96 px (the PNG
+  // header's width and height). No other logo is left in the folder.
   const rendered: [phone: string, web: string][] = [
-    ["openclaw.png", "brands/openclaw.svg"],
-    ["hermes.png", "brands/hermes.svg"],
-    ["hermes-dark.png", "brands/hermes-dark.svg"],
-    ["openbotrun.png", "brands/openbotrun.svg"],
-    ["paperclip.png", "brands/paperclip.svg"],
-    ["paperclip-dark.png", "brands/paperclip-dark.svg"],
-    ["openmausbot.png", "brands/openmausbot.svg"],
-    ["agenteschat.png", "favicon.svg"],
+    ["chatgpt-dots.png", "chatgpt-dots.svg"],
+    ["grok-bot-dark.png", "grok-bot-dark.svg"],
+    ["grok-bot.png", "grok-bot.svg"],
+    ["openbotrun.png", "openbotrun.svg"],
   ];
+  const pngs = readdirSync(brands).filter((f) => f.endsWith(".png"));
+  expect(pngs.sort()).toEqual(rendered.map(([png]) => png));
   for (const [png, svg] of rendered) {
     expect(await web(svg).exists()).toBe(true);
-    const header = new DataView(await phone(png).arrayBuffer());
+    const header = new DataView(await Bun.file(brands + png).arrayBuffer());
     expect([png, header.getUint32(16), header.getUint32(20)]).toEqual([png, 96, 96]);
   }
 });
@@ -145,9 +130,7 @@ test("the line under the first message: whether the agent it names can start, or
     text: "Theo starts right away, in #general.",
   });
   expect(line({ status: status("waiting") })?.text).toBe("Theo starts as soon as Acme's computer is back.");
-  expect(line({ status: status("no_ai") })?.text).toBe(
-    "No AI connected yet: Theo answers once you connect one.",
-  );
+  expect(line({ status: status("no_ai") })?.text).toBe("No AI connected yet: Theo answers once you connect one.");
   // Nobody named: only that no agent has an AI, else nothing.
   expect(line({ mentioned: undefined, status: status("no_ai", false) })?.text).toBe(
     "No AI connected yet: your agents answer once you connect one.",
