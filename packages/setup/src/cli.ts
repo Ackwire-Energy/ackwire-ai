@@ -26,6 +26,7 @@ import {
   COMPUTER_PROBLEMS,
   COMPUTER_WAIT_S,
   type ComputerPlan,
+  checkJevKey,
   computerFiles,
   computerOffer,
   computerUpToDate,
@@ -56,6 +57,8 @@ import {
   installedCommands,
   isComposeFile,
   isTailnetUrl,
+  type JevChoice,
+  jevStep,
   lastLine,
   MIN_COMPOSE,
   type Network,
@@ -84,6 +87,7 @@ import {
   TELEMETRY_TEXT,
   type ThisMachine,
   TS,
+  TYPESAFE_KEYS,
   tailscaleKeyEntries,
   tailscaleKeyProblem,
   theEnd,
@@ -120,6 +124,7 @@ It asks only for what it needs and fills in only what's missing, so running it a
                                       where they work as you, and yes on Linux, where each agent is
                                       its own user)
   --telemetry <on|off>                Send anonymous usage statistics to agentes.chat (default on)
+  --typesafe-key <key>                TypeSafe key for Jev, optional (${TYPESAFE_KEYS})
   --no-start                          Write .env and docker-compose.yml, start nothing
   --timeout <seconds>                 How long each wait may take (default 300)
   --tailscale-status <file|->         Finish from \`tailscale status --json\` (setup inside the image)
@@ -714,7 +719,13 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     entries,
   });
   const telemetry = await chooseTelemetry(opts, ui, content, asked, entries);
-  const choices: Choices = { computer, telemetry: telemetry.value };
+  // Checked with TypeSafe before anything is written: a key it refuses stops the setup here.
+  const jev = await jevStep({ flag: opts.typesafeKey, content, dryRun: opts.dryRun, check: (key) => checkJevKey(key) });
+  if ("problem" in jev) throw new SetupError(jev.problem);
+  Object.assign(entries, jev.entries);
+  if (jev.said?.ok) ui.ok(jev.said.text);
+  else if (jev.said) ui.warn(jev.said.text);
+  const choices: Choices = { computer, telemetry: telemetry.value, jev: jev.value };
 
   const plan = planSteps({
     docker: dockerCheck && "problem" in dockerCheck ? `${dockerCheck.problem.error} ${dockerCheck.problem.fix}` : null,
@@ -730,6 +741,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     email,
     computer,
     telemetry,
+    jev: jev.value,
     compose: composeFile,
     start: opts.start,
     image,
@@ -783,9 +795,10 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
 interface Choices {
   computer: ComputerPlan;
   telemetry: OnOff;
+  jev: JevChoice;
 }
 
-const results = (c: Choices) => ({ computer: c.computer.state, telemetry: c.telemetry });
+const results = (c: Choices) => ({ computer: c.computer.state, telemetry: c.telemetry, jev: c.jev });
 
 /** A file readable by its owner only, like .env. */
 function saveSecret(file: string, content: string) {
