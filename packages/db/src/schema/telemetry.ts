@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import type { MachineLoadRecord } from "./machines";
 
 /**
@@ -22,6 +22,11 @@ export const instanceTelemetry = pgTable(
     hostSamples: jsonb().$type<{ at: number; load: number; memory: number }[]>(),
     /** When the next report is due; kept so a restart neither delays it nor sends it twice in a day. */
     nextReportAt: timestamp({ withTimezone: true }),
+    /**
+     * Who has the installation's own settings (this switch, the Jev key, ADR 0073): its first account, pinned so
+     * the next oldest never inherits them. No foreign key: a deleted owner's id keeps matching nobody.
+     */
+    ownerUserId: text(),
   },
   (t) => [check("instance_telemetry_one_row", sql`${t.id} = 1`)],
 );
