@@ -19,6 +19,7 @@ import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
@@ -789,6 +790,7 @@ export async function createInvitation(
     .innerJoin(organizationMembers, eq(organizationMembers.userId, users.id))
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
+  await assertMemberRoom(db, orgId);
   const ownersOk = can(actor.role, "manage_owners");
   return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, ownersOk, now });
 }
@@ -1001,10 +1003,18 @@ export async function acceptInvitation(
 }
 
 /**
- * Adds a person to an organization (keeping an existing role) and to `general`. A request to join that they or
- * their address had waiting closes: whoever answers it next finds it answered.
+ * Adds a person to an organization (keeping an existing role) and to `general`, in the caller's transaction. A
+ * request to join that they or their address had waiting closes: whoever answers it next finds it answered. A
+ * full workspace refuses a new member (`org.members_full`), under the lock role changes and removals take, so
+ * two people taking the last seat at once can't both get in.
  */
 export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  const [member] = await tx
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  if (!member) await assertMemberRoom(tx, orgId);
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
   await tx
     .update(organizationJoinRequests)
@@ -1082,7 +1092,8 @@ export async function inviteMany(
       const { invitation, token } = await createInvitation(db, actorId, orgId, { email, role: input.role }, now);
       out.push({ email, status: "invited", invitationId: invitation.id, token });
     } catch (error) {
-      if (error instanceof ConflictError) out.push({ email, status: "already_member" });
+      // A full workspace (`org.members_full`) refuses the batch, not one address.
+      if (error instanceof ConflictError && error.code === "conflict") out.push({ email, status: "already_member" });
       else throw error;
     }
   }
@@ -1104,6 +1115,7 @@ export async function resendInvitation(
     .from(organizationInvitations)
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
+  await assertMemberRoom(db, orgId);
   return sendInvitation(db, {
     orgId,
     email: existing.email,

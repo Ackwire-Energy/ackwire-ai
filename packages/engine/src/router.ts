@@ -7,6 +7,7 @@ import { quotedLine } from "./context";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
+import { PLATFORM_CAP } from "./limits";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage } from "./messages";
 import { type AgentRun, NO_AI } from "./runs";
 import { standingRefusal } from "./standing";
@@ -324,6 +325,8 @@ export interface RouterDeps {
   policy: RouterPolicy;
   /** Whether the organization has any AI (`orgHasAi`); without it the strategy is always asked. */
   hasAi?(orgId: string): Promise<boolean>;
+  /** Whether the workspace used up its platform AI for the month (`limits.ts`): only with a strategy that bills it. */
+  platformCapReached?(orgId: string): Promise<boolean>;
 }
 
 export interface RouteResult {
@@ -434,9 +437,8 @@ export async function routeMessage(
     about: r.instructions.slice(0, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
-  // No AI anywhere in the organization: nobody could answer, whatever the strategy (Jev only scores, so it
-  // never misses a key). Stored as `no_ai`, which "Responder agora" routes again once an AI is connected.
-  if (deps.hasAi && !(await deps.hasAi(message.orgId))) {
+  // Routed to nobody without asking the strategy, and why (the receipts say it).
+  const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
     const stored = await db
       .insert(routingDecisions)
       .values({
@@ -445,12 +447,16 @@ export async function routeMessage(
         messageId: message.id,
         strategy: deps.strategy.name,
         candidates: [],
-        error: NO_AI,
+        error: reason,
       })
       .onConflictDoNothing()
       .returning({ id: routingDecisions.id });
-    return stored.length > 0 ? { runs: [], selected: [], reason: NO_AI } : { runs: [], skipped: "already_routed" };
-  }
+    return stored.length > 0 ? { runs: [], selected: [], reason } : { runs: [], skipped: "already_routed" };
+  };
+  // No AI anywhere in the organization: nobody could answer, whatever the strategy (Jev only scores, so it
+  // never misses a key). Stored as `no_ai`, which "Responder agora" routes again once an AI is connected.
+  if (deps.hasAi && !(await deps.hasAi(message.orgId))) return unrouted(NO_AI);
+  if (await deps.platformCapReached?.(message.orgId)) return unrouted(PLATFORM_CAP);
   // What each one can reach, by name ("Sentry"): a question about an app goes to who has it.
   const [granted, connections] = await Promise.all([
     db

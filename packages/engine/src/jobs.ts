@@ -16,6 +16,7 @@ import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import { mentionHandoffs } from "./judge";
+import { platformCapReached } from "./limits";
 import { wakeForAccessDecision } from "./machine-access";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage, referencedOf } from "./messages";
@@ -148,6 +149,8 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
       maxHops: deps.maxHops,
     },
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
+    // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
+    ...(jev && !router.strategy ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
   };
 }
 

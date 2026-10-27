@@ -3,6 +3,7 @@ import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agen
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { can, requirePermission } from "./organizations";
 import { readZip } from "./zip";
@@ -239,15 +240,32 @@ async function loadSkill(db: Database, orgId: string, id: string) {
   return s;
 }
 
-/** Stores a version's files: showable ones in the blob store, the rest only listed as ignored. */
-async function storeFiles(deps: SkillDeps, s: { id: string; orgId: string }, version: number, files: SkillFileInput[]) {
+/** Where a version's files go and how each is kept, refused before the skill or any file is written. */
+async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]) {
   if (files.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
   const total = files.reduce((n, f) => n + f.data.byteLength, 0);
   if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-  const location = await deps.blobs.forOrg(s.orgId);
-  for (const f of files) {
+  const location = await deps.blobs.forOrg(orgId);
+  const planned = files.map((f) => {
     const path = safePath(f.path);
-    const { mime, status } = classifyFile(path);
+    return { f, path, ...classifyFile(path) };
+  });
+  // The workspace's own bucket counts against no limit of ours.
+  if (location.storageConfigId === null) {
+    const stored = planned.filter((p) => p.status !== "ignored").reduce((n, p) => n + p.f.data.byteLength, 0);
+    await assertStorageRoom(deps.db, orgId, stored);
+  }
+  return { location, files: planned };
+}
+
+/** Stores a version's files: showable ones in the blob store, the rest only listed as ignored. */
+async function storeFiles(
+  deps: SkillDeps,
+  s: { id: string; orgId: string },
+  version: number,
+  { location, files }: Awaited<ReturnType<typeof planFiles>>,
+) {
+  for (const { f, path, mime, status } of files) {
     let blobKey: string | null = null;
     if (status !== "ignored") {
       blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
@@ -287,6 +305,7 @@ export async function saveSkill(
 ): Promise<SkillDetail> {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
   validateSkill(input);
+  const files = await planFiles(deps, orgId, input.files ?? []);
   const [existing] = await deps.db
     .select()
     .from(skills)
@@ -330,7 +349,7 @@ export async function saveSkill(
     if (!created) throw new Error("skill insert returned nothing");
     row = created;
   }
-  await storeFiles(deps, row, row.version, input.files ?? []);
+  await storeFiles(deps, row, row.version, files);
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },

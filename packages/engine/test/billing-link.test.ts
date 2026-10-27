@@ -4,10 +4,13 @@ import { eq, schema } from "@agenteschat/db";
 import {
   BILLING_FROM,
   type BillingLinkClaims,
+  createFileArtifact,
   mintBillingLink,
+  saveStorage,
   setBillingHold,
   setOrgStanding,
   signBillingLink,
+  testStorage,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
@@ -83,7 +86,7 @@ describe("mintBillingLink", () => {
       locale: "pt-BR",
       from: "settings",
       return: `/org/${f.org.id}/settings/billing`,
-      usage: { members: 1, agents: 1, storageBytes: null },
+      usage: { members: 1, agents: 1, storageBytes: 0 },
     });
     // Single use on the billing side: every link is its own.
     expect(claimsOf((await mint(f.owner.id)).url).jti).not.toBe(claims.jti);
@@ -107,6 +110,24 @@ describe("mintBillingLink", () => {
     });
     const claims = claimsOf((await mint(admin.id, "hold", "https://billing.example.com/")).url);
     expect(claims).toMatchObject({ role: "admin", locale: "en", usage: { members: 2 } });
+  });
+
+  test("usage counts the files on this server's storage; on the workspace's own bucket, none", async () => {
+    const owner = { type: "person" as const, userId: f.owner.id };
+    await createFileArtifact(f.artifactDeps, owner, f.org.id, { title: "a", name: "a.txt", bytes: new Uint8Array(42) });
+    expect(claimsOf((await mint(f.owner.id)).url).usage.storageBytes).toBe(42);
+    const bucket = {
+      endpoint: "https://s3.example.com",
+      region: "us-east-1",
+      bucket: "acme-files",
+      prefix: null,
+      pathStyle: true,
+      accessKeyId: "AKIATEST",
+      secretAccessKey: "secret-test-key-123456",
+    };
+    expect((await testStorage(f.storage, f.owner.id, f.org.id, bucket)).ok).toBe(true);
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket });
+    expect(claimsOf((await mint(f.owner.id)).url).usage.storageBytes).toBeNull();
   });
 
   test("members and strangers never get one; a held workspace does, a suspended one doesn't", async () => {

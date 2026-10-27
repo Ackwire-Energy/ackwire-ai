@@ -29,7 +29,8 @@ export type OperatorEventType =
   | "mail.sent"
   | "run.finished"
   | "task.finished"
-  | "content.viewed";
+  | "content.viewed"
+  | "platform_ai.threshold";
 
 export interface OperatorEvent {
   type: OperatorEventType;

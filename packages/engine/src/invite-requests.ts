@@ -20,6 +20,7 @@ import { inviteLinkToken, sha256 } from "./crypto";
 import { emailLocale, emailsByLocale, queueEmail } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { adminIds } from "./gateway";
+import { assertMemberRoom } from "./limits";
 import { oneLine } from "./mail/text";
 import { notify, resolveNotifications } from "./notifications";
 import {
@@ -430,6 +431,8 @@ export async function approveJoinRequest(
     const context = await answerContext(tx, orgId, actorId, row);
     // Someone with this address got in meanwhile: nothing to send.
     const already = await addressIsMember(tx, orgId, row.email);
+    // Full: nobody joins, and no invitation goes out that couldn't be accepted.
+    if (!already) await assertMemberRoom(tx, orgId);
     let approval: JoinApproval = { outcome: "joined" };
     let invitationId: string | null = null;
     if (!already && context.confirmed && row.userId) {

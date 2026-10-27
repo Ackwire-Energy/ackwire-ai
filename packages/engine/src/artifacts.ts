@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { assertStorageRoom } from "./limits";
 import { can, getMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
@@ -436,6 +437,8 @@ interface Stored {
 async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, version: number, stored: Stored) {
   const location = await deps.blobs.forOrg(orgId);
   const { body, contentType } = stored;
+  // The workspace's own bucket counts against no limit of ours.
+  if (location.storageConfigId === null) await assertStorageRoom(deps.db, orgId, body.byteLength);
   const key = `${location.prefix}artifacts/${artifactId}/v${version}`;
   await location.store.put(key, body, { contentType });
   return { storageConfigId: location.storageConfigId, key, contentType, size: body.byteLength, sha: sha256Hex(body) };

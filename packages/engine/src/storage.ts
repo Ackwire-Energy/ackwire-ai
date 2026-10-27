@@ -126,6 +126,9 @@ async function activeConfig(db: Database, orgId: string) {
   return row ?? null;
 }
 
+/** New files go to the workspace's own bucket. */
+export const usesOwnBucket = async (db: Database, orgId: string) => (await activeConfig(db, orgId)) !== null;
+
 /**
  * Every blob read and write goes through this (like `SearchIndexResolver`):
  * new objects go to the org's active storage (its own bucket, or platform

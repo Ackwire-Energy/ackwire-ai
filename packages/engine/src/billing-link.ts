@@ -89,7 +89,11 @@ export async function mintBillingLink(
     locale: appLocale([user.locale]) ?? "pt-BR",
     from,
     return: `/org/${orgId}${RETURN_TO[from] ?? ""}`,
-    usage: { members: org.counts.members, agents: org.counts.agents, storageBytes: null },
+    usage: {
+      members: org.counts.members,
+      agents: org.counts.agents,
+      storageBytes: org.meters.ownStorage ? null : org.meters.storageBytes,
+    },
   });
   return { url: `${input.baseUrl.replace(/\/+$/, "")}/link?t=${token}`, expiresAt: new Date(exp * 1000) };
 }

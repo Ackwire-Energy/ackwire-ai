@@ -84,6 +84,8 @@ export const caches = {
   zones: new TtlCache<unknown>(TTL_MS),
   /** An org's standing (`standing.ts`), read before every model and computer call: a hold bites within 5 s everywhere. */
   standing: new TtlCache<unknown>(5_000),
+  /** Whether an org spent its platform AI for the month (`limits.ts`), read before every Jev call and route. */
+  platformSpend: new TtlCache<unknown>(60_000),
 };
 
 /** Forgets everything about an org (used after broad changes and in tests). */

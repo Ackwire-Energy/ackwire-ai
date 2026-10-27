@@ -25,6 +25,7 @@ import {
 } from "./artifacts";
 import { recordAudit } from "./audit";
 import { publishChannelEvent } from "./events";
+import { formatBytes } from "./format";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
 import { notAllowedMessage } from "./machine-provider";
@@ -379,13 +380,6 @@ const fileOfArtifact = (a: Awaited<ReturnType<typeof getArtifact>>) => {
 
 /** How long `upload_file` waits for the bytes. */
 export const UPLOAD_TIMEOUT_SECONDS = 300;
-
-/** `2.3 MB`, `12 KB`, `512 bytes`. */
-export function formatBytes(n: number) {
-  if (n < 1024) return `${n} bytes`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 /** The last line of a command's output. */
 const lastLine = (text: string) => text.trim().split("\n").at(-1)?.trim() ?? "";

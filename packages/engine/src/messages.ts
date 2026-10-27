@@ -21,6 +21,7 @@ import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { type Judge, personMentionAddressees } from "./judge";
+import { PLATFORM_CAP } from "./limits";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
@@ -162,6 +163,8 @@ export interface Receipts {
   referenced?: string[];
   /** Routed to nobody: the organization had no AI connected. */
   noAi?: true;
+  /** Routed to nobody: the workspace used up its platform AI for the month, so only @mentions start agents. */
+  platformCap?: true;
 }
 
 /** `meta.referencedAgentIds`: agents a person's message only references (no run; see `classifyAddressees`). */
@@ -221,6 +224,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   ]);
   const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
+  const capped = new Set(decisions.filter((d) => d.error === PLATFORM_CAP).map((d) => d.messageId));
   const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
   const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
   for (const m of list) {
@@ -252,6 +256,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
       ...(noAi.has(m.id) ? { noAi: true as const } : {}),
+      ...(capped.has(m.id) ? { platformCap: true as const } : {}),
     });
   }
   return out;
