@@ -2,12 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import {
   createAgent,
+  createJevJudge,
   createJevKey,
   createJobHandlers,
+  createLlmJudge,
   drainOutbox,
   insertMessage,
   JevOffError,
   jevCostNanoUsd,
+  messageRouter,
   postPersonMessage,
   RouterChainEnd,
   RouterSkip,
@@ -16,6 +19,8 @@ import {
   type RoutingInput,
   routeChain,
   selectAgents,
+  standingJudge,
+  withJudgeFallback,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -261,6 +266,22 @@ describe("Jev strategy end to end", () => {
     const [decision] = await f.db.select().from(schema.routingDecisions);
     expect(decision).toMatchObject({ strategy: "llm:claude-haiku-5-5", error: null, selectedAgentIds: [f.agent.id] });
     expect(jev.requests).toEqual([]);
+  });
+
+  test("named for who decides now: the cheap model with no key, Jev once one is saved", async () => {
+    f = await setup();
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0 }));
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper], fetch: jev.fetcher });
+    await key.ready();
+    const routing = messageRouter({ ...f.jobDeps, router: { enabled: true, model: "m", jev: { key } } });
+    const llm = createLlmJudge({ gateway: f.gateway, resolveModel: async () => "m" });
+    const judge = standingJudge(
+      f.db,
+      withJudgeFallback(createJevJudge({ key, gateway: f.gateway }), llm, () => key.usable()),
+    );
+    expect([routing?.strategy.name, judge.name]).toEqual(["llm", "llm"]);
+    await key.save("ts_named_key_1", f.owner.id);
+    expect([routing?.strategy.name, judge.name]).toEqual(["jev", "jev"]);
   });
 
   test("out of credit: the LLM strategy decides, and Jev isn't called again for 30 minutes", async () => {

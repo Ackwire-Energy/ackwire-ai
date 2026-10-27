@@ -1,6 +1,6 @@
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gte, schema, sql } from "@agenteschat/db";
-import { recordAudit } from "./audit";
+import { type AuditEntry, recordAudit } from "./audit";
 import { openSecret, sealSecret } from "./crypto";
 import { ConflictError, ValidationError } from "./errors";
 import { monthStartUtc } from "./usage";
@@ -32,7 +32,8 @@ export interface JevKey {
   key(): Promise<string | null>;
   /** Whether a call now would get a key. */
   usable(): boolean;
-  report(state: JevState, retryAfterMs?: number): void;
+  /** How a call went. `key`: the one it was made with, so an answer for a key replaced since is dropped. */
+  report(state: JevState, retryAfterMs?: number, key?: string): void;
   view(): Promise<JevKeyView>;
   /** Checked with TypeSafe first: a refused key is never stored (`jev_key_invalid`). */
   save(apiKey: string, userId: string): Promise<JevKeyView>;
@@ -42,7 +43,7 @@ export interface JevKey {
 }
 
 /** A fixed key (evals, tests), or the installation's. */
-export type JevKeySource = string | Pick<JevKey, "key" | "report">;
+export type JevKeySource = string | Pick<JevKey, "key" | "report" | "usable">;
 
 /** No Jev key to call with now: the next step decides. */
 export class JevOffError extends Error {
@@ -62,6 +63,9 @@ const DOWNS_TO_SKIP = 3;
 const REREAD_MS = 60_000;
 const CHECK_TIMEOUT_MS = 5000;
 const CREDIT_WORDS = /credit|balance|billing|payment|funds/i;
+// A key is printable ASCII. Anything else, like a pasted curly quote or zero-width space, fails in fetch before the
+// request leaves, which would read as an outage and keep a key TypeSafe never saw.
+const KEY_SHAPE = /^[\x21-\x7E]+$/;
 
 /**
  * What a TypeSafe answer says about the key, first match first. Null: the request's own fault (400, 413, 415,
@@ -120,7 +124,7 @@ export async function callJev<T>(source: JevKeySource, call: JevCall): Promise<T
   const apiKey = await jev.key();
   if (!apiKey) throw new JevOffError();
   const r = await systemOne(apiKey, call);
-  if (r.state) jev.report(r.state, r.retryAfterMs);
+  if (r.state) jev.report(r.state, r.retryAfterMs, apiKey);
   if (r.state !== "ok" || r.body === null) {
     throw new Error(r.status ? `TypeSafe answered ${r.status}` : "TypeSafe didn't answer");
   }
@@ -156,12 +160,12 @@ export async function jevMonth(db: Database, now = new Date()) {
 }
 
 /** Every workspace's routed messages go to the key's TypeSafe account, so each workspace's log says who changed it. */
-async function auditEveryOrg(tx: Executor, userId: string, action: string, hint: string) {
+async function auditEveryOrg(tx: Executor, actor: AuditEntry["actor"], action: string, hint: string) {
   const orgs = await tx.select({ id: schema.organizations.id }).from(schema.organizations);
   for (const org of orgs) {
     await recordAudit(tx, {
       orgId: org.id,
-      actor: { type: "person", id: userId },
+      actor,
       action,
       target: { type: "instance_secret", id: NAME },
       details: { hint },
@@ -169,8 +173,18 @@ async function auditEveryOrg(tx: Executor, userId: string, action: string, hint:
   }
 }
 
+/** Deletes the saved key, with a `jev.key_removed` row in each organization. Processes drop it at their next read. */
+export async function deleteJevKey(tx: Executor, actor: AuditEntry["actor"]) {
+  const [gone] = await tx
+    .delete(instanceSecrets)
+    .where(eq(instanceSecrets.name, NAME))
+    .returning({ hint: instanceSecrets.keyHint });
+  if (gone) await auditEveryOrg(tx, actor, "jev.key_removed", gone.hint);
+}
+
 const envError = () =>
   new ConflictError("The Jev key is set in this server's settings (TYPESAFE_API_KEY).", "jev_key_env");
+const invalidError = () => new ValidationError("TypeSafe didn't accept this key.", "jev_key_invalid");
 
 /**
  * The key and how its calls went, in memory: the saved row is read when built and again every 60 s (a second
@@ -187,12 +201,14 @@ export function createJevKey(deps: {
 }): JevKey {
   const now = deps.now ?? Date.now;
   const env = deps.envKey?.trim() || null;
+  // An env key that can't be sent reads as not accepted, and nothing calls with it.
+  const envKey = env && KEY_SHAPE.test(env) ? env : null;
   const tsa = { fetch: deps.fetch, baseURL: deps.baseURL };
   /** The saved row as last read. `key` is null when it doesn't open (another `AGENTES_SECRET`). */
   let saved: { key: string | null; hint: string; at: number } | null = null;
   let readAt = Number.NEGATIVE_INFINITY;
   let reading: Promise<void> | null = null;
-  let state: JevState = env ? "unchecked" : "off";
+  let state: JevState = env ? (envKey ? "unchecked" : "invalid") : "off";
   let skipUntil = 0;
   let downs = 0;
 
@@ -201,7 +217,7 @@ export function createJevKey(deps: {
     skipUntil = 0;
     downs = 0;
   };
-  const current = () => env ?? saved?.key ?? null;
+  const current = () => (env ? envKey : (saved?.key ?? null));
 
   async function read() {
     const [row] = await deps.db.select().from(instanceSecrets).where(eq(instanceSecrets.name, NAME));
@@ -234,7 +250,8 @@ export function createJevKey(deps: {
     state: !env && !saved ? "off" : state === "invalid" || state === "no_credit" ? state : "ok",
   });
 
-  function report(s: JevState, retryAfterMs?: number) {
+  function report(s: JevState, retryAfterMs?: number, key?: string) {
+    if (key !== undefined && key !== current()) return;
     const t = now();
     if (s === "ok") restart("ok");
     else if (s === "invalid" || s === "no_credit") {
@@ -260,8 +277,9 @@ export function createJevKey(deps: {
     async save(apiKey, userId) {
       if (env) throw envError();
       const key = apiKey.trim();
+      if (!KEY_SHAPE.test(key)) throw invalidError();
       const checked = await checkJevKey(key, tsa);
-      if (checked === "invalid") throw new ValidationError("TypeSafe didn't accept this key.", "jev_key_invalid");
+      if (checked === "invalid") throw invalidError();
       const values = {
         ...(await sealSecret(deps.keyWrapper, key, AAD)),
         keyHint: key.slice(-4),
@@ -273,7 +291,7 @@ export function createJevKey(deps: {
           .insert(instanceSecrets)
           .values({ name: NAME, ...values })
           .onConflictDoUpdate({ target: instanceSecrets.name, set: values });
-        await auditEveryOrg(tx, userId, "jev.key_saved", values.keyHint);
+        await auditEveryOrg(tx, { type: "person", id: userId }, "jev.key_saved", values.keyHint);
       });
       saved = { key, hint: values.keyHint, at: values.updatedAt.getTime() };
       readAt = now();
@@ -283,13 +301,7 @@ export function createJevKey(deps: {
     },
     async remove(userId) {
       if (env) throw envError();
-      await deps.db.transaction(async (tx) => {
-        const [gone] = await tx
-          .delete(instanceSecrets)
-          .where(eq(instanceSecrets.name, NAME))
-          .returning({ hint: instanceSecrets.keyHint });
-        if (gone) await auditEveryOrg(tx, userId, "jev.key_removed", gone.hint);
-      });
+      await deps.db.transaction((tx) => deleteJevKey(tx, { type: "person", id: userId }));
       saved = null;
       readAt = now();
       restart("off");
@@ -300,7 +312,7 @@ export function createJevKey(deps: {
       const key = current();
       if (key) {
         const checked = await checkJevKey(key, tsa);
-        if (checked === "ok" || checked === "invalid" || checked === "no_credit") report(checked);
+        if (checked === "ok" || checked === "invalid" || checked === "no_credit") report(checked, undefined, key);
       }
       return snapshot();
     },

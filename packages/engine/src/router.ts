@@ -84,6 +84,8 @@ export interface RoutingResult {
  */
 export interface RouterStrategy {
   readonly name: string;
+  /** False while the step can't read any message (Jev with no usable key). The chain is named after the first on. */
+  on?(): boolean;
   decide(input: RoutingInput): Promise<RoutingResult>;
 }
 

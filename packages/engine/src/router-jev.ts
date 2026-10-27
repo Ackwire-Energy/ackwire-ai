@@ -50,6 +50,7 @@ export function createJevRouterStrategy(options: {
 }): RouterStrategy {
   return {
     name: "jev",
+    on: () => typeof options.key === "string" || options.key.usable(),
     async decide(input: RoutingInput): Promise<RoutingResult> {
       const handles = input.candidates.map((c) => c.handle);
       const state = {
@@ -173,14 +174,17 @@ const clamp = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Mat
  * (`RouterSkip`, or Jev without a key) passes without a trace. One that fails (an error, a timeout, an answer
  * that isn't JSON) is noted (`jev: TypeSafe answered 529`) and the next one runs. When none decides,
  * `RouterChainEnd` carries what failed, and the rules decide. Each step's time goes to `onTiming`
- * (`router_step_ms`, with the step and how it ended).
+ * (`router_step_ms`, with the step and how it ended). Named after the first step that is on now, so nothing
+ * names Jev while it has no key.
  */
 export function routeChain(
   steps: RouterStrategy[],
   o: { onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void } = {},
 ): RouterStrategy {
   return {
-    name: steps[0]?.name ?? "none",
+    get name() {
+      return steps.find((s) => s.on?.() ?? true)?.name ?? "none";
+    },
     async decide(input) {
       const failures: string[] = [];
       for (const step of steps) {
