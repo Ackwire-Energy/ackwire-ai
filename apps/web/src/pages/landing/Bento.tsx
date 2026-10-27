@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/ui";
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { POSTGRES_MARK } from "@/components/DatabaseConnect";
+import { POSTGRES_MARK } from "@/lib/brands";
 import { CAST, type CastKey, ORGS } from "./cast";
 import { useLanding } from "./context";
 import { useJoy, useRunner, useVisible } from "./hooks";

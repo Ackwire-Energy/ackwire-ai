@@ -7,7 +7,8 @@ import { readdirSync } from "node:fs";
 import { PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import { cleanup, render } from "@testing-library/react";
 import { createElement } from "react";
-import { DatabaseIcon, POSTGRES_MARK } from "@/components/DatabaseConnect";
+import { DatabaseIcon } from "@/components/DatabaseConnect";
+import { POSTGRES_MARK } from "@/lib/brands";
 
 afterEach(() => cleanup());
 

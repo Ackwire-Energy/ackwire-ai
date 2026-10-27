@@ -42,6 +42,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { POSTGRES_MARK } from "@/lib/brands";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -53,9 +54,6 @@ import { useToast } from "@/lib/toast";
 
 /** Read-only for now: "Sem acesso" or "Ler". */
 const DB_LEVELS: Level[] = ["none", "read"];
-
-/** PostgreSQL's own elephant (`apps/web/public/brands/README.md`), for the product, never for databases in general. */
-export const POSTGRES_MARK = "/brands/postgresql.svg";
 
 export function DatabaseIcon({ size = "md" }: { size?: "md" | "lg" }) {
   return (
