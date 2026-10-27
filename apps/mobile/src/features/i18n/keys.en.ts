@@ -1334,6 +1334,10 @@ export const featureKeysEn: FeatureTranslations = {
     share: "Share the link",
     rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
   },
+  members: {
+    waiting_one: "{{count}} waiting",
+    waiting_other: "{{count}} waiting",
+  },
   reset: {
     title: "Pick a new password",
     save: "Save and sign in",
