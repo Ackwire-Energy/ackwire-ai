@@ -75,7 +75,7 @@ test("without OPERATOR_API_TOKEN nothing listens; the public listener never serv
   try {
     const base = `http://127.0.0.1:${server.port}`;
     const health = await fetch(`${base}/api/operator/v1/health`, { headers: { authorization: BEARER } });
-    expect(await health.json()).toEqual({ ok: true, version: "test" });
+    expect(await health.json()).toMatchObject({ ok: true, version: "test", botCheck: { state: "off" } });
     // Only the operator API there, not the app.
     expect((await fetch(`${base}/api/health`, { headers: { authorization: BEARER } })).status).toBe(404);
   } finally {
@@ -106,8 +106,27 @@ test("401 without the right bearer token, on every path under the prefix", async
   expect((await op("/nope")).status).toBe(404);
 });
 
-test("health", async () => {
-  expect(await body(await op("/health"))).toEqual({ ok: true, version: "test" });
+test("health, with the bot check: off without its keys, else its state, since when, and the pages it refused", async () => {
+  const off = await body<{ ok: boolean; version: string; botCheck: { state: string; since: string; blocked: number } }>(
+    await op("/health"),
+  );
+  expect(off).toEqual({ ok: true, version: "test", botCheck: { state: "off", since: off.botCheck.since, blocked: 0 } });
+  expect(off.botCheck.since).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+
+  const since = new Date("2026-10-27T12:00:00.000Z");
+  const humanCheck = {
+    siteKey: "1x00000000000000000000AA",
+    verify: async () => null,
+    probe: async () => "unreachable" as const,
+    status: () => ({ state: "unreachable" as const, since, blocked: 21 }),
+  };
+  const app = createOperatorApp({ ...deps, humanCheck }, TOKEN);
+  const res = await app.request("/api/operator/v1/health", { headers: { authorization: BEARER } });
+  expect(await body(res)).toEqual({
+    ok: true,
+    version: "test",
+    botCheck: { state: "unreachable", since: "2026-10-27T12:00:00.000Z", blocked: 21 },
+  });
 });
 
 test("org search: by id, part of the name or of a member's email, any case; no wildcards", async () => {

@@ -21,6 +21,7 @@ import {
   createPostgresSearchResolver,
   createS3BlobStore,
   createSmtpEmailSender,
+  createTurnstileCheck,
   type EmailSender,
   envPlatformCredentials,
   MAIL_PRESETS,
@@ -53,6 +54,7 @@ import { createModelProviders } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
+import { checkHumanCheckAtBoot } from "./http/human-check";
 import { createLogger, type Logger } from "./logger";
 import { OPERATOR_API_PREFIX, serveOperatorApi } from "./operator/app";
 import { createMachineSockets } from "./realtime/machines";
@@ -137,6 +139,16 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     mail: mailAdapters(config),
     // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
     databases: createPostgresDatabaseDriver(),
+    // agentes.chat Cloud's bot check (ADR 0075), only with both keys: without them nothing reaches Cloudflare.
+    humanCheck:
+      config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY
+        ? createTurnstileCheck({
+            siteKey: config.TURNSTILE_SITE_KEY,
+            secretKey: config.TURNSTILE_SECRET_KEY,
+            hostnames: [new URL(config.PUBLIC_URL).hostname],
+            log,
+          })
+        : null,
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
@@ -150,6 +162,15 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     createModelProviders(),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
+  try {
+    await checkHumanCheckAtBoot(adapters.humanCheck, log);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
   const ctx: ModuleContext = { ...base, adapters };
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
@@ -201,7 +222,14 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   });
   const telemetry = startTelemetry({ db: database.db, config, log });
 
-  const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
+  const auth = createAuth({
+    db: database.db,
+    config,
+    log,
+    emailDelivers: adapters.email.delivers,
+    rateLimiter: adapters.rateLimiter,
+    humanCheck: adapters.humanCheck,
+  });
   const app = createApp({
     edition,
     version,
@@ -277,6 +305,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     pubsub: adapters.pubsub,
     hub: engine.machineHub,
     emails: adapters.email.delivers,
+    humanCheck: adapters.humanCheck,
   });
   if (operator) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });

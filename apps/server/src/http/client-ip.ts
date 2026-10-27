@@ -2,6 +2,7 @@
  * The client's address behind a reverse proxy. Shared by every route that
  * rate limits or records where a request came from.
  */
+import { BlockList, isIP, isIPv6 } from "node:net";
 
 /**
  * Loopback, private, shared (CGNAT, 100.64.0.0/10) and link-local addresses:
@@ -25,26 +26,89 @@ export function isInternal(ip: string): boolean {
   return v6 === "::1" || v6.startsWith("fc") || v6.startsWith("fd") || v6.startsWith("fe80");
 }
 
+/** `TRUSTED_PROXIES` as the config parses it, built once per list. An entry that isn't an address or a range is skipped. */
+const trustedLists = new WeakMap<readonly string[], BlockList>();
+function trustedList(proxies: readonly string[]) {
+  let list = trustedLists.get(proxies);
+  if (list) return list;
+  list = new BlockList();
+  for (const entry of proxies) {
+    const [address = "", bits] = entry.split("/");
+    const family = isIP(address);
+    if (!family) continue;
+    const type = family === 6 ? "ipv6" : "ipv4";
+    try {
+      if (bits === undefined) list.addAddress(address, type);
+      else list.addSubnet(address, Number(bits), type);
+    } catch {
+      // A prefix out of range.
+    }
+  }
+  trustedLists.set(proxies, list);
+  return list;
+}
+
 /**
  * The client's address: walking `x-forwarded-for` from the right (what
- * proxies appended), the first one that isn't internal. When every hop is
- * internal, as for a tailnet client behind `tailscale serve`, the last one:
- * the address the nearest proxy saw. Entries further left, and `x-real-ip`
- * while that header exists, come from the client and can be anything, so they
- * never key a limit. Without the header, the `x-real-ip` a proxy may set.
+ * proxies appended), the first one that is neither internal nor one of
+ * `TRUSTED_PROXIES` (a public proxy in front, such as Cloudflare's). When
+ * every hop is, as for a tailnet client behind `tailscale serve`, the last one
+ * that isn't a trusted proxy: the address the nearest proxy saw. Entries
+ * further left, and `x-real-ip` while that header exists, come from the client
+ * and can be anything, so they never key a limit. Without the header, the
+ * `x-real-ip` a proxy may set.
  */
-export function clientIp(forwardedFor: string | undefined, realIp: string | undefined): string {
+export function clientIp(
+  forwardedFor: string | undefined,
+  realIp: string | undefined,
+  trustedProxies: readonly string[] | undefined,
+): string {
   const hops = (forwardedFor ?? "")
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean);
+  const trusted = trustedProxies?.length ? trustedList(trustedProxies) : null;
+  const isTrusted = (hop: string) => {
+    const family = isIP(hop);
+    return trusted !== null && family !== 0 && trusted.check(hop, family === 6 ? "ipv6" : "ipv4");
+  };
+  let nearest: string | undefined;
   for (let i = hops.length - 1; i >= 0; i--) {
     const hop = hops[i] as string;
+    if (isTrusted(hop)) continue;
     if (!isInternal(hop)) return hop;
+    nearest ??= hop;
   }
-  return hops.at(-1) ?? (realIp?.trim() || "unknown");
+  return nearest ?? hops.at(-1) ?? (realIp?.trim() || "unknown");
 }
 
-/** `clientIp` of a request's headers. */
-export const requestIp = (headers: { get(name: string): string | null | undefined }) =>
-  clientIp(headers.get("x-forwarded-for") ?? undefined, headers.get("x-real-ip") ?? undefined);
+/** `clientIp` of a request's headers, past the proxies of `TRUSTED_PROXIES`. */
+export const requestIp = (
+  headers: { get(name: string): string | null | undefined },
+  trustedProxies: readonly string[] | undefined,
+) => clientIp(headers.get("x-forwarded-for") ?? undefined, headers.get("x-real-ip") ?? undefined, trustedProxies);
+
+/**
+ * The part of an address a rate limit counts: an IPv4 address whole, an IPv6 one by its /64, which one customer
+ * usually holds whole (each of its 2^64 addresses would get a fresh count otherwise), as Better Auth counts its own.
+ */
+export function limitIp(ip: string): string {
+  const address = ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, "");
+  if (!isIPv6(address)) return address;
+  const [head = "", tail] = (address.split("%")[0] ?? "").toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  // An IPv4 tail (`64:ff9b::192.0.2.1`) takes two groups' room.
+  const room = 8 - left.length - right.reduce((n, group) => n + (group.includes(".") ? 2 : 1), 0);
+  const groups = tail === undefined ? left : [...left, ...Array<string>(room).fill("0"), ...right];
+  return `${groups
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group, 16).toString(16))
+    .join(":")}::/64`;
+}
+
+/** `limitIp` of a request's client: what every per-IP rate limit counts. */
+export const requestLimitIp = (
+  headers: { get(name: string): string | null | undefined },
+  trustedProxies: readonly string[] | undefined,
+) => limitIp(requestIp(headers, trustedProxies));

@@ -29,7 +29,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { installScript } from "../../runner/install-script";
-import { requestIp } from "../http/client-ip";
+import { limitIp, requestIp, requestLimitIp } from "../http/client-ip";
 import { apiError, domainErrorResponse, errorResponse } from "../http/errors";
 import {
   type AppDeps,
@@ -353,7 +353,7 @@ export function machineAppRoutes(deps: AppDeps) {
         limit: 30,
         windowMs: 60_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
       return c.json(await getDeviceCode({ db }, c.req.valid("param").userCode, c.get("user").id), 200);
     },
   );
@@ -699,9 +699,9 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     async (c) => {
       if (config.MACHINE_PROVISIONING === "external")
         return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.server);
-      const ip = requestIp(c.req.raw.headers);
-      const limit = await adapters.rateLimiter.consume(`machine-device:${ip}`, DEVICE_START_LIMIT);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      const ip = requestIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`machine-device:${limitIp(ip)}`, DEVICE_START_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
       try {
         const started = await startDeviceCode({ db, publicUrl: config.PUBLIC_URL }, c.req.valid("json"), { ip });
         return c.json(started, 200);
@@ -741,7 +741,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       },
     }),
     async (c) => {
-      const ip = requestIp(c.req.raw.headers);
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
       const limit = await adapters.rateLimiter.consume(`machine-device-poll:${ip}`, DEVICE_POLL_LIMIT);
       if (!limit.allowed) return c.json({ error: "slow_down" as const }, 400);
       const result = await pollDeviceToken({ db, pubsub: adapters.pubsub }, c.req.valid("json").deviceCode);
@@ -785,8 +785,9 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     async (c) => {
       const expected = config.HOST_COMPUTER_TOKEN;
       if (!expected) return apiError(c, 404, "machine.host_off", "This server has no computer of its own");
-      const limit = await adapters.rateLimiter.consume(`machine-host:${requestIp(c.req.raw.headers)}`, HOST_SYNC_LIMIT);
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts; try again in a minute");
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`machine-host:${ip}`, HOST_SYNC_LIMIT);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
       const auth = c.req.header("authorization") ?? "";
       if (!auth.startsWith("Bearer ") || !safeEqual(auth.slice(7).trim(), expected)) {
         return apiError(c, 401, "machine.unauthorized", "This server's computer token is not valid");

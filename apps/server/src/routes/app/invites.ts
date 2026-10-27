@@ -18,8 +18,9 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sessionUser } from "../../auth";
-import { requestIp } from "../../http/client-ip";
+import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
+import { humanCheckRefusal } from "../../http/human-check";
 import {
   type AppDeps,
   body,
@@ -251,7 +252,8 @@ export function inviteRoutes(deps: AppDeps) {
       description:
         "Public. Signed out: the address typed. Signed in: the account's own, when it isn't confirmed. Every " +
         "address gets the same answer. 60 s between two codes for one address (`retryIn`), and a few an hour " +
-        "and a day per address, all counted in the database. `join.no_email` on a server that sends no email.",
+        "and a day per address, all counted in the database. `join.no_email` on a server that sends no email. " +
+        "Guarded by the bot check when this server has one (`human_check`, `human_check_blocked`).",
       request: { params: Token, body: body(z.object({ email: z.email().max(254).optional() })) },
       responses: {
         202: json(z.object({ email: z.string(), resendIn: z.number().int() }), "Sent"),
@@ -263,10 +265,20 @@ export function inviteRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { token } = c.req.valid("param");
-      const ip = await adapters.rateLimiter.consume(`join-code:ip:${requestIp(c.req.raw.headers)}`, CODES_PER_IP);
+      const ip = await adapters.rateLimiter.consume(
+        `join-code:ip:${requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES)}`,
+        CODES_PER_IP,
+      );
       if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
       const link = await adapters.rateLimiter.consume(`join-code:link:${sha256(token)}`, CODES_PER_LINK);
       if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
+      const refused = await humanCheckRefusal(
+        adapters.humanCheck,
+        c.req.raw.headers,
+        "ask-code",
+        config.TRUSTED_PROXIES,
+      );
+      if (refused) return apiError(c, 403, refused.code, refused.message);
       if (adapters.email.delivers !== true) return apiError(c, 409, "join.no_email", "This server doesn't send email.");
       const { email } = c.req.valid("json");
       const user = await sessionUser(deps.auth, c.req.raw.headers);
@@ -303,7 +315,7 @@ export function inviteRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const ip = await adapters.rateLimiter.consume(
-        `join-code-check:ip:${requestIp(c.req.raw.headers)}`,
+        `join-code-check:ip:${requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES)}`,
         CHECKS_PER_IP,
       );
       if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
@@ -348,7 +360,10 @@ export function inviteRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { token } = c.req.valid("param");
-      const ip = await adapters.rateLimiter.consume(`join-request:ip:${requestIp(c.req.raw.headers)}`, ASKS_PER_IP);
+      const ip = await adapters.rateLimiter.consume(
+        `join-request:ip:${requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES)}`,
+        ASKS_PER_IP,
+      );
       if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
       const link = await adapters.rateLimiter.consume(`join-request:link:${sha256(token)}`, ASKS_PER_LINK);
       if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
@@ -384,9 +399,9 @@ export function inviteRoutes(deps: AppDeps) {
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
-      const ip = requestIp(c.req.raw.headers);
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
       const limit = await adapters.rateLimiter.consume(`invite-request:${ip}`, { limit: 10, windowMs: 3600_000 });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       await requestNewInvitation(db, config.PUBLIC_URL, c.req.valid("param").token);
       deps.wakeWorkers?.();
       return c.body(null, 204);
