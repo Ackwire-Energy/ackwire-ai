@@ -395,7 +395,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
           },
           "orgId": {
             "type": ["string", "null"],
@@ -417,7 +417,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": ["run", "task"]
+            "enum": ["run", "task", "session"]
           },
           "id": {
             "type": "string",
@@ -1170,13 +1170,13 @@
     "/review/{kind}/{id}": {
       "get": {
         "tags": ["Operator"],
-        "summary": "What one run or task did, as one redacted text block",
-        "description": "The only content this API gives: the request, the tool calls with their results, the reply (a run), or the prompt, command and output (a task). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
+        "summary": "What one run, task or screened session did, as one redacted text block",
+        "description": "The only content this API gives: the request, the tool calls with their results, the reply (a run), the prompt, command and output (a task), or the text a person in control of an agent's screen had on it (a session of `desktop_control.ended`, on a server with `SESSION_SCREENING`: from memory only, until 10 minutes after the segment ended, then 404). Credentials are masked and workspace text is inside `<external_data>` blocks. Every read is recorded as a `content.viewed` event first.",
         "parameters": [
           {
             "schema": {
               "type": "string",
-              "enum": ["run", "task"]
+              "enum": ["run", "task", "session"]
             },
             "required": true,
             "name": "kind",

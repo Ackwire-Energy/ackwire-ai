@@ -235,6 +235,25 @@ test("a terminal: the resize reaches the computer and the shell's exit the perso
   runner.ws.close();
 });
 
+test("where sessions are screened no terminal opens: refused as not found, nothing asked of the computer", async () => {
+  // Without the switch nothing is screened, and a terminal opens (above).
+  expect(t.engine.sessions).toBeNull();
+  await Promise.race([server.stop(true), Bun.sleep(500)]);
+  await t.close();
+  t = await createTestServer({
+    env: { ALLOW_SIGNUP: "true", SESSION_SCREENING: "true", OPERATOR_API_TOKEN: "operator-".padEnd(40, "x") },
+  });
+  server = listen(t);
+  expect(t.engine.sessions).not.toBeNull();
+  const { owner, machine, terminal } = await seeded();
+  const runner = await connectRunner(machine.token);
+  const viewer = openViewer(terminal, owner);
+  await until(() => viewer.closed !== null, "the refusal");
+  expect(viewer.closed).toEqual({ code: STREAM_CLOSE.notFound, reason: "no_terminal" });
+  expect(runner.opened).toEqual([]);
+  runner.ws.close();
+});
+
 test("after the upgrade, refusals are close codes: a member who may not watch, a computer held by another server", async () => {
   const { owner, machine, desktop, invite } = await seeded();
   const ana = await invite("ana@example.com", "member");

@@ -719,6 +719,12 @@ export const envVars = {
     section: "Operator",
     example: "support@example.com",
   },
+  SESSION_SCREENING: {
+    schema: z.stringbool().default(false),
+    description:
+      "For agentes.chat Cloud. Unset by default. While a person is in control of an agent's screen, reads the screen's text to screen it for abuse (needs `OPERATOR_API_TOKEN`).",
+    section: "Operator",
+  },
   MACHINE_PROVISIONING: {
     schema: z.enum(["off", "external"]).default("off"),
     description:
