@@ -8,8 +8,10 @@ import {
   createJevKey,
   createLlmJudge,
   insertContextItem,
+  isStopRequest,
   itemLabel,
   type NewContextItem,
+  smallModelFor,
   withJudgeFallback,
 } from "../src";
 import {
@@ -266,6 +268,17 @@ test("memory never takes the LLM fallback's word: without Jev, words decide", as
     const res = await consolidateItem(f.db, fact(f, "We host the app on Railway."), { judge, semantic: true });
     expect(res).toMatchObject({ action: "merged", item: { id: old.item.id } }); // by words, as today
   }
+});
+
+test("without Jev the judge asks the workspace's small model with the least thinking it allows; with none it fails", async () => {
+  f = await setup({ reply: () => ({ chunks: ['{"stop":0.9}'] }) });
+  const judge = createLlmJudge({ gateway: f.gateway, resolveModel: (orgId) => smallModelFor(f, orgId) });
+  const stop = { orgId: f.org.id, text: "para", agentName: "Dev" };
+  expect(await isStopRequest(judge, stop)).toBe(true);
+  expect(f.provider.calls[0]?.request).toMatchObject({ model: "claude-haiku-5-5", effort: "none", maxTokens: 512 });
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  await expect(isStopRequest(judge, stop)).rejects.toThrow("no small model");
+  expect(f.provider.calls).toHaveLength(1);
 });
 
 describe("memory judgments: the daily pass", () => {

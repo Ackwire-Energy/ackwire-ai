@@ -71,6 +71,7 @@ import {
   type SandboxDeps,
   type ScheduleReader,
   type StorageDeps,
+  smallModelFor,
   standingJudge,
   streamClosed,
   type ToolSource,
@@ -161,10 +162,16 @@ export function buildEngine(o: EngineOptions) {
     envKey: config.TYPESAFE_API_KEY,
     fetch: o.jevFetch,
   });
+  // The small model that routes and judges on an organization's keys (ADR 0074): the deployment's own on a
+  // Claude or an OpenAI key, the catalog's routing pick on the others.
+  const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
   // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
-  // with the org's cheap model as fallback.
+  // with the org's small model as fallback.
   if (!context.judge) {
-    const llmJudge = createLlmJudge({ gateway, resolveModel: (orgId) => resolveSummaryModel(context, orgId) });
+    const llmJudge = createLlmJudge({
+      gateway,
+      resolveModel: (orgId) => smallModelFor({ db, gateway }, orgId, smallModels),
+    });
     context.judge = withJudgeFallback(
       createJevJudge({
         key: jevKey,
@@ -408,8 +415,10 @@ export function buildEngine(o: EngineOptions) {
     onRunProfile: o.onRunProfile,
     router: {
       enabled: config.ROUTER_ENABLED,
-      model: config.ROUTER_MODEL,
-      cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
+      model: smallModels.anthropic,
+      cheapModels: { openai: smallModels.openai },
+      // The author's own plan on their computer, where the server isn't the Cloud's (ADR 0074).
+      plans: { hub: machineHub, publicUrl: config.PUBLIC_URL },
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
       // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.

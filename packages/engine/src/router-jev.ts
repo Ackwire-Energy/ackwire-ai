@@ -1,5 +1,5 @@
 import { callJev, type JevKeySource, JevOffError } from "./jev-key";
-import type { RouterStrategy, RoutingInput, RoutingResult } from "./router";
+import { RouterChainEnd, RouterSkip, type RouterStrategy, type RoutingInput, type RoutingResult } from "./router";
 
 /**
  * TypeSafe Jev (System One) as a router strategy (docs/adr/0013-router.md):
@@ -8,7 +8,8 @@ import type { RouterStrategy, RoutingInput, RoutingResult } from "./router";
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
  * more candidates, a Choice over the candidates plus "none" to break ties.
  * It only scores; policy stays in `selectAgents`. Optional (needs the
- * installation's Jev key, ADR 0073); errors and timeouts fall back to another strategy.
+ * installation's Jev key, ADR 0073), and the first step of `routeChain`:
+ * on an error or a timeout the next step decides.
  *
  * Questions are in English (Jev's primary training language); the
  * conversation goes in as written.
@@ -150,12 +151,16 @@ export function createJevRouterStrategy(options: {
         agents: scores,
         needsAgent: clamp(answers.needs_agent?.noul),
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
-        reason:
-          choice && choice !== NONE
-            ? `jev: best @${choice} (confidence ${(answers.best_agent?.confidence ?? 0).toFixed(2)})`
-            : choice === NONE
-              ? "jev: no agent should reply"
-              : "jev",
+        ...(choice
+          ? {
+              reason:
+                choice === NONE
+                  ? "no agent should reply"
+                  : `best @${choice} (confidence ${(answers.best_agent?.confidence ?? 0).toFixed(2)})`,
+            }
+          : {}),
+        strategy: "jev",
+        decidedBy: { step: "jev" },
       };
     },
   };
@@ -164,23 +169,35 @@ export function createJevRouterStrategy(options: {
 const clamp = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
 
 /**
- * Uses `primary`; on any error or timeout uses `fallback`, recording which one decided. With no Jev key the
- * fallback simply decides, under its own name.
+ * The router's chain (ADR 0074): each step in order until one decides. A step that can't read this message
+ * (`RouterSkip`, or Jev without a key) passes without a trace. One that fails (an error, a timeout, an answer
+ * that isn't JSON) is noted (`jev: TypeSafe answered 529`) and the next one runs. When none decides,
+ * `RouterChainEnd` carries what failed, and the rules decide. Each step's time goes to `onTiming`
+ * (`router_step_ms`, with the step and how it ended).
  */
-export function withFallback(primary: RouterStrategy, fallback: RouterStrategy): RouterStrategy {
+export function routeChain(
+  steps: RouterStrategy[],
+  o: { onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void } = {},
+): RouterStrategy {
   return {
-    name: primary.name,
+    name: steps[0]?.name ?? "none",
     async decide(input) {
-      try {
-        return { ...(await primary.decide(input)), strategy: primary.name };
-      } catch (error) {
-        const result = await fallback.decide(input);
-        if (error instanceof JevOffError) return { ...result, strategy: fallback.name };
-        return {
-          ...result,
-          strategy: `${fallback.name} (fallback: ${error instanceof Error ? error.message.slice(0, 80) : "error"})`,
-        };
+      const failures: string[] = [];
+      for (const step of steps) {
+        const started = Date.now();
+        const timed = (outcome: "decided" | "skipped" | "failed") =>
+          o.onTiming?.("router_step_ms", Date.now() - started, { step: step.name, outcome });
+        try {
+          const result = await step.decide(input);
+          timed("decided");
+          return { ...result, strategy: result.strategy ?? step.name, ...(failures.length ? { failures } : {}) };
+        } catch (error) {
+          const skipped = error instanceof RouterSkip || error instanceof JevOffError;
+          timed(skipped ? "skipped" : "failed");
+          if (!skipped) failures.push(`${step.name}: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
+      throw new RouterChainEnd(failures);
     },
   };
 }

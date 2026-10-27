@@ -151,6 +151,7 @@ export * from "./recovery";
 export * from "./reply-policy";
 export * from "./router";
 export * from "./router-jev";
+export * from "./router-plan";
 export * from "./routine-brief";
 export * from "./routine-ledger";
 export * from "./routines";

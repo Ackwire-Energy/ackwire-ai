@@ -1,5 +1,5 @@
 import { and, asc, type Executor, eq, isNull, schema } from "@agenteschat/db";
-import { isAutoModel, modelForTier } from "@agenteschat/providers";
+import { isAutoModel, modelForTier, routerModelOf } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { autoProvider } from "./auto-model";
 import { brainOf } from "./brain-settings";
@@ -7,6 +7,8 @@ import { brainAccountFor, computerBrainUnavailable, mayFallBack, NO_AI_CODES } f
 import type { ModelGateway } from "./gateway";
 import type { MachineStatus } from "./machine-hub";
 import { missionTurnFor } from "./missions-engine";
+import { orgKeyProviders, orgModelProvider, type RoutingSetup } from "./router";
+import { planSignInsOf } from "./router-plan";
 import type { AgentRun } from "./runs";
 
 /**
@@ -106,4 +108,46 @@ export async function orgHasAi(deps: AiStatusDeps, orgId: string): Promise<boole
     if ((await agentAiState(deps, agent)).state !== "no_ai") return true;
   }
   return false;
+}
+
+/**
+ * Who picks the agents for a message nobody mentioned (ADR 0074), as Settings and the members menu say it:
+ * `by` for the workspace, `mine` for the person asking (a plan picks only for its owner's own messages).
+ */
+export interface AiRouting {
+  by: "jev" | "model" | "plans" | "rules" | "off";
+  mine: "jev" | "model" | "plan" | "rules" | "off";
+  /** The small model, while it picks. */
+  model: string | null;
+  /** With `rules`: the default key's provider, which has no small model (Kimi alone). */
+  noSmallModel: string | null;
+}
+
+/**
+ * The first step of the chain that can pick for this workspace now, without asking any. `off`: the router is
+ * off. `apiKey`: a key of its own, or the server's own Claude key. No key is decrypted.
+ */
+export async function orgRouting(
+  deps: AiStatusDeps,
+  routing: RoutingSetup | null,
+  orgId: string,
+  userId: string,
+): Promise<{ routing: AiRouting; apiKey: boolean }> {
+  const keys = await orgKeyProviders(deps.db, orgId);
+  const claude = routerModelOf("anthropic");
+  const apiKey =
+    keys.size > 0 ||
+    (claude !== null && (await deps.gateway.hasModelCredential({ orgId, model: claude, credentialId: null })));
+  const of = (by: AiRouting["by"], mine: AiRouting["mine"], model: string | null, noSmallModel: string | null) => ({
+    routing: { by, mine, model, noSmallModel },
+    apiKey,
+  });
+  if (!routing) return of("off", "off", null, null);
+  if (await routing.jev()) return of("jev", "jev", null, null);
+  const model = await routing.smallModel(orgId);
+  if (model) return of("model", "model", model, null);
+  const plans = routing.plans ? await planSignInsOf(deps.db, routing.plans, orgId) : [];
+  const mine = plans.some((p) => p.ownerId === userId) ? "plan" : "rules";
+  if (plans.length > 0) return of("plans", mine, null, null);
+  return of("rules", mine, null, keys.size > 0 ? await orgModelProvider(deps.db, orgId) : null);
 }
