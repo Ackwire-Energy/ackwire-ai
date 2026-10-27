@@ -38,7 +38,7 @@ export function DesktopTitleBar() {
   return (
     <header className="titlebar" data-tauri-drag-region="deep">
       {/* Over the sidebar, the workspace's sky goes on up behind the window's buttons (one sky with its header). */}
-      {!collapsed && !tablet && <WorkspaceSky part="bar" />}
+      <WorkspaceSky part="bar" rail={collapsed || tablet} />
       <nav className="titlebar__nav">
         {!tablet && (
           <Button

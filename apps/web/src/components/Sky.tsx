@@ -6,6 +6,7 @@ import {
   agentGradient,
   agentTones,
   cloudAt,
+  cx,
   drawSprite,
   EYE,
   HEADER_AREA,
@@ -464,7 +465,7 @@ const WORKSPACE_SKY_PX = 4;
  * stars (`@agenteschat/ui` sky/workspace). Both parts read one field over their joint height and the same clouds
  * and stars (from the clock), so they meet without a seam.
  */
-export function WorkspaceSky({ part }: { part: "bar" | "side" }) {
+export function WorkspaceSky({ part, rail = false }: { part: "bar" | "side"; rail?: boolean }) {
   const box = useRef<HTMLSpanElement>(null);
   const hour = skyHourOf(window.location.host);
   const ink = useRef({ bright: 0, dim: 0 });
@@ -484,7 +485,8 @@ export function WorkspaceSky({ part }: { part: "bar" | "side" }) {
   }, [part]);
   const opts: SkyOptions = {
     pixel: WORKSPACE_SKY_PX,
-    surface: "--side",
+    // The icon rail is its own glass; the title bar keeps the sidebar's paper.
+    surface: rail && part === "side" ? "--glass-solid" : "--side",
     palette: (bg) => {
       const colors = workspaceInk(hour, bg, true);
       ink.current = { bright: pixelOf(colors.bright), dim: pixelOf(colors.dim) };
@@ -512,7 +514,11 @@ export function WorkspaceSky({ part }: { part: "bar" | "side" }) {
     },
   };
   return (
-    <span ref={box} className={`workspace-sky workspace-sky--${part}`} aria-hidden="true">
+    <span
+      ref={box}
+      className={cx("workspace-sky", `workspace-sky--${part}`, rail && "workspace-sky--rail")}
+      aria-hidden="true"
+    >
       <PixelSky options={opts} />
     </span>
   );

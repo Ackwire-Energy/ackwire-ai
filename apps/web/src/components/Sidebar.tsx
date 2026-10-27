@@ -276,7 +276,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
       <div className="sidebar__top">
-        <WorkspaceSky part="side" />
+        <WorkspaceSky part="side" rail={rail} />
         <div className="sidebar__org">
           <WorkspaceMenu
             summary={

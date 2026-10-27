@@ -39,6 +39,10 @@ html[data-desktop="linux"] {
   bottom: -1px;
   width: 272px;
 }
+/* Over the icon rail (68px, its hairline left free). */
+.workspace-sky--bar.workspace-sky--rail {
+  width: 67px;
+}
 .titlebar__nav {
   display: flex;
   gap: 2px;
