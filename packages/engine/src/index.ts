@@ -94,6 +94,7 @@ export * from "./issue-columns";
 export * from "./issue-tools";
 export * from "./issue-work";
 export * from "./issues";
+export * from "./jev-key";
 export * from "./jobs";
 export * from "./judge";
 export * from "./machine-access";

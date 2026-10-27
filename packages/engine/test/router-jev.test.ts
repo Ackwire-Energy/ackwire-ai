@@ -2,13 +2,19 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import {
   createAgent,
+  createJevJudge,
+  createJevKey,
   createJobHandlers,
+  createLlmJudge,
   drainOutbox,
   insertMessage,
   jevCostNanoUsd,
+  messageRouter,
   postPersonMessage,
   type RoutingCandidate,
   selectAgents,
+  standingJudge,
+  withJudgeFallback,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -94,7 +100,7 @@ describe("Jev strategy end to end", () => {
     const jev = fakeJev(() => ({ nouls: { "@dev": 0.81, "@qa": 0.2 }, needs: 0.9, best: "dev" }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "ts_secret", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "ts_secret", fetch: jev.fetcher } },
     });
     const m = await post(f, "is the deploy green?");
     await drainOutbox(f.db, handlers);
@@ -139,7 +145,7 @@ describe("Jev strategy end to end", () => {
     const jev = fakeJev(() => new Error("down"));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
     });
     await post(f, "help with the build?");
     await drainOutbox(f.db, handlers);
@@ -156,7 +162,7 @@ describe("Jev strategy end to end", () => {
     }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
     });
     await post(f, "oi @dev");
     await drainOutbox(f.db, handlers);
@@ -172,7 +178,7 @@ describe("Jev strategy end to end", () => {
     const jev = fakeJev(() => ({ nouls: { "@dev": 0.2 }, needs: 0.1 }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "claude-haiku-5-5", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key: "k", fetch: jev.fetcher } },
     });
     const events = f.listen(f.general.id);
     const m = await post(f, "pessoal, almoço?");
@@ -184,12 +190,89 @@ describe("Jev strategy end to end", () => {
     expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
   });
 
+  test("with no Jev key the LLM strategy decides at once, under its own name, and nothing calls TypeSafe", async () => {
+    f = await setup({
+      reply: (req) =>
+        req.outputSchema
+          ? { chunks: ['{"needs_agent":0.9,"scores":[{"handle":"dev","score":0.9}],"reason":"r"}'] }
+          : { chunks: ["ok"] },
+    });
+    const jev = fakeJev(() => ({ nouls: { "@dev": 0.9 }, needs: 0.9 }));
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper] });
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key, fetch: jev.fetcher } },
+    });
+    await post(f, "help with the build?");
+    await drainOutbox(f.db, handlers);
+    const [decision] = await f.db.select().from(schema.routingDecisions);
+    expect(decision).toMatchObject({ strategy: "llm", selectedAgentIds: [f.agent.id] });
+    expect(jev.requests).toEqual([]);
+  });
+
+  test("named for who decides now: the cheap model with no key, Jev once one is saved", async () => {
+    f = await setup();
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0 }));
+    const key = createJevKey({ db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper], fetch: jev.fetcher });
+    await key.ready();
+    const routing = messageRouter({ ...f.jobDeps, router: { enabled: true, model: "m", jev: { key } } });
+    const llm = createLlmJudge({ gateway: f.gateway, resolveModel: async () => "m" });
+    const judge = standingJudge(
+      f.db,
+      withJudgeFallback(createJevJudge({ key, gateway: f.gateway }), llm, () => key.usable()),
+    );
+    expect([routing?.strategy.name, judge.name]).toEqual(["llm", "llm"]);
+    await key.save("ts_named_key_1", f.owner.id);
+    expect([routing?.strategy.name, judge.name]).toEqual(["jev", "jev"]);
+  });
+
+  test("out of credit: the LLM strategy decides, and Jev isn't called again for 30 minutes", async () => {
+    f = await setup({
+      reply: (req) =>
+        req.outputSchema ? { chunks: ['{"needs_agent":0.1,"scores":[],"reason":"r"}'] } : { chunks: ["ok"] },
+    });
+    let clock = Date.now();
+    const key = createJevKey({
+      db: f.db,
+      keyWrapper: f.keyWrapper,
+      keyWrappers: [f.keyWrapper],
+      envKey: "ts_broke_key",
+      now: () => clock,
+    });
+    let calls = 0;
+    const broke = (async () => {
+      calls++;
+      return Response.json({ detail: { error_type: "billing_error", message: "No credit left" } }, { status: 402 });
+    }) as unknown as typeof fetch;
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: { enabled: true, model: "claude-haiku-5-5", jev: { key, fetch: broke } },
+    });
+    await post(f, "anyone around?");
+    await drainOutbox(f.db, handlers);
+    expect(calls).toBe(1);
+    expect((await key.view()).state).toBe("no_credit");
+    await post(f, "still there?");
+    await drainOutbox(f.db, handlers);
+    expect(calls).toBe(1);
+    clock += 30 * 60_000;
+    await post(f, "and now?");
+    await drainOutbox(f.db, handlers);
+    expect(calls).toBe(2);
+    const strategies = (await f.db.select().from(schema.routingDecisions)).map((d) => d.strategy);
+    expect(strategies.sort()).toEqual([
+      "llm",
+      "llm (fallback: TypeSafe answered 402)",
+      "llm (fallback: TypeSafe answered 402)",
+    ]);
+  });
+
   test("agents' messages never reach the router", async () => {
     f = await setup();
     const jev = fakeJev(() => ({ nouls: {}, needs: 1 }));
     const handlers = createJobHandlers({
       ...f.jobDeps,
-      router: { enabled: true, model: "m", jev: { apiKey: "k", fetch: jev.fetcher } },
+      router: { enabled: true, model: "m", jev: { key: "k", fetch: jev.fetcher } },
     });
     await f.db.transaction((tx) =>
       insertMessage(tx, {

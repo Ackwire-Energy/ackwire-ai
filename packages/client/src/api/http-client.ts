@@ -70,6 +70,7 @@ import type {
   Issue,
   IssueActivity,
   IssueColumn,
+  JevKey,
   JoinApproval,
   JoinCodeSent,
   JoinRequest,
@@ -320,6 +321,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       },
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
+      jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),
+      saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
+      checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
+      removeJev: () => request<JevKey>("/api/app/jev", { method: "DELETE" }),
     },
     waitlist: {
       join: async (input, humanCheck) => {

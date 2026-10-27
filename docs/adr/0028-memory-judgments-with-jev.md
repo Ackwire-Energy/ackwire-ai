@@ -25,9 +25,9 @@ Most of the missing pieces are **judgments**, not generation: is A the same as B
 
 ### 0. The judge
 
-- Memory uses the shared `Judge` (`packages/engine/src/judge.ts`, `ContextDeps.judge`, `judgeOf`): Jev when `TYPESAFE_API_KEY` is set, and the org's cheap model through the Model Gateway when Jev errors or times out, the same fallback the router uses. No second Jev client.
+- Memory uses the shared `Judge` (`packages/engine/src/judge.ts`, `ContextDeps.judge`, `judgeOf`): Jev when the installation has its key (`TYPESAFE_API_KEY`, or the one its owner adds in Settings, ADR 0073), and the org's cheap model through the Model Gateway when Jev errors or times out, the same fallback the router uses. No second Jev client.
 - Usage is recorded like the judge's other calls (kind `router`, provider `typesafe`, billed to the platform). A separate `memory` kind is a follow-up once usage is shown per kind.
-- Platform key only, never per org, never sent to clients.
+- One key per installation, never per org, never sent to clients (ADR 0073).
 - **Always on:** every organization, with no setting to limit or turn it off (`MEMORY_JUDGE_ORGS` was removed on 2026-10-19).
 - **If the judge is off or both judges fail,** each point falls back to today's behavior. Memory never blocks on the judge and a run never fails because of it.
 - **Memory moves need Jev itself** (`calibrated` requests): the first live eval (2026-10-16, 46 cases) gave Jev 91–93% right actions with 0 harmful moves, against the cheap LLM's 83% with 8 harmful ones, because the LLM has no real probabilities and passes every threshold. Without Jev, consolidation uses words, as before.

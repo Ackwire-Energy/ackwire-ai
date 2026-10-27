@@ -15,6 +15,7 @@ import { publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
+import type { JevKeySource } from "./jev-key";
 import { mentionHandoffs } from "./judge";
 import { wakeForAccessDecision } from "./machine-access";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
@@ -91,8 +92,8 @@ export interface JobDeps extends RunExecutorDeps {
     mentionThreshold?: number;
     /** Replaces the core LLM strategy (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
-    /** TypeSafe Jev as the strategy, with the LLM one as fallback (platform key, never per org). */
-    jev?: { apiKey: string; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
+    /** TypeSafe Jev as the strategy, with the LLM one as fallback (the installation's key, never per org). */
+    jev?: { key: JevKeySource; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
   };
 }
 
@@ -120,7 +121,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     (jev
       ? withFallback(
           createJevRouterStrategy({
-            apiKey: jev.apiKey,
+            key: jev.key,
             timeoutMs: jev.timeoutMs,
             fetch: jev.fetch,
             baseURL: jev.baseURL,
@@ -137,6 +138,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
             },
           }),
           llm,
+          () => typeof jev.key === "string" || jev.key.usable(),
         )
       : llm);
   return {

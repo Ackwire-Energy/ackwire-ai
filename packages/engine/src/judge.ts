@@ -1,4 +1,5 @@
 import type { ModelGateway } from "./gateway";
+import { callJev, type JevKeySource } from "./jev-key";
 import { jevCostNanoUsd } from "./router-jev";
 
 /**
@@ -11,7 +12,7 @@ import { jevCostNanoUsd } from "./router-jev";
  *
  * - `box`: where something is in an image (`images`), as fractions of its sides.
  *
- * TypeSafe Jev answers when its platform key is set (fast, cheap, calibrated);
+ * TypeSafe Jev answers when the installation has its key (fast, cheap, calibrated);
  * otherwise, or when it fails, the org's cheap model answers through the
  * Model Gateway with structured output. Images and `box` need Jev (its vision
  * model): the cheap model refuses them. Never used to grant anything.
@@ -92,7 +93,8 @@ function boxOf(v: unknown): JudgeBox {
 
 /** TypeSafe Jev (`POST /v1/systemone`): one request, all questions answered in parallel. */
 export function createJevJudge(options: {
-  apiKey: string;
+  /** Read on every call (`jev-key.ts`): without one it throws `JevOffError`. */
+  key: JevKeySource;
   gateway: Pick<ModelGateway, "recordExternalUsage">;
   baseURL?: string;
   model?: string;
@@ -103,8 +105,6 @@ export function createJevJudge(options: {
   visionTimeoutMs?: number;
   fetch?: typeof fetch;
 }): Judge {
-  const http = options.fetch ?? fetch;
-  const base = (options.baseURL ?? "https://api.typesafe.ai").replace(/\/$/, "");
   return {
     name: "jev",
     async ask(request) {
@@ -116,30 +116,25 @@ export function createJevJudge(options: {
           { data_base64: image.data, format: image.format },
         ]),
       );
-      const res = await http(`${base}/v1/systemone`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${options.apiKey}`,
-          "content-type": "application/json",
-          // Images and Box questions are off unless asked for on each request.
-          ...(vision ? { "TypeSafe-Danger-Zone-Images": "true" } : {}),
-        },
-        body: JSON.stringify({
+      const body = await callJev<{
+        model?: string;
+        answers?: Record<string, JudgeAnswer>;
+        usage?: { input_tokens?: number; output_tokens?: number };
+      }>(options.key, {
+        fetch: options.fetch,
+        baseURL: options.baseURL,
+        // Images and Box questions are off unless asked for on each request.
+        headers: vision ? { "TypeSafe-Danger-Zone-Images": "true" } : undefined,
+        body: {
           state: request.state,
           model,
           questions: request.questions,
           ...(Object.keys(assets).length > 0 ? { assets } : {}),
-        }),
-        signal: AbortSignal.timeout(
-          vision ? (options.visionTimeoutMs ?? Math.max(6000, options.timeoutMs ?? 0)) : (options.timeoutMs ?? 2000),
-        ),
+        },
+        timeoutMs: vision
+          ? (options.visionTimeoutMs ?? Math.max(6000, options.timeoutMs ?? 0))
+          : (options.timeoutMs ?? 2000),
       });
-      if (!res.ok) throw new Error(`TypeSafe answered ${res.status}`);
-      const body = (await res.json()) as {
-        model?: string;
-        answers?: Record<string, JudgeAnswer>;
-        usage?: { input_tokens?: number; output_tokens?: number };
-      };
       const inputTokens = body.usage?.input_tokens ?? 0;
       await options.gateway
         .recordExternalUsage({
@@ -232,10 +227,15 @@ export function createLlmJudge(deps: {
   };
 }
 
-/** `primary`, and `fallback` on any error or timeout. */
-export function withJudgeFallback(primary: Judge, fallback: Judge): Judge {
+/**
+ * `primary`, and `fallback` on any error or timeout. Named after `fallback` while `primaryOn()` is false (no Jev key
+ * now), so a decision never names a judge that wasn't asked.
+ */
+export function withJudgeFallback(primary: Judge, fallback: Judge, primaryOn: () => boolean = () => true): Judge {
   return {
-    name: primary.name,
+    get name() {
+      return primaryOn() ? primary.name : fallback.name;
+    },
     async ask(request) {
       try {
         return await primary.ask(request);

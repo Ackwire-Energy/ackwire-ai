@@ -7,6 +7,7 @@ export * from "./context";
 export * from "./databases";
 export * from "./forum";
 export * from "./imports";
+export * from "./instance-secrets";
 export * from "./machines";
 export * from "./mail";
 export * from "./missions";

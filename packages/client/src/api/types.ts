@@ -19,6 +19,18 @@ export interface ServerTelemetry {
   report: Record<string, unknown>;
 }
 
+/** The installation's Jev key, for its pinned owner on a self-hosted server (`GET /api/app/jev`, ADR 0073). */
+export interface JevKey {
+  /** `env`: `TYPESAFE_API_KEY`, read-only here. `settings`: added in Settings. Null: none. */
+  source: "env" | "settings" | null;
+  /** The key's last 4 characters (the key itself is never returned). */
+  hint: string | null;
+  /** What its owner can fix: TypeSafe refused the key, or its account is out of credit. Else `ok`. */
+  state: "off" | "ok" | "invalid" | "no_credit";
+  /** Jev's calls this month (UTC), every workspace together. */
+  month: { decisions: number; costUsd: number };
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
