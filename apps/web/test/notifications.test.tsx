@@ -5,6 +5,7 @@ setupDom();
 
 import type { Agent, AgentQuestion, AppNotification } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { dispatchPushOpen, pushOpenPath } from "../src/lib/push-open";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
@@ -739,5 +740,48 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const ring = value(".nt-item:focus-visible", "box-shadow");
     expect(ring).toStartWith("inset ");
     expect(value(".nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
+  });
+});
+
+describe("a click on a browser notification (ADR 0071)", () => {
+  test("no tab open: ?open= goes where Abrir goes and marks it read, in place of the inbox", async () => {
+    const state = seedState({ notifications: inbox() });
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications?open=n-thread`, { api: createFakeApi(state) });
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/threads/m-1`);
+    expect(state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
+      [ORG_ID, "n-thread", true],
+    ]);
+  });
+
+  test("one that is gone: the inbox, without ?open", async () => {
+    const state = seedState({ notifications: inbox() });
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications?open=n-gone`, { api: createFakeApi(state) });
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(router.state.location.search).toEqual({});
+    expect(document.querySelector('[data-n="n-thread"]')).not.toBeNull();
+  });
+
+  test("a tab open in the workspace: it opens there at once, no stop at the inbox", async () => {
+    const state = seedState({ notifications: inbox() });
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const seen: string[] = [];
+    const unsubscribe = router.subscribe("onResolved", (e) => seen.push(e.toLocation.pathname));
+    await act(async () =>
+      dispatchPushOpen(
+        {
+          path: pushOpenPath(ORG_ID, "n-routine"),
+          data: { orgId: ORG_ID, notificationId: "n-routine", kind: "routine_failed" },
+        },
+        (path) => router.history.push(path),
+      ),
+    );
+    await settle(8);
+    unsubscribe();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/routines`);
+    expect(seen).not.toContain(`/org/${ORG_ID}/notifications`);
+    expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-routine", true]);
   });
 });

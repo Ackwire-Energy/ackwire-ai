@@ -300,7 +300,7 @@ describe("what each terminal gets", () => {
 
   test("a log keeps each line whole, for grep", () => {
     const { term, text } = capture({ tty: false });
-    const long = `Agents' computer: set up, but it hasn't answered agentes.chat yet; it keeps trying. Its log: ${"x".repeat(60)}`;
+    const long = `Agents' computer: set up, but it hasn't answered agentes.chat yet. It keeps trying. Its log: ${"x".repeat(60)}`;
     term.warn(long);
     term.info("Next", [long], "numbered");
     expect(text()).toBe(`▲  ${long}\n●  Next\n   1. ${long}\n`);

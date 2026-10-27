@@ -160,6 +160,15 @@ export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.sys
 export const useCheckJevKey = () => useJevChange<void>((api) => api.system.checkJev());
 export const useRemoveJevKey = () => useJevChange<void>((api) => api.system.removeJev());
 
+/**
+ * The server's Web Push key (ADR 0071): `null` when this server has Web Push off. Asked only where this
+ * browser could take pushes (`enabled`); the key changes only when the server's does.
+ */
+export const useWebPushKey = (enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.webPushKey, queryFn: () => api.push.webKey(), enabled, staleTime: 60 * 60_000 });
+};
+
 export function useCreateOrganization() {
   const api = useApi();
   const qc = useQueryClient();

@@ -765,6 +765,11 @@ export const ptBR = {
     soundSky: "Céu",
     soundPixel: "Pixel",
     soundOff: "Sem som",
+    browserNotices: "Avisos neste navegador",
+    browserNoticesHint: "Mesmo com a aba fechada",
+    browserNoticesBlocked:
+      "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
+    browserNoticesFailed: "Não deu para ligar os avisos agora. Tente de novo.",
     languageCurrent: "Idioma: {{name}}",
     orgSettings: "Configurações da organização",
     switchOrg: "Trocar de organização",
@@ -2630,10 +2635,6 @@ export const ptBR = {
       askedNow: "Pediu agora",
       askedOn: "Pediu em {{date}}",
       unverified: "Não verificado",
-      // A folha de pedidos do celular lê estas três.
-      confirmed: "E-mail confirmado",
-      unconfirmed: "E-mail não confirmado: aprovar manda um convite para ele.",
-      via: "Fecha em {{date}}",
       roleOf: "Papel de {{name}}",
       approve: "Aprovar",
       deny: "Recusar",

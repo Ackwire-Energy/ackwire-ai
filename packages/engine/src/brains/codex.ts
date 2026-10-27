@@ -168,7 +168,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: "The runner on the computer is too old for agents that think with Codex; update it.",
+        message: "The runner on the computer is too old for agents that think with Codex. Update it.",
         retryable: true,
       };
       return;
@@ -187,7 +187,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "codex_too_old",
-        message: `Codex on the computer is ${codex.version}; agents need ${CODEX_MIN_VERSION} or newer (update it there).`,
+        message: `Codex on the computer is ${codex.version}. Agents need ${CODEX_MIN_VERSION} or newer (update it there).`,
         retryable: true,
       };
       return;
@@ -203,7 +203,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: "The runner on the computer is too old to keep Codex within this agent's permissions; update it.",
+        message: "The runner on the computer is too old to keep Codex within this agent's permissions. Update it.",
         retryable: true,
       };
       return;

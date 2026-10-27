@@ -1214,6 +1214,29 @@ test("a download that doesn't match its pinned checksum is never used", async ()
   expect(fetched).toBe("");
 });
 
+test.if(posix)(
+  "a Chrome install that fails without a word says so in a sentence, with no empty parentheses",
+  async () => {
+    const home = tempDir("runner-home-");
+    const ws = tempDir();
+    dirs.push(home, ws);
+    const manager = new BrowserManager({
+      home,
+      log: () => {},
+      send: () => true,
+      secret: async () => null,
+      command: ["/bin/sh", "-c", ":"],
+      chrome: () => null,
+    });
+    const act = () =>
+      manager.act(dev, ws, { op: "browser.act", command: "open", args: ["https://a.example"], timeoutSeconds: 5 });
+    expect(await errorCode(act)).toBe("browser_unavailable");
+    const { reason } = manager.info();
+    expect(reason).toStartWith("Couldn't install a browser for the agent.");
+    expect(reason).not.toMatch(/[;—]|\(\)/);
+  },
+);
+
 test.if(posix)("the desktop app's sidecar is used as is, and closeAll closes this runner's browsers only", async () => {
   const home = tempDir("runner-home-");
   const bin = tempDir("runner-bin-");

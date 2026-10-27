@@ -19,3 +19,5 @@ packages/engine/scripts/out/
 
 # Design prototypes stay local (never in the repo).
 docs/design/telas/
+*.keystore
+*.jks

@@ -45,10 +45,13 @@ export interface MachineDeps {
   now?: () => Date;
 }
 
+export const REMOVED_COMPUTER_MESSAGE =
+  "Your connected computer was removed. Ask an admin or your owner to choose another one.";
+
 /** The machine can't be reached now (runner not connected). */
 export class MachineOfflineError extends Error {
   constructor(readonly machineName: string) {
-    super(`The computer ${machineName} is offline; ask its owner to start the runner.`);
+    super(`The computer ${machineName} is offline. Ask its owner to start the runner.`);
     this.name = "MachineOfflineError";
   }
 }
@@ -72,7 +75,7 @@ export class MachinePausedError extends Error {
 
 /** "The owner paused the computer X until 16:24 (UTC)." in the owner's time zone when known. */
 export function pausedMessage(name: string, until: string | null, timezone?: string | null, now = new Date()) {
-  if (!until) return `The owner paused the computer ${name} until they resume it; nothing new can start there now.`;
+  if (!until) return `The owner paused the computer ${name} until they resume it. Nothing new can start there now.`;
   const at = new Date(until);
   const zone = timezone || "UTC";
   let when: string;
@@ -88,7 +91,7 @@ export function pausedMessage(name: string, until: string | null, timezone?: str
   } catch {
     when = until.slice(11, 16);
   }
-  return `The owner paused the computer ${name} until ${when}${zone === "UTC" ? " UTC" : ""}; nothing new can start there before that.`;
+  return `The owner paused the computer ${name} until ${when}${zone === "UTC" ? " UTC" : ""}. Nothing new can start there before that.`;
 }
 
 export const sha256Hex = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -559,7 +562,7 @@ export async function setAgentComputerTarget(
     // The workspace's own computers (managed, host) are nobody's: any agent of the workspace may use them.
     if (machine && machine.kind === "connected" && machine.pairedByUserId !== actorId) {
       throw new ForbiddenError(
-        "You can only give your agent a computer you connected yourself; ask an admin for this one",
+        "You can only give your agent a computer you connected yourself. Ask an admin for this one.",
         "machine.forbidden",
       );
     }

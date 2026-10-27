@@ -1,9 +1,9 @@
 # 0072. Asking to join proves the address
 
-- Status: Accepted (built: server, web and the shared client; the phone app follows)
+- Status: Accepted (built: server, web, the shared client and the phone app)
 - Date: 2026-10-27
 - Revises: ADR 0068 §2, §4, §7 and §8
-- Code: `packages/engine/src/invite-requests.ts` (`sendJoinCode`, `checkJoinCode`, `askToJoin`, approval, prune), `packages/engine/src/jobs.ts` (`email.send`), `packages/engine/src/email/` (`join_code`, the `code` block), `apps/server/src/routes/app/invites.ts`, `apps/web/src/pages/InvitePage.tsx` (`EmailProof`), `apps/web/src/pages/MembersPage.tsx`
+- Code: `packages/engine/src/invite-requests.ts` (`sendJoinCode`, `checkJoinCode`, `askToJoin`, approval, prune), `packages/engine/src/jobs.ts` (`email.send`), `packages/engine/src/email/` (`join_code`, the `code` block), `apps/server/src/routes/app/invites.ts`, `apps/web/src/pages/InvitePage.tsx` (`EmailProof`), `apps/web/src/pages/MembersPage.tsx`, `apps/mobile/src/features/auth/InviteScreen.tsx` (`EmailProof`), `apps/mobile/src/features/members/JoinRequestsSheet.tsx`
 
 ## Context
 

@@ -6,6 +6,7 @@
  * into words.
  */
 import type {
+  AiStatus,
   AppNotification,
   NotificationCounts,
   NotificationFilter,
@@ -278,6 +279,15 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (s.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
 }
+
+/**
+ * The workspace's computer is ready and its agents have no AI yet: opening it opens "Conectar uma IA" (the one
+ * next step there is) instead of a page. `ai` unknown yet: the page.
+ */
+export const opensConnectAi = (
+  n: Pick<AppNotification, "kind">,
+  ai: Pick<AiStatus, "any" | "agents"> | undefined,
+): boolean => n.kind === "computer_ready" && ai !== undefined && !ai.any && ai.agents.length > 0;
 
 /** Mission and routine steps as strip cells: done, the one it stopped at, the rest to do. */
 export function stepCells(steps: { done: number; total: number; failedAt?: number }) {

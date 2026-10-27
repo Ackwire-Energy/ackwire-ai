@@ -29,7 +29,7 @@ const same = (a: unknown, b: unknown) => canonicalJson(a ?? null) === canonicalJ
 
 /** Someone changed the target since the agent did: undoing would overwrite their work. */
 const changedSince = () =>
-  new ConflictError("This was changed after the agent did it; undo it by hand", "action.changed_since");
+  new ConflictError("This changed after the agent did it. Undo it by hand.", "action.changed_since");
 
 // ── Issues ───────────────────────────────────────────────────────────────────
 
@@ -502,7 +502,7 @@ async function toggle(deps: AgentUndoDeps, userId: string, orgId: string, id: st
   if (direction === "undo" && a.undoneAt) throw new ConflictError("Already undone", "action.already_undone");
   if (direction === "redo" && !a.undoneAt) throw new ConflictError("Not undone", "action.not_undone");
   if (a.undoableUntil.getTime() <= now.getTime()) {
-    throw new ConflictError("Too late to undo this; change it by hand", "action.expired");
+    throw new ConflictError("Too late to undo this. Change it by hand.", "action.expired");
   }
   const handler = handlers[a.kind];
   if (!handler) throw new ConflictError("This can't be undone", "action.not_undoable");

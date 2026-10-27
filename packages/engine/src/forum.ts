@@ -1154,7 +1154,7 @@ async function reopenFromPost(
     });
     return true;
   });
-  if (!reopened) throw new ConflictError("This topic changed; reload and try again", "forum.state_changed");
+  if (!reopened) throw new ConflictError("This topic changed. Reload and try again.", "forum.state_changed");
   // "Only the chosen agents": an empty list means all of them.
   if (!request.agentIds) {
     const parts = await participantsOf(db, [topic.id]);
@@ -2031,7 +2031,8 @@ export async function postInForumAsAgent(
   const already = postsOf(topicId, await channelMessages(db, orgId, topic.channelId)).some(
     (p) => p.author.type === "agent" && p.author.id === agentId && p.round === round,
   );
-  if (already) throw new ValidationError("You already posted this round; wait for the next", "forum.already_posted");
+  if (already)
+    throw new ValidationError("You already posted this round. Wait for the next one.", "forum.already_posted");
   const text = body.trim().slice(0, FORUM_LIMITS.postChars);
   if (!text) throw new ValidationError("Write something first", "forum.empty_post");
   const { message } = await insertMessageWithRuns(

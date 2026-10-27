@@ -268,7 +268,7 @@ async function onRequestComputer<T>(
   }
   return withSandbox(deps, ctx, 60, async (computer) => {
     if ((computer.machineId ?? null) !== row.machineId) {
-      throw new ConflictError("The agent changed computers since it asked; ask it again", "secret.computer_changed");
+      throw new ConflictError("The agent changed computers since it asked. Ask it again.", "secret.computer_changed");
     }
     return fn(computer);
   });

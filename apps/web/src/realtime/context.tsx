@@ -83,6 +83,7 @@ import { checkAppVersion } from "@/lib/app-version";
 import { desktopNotice, inDesktopApp, thisMac } from "@/lib/desktop";
 import { notificationAudience } from "@/lib/sounds";
 import { useToast } from "@/lib/toast";
+import { settleShownPushes } from "@/lib/web-push";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
 export interface LiveState {
@@ -440,6 +441,9 @@ export function RealtimeProvider({
         const sound = mine ? soundForNotification(event.notification, background) : null;
         if (sound) playSound(sound);
       }
+      // Notifications in this browser (ADR 0071): what was read, done or snoozed closes there too; a drop in
+      // the badge ("Marcar tudo como lido") has one tab ask the server which shown ones went stale.
+      if (isNotificationEvent(event)) settleShownPushes(orgId, event, notificationAudience().mine);
       // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
       if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
         const notice = desktopNotice(tRef.current, orgId, event.notification);
