@@ -329,8 +329,7 @@ describe("rules, when nothing can read the message", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       author: { type: "person", userId: f.owner.id },
-      body: "@dev olha o deploy",
-      mentionedAgentIds: [f.agent.id],
+      body: "dev, olha o deploy",
       createdAt: new Date(Date.now() - 30 * 60_000),
     });
     await byAgent(f.agent.id, "Olhei: está verde.", 29);

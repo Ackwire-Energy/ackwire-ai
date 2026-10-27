@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { envPlatformCredentials, noPlatformCredentials, ROUTE_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  type AiRouting,
   agentAiState,
   createAgent,
   createCredential,
@@ -229,7 +230,7 @@ describe("who picks the agents (ADR 0074)", () => {
       now: () => clock,
     });
     const jev = routingOf({ jev: { key } });
-    const jevLine = { by: "jev", mine: "jev", model: null, noSmallModel: null };
+    const jevLine: AiRouting = { by: "jev", mine: "jev", model: null, noSmallModel: null };
     expect(await who(jev)).toEqual({ apiKey: true, routing: jevLine });
     // Three outages in a row skip Jev for a minute: no screen says so.
     for (const _ of [1, 2, 3]) key.report("down");

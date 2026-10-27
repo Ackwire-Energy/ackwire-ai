@@ -88,7 +88,7 @@ describe("receipts", () => {
     const none = await post(f, "good morning all");
     await drainOutbox(f.db, handlers);
     // Who picked, never what the model said.
-    const decidedBy = { step: "model", model: "claude-haiku-5-5", provider: "anthropic" };
+    const decidedBy = { step: "model" as const, model: "claude-haiku-5-5", provider: "anthropic" };
     expect(await receiptOf(f, picked.id)).toEqual({
       seenBy: [f.agent.id],
       pickedBy: [f.agent.id],
