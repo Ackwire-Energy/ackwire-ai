@@ -6871,6 +6871,8 @@ export const ptBR = {
     invitation: {
       askToJoin: "Este link agora passa por um admin. Abra de novo para pedir para entrar.",
     },
+    humanCheck: "Não conseguimos confirmar que você é uma pessoa. Tente de novo.",
+    humanCheckBlocked: "A verificação não carregou. Tente outro navegador ou outra rede.",
     mission: {
       notFound: "Missão não encontrada.",
       notOwner: "Só quem é responsável pela missão pode fazer isso.",

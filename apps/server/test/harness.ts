@@ -8,6 +8,7 @@ import {
   createMemoryRateLimiter,
   createPostgresSearchResolver,
   type DatabaseDriver,
+  type HumanCheck,
   type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
@@ -83,6 +84,8 @@ export async function createTestServer(
     databases?: DatabaseDriver;
     /** Where emails get their pictures; absent = linked from `PUBLIC_URL`. */
     emailArt?: EmailArt;
+    /** The bot check (Turnstile with a fake `fetch`); absent = none, as without its keys. */
+    humanCheck?: HumanCheck;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -108,6 +111,7 @@ export async function createTestServer(
     push,
     ...(options.mail ? { mail: options.mail } : {}),
     databases: options.databases ?? null,
+    humanCheck: options.humanCheck ?? null,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -131,7 +135,14 @@ export async function createTestServer(
     emailArt: options.emailArt,
   });
   const { handlers } = engine;
-  const auth = createAuth({ db, config, log, emailDelivers: true });
+  const auth = createAuth({
+    db,
+    config,
+    log,
+    emailDelivers: true,
+    rateLimiter: adapters.rateLimiter,
+    humanCheck: adapters.humanCheck,
+  });
   const app = createApp({
     edition: "selfhost",
     version: "test",

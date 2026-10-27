@@ -1,3 +1,4 @@
+import { humanCheckHeaders } from "../lib/human-check";
 import { CLOUD_SERVER } from "../lib/server";
 import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
@@ -321,8 +322,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
     },
     waitlist: {
-      join: async (input) => {
-        await request<{ ok: true }>("/api/waitlist", { json: input });
+      join: async (input, humanCheck) => {
+        await request<{ ok: true }>("/api/waitlist", { json: input, headers: humanCheckHeaders(humanCheck) });
       },
       confirm: async (input) => {
         await request<{ ok: true }>("/api/waitlist/confirm", { json: input });
@@ -330,7 +331,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
-      signInOptions: (input) => request<SignInOptions>("/api/app/sign-in-options", { json: input }),
+      signInOptions: (input, humanCheck) =>
+        request<SignInOptions>("/api/app/sign-in-options", { json: input, headers: humanCheckHeaders(humanCheck) }),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
@@ -664,7 +666,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ id: string; url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
       links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
       turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
-      sendCode: (token, input) => request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, { json: input }),
+      sendCode: (token, input, humanCheck) =>
+        request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, {
+          json: input,
+          headers: humanCheckHeaders(humanCheck),
+        }),
       checkCode: (token, input) =>
         request<{ verified: true }>(`/api/app/invitations/${enc(token)}/code/check`, { json: input }),
       ask: (token, input) => request<AskToJoinResult>(`/api/app/invitations/${enc(token)}/requests`, { json: input }),

@@ -36,6 +36,8 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
+  /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
+  turnstileSiteKey?: string | null;
 }
 
 export type SignInProvider = "google" | "github" | "apple";

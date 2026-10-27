@@ -13,7 +13,35 @@ const errors = {
   404: errorResponse("Not found"),
 };
 
-const Health = z.object({ ok: z.literal(true), version: z.string() }).openapi("OperatorHealth");
+const BotCheck = z
+  .object({
+    state: z.enum(["off", "ok", "unreachable", "secret_refused"]).openapi({
+      description:
+        "`off` without both Turnstile keys. While `unreachable` (this server can't reach Cloudflare) or `secret_refused` (Cloudflare refuses `TURNSTILE_SECRET_KEY`), every request goes through unchecked.",
+    }),
+    since: z.iso.datetime({ offset: true }).openapi({ description: "When it took this state." }),
+    blocked: z.number().int().min(0).openapi({
+      description:
+        "Networks refused in the last 10 minutes because their page couldn't load the check (`human_check_blocked`), each counted once: an IPv4 address, or an IPv6 /64. Any client can claim its page couldn't load it, so read it beside `passed`.",
+    }),
+    passed: z.number().int().min(0).openapi({
+      description:
+        "Tokens Cloudflare passed in the last 10 minutes. When the widget is down for everyone, `blocked` rises while this falls. Clients claiming it is down don't move it.",
+    }),
+    testing: z.boolean().openapi({
+      description:
+        "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets, which pass every token, so nothing is really checked. Right only on a test server.",
+    }),
+  })
+  .openapi("OperatorBotCheck");
+
+const Health = z
+  .object({
+    ok: z.literal(true),
+    version: z.string(),
+    botCheck: BotCheck.openapi({ description: "The bot check before public forms (ADR 0075)." }),
+  })
+  .openapi("OperatorHealth");
 
 const OrgSummary = z
   .object({
@@ -100,16 +128,26 @@ const User = z
   })
   .openapi("OperatorUser");
 
-export function registerOperatorOrgs(api: OpenAPIHono, { db, version }: OperatorDeps) {
+export function registerOperatorOrgs(api: OpenAPIHono, { db, version, humanCheck }: OperatorDeps) {
+  const started = new Date();
   api.openapi(
     createRoute({
       method: "get",
       path: "/health",
       tags,
-      summary: "The token works and this server answers",
+      summary: "The token works and this server answers, with its bot check's state",
       responses: { 200: json(Health), 401: errors[401] },
     }),
-    (c) => c.json({ ok: true as const, version }, 200),
+    (c) => {
+      const check = humanCheck?.status() ?? {
+        state: "off" as const,
+        since: started,
+        blocked: 0,
+        passed: 0,
+        testing: false,
+      };
+      return c.json({ ok: true as const, version, botCheck: { ...check, since: check.since.toISOString() } }, 200);
+    },
   );
 
   api.openapi(

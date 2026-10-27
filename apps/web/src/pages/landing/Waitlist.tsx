@@ -1,11 +1,14 @@
+import type { HumanCheck } from "@agenteschat/client/lib/human-check";
 import { type AgentAppearance, Button, Icon } from "@agenteschat/ui";
 import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useHumanCheck } from "@/lib/human-check";
 import { WAITLIST_EMAIL } from "./data";
 import { useJoy } from "./hooks";
 import { LpAvatar } from "./LpAvatar";
 
-export type JoinResult = "ok" | "invalid" | "rate" | "failed";
+/** `human` and `blocked`: the bot check refused, or its page couldn't load it (ADR 0075). */
+export type JoinResult = "ok" | "invalid" | "rate" | "failed" | "human" | "blocked";
 /** What happened to a confirmation link the page was opened with. */
 export type LinkProblem = "expired" | "confirmFailed";
 
@@ -20,7 +23,7 @@ interface WaitlistProps {
   linkProblem?: LinkProblem | null;
   /** The look of the happy agent in the done state (the giant's). */
   look: AgentAppearance;
-  onJoin: (email: string) => Promise<JoinResult>;
+  onJoin: (email: string, check: HumanCheck | null) => Promise<JoinResult>;
   onTyping: () => void;
   onFocusInput?: (input: HTMLInputElement | null) => void;
 }
@@ -36,6 +39,9 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
   const [email, setEmail] = useState("");
   const [error, setError] = useState<JoinResult | null>(null);
   const [pending, setPending] = useState(false);
+  // The page has two forms: the bot check loads for the first one someone types in.
+  const [touched, setTouched] = useState(false);
+  const human = useHumanCheck(touched ? "waitlist" : null);
 
   const submit = async () => {
     const value = email.trim();
@@ -46,7 +52,7 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
       return;
     }
     setPending(true);
-    const result = await onJoin(value);
+    const result = await onJoin(value, human.check);
     setPending(false);
     if (result !== "ok") {
       setError(result);
@@ -63,7 +69,11 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
           ? t("landing.waitlist.rateLimited")
           : error === "failed"
             ? t("landing.waitlist.failed")
-            : null;
+            : error === "human"
+              ? t("errors.humanCheck")
+              : error === "blocked"
+                ? t("errors.humanCheckBlocked")
+                : null;
 
   return (
     <div className={variant === "final" ? "lp-slot" : undefined} ref={ref}>
@@ -98,13 +108,17 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
                 setError(null);
                 onTyping();
               }}
-              onFocus={(e) => onFocusInput?.(e.currentTarget)}
+              onFocus={(e) => {
+                setTouched(true);
+                onFocusInput?.(e.currentTarget);
+              }}
               onBlur={() => onFocusInput?.(null)}
             />
             <Button type="submit" className="lp-bsky" loading={pending}>
               {t("landing.waitlist.submit")}
             </Button>
           </form>
+          {human.slot}
           {message && (
             <div className="lp-wl-err" role="alert">
               <Icon name="alert" size={16} />

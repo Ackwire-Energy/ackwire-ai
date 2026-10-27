@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { HumanCheck, PubSub } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import { type MachineHub, safeEqual } from "@agenteschat/engine";
@@ -24,6 +24,8 @@ export interface OperatorDeps {
   hub?: MachineHub;
   /** The server sends email: a workspace waiting long for its computer is told its owners will be emailed. */
   emails?: boolean;
+  /** The bot check (ADR 0075), reported by `/health`; absent: `off`. */
+  humanCheck?: HumanCheck | null;
 }
 
 /**

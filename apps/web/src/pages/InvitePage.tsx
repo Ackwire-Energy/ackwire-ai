@@ -1,9 +1,10 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { ApiError, invitationQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { authErrorText, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { signInPath } from "@agenteschat/client/lib/guards";
+import { withHumanCheck } from "@agenteschat/client/lib/human-check";
 import {
   ANSWER_POLL_MS,
   askView,
@@ -24,6 +25,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { CenteredLayout } from "@/components/AuthLayout";
 import { useNow } from "@/hooks/useNow";
 import { TYPED_VALUES } from "@/i18n";
+import { useHumanCheck } from "@/lib/human-check";
 import { lookOf } from "@/lib/look";
 import "./invite.css";
 
@@ -40,6 +42,9 @@ export function InvitePage({ token }: { token: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [asked, setAsked] = useState(false);
+  const [signingUp, setSigningUp] = useState(false);
+  // Signed out on an email invitation: the sign-up form below.
+  const human = useHumanCheck(preview.data && preview.data.kind !== "link" && me.data === null ? "sign-up" : null);
 
   const accept = useMutation({
     mutationFn: () => api.orgs.acceptInvitation(token),
@@ -51,23 +56,32 @@ export function InvitePage({ token }: { token: string }) {
     onError: (e) => setError(e instanceof Error ? e.message : t("common.unknownError")),
   });
 
+  // From the press on: the bot check may wait for its token, or for a click, before the sign-up goes out.
+  const busy = signingUp || accept.isPending;
   const signUpAndAccept = async (e: React.FormEvent) => {
     e.preventDefault();
     const invitation = preview.data;
-    if (!invitation) return;
+    if (!invitation || busy) return;
     setError(null);
-    const result = await auth.signUp({ name: name.trim(), email: invitation.email, password });
-    if (!result.ok) {
-      setError(result.message || t("common.unknownError"));
-      return;
+    setSigningUp(true);
+    try {
+      const result = await withHumanCheck(human.check, (humanCheck) =>
+        auth.signUp({ name: name.trim(), email: invitation.email, password }, humanCheck),
+      );
+      if (!result.ok) {
+        setError(authErrorText(t, result));
+        return;
+      }
+      accept.mutate();
+    } finally {
+      setSigningUp(false);
     }
-    accept.mutate();
   };
 
   if (preview.isPending || me.isPending) {
     return (
       <CenteredLayout narrow>
-        <Card padded aria-busy="true">
+        <Card padded className="invite-card" aria-busy="true">
           <p className="muted">{t("common.loading")}</p>
         </Card>
       </CenteredLayout>
@@ -82,7 +96,7 @@ export function InvitePage({ token }: { token: string }) {
 
   return (
     <CenteredLayout narrow>
-      <Card padded as="div">
+      <Card padded as="div" className="invite-card">
         {invitation && <OrgHead orgName={orgName} />}
 
         {invitation ? (
@@ -155,12 +169,13 @@ export function InvitePage({ token }: { token: string }) {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </Field>
+                {human.slot}
                 <Button
                   type="submit"
                   variant="primary"
                   block
-                  disabled={!name.trim() || !passwordOk || accept.isPending}
-                  loading={accept.isPending}
+                  disabled={!name.trim() || !passwordOk || busy}
+                  loading={busy}
                 >
                   {t("invite.accept", { org: orgName })}
                 </Button>
@@ -261,6 +276,7 @@ function EmailProof({
 }) {
   const { t } = useTranslation();
   const api = useApi();
+  const human = useHumanCheck("ask-code");
   const key = email.trim().toLowerCase();
   const [sent, setSent] = useState<{ email: string; resendAt: number } | null>(null);
   const [code, setCode] = useState("");
@@ -279,7 +295,7 @@ function EmailProof({
     setError(null);
   };
   const send = useMutation({
-    mutationFn: () => api.invites.sendCode(token, body),
+    mutationFn: () => withHumanCheck(human.check, (humanCheck) => api.invites.sendCode(token, body, humanCheck)),
     meta: { silent: true },
     onSuccess: (r) => codeOut(r.resendIn),
     onError: (e) => {
@@ -372,6 +388,7 @@ function EmailProof({
         </div>
       </Field>
       {children}
+      {human.slot}
       {showCode && (
         <Field label={t("invite.ask.code")} id="ask-code" error={said && <span role="alert">{said}</span>}>
           <Input
@@ -651,7 +668,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
 
   return (
     <CenteredLayout narrow>
-      <Card padded as="div">
+      <Card padded as="div" className="invite-card">
         <OrgHead orgName={org} />
         {body}
       </Card>
