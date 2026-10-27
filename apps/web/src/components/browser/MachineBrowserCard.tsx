@@ -126,21 +126,23 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         )}
         {ready && m.browser?.version && <span className="small muted">{m.browser.chrome ?? ""}</span>}
       </div>
-      {!switchedOn && (
-        <div className="brw-note">
-          <Icon name="computer" size={16} />
-          {here ? (
-            <div className="row" style={{ flex: 1, gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ flex: 1, minWidth: 200 }}>{t("machines.thisMac.toolsHere")}</span>
-              <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-            </div>
-          ) : (
+      {!switchedOn &&
+        (here ? (
+          <div className="brw-note brw-note--act">
+            <span className="brw-note__text ac-iconline">
+              <Icon name="computer" size={16} />
+              <span>{t("machines.thisMac.toolsHere")}</span>
+            </span>
+            <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+          </div>
+        ) : (
+          <div className="brw-note ac-iconline">
+            <Icon name="computer" size={16} />
             <div>{t("browser.machine.offHelp")}</div>
-          )}
-        </div>
-      )}
+          </div>
+        ))}
       {switchedOn && !ready && m.browser?.reason && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {m.browser.reason}
@@ -152,7 +154,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         <>
           <h3 className="brw-gh">{t("browser.machine.inUse")}</h3>
           {uses.length === 0 ? (
-            <div className="brw-note" style={{ marginTop: 8 }}>
+            <div className="brw-note ac-iconline" style={{ marginTop: 8 }}>
               <Icon name="globe" size={16} />
               <div>{t("browser.machine.nobody")}</div>
             </div>

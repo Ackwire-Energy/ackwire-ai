@@ -68,7 +68,7 @@ export function DmPage({ target }: { target: DmTarget }) {
       <NavToggle />
       {agent ? <AgentAvatar agentId={agent.id} name={agent.name} /> : <Avatar name={name} imageUrl={person?.image} />}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
-        <h1 className="channel__title">
+        <h1 className={agent ? "channel__title ac-captop" : "channel__title"}>
           {name}
           {agent && <AudienceChip agent={agent} />}
         </h1>

@@ -1278,11 +1278,32 @@ export function OnboardingPage() {
             />
           )}
 
+          {step.id === "workspace" && confirmationSent && (
+            <p className="onb__help onb__note ac-iconline" role="status">
+              <Icon name="mail" size={14} />
+              <span>
+                {t("onboarding.confirmation.sent", { email })}
+                {!resend.data && (
+                  <>
+                    <br />
+                    <button
+                      type="button"
+                      className="ac-link onb__link"
+                      onClick={() => resend.mutate()}
+                      disabled={resend.isPending}
+                    >
+                      {t("auth.sendNewLink")}
+                    </button>
+                  </>
+                )}
+              </span>
+            </p>
+          )}
+
           <div className="onb__actions">
             <Button
               variant="primary"
               size="lg"
-              block
               kbd={["↵"]}
               onClick={() => void advance().catch(() => {})}
               disabled={blocked || busy}
@@ -1299,27 +1320,6 @@ export function OnboardingPage() {
               <Button variant="ghost" onClick={() => void advance("keyLater").catch(() => {})} disabled={busy}>
                 {t("connectAi.later")}
               </Button>
-            )}
-            {step.id === "workspace" && confirmationSent && (
-              <p className="onb__help onb__note ac-iconline" role="status">
-                <Icon name="mail" size={14} />
-                <span>
-                  {t("onboarding.confirmation.sent", { email })}
-                  {!resend.data && (
-                    <>
-                      <br />
-                      <button
-                        type="button"
-                        className="ac-link onb__link"
-                        onClick={() => resend.mutate()}
-                        disabled={resend.isPending}
-                      >
-                        {t("auth.sendNewLink")}
-                      </button>
-                    </>
-                  )}
-                </span>
-              </p>
             )}
           </div>
         </div>

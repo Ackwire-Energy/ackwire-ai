@@ -43,7 +43,7 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
         )}
       </div>
       {off && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="computer" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {t("desktop.use.offHelp")}
@@ -52,7 +52,7 @@ export function MachineDesktopUseCard({ machine: m }: { machine: Machine }) {
         </div>
       )}
       {reason && (
-        <div className="brw-note">
+        <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {reason}

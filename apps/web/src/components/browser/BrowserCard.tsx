@@ -856,6 +856,7 @@ export function BrowserCard({
   ) : closed ? (
     <Cover
       color={color}
+      sky
       icon="globe"
       text={t("browser.inCard.closed", g)}
       help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}

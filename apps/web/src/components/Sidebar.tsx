@@ -29,6 +29,7 @@ import {
   Checkbox,
   CountBadge,
   CountChip,
+  cx,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -804,7 +805,8 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       <button
         ref={trigger}
         type="button"
-        className="sidebar__user"
+        // With the budget under the name the face stands beside two lines: the name's capitals at its top.
+        className={cx("sidebar__user", budgetUsed !== null && "ac-faceline")}
         aria-haspopup="dialog"
         aria-label={
           budgetUsed === null
@@ -816,7 +818,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       >
         <Avatar name={me.user.name} size="sm" imageUrl={photo} />
         <span className="sidebar__user-text">
-          <span className="sidebar__user-name">{me.user.name}</span>
+          <span className={cx("sidebar__user-name", budgetUsed !== null && "ac-captop")}>{me.user.name}</span>
           {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>
       </button>

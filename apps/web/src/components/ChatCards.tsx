@@ -59,7 +59,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
           {t("memoryCard.was", { text: update.previousText })}
         </p>
       )}
-      <div className="ac-approval__actions">
+      <div className="ac-approval__actions ac-acts">
         <Button asChild variant="ghost" size="sm">
           <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId }}>
             {t("memoryCard.open", g)}
@@ -134,7 +134,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           lines={diffLines(p.before.split("\n"), text.split("\n"))}
         />
       )}
-      <div className="ac-approval__actions">
+      <div className="ac-approval__actions ac-acts">
         {pending && p.canDecide && (
           <>
             <Button
@@ -229,7 +229,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
             : t("question.answeredByYou", { answer: current.answer ?? "" })}
         </p>
       ) : (
-        <div className="ac-approval__actions">
+        <div className="ac-approval__actions ac-acts">
           {(current.choices ?? []).map((choice) => (
             <Button
               key={choice}
@@ -380,7 +380,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               data-1p-ignore
             />
           </Field>
-          <div className="ac-approval__actions">
+          <div className="ac-approval__actions ac-acts">
             <Button
               type="submit"
               variant="primary"

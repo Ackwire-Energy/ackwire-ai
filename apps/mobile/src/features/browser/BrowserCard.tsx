@@ -30,7 +30,7 @@ import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf, stepText } from "./logic";
+import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf, skyBehind, stepText } from "./logic";
 import { AddressBar, FrameView, TypeBar, useLiveConnection } from "./parts";
 
 /** The log's last lines under the page (the design shows three). */
@@ -131,6 +131,7 @@ export function BrowserCard({
   const canTake = canTakeOver && (ready || (surface && closed));
   const goShown = surface && mine && (closed || !live.frame || isBlankPage(live.frame.metadata.url));
   const note = pageNoteOf(live.unavailable, live.hidden, mine);
+  const sky = !live.frame && skyBehind(note);
   const doneLabel = handoff?.kind === "takeover" ? t("mobile.browser.live.handBack") : t("mobile.browser.live.done");
 
   // A push or the inbox opened this request: the card opens and takes the control (first one wins).
@@ -366,29 +367,32 @@ export function BrowserCard({
               styles.page,
               // Nothing under the page (no controls, note or steps): it keeps the card's margin at the bottom too.
               !mine && !(helper && !live.hidden) && steps.length === 0 && styles.pageLast,
-              { backgroundColor: c.sunken },
+              sky ? null : { backgroundColor: c.sunken },
             ]}
           >
+            {sky ? <Sky color={color} surface="raised" depth={0.95} fade={0} style={StyleSheet.absoluteFill} /> : null}
             {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
             {!live.frame || live.unavailable ? (
               <View style={[styles.center, live.frame ? styles.overlay : null]}>
-                {note.spin ? (
-                  <ActivityIndicator color={c.muted} />
-                ) : note.say === "hidden" ? (
-                  <Icon name="eyeoff" size={18} color={c.muted} />
-                ) : null}
-                <Text variant="small" tone="ink" style={[styles.semibold, styles.centerText]}>
-                  {note.say === "starting"
-                    ? t(`mobile.browser.card.starting${g}`, { name })
-                    : note.say === "hidden"
-                      ? t("mobile.browser.live.hidden", { name: helper })
-                      : t(pageGapKey(note.say, g, cloud), { name })}
-                </Text>
-                {note.help ? (
-                  <Text variant="caption" tone="muted" style={styles.centerText}>
-                    {t(`mobile.browser.live.${note.help}${g}`, { name })}
+                <View style={sky ? [styles.onSky, raised] : styles.lines}>
+                  {note.spin ? (
+                    <ActivityIndicator color={c.muted} />
+                  ) : note.say === "hidden" ? (
+                    <Icon name="eyeoff" size={18} color={c.muted} />
+                  ) : null}
+                  <Text variant="small" tone="ink" style={[styles.semibold, styles.centerText]}>
+                    {note.say === "starting"
+                      ? t(`mobile.browser.card.starting${g}`, { name })
+                      : note.say === "hidden"
+                        ? t("mobile.browser.live.hidden", { name: helper })
+                        : t(pageGapKey(note.say, g, cloud), { name })}
                   </Text>
-                ) : null}
+                  {note.help ? (
+                    <Text variant="caption" tone="muted" style={styles.centerText}>
+                      {t(`mobile.browser.live.${note.help}${g}`, { name })}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             ) : null}
           </View>
@@ -484,7 +488,9 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   page: { aspectRatio: 16 / 10, marginHorizontal: 8, borderRadius: 12, overflow: "hidden" },
   pageLast: { marginBottom: 8 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
+  lines: { alignItems: "center", gap: 8 },
+  onSky: { alignItems: "center", gap: 4, maxWidth: 420, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
   centerText: { textAlign: "center" },
   overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" },
   control: { padding: 10, gap: 8 },
