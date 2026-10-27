@@ -141,6 +141,7 @@ export const en: Translations = {
       handover: "Signing in with your account from the other device…",
       handoverFailed: "The code expired or was already used.",
       handoverFailedLead: "Sign in with your email, or show a new code on the other device.",
+      connecting: "Finishing the connection…",
     },
     desktopOwner: {
       continue: "Continue on this {{device}}",

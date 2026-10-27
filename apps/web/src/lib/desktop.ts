@@ -81,6 +81,17 @@ export function desktopNotice(
   };
 }
 
+/**
+ * A connector's OAuth started in the app's window: the provider opens in the browser, which isn't signed in, so
+ * the server hands what it sent back to the app (`agenteschat://desktop/connectors/oauth`), which opens
+ * `/desktop/connector` in its window to finish there (packages/engine oauth-return.ts). Apps from before say
+ * nothing and keep the web's return.
+ */
+export function oauthReturnPath(path: string) {
+  const desktop = (window as { __agentesDesktop?: { connectorReturn?: unknown } }).__agentesDesktop;
+  return desktop?.connectorReturn === true ? `desktop:${path}` : path;
+}
+
 /** The window opens this in the browser instead of loading it (main_window.rs). */
 export const BROWSER_SIGN_IN_PATH = "/desktop/sign-in";
 /** Loading this brings the window to the front (main_window.rs), then goes on to `to`. */

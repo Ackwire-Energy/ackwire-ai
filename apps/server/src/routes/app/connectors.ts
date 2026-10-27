@@ -10,9 +10,12 @@ import {
   connectorGrantValidator,
   connectorListing,
   createApiKeyConnection,
+  desktopOAuthRedirect,
+  desktopReturnPath,
   getAgent,
   isAppReturn,
   isCustom,
+  isDesktopReturn,
   listAgentScopes,
   listConnections,
   NotFoundError,
@@ -216,7 +219,7 @@ export function connectorRoutes(deps: AppDeps) {
           z.object({
             returnTo: z.string().max(500).optional().openapi({
               description:
-                'Path to land on afterwards; "app:connectors" from the phone app (the callback hands the code back to the app, which finishes with `oauth/complete`).',
+                'Path to land on afterwards; "app:connectors" from the phone app, "desktop:" + the path from the desktop app\'s window (the callback hands the code back to the app, which finishes with `oauth/complete`).',
             }),
             serverUrl: z.url().optional(),
           }),
@@ -258,6 +261,13 @@ export function connectorRoutes(deps: AppDeps) {
         if (q.error || !q.code) return c.redirect(appOAuthRedirect({ error: q.error ?? "missing_code" }), 302);
         return c.redirect(appOAuthRedirect({ state: q.state, code: q.code }), 302);
       }
+      // Started in the desktop app's window: the browser the provider opened in isn't signed in either. The app
+      // opens what the provider sent back in its window, which finishes with the window's session.
+      if (started && isDesktopReturn(started.returnTo)) {
+        const org = started.orgId;
+        if (q.error || !q.code) return c.redirect(desktopOAuthRedirect({ org, error: q.error ?? "missing_code" }), 302);
+        return c.redirect(desktopOAuthRedirect({ org, state: q.state, code: q.code }), 302);
+      }
       if (q.error || !q.state || !q.code) {
         return c.redirect(`${base}/?connector_error=${encodeURIComponent(q.error ?? "missing_code")}`, 302);
       }
@@ -281,15 +291,15 @@ export function connectorRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/connectors/oauth/complete",
       tags,
       security,
-      summary: "Finish an OAuth connection the phone app started (admins)",
+      summary: "Finish an OAuth connection the phone app or the desktop app started (admins)",
       description:
-        "The phone app opened the authorize URL in the system browser (`returnTo: \"app:connectors\"`); the callback handed `state` and `code` back to the app, which sends them here with its own session. The state must be this person's and this organization's, unused and not expired.",
+        'The phone app opened the authorize URL in the system browser (`returnTo: "app:connectors"`), or the desktop app\'s window did (`returnTo: "desktop:"` + a path); the callback handed `state` and `code` back to the app, which sends them here with its own session. The state must be this person\'s and this organization\'s, unused and not expired. `returnTo`: the path a desktop authorization lands on.',
       request: {
         params: OrgParams,
         body: body(z.object({ state: z.string().min(1).max(200), code: z.string().min(1).max(2000) })),
       },
       responses: {
-        200: json(z.object({ connectionId: z.uuid(), connector: z.string() })),
+        200: json(z.object({ connectionId: z.uuid(), connector: z.string(), returnTo: z.string().optional() })),
         ...errors,
       },
     }),
@@ -299,12 +309,17 @@ export function connectorRoutes(deps: AppDeps) {
       const user = c.get("user");
       const started = await peekOAuthState(connectorDeps, input.state);
       // Another organization's (or an unknown) state reads as not found: nothing about it leaks.
-      if (!started || started.orgId !== orgId || !isAppReturn(started.returnTo)) {
+      if (
+        !started ||
+        started.orgId !== orgId ||
+        !(isAppReturn(started.returnTo) || isDesktopReturn(started.returnTo))
+      ) {
         throw new NotFoundError("This authorization link is invalid or expired");
       }
-      const { connection } = await completeOAuth(connectorDeps, user, input);
+      const { connection, returnTo } = await completeOAuth(connectorDeps, user, input);
       await afterConnected(connection, user.id);
-      return c.json({ connectionId: connection.id, connector: connection.connector }, 200);
+      const landing = isDesktopReturn(returnTo) ? { returnTo: desktopReturnPath(returnTo) } : {};
+      return c.json({ connectionId: connection.id, connector: connection.connector, ...landing }, 200);
     },
   );
 

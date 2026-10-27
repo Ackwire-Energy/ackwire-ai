@@ -148,6 +148,7 @@ export const ptBR = {
       handover: "Entrando com a sua conta do outro aparelho…",
       handoverFailed: "O código expirou ou já foi usado.",
       handoverFailedLead: "Entre com o seu e-mail, ou mostre um código novo no outro aparelho.",
+      connecting: "Terminando de conectar…",
     },
     desktopOwner: {
       continue: "Continuar neste {{device}}",
