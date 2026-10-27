@@ -204,6 +204,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         .on_document_title_changed(move |_, title| {
             if let Some(window) = on_title.get_window(LABEL) {
                 let _ = window.set_title(window_title(&title));
+                // A new title lays the title bar out anew, the buttons back at its top.
+                keep_lights(&on_title);
             }
         })
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
@@ -271,10 +273,8 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true)
-        // Centred in the site's 40px title bar (apps/web desktop.css): `y` places the top of the buttons' row,
-        // not their middle (at 20 they sat ~3pt below the bar's icons).
-        .traffic_light_position(tauri::LogicalPosition::new(16.0, 17.0));
+        // The buttons are placed by `place_lights` (on every fit), not with `traffic_light_position`.
+        .hidden_title(true);
     let built = builder.build().map_err(|e| e.to_string())?;
     let window = built.as_ref().window();
     if saved.maximized {
@@ -284,6 +284,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         let _ = built.set_zoom(crate::menus::restore_zoom(app, step));
     }
     crate::cover::attach(app, &window).map_err(|e| e.to_string())?;
+    fit_page(app);
     front(app)
 }
 
@@ -297,57 +298,117 @@ fn window_title(title: &str) -> &str {
     }
 }
 
-/// Tells the page the zoom (`--app-zoom`: its title bar keeps its points and stays level with the window's
-/// buttons), where the buttons' row really is (`--titlebar-middle`, on a Mac) and whether the window is full
-/// screen (no room kept for the buttons then). AppKit is read on the main thread.
+/// Tells the page the zoom (`--app-zoom`: its title bar stays 40pt and level with the window's buttons) and
+/// whether the window is full screen (no room kept for the buttons then), and puts the buttons back in the
+/// bar's middle (a resize or full screen lays them out anew). AppKit is touched on the main thread.
 pub fn fit_page(app: &AppHandle) {
+    keep_lights(app);
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        let Some(page) = handle.get_webview(LABEL) else { return };
-        let zoom = crate::menus::current_zoom(&handle);
         let window = handle.get_window(LABEL);
         let full = window.as_ref().and_then(|w| w.is_fullscreen().ok()).unwrap_or(false);
-        #[cfg(target_os = "macos")]
-        let middle = window.as_ref().and_then(lights_middle);
-        #[cfg(not(target_os = "macos"))]
-        let middle: Option<f64> = None;
-        let middle = middle
-            .map(|m| format!("document.documentElement.style.setProperty('--titlebar-middle','{m:.2}px');"))
-            .unwrap_or_default();
+        let Some(page) = handle.get_webview(LABEL) else { return };
+        let zoom = crate::menus::current_zoom(&handle);
         let _ = page.eval(format!(
             "document.documentElement.style.setProperty('--app-zoom','{zoom}');\
-             document.documentElement.toggleAttribute('data-fullscreen',{full});{middle}"
+             document.documentElement.toggleAttribute('data-fullscreen',{full});"
         ));
     });
 }
 
-/// The middle of the window's close, minimize and zoom buttons, in points from the window's top. macOS 26
-/// places them itself and ignores `traffic_light_position` (on macOS 27 their middle is at ~15pt, not the
-/// 20pt asked for), so the site's title bar follows where they are (desktop.css `--titlebar-middle`).
+/// The window's buttons back in the middle of the site's title bar after AppKit lays it out anew (a resize,
+/// a new title, focus, the cover going): now, on the next turn of the main loop, and once more a moment later
+/// (a new title's layout pass can come after both). Nothing in full screen (no buttons).
+pub fn keep_lights(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            place_now(&handle);
+            let again = handle.clone();
+            let _ = handle.run_on_main_thread(move || place_now(&again));
+        });
+        let later = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(LIGHTS_AGAIN);
+            let handle = later.clone();
+            let _ = later.run_on_main_thread(move || place_now(&handle));
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+/// How long after a layout the buttons are placed once more.
 #[cfg(target_os = "macos")]
-fn lights_middle(window: &tauri::Window) -> Option<f64> {
-    use crate::notch::native::CGRect;
+const LIGHTS_AGAIN: Duration = Duration::from_millis(300);
+
+#[cfg(target_os = "macos")]
+fn place_now(app: &AppHandle) {
+    if let Some(window) = app.get_window(LABEL) {
+        if !window.is_fullscreen().unwrap_or(false) {
+            place_lights(&window);
+        }
+    }
+}
+
+/// The site's title bar (apps/web desktop.css), in points.
+#[cfg(target_os = "macos")]
+const TITLE_BAR: f64 = 40.0;
+/// The close button's left edge, in points.
+#[cfg(target_os = "macos")]
+const LIGHTS_LEFT: f64 = 16.0;
+
+/// The window's close, minimize and zoom buttons in the middle of the site's title bar, as Electron places
+/// them (`WindowButtonsProxy`): the title bar's container as tall as the bar, each button centred in it.
+/// `traffic_light_position` only makes the container taller, and macOS 26 keeps the buttons at its top (their
+/// middle at ~15pt on macOS 27, under the bar's icons at 20pt).
+#[cfg(target_os = "macos")]
+fn place_lights(window: &tauri::Window) {
+    use crate::notch::native::{CGPoint, CGRect};
     use objc2::msg_send;
     use objc2::runtime::AnyObject;
 
-    let ns = window.ns_window().ok()? as *mut AnyObject;
+    let Ok(ns) = window.ns_window() else { return };
+    let ns = ns as *mut AnyObject;
     if ns.is_null() {
-        return None;
+        return;
     }
-    // SAFETY: `ns` is this window's live NSWindow, read on the main thread; NSWindowCloseButton is 0.
+    // SAFETY: `ns` is this window's live NSWindow, on the main thread; the buttons and their container are
+    // its own views (NSWindowCloseButton, MiniaturizeButton, ZoomButton = 0, 1, 2).
     unsafe {
-        let close: *mut AnyObject = msg_send![ns, standardWindowButton: 0usize];
-        let content: *mut AnyObject = msg_send![ns, contentView];
-        if close.is_null() || content.is_null() {
-            return None;
+        let buttons: [*mut AnyObject; 3] = [
+            msg_send![ns, standardWindowButton: 0usize],
+            msg_send![ns, standardWindowButton: 1usize],
+            msg_send![ns, standardWindowButton: 2usize],
+        ];
+        if buttons.iter().any(|b| b.is_null()) {
+            return;
         }
-        let bounds: CGRect = msg_send![close, bounds];
-        let nil: *mut AnyObject = std::ptr::null_mut();
-        // In the window's coordinates (origin at its bottom left); the content view fills the window.
-        let button: CGRect = msg_send![close, convertRect: bounds, toView: nil];
-        let frame: CGRect = msg_send![content, frame];
-        let middle = frame.size.height - (button.origin.y + button.size.height / 2.0);
-        (middle > 4.0 && middle < 40.0).then_some(middle)
+        let row: *mut AnyObject = msg_send![buttons[0], superview];
+        if row.is_null() {
+            return;
+        }
+        let container: *mut AnyObject = msg_send![row, superview];
+        if container.is_null() {
+            return;
+        }
+        let window_frame: CGRect = msg_send![ns, frame];
+        let first: CGRect = msg_send![buttons[0], frame];
+        let second: CGRect = msg_send![buttons[1], frame];
+        let spacing = second.origin.x - (first.origin.x + first.size.width);
+        let mut bar: CGRect = msg_send![container, frame];
+        bar.size.height = TITLE_BAR;
+        bar.origin.y = window_frame.size.height - TITLE_BAR;
+        let _: () = msg_send![container, setFrame: bar];
+        for (i, button) in buttons.into_iter().enumerate() {
+            let frame: CGRect = msg_send![button, frame];
+            let origin = CGPoint {
+                x: LIGHTS_LEFT + i as f64 * (frame.size.width + spacing),
+                y: (TITLE_BAR - frame.size.height) / 2.0,
+            };
+            let _: () = msg_send![button, setFrameOrigin: origin];
+        }
     }
 }
 
@@ -546,6 +607,7 @@ fn notify(app: &AppHandle, request: &Value, site: &Url) {
 
 /// The main window came to the front: within 30 seconds of a notification, its page.
 pub fn focused(app: &AppHandle) {
+    keep_lights(app);
     let pending = {
         let notices = app.state::<Notices>();
         let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());

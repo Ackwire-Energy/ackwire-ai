@@ -72,6 +72,7 @@ pub fn show(app: &AppHandle, min: Duration) {
         let _ = cover.eval("window.__coverShown?.()");
     }
     let _ = cover.show();
+    main_window::keep_lights(app);
     // Typing goes to what shows, not to the page loading behind it.
     if window_is_key(app) {
         let _ = cover.set_focus();
@@ -110,6 +111,8 @@ pub fn hide(app: &AppHandle) {
             shown.since = None;
         }
         let _ = cover.hide();
+        // Hiding a web view lays the window out anew, the buttons back at the title bar's top.
+        main_window::keep_lights(&app);
         if window_is_key(&app) {
             if let Some(site) = app.get_webview(main_window::LABEL) {
                 let _ = site.set_focus();
