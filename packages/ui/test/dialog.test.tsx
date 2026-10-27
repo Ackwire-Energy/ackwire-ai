@@ -82,6 +82,34 @@ describe("Dialog", () => {
     expect(document.activeElement === trigger).toBe(true);
   });
 
+  test("its head: the face on the title's line, its actions and close in one row of actions", () => {
+    render(
+      <Dialog
+        open
+        onOpenChange={() => {}}
+        title="Computador da Ada"
+        subtitle="Ao vivo"
+        leading={<span className="ac-avatar">A</span>}
+        actions={<Button size="sm">Assumir o controle</Button>}
+        closeLabel="Fechar"
+      >
+        <p>Tela</p>
+      </Dialog>,
+    );
+    const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
+    expect([...head.children].map((c) => c.className)).toEqual([
+      "ac-dialog__lead",
+      "ac-dialog__titles",
+      "ac-dialog__acts ac-acts",
+    ]);
+    const acts = head.querySelector(".ac-dialog__acts") as HTMLElement;
+    expect([...acts.children].map((c) => c.textContent || c.getAttribute("aria-label"))).toEqual([
+      "Assumir o controle",
+      "Fechar",
+    ]);
+    expect(head.querySelector(".ac-dialog__lead > .ac-avatar")).not.toBeNull();
+  });
+
   test("the close button closes it", async () => {
     render(<Harness />);
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Ajustar orçamento" })));

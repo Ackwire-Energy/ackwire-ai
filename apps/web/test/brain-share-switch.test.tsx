@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AudienceMode, MachineAccount } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -24,14 +24,26 @@ const click = async (el: Element) => {
 const brainCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "agents.setBrain").map((c) => c.args[2]);
 
-/** Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does). */
-async function ada(patch: Partial<AgentBrain>, { mine = true, tab = "", provider = "" } = {}) {
+/**
+ * Ada on the MacBook with the given brain view; Walter (me) owns her unless `mine` is false (then João does).
+ * `stored`: whom she answers as stored, where the gate reads otherwise (on the Cloud, a plan answers only its owner).
+ */
+async function ada(
+  patch: Partial<AgentBrain>,
+  {
+    mine = true,
+    tab = "",
+    provider = "",
+    stored,
+  }: { mine?: boolean; tab?: string; provider?: string; stored?: AudienceMode } = {},
+) {
   const state = seedState();
   const agent = state.agents.find((a) => a.id === ADA_ID);
   if (agent) {
     agent.ownerUserId = mine ? "u-walter" : "u-joao";
     agent.brain = { kind: patch.brain ?? "claude_code", model: "Sonnet", ...(provider ? { provider } : {}) };
     agent.audience = { mode: patch.onlyOwner === false ? "everyone" : "owner", userIds: [] };
+    agent.audienceMode = stored ?? agent.audience.mode;
   }
   const api = createFakeApi(state);
   fakeMachinesOf.get(api)?.pair({
@@ -190,6 +202,21 @@ describe("Só responde a você (Quem pensa)", () => {
     await click(screen().getByRole("button", { name: "Liberar para todos" }));
     await settle(4);
     expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }, { onlyOwner: false }]);
+  });
+
+  test("on the Cloud, one shared before plans were personal answers everyone again on the API: no such notice", async () => {
+    const state = await ada({}, { stored: "everyone" });
+    const d = await brainDialog();
+    await click(
+      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
+        name: /^Modelo da organização/,
+      }),
+    );
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(document.body.textContent).not.toContain("ainda só responde a você");
+    expect(screen().queryByRole("button", { name: "Liberar para todos" })).toBeNull();
+    expect(brainCalls(state)).toEqual([{ brain: "model", fallback: true }]);
   });
 });
 

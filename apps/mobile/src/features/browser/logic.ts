@@ -114,3 +114,6 @@ export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean):
   }
   return hidden ? { say: "hidden", spin: false, help: null } : { say: "starting", spin: true, help: null };
 }
+
+/** A browser that is closed, ended or on a computer that's off: the agent's sky in the page's place, the words on it. */
+export const skyBehind = (note: PageNote) => note.say === "closed" || note.say === "ended" || note.say === "offline";

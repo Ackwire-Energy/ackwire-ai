@@ -1,5 +1,7 @@
 import type { AiAccounts as AiAccountsView } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi } from "@agenteschat/client";
+import { groupPlans, type PlanAccount } from "@agenteschat/client/lib/ai-accounts";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import {
   Button,
@@ -16,7 +18,7 @@ import {
   SettingNote,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingList } from "@/components/Loading";
@@ -27,13 +29,14 @@ import { AddAccount } from "./AddAccountFlow";
 
 /*
  * Configurações › Contas de IA, "Seus planos" (ADR 0059): the viewer's own
- * accounts on every computer, each with its plan's meter and the agent it
- * thinks for; renamed, signed in again (a new key for a coding plan) or
- * disconnected here. Never blank: with none, one way to connect one.
+ * accounts on every computer, each with its plan's meter and the agents it
+ * thinks for, its logins (one per agent) in one row; renamed, signed in again
+ * (a new key for a coding plan, to every login) or disconnected here. Never
+ * blank: with none, one way to connect one.
  */
 
 type Row = AiAccountsView["accounts"][number];
-type Open = { type: "rename" | "again" | "remove"; account: Row };
+type Open = { type: "rename" | "again" | "remove"; account: PlanAccount<Row> };
 
 export function AiAccountsSection() {
   const { t, i18n } = useTranslation();
@@ -50,7 +53,9 @@ export function AiAccountsSection() {
     void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
   }, [api, org.id]);
   const rows = ai.data?.accounts ?? [];
+  const accounts = groupPlans(rows);
   const several = new Set(rows.map((r) => r.machineId)).size > 1;
+  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
   const meterText = planMeterText(t, i18n.language);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });
   // The same picker as everywhere an AI is connected, from the card's head as Provider keys' Add key is.
@@ -60,11 +65,12 @@ export function AiAccountsSection() {
     </Button>
   );
 
-  const remove = async (a: Row) => {
+  // Every login of the account goes.
+  const remove = async (account: PlanAccount<Row>) => {
     setBusy(true);
     try {
-      await api.machines.removeAccount(org.id, a.machineId, a.id);
-      toast.show(t("aiAccounts.page.disconnected", { label: a.label }));
+      for (const a of account.logins) await api.machines.removeAccount(org.id, a.machineId, a.id);
+      toast.show(t("aiAccounts.page.disconnected", { label: account.logins[0]?.label ?? "" }));
       setOpen(null);
       refetch();
       void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
@@ -91,29 +97,40 @@ export function AiAccountsSection() {
       {ai.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {ai.isError && <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>}
       {ai.isSuccess && rows.length === 0 && <p className="small muted">{t("aiAccounts.page.empty")}</p>}
-      {rows.length > 0 && (
+      {accounts.length > 0 && (
         <List>
-          {rows.map((a) => {
+          {accounts.map((account) => {
+            const { logins, usedBy, usage, signedOut } = account;
+            const a = logins[0];
+            if (!a) return null;
             const plan = planOf(a.provider);
-            const out = a.status === "signed_out";
+            const allOut = signedOut.length === logins.length;
+            // Of an account with a login per agent, the agents whose login is out.
+            const outFor = allOut ? [] : signedOut.flatMap((l) => l.usedBy);
             const facts = [
               a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
               several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
-              a.usedBy[0] ? t("aiAccounts.page.thinksFor", { agent: a.usedBy[0] }) : t("aiAccounts.page.noAgent"),
+              usedBy.length > 0
+                ? t("aiAccounts.page.usedBy", { count: usedBy.length, agents: names(usedBy) })
+                : t("aiAccounts.page.noAgent"),
             ].filter(Boolean);
             return (
-              <div key={a.id} className="ac-list__row ai-accounts__row">
-                <ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />
+              <div key={account.key} className="ac-list__row ai-accounts__row">
+                <ProviderLogo id={a.provider ?? a.kind} size="sm" off={allOut} />
                 <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>{a.label}</span>
+                  <span className="ai-accounts__name ac-captop">{a.label}</span>
                   <span className="small muted">{facts.join(" · ")}</span>
-                  {out && (
+                  {signedOut.length > 0 && (
                     <SettingNote icon="alert">
-                      {plan ? t("aiAccounts.page.keyRefused") : t("aiAccounts.page.signedOut")}
+                      {outFor.length > 0
+                        ? t("aiAccounts.page.signedOutFor", { count: outFor.length, agents: names(outFor) })
+                        : plan
+                          ? t("aiAccounts.page.keyRefused")
+                          : t("aiAccounts.page.signedOut")}
                     </SettingNote>
                   )}
-                  {a.usage ? (
-                    <PlanMeter usage={a.usage} text={meterText} compact />
+                  {usage ? (
+                    <PlanMeter usage={usage} text={meterText} compact />
                   ) : (
                     plan &&
                     !plan.usage && (
@@ -121,12 +138,12 @@ export function AiAccountsSection() {
                     )
                   )}
                 </span>
-                <div className="row" style={{ gap: 4 }}>
-                  <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "rename", account: a })}>
+                <div className="ac-acts">
+                  <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "rename", account })}>
                     {t("aiAccounts.page.rename")}
                   </Button>
-                  {(out || plan) && (
-                    <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "again", account: a })}>
+                  {(signedOut.length > 0 || plan) && (
+                    <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "again", account })}>
                       {plan ? t("aiAccounts.page.newKey") : t("aiAccounts.page.signInAgain")}
                     </Button>
                   )}
@@ -134,7 +151,7 @@ export function AiAccountsSection() {
                     variant="ghost"
                     size="sm"
                     className="ac-btn--danger"
-                    onClick={() => setOpen({ type: "remove", account: a })}
+                    onClick={() => setOpen({ type: "remove", account })}
                   >
                     {t("aiAccounts.page.disconnect")}
                   </Button>
@@ -145,9 +162,9 @@ export function AiAccountsSection() {
         </List>
       )}
 
-      {open?.type === "rename" && (
+      {open?.type === "rename" && open.account.logins[0] && (
         <RenameDialog
-          account={open.account}
+          account={open.account.logins[0]}
           onClose={() => setOpen(null)}
           onSaved={(label) => {
             toast.show(t("aiAccounts.page.renamed", { label }));
@@ -157,40 +174,29 @@ export function AiAccountsSection() {
         />
       )}
       {open?.type === "again" && (
-        <Dialog
-          open
-          onOpenChange={(o) => !o && setOpen(null)}
-          title={open.account.label}
-          closeLabel={t("common.close")}
-          width={520}
-        >
-          <DialogBody>
-            <AddAccount
-              machineId={open.account.machineId}
-              kind={open.account.kind}
-              computer={open.account.computer}
-              again={open.account.id}
-              email={open.account.email}
-              local={ai.data?.computers.find((c) => c.machineId === open.account.machineId)?.mine}
-              {...(isPlanId(open.account.provider) ? { provider: open.account.provider } : {})}
-              onBack={() => setOpen(null)}
-              onAdded={() => {
-                setOpen(null);
-                refetch();
-              }}
-            />
-          </DialogBody>
-        </Dialog>
+        <AgainDialog
+          account={open.account}
+          local={ai.data?.computers.find((c) => c.machineId === open.account.logins[0]?.machineId)?.mine}
+          onClose={() => setOpen(null)}
+          onDone={() => {
+            setOpen(null);
+            refetch();
+          }}
+        />
       )}
       {open?.type === "remove" && (
         <Dialog
           open
           onOpenChange={(o) => !o && setOpen(null)}
-          title={t("aiAccounts.page.disconnectTitle", { label: open.account.label })}
+          title={t("aiAccounts.page.disconnectTitle", { label: open.account.logins[0]?.label ?? "" })}
           description={
-            open.account.usedBy[0]
-              ? t("aiAccounts.page.disconnectAgent", { agent: open.account.usedBy[0], computer: open.account.computer })
-              : t("aiAccounts.page.disconnectNone", { computer: open.account.computer })
+            open.account.usedBy.length > 0
+              ? t("aiAccounts.page.disconnectAgents", {
+                  count: open.account.usedBy.length,
+                  agents: names(open.account.usedBy),
+                  computer: open.account.logins[0]?.computer ?? "",
+                })
+              : t("aiAccounts.page.disconnectNone", { computer: open.account.logins[0]?.computer ?? "" })
           }
           closeLabel={t("common.close")}
           width={440}
@@ -204,6 +210,50 @@ export function AiAccountsSection() {
         </Dialog>
       )}
     </Card>
+  );
+}
+
+/**
+ * Signing in again: a coding plan's new key goes to every login of the account, a sign-in to its first login out
+ * (else its first). Closes once each login took it.
+ */
+function AgainDialog({
+  account,
+  local,
+  onClose,
+  onDone,
+}: {
+  account: PlanAccount<Row>;
+  local: boolean | undefined;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const added = useRef(new Set<string>());
+  const a = account.signedOut[0] ?? account.logins[0];
+  if (!a) return null;
+  const key = isPlanId(a.provider);
+  const fanOut = key ? account.logins.map((l) => ({ id: l.id, again: l.id })) : undefined;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()} title={a.label} closeLabel={t("common.close")} width={520}>
+      <DialogBody>
+        <AddAccount
+          machineId={a.machineId}
+          kind={a.kind}
+          computer={a.computer}
+          again={a.id}
+          email={a.email}
+          local={local}
+          {...(isPlanId(a.provider) ? { provider: a.provider } : {})}
+          {...(fanOut ? { fanOut } : {})}
+          onBack={onClose}
+          onAdded={(_, login) => {
+            added.current.add(login ?? a.id);
+            if (added.current.size >= (fanOut?.length ?? 1)) onDone();
+          }}
+        />
+      </DialogBody>
+    </Dialog>
   );
 }
 

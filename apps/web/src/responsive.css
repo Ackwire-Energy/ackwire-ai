@@ -139,7 +139,7 @@
     padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px 8px;
   }
   .channel__header > .ac-btn,
-  .channel__header > .members-stack {
+  .channel__header > .ac-acts {
     flex: none;
   }
   .channel__title {

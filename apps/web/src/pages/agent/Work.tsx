@@ -26,7 +26,9 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
+import { groupPlans } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -34,6 +36,7 @@ import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
   isPlanId,
+  loginPerAgent,
   planAliases,
   planModel as planModelOf,
   planModelOptions,
@@ -335,7 +338,7 @@ function DesktopUseNote({ machine: m }: { machine: Machine }) {
   if (m.os !== "linux" || !use || use.available || !use.reason) return null;
   const command = commandInReason(use.reason);
   return (
-    <div className="brw-note">
+    <div className="brw-note ac-iconline">
       <Icon name="computer" size={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block" }}>{t("desktop.use.agent", { ...g, computer: m.name })}</span>
@@ -535,9 +538,13 @@ function Footer({
  * through the API while the computer is off.
  */
 
-/** Select values that aren't an account id: the computer's own sign-in, and "Adicionar conta". */
+/**
+ * Select values that aren't an account id: the computer's own sign-in, "Adicionar conta", and before a login's id
+ * a sign-in of this agent's own to that login's account ("Also used by Ada").
+ */
 const HERE = "__computer";
 const ADD = "__add";
+const ALSO = "__also:";
 /**
  * The effort's four levels. Automático is the model's choice, not a level: an automatic model picks the
  * effort too, and the ramp goes away.
@@ -609,7 +616,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
   const [effort, setEffort] = useState<ShownEffort>(shownEffort(view.effort));
-  const [adding, setAdding] = useState(false);
+  // Adding an account: any, or (an account) one more login of it for this agent.
+  const [adding, setAdding] = useState<boolean | MachineAccount>(false);
   // Accounts that arrived while the dialog was open (saved with the rest on "Usar").
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
@@ -731,7 +739,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
-      if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
+      // On the API it answers its stored audience: `view.onlyOwner` is the gate's, which a personal plan narrows.
+      if (kind === "model" && view.brain !== "model" && agent.audienceMode === "owner") {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
           label: agent.audience?.userIds?.length ? t("aiAccounts.share.letPeople") : t("aiAccounts.share.letEveryone"),
@@ -811,25 +820,38 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         : t("aiAccounts.share.hereNotYours", { computer: computerName }),
       leading: accountIcon,
     },
-    ...accounts.map((a) => {
-      // One account thinks for one agent.
+    // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
+    // per agent, one more for this agent ("Also used by Ada"); else another agent's, moved here.
+    ...groupPlans(accounts).flatMap(({ logins, usedBy }) => {
+      const own =
+        logins.find((l) => l.id === account) ??
+        logins.find((l) => l.id === view.account) ??
+        logins.find((l) => l.mine && l.usedBy.length === 0);
+      const a = own ?? logins[0];
+      if (!a) return [];
+      const also = !own && a.mine && loginPerAgent(a.kind, a.provider);
+      // One login thinks for one agent.
       const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
       const about = !a.mine
         ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
-        : a.status === "signed_out"
-          ? t("agentPage.work.brain.accountSignedOut")
-          : others
-            ? t("agentPage.work.brain.accountMove", { agents: others })
-            : a.keyHint
-              ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
-              : a.email;
-      return {
-        value: a.id,
-        label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
-        disabled: !a.mine,
-        description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
-        leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
-      };
+        : also
+          ? t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) })
+          : a.status === "signed_out"
+            ? t("agentPage.work.brain.accountSignedOut")
+            : others
+              ? t("agentPage.work.brain.accountMove", { agents: others })
+              : a.keyHint
+                ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                : a.email;
+      return [
+        {
+          value: also ? `${ALSO}${a.id}` : a.id,
+          label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
+          disabled: !a.mine,
+          description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
+          leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
+        },
+      ];
     }),
     {
       value: ADD,
@@ -856,6 +878,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         disabled={!view.canUsePlans}
         onValueChange={(v) => {
           if (v === ADD) return setAdding(true);
+          const also = v.startsWith(ALSO) ? accounts.find((a) => `${ALSO}${a.id}` === v) : undefined;
+          if (also) return setAdding(also);
           setArrived(null);
           setAccount(v === HERE ? null : v);
         }}
@@ -894,6 +918,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       )}
     </BrainField>
   );
+  const shareLabel = view.canUsePlans
+    ? t("aiAccounts.share.switch")
+    : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" });
+  const also = typeof adding === "object" ? adding : undefined;
   const planRows = (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
@@ -929,31 +957,36 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         />
       )}
       {accountField}
-      {agent.ownerUserId && (
-        <div className="agp-brainshare">
-          <SwitchLabel
-            htmlFor={shareId}
-            label={
-              view.canUsePlans
-                ? t("aiAccounts.share.switch")
-                : t("aiAccounts.share.switchOther", { name: ownerFirst ?? "" })
-            }
-            hint={
-              view.canUsePlans
-                ? t("aiAccounts.share.hint", g)
-                : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
-            }
-          />
-          <Switch
-            id={shareId}
-            aria-describedby={`${shareId}-hint`}
-            checked={onlyOwner}
-            // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
-            disabled={!view.canUsePlans && onlyOwner}
-            onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
-          />
-        </div>
-      )}
+      {agent.ownerUserId &&
+        (edition === "cloud" ? (
+          // Where the server provisions the computers a plan is personal: nobody lets more people in (ADR 0059 §5).
+          <div className="agp-brainshare">
+            <span className="agp-brainoff ac-hintline">
+              <b>{shareLabel}</b>
+              <InfoHint name={t("common.about", { label: shareLabel })}>{t("aiAccounts.share.fixedHint")}</InfoHint>
+            </span>
+          </div>
+        ) : (
+          <div className="agp-brainshare">
+            <SwitchLabel
+              htmlFor={shareId}
+              label={shareLabel}
+              hint={
+                view.canUsePlans
+                  ? t("aiAccounts.share.hint", g)
+                  : t("aiAccounts.share.onOther", { owner: ownerFirst ?? "" })
+              }
+            />
+            <Switch
+              id={shareId}
+              aria-describedby={`${shareId}-hint`}
+              checked={onlyOwner}
+              // Only the plan's owner lets other people in; anyone who edits the brain narrows it.
+              disabled={!view.canUsePlans && onlyOwner}
+              onCheckedChange={(on) => (on ? setShare({ kind, onlyOwner: true }) : setAsking(true))}
+            />
+          </div>
+        ))}
       {asking && accountKind && (
         <SharePlanDialog
           agentName={agent.name}
@@ -1072,9 +1105,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={signedOut ? current?.id : undefined}
-                    {...(signedOut && isPlanId(current?.provider) ? { provider: current.provider } : {})}
-                    email={signedOut ? current?.email : undefined}
-                    askEmail={view.ownSignIn || accounts.some((a) => a.mine)}
+                    {...(signedOut && isPlanId(current?.provider)
+                      ? { provider: current.provider }
+                      : isPlanId(also?.provider)
+                        ? { provider: also.provider }
+                        : {})}
+                    email={signedOut ? current?.email : also?.email}
+                    askEmail={!also && (view.ownSignIn || accounts.some((a) => a.mine))}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
@@ -1109,7 +1146,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             />
           </span>
         }
-        disabled={unchanged || adding || (kind !== "model" && !home)}
+        disabled={unchanged || adding !== false || (kind !== "model" && !home)}
         busy={busy}
         primary={planKind ? t(`agentPage.work.usePlan.${planKind}`) : t("agentPage.work.use")}
         onClose={onClose}
