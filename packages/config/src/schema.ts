@@ -272,13 +272,13 @@ export const envVars = {
   ROUTER_STRATEGY: {
     schema: z.enum(["jev", "llm"]).optional(),
     description:
-      "Who picks first which agents answer a message nobody @mentioned. Unset or `jev`: Jev, whenever this server has its TypeSafe key (`TYPESAFE_API_KEY`, or one saved in Settings), then the next step after an error or a timeout. `llm`: never Jev, so the organization's small model goes first.",
+      "Who picks first which agents answer a message nobody @mentioned. Unset or `jev`: Jev, whenever this server has its TypeSafe key (`TYPESAFE_API_KEY`, or one the server's owner saves with `PUT /api/app/jev`), then the next step after an error or a timeout. `llm`: never Jev, so the organization's small model goes first.",
     section: "Agents",
   },
   TYPESAFE_API_KEY: {
     schema: z.string().optional(),
     description:
-      "This server's own TypeSafe key for Jev. Jev picks who answers a message nobody @mentioned, makes quick judgments for agents (memory, stops, hand-offs) and reads screens for computer use. It wins over a key saved in Settings: Settings then shows this one, read-only. One key for the whole server, never per organization, never returned by the API. TypeSafe bills the account the key belongs to. Calls are recorded per organization as `router` usage, kept out of the organization's total.",
+      "This server's own TypeSafe key for Jev. Jev picks who answers a message nobody @mentioned, makes quick judgments for agents (memory, stops, hand-offs) and reads screens for computer use. It wins over a key the server's owner saves with `PUT /api/app/jev` (ADR 0073). One key for the whole server, never per organization, never returned by the API. TypeSafe bills the account the key belongs to. Calls are recorded per organization as `router` usage, kept out of the organization's total.",
     section: "Agents",
     secret: true,
   },

@@ -43,9 +43,10 @@ by an account with it.
    typed for their address shows there as waiting only once they ask, which makes it theirs: approved before that,
    it sends an invitation. An account whose address isn't confirmed hears the answer by email only, like a typed
    request.
-8. **Limits.** 10 asks an hour per IP, and 20 new requests an hour per link (per server process, like every rate
-   limit here): a proven ask counts only when it files one, and on a server without email every ask does, so asks
-   without a right code (ADR 0072) can't use up a link's hour; at most 50
+8. **Limits.** 10 asks an hour per IP (`join.rate_limited`), and 20 new requests an hour per link
+   (`join.link_busy`, per server process, like every rate limit here): a proven ask counts only when it files one,
+   and on a server without email every ask does, so asks without a right code (ADR 0072) can't use up a link's
+   hour; at most 50
    waiting per workspace (counted under an advisory lock, so it holds across replicas); one waiting request per
    address (a partial unique index); a denied address can't ask again through a link while the denial is kept;
    requests close unanswered after 14 days; rows are deleted 90 days after their answer or expiry, in the daily
