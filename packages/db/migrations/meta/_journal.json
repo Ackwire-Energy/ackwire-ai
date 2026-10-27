@@ -792,6 +792,13 @@
       "when": 1793109327884,
       "tag": "0112_machine_browser_traffic",
       "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1793119327884,
+      "tag": "0113_connector_server_icon",
+      "breakpoints": true
     }
   ]
 }

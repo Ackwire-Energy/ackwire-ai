@@ -273,7 +273,7 @@ function ConnectedRow({
   ].filter(Boolean);
   return (
     <div className="ac-list__row connected-row">
-      <ConnectorIcon def={item.def} label={itemName(t, item)} size="lg" />
+      <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size="lg" />
       <span className="list-col connected-row__text">
         <span className="connected-row__name">
           <span>{itemName(t, item)}</span>

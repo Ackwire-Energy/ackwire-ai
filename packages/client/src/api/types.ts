@@ -1167,6 +1167,8 @@ export interface CustomServer {
   serverUrl: string;
   label: string;
   authType: "oauth" | "api_key";
+  /** The server's own icon, kept and served by the backend (`/api/app/connector-icons/…`); null = a monogram. */
+  iconUrl?: string | null;
   tools: CustomTool[];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;

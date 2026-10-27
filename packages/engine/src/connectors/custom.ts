@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { BlobStore } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, like, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
@@ -30,6 +31,7 @@ import type { McpConnect, McpTool } from "./mcp";
 import { authServerMetadata, ensureOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
 import { presetForServer } from "./presets";
+import { type McpServerInfo, refreshServerIcon } from "./server-icon";
 
 const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
 
@@ -92,6 +94,8 @@ export interface CustomServerView {
   serverUrl: string;
   label: string;
   authType: "oauth" | "api_key";
+  /** The server's own icon, served by us (`/api/app/connector-icons/…`); null = a monogram. */
+  iconUrl: string | null;
   tools: CustomToolView[];
   reviewedAt: string | null;
   createdAt: string;
@@ -107,6 +111,8 @@ export interface CustomDeps extends McpOAuthDeps {
   connect?: McpConnect;
   /** Suggests a level for tools whose name doesn't say (none: they suggest approval). */
   judge?: Judge;
+  /** Where servers' icons are kept (the platform bucket); none: no icons. */
+  blobs?: BlobStore;
 }
 
 const aadFor = (orgId: string, id: string) => `connector-connection|${orgId}|${id}`;
@@ -162,6 +168,7 @@ function view(c: ConnectorConnection, tools: ToolRow[]): CustomServerView {
     serverUrl: c.serverUrl,
     label: c.label,
     authType: c.authType === "oauth" ? "oauth" : "api_key",
+    iconUrl: c.icon,
     tools: mine.map((t) => toolView(t, prefix)),
     reviewedAt: c.reviewedAt ? c.reviewedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),
@@ -306,8 +313,10 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   if (!deps.connect) throw new Error("no MCP connect configured");
   const session = await deps.connect(c, await connectionHeaders(deps, c));
   let listed: McpTool[];
+  let info: McpServerInfo | null = null;
   try {
     listed = await session.listTools();
+    info = session.serverInfo?.() ?? null;
   } finally {
     await session.close().catch(() => {});
   }
@@ -377,10 +386,12 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   }
   await deps.db.update(connectorConnections).set({ updatedAt: new Date() }).where(eq(connectorConnections.id, c.id));
   caches.connections.delete(`${c.orgId}:active`);
+  await refreshServerIcon(deps, c, info).catch(() => {});
 }
 
-async function serverView(db: Database, c: ConnectorConnection) {
-  return view(c, await toolRows(db, [c.id]));
+/** The server as stored now (a listing may have just changed its icon). */
+async function serverView(db: Database, orgId: string, id: string) {
+  return view(await loadCustom(db, orgId, id), await toolRows(db, [id]));
 }
 
 /**
@@ -411,13 +422,13 @@ export async function connectCustomServer(
       secret: { apiKey },
     });
     await syncCustomTools(deps, c).catch(() => {});
-    return { status: "connected", server: await serverView(deps.db, c) };
+    return { status: "connected", server: await serverView(deps.db, c.orgId, c.id) };
   }
   const probe = await probeMcpServer(deps, serverUrl);
   if (probe.kind === "open") {
     const c = await storeCustomConnection(deps, { orgId, actorId, serverUrl, label, authType: "none", secret: null });
     await syncCustomTools(deps, c).catch(() => {});
-    return { status: "connected", server: await serverView(deps.db, c) };
+    return { status: "connected", server: await serverView(deps.db, c.orgId, c.id) };
   }
   if (probe.kind === "needs_key") return { status: "needs_key" };
   const authorizeUrl = await beginMcpOAuth(deps, actorId, orgId, {
@@ -497,7 +508,7 @@ export async function refreshCustomServer(deps: CustomDeps, actorId: string, org
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const c = await loadCustom(deps.db, orgId, id);
   await syncCustomTools(deps, c);
-  return serverView(deps.db, c);
+  return serverView(deps.db, c.orgId, c.id);
 }
 
 /** A person's decision on one tool. `confirmed: false` = the suggestion applies, but it still waits for a decision. */
@@ -564,7 +575,7 @@ export async function saveCustomTools(
   });
   caches.connections.delete(`${orgId}:active`);
   caches.scopes.deletePrefix(`${orgId}:`);
-  return serverView(deps.db, await loadCustom(deps.db, orgId, id));
+  return serverView(deps.db, orgId, id);
 }
 
 /** Classified, still-listed tools of a custom connection (the tool source exposes only these). */

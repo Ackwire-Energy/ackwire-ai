@@ -83,7 +83,7 @@ export function ConnectFlow({
       title={
         <span className="cflow__title">
           {name ? (
-            <ConnectorIcon def={icon} label={name} size="lg" />
+            <ConnectorIcon def={icon} image={flow.step === 0 ? null : flow.item.image} label={name} size="lg" />
           ) : (
             <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
               <Icon name="plus" />
