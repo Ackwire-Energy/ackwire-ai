@@ -502,7 +502,7 @@ export const ptBR = {
         link: "Não deu para ler esse link. Confira se o repositório é público e se o link aponta para o arquivo ou a pasta.",
         notGithub: "Por enquanto a gente só lê links do GitHub. De outro lugar, baixe a pasta ou o .zip e solte aqui.",
         unknownPasted:
-          "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou peça de novo com o pedido de Outro app.",
+          "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou copie o pedido de novo e peça outra vez.",
         invalidBundle:
           "O arquivo tem algo fora do formato que dá para importar. Se veio de outro app, peça a exportação de novo.",
         read: "Não deu para ler o arquivo. Tente de novo ou escolha outro.",

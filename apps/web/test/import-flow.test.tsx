@@ -569,7 +569,10 @@ describe("Configurações → Importar e exportar", () => {
 
     await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => "oi, tudo bem?" } }));
     await settle(6);
-    expect(alert()).toContain("Não reconhecemos esse texto. Cole a resposta inteira do outro app");
+    // No card named: Grok Bot, ChatGPT dots and Outro app each show the request.
+    expect(alert()).toContain(
+      "Não reconhecemos esse texto. Cole a resposta inteira do outro app, com o JSON, ou copie o pedido de novo e peça outra vez.",
+    );
 
     fail = new ApiError(500, "internal", "boom");
     await pick("Arquivos para importar", [fixture("sales-desk.openmaus.json")]);

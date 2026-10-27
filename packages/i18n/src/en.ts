@@ -495,7 +495,7 @@ export const en: Translations = {
         notGithub:
           "For now we only read GitHub links. From anywhere else, download the folder or the .zip and drop it here.",
         unknownPasted:
-          "We don't recognize that text. Paste the other app's whole reply, with the JSON, or ask again with the request under Another app.",
+          "We don't recognize that text. Paste the other app's whole reply, with the JSON, or copy the request again and ask once more.",
         invalidBundle:
           "The file has something outside the format we can import. If it came from another app, ask it to export again.",
         read: "Couldn't read the file. Try again or choose another one.",
