@@ -27,6 +27,8 @@ export interface RequestOptions {
   method?: Method;
   json?: unknown;
   query?: Record<string, string | number | undefined | null>;
+  /** This request's own, such as the bot check's token. */
+  headers?: Record<string, string>;
 }
 
 /** Headers added to every request (the phone app's session cookie and client marker). */
@@ -65,6 +67,7 @@ export function createRequester(options: TransportOptions = {}) {
     const method = options.method ?? (options.json === undefined ? "GET" : "POST");
     const headers: Record<string, string> = {
       ...(t.headers ? await t.headers() : {}),
+      ...options.headers,
       accept: "application/json",
     };
     const hasBody = method !== "GET" && method !== "DELETE";

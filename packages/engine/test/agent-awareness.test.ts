@@ -54,6 +54,13 @@ describe("what earlier runs did", () => {
       .filter((e) => e.type === "agent.tool")
       .map((e) => (e as unknown as { tool: string | null; threadId: string | null }).tool);
     expect(toolEvents).toEqual(["create_issue", null]);
+    // The end names its call, and says nothing failed.
+    const [start, end] = events.filter((e) => e.type === "agent.tool") as unknown as {
+      toolUseId?: string;
+      failed?: boolean;
+    }[];
+    expect(end?.toolUseId).toBe(start?.toolUseId);
+    expect(end?.failed).toBeUndefined();
     await post("@dev você criou mesmo?", root.id);
     await drainOutbox(f.db, f.handlers);
     const prompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");

@@ -36,6 +36,7 @@ import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import { resetIso } from "./plan-usage";
+import type { Spawn } from "./scope-gate";
 import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
 
 /**
@@ -658,10 +659,10 @@ export class ClaudeProcess {
   private lineHandler: ((line: string) => void) | null = null;
   private exitHandlers = new Set<() => void>();
 
-  constructor(command: string[], args: string[], cwd: string, env: NodeJS.ProcessEnv) {
+  constructor(command: string[], args: string[], cwd: string, env: NodeJS.ProcessEnv, start: Spawn = spawn) {
     const [file, ...pre] = command;
     // A full path: the compiled runner would look the bare name up on the PATH it started with.
-    this.child = spawn(resolveCommand(file ?? "claude", env.PATH), [...pre, ...args], {
+    this.child = start(resolveCommand(file ?? "claude", env.PATH), [...pre, ...args], {
       cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -1062,6 +1063,8 @@ export interface BrainManagerOptions {
   mcp?: { socketPath: string; command: string[] };
   /** The runner's home (its accounts among it): turns never read it. */
   runnerHome?: string;
+  /** How Claude Code starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+  spawn?: Spawn;
   idleMs?: number;
   maxProcesses?: number;
   deltaMs?: number;
@@ -1579,7 +1582,7 @@ export class BrainManager {
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     });
-    const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
+    const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env, this.opts.spawn);
     const live: Live = {
       key,
       id,

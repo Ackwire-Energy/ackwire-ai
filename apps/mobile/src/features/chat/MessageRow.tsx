@@ -4,6 +4,7 @@ import {
   desktopTrailOf,
   keys,
   type Message,
+  type ScreenKind,
   type ThreadInfo,
   useApi,
   useContinuedRun,
@@ -48,9 +49,8 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
-import { ApprovalInline, ConsultationCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
+import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
-import { FoldingWork } from "./LiveRows";
 import { cacheContinued } from "./live";
 import {
   approvalIdOf,
@@ -67,6 +67,7 @@ import {
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";
+import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stoppedOf } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
@@ -75,9 +76,9 @@ const TRAIL_RECENT_MS = 12 * 60 * 60_000;
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
  * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
- * actions (the screen's sheet). An agent's reply takes its live block's place: the work folds into
- * "N passos" above the words, and a stopped one says so with "Continuar". Under my own message sent
- * while an agent works: whether it read it ("lê na próxima pausa", "leu", "parou para ler").
+ * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
+ * line above the words ("Usou N ferramentas"), and a stopped one says so with "Continuar". Under my own
+ * message sent while an agent works: whether it read it ("lê na próxima pausa", "leu", "parou para ler").
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -105,6 +106,7 @@ export const MessageRow = memo(function MessageRow({
   const isAgent = m.author.type === "agent";
   const agent = isAgent && m.author.id ? dir.agentById.get(m.author.id) : undefined;
   const accent = agent ? agentLook(agent).color : undefined;
+  const color = agentLook(agent).color;
   const name = dir.nameOf(m.author) || t("mobile.chat.someone");
   const meta = m.meta;
   // What a routine found, told by its agent (as on the web): a small tag, and the report it answers on demand
@@ -131,8 +133,8 @@ export const MessageRow = memo(function MessageRow({
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
-  // This reply just took its live block's place here: the block's work folds away above it.
-  const [folds] = useState(() => Boolean(isAgent && m.agentRunId && recentTurn(m.agentRunId, Date.now())));
+  // This reply just took its live block's place here: the same tools (and the messages it read) stay.
+  const [kept] = useState(() => (isAgent && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   const approvalId = approvalIdOf(meta);
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
@@ -153,6 +155,11 @@ export const MessageRow = memo(function MessageRow({
           recent: Date.now() - Date.parse(m.createdAt) < TRAIL_RECENT_MS,
         }
       : null;
+  // Calls that have their own card under the message (where it browsed, its desktop) stay out of its tools.
+  const onCards: ScreenKind[] = [
+    ...(trails?.browser.length ? (["browser"] as const) : []),
+    ...(trails?.desktop.length ? (["desktop"] as const) : []),
+  ];
   // "Esperando o MacBook Air voltar": its brain's computer is offline (the card, when it says which computer).
   const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
@@ -296,8 +303,24 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {folds && m.agentRunId && m.author.id ? <FoldingWork runId={m.agentRunId} agentId={m.author.id} /> : null}
-        {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
+        {kept ? (
+          <TurnTools
+            items={kept.items}
+            agentName={agent?.name ?? name}
+            color={color}
+            quoteOf={(id) => kept.quotes[id]}
+            done
+            settled
+          />
+        ) : steps && m.agentRunId ? (
+          <SavedTools
+            runId={m.agentRunId}
+            meta={meta}
+            agentName={agent?.name ?? name}
+            color={color}
+            skipScreens={onCards}
+          />
+        ) : null}
         {brainWait ? (
           <BrainWait
             message={m}

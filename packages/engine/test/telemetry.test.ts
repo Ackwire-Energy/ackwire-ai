@@ -35,6 +35,7 @@ const FACTS: TelemetryFacts = {
   host: { size: { cpus: 2, memoryGb: 4, diskGb: 80 }, container: true },
 };
 const LOAD = { loadAvg: 0.42, loadPeak: 1.75, memoryAvg: 0.61, memoryPeak: 0.88, hours: 24 };
+const TRAFFIC = { up: 12_400_000, down: 734_600_000, hours: 23.5 };
 const HOST_LOAD = { loadAvg: 0.3, loadPeak: 0.9, memoryAvg: 0.5, memoryPeak: 0.7, hours: 12 };
 /** Words that must never leave the server, seeded below. */
 const SECRET = {
@@ -73,7 +74,8 @@ function runner(token: string, hello: Record<string, unknown>) {
           ...hello,
         }),
       ),
-    pong: (load?: unknown) => h.message(conn, JSON.stringify({ type: "pong", at: Date.now(), load })),
+    pong: (load?: unknown, browserTraffic?: unknown) =>
+      h.message(conn, JSON.stringify({ type: "pong", at: Date.now(), load, browserTraffic })),
   };
 }
 
@@ -216,7 +218,7 @@ async function seed() {
     size: { cpus: 4, memoryGb: 7.5, diskGb: 150 },
   });
   await a.hello();
-  await a.pong(LOAD);
+  await a.pong(LOAD, TRAFFIC);
   const b = runner(old.token, { protocol: MACHINE_STATS_PROTOCOL - 1, arch: "weird-arch-quokka" });
   await b.hello();
   await b.pong();
@@ -282,8 +284,18 @@ test("the report is exactly its fields, from the seeded data, with no content in
         count: 1,
         agents: 1,
         load: LOAD,
+        browserTraffic: { upMb: 12, downMb: 735, hours: 23.5, computers: 1 },
       },
-      { kind: "connected", os: "linux", arch: "other", size: null, count: 1, agents: 0, load: null },
+      {
+        kind: "connected",
+        os: "linux",
+        arch: "other",
+        size: null,
+        count: 1,
+        agents: 0,
+        load: null,
+        browserTraffic: null,
+      },
       {
         kind: "managed",
         os: "linux",
@@ -292,6 +304,7 @@ test("the report is exactly its fields, from the seeded data, with no content in
         count: 1,
         agents: 0,
         load: null,
+        browserTraffic: null,
       },
     ],
     lastDay: {
@@ -330,20 +343,21 @@ test("the report is exactly its fields, from the seeded data, with no content in
   expect(text).not.toContain("123456789012");
 });
 
-test("an older runner's computer stays size unknown; a load older than a day says nothing", async () => {
+test("an older runner's computer stays size unknown; a load or traffic older than a day says nothing", async () => {
   const s = await seed();
+  const at = new Date(s.now.getTime() - 25 * HOUR).toISOString();
   await f.db
     .update(schema.machines)
-    .set({ load: { ...LOAD, at: new Date(s.now.getTime() - 25 * HOUR).toISOString() } })
+    .set({ load: { ...LOAD, at }, browserTraffic: { ...TRAFFIC, at } })
     .where(eq(schema.machines.id, s.fresh.machineId));
   // The older runner reconnects: nothing it says makes up a size.
   const b = runner(s.old.token, { protocol: MACHINE_STATS_PROTOCOL - 1 });
   await b.hello();
   const { computers } = await buildTelemetryReport(f.db, FACTS, s.now);
-  expect(computers.map((c) => [c.size, c.load])).toEqual([
-    [{ cpus: 4, memoryGb: 7.5, diskGb: 150 }, null],
-    [null, null],
-    [{ cpus: 4, memoryGb: 8, diskGb: 75 }, null],
+  expect(computers.map((c) => [c.size, c.load, c.browserTraffic])).toEqual([
+    [{ cpus: 4, memoryGb: 7.5, diskGb: 150 }, null, null],
+    [null, null, null],
+    [{ cpus: 4, memoryGb: 8, diskGb: 75 }, null, null],
   ]);
 });
 
@@ -372,11 +386,21 @@ test("the server's own computer is one machine, however many organizations it se
   f = await setup();
   const { db, owner, org, agent } = f;
   const { organization: second } = await createOrganization(db, owner.id, { name: "Second" });
+  const { organization: third } = await createOrganization(db, owner.id, { name: "Third" });
   const at = new Date().toISOString();
+  // Each organization's runner there counts its own agents' browsers: the rows add up to the machine's.
   const rows = await db
     .insert(schema.machines)
     .values([
-      { orgId: org.id, name: "This server", kind: "host", os: "linux", arch: "x64", lastSeenAt: new Date() },
+      {
+        orgId: org.id,
+        name: "This server",
+        kind: "host",
+        os: "linux",
+        arch: "x64",
+        lastSeenAt: new Date(),
+        browserTraffic: { up: 3_000_000, down: 40_000_000, hours: 5, at },
+      },
       {
         orgId: second.id,
         name: "This server",
@@ -386,7 +410,9 @@ test("the server's own computer is one machine, however many organizations it se
         lastSeenAt: new Date(),
         size: { cpus: 2, memoryGb: 4, diskGb: 80 },
         load: { ...LOAD, at },
+        browserTraffic: { up: 1_000_000, down: 10_000_000, hours: 20, at },
       },
+      { orgId: third.id, name: "This server", kind: "host", os: "linux", arch: "x64", lastSeenAt: new Date() },
     ])
     .returning({ id: schema.machines.id });
   await db.update(schema.agents).set({ machineId: rows[0]?.id }).where(eq(schema.agents.id, agent.id));
@@ -394,7 +420,7 @@ test("the server's own computer is one machine, however many organizations it se
     .insert(schema.agents)
     .values({ orgId: second.id, name: "Bot", handle: "bot", model: "claude-sonnet-5-5", machineId: rows[1]?.id });
   const { computers, organizations, agents } = await buildTelemetryReport(db, FACTS);
-  expect([organizations, agents]).toEqual([2, 2]);
+  expect([organizations, agents]).toEqual([3, 2]);
   expect(computers).toEqual([
     {
       kind: "host",
@@ -404,6 +430,7 @@ test("the server's own computer is one machine, however many organizations it se
       count: 1,
       agents: 2,
       load: LOAD,
+      browserTraffic: { upMb: 4, downMb: 50, hours: 20, computers: 1 },
     },
   ]);
 });
@@ -421,8 +448,10 @@ test("computers alike go as one line with their count, and a report stays under 
     hours: 24,
     at,
   });
-  // The Cloud's way, many computers of one size (two said how busy they got), and a big self-hosted
-  // server's, laptops of every disk size in containers.
+  // The Cloud's way, many computers of one size (two said how busy they got, two how much their browsers
+  // moved, one of those over a day ago), and a big self-hosted server's, laptops of every disk size in
+  // containers whose browsers moved as much as a runner may say.
+  const stale = new Date(seen.getTime() - 25 * HOUR).toISOString();
   const vps = Array.from({ length: 150 }, (_, i) => ({
     orgId: org.id,
     name: `vps ${i}`,
@@ -431,6 +460,14 @@ test("computers alike go as one line with their count, and a report stays under 
     lastSeenAt: seen,
     size: { cpus: 4, memoryGb: 8, diskGb: 75 },
     load: i === 0 ? day(0.2, 0.8) : i === 1 ? day(0.6, 1.9) : null,
+    browserTraffic:
+      i === 0
+        ? { up: 2_600_000, down: 3_000_000, hours: 24, at }
+        : i === 1
+          ? { up: 1_000_000, down: 1_000_000, hours: 12.5, at }
+          : i === 2
+            ? { up: 9e9, down: 9e9, hours: 24, at: stale }
+            : null,
   }));
   const laptops = Array.from({ length: 120 }, (_, i) => ({
     orgId: org.id,
@@ -440,6 +477,7 @@ test("computers alike go as one line with their count, and a report stays under 
     lastSeenAt: seen,
     size: { cpus: 10, memoryGb: 16, diskGb: 200 + i, limit: { cpus: 8, memoryGb: 12 } },
     load: day(0.42, 1.75),
+    browserTraffic: { up: 1e15, down: 1e15, hours: 23.9, at },
   }));
   const rows = await db
     .insert(schema.machines)
@@ -471,8 +509,13 @@ test("computers alike go as one line with their count, and a report stays under 
     count: 150,
     agents: 1,
     load: { loadAvg: 0.4, loadPeak: 1.9, memoryAvg: 0.5, memoryPeak: 0.9, hours: 24 },
+    browserTraffic: { upMb: 4, downMb: 4, hours: 18.3, computers: 2 },
   });
-  expect(report.computers[1]).toMatchObject({ size: { limit: { cpus: 8, memoryGb: 12 } }, count: 1 });
+  expect(report.computers[1]).toMatchObject({
+    size: { limit: { cpus: 8, memoryGb: 12 } },
+    count: 1,
+    browserTraffic: { upMb: 1e9, downMb: 1e9, hours: 23.9, computers: 1 },
+  });
   expect(report.computers).toHaveLength(50);
   expect(report.lastDay.models).toHaveLength(50);
   expect(new TextEncoder().encode(JSON.stringify(report)).length).toBeLessThan(32 * 1024);

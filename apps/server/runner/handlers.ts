@@ -33,6 +33,7 @@ import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
+import type { Spawn } from "./scope-gate";
 import { agentSecrets, handleSecret } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
@@ -156,6 +157,8 @@ export interface HandlerContext {
     app?: CodexAppServers;
     /** System mode, in a worker: the account folders lent to this agent (`accounts` is root's). */
     accounts?: { accountDir(kind: "claude_code" | "codex", id: string): string | null };
+    /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+    spawn?: Spawn;
   };
   /** Protocol 9: whether the owner paused this computer (new work is refused with `paused`). */
   paused?: () => boolean;
@@ -559,7 +562,7 @@ async function handleStream(
   const streams = ctx.streams;
   if (!agent || !isStreamId(streamId)) throw new RunnerError("bad_request", "A stream needs an agent and its id");
   if (!streams) throw new RunnerError("bad_request", "This runner opens no streams");
-  const dial = () => streams.dial(streamId, scope.signal);
+  const dial = () => streams.dial(streamId, req.kind, scope.signal);
   if (req.kind === "desktop") {
     requireTool(ctx, "desktop");
     if (!ctx.desktops) throw new RunnerError("desktop_unavailable", "This runner runs no desktops");
@@ -814,6 +817,7 @@ async function doCodexTurn(
         ...(ctx.grants ? { grants: ctx.grants } : {}),
         ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
         ...(codex.app ? { app: codex.app } : {}),
+        ...(codex.spawn ? { spawn: codex.spawn } : {}),
       },
       req as unknown as CodexBrainTurnRequest,
       {

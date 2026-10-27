@@ -252,6 +252,16 @@ describe("sending", () => {
 
 test("agentes telemetry prints exactly the next report, on or off, and sends nothing", async () => {
   const { clock, http, config } = await start({});
+  // A computer whose agents' browsers said how much they moved (protocol 23).
+  const [org] = await db.insert(schema.organizations).values({ name: "Org" }).returning();
+  await db.insert(schema.machines).values({
+    orgId: org?.id as string,
+    name: "Box",
+    os: "linux",
+    arch: "x64",
+    lastSeenAt: new Date(clock.now()),
+    browserTraffic: { up: 5_200_000, down: 81_000_000, hours: 1.5, at: new Date(clock.now()).toISOString() },
+  });
   const out: string[] = [];
   const err: string[] = [];
   const print = (c = config) =>
@@ -266,6 +276,9 @@ test("agentes telemetry prints exactly the next report, on or off, and sends not
   await clock.fire(FIRST_REPORT_MS);
   expect(http.calls).toHaveLength(1);
   expect(JSON.parse(out.join(""))).toEqual(http.calls[0]?.body);
+  expect(JSON.parse(out.join("")).computers).toEqual([
+    expect.objectContaining({ count: 1, browserTraffic: { upMb: 5, downMb: 81, hours: 1.5, computers: 1 } }),
+  ]);
   expect(err.join("")).toContain("On: sent once a day to https://telemetry.agentes.chat/v1/report");
 
   await setTelemetryEnabled(db, false);

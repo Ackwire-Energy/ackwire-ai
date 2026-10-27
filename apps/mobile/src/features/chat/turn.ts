@@ -1,6 +1,5 @@
 import type { LiveRun } from "@agenteschat/client";
-import { type Activity, toolActivity } from "@agenteschat/client/lib/activity";
-import { foldLiveWork } from "@agenteschat/client/lib/work";
+import { type ToolItem, toolItemsLive } from "@agenteschat/client/lib/work";
 
 /**
  * An agent's turn in the conversation as one block: from "pensando" through
@@ -18,27 +17,13 @@ export function turnPhase(r: Pick<LiveRun, "status" | "text" | "tool" | "work">)
   return "thinking";
 }
 
-/** One line of the work above the words: a step (running, done), what it said between steps, a message it read. */
-export type TurnItem =
-  | { kind: "step"; key: string; activity: Activity; tool: string; running: boolean }
-  | { kind: "say"; key: string; text: string }
-  | { kind: "read"; key: string; messageId: string; now: boolean };
-
-/** The run's work in order, repeats folded (five browser steps are one line), as lines of the block. */
-export function turnItems(r: Pick<LiveRun, "work" | "status">): TurnItem[] {
-  const live = r.status !== "canceled";
-  return foldLiveWork(r.work ?? []).map((w, i): TurnItem => {
-    if (w.kind === "say") return { kind: "say", key: `say-${w.turn ?? i}`, text: w.text };
-    if (w.kind === "steer")
-      return { kind: "read", key: `read-${w.messageId}`, messageId: w.messageId, now: Boolean(w.now) };
-    return {
-      kind: "step",
-      key: `step-${w.id}`,
-      activity: toolActivity(w.tool, w.connector, w.detail),
-      tool: w.tool,
-      running: live && w.running,
-    };
-  });
+/**
+ * The run's work in order, as the tool block's items (the shared model): its calls, repeats folded (five
+ * browser steps are one line), what it said between them and the messages it read. A stopped run's call
+ * that was running shows as stopped.
+ */
+export function turnItems(r: Pick<LiveRun, "work" | "status">): ToolItem[] {
+  return toolItemsLive(r.work ?? [], r.status === "canceled");
 }
 
 /**
@@ -61,8 +46,8 @@ export const OPENERS = 3;
  */
 export function turnOpener(
   run: Pick<LiveRun, "runId" | "status" | "text">,
-  items: readonly TurnItem[],
-): { said: string | null; opener: number | null; lines: TurnItem[] } {
+  items: readonly ToolItem[],
+): { said: string | null; opener: number | null; lines: ToolItem[] } {
   const first = items.find((x) => x.kind === "say");
   if (first) return { said: first.text, opener: null, lines: items.filter((x) => x !== first) };
   const generic = run.text.length === 0 && run.status !== "canceled";
@@ -79,9 +64,6 @@ export function turnOpener(
 export function openingRuns<R extends Pick<LiveRun, "status">>(runs: readonly R[]): R[] {
   return runs.filter((r, i) => i === 0 || r.status === "canceled");
 }
-
-/** How many steps the block folds into when it is done ("3 passos"). */
-export const turnSteps = (items: readonly TurnItem[]) => items.filter((x) => x.kind === "step").length;
 
 const TURN_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running", "canceled"]);
 
@@ -166,9 +148,12 @@ export function withOpacity(color: string, opacity: number): string {
 
 // ── The block's work, handed to the saved reply ──────────────────────────────
 
-/** The work a block showed last, so its saved reply can fold it into "N passos" in place. */
+/**
+ * The work a block showed last, so its saved reply keeps the same tool block in place ("Usou 4 ferramentas")
+ * and the messages it read, instead of loading the run's steps again.
+ */
 export interface TurnSnapshot {
-  items: TurnItem[];
+  items: ToolItem[];
   /** The text of each message it read (the "Leu seu recado" wells). */
   quotes: Record<string, string>;
   at: number;
@@ -217,4 +202,12 @@ export function withContinued(meta: Record<string, unknown> | undefined, newRunI
   const c = meta?.canceled;
   const base = c && typeof c === "object" ? (c as Record<string, unknown>) : {};
   return { ...(meta ?? {}), canceled: { ...base, continuedRunId: newRunId } };
+}
+
+// ── A tool line's open view ──────────────────────────────────────────────────
+
+/** What a call printed, as one text: its end when long (the open line shows the newest output). */
+export function outputTail(output: readonly { text: string }[], max = 2000): string {
+  const text = output.map((o) => o.text).join("");
+  return text.length > max ? `…${text.slice(text.length - max + 1)}` : text;
 }

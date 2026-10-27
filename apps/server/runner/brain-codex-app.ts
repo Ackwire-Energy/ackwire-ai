@@ -32,6 +32,7 @@ import {
   permissionPrompt,
 } from "./mcp";
 import { isInside } from "./paths";
+import type { Spawn } from "./scope-gate";
 
 /**
  * Codex brain turns on `codex app-server` (protocol 15, live steering): the
@@ -231,8 +232,8 @@ export class CodexAppClient {
   private readonly exitHandlers = new Set<() => void>();
   private requestHandler: ServerRequestHandler | null = null;
 
-  constructor(file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }) {
-    this.child = spawn(file, args, {
+  constructor(file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; spawn?: Spawn }) {
+    this.child = (opts.spawn ?? spawn)(file, args, {
       cwd: opts.cwd,
       env: opts.env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -639,6 +640,8 @@ export interface CodexAppServersOptions {
   ask?: (process: { id: string; token: string }, tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
   /** Protocol 19: Codex's `account/rateLimits/updated` (`rateLimits`), for the process's account (null: its own sign-in). */
   onRateLimits?: (account: string | null, rateLimits: unknown) => void;
+  /** How `codex app-server` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
+  spawn?: Spawn;
   log?: (line: string) => void;
 }
 
@@ -827,7 +830,11 @@ export class CodexAppServers implements CodexAppRunner {
     const brokenKey = `${opts.bin ?? "codex"}@${input.version}`;
     let client: CodexAppClient;
     try {
-      client = new CodexAppClient(resolveCommand(opts.bin ?? "codex", env.PATH), args, { cwd: input.cwd, env });
+      client = new CodexAppClient(resolveCommand(opts.bin ?? "codex", env.PATH), args, {
+        cwd: input.cwd,
+        env,
+        ...(this.opts.spawn ? { spawn: this.opts.spawn } : {}),
+      });
     } catch (err) {
       this.log(`codex app-server didn't start: ${err instanceof Error ? err.message : String(err)}`);
       return null;

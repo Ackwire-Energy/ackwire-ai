@@ -203,6 +203,17 @@ test("codes are limited per IP (10 an hour) and per link (40 an hour), checks pe
   expect((await check(30)).status).toBe(429);
 });
 
+test("an IPv6 network asks as one address: two addresses in one /64 share its count, another /64 has its own", async () => {
+  const { token } = await start();
+  const from = (ip: string, i: number) =>
+    sendCode(browser(t), token, { email: `v${i}@example.com` }, { "x-forwarded-for": ip });
+  for (let i = 0; i < 10; i++) expect((await from(`2001:db8:a:b::${i + 1}`, i)).status).toBe(202);
+  const limited = await from("2001:db8:a:b:ffff::1", 10);
+  expect(limited.status).toBe(429);
+  expect(await errorCode(limited)).toBe("join.rate_limited");
+  expect((await from("2001:db8:a:c::1", 11)).status).toBe(202);
+});
+
 test("an address's limits are in the database: a restart resets none of them", async () => {
   const { token } = await start();
   const anon = browser(t);

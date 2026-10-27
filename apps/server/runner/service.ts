@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { DEFAULT_AGENT_UID_RANGE, pairedConfig, runnerHome, updateConfig } from "./config";
 import { thisRunner } from "./launch";
+import type { ScopeKind } from "./scope-gate";
 import { xmlEscape } from "./xml";
 
 export const SERVICE_NAME = "agentes-runner";
@@ -19,6 +20,11 @@ export const systemdBooted = () => existsSync("/run/systemd/system");
 /** System mode: each agent's processes run in its own slice, `agents-<uid>.slice` (inside `agents.slice`). */
 const AGENT_SLICE_PREFIX = "agents-";
 export const agentSlice = (uid: number) => `${AGENT_SLICE_PREFIX}${uid}.slice`;
+/**
+ * Inside it, the agent's Chrome and its AI CLIs each in a slice of their own (`scope-gate.ts`):
+ * `agents-<uid>-browser.slice`, `agents-<uid>-cli.slice`. The Cloud's guard reads these names.
+ */
+export const agentCategorySlice = (uid: number, kind: ScopeKind) => `${AGENT_SLICE_PREFIX}${uid}-${kind}.slice`;
 /**
  * What every agent's slice may use, as a drop-in for the slice prefix: room
  * for a desktop, a headed Chrome and one coding CLI, and no agent can starve

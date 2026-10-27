@@ -148,7 +148,10 @@ export type ChannelEvent =
       consultedAgentId: string;
       status: "answered" | "expired" | "failed";
     }
-  /** The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`). */
+  /**
+   * The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`,
+   * with its `toolUseId`, `failed` when the tool answered with an error, `held` when it waits on a person).
+   */
   | {
       type: "agent.tool";
       channelId: string;
@@ -163,6 +166,10 @@ export type ChannelEvent =
       toolUseId?: string;
       /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
       code?: { language: string; source: string };
+      /** On the end (`tool: null`): the tool answered with an error. Never the error itself (it can carry data). */
+      failed?: boolean;
+      /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
+      held?: boolean;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {

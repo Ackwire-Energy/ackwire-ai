@@ -33,9 +33,43 @@
           },
           "version": {
             "type": "string"
+          },
+          "botCheck": {
+            "$ref": "#/components/schemas/OperatorBotCheck"
           }
         },
-        "required": ["ok", "version"]
+        "required": ["ok", "version", "botCheck"]
+      },
+      "OperatorBotCheck": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["off", "ok", "unreachable", "secret_refused"],
+            "description": "`off` without both Turnstile keys. While `unreachable` (this server can't reach Cloudflare) or `secret_refused` (Cloudflare refuses `TURNSTILE_SECRET_KEY`), every request goes through unchecked."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it took this state."
+          },
+          "blocked": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Networks refused in the last 10 minutes because their page couldn't load the check (`human_check_blocked`), each counted once: an IPv4 address, or an IPv6 /64. Any client can claim its page couldn't load it, so read it beside `passed`."
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tokens Cloudflare passed in the last 10 minutes. When the widget is down for everyone, `blocked` rises while this falls. Clients claiming it is down don't move it."
+          },
+          "testing": {
+            "type": "boolean",
+            "description": "`TURNSTILE_SECRET_KEY` is one of Cloudflare's test secrets, which pass every token, so nothing is really checked. Right only on a test server."
+          }
+        },
+        "required": ["state", "since", "blocked", "passed", "testing"],
+        "description": "The bot check before public forms (ADR 0075)."
       },
       "Error": {
         "type": "object",
@@ -569,7 +603,7 @@
     "/health": {
       "get": {
         "tags": ["Operator"],
-        "summary": "The token works and this server answers",
+        "summary": "The token works and this server answers, with its bot check's state",
         "responses": {
           "200": {
             "description": "OK",

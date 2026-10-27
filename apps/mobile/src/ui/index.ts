@@ -6,7 +6,7 @@ export { AgentAvatar, type AgentAvatarProps } from "@/agent/AgentAvatar";
 export { LivePause, useLivePaused } from "@/agent/live";
 export { type AgentLookInput, lookOf, rememberAgentLooks } from "@/agent/looks";
 export { PersonAvatar, type PersonAvatarProps } from "@/agent/PersonAvatar";
-export { InkOrbit, PixelDone, PixelStop, PixelStopped } from "@/agent/PixelMarks";
+export { InkOrbit, PixelDone, PixelFail, PixelStop, PixelStopped } from "@/agent/PixelMarks";
 export { PixelOrbit, type PixelOrbitProps } from "@/agent/PixelOrbit";
 export type { AgentMode } from "@/agent/poses";
 export { Fuse, type FuseProps } from "@/sky/Fuse";
