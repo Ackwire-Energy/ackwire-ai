@@ -1,4 +1,4 @@
-import type { ChannelEvent, ConnectIntent, Message, MessageReceipts, RunStatus } from "../api/types";
+import type { ChannelEvent, ConnectIntent, DecidedBy, Message, MessageReceipts, RunStatus } from "../api/types";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
 
@@ -31,9 +31,17 @@ export interface MessageReceipt {
   referenced?: string[];
   /** Routed to nobody: the organization has no AI connected (with the Connect step the message asked for). */
   noAi?: { intent?: ConnectIntent; provider?: string };
+  /** Who picked the agents (ADR 0074). */
+  decidedBy?: DecidedBy;
+  /** Nobody could read it (no Jev, small model, plan or rule): only a mention reaches an agent. */
+  mentionNeeded?: true;
+  /** The author's own plan is picking who answers, until the decision. */
+  picking?: true;
   /** The list receipts last seeded: the same read seeded again changes nothing. */
   server?: MessageReceipts;
 }
+
+const MENTION_NEEDED = "mention_needed";
 
 export type ReceiptsState = Record<string, MessageReceipt>;
 
@@ -181,6 +189,8 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
         blocked: r.blocked ?? [],
         // The Connect step `message.routed` asked for stays while the server still says "no AI".
         ...(r.noAi ? { noAi: existing?.noAi ?? {} } : {}),
+        ...(r.decidedBy ? { decidedBy: r.decidedBy } : {}),
+        ...(r.reason === MENTION_NEEDED ? { mentionNeeded: true as const } : {}),
         server: r,
       },
     });
@@ -203,6 +213,11 @@ export function applyReceiptEvent(
   event: ChannelEvent | (RunSteeredEvent & { agentId?: string }),
 ): ReceiptsState {
   switch (event.type) {
+    case "message.routing": {
+      const current = state[event.messageId] ?? { routed: false, agents: [] };
+      if (current.routed || current.picking) return state;
+      return { ...state, [event.messageId]: { ...current, picking: true } };
+    }
     case "message.routed": {
       // The router's decision wins over any guess: agents not picked only "saw" it.
       const picked = new Set(event.pickedBy);
@@ -219,7 +234,13 @@ export function applyReceiptEvent(
       for (const id of event.seenBy) next = set(next, event.messageId, id, "seen");
       for (const id of event.pickedBy) next = set(next, event.messageId, id, "picked");
       for (const r of event.runs ?? []) next = linkRun(next, event.messageId, r.runId, r.agentId);
-      const { noAi: _before, ...current } = next[event.messageId] ?? { routed: false, agents: [] };
+      const {
+        noAi: _before,
+        picking: _picking,
+        decidedBy: _decidedBy,
+        mentionNeeded: _mentionNeeded,
+        ...current
+      } = next[event.messageId] ?? { routed: false, agents: [] };
       // Mentioned agents that got nothing: said explicitly, or the whole decision was "nobody".
       const blocked = event.blocked ?? (event.strategy === "none" ? event.seenBy : current.blocked);
       const referenced = event.referenced ?? current.referenced;
@@ -233,6 +254,8 @@ export function applyReceiptEvent(
           ...(referenced ? { referenced } : {}),
           // Routed again once an AI is connected: the decision that replaces it says what happens now.
           ...(event.reason === NO_AI ? { noAi: { intent: event.intent, provider: event.provider } } : {}),
+          ...(event.decidedBy ? { decidedBy: event.decidedBy } : {}),
+          ...(event.reason === MENTION_NEEDED ? { mentionNeeded: true as const } : {}),
         },
       };
     }
@@ -303,7 +326,8 @@ export interface ReceiptView {
   /** Main status, or null when there is nothing to say yet. */
   status:
     | { kind: "picked" | "claimed" | "waiting" | "asking" | "handled" | "failed"; agents: string[] }
-    | { kind: "nobody" }
+    /** `mentionNeeded`: no step could read it and no rule fit, so only a mention reaches an agent. */
+    | { kind: "nobody"; mentionNeeded?: true }
     /** Nobody will answer for want of an AI (`agents`: those that couldn't think; empty: nobody was asked). */
     | { kind: "no_ai"; agents: string[] }
     | null;
@@ -311,11 +335,18 @@ export interface ReceiptView {
   done: boolean;
   /** Agents the message only references (no answer expected from them). */
   referenced: string[];
+  /** Who picked the agents (ADR 0074), when the server said. */
+  decidedBy?: DecidedBy;
+  /** The author's own plan is picking who answers: "Picking who answers" until the decision. */
+  picking?: true;
 }
 
 export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
+  if (receipt?.picking && !receipt.routed)
+    return { seen: [], status: null, done: false, referenced: [], picking: true };
   if (!receipt || (receipt.agents.length === 0 && !receipt.noAi))
     return { seen: [], status: null, done: false, referenced: [] };
+  const decided = receipt.decidedBy ? { decidedBy: receipt.decidedBy } : {};
   const seen = receipt.agents.map(([id]) => id);
   const referenced = (receipt.referenced ?? []).filter((id) => seen.includes(id));
   const with_ = (phase: ReceiptPhase) => receipt.agents.filter(([, p]) => p === phase).map(([id]) => id);
@@ -325,13 +356,16 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
     return { seen, status: { kind: "no_ai", agents: noAi }, done: false, referenced };
   for (const kind of ["failed", "asking", "waiting", "claimed", "picked"] as const) {
     const agents = with_(kind);
-    if (agents.length) return { seen, status: { kind, agents }, done: false, referenced };
+    if (agents.length) return { seen, status: { kind, agents }, done: false, referenced, ...decided };
   }
   const handled = with_("handled");
-  if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced };
+  if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced, ...decided };
   // A mention always gets an answer unless the server said that agent can't, or that the message only
   // references it (never "nobody" on a guess).
   const blocked = new Set([...(receipt.blocked ?? []), ...(receipt.referenced ?? [])]);
   const unanswered = (receipt.mentioned ?? []).some((id) => !blocked.has(id));
-  return { seen, status: receipt.routed && !unanswered ? { kind: "nobody" } : null, done: false, referenced };
+  const nobody = receipt.mentionNeeded
+    ? { kind: "nobody" as const, mentionNeeded: true as const }
+    : { kind: "nobody" as const };
+  return { seen, status: receipt.routed && !unanswered ? nobody : null, done: false, referenced, ...decided };
 }
