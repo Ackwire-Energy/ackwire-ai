@@ -174,7 +174,7 @@ describe("Run agentes.chat on this Mac", () => {
       async ({ el, press, until, tailscale }) => {
         await press("Use your own server");
         await press("Run agentes.chat on this Mac");
-        await until(() => switchRows(el)[0]?.line);
+        await until(() => switchRows(el)[0]?.line?.startsWith("Needs"));
         const [reach] = switchRows(el);
         expect(reach?.line).toBe("Needs Tailscale, which is free. Get Tailscale");
         expect(reach?.hint).toBe(REACH_TEXT);
@@ -215,7 +215,7 @@ describe("Run agentes.chat on this Mac", () => {
 });
 
 describe("Run here, while Tailscale is read", () => {
-  test("nothing shows under reach and its switch waits, so no wrong line flashes", async () => {
+  test("the line under reach says it is checking and its switch waits, so no wrong line flashes", async () => {
     // Tailscale is connected, but its read takes a moment (up to 2 s on a Mac).
     const answers: ((tailnet: Tailnet) => void)[] = [];
     await firstRun(
@@ -224,7 +224,7 @@ describe("Run here, while Tailscale is read", () => {
         await press("Use your own server");
         await press("Run agentes.chat on this Mac");
         await until(() => el.querySelector("form.dk-fr__here"));
-        expect(switchRows(el)[0]?.line).toBeNull();
+        expect(switchRows(el)[0]?.line).toBe("Checking whether Tailscale is connected…");
         expect(el.textContent).not.toContain("Needs Tailscale");
         expect(el.querySelector("#here-reach")?.hasAttribute("disabled")).toBe(true);
         await act(async () => {

@@ -1,7 +1,7 @@
 import { keys } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import { connectLink, isTailnet } from "@agenteschat/client/lib/server";
-import { Alert, Button, Dialog, DialogBody } from "@agenteschat/ui";
+import { Alert, Button, Dialog, DialogBody, PixelSpinner } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { encode } from "uqr";
@@ -64,10 +64,13 @@ function PhoneCode() {
   const server = code.data?.server ?? "";
   return (
     <div className="phone-code">
-      <div className="phone-code__qr">
+      {/* The square keeps its place while the code is made, with the spinner in it (a tailnet can take a moment). */}
+      <div className="phone-code__qr" data-loading={!code.data || undefined}>
         {code.data ? (
           <QrCode text={connectLink(code.data.server, { token: code.data.token })} label={t("openOnPhone.qr")} />
-        ) : null}
+        ) : (
+          <PixelSpinner size={24} label={t("openOnPhone.making")} />
+        )}
       </div>
       {code.data && (
         <span className="small muted">

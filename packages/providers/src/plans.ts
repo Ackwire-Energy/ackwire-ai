@@ -136,3 +136,19 @@ export const planAliases = (plan: CodingPlan): PlanAlias[] =>
 
 /** A pasted key that fits the plan: one line, the plan's shape. */
 export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.keyPattern).test(key);
+
+/**
+ * The accounts that may have one login per agent, the same account signed in again for each (on a computer where
+ * every agent is its own OS user, a sign-in folder belongs to one agent at a time). A coding plan's key has no
+ * refresh token, so its copies never sign each other out. Claude's and ChatGPT's sign-ins stay one agent per
+ * account until several sign-ins of one account are seen to hold.
+ */
+export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "key", boolean>> = {
+  claude_code: false,
+  codex: false,
+  key: true,
+};
+
+/** Whether an account (its CLI's kind, and a coding plan's `provider` for a key) may have one login per agent. */
+export const loginPerAgent = (kind: string, provider?: string | null) =>
+  isPlanId(provider) ? LOGIN_PER_AGENT.key : kind === "codex" ? LOGIN_PER_AGENT.codex : LOGIN_PER_AGENT.claude_code;

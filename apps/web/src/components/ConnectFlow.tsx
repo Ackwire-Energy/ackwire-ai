@@ -36,6 +36,7 @@ import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { oauthReturnPath } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./ToolReview";
@@ -50,8 +51,8 @@ export type FlowState =
   /** Step 1: a catalog entry, or `null` for any MCP server by address. */
   { step: 0; def: ConnectorDef | null } | { step: 1 | 2; item: ConnectedItem };
 
-/** Back from OAuth the app lands here; the server adds `?connected=…`. */
-const returnPath = (orgId: string) => `/org/${orgId}/settings/connectors`;
+/** Back from OAuth the app lands here; the server adds `?connected=…`. In the desktop app, through its window. */
+const returnPath = (orgId: string) => oauthReturnPath(`/org/${orgId}/settings/connectors`);
 
 export function ConnectFlow({
   flow,
@@ -83,7 +84,7 @@ export function ConnectFlow({
       title={
         <span className="cflow__title">
           {name ? (
-            <ConnectorIcon def={icon} label={name} size="lg" />
+            <ConnectorIcon def={icon} image={flow.step === 0 ? null : flow.item.image} label={name} size="lg" />
           ) : (
             <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
               <Icon name="plus" />

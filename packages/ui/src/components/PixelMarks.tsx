@@ -4,7 +4,8 @@ import { cx } from "../cx";
 /**
  * Pixel marks that sit next to the PixelSpinner:
  * `PixelDone`, one green pixel (the spinner grid's center cell) that pops in
- * when a step is done, and `PixelStop`, a solid rounded square that reads as
+ * when a step is done, `PixelFail`, an exclamation in two pixels of the danger
+ * color when a step failed, and `PixelStop`, a solid rounded square that reads as
  * "stop" (it breathes while an agent works). Pure CSS; still under
  * prefers-reduced-motion. Decorative unless `label` is given.
  */
@@ -31,7 +32,19 @@ export function PixelDone({ size = 14, label, className }: PixelDoneProps) {
   return (
     <span
       className={cx("ac-pixdone", className)}
-      style={{ width: size, height: size, "--px": `${inner}px` } as CSSProperties}
+      style={{ width: size, height: size, "--mark-size": `${size}px`, "--px": `${inner}px` } as CSSProperties}
+      {...a11y(label)}
+    />
+  );
+}
+
+/** Failed: an exclamation of two pixels (a tall one over the center cell's size) in the danger color. */
+export function PixelFail({ size = 14, label, className }: PixelDoneProps) {
+  const { inner, gap } = pixelCell(size, 3);
+  return (
+    <span
+      className={cx("ac-pixfail", className)}
+      style={{ width: size, height: size, "--px": `${inner}px`, "--px-gap": `${gap}px` } as CSSProperties}
       {...a11y(label)}
     />
   );
@@ -56,7 +69,15 @@ export function PixelStop({ size = 13, animated = false, dim = false, label, cla
       className={cx("ac-pixstop", className)}
       data-animated={animated || undefined}
       data-dim={(!animated && dim) || undefined}
-      style={{ width: size, height: size, "--stop-side": `${side}px`, "--stop-radius": `${radius}px` } as CSSProperties}
+      style={
+        {
+          width: size,
+          height: size,
+          "--mark-size": `${size}px`,
+          "--stop-side": `${side}px`,
+          "--stop-radius": `${radius}px`,
+        } as CSSProperties
+      }
       {...a11y(label)}
     >
       <span />

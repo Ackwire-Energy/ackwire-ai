@@ -223,12 +223,13 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: Mem
   if (!(await orgHasAi(deps, message.orgId))) throw stillMissing();
   const deleted = await deps.db.delete(routingDecisions).where(noAiDecision).returning({ id: routingDecisions.id });
   if (deleted.length === 0) return null;
-  const res = await routeMessage(deps.router, { orgId: message.orgId, messageId: message.id }, { finalAttempt: true });
+  const res = await routeMessage(deps.router, { orgId: message.orgId, messageId: message.id });
   await publishRouted(deps.pubsub, message, {
     strategy: res.seenBy ? "router" : "none",
     seenBy: res.seenBy ?? [],
     runs: res.runs,
     ...(res.reason ? { reason: res.reason } : {}),
+    ...(res.decidedBy ? { decidedBy: res.decidedBy } : {}),
   });
   return res.runs.map((r) => ({ agentId: r.agentId, runId: r.id }));
 }

@@ -6,6 +6,7 @@ setupDom();
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, type FakeState, seedState } from "./fake-api";
+import { installTurnstile, removeTurnstile } from "./fake-turnstile";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -85,6 +86,31 @@ describe("landing page", () => {
     expect(screen().getByRole("alert").textContent).toContain("Muitas tentativas seguidas.");
     expect(screen().queryByText("Você está na lista.")).toBeNull();
     expect(localStorage.getItem("agentes.waitlist")).toBeNull();
+  });
+
+  test("with the bot check: it loads at the first focus of a form, for that form only, and its token goes with the join", async () => {
+    const cf = installTurnstile();
+    try {
+      const { state, api } = signedOut({
+        authConfig: { turnstileSiteKey: "1x00000000000000000000BB" },
+        waitlistError: new ApiError(403, "human_check_blocked", "The bot check didn't load."),
+      });
+      await renderApp("/", { api });
+      await settle();
+      // A visitor who only reads reaches nothing of Cloudflare.
+      expect(cf.scripts()).toEqual([]);
+      const input = screen().getAllByPlaceholderText("voce@empresa.com")[0] as HTMLInputElement;
+      await act(async () => fireEvent.focus(input));
+      await settle();
+      expect(cf.widgets.map((w) => [w.options.action, w.options.theme])).toEqual([["waitlist", "dark"]]);
+      await joinWith("ana@empresa.com");
+      expect(joins(state)).toEqual([
+        { method: "waitlist.join", args: [{ email: "ana@empresa.com", locale: "pt-BR" }, "w1-1"] },
+      ]);
+      expect(screen().getByRole("alert").textContent).toContain("A verificação não carregou.");
+    } finally {
+      removeTurnstile();
+    }
   });
 
   test("any other error shows the generic message", async () => {

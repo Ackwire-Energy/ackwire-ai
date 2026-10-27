@@ -4,6 +4,7 @@ import type { ScreenKind } from "./types";
 export const keys = {
   health: ["health"] as const,
   telemetry: ["telemetry"] as const,
+  jev: ["jev"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   phoneSignIn: ["phone-sign-in"] as const,

@@ -1,5 +1,5 @@
 {
-  "id": "b634b5f8-c6f6-4c70-91b3-2c5266c4d49e",
+  "id": "49f95e33-7d3b-4bb4-8cd1-e2cfc61f9b2c",
   "prevId": "5d030668-d96d-4b0b-a716-98aeaeda9c0e",
   "version": "7",
   "dialect": "postgresql",
@@ -14468,6 +14468,171 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.organization_join_code_events": {
+      "name": "organization_join_code_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mailbox": {
+          "name": "mailbox",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "organization_join_code_events_mailbox_at_index": {
+          "name": "organization_join_code_events_mailbox_at_index",
+          "columns": [
+            {
+              "expression": "mailbox",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "organization_join_code_events_at_index": {
+          "name": "organization_join_code_events_at_index",
+          "columns": [
+            {
+              "expression": "at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_join_codes": {
+      "name": "organization_join_codes",
+      "schema": "",
+      "columns": {
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code_hash": {
+          "name": "code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tries": {
+          "name": "tries",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verified_hash": {
+          "name": "verified_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified_until": {
+          "name": "verified_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_join_codes_org_id_organizations_id_fk": {
+          "name": "organization_join_codes_org_id_organizations_id_fk",
+          "tableFrom": "organization_join_codes",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "organization_join_codes_org_id_email_pk": {
+          "name": "organization_join_codes_org_id_email_pk",
+          "columns": [
+            "org_id",
+            "email"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.organization_join_requests": {
       "name": "organization_join_requests",
       "schema": "",
@@ -14502,6 +14667,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "name": {
           "name": "name",
@@ -14879,48 +15050,6 @@
         "standing_changed_at": {
           "name": "standing_changed_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_members": {
-          "name": "limit_members",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_storage_bytes": {
-          "name": "limit_storage_bytes",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_upload_bytes_per_day": {
-          "name": "limit_upload_bytes_per_day",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_platform_nano_usd": {
-          "name": "limit_platform_nano_usd",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limits_updated_at": {
-          "name": "limits_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_month": {
-          "name": "platform_alert_month",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_percent": {
-          "name": "platform_alert_percent",
-          "type": "smallint",
           "primaryKey": false,
           "notNull": false
         },

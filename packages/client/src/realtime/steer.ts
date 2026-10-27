@@ -10,7 +10,7 @@ import type { ActiveRun, Message, WaitMessageOutcome } from "../api/types";
  *   waiting run), until it is read;
  * - `delivered`: "Ada recebeu" (handed to Claude Code mid-turn, read at its
  *   next tool boundary);
- * - `held`: "Ada lê depois da sua decisão no card" (the run waits for an
+ * - `held`: "Ada lê depois da sua decisão" (the run waits for an
  *   approval: chat text never decides one);
  * - `read`: "Ada leu";
  * - `resolved`: "Ada encerrou o pedido de ajuda" (it ended the run's wait,
@@ -380,7 +380,7 @@ const keyOf = (s: SteerState | null) => (s ? `${s.state}|${s.runId}|${s.agentId}
 
 /**
  * Under a person's message: "lê na próxima pausa" / "parou para ler" / "recebeu" / "lê depois da sua
- * decisão no card" / "leu" / "encerrou o pedido de ajuda", or null.
+ * decisão" / "leu" / "encerrou o pedido de ajuda", or null.
  * `orgId` and `channelId` name where the message is (ids are unique; the store is the app's).
  */
 export function useSteerState(_orgId: string, _channelId: string, messageId: string): SteerState | null {

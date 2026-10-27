@@ -305,14 +305,18 @@ export const routingDecisions = pgTable(
     orgId: uuid().notNull(),
     channelId: uuid().notNull(),
     messageId: uuid().notNull(),
-    /** Strategy name, e.g. `llm` (core) or another implementation's name. */
+    /**
+     * Who decided (ADR 0074): `jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`, `none` (nobody could read
+     * it), `no_ai`, a mention's judge, or another implementation's name.
+     */
     strategy: text().notNull(),
     candidates: jsonb().$type<{ agentId: string; score: number }[]>().notNull(),
     /** Need-any-agent probability, when the strategy reports one. */
     needsAgentScore: real(),
     selectedAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Code's markers first (`follow-up`), then the deciding step's words after its name (`jev: …`). */
     reason: text(),
-    /** Set when the strategy failed; nobody is picked. */
+    /** The router's steps that failed before one decided (`jev: TypeSafe answered 529`), or `no_ai`. */
     error: text(),
     usageRecordId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

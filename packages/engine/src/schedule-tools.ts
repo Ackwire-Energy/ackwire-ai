@@ -568,6 +568,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               audienceMode: agents.audienceMode,
               audienceUserIds: agents.audienceUserIds,
               ownerUserId: agents.ownerUserId,
+              brain: agents.brain,
             })
             .from(agents)
             .where(and(eq(agents.orgId, ctx.orgId), isNull(agents.archivedAt)));

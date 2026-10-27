@@ -130,7 +130,7 @@ function Gallery() {
                     accessibilityLabel={t("mobile.connectors.connectedCheck", { name: itemName(t, item) })}
                     style={styles.mini}
                   >
-                    <ConnectorIcon def={item.def} label={itemName(t, item)} size={48} check />
+                    <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size={48} check />
                     <Text variant="caption" tone="muted" numberOfLines={1}>
                       {itemName(t, item)}
                     </Text>

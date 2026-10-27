@@ -278,6 +278,22 @@ const MessageBase = z.object({
       platformCap: z.literal(true).optional().openapi({
         description: "Routed to nobody: the workspace used up its platform AI for the month; @mentions still answer.",
       }),
+      decidedBy: z
+        .union([
+          z.object({ step: z.literal("jev") }),
+          z.object({ step: z.literal("model"), model: z.string(), provider: z.string() }),
+          z.object({ step: z.literal("plan"), brand: z.enum(["claude", "chatgpt"]), ownerId: z.string() }),
+          z.object({ step: z.literal("rule"), rule: z.enum(["reply", "only_agent", "follow_up"]) }),
+        ])
+        .optional()
+        .openapi({
+          description:
+            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule. Absent before the chain.",
+        }),
+      reason: z
+        .literal("mention_needed")
+        .optional()
+        .openapi({ description: "No step could read it and no rule fit: only a mention reaches an agent." }),
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),

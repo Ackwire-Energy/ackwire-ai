@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
 import {
   and,
@@ -9,6 +10,7 @@ import {
   gt,
   inArray,
   isNull,
+  like,
   lt,
   ne,
   or,
@@ -18,10 +20,10 @@ import {
 import { recordAudit } from "./audit";
 import { inviteLinkToken, sha256 } from "./crypto";
 import { emailLocale, emailsByLocale, queueEmail } from "./email";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
 import { adminIds } from "./gateway";
 import { assertMemberRoom } from "./limits";
-import { oneLine } from "./mail/text";
+import { mailboxOf, oneLine } from "./mail/text";
 import { notify, resolveNotifications } from "./notifications";
 import {
   announceMembers,
@@ -35,15 +37,18 @@ import {
   requirePermission,
   sendInvitation,
 } from "./organizations";
-import { enqueue } from "./outbox";
+import { enqueue, type OutboxJob } from "./outbox";
 
 const {
   organizationInvitations,
   organizationInviteLinks,
   organizationJoinRequests: requests,
+  organizationJoinCodes: codes,
+  organizationJoinCodeEvents: codeEvents,
   organizationMembers,
   organizations,
   notifications,
+  outbox,
   users,
 } = schema;
 
@@ -61,6 +66,22 @@ export const JOIN_REASON_MAX = 300;
 /** The outbox job that files a request whose address isn't proven (`fileJoinRequest`). */
 export const FILE_JOIN_REQUEST_JOB = "join_request.file";
 
+/** Digits in the code that proves an address (ADR 0072): mirrored in packages/client/src/lib/join-requests.ts. */
+export const JOIN_CODE_LENGTH = 6;
+/** Between two codes for one workspace and address; the apps count it down. */
+export const JOIN_CODE_RESEND_SECONDS = 60;
+/** To type a code, then, once typed right, to ask with it. */
+const JOIN_CODE_TTL_MS = 10 * 60_000;
+const JOIN_CODE_VERIFIED_MS = 30 * 60_000;
+/** Wrong tries per code. */
+const JOIN_CODE_TRIES = 5;
+/**
+ * Per workspace and mailbox: codes an hour and a day, and wrong tries a day, after which no new code goes out and
+ * none is checked. Per mailbox across workspaces: codes a day. The whole server: codes an hour.
+ */
+const JOIN_CODE_LIMITS = { hour: 5, day: 10, wrongDay: 10, mailboxDay: 20, serverHour: 500 };
+
+const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 const group = (orgId: string) => `join_requests:${orgId}`;
 const closedLink = () => new NotFoundError("This link no longer works", "join.link_closed");
@@ -119,10 +140,195 @@ const lockRequests = (tx: Executor, orgId: string) =>
 /** The account's own address and whether it opened the link that confirms it, read here: a session's copy lags. */
 async function accountOf(db: Executor, userId: string) {
   const [row] = await db
-    .select({ name: users.name, email: users.email, verified: users.emailVerified, blockedAt: users.blockedAt })
+    .select({
+      name: users.name,
+      email: users.email,
+      verified: users.emailVerified,
+      blockedAt: users.blockedAt,
+      locale: users.locale,
+    })
     .from(users)
     .where(eq(users.id, userId));
   return row ?? null;
+}
+
+/** An open link, by its token; else `join.link_closed`. */
+async function openLink(db: Executor, token: string, now: Date) {
+  const found = await findInviteLink(db, token);
+  if (!found || !inviteLinkOpen(found, now)) throw closedLink();
+  return found;
+}
+
+const codeHash = (orgId: string, email: string, code: string) => sha256(`${orgId}:${email}:${code}`);
+const codeRow = (orgId: string, email: string) => and(eq(codes.orgId, orgId), eq(codes.email, email));
+
+// ponytail: one lock for every code sent or checked on the server, so each count holds; per-mailbox locks if
+// codes ever queue behind it.
+const lockCodes = (tx: Executor) => tx.execute(sql`select pg_advisory_xact_lock(hashtext('join-codes'))`);
+
+type CodeRefusal = "join.code_wrong" | "join.code_expired" | "join.code_tries";
+const codeRefused = (code: CodeRefusal) =>
+  code === "join.code_wrong"
+    ? new ValidationError("That code isn't right.", code)
+    : code === "join.code_expired"
+      ? new ConflictError("This code expired. Ask for a new one.", code)
+      : new ConflictError("Too many tries for this code. Ask for a new one.", code);
+
+/** The counts every code limit reads, from the events of the last day. */
+async function codeCounts(tx: Executor, orgId: string, mailbox: string, now: Date) {
+  const hourAgo = new Date(now.getTime() - HOUR_MS);
+  const dayAgo = new Date(now.getTime() - DAY_MS);
+  const here = eq(codeEvents.orgId, orgId);
+  const sent = eq(codeEvents.kind, "sent");
+  const [mine] = await tx
+    .select({
+      hour: sql<number>`count(*) filter (where ${and(here, sent, gt(codeEvents.at, hourAgo))})::int`,
+      day: sql<number>`count(*) filter (where ${and(here, sent)})::int`,
+      wrong: sql<number>`count(*) filter (where ${and(here, eq(codeEvents.kind, "wrong"))})::int`,
+      mailboxDay: sql<number>`count(*) filter (where ${sent})::int`,
+    })
+    .from(codeEvents)
+    .where(and(eq(codeEvents.mailbox, mailbox), gt(codeEvents.at, dayAgo)));
+  const [all] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(codeEvents)
+    .where(and(sent, gt(codeEvents.at, hourAgo)));
+  return { hour: 0, day: 0, wrong: 0, mailboxDay: 0, ...mine, serverHour: all?.n ?? 0 };
+}
+
+export interface JoinCodeInput {
+  token: string;
+  /** Signed in: the code goes to the account's own address (a confirmed one needs none). */
+  user: { id: string } | null;
+  /** Typed when signed out. */
+  email?: string;
+  /** The page's language (`requestLocale`), for the email. */
+  locale?: string | null;
+}
+
+/** The address a code is for, and the email's language. */
+async function codeAddress(db: Executor, input: JoinCodeInput) {
+  if (!input.user) {
+    const email = (input.email ?? "").trim().toLowerCase();
+    if (!email.includes("@")) throw new ValidationError("An email is needed");
+    return { email, locale: emailLocale(input.locale) };
+  }
+  const account = await accountOf(db, input.user.id);
+  if (!account || account.blockedAt) throw new ForbiddenError();
+  if (account.verified) throw new ConflictError("This account's email is already confirmed.", "join.verified");
+  return { email: account.email.trim().toLowerCase(), locale: emailLocale(account.locale ?? input.locale) };
+}
+
+/**
+ * Emails a code that proves the address asking through a link (ADR 0072). Every address gets one alike, a member's,
+ * a waiting or a denied one too, since only its mailbox reads it. A new code replaces one still waiting to be
+ * typed, never one already typed right. Every limit is counted in the database (`JOIN_CODE_LIMITS`, and 60 s
+ * between two codes for one workspace and address), so a restart resets none.
+ */
+export async function sendJoinCode(deps: Deps, publicUrl: string, input: JoinCodeInput, now = new Date()) {
+  const found = await openLink(deps.db, input.token, now);
+  const orgId = found.link.orgId;
+  const { email, locale } = await codeAddress(deps.db, input);
+  const mailbox = sha256(mailboxOf(email));
+  return deps.db.transaction(async (tx) => {
+    await lockCodes(tx);
+    const [row] = await tx.select({ sentAt: codes.sentAt }).from(codes).where(codeRow(orgId, email));
+    const wait = row ? row.sentAt.getTime() + JOIN_CODE_RESEND_SECONDS * 1000 - now.getTime() : 0;
+    if (wait > 0) {
+      throw new TooManyError("A code was just sent. Ask for a new one in a minute.", "join.code_wait", {
+        retryIn: Math.ceil(wait / 1000),
+      });
+    }
+    const n = await codeCounts(tx, orgId, mailbox, now);
+    const limits = JOIN_CODE_LIMITS;
+    if (n.hour >= limits.hour || n.day >= limits.day || n.wrong >= limits.wrongDay || n.mailboxDay >= limits.mailboxDay)
+      throw new TooManyError("Too many codes for this email. Try again later.", "join.code_limit");
+    if (n.serverHour >= limits.serverHour) throw new TooManyError("Too many requests. Try again later.");
+    const code = String(randomInt(0, 10 ** JOIN_CODE_LENGTH)).padStart(JOIN_CODE_LENGTH, "0");
+    const waiting = {
+      codeHash: codeHash(orgId, email, code),
+      tries: 0,
+      sentAt: now,
+      expiresAt: new Date(now.getTime() + JOIN_CODE_TTL_MS),
+    };
+    await tx
+      .insert(codes)
+      .values({ orgId, email, ...waiting })
+      .onConflictDoUpdate({ target: [codes.orgId, codes.email], set: waiting });
+    await tx.insert(codeEvents).values({ orgId, mailbox, kind: "sent", at: now });
+    // Three tries within the code's first minute; the job deletes the row once it can't send again.
+    await queueEmail(tx, {
+      orgId,
+      key: `join-code:${orgId}:${sha256(email)}:${now.getTime()}`,
+      to: [email],
+      template: { kind: "join_code", locale, orgName: found.orgName, code, url: base(publicUrl) },
+      maxAttempts: 3,
+    });
+    return { email, resendIn: JOIN_CODE_RESEND_SECONDS };
+  });
+}
+
+/**
+ * A code typed for an address, under the codes' lock: `verified` (typed right before, still good), `right` (the
+ * code waiting), or why not. A wrong one counts against the code waiting and the day's wrong tries. With only a
+ * code typed right left, it still counts against the day, or that code could be guessed for its 30 minutes. With
+ * no code sent it is wrong, so nobody learns whether one went out.
+ */
+async function tryCode(
+  tx: Executor,
+  orgId: string,
+  email: string,
+  code: string,
+  now: Date,
+): Promise<"verified" | "right" | CodeRefusal> {
+  const hash = codeHash(orgId, email, code);
+  const [row] = await tx.select().from(codes).where(codeRow(orgId, email));
+  if (row?.verifiedHash === hash)
+    return row.verifiedUntil && row.verifiedUntil > now ? "verified" : "join.code_expired";
+  const mailbox = sha256(mailboxOf(email));
+  if ((await codeCounts(tx, orgId, mailbox, now)).wrong >= JOIN_CODE_LIMITS.wrongDay) return "join.code_tries";
+  const wrong = () => tx.insert(codeEvents).values({ orgId, mailbox, kind: "wrong", at: now });
+  if (!row?.codeHash) {
+    if (row) await wrong();
+    return "join.code_wrong";
+  }
+  if (row.tries >= JOIN_CODE_TRIES) return "join.code_tries";
+  if (row.expiresAt <= now) return "join.code_expired";
+  if (row.codeHash === hash) return "right";
+  await tx
+    .update(codes)
+    .set({ tries: row.tries + 1 })
+    .where(codeRow(orgId, email));
+  await wrong();
+  return row.tries + 1 >= JOIN_CODE_TRIES ? "join.code_tries" : "join.code_wrong";
+}
+
+/**
+ * Checks a code typed on a link's page (ADR 0072). Right, the address is proven for 30 minutes to ask with the
+ * same code, and a newer code doesn't undo it. It never confirms an account: the code proves the request only.
+ */
+export async function checkJoinCode(deps: Deps, input: JoinCodeInput & { code: string }, now = new Date()) {
+  const found = await openLink(deps.db, input.token, now);
+  const orgId = found.link.orgId;
+  const { email } = await codeAddress(deps.db, input);
+  const result = await deps.db.transaction(async (tx) => {
+    await lockCodes(tx);
+    const tried = await tryCode(tx, orgId, email, input.code, now);
+    if (tried === "right") {
+      await tx
+        .update(codes)
+        .set({
+          codeHash: null,
+          tries: 0,
+          verifiedHash: codeHash(orgId, email, input.code),
+          verifiedUntil: new Date(now.getTime() + JOIN_CODE_VERIFIED_MS),
+        })
+        .where(codeRow(orgId, email));
+    }
+    return tried;
+  });
+  if (result !== "right" && result !== "verified") throw codeRefused(result);
+  return { verified: true as const };
 }
 
 export interface AskToJoinInput {
@@ -135,6 +341,10 @@ export interface AskToJoinInput {
   note?: string | null;
   /** The page's language, for the answer's email when there is no account (`requestLocale`). */
   locale?: string | null;
+  /** This server sends email: the address is proven with a code before it can ask (ADR 0072). */
+  proofNeeded?: boolean;
+  /** The code from the address's mailbox (`sendJoinCode`), checked or not. */
+  code?: string;
 }
 
 /** A request as filed: the workspace and link it came through, and who asks. */
@@ -150,18 +360,18 @@ interface Ask {
 }
 
 /**
- * Someone who opened an invitation link asks to join (ADR 0068). Signed out, they typed a name and an address;
- * signed in, their account asks. A typed address, or an account's that isn't confirmed (anyone can sign up with
- * an address that isn't theirs), gets the same answer after the same work whatever it is: nothing here depends on
- * the address, so a link never tells who works there, who waits or who was turned down, not even by how long the
- * answer takes. A job files it (`fileJoinRequest`). A confirmed account asks for its own address, so it hears
- * where it stands, and its request is filed at once. `created` is false only when that account's request already
- * waited.
+ * Someone who opened an invitation link asks to join (ADR 0068, 0072). Signed out, they typed a name and an
+ * address; signed in, their account asks. A confirmed account asks for its own address. Anyone else, on a server
+ * that sends email, first proves the address with a code from its mailbox (`code`, ADR 0072). A proven ask hears
+ * where it stands and is filed at once. On a server without email, a typed address, or an account's that isn't
+ * confirmed (anyone can sign up with an address that isn't theirs), gets the same answer after the same work
+ * whatever it is: nothing here depends on the address, so a link never tells who works there, who waits or who was
+ * turned down, not even by how long the answer takes. A job files it (`fileJoinRequest`). `created` is false only
+ * when a request for the address already waited.
  */
 export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinInput, now = new Date()) {
   const { db } = deps;
-  const found = await findInviteLink(db, input.token);
-  if (!found || !inviteLinkOpen(found, now)) throw closedLink();
+  const found = await openLink(db, input.token, now);
   const orgId = found.link.orgId;
   const account = input.user ? await accountOf(db, input.user.id) : null;
   if (input.user) {
@@ -186,6 +396,17 @@ export async function askToJoin(deps: Deps, publicUrl: string, input: AskToJoinI
     const created = await file(deps, publicUrl, ask, true, now);
     return { status: "pending" as const, email, created };
   }
+  if (input.proofNeeded) {
+    if (!input.code) throw new ValidationError("Verify the email with a code first.", "join.code_needed");
+    const code = input.code;
+    const tried = await db.transaction(async (tx) => {
+      await lockCodes(tx);
+      return tryCode(tx, orgId, email, code, now);
+    });
+    if (tried !== "right" && tried !== "verified") throw codeRefused(tried);
+    const created = await file(deps, publicUrl, ask, true, now, codeHash(orgId, email, code));
+    return { status: "pending" as const, email, created };
+  }
   if ((await waitingCount(db, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
   await enqueue(db, { orgId, kind: FILE_JOIN_REQUEST_JOB, payload: { ...ask, publicUrl } });
   return { status: "pending" as const, email, created: true };
@@ -202,12 +423,13 @@ export async function fileJoinRequest(deps: Deps, payload: Record<string, unknow
 
 /**
  * Files a request under the workspace's lock, the link read again under it. `proven`: a confirmed account asking
- * for its own address, which hears where it stands (`join.link_closed`, `join.denied`, `join.full`) and takes
- * over a typed request still waiting for that address. An unproven ask changes nothing that exists: a member's,
- * a waiting or a denied address files nothing. Admins are told of a new request by an email at most once an hour
- * per workspace and a notice merged while unread (one push per burst). Returns whether a new request waits.
+ * for its own address, or an address proven with a code (`usedCode`, the code's hash, used up here). A proven ask
+ * hears where it stands (`join.link_closed`, `join.member`, `join.denied`, `join.full`, which leave the code
+ * good) and takes over a request still waiting for that address. An unproven ask changes nothing that exists: a
+ * member's, a waiting or a denied address files nothing. Admins are told of a new request by an email at most once
+ * an hour per workspace and a notice merged while unread (one push per burst). Returns whether a new request waits.
  */
-async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, now: Date) {
+async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, now: Date, usedCode?: string) {
   const { db } = deps;
   const { orgId } = ask;
   const admins = await adminIds(db, orgId);
@@ -218,6 +440,14 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
       if (proven) throw closedLink();
       return null;
     }
+    if (usedCode) {
+      const used = await tx
+        .delete(codes)
+        .where(and(codeRow(orgId, ask.email), or(eq(codes.verifiedHash, usedCode), eq(codes.codeHash, usedCode))))
+        .returning({ email: codes.email });
+      // Another ask used it a moment ago.
+      if (used.length === 0) throw codeRefused("join.code_expired");
+    }
     const [latest] = await tx
       .select()
       .from(requests)
@@ -227,11 +457,13 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
     const waiting = latest && isWaiting(latest, now) ? latest : null;
     const denied = latest !== undefined && isKeptDenial(latest, now);
     if (proven) {
+      if (await addressIsMember(tx, orgId, ask.email))
+        throw new ConflictError("You're already in this workspace", "join.member");
       if (denied) throw new ConflictError("Your request wasn't approved", "join.denied");
       if (waiting) {
         await tx
           .update(requests)
-          .set({ userId: ask.userId, name: ask.name, note: ask.note })
+          .set({ userId: ask.userId ?? waiting.userId, name: ask.name, note: ask.note, verifiedAt: now })
           .where(eq(requests.id, waiting.id));
         return null;
       }
@@ -255,6 +487,7 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
       decidedByUserId: null,
       decidedAt: null,
       invitationId: null,
+      verifiedAt: proven ? now : null,
       expiresAt: new Date(now.getTime() + JOIN_REQUEST_TTL_DAYS * DAY_MS),
       createdAt: now,
     };
@@ -354,8 +587,10 @@ export async function joinStatus(db: Database, user: { id: string }, token: stri
 }
 
 /**
- * Requests waiting in a workspace, oldest first (`manage_members`). `confirmed`: asked by a signed-in account whose
- * address is this one, confirmed and not blocked, so approving lets it in at once.
+ * Requests waiting in a workspace, oldest first (`manage_members`). `verified`: a code proved the address, or a
+ * confirmed account with it asked; false only on a server without email, or for a request typed before codes.
+ * `confirmed` (read by phone builds from before `verified`): approving lets an account in at once, as
+ * `approveJoinRequest` decides.
  */
 export async function listWaitingJoinRequests(db: Database, actorId: string, orgId: string, now = new Date()) {
   await requirePermission(db, actorId, orgId, "manage_members");
@@ -365,15 +600,16 @@ export async function listWaitingJoinRequests(db: Database, actorId: string, org
       name: requests.name,
       email: requests.email,
       note: requests.note,
-      confirmed: sql<boolean>`coalesce(${users.emailVerified} and ${users.blockedAt} is null and ${users.email} = ${requests.email}, false)`,
+      verified: sql<boolean>`${requests.verifiedAt} is not null or coalesce(${users.id} = ${requests.userId} and ${users.emailVerified}, false)`,
+      confirmed: sql<boolean>`coalesce(${users.emailVerified} and ${users.blockedAt} is null and (${requests.verifiedAt} is not null or ${users.id} = ${requests.userId}), false)`,
       createdAt: requests.createdAt,
       expiresAt: requests.expiresAt,
     })
     .from(requests)
-    .leftJoin(users, eq(users.id, requests.userId))
+    .leftJoin(users, eq(users.email, requests.email))
     .where(and(eq(requests.orgId, orgId), eq(requests.status, "pending"), gt(requests.expiresAt, now)))
     .orderBy(asc(requests.createdAt));
-  return rows.map((r) => ({ ...r, confirmed: Boolean(r.confirmed) }));
+  return rows.map((r) => ({ ...r, verified: Boolean(r.verified), confirmed: Boolean(r.confirmed) }));
 }
 
 /** The request, locked, while it still waits; else why not. */
@@ -389,30 +625,33 @@ async function waitingRequest(tx: Executor, orgId: string, id: string, now: Date
   return row;
 }
 
-/** The answer email's words, and whether the account that asked proved the address. */
+/**
+ * The answer email's words, and the account an approval lets in at once: the confirmed one with the address, when
+ * the address was proven (a code, or that account asking). Anyone can sign up with an address that isn't theirs, and
+ * on a server without email anyone can type one.
+ */
 async function answerContext(tx: Executor, orgId: string, actorId: string, row: RequestRow) {
   const [org] = await tx.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
   const [approver] = await tx.select({ name: users.name }).from(users).where(eq(users.id, actorId));
-  const [account] = row.userId
-    ? await tx
-        .select({ email: users.email, verified: users.emailVerified, blockedAt: users.blockedAt, locale: users.locale })
-        .from(users)
-        .where(eq(users.id, row.userId))
-    : [];
+  const [account] = await tx
+    .select({ id: users.id, verified: users.emailVerified, blockedAt: users.blockedAt, locale: users.locale })
+    .from(users)
+    .where(eq(users.email, row.email));
+  const proven = row.verifiedAt !== null || row.userId === account?.id;
   return {
     orgName: org?.name ?? "",
     approverName: approver?.name ?? "",
     locale: emailLocale(account?.locale ?? row.locale),
-    confirmed: account !== undefined && account.email === row.email && account.verified && !account.blockedAt,
+    joiner: account?.verified && !account.blockedAt && proven ? account.id : null,
   };
 }
 
 export type JoinApproval = { outcome: "joined" } | { outcome: "invited"; url: string };
 
 /**
- * Approves a request with a role (member or admin, ADR 0068). Only whoever controls the address gets in: a
- * signed-in account with it confirmed joins at once; any other request gets an email invitation to it (7 days),
- * which opens sign-up for that address. The person is told by email either way.
+ * Approves a request with a role (member or admin, ADR 0068, 0072). Only whoever controls the address gets in: a
+ * confirmed account with it joins at once when the address was proven; any other request gets an email invitation
+ * to it (7 days), which opens sign-up for that address. The person is told by email either way.
  */
 export async function approveJoinRequest(
   deps: Deps,
@@ -435,8 +674,8 @@ export async function approveJoinRequest(
     if (!already) await assertMemberRoom(tx, orgId);
     let approval: JoinApproval = { outcome: "joined" };
     let invitationId: string | null = null;
-    if (!already && context.confirmed && row.userId) {
-      await joinOrganization(tx, orgId, row.userId, role);
+    if (!already && context.joiner) {
+      await joinOrganization(tx, orgId, context.joiner, role);
     } else if (!already) {
       const sent = await sendInvitation(tx, {
         orgId,
@@ -620,9 +859,22 @@ export async function turnOffInviteLink(deps: Deps, actorId: string, orgId: stri
 
 /**
  * Daily: deletes requests answered, closed or run out more than 90 days ago, and closes the admins' notices of
- * workspaces where nothing waits anymore (requests that ran out). Returns how many were deleted.
+ * workspaces where nothing waits anymore (requests that ran out). Codes go a day after both their times pass, their
+ * counts after a day, and so does a code's email the job couldn't delete (a worker that died sending it). Returns
+ * how many requests were deleted.
  */
 export async function pruneJoinRequests(deps: Deps, now = new Date()) {
+  const dayAgo = new Date(now.getTime() - DAY_MS);
+  await deps.db
+    .delete(codes)
+    .where(and(lt(codes.expiresAt, dayAgo), or(isNull(codes.verifiedUntil), lt(codes.verifiedUntil, dayAgo))));
+  await deps.db.delete(codeEvents).where(lt(codeEvents.at, dayAgo));
+  // ponytail: a scan of the outbox once a day; an index on the key's prefix if the outbox grows past millions.
+  await deps.db
+    .delete(outbox)
+    .where(
+      and(eq(outbox.kind, "email.send"), like(outbox.dedupeKey, "email:join-code:%"), lt(outbox.createdAt, dayAgo)),
+    );
   const cutoff = new Date(now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY_MS);
   const gone = await deps.db
     .delete(requests)
@@ -639,6 +891,12 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
     .where(and(eq(notifications.kind, "join_request"), isNull(notifications.doneAt)));
   for (const { orgId } of open) await settleJoinRequests(deps, orgId, now);
   return gone.length;
+}
+
+/** A join code's email holds the code and the address: its job's row goes once it can't be sent again. */
+export async function forgetJoinCodeEmail(db: Executor, job: OutboxJob) {
+  if ((job.payload.template as { kind?: unknown } | undefined)?.kind !== "join_code") return;
+  await db.delete(outbox).where(eq(outbox.id, job.id));
 }
 
 /**

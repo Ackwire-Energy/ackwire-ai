@@ -178,6 +178,7 @@ export { OptionList, type OptionListItem, type OptionListProps } from "./compone
 export {
   PixelDone,
   type PixelDoneProps,
+  PixelFail,
   PixelStop,
   type PixelStopProps,
   pixelCell,
@@ -276,6 +277,13 @@ export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
 export { Token, TokenList } from "./components/Token";
+export {
+  ToolBlock,
+  type ToolBlockHead,
+  type ToolBlockItem,
+  type ToolBlockLine,
+  type ToolBlockState,
+} from "./components/ToolBlock";
 export {
   FilterToggle,
   type FilterToggleProps,

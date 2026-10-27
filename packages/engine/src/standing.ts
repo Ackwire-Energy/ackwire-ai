@@ -167,7 +167,10 @@ export async function assertCanWork(db: Executor, orgId: string, agentId?: strin
  */
 export function standingJudge(db: Database, judge: Judge): Judge {
   return {
-    name: judge.name,
+    // Read live: the name follows whether Jev has a key now.
+    get name() {
+      return judge.name;
+    },
     async ask(request) {
       await assertCanWork(db, request.orgId);
       return judge.ask(request);

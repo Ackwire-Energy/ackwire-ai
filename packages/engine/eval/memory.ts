@@ -99,7 +99,7 @@ const strategies: Record<string, () => Strategy | null> = {
     const apiKey = process.env.TYPESAFE_API_KEY;
     if (!apiKey) return null;
     const judge = createJevJudge({
-      apiKey,
+      key: apiKey,
       timeoutMs: 10_000,
       gateway: {
         recordExternalUsage: (async (u: { inputTokens: number }) => {

@@ -148,6 +148,7 @@ export const ptBR = {
       handover: "Entrando com a sua conta do outro aparelho…",
       handoverFailed: "O código expirou ou já foi usado.",
       handoverFailedLead: "Entre com o seu e-mail, ou mostre um código novo no outro aparelho.",
+      connecting: "Terminando de conectar…",
     },
     desktopOwner: {
       continue: "Continuar neste {{device}}",
@@ -198,6 +199,12 @@ export const ptBR = {
       moreAgents: "mais {{count}}",
       name: "Seu nome",
       email: "Seu e-mail",
+      verify: "Verificar",
+      resend: "Reenviar",
+      resendIn_one: "Reenviar em {{count}} segundo",
+      resendIn_other: "Reenviar em {{count}} segundos",
+      verified: "Verificado",
+      code: "Código do e-mail",
       note: "Algo que eles devam saber? (opcional)",
       noteHelp: "Quem é você, ou quem mandou o link",
       send: "Pedir para entrar",
@@ -778,6 +785,7 @@ export const ptBR = {
   },
   openOnPhone: {
     qr: "QR code para entrar no app agentes",
+    making: "Gerando o código…",
     stepApp: "Instale o app agentes no celular (App Store ou Google Play).",
     stepTailscale: "Instale o Tailscale no celular e entre na mesma rede (tailnet) deste servidor.",
     stepScan: "Aponte a câmera do celular para o código.",
@@ -1032,8 +1040,9 @@ export const ptBR = {
       platform: "agentes.chat",
     },
     wait: {
-      signIn: "Você entra aqui assim que ele ficar pronto.",
-      key: "Enquanto isso, crie a chave: você envia aqui assim que ele ficar pronto.",
+      signIn: "Você entra aqui assim que o computador ficar pronto.",
+      key: "Você envia assim que o computador ficar pronto.",
+      email: "Avisamos você por e-mail quando ele ficar pronto. Pode fechar esta página.",
       ready: "O {{computer}} está pronto.",
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
@@ -1041,7 +1050,7 @@ export const ptBR = {
     own: {
       this: "A conta do {{brand}} com login no {{computer}}",
       thisText: "Todos os agentes pensam com ela.",
-      other: "Outra conta do {{brand}}, para um agente",
+      other: "Outra conta do {{brand}}",
       note: "Eles só respondem a você enquanto pensam com o seu plano.",
     },
     /** Under a plan's sign-in: it changes how the agent treats everyone else. */
@@ -1054,9 +1063,28 @@ export const ptBR = {
     zaiTeam: "Num plano de equipe, use a chave da página Team Plan.",
     who: {
       key: "Chave de API · {{provider}}",
-      line: "Cada plano pensa por um agente.",
       keyFor: "Chave de API para {{names}}",
+      state: { done: "Pronto", now: "Entrando", next: "Esperando" },
     },
+    /** The plan panel's head: whom the plan thinks for. */
+    for: "Para",
+    all: "Todos os agentes",
+    agentAria: "Agentes que usam este plano",
+    /** The plan panel's foot: who the agents answer, and where the account stays (its ⓘ). */
+    foot: {
+      one: "Com o seu plano, {{article}} {{name}} só responde a você.",
+      all: "Com o seu plano, os seus agentes só respondem a você.",
+      signIn: "A conta fica só no {{computer}}. A sua senha vai só para o {{brand}}.",
+    },
+    each: "Um login por agente, com a mesma conta.",
+    eachHint: "Cada agente tem o próprio login. Todos dividem os limites do seu plano.",
+    signInFor: "Fazer login {{for}} {{name}}",
+    doneAll: "{{names}} agora pensam com {{label}}.",
+    otherAccount: {
+      claude_code: "O Claude entrou como {{email}}. Para usar {{wanted}}, saia na página do Claude e tente de novo.",
+      codex: "O ChatGPT entrou como {{email}}. Para usar {{wanted}}, saia na página do ChatGPT e tente de novo.",
+    },
+    useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
     noAgents: "Um plano só pensa pelos agentes de quem o conecta, e você ainda não tem nenhum.",
     done: "Pronto",
@@ -1338,6 +1366,11 @@ export const ptBR = {
       unattended: "sem ninguém acompanhando",
     },
     said: "<b>{{name}}:</b> “{{text}}”",
+    /** A request in the conversation, as the agent asking (ApprovalAsk). */
+    askPlain: "Preciso do seu ok para seguir:",
+    seeEmail: "Ver o e-mail",
+    seeDetails: "Ver detalhes",
+    notNow: "Agora não",
     email: {
       from: "De",
       to: "Para",
@@ -1815,6 +1848,7 @@ export const ptBR = {
         thisComputer: "Conta deste {{computer}}",
         thisComputerText: "A que já está no {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
+        accountAlso: "Também usada por {{agents}}",
         accountOf: "De {{name}}",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
@@ -1835,15 +1869,20 @@ export const ptBR = {
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: {
-            claude_code: "Entre no Claude com a conta que vai usar",
-            codex: "Entre no ChatGPT com a conta que vai usar",
+            claude_code: "Entre no Claude",
+            codex: "Entre no ChatGPT",
           },
-          /** The sign-in step's ⓘ, for Claude and ChatGPT. */
+          /** The sign-in step's ⓘ, for Claude and ChatGPT, where the steps have a head of their own. */
           stepOneHint:
-            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}: o agentes.chat nunca vê a senha nem o acesso.",
+            "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. A sua senha vai só para o {{brand}}.",
+          /** The same ⓘ in a plan's panel, whose foot says where the account stays. */
+          stepOneTip: {
+            claude_code: "Conta errada? Saia na página do Claude e tente de novo.",
+            codex: "Conta errada? Saia na página do ChatGPT e tente de novo.",
+          },
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT" },
           openAgain: "Abrir de novo",
-          stepTwo: "Copie o código que o Claude mostrou e cole aqui",
+          stepTwo: "Cole o código que o Claude mostrar",
           codeLabel: "Código do Claude",
           send: "Enviar ao {{computer}}",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
@@ -1856,9 +1895,9 @@ export const ptBR = {
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {
             claude_code:
-              "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do Claude na página que abriu e entre com a outra conta.",
+              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do Claude e entre com a outra.",
             codex:
-              "Essa conta já está aqui ({{account}}). Para adicionar outra, saia do ChatGPT na página que abriu e entre com a outra conta.",
+              "Essa conta já está aqui, como {{account}}. Para adicionar outra, saia na página do ChatGPT e entre com a outra.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -2552,6 +2591,9 @@ export const ptBR = {
     and: " e ",
   },
   members: {
+    /** Before inviting, while every agent with an AI answers only the person (a plan is personal). */
+    agentsOnlyYou: "Seus agentes só respondem a você.",
+    agentsOnlyYouHint: "Um plano é pessoal. Agentes que usam a chave de API respondem a todos.",
     filters: "Filtrar pessoas",
     roleFilter: "Papel",
     rolesCount_one: "{{count}} papel",
@@ -2596,6 +2638,8 @@ export const ptBR = {
       asked: "Pediu {{ago}}",
       askedNow: "Pediu agora",
       askedOn: "Pediu em {{date}}",
+      unverified: "Não verificado",
+      // A folha de pedidos do celular lê estas três.
       confirmed: "E-mail confirmado",
       unconfirmed: "E-mail não confirmado: aprovar manda um convite para ele.",
       via: "Fecha em {{date}}",
@@ -4447,10 +4491,13 @@ export const ptBR = {
       letPeople: "Liberar de novo",
       ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
       hereNotYours: "Só para agentes de quem conectou o {{computer}}",
+      fixedHint:
+        "Um plano é pessoal, então só responde a quem o conectou. Os outros podem usar o próprio plano ou a chave de API do workspace.",
     },
     errors: {
       planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
       planTermsRequired: "Confirme o aviso do plano pessoal antes de liberar para mais gente.",
+      planPersonal: "Um plano é pessoal. Neste workspace, só quem o conectou fala com os agentes que o usam.",
     },
     add: {
       paste: "Colar",
@@ -4464,7 +4511,7 @@ export const ptBR = {
       keyTitle: "Cole a chave aqui",
       keyLabel: "Chave do {{plan}}",
       keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
-      keySafe: "A chave vai criptografada para o {{computer}} e fica só lá. O agentes.chat não consegue lê-la.",
+      keySafe: "A chave vai criptografada para o {{computer}} e fica só lá.",
       keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },
@@ -4488,14 +4535,18 @@ export const ptBR = {
     },
     page: {
       title: "Seus planos",
-      hint: "Cada conta pensa por um agente e fica no computador onde foi conectada; quem administra esse computador pode acessá-la. O agentes.chat guarda só o nome, o email e o uso.",
+      hint: "Cada plano fica no computador onde foi conectado, e quem administra esse computador pode acessá-lo. O agentes.chat guarda só o nome, o email e o uso.",
       empty: "Nenhum plano ainda.",
       connect: "Conectar uma IA",
       keyEnds: "chave …{{hint}}",
       on: "no {{computer}}",
       thinksFor: "{{agent}} pensa com ela",
+      usedBy_one: "{{agents}} pensa com ela",
+      usedBy_other: "{{agents}} pensam com ela",
       noAgent: "Nenhum agente ainda",
-      signedOut: "Saiu da conta: entre de novo para os agentes voltarem a usá-la.",
+      signedOut: "Saiu da conta. Entre de novo para os agentes voltarem a usá-la.",
+      signedOutFor_one: "{{agents}} ficou sem login.",
+      signedOutFor_other: "{{agents}} ficaram sem login.",
       keyRefused: "A chave foi recusada: troque por uma nova.",
       rename: "Renomear",
       signInAgain: "Entrar de novo",
@@ -4507,6 +4558,9 @@ export const ptBR = {
       disconnectTitle: "Desconectar {{label}}?",
       disconnectAgent:
         "{{agent}} deixa de pensar com ela e volta para a API. O {{computer}} sai da conta e apaga o que guardava.",
+      disconnectAgents_one: "{{agents}} deixa de pensar com ela. O {{computer}} sai da conta e apaga o que guardava.",
+      disconnectAgents_other:
+        "{{agents}} deixam de pensar com ela. O {{computer}} sai da conta e apaga o que guardava.",
       disconnectNone: "O {{computer}} sai da conta e apaga o que guardava dela.",
       disconnected: "{{label}} desconectada.",
     },
@@ -5505,7 +5559,7 @@ export const ptBR = {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
-      held: "{{name}} lê depois da sua decisão no card",
+      held: "{{name}} lê depois da sua decisão",
       read: "{{name}} leu",
       resolved: "{{name}} encerrou o pedido de ajuda",
     },
@@ -6861,10 +6915,18 @@ export const ptBR = {
       denied: "Seu pedido não foi aprovado. Peça a alguém de lá para convidar você por e-mail.",
       answered: "Alguém já respondeu este pedido.",
       expired: "Este pedido expirou: ninguém respondeu em 14 dias.",
+      codeWrong: "Código errado. Tente de novo.",
+      codeExpired: "Este código expirou. Peça um novo.",
+      codeTries: "Muitas tentativas. Peça um código novo.",
+      codeLimit: "Muitos códigos para este e-mail. Tente de novo mais tarde.",
+      codeWait: "Espere um minuto para pedir outro código.",
+      codeNeeded: "Verifique seu e-mail primeiro.",
     },
     invitation: {
       askToJoin: "Este link agora passa por um admin. Abra de novo para pedir para entrar.",
     },
+    humanCheck: "Não conseguimos confirmar que você é uma pessoa. Tente de novo.",
+    humanCheckBlocked: "A verificação não carregou. Tente outro navegador ou outra rede.",
     mission: {
       notFound: "Missão não encontrada.",
       notOwner: "Só quem é responsável pela missão pode fazer isso.",
@@ -7532,6 +7594,15 @@ export const ptBR = {
       steps_other: "{{count}} passos",
       none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
+      /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
+      block: "O que {{pronoun}} fez",
+      used_one: "Usou {{count}} ferramenta",
+      used_other: "Usou {{count}} ferramentas",
+      times: "×{{count}}",
+      erred: "Deu erro {{activity}}",
+      gave: "recebeu",
+      answered: "devolveu",
+      error: "erro",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
@@ -7589,6 +7660,7 @@ export const ptBR = {
         offeringConnectAi: "Ofereceu conectar uma IA",
         askingAgent: "Perguntou a outro agente",
         tellingAgent: "Avisou outro agente",
+        findingTools: "Procurou ferramentas",
         usingTool: "Usou a ferramenta {{tool}}",
         thinking: "Pensou",
         typing: "Escreveu",
@@ -7653,6 +7725,7 @@ export const ptBR = {
       offeringConnectAi: "preparando a conexão de uma IA",
       askingAgent: "perguntando a outro agente",
       tellingAgent: "avisando outro agente",
+      findingTools: "procurando ferramentas",
       usingTool: "usando uma ferramenta",
     },
     tokens: "{{value}} tokens",

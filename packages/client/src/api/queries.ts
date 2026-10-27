@@ -60,6 +60,7 @@ import type {
   IssueInput,
   IssuePatch,
   IssueStatus,
+  JevKey,
   Machine,
   MachineAccessReduce,
   MailAccountUpdate,
@@ -140,6 +141,24 @@ export function useSetServerTelemetry() {
     onSuccess: (telemetry) => qc.setQueryData(keys.telemetry, telemetry),
   });
 }
+
+/** The installation's Jev key: `null` for everyone but its owner on a self-hosted server. */
+export const useJevKey = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.jev, queryFn: () => api.system.jev() });
+};
+
+function useJevChange<T>(change: (api: ApiClient, input: T) => Promise<JevKey>) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(api, input),
+    onSuccess: (jev) => qc.setQueryData(keys.jev, jev),
+  });
+}
+export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.system.saveJev(apiKey));
+export const useCheckJevKey = () => useJevChange<void>((api) => api.system.checkJev());
+export const useRemoveJevKey = () => useJevChange<void>((api) => api.system.removeJev());
 
 export function useCreateOrganization() {
   const api = useApi();
@@ -700,7 +719,7 @@ export function useStartOAuth(orgId: string) {
 /** Where the phone app's OAuth lands: the callback hands `state` and `code` back to the app. */
 export const APP_OAUTH_RETURN = "app:connectors";
 
-/** The phone app finishes an authorization it started (see `APP_OAUTH_RETURN`). */
+/** The phone app (see `APP_OAUTH_RETURN`) or the desktop app's window finishes an authorization it started. */
 export function useCompleteOAuth(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();

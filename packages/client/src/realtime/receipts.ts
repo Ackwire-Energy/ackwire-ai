@@ -1,4 +1,4 @@
-import type { ChannelEvent, ConnectIntent, Message, MessageReceipts, RunStatus } from "../api/types";
+import type { ChannelEvent, ConnectIntent, DecidedBy, Message, MessageReceipts, RunStatus } from "../api/types";
 import { PLATFORM_CAP } from "../lib/limits";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
@@ -34,9 +34,17 @@ export interface MessageReceipt {
   noAi?: { intent?: ConnectIntent; provider?: string };
   /** Routed to nobody: the workspace used up its platform AI for the month, so only @mentions start agents. */
   platformCap?: true;
+  /** Who picked the agents (ADR 0074). */
+  decidedBy?: DecidedBy;
+  /** Nobody could read it (no Jev, small model, plan or rule): only a mention reaches an agent. */
+  mentionNeeded?: true;
+  /** The author's own plan is picking who answers, until the decision. */
+  picking?: true;
   /** The list receipts last seeded: the same read seeded again changes nothing. */
   server?: MessageReceipts;
 }
+
+const MENTION_NEEDED = "mention_needed";
 
 export type ReceiptsState = Record<string, MessageReceipt>;
 
@@ -174,17 +182,23 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
       next = set(next, message.id, h.agentId, h.reason === NO_AI ? "no_ai" : phaseOf(h.status));
       next = linkRun(next, message.id, h.runId, h.agentId);
     }
-    // Receipts come from the router's decision: "nobody picked it" is final.
+    // Receipts come from the router's decision: "nobody picked it" is final. A read with none (the router is
+    // still on it) keeps "Picking who answers", and a `message.routing` after it still counts.
     const current = next[message.id] ?? { routed: false, agents: [] };
+    const decided =
+      r.seenBy.length > 0 || r.handled.length > 0 || Boolean(r.noAi || r.platformCap || r.reason || r.decidedBy);
     return withMentions({
       ...next,
       [message.id]: {
         ...current,
-        routed: true,
+        routed: decided,
+        ...(!decided && existing?.picking ? { picking: true as const } : {}),
         blocked: r.blocked ?? [],
         // The Connect step `message.routed` asked for stays while the server still says "no AI".
         ...(r.noAi ? { noAi: existing?.noAi ?? {} } : {}),
         ...(r.platformCap ? { platformCap: true as const } : {}),
+        ...(r.decidedBy ? { decidedBy: r.decidedBy } : {}),
+        ...(r.reason === MENTION_NEEDED ? { mentionNeeded: true as const } : {}),
         server: r,
       },
     });
@@ -207,6 +221,11 @@ export function applyReceiptEvent(
   event: ChannelEvent | (RunSteeredEvent & { agentId?: string }),
 ): ReceiptsState {
   switch (event.type) {
+    case "message.routing": {
+      const current = state[event.messageId] ?? { routed: false, agents: [] };
+      if (current.routed || current.picking) return state;
+      return { ...state, [event.messageId]: { ...current, picking: true } };
+    }
     case "message.routed": {
       // The router's decision wins over any guess: agents not picked only "saw" it.
       const picked = new Set(event.pickedBy);
@@ -226,6 +245,9 @@ export function applyReceiptEvent(
       const {
         noAi: _before,
         platformCap: _capped,
+        picking: _picking,
+        decidedBy: _decidedBy,
+        mentionNeeded: _mentionNeeded,
         ...current
       } = next[event.messageId] ?? { routed: false, agents: [] };
       // Mentioned agents that got nothing: said explicitly, or the whole decision was "nobody".
@@ -242,6 +264,8 @@ export function applyReceiptEvent(
           // Routed again once an AI is connected: the decision that replaces it says what happens now.
           ...(event.reason === NO_AI ? { noAi: { intent: event.intent, provider: event.provider } } : {}),
           ...(event.reason === PLATFORM_CAP ? { platformCap: true as const } : {}),
+          ...(event.decidedBy ? { decidedBy: event.decidedBy } : {}),
+          ...(event.reason === MENTION_NEEDED ? { mentionNeeded: true as const } : {}),
         },
       };
     }
@@ -312,7 +336,8 @@ export interface ReceiptView {
   /** Main status, or null when there is nothing to say yet. */
   status:
     | { kind: "picked" | "claimed" | "waiting" | "asking" | "handled" | "failed"; agents: string[] }
-    | { kind: "nobody" }
+    /** `mentionNeeded`: no step could read it and no rule fit, so only a mention reaches an agent. */
+    | { kind: "nobody"; mentionNeeded?: true }
     /** Nobody will answer for want of an AI (`agents`: those that couldn't think; empty: nobody was asked). */
     | { kind: "no_ai"; agents: string[] }
     /** Nobody was asked: the workspace used up its platform AI for the month, an @mention still gets an answer. */
@@ -322,11 +347,18 @@ export interface ReceiptView {
   done: boolean;
   /** Agents the message only references (no answer expected from them). */
   referenced: string[];
+  /** Who picked the agents (ADR 0074), when the server said. */
+  decidedBy?: DecidedBy;
+  /** The author's own plan is picking who answers: "Picking who answers" until the decision. */
+  picking?: true;
 }
 
 export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
+  if (receipt?.picking && !receipt.routed)
+    return { seen: [], status: null, done: false, referenced: [], picking: true };
   if (!receipt || (receipt.agents.length === 0 && !receipt.noAi && !receipt.platformCap))
     return { seen: [], status: null, done: false, referenced: [] };
+  const decided = receipt.decidedBy ? { decidedBy: receipt.decidedBy } : {};
   const seen = receipt.agents.map(([id]) => id);
   const referenced = (receipt.referenced ?? []).filter((id) => seen.includes(id));
   const with_ = (phase: ReceiptPhase) => receipt.agents.filter(([, p]) => p === phase).map(([id]) => id);
@@ -336,14 +368,17 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
     return { seen, status: { kind: "no_ai", agents: noAi }, done: false, referenced };
   for (const kind of ["failed", "asking", "waiting", "claimed", "picked"] as const) {
     const agents = with_(kind);
-    if (agents.length) return { seen, status: { kind, agents }, done: false, referenced };
+    if (agents.length) return { seen, status: { kind, agents }, done: false, referenced, ...decided };
   }
   const handled = with_("handled");
-  if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced };
+  if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced, ...decided };
   if (receipt.platformCap) return { seen, status: { kind: "platform_cap" }, done: false, referenced };
   // A mention always gets an answer unless the server said that agent can't, or that the message only
   // references it (never "nobody" on a guess).
   const blocked = new Set([...(receipt.blocked ?? []), ...(receipt.referenced ?? [])]);
   const unanswered = (receipt.mentioned ?? []).some((id) => !blocked.has(id));
-  return { seen, status: receipt.routed && !unanswered ? { kind: "nobody" } : null, done: false, referenced };
+  const nobody = receipt.mentionNeeded
+    ? { kind: "nobody" as const, mentionNeeded: true as const }
+    : { kind: "nobody" as const };
+  return { seen, status: receipt.routed && !unanswered ? nobody : null, done: false, referenced, ...decided };
 }

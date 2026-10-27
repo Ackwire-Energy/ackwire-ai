@@ -1,6 +1,6 @@
 # 0059. AI accounts belong to people: one account per agent, a plan answers its owner, more providers, official marks
 
-- Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first
+- Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first. Amended 2026-10-27: §2 and §4 (one login per agent), §5 (plans are personal where the server provisions the computers)
 - Date: 2026-10-24
 - Extends: ADR 0018 (providers), ADR 0027 (secrets end to end), ADR 0032 (computer brains), ADR 0041 (accounts per agent)
 - Supersedes in part: ADR 0041 §2 (who adds accounts), §4 (who decides) and §7 (removing); ADR 0032 §5 (when the plan warning shows); ADR 0058 §4 (who drives an agent's computer in system mode while its user holds a sign-in)
@@ -32,6 +32,10 @@ People also asked for more providers than Anthropic and OpenAI (DeepSeek, Kimi, 
 - The computer's own sign-in (no folder) can still serve several of its pairer's agents.
 - Each seat's limits stay predictable, and on a computer where every agent runs as its own OS user, one sign-in folder can't be shared anyway.
 
+*Amended 2026-10-27:* one login (a row and its folder) still serves at most one agent, and an account may have one login per agent where `LOGIN_PER_AGENT` (`packages/providers/src/plans.ts`) allows it. "All agents" then signs each agent in with the same account, back to back, and a coding plan's key is pasted once and sealed to each login. The coding plans allow it now: a key has no refresh token, so its copies never sign each other out, and several agents of one person are still one user of the plan. Claude's and ChatGPT's sign-ins stay one agent per account until several sign-ins of one account are seen to hold through their refreshes. Users report that a new Claude sign-in can sign the account's other sign-ins out (anthropics/claude-code #20310, #40419, #80292), and OpenAI documents one `auth.json` per runner or serialized job stream. Each turns on by flipping its value.
+
+The plan's panel says whom it is for ("For [All agents ▾]"). "All agents" means the person's agents with no AI on one computer, and those already on that plan. An agent on the API key stays out, since a plan would make it answer only its owner, and one on another plan keeps it. The setup opens on "All agents" where the plan allows it. Elsewhere the panel opens on the agent it was opened for, else on "All agents" while two or more have no AI, else on the first with no AI. One key fanned out to many agents counts each login against the ten sign-ins a person starts per computer every 15 minutes.
+
 ### 3. A plan only serves its owner's agents
 
 A personal plan thinks only for agents owned by the plan's owner. This is checked when an account is chosen, when an agent changes owner (the plan is cleared), when an account goes away (the agent goes back to the API, or waits with no AI), and at run time (`plan_not_owner`, which also covers an owner who left). Runs never slip onto someone else's plan.
@@ -40,12 +44,19 @@ A personal plan thinks only for agents owned by the plan's owner. This is checke
 
 Automatic names are the maker and the plan, numbered per owner: "Claude Max", "Claude Team 2", "ChatGPT Plus", "GLM Coding", "Kimi Code", "MiniMax", "OpenCode Go". The owner sees the email under the name (and the organization of a team seat); everyone else sees "Claude Team 2 · {owner}'s" and never the email. The same email twice for one owner on one computer is refused, and the new folder is removed.
 
+*Amended 2026-10-27:* where the account may have one login per agent (§2), the same account again is another login: it takes the account's name, and renaming one renames them all. Logins of one account are told apart by its email (in any case) or its key's last 4, never by the name, which any rename can repeat, and the apps show them as one row.
+
 ### 5. "Only replies to you"
 
 - An agent that thinks with a personal plan answers only its owner by default: the audience is `owner`, enforced everywhere a person's message can start a run (ADR 0032's audience gate).
 - Turning the switch off shows the provider's own words about personal use and that answering others might go against its terms. Accepting sets the audience to everyone and is audited with the date. Choosing a plan no longer asks anything; only sharing it does.
 - Only the plan's owner can widen the audience of an agent that thinks with their plan. Admins can only narrow it.
 - With sharing on, anyone who can talk to the agent can make it use the owner's plan and, on a computer where agents share one OS user, reach its sign-in.
+- A plan also picks who answers its owner's own messages nobody mentioned, only on a self-hosted server, and never for anyone else's (ADR 0074 §3).
+
+*Amended 2026-10-27:* where the server provisions the workspaces' computers (`MACHINE_PROVISIONING=external`, the Cloud), the service runs the plans' CLIs for its customers, and the providers' conditions for platforms that do want each person on their own plan ("Each end user must authenticate with their own Anthropic API key, Claude subscription plan credentials, or 3P inference provider credential", code.claude.com/docs/en/legal-and-compliance). There an agent on a plan answers only its owner whatever its stored audience, and nobody can widen it (`plan.personal`). An agent shared before narrows, and answers its stored audience again once it moves to the API key. A self-host keeps the switch and the warning: whoever runs it carries the terms.
+
+The apps say it where it matters. The plan's panel ends with who the agents answer ("On your plan, Ada only replies to you."). Where every agent with an AI answers only the person setting up, the setup's Team step says so before anyone is invited, since someone invited then has no agent to talk to. On the Cloud the agent's page shows "Only replies to you" as a fixed line, with no switch.
 
 ### 6. The sign-in code never passes through our servers in the clear
 
@@ -72,7 +83,7 @@ Each account's usage comes from the CLIs themselves: the rate-limit events durin
 
 ## Risks we accept
 
-- **Terms.** Anthropic says personal subscriptions are for personal use and that "developers may not collect, store, or intermediate Claude.ai credentials or session tokens". OpenAI's Sign in with ChatGPT terms say: "Another user's activity must not trigger requests to the authenticated user's account." Z.ai says "Account sharing or multi-user access is prohibited" and limits the GLM Coding Plan to "officially supported tools and products"; MiniMax describes its plan as individual, interactive developer use; OpenCode Go plans "are for single-member workspaces" (all read 2026-10-23). Our server never sees a sign-in code or a plan key in the clear, a plan answers only its owner unless the owner accepts the risk, and that acceptance is recorded. An owner-only autonomous agent on a Z.ai or MiniMax plan is still a gray area.
+- **Terms.** Anthropic says personal subscriptions are for personal use and that "developers may not collect, store, or intermediate Claude.ai credentials or session tokens". OpenAI's Sign in with ChatGPT terms say: "Another user's activity must not trigger requests to the authenticated user's account." Z.ai says "Account sharing or multi-user access is prohibited" and limits the GLM Coding Plan to "officially supported tools and products"; MiniMax describes its plan as individual, interactive developer use; OpenCode Go plans "are for single-member workspaces" (all read 2026-10-23). Our server never sees a sign-in code or a plan key in the clear, a plan answers only its owner unless the owner accepts the risk, and that acceptance is recorded. Where the server provisions the computers, the owner can't accept it (§5). An owner-only autonomous agent on a Z.ai or MiniMax plan is still a gray area.
 - **Several seats.** One person running several seats as several agents sits close to the usage policies' "bypassing restrictions". Accounts never switch by themselves; moving an agent to another of the owner's accounts is always the owner's own choice.
 - **Logos.** Anthropic's brand terms rule out its names and logos in "your own product, feature, or company name" and say any other use "requires our written permission"; MiniMax keeps all rights to its drawing. We show marks only to say which provider something is, never redrawn and never in our feature names, and one data file means removing or swapping a mark is a one-line change.
 
@@ -88,4 +99,9 @@ Each account's usage comes from the CLIs themselves: the rate-limit events durin
 - **A direct-to-computer endpoint for the code**, so it never crosses our server. Computers sit behind NAT, and on the Cloud we would issue the endpoint's TLS name ourselves, so it would be no more private than the sealed relay. Rejected.
 - **Per-person routing to the workspace key**: the plan for its owner, the workspace's API key for everyone else. One agent would think with two brains and two costs depending on who is talking, and its sessions would split. The audience gate does the job. Rejected.
 - **Switching accounts automatically at a limit.** Rotating subscriptions to get around limits can break the providers' terms (ADR 0041 §6). Rejected.
+- **One sign-in folder for several agents' OS users** (a group, ACLs). Claude Code and Codex rewrite their credentials file readable only by the user who refreshed it, so every other agent loses it at the first refresh. Rejected.
+- **Copying a login into each agent's folder.** The copies race on a rotating refresh token, and for Claude our code would handle a session token. Rejected.
+- **`claude setup-token` kept by the runner and given to each turn.** It holds across users (no refresh), but our code would store a Claude.ai credential, which Anthropic's terms forbid, and such a token can't read the plan's usage. Rejected.
+- **Taking turns on one folder**, lent to whichever agent runs. Agents would queue behind each other's turns, which take minutes, and the router starts up to two at once. Rejected.
+- **One OS user for all of one person's agents.** It would give one sign-in to every agent of a person and drop the isolation between them (files, browser profiles, processes, ADR 0057). Not now.
 - **Storing plan keys on the server**, encrypted like workspace keys. The coding plans' terms allow only their coding tools, and a server-held key could be routed anywhere. Rejected.

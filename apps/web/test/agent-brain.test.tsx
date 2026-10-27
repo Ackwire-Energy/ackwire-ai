@@ -250,7 +250,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   });
 
   test("one agent per account, each person's own: another agent's moves here, someone else's only shows while it's this one's", async () => {
-    const theo: MachineAccount = { ...work, id: "acct_theo", label: "Pessoal", plan: "Max", usedBy: ["Theo"] };
+    const theo: MachineAccount = {
+      ...work,
+      id: "acct_theo",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Max",
+      usedBy: ["Theo"],
+    };
     const hers: MachineAccount = {
       ...work,
       id: "acct_ana",
@@ -382,10 +389,10 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       // Nothing runs on the computer before the person goes on.
       expect(fakeMachinesOf.get(api)?.lastLogin()).toBeUndefined();
       // Where the account stays is the sign-in step's ⓘ.
-      expect(hintOf("Entre no Claude com a conta que vai usar", block).text).toContain(
-        "o agentes.chat nunca vê a senha nem o acesso.",
+      expect(hintOf("Entre no Claude", block).text).toBe(
+        "Conta errada? Saia de lá e tente de novo. A conta fica só no MacBook. A sua senha vai só para o Claude.",
       );
-      expect(shownText(block)).not.toContain("nunca vê a senha");
+      expect(shownText(block)).not.toContain("senha vai só");
       fireEvent.change(within(block).getByRole("textbox", { name: "Qual conta? (opcional)" }), {
         target: { value: "walt@acme.com" },
       });
@@ -466,6 +473,86 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: null, fallback: true, account: "acct_codex" });
+  });
+});
+
+describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", () => {
+  const glm = (id: string, usedBy: string[]): MachineAccount => ({
+    id,
+    kind: "claude_code",
+    label: "GLM Coding",
+    email: null,
+    plan: null,
+    status: "active",
+    ownerId: "u-walter",
+    ownerName: "Walter Nogueira",
+    mine: true,
+    usedBy,
+    usage: null,
+    provider: "zai",
+    keyHint: "4f2a",
+  });
+
+  test("a coding plan whose logins think for other agents: one more for this one, its key pasted again", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () =>
+      fakeAgentBrain(ADA_ID, {
+        brain: "claude_code",
+        effectiveModel: "sonnet",
+        accounts: [glm("acct_theo", ["Theo"]), glm("acct_lia", ["Lia"])],
+      });
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: glm("acct_ada", []) });
+    await open(state, api);
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    // One option for the account, not one per login.
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "Conta deste MacBookA que já está no MacBook",
+      "GLM CodingTambém usada por Theo e Lia",
+      "Adicionar conta",
+    ]);
+    await click(screen().getByRole("option", { name: /^GLM Coding/ }));
+    const block = within(d).getByRole("region", { name: "Conectar GLM Coding" });
+    fireEvent.change(within(block).getByLabelText("Chave do GLM Coding"), {
+      target: { value: "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp" },
+    });
+    await click(within(block).getByRole("button", { name: "Enviar ao MacBook" }));
+    await settle(8);
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { provider: "zai" },
+    ]);
+    expect(d.textContent).toContain("A conta GLM Coding entrou no MacBook. Clique em Usar para salvar.");
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
+  });
+
+  test("on the Cloud a plan only answers its owner: a fixed line with its ⓘ, no switch to share it", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () =>
+      fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", onlyOwner: true });
+    await open(state, api);
+    const d = await brainDialog();
+    expect(within(d).queryByRole("switch", { name: /^Só responde/ })).toBeNull();
+    expect(hintOf("Só responde a você", d).text).toBe(
+      "Um plano é pessoal, então só responde a quem o conectou. Os outros podem usar o próprio plano ou a chave de API do workspace.",
+    );
   });
 });
 

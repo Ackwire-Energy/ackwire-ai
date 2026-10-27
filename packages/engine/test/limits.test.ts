@@ -353,11 +353,11 @@ describe("the platform's AI", () => {
     await post("@dev are you there?");
     expect(await f.db.select().from(schema.agentRuns)).toHaveLength(1);
 
-    // Only Jev bills the platform: the router checks the cap with Jev as its strategy, never with another.
+    // Only Jev bills the platform: the router checks the cap only with Jev in its chain.
     const router = (jev: boolean) =>
       messageRouter({
         ...f.jobDeps,
-        router: { enabled: true, model: "claude-haiku-5-5", ...(jev ? { jev: { apiKey: "jev-test" } } : {}) },
+        router: { enabled: true, model: "claude-haiku-5-5", ...(jev ? { jev: { key: "jev-test" } } : {}) },
       });
     expect(router(true)?.platformCapReached).toBeFunction();
     expect(router(false)?.platformCapReached).toBeUndefined();

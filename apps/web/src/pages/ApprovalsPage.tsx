@@ -427,6 +427,8 @@ type ApprovalVia = {
   name: string;
   account: string | null;
   def: ConnectorDef | null;
+  /** A server connected by address: its own icon. */
+  image?: string | null;
 };
 
 /** What an approval goes through: a mailbox, a server connected by address, a catalog connector, or the app itself. */
@@ -449,11 +451,11 @@ function useApprovalVia(approval: Approval): ApprovalVia {
     : customId
       ? t("approvals.panel.orgConnector")
       : connectorName(t, def ?? { id: approval.connector, label: approval.connector });
-  return { kind: "connector", name, account: approval.connectorAccount ?? null, def };
+  return { kind: "connector", name, account: approval.connectorAccount ?? null, def, image: custom?.image };
 }
 
 function ViaGlyph({ via }: { via: ApprovalVia }) {
-  if (via.kind === "connector") return <ConnectorIcon def={via.def} label={via.name} />;
+  if (via.kind === "connector") return <ConnectorIcon def={via.def} image={via.image} label={via.name} />;
   return (
     <span className="ap-conn__own" aria-hidden="true">
       <Icon name={via.kind === "mail" ? "mail" : "shield"} size={14} />
@@ -564,7 +566,7 @@ function Traits({ approval }: { approval: Approval }) {
   );
 }
 
-function expiryText(t: TFunction, a: Approval) {
+export function expiryText(t: TFunction, a: Approval) {
   const left = timeLeft(t, a.expiresAt);
   if (!left) return t("approval.expired");
   return new Date(a.expiresAt).getTime() - Date.now() <= URGENT_MS

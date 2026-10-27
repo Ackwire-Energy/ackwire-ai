@@ -186,6 +186,17 @@ export const desktopEn: DesktopTranslations = {
     reachOff: "Tailscale isn't connected.",
     reachOffTerminal: "Tailscale isn't connected. Connect it in the terminal:",
     reachMissing: "Needs Tailscale, which is free.",
+    reachChecking: "Checking whether Tailscale is connected…",
+    /** What turning access on or off is doing while it takes. */
+    reachStage: {
+      sharing: "Asking Tailscale to share it…",
+      approve:
+        "Tailscale asks for HTTPS to be turned on in your network. Turn it on in its page: the rest goes on by itself.",
+      restarting: "Restarting agentes.chat at its new address…",
+      signingIn: "Signing in again at the new address…",
+    },
+    approveOpen: "Open Tailscale's page",
+    approveStop: "Stop waiting",
     openTailscale: "Open Tailscale",
     getTailscale: "Get Tailscale",
     usage: "Send anonymous usage statistics to agentes.chat",
@@ -218,6 +229,8 @@ export const desktopEn: DesktopTranslations = {
       https: "HTTPS is off on your Tailscale network",
       serve: "Tailscale on this {{device}} can't share it",
       operator: "Tailscale needs your permission first",
+      stopped: "you stopped waiting for HTTPS to be turned on",
+      start: "agentes.chat didn't answer again at its new address",
     },
     serveFix: "Install Tailscale from tailscale.com.",
     operatorRun: "Give that permission once, in the terminal:",

@@ -63,7 +63,7 @@ describe("an agent's Connect card", () => {
     await click(within(ada).getByRole("button", { name: "Conectar" }));
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     expect(within(plan).getByRole("region", { name: "Seu plano do Claude" })).toBeTruthy();
-    expect(within(plan).queryByRole("combobox", { name: "Para qual agente" })).toBeNull();
+    expect(within(plan).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     await click(within(plan).getByRole("button", { name: "Fechar" }));
     // Two: a choice between them, the first one named chosen.
     await click(
@@ -71,7 +71,7 @@ describe("an agent's Connect card", () => {
     );
     const both = dialog("Conectar uma IA") as HTMLElement;
     expect(within(both).getByRole("region", { name: "Seu plano do Claude" })).toBeTruthy();
-    expect(within(both).getByRole("combobox", { name: "Para qual agente" }).textContent).toContain("Atlas");
+    expect(within(both).getByRole("combobox", { name: "Agentes que usam este plano" }).textContent).toContain("Atlas");
   });
 
   test("an organization's key: no agent named, the key panel with its maker picked; it stays a button", async () => {

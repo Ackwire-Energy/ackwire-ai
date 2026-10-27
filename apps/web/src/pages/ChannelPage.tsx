@@ -172,6 +172,7 @@ import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
+import { ApprovalAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -189,7 +190,7 @@ import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { useUploadFailed } from "@/components/Limits";
-import { LiveCodeToggle, LiveWorkList, type SteerNote } from "@/components/LiveCode";
+import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { WaitingCard } from "@/components/MachineOutages";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
@@ -197,7 +198,6 @@ import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
-import { MessageWork } from "@/components/MessageWork";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   AutoApprovedLine,
@@ -225,6 +225,7 @@ import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { TeamChecks } from "@/components/TeamChecks";
+import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -1605,16 +1606,18 @@ function ChannelView({
                   <h1 className="channel__title"># {channel.name}</h1>
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
-                <ChannelMembersStack
-                  channelId={channel.id}
-                  people={channelPeople}
-                  agents={channelAgents}
-                  onDetails={() => setDetailsOpen(true)}
-                />
-                {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                <Button size="sm" onClick={() => setDetailsOpen(true)}>
-                  {t("channel.details")}
-                </Button>
+                <div className="channel__acts ac-acts">
+                  <ChannelMembersStack
+                    channelId={channel.id}
+                    people={channelPeople}
+                    agents={channelAgents}
+                    onDetails={() => setDetailsOpen(true)}
+                  />
+                  {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+                  <Button size="sm" onClick={() => setDetailsOpen(true)}>
+                    {t("channel.details")}
+                  </Button>
+                </div>
               </header>
             )}
             {!chrome && isMember && (
@@ -2455,7 +2458,7 @@ function StoppedLine({
 /**
  * Under a message sent while an agent worked: "Theo lê na próxima pausa" → "Theo leu" (its face);
  * "Theo parou para ler" when the person asked it to stop and read now (or it woke a wait); "Theo
- * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão no card" while an approval
+ * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão" while an approval
  * holds it; "encerrou o pedido de ajuda" when it ended the wait.
  */
 function SteerLine({ steer }: { steer: SteerState }) {
@@ -3079,8 +3082,14 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </MessageText>
           )}
-          {/* Steps, the messages it read, and each tool call (the same list folds when it is done). */}
-          <LiveWorkList work={opening.work} steerNote={steerNote} agentId={live.agentId} stopped={liveStopped} />
+          {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
+          <LiveTools
+            work={opening.work}
+            agentName={name}
+            color={colorOf(agent)}
+            steerNote={steerNote}
+            stopped={liveStopped}
+          />
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
               <Icon name="alert" size={18} />
@@ -3127,10 +3136,11 @@ export const TimelineMessage = memo(function TimelineMessage({
       ) : (
         <>
           {keptWork?.length && seenLive ? (
-            <LiveWorkList
+            <LiveTools
               work={keptWork}
+              agentName={name}
+              color={colorOf(agent)}
               steerNote={steerNote}
-              agentId={seenLive.agentId}
               done
               stopped={stopped.canceled}
             />
@@ -3142,6 +3152,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
             ))}
           {!missionCard &&
+            // A request says its action itself ("Pedido de aprovação: …" would repeat it).
+            !approvalId &&
             !forumSuggestion &&
             !issueWork &&
             !waitNotice &&
@@ -3225,7 +3237,13 @@ export const TimelineMessage = memo(function TimelineMessage({
             />
           )}
           {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
-            <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} skipScreens={onCards} />
+            <SavedTools
+              runId={m.agentRunId}
+              meta={m.meta}
+              agentName={agent?.name ?? name}
+              color={colorOf(agent)}
+              skipScreens={onCards}
+            />
           )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
           {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
@@ -3309,7 +3327,7 @@ const inlineButton = {
   color: "inherit",
 };
 
-/** The card of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
+/** The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
 function MessageApproval({
   approvalId,
   agent,
@@ -3325,6 +3343,8 @@ function MessageApproval({
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
   if (!approval) return null;
+  // Waiting: the agent asking, in the conversation; decided: one line.
+  if (approval.status === "pending") return <ApprovalAsk approval={approval} agent={agent} members={members} />;
   return <InlineApproval approval={approval} agent={agent} members={members} />;
 }
 

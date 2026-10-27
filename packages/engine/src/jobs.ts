@@ -11,13 +11,15 @@ import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
-import { publishRouted } from "./events";
+import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
-import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
+import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
+import type { JevKey, JevKeySource } from "./jev-key";
 import { mentionHandoffs } from "./judge";
 import { platformCapReached } from "./limits";
 import { wakeForAccessDecision } from "./machine-access";
+import type { MachineCaller } from "./machine-hub";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
@@ -33,15 +35,17 @@ import {
   DEFAULT_ROUTER_POLICY,
   type RouterDeps,
   type RouterStrategy,
-  resolveRouterModel,
   routeMessage,
+  smallModelFor,
 } from "./router";
-import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
+import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-jev";
+import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
 import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
+import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
 
@@ -83,17 +87,22 @@ export interface JobDeps extends RunExecutorDeps {
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
-    /** Anthropic cheap model (ROUTER_MODEL); an org may override it in its settings. */
+    /** The small model on a Claude key (ROUTER_MODEL); an org may override it in its settings. */
     model: string;
-    /** Cheap model per other provider (e.g. `{ openai: "gpt-6-luna" }`), used when the org's default key is theirs. */
+    /** The small model on another provider's key (e.g. `{ openai: "gpt-6-luna" }`); else its catalog pick. */
     cheapModels?: Record<string, string>;
     minScore?: number;
     /** Jev probability needed for an agent's @mention of another agent to start it (default 0.6). */
     mentionThreshold?: number;
-    /** Replaces the core LLM strategy (e.g. an optional external classifier). */
+    /** Replaces the core small-model step (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
-    /** TypeSafe Jev as the strategy, with the LLM one as fallback (platform key, never per org). */
-    jev?: { apiKey: string; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
+    /** TypeSafe Jev as the chain's first step (the installation's key, never per org). */
+    jev?: { key: JevKeySource; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
+    /**
+     * The author's own plan as a step (ADR 0074 §3): the computers it picks on, and this server's address. Off
+     * on the Cloud (`isAgentesCloud`), where Jev is ours. Absent: no plan step.
+     */
+    plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
   };
 }
 
@@ -104,24 +113,22 @@ const orgOf = (job: OutboxJob) => {
 };
 
 /**
- * The router of messages nobody mentioned (`message.posted`, and "Responder agora" routing one again):
- * Jev when configured, with the LLM strategy as its fallback, and the organization's AI checked first.
- * Null when routing is off.
+ * The router of messages nobody mentioned (`message.posted`, and "Responder agora" routing one again): the
+ * chain of ADR 0074 (Jev when configured, the organization's small model, the author's own plan where it is
+ * on, then rules in `routeMessage`), with the organization's AI checked first. Null when routing is off.
  */
 export function messageRouter(deps: JobDeps): RouterDeps | null {
   const router = deps.router;
   if (!router?.enabled) return null;
-  const llm = createLlmRouterStrategy({
-    gateway: deps.gateway,
-    resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model, router.cheapModels),
-  });
+  const perProvider = { anthropic: router.model, ...router.cheapModels };
+  const smallModel = (orgId: string) => smallModelFor(deps, orgId, perProvider);
   const jev = router.jev;
-  const strategy =
-    router.strategy ??
-    (jev
-      ? withFallback(
+  const plans = router.plans && !isAgentesCloud(router.plans.publicUrl) ? router.plans.hub : null;
+  const steps = [
+    ...(jev
+      ? [
           createJevRouterStrategy({
-            apiKey: jev.apiKey,
+            key: jev.key,
             timeoutMs: jev.timeoutMs,
             fetch: jev.fetch,
             baseURL: jev.baseURL,
@@ -137,21 +144,31 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
               });
             },
           }),
-          llm,
-        )
-      : llm);
+        ]
+      : []),
+    router.strategy ?? createLlmRouterStrategy({ gateway: deps.gateway, resolveModel: smallModel }),
+    ...(plans ? [createPlanRouterStrategy({ db: deps.db, hub: plans, pubsub: deps.pubsub })] : []),
+  ];
   return {
     db: deps.db,
-    strategy,
+    strategy: routeChain(steps, { onTiming: deps.onTiming }),
     policy: {
       ...DEFAULT_ROUTER_POLICY,
       minScore: router.minScore ?? DEFAULT_ROUTER_POLICY.minScore,
       maxHops: deps.maxHops,
     },
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
+    routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
-    ...(jev && !router.strategy ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
+    ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
   };
+}
+
+/** Whether Jev picks now: a key its owner sees working (a limit, an outage or a slow answer don't count). */
+async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
+  if (!key) return false;
+  if (typeof key === "string") return true;
+  return "view" in key ? (await (key as JevKey).view()).state === "ok" : (await key.key()) !== null;
 }
 
 /** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
@@ -236,7 +253,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   };
 
   return {
-    "message.posted": async (job, ctx) => {
+    "message.posted": async (job) => {
       const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
@@ -253,7 +270,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         runs: AgentRun[],
         reason?: string,
         intent?: ConnectIntent,
-      ) => publishRouted(deps.pubsub, message, { strategy, seenBy, runs, ...(reason ? { reason } : {}), ...intent });
+        decidedBy?: DecidedBy,
+      ) =>
+        publishRouted(deps.pubsub, message, {
+          strategy,
+          seenBy,
+          runs,
+          ...(reason ? { reason } : {}),
+          ...(decidedBy ? { decidedBy } : {}),
+          ...intent,
+        });
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
       // The forum moves by its own turns (ADR 0022): no mentions, router or DMs there.
       if (where?.kind === "forum") return;
@@ -303,9 +329,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // channels, never in a mission's thread (the mission's own turns run it).
         if (!routing || where?.kind !== "channel") return;
         if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
-        const res = await routeMessage(routing, input, ctx);
+        const res = await routeMessage(routing, input);
         // Receipts only when someone answers: an agent's message isn't waiting for anyone.
-        if (res.runs.length > 0) await routed("router", res.seenBy ?? [], res.runs, res.reason);
+        if (res.runs.length > 0)
+          await routed("router", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
         return;
       }
       if (message.mentionedAgentIds.length > 0) {
@@ -350,14 +377,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           if (role !== "owner" && role !== "decide") return routed("none", [], [], "mission_read_only");
         }
       }
-      const res = await routeMessage(routing, input, ctx);
+      const res = await routeMessage(routing, input);
       if (res.skipped === "already_routed") return;
       // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
       if (res.reason === NO_AI) {
         const intent = await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });
         return routed("none", [], [], NO_AI, intent);
       }
-      await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason);
+      await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
     },
     "agent_run.execute": async (job, ctx) => {
       // Counted per run (statements per stage go into the run profile).
@@ -435,9 +462,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.storage) throw new PermanentJobError("no storage configured");
       await runMigration(deps.storage, String(job.payload.migrationId));
     },
-    "email.send": async (job) => {
-      if (!deps.email) throw new PermanentJobError("no email sender configured");
-      await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
+    "email.send": async (job, ctx) => {
+      try {
+        if (!deps.email) throw new PermanentJobError("no email sender configured");
+        await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
+      } catch (error) {
+        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetJoinCodeEmail(deps.db, job);
+        throw error;
+      }
+      await forgetJoinCodeEmail(deps.db, job);
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");

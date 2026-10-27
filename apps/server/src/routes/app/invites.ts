@@ -1,8 +1,10 @@
 import {
   approveJoinRequest,
   askToJoin,
+  checkJoinCode,
   denyJoinRequest,
   inviteLink,
+  JOIN_CODE_LENGTH,
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
   JOIN_REASON_MAX,
@@ -10,13 +12,15 @@ import {
   listWaitingJoinRequests,
   requestLocale,
   requestNewInvitation,
+  sendJoinCode,
   sha256,
   turnOffInviteLink,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sessionUser } from "../../auth";
-import { requestIp } from "../../http/client-ip";
+import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
+import { humanCheckRefusal } from "../../http/human-check";
 import {
   type AppDeps,
   body,
@@ -33,7 +37,12 @@ const tags = ["Organizations"];
 /** Asks from one place and through one link (ADR 0068): enough for a team arriving, not for a flood. */
 const ASKS_PER_IP = { limit: 10, windowMs: 3600_000 };
 const ASKS_PER_LINK = { limit: 20, windowMs: 3600_000 };
+/** Codes that prove an address (ADR 0072): the per-address limits are the engine's, in the database. */
+const CODES_PER_IP = { limit: 10, windowMs: 3600_000 };
+const CODES_PER_LINK = { limit: 40, windowMs: 3600_000 };
+const CHECKS_PER_IP = { limit: 30, windowMs: 3600_000 };
 const TOO_MANY = "Too many requests from here. Try again in an hour.";
+const Code = z.string().regex(new RegExp(`^\\d{${JOIN_CODE_LENGTH}}$`));
 
 const Token = z.object({ token: z.string().min(1).max(200) });
 const LinkParams = OrgParams.extend({ linkId: z.uuid() });
@@ -51,9 +60,15 @@ const JoinRequest = z.object({
   name: z.string(),
   email: z.string(),
   note: z.string().nullable().openapi({ description: "Their words: shown in the app, never sent out." }),
-  confirmed: z
-    .boolean()
-    .openapi({ description: "Asked signed in with this address confirmed: approving lets them in at once." }),
+  verified: z.boolean().openapi({
+    description:
+      "A code proved the address, or a confirmed account with it asked. False only on a server without email, " +
+      "or for a request typed before codes.",
+  }),
+  confirmed: z.boolean().openapi({
+    deprecated: true,
+    description: "Approving lets an account in at once. Read `verified` instead.",
+  }),
   createdAt: z.string(),
   expiresAt: z.string(),
 });
@@ -171,8 +186,9 @@ export function inviteRoutes(deps: AppDeps) {
       security,
       summary: "Approve a request to join with a role (admins)",
       description:
-        "A signed-in account with this address confirmed joins at once; anyone else gets an email invitation to " +
-        "the address. `emailed: false` on a server that doesn't send email: hand them `url` yourself.",
+        "A confirmed account with this address joins at once when the address was proven (a code from its " +
+        "mailbox, or that account asking). Anyone else gets an email invitation to the address. `emailed: false` " +
+        "on a server that doesn't send email: hand them `url` yourself.",
       request: { params: RequestParams, body: body(z.object({ role: z.enum(["member", "admin"]) })) },
       responses: {
         200: json(
@@ -231,13 +247,98 @@ export function inviteRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/invitations/{token}/code",
+      tags,
+      summary: "Email a code that proves the address, before asking to join through a link",
+      description:
+        "Public. Signed out: the address typed. Signed in: the account's own, when it isn't confirmed. Every " +
+        "address gets the same answer. 60 s between two codes for one address (`retryIn`), and a few an hour " +
+        "and a day per address, all counted in the database. `join.no_email` on a server that sends no email. " +
+        "Guarded by the bot check when this server has one (`human_check`, `human_check_blocked`).",
+      request: { params: Token, body: body(z.object({ email: z.email().max(254).optional() })) },
+      responses: {
+        202: json(z.object({ email: z.string(), resendIn: z.number().int() }), "Sent"),
+        429: errorResponse(
+          "Too many (`join.code_wait` with `retryIn`, `join.code_limit`, `join.rate_limited`, `rate_limited`)",
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { token } = c.req.valid("param");
+      const ip = await adapters.rateLimiter.consume(
+        `join-code:ip:${requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES)}`,
+        CODES_PER_IP,
+      );
+      if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
+      // Before the link's count, so refused bots don't spend what everyone asking through it shares.
+      const refused = await humanCheckRefusal(
+        adapters.humanCheck,
+        c.req.raw.headers,
+        "ask-code",
+        config.TRUSTED_PROXIES,
+      );
+      if (refused) return apiError(c, 403, refused.code, refused.message);
+      const link = await adapters.rateLimiter.consume(`join-code:link:${sha256(token)}`, CODES_PER_LINK);
+      if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
+      if (adapters.email.delivers !== true) return apiError(c, 409, "join.no_email", "This server doesn't send email.");
+      const { email } = c.req.valid("json");
+      const user = await sessionUser(deps.auth, c.req.raw.headers);
+      if (!user && !email) return apiError(c, 400, "invalid_request", "Your email is needed");
+      const sent = await sendJoinCode(events, config.PUBLIC_URL, {
+        token,
+        user,
+        email,
+        locale: requestLocale(c.req.header("accept-language")),
+      });
+      deps.wakeWorkers?.();
+      return c.json(sent, 202);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/{token}/code/check",
+      tags,
+      summary: "Check a code from the email: right, the address can ask for 30 minutes",
+      description:
+        "Public. `join.code_wrong` also when no code was sent. 5 wrong tries per code, 10 a day per address. " +
+        "It never confirms an account.",
+      request: {
+        params: Token,
+        body: body(z.object({ email: z.email().max(254).optional(), code: Code })),
+      },
+      responses: {
+        200: json(z.object({ verified: z.literal(true) })),
+        429: errorResponse("Too many checks from here (`join.rate_limited`)"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const ip = await adapters.rateLimiter.consume(
+        `join-code-check:ip:${requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES)}`,
+        CHECKS_PER_IP,
+      );
+      if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
+      const { email, code } = c.req.valid("json");
+      const user = await sessionUser(deps.auth, c.req.raw.headers);
+      if (!user && !email) return apiError(c, 400, "invalid_request", "Your email is needed");
+      return c.json(await checkJoinCode(events, { token: c.req.valid("param").token, user, email, code }), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/invitations/{token}/requests",
       tags,
       summary: "Ask to join through an invitation link",
       description:
         "Public. Signed out: a name, an email and an optional note, and no account is made. Signed in: the " +
-        "account asks. A typed request, or one from an account whose address isn't confirmed, answers the same " +
-        "whatever the address. Limited per IP and per link.",
+        "account asks. On a server that sends email, an address that isn't a confirmed account's carries the " +
+        "`code` from it (`…/code`), and a proven ask hears where it stands. On a server without email, a typed " +
+        "request answers the same whatever the address. Limited per IP and per link.",
       request: {
         params: Token,
         body: body(
@@ -245,6 +346,7 @@ export function inviteRoutes(deps: AppDeps) {
             name: z.string().trim().min(1).max(JOIN_NAME_MAX).optional(),
             email: z.email().max(254).optional(),
             note: z.string().max(JOIN_NOTE_MAX).optional(),
+            code: Code.optional(),
           }),
         ),
       },
@@ -260,7 +362,10 @@ export function inviteRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { token } = c.req.valid("param");
-      const ip = await adapters.rateLimiter.consume(`join-request:ip:${requestIp(c.req.raw.headers)}`, ASKS_PER_IP);
+      const ip = await adapters.rateLimiter.consume(
+        `join-request:ip:${requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES)}`,
+        ASKS_PER_IP,
+      );
       if (!ip.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
       const link = await adapters.rateLimiter.consume(`join-request:link:${sha256(token)}`, ASKS_PER_LINK);
       if (!link.allowed) return apiError(c, 429, "join.rate_limited", TOO_MANY);
@@ -276,6 +381,8 @@ export function inviteRoutes(deps: AppDeps) {
         email: input.email,
         note: input.note,
         locale: requestLocale(c.req.header("accept-language")),
+        proofNeeded: adapters.email.delivers === true,
+        code: input.code,
       });
       deps.wakeWorkers?.();
       const reply = { status: asked.status, email: asked.email, emailed: adapters.email.delivers === true };
@@ -294,9 +401,9 @@ export function inviteRoutes(deps: AppDeps) {
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
-      const ip = requestIp(c.req.raw.headers);
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
       const limit = await adapters.rateLimiter.consume(`invite-request:${ip}`, { limit: 10, windowMs: 3600_000 });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       await requestNewInvitation(db, config.PUBLIC_URL, c.req.valid("param").token);
       deps.wakeWorkers?.();
       return c.body(null, 204);

@@ -87,18 +87,28 @@ describe("receipts", () => {
     const picked = await post(f, "is the deploy broken?");
     const none = await post(f, "good morning all");
     await drainOutbox(f.db, handlers);
+    // Who picked, never what the model said.
+    const decidedBy = { step: "model" as const, model: "claude-haiku-5-5", provider: "anthropic" };
     expect(await receiptOf(f, picked.id)).toEqual({
       seenBy: [f.agent.id],
       pickedBy: [f.agent.id],
       handled: [{ agentId: f.agent.id, runId: expect.any(String), status: "done" }],
       blocked: [],
+      decidedBy,
     });
-    expect(await receiptOf(f, none.id)).toEqual({ seenBy: [f.agent.id], pickedBy: [], handled: [], blocked: [] });
+    expect(await receiptOf(f, none.id)).toEqual({
+      seenBy: [f.agent.id],
+      pickedBy: [],
+      handled: [],
+      blocked: [],
+      decidedBy,
+    });
     const routed = events.filter((e) => e.type === "message.routed");
     expect(routed).toContainEqual(
       expect.objectContaining({ messageId: none.id, seenBy: [f.agent.id], pickedBy: [], strategy: "router" }),
     );
     expect(JSON.stringify(routed)).not.toContain("score");
+    expect(JSON.stringify(routed)).not.toContain("chit-chat");
 
     const off = await post(f, "router is off now");
     await drainOutbox(f.db, f.handlers); // fixture handlers: router disabled

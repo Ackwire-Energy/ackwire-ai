@@ -25,7 +25,7 @@ mod window_state;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{mpsc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -214,38 +214,83 @@ pub(crate) enum Cut {
     Stopped,
 }
 
+/// What `run_watched` does next, from what the program printed so far.
+pub(crate) enum Watch {
+    /// Keeps waiting, up to the wait it was given.
+    Wait,
+    /// Keeps waiting, up to this long from its start.
+    WaitUpTo(Duration),
+    /// Ends it now (`Cut::Stopped`).
+    Stop,
+}
+
 /// The one way the app waits on a program (Tailscale, the server's `migrate` and database moves, `host --once`):
 /// until it ends, `wait` passes or `stop` says so, checked every 50 ms; a cut kills it. Its output is read while
 /// it runs: a pipe holds 64 KB, and `tailscale status --json` on a large tailnet prints more, so a reader after
 /// the exit would never see it end. A program it started that outlives it keeps the pipes open until it ends too.
 pub(crate) fn run_program(command: &mut Command, wait: Duration, stop: &dyn Fn() -> bool) -> io::Result<Ran> {
+    run_watched(command, wait, &mut |_| if stop() { Watch::Stop } else { Watch::Wait })
+}
+
+/// `run_program`, with `watch` asked every 50 ms, given what the program printed so far (both outputs, as they
+/// came), whether to wait longer or end it: `tailscale serve` names the page for allowing HTTPS and then waits
+/// there until it is allowed.
+pub(crate) fn run_watched(
+    command: &mut Command,
+    wait: Duration,
+    watch: &mut dyn FnMut(&str) -> Watch,
+) -> io::Result<Ran> {
     let mut child = no_console(command)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
-    let reader = |pipe: Option<Box<dyn Read + Send>>| {
+    let (sent, arrived) = mpsc::channel::<Vec<u8>>();
+    let reader = |pipe: Option<Box<dyn Read + Send>>, sent: mpsc::Sender<Vec<u8>>| {
         std::thread::spawn(move || {
             let mut bytes = Vec::new();
             if let Some(pipe) = pipe {
-                let _ = pipe.take(1024 * 1024).read_to_end(&mut bytes);
+                let mut pipe = pipe.take(1024 * 1024);
+                let mut chunk = [0u8; 8192];
+                loop {
+                    match pipe.read(&mut chunk) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            bytes.extend_from_slice(&chunk[..n]);
+                            let _ = sent.send(chunk[..n].to_vec());
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                        Err(_) => break,
+                    }
+                }
             }
             String::from_utf8_lossy(&bytes).into_owned()
         })
     };
-    let out = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
-    let err = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
+    let out = reader(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent.clone());
+    let err = reader(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>), sent);
     let started = Instant::now();
+    let mut so_far = String::new();
     let (code, cut) = loop {
+        while let Ok(chunk) = arrived.try_recv() {
+            so_far.push_str(&String::from_utf8_lossy(&chunk));
+        }
         let cut = match child.try_wait() {
             Ok(Some(status)) => break (status.code(), None),
-            _ if stop() => Cut::Stopped,
-            Ok(None) if started.elapsed() <= wait => {
-                std::thread::sleep(Duration::from_millis(50));
-                continue;
-            }
-            // Too long, or it can't be asked.
-            _ => Cut::TooLong,
+            Ok(None) => match watch(&so_far) {
+                Watch::Stop => Cut::Stopped,
+                Watch::Wait if started.elapsed() <= wait => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                Watch::WaitUpTo(longer) if started.elapsed() <= wait.max(longer) => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                _ => Cut::TooLong,
+            },
+            // It can't be asked.
+            Err(_) => Cut::TooLong,
         };
         let _ = child.kill();
         let _ = child.wait();
@@ -583,6 +628,7 @@ pub fn run() {
             local_server::local_server_stop,
             local_server::local_server_restart,
             local_server::local_server_reach,
+            local_server::local_server_reach_stop,
             local_server::local_server_usage,
             local_server::local_server_backup,
             local_server::local_server_diagnostics,
@@ -776,5 +822,36 @@ mod tests {
             assert_eq!(ran.cut, Some(Cut::Stopped));
             assert!(started.elapsed() < Duration::from_secs(2));
         });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_watched_run_waits_longer_once_asked_and_stops_when_told() {
+        let sh = |script: &str| {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", script]);
+            command
+        };
+        // It names a page, then takes longer than the first wait: the watcher gives it more time.
+        let script = "echo 'visit https://login.tailscale.com/f/serve?node=abc'; sleep 1; echo done";
+        let mut seen = None;
+        let ran = run_watched(&mut sh(script), Duration::from_millis(300), &mut |so_far: &str| {
+            match so_far.split_whitespace().find(|w| w.starts_with("https://")) {
+                Some(url) => {
+                    seen.get_or_insert(url.to_string());
+                    Watch::WaitUpTo(Duration::from_secs(5))
+                }
+                None => Watch::Wait,
+            }
+        })
+        .unwrap();
+        assert_eq!((ran.code, ran.cut), (Some(0), None), "it finished on its own");
+        assert!(ran.out.ends_with("done\n"));
+        assert_eq!(seen.as_deref(), Some("https://login.tailscale.com/f/serve?node=abc"));
+        // Told to stop: it ends at once, well before its own end.
+        let started = Instant::now();
+        let ran = run_watched(&mut sh("exec sleep 5"), Duration::from_secs(10), &mut |_| Watch::Stop).unwrap();
+        assert_eq!(ran.cut, Some(Cut::Stopped));
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 }

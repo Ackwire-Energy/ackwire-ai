@@ -121,7 +121,7 @@ describe("no AI connected: above the composer", () => {
     expect(option(first, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
     // Ada is Walter's and has no AI: the plan is for her (Atlas isn't his), on the MacBook he connected.
     const panel = within(first).getByRole("region", { name: "Seu plano do Claude" });
-    expect(within(panel).queryByRole("combobox", { name: "Para qual agente" })).toBeNull();
+    expect(within(panel).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
     expect(panel.textContent).toContain("A conta do Claude com login no MacBook");
   });
 
@@ -256,7 +256,7 @@ describe("the agent's no-AI card", () => {
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
     // Choosing a plan asks nothing: she then answers only him until he shares it (ADR 0059 §5).
-    expect(plan.textContent).toContain("A Ada vai responder só a você.");
+    expect(plan.textContent).toContain("Com o seu plano, a Ada só responde a você.");
     // Claude's sign-in starts on its button, in a window of its own.
     const realOpen = window.open;
     const popup = { closed: false, opener: {}, location: { href: "" }, close: () => {} };
@@ -291,7 +291,7 @@ describe("the agent's no-AI card", () => {
     const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
     const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Faltam uns 6 min");
-    expect(panel.textContent).toContain("Você entra aqui assim que ele ficar pronto.");
+    expect(panel.textContent).toContain("Você entra aqui assim que o computador ficar pronto.");
     expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(true);
     await click(option(plan, /^Chave de API/));
     expect(within(plan).getByRole("region", { name: "Chave de API" })).toBeTruthy();

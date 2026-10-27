@@ -248,7 +248,7 @@ function AddAccountFlow({
   );
 
   // Where the account stays and what to do on the wrong one: the sign-in step's ⓘ.
-  const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer });
+  const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;
   if (plan) {
     const site = new URL(plan.site);

@@ -55,6 +55,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       "BILLING_HOLD_NEW_WORKSPACES=true needs BILLING_URL, BILLING_LINK_SECRET and OPERATOR_API_TOKEN",
     ]);
   }
+  // Half a pair means the bot check was meant to be on: it never runs quietly off.
+  if (Boolean(config.TURNSTILE_SITE_KEY) !== Boolean(config.TURNSTILE_SECRET_KEY)) {
+    throw new ConfigError(["TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY go together: set both, or neither"]);
+  }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;

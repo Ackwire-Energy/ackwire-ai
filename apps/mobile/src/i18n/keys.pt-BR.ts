@@ -43,6 +43,10 @@ export const mobilePtBR = {
       notAgentes: "{{host}} não é um servidor agentes.chat. Confira o endereço.",
       serverTooOld: "{{host}} precisa de uma atualização para funcionar com este app.",
       appTooOld: "Atualize o app agentes para usar {{host}}.",
+      down: {
+        line: "{{host}} não respondeu.",
+        text: "Ele pode estar fora do ar ou fora da sua rede. O app abre sozinho quando ele voltar.",
+      },
     },
     connect: {
       title: "Conectar a este servidor?",
@@ -53,6 +57,8 @@ export const mobilePtBR = {
       checking: "Conferindo o servidor…",
       notALink: "Este link não é de um servidor agentes.chat.",
       tokenFailed: "O código expirou ou já foi usado. Entre com seu e-mail, ou mostre um código novo no computador.",
+      signInSlow:
+        "Entrar está demorando mais que o normal. Entre com seu e-mail, ou mostre um código novo no computador.",
     },
     scan: {
       hint: "Aponte para o QR code que aparece no computador.",

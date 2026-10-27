@@ -79,7 +79,8 @@ export function ResourceIcon({
   name: string;
 }) {
   if (resource.connectionId) {
-    return <ConnectorIcon def={items.get(resource.connectionId)?.def ?? null} label={name} />;
+    const item = items.get(resource.connectionId);
+    return <ConnectorIcon def={item?.def ?? null} image={item?.image} label={name} />;
   }
   return (
     <span className="connector-icon connector-icon--mono" aria-hidden="true">
@@ -168,10 +169,10 @@ export function LevelRow({
     ...(value === "custom" ? [{ value: "custom" as LevelState, label: t("access.level.custom") }] : []),
   ];
   return (
-    <li className="level-row" data-changed={changed || undefined}>
+    <li className="level-row ac-faceline" data-changed={changed || undefined}>
       {icon}
       <span className="level-row__text">
-        <span className="level-row__name">
+        <span className="level-row__name ac-captop">
           {name}
           {tag}
         </span>
