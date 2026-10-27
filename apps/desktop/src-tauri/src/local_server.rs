@@ -1842,7 +1842,8 @@ pub async fn local_server_install(app: AppHandle, webview: tauri::Webview, choic
 
 /// `install`, and when it doesn't finish (Cancel, a failure, quitting) the computer as it was before Start: what
 /// it started stops, Tailscale shares nothing it didn't, and the database it made goes. Its window closed meanwhile
-/// (hidden): a notification when it failed, the window gone when it finished.
+/// (hidden): a notification when it failed, and opening the app brings the window back on that step; else the
+/// window goes (`open_app` brings back any hidden one).
 fn set_up(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     let (was_run, reach_before) = (state(app).here.run, reached(app));
     let folder = folder(app).ok_or("no home folder")?;
@@ -1868,11 +1869,11 @@ fn set_up(app: &AppHandle, choice: &Choice) -> Result<(), String> {
     }
     if let Some(window) = app.get_webview_window("welcome").filter(|w| !w.is_visible().unwrap_or(true)) {
         match &result {
-            Ok(()) => {
+            Err(why) if why != "cancelled" => notify(app, "setupFailed", "setupFailedBody", None),
+            // Done, or stopped from the popover or Preferences.
+            _ => {
                 let _ = window.destroy();
             }
-            Err(why) if why != "cancelled" => notify(app, "setupFailed", "setupFailedBody", None),
-            Err(_) => {}
         }
     }
     state(app).setting_up = None;

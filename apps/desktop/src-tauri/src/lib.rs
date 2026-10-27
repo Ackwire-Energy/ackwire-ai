@@ -389,7 +389,7 @@ fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// The update downloading now: Cancel drops it (nothing is installed until it is whole).
+/// The update being checked for or downloaded now: Cancel drops it (nothing is installed until it is whole).
 #[derive(Default)]
 struct UpdateDownload(Mutex<Option<Box<dyn Fn() + Send>>>);
 
@@ -397,7 +397,7 @@ const UPDATE_PROGRESS_EVENT: &str = "update://progress";
 
 /// Downloads the newer version, with its progress to Preferences, then installs it (signed with the key built
 /// into the app, checked by the plugin), stops the runners and relaunches. `false`: nothing newer to install.
-/// Err "cancelled": Cancel dropped the download.
+/// Err "cancelled": Cancel dropped the check or the download.
 #[tauri::command]
 async fn update_install(app: AppHandle) -> Result<bool, String> {
     // Windows runs the installer and ends the app at once, and the installer can't replace the files of a
@@ -416,25 +416,27 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
         })
         .build()
         .map_err(|e| e.to_string())?;
-    let Some(mut update) = updater.check().await.map_err(|e| e.to_string())? else {
-        return Ok(false);
-    };
-    // The 30 s are the check's: a download of any length is fine while it keeps moving.
-    update.timeout = None;
-    let (mut got, mut said) = (0u64, None::<u64>);
     let progress = app.clone();
-    let on_chunk = move |chunk: usize, total: Option<u64>| {
-        got += chunk as u64;
-        // Once per percent, or per MB without a size: never once per chunk.
-        let step = total.map_or(got / 1_048_576, |t| got * 100 / t.max(1));
-        if said != Some(step) {
-            said = Some(step);
-            let _ = progress.emit_to("prefs", UPDATE_PROGRESS_EVENT, (got, total));
-        }
-    };
-    let task = tauri::async_runtime::spawn({
-        let update = update.clone();
-        async move { update.download(on_chunk, || {}).await }
+    // The check and the download are one task: Preferences shows Cancel from the click, and the check can take
+    // its 30 s.
+    let task = tauri::async_runtime::spawn(async move {
+        let Some(mut update) = updater.check().await? else {
+            return Ok(None);
+        };
+        // The 30 s are the check's: a download of any length is fine while it keeps moving.
+        update.timeout = None;
+        let (mut got, mut said) = (0u64, None::<u64>);
+        let on_chunk = move |chunk: usize, total: Option<u64>| {
+            got += chunk as u64;
+            // Once per percent, or per MB without a size: never once per chunk.
+            let step = total.map_or(got / 1_048_576, |t| got * 100 / t.max(1));
+            if said != Some(step) {
+                said = Some(step);
+                let _ = progress.emit_to("prefs", UPDATE_PROGRESS_EVENT, (got, total));
+            }
+        };
+        let bytes = update.download(on_chunk, || {}).await?;
+        Ok::<_, tauri_plugin_updater::Error>(Some((update, bytes)))
     });
     let abort = task.inner().abort_handle();
     let download = app.state::<UpdateDownload>();
@@ -445,8 +447,9 @@ async fn update_install(app: AppHandle) -> Result<bool, String> {
     if let Ok(mut current) = download.0.lock() {
         *current = None;
     }
-    let bytes = match done {
-        Ok(Ok(bytes)) => bytes,
+    let (update, bytes) = match done {
+        Ok(Ok(Some(found))) => found,
+        Ok(Ok(None)) => return Ok(false),
         Ok(Err(e)) => return Err(e.to_string()),
         Err(_) => return Err("cancelled".into()),
     };

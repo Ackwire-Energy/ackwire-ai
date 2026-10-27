@@ -360,7 +360,14 @@ describe("Setting it up here", () => {
       "first",
       async (screen) => {
         const { el, until, button, press } = screen;
-        await startSetup(screen);
+        const switchOn = (id: string) => el.querySelector(`#${id}`)?.getAttribute("aria-checked");
+        await press("Use your own server");
+        await press("Run agentes.chat on this Mac");
+        await until(() => el.querySelector("#here-reach:not([disabled])"));
+        await act(async () => typeInto(el.querySelector('input[type="email"]'), "ana@example.com"));
+        await act(async () => (el.querySelector("#here-reach") as HTMLElement).click());
+        await act(async () => (el.querySelector("#here-usage") as HTMLElement).click());
+        await press("Start agentes.chat");
         await until(() => stepOf(el, "Creating your account")?.dataset.state === "active");
         await press("Cancel");
         expect(cancels).toBe(1);
@@ -371,6 +378,9 @@ describe("Setting it up here", () => {
         expect(el.querySelector(".dk-fr__setup")).toBeNull();
         expect((el.querySelector('input[autocomplete="name"]') as HTMLInputElement).value).toBe("Ana Souza");
         expect((el.querySelector('input[type="email"]') as HTMLInputElement).value).toBe("ana@example.com");
+        // The switches as they were set, though the undone setup reads as reach off and usage on.
+        await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+        expect([switchOn("here-reach"), switchOn("here-usage")]).toEqual(["true", "false"]);
       },
       {
         here: { hold: "account", pace: 10 },

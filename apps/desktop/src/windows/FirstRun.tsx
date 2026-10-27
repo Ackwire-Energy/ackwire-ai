@@ -623,10 +623,14 @@ function RunHere({
     );
   }
 
-  // The computer is as it was before Start: the form comes back, with what was typed.
+  // The computer is as it was before Start: the form comes back, with what was typed and chosen (the undone setup
+  // reads as reach off, and usage on when it stopped before writing it).
   const backToForm = () => {
     setSetup(null);
-    read();
+    void host
+      .localServer()
+      .then(setStatus)
+      .catch(() => {});
   };
   const start = async () => {
     const choice = view.ask ? { name: name.trim(), email: email.trim(), reach, usage } : { reach, usage };
