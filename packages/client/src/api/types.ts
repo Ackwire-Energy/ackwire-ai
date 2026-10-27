@@ -1550,11 +1550,21 @@ export interface S3Input {
   secretAccessKey?: string;
 }
 
+/**
+ * Where the server keeps the files of workspaces without a bucket of their own: its disk, its database or the bucket
+ * its operator set. `folder`: that disk's folder, absolute, only where the server isn't in a container.
+ */
+export interface StoragePlatform {
+  kind: "disk" | "database" | "bucket";
+  folder: string | null;
+}
+
 export interface StorageConfig {
   kind: StorageKind;
   /** The bucket in use (keys never come back: only their last characters). */
   s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
   migration: StorageMigration | null;
+  platform: StoragePlatform;
 }
 
 export type StorageStep = "write" | "read" | "list" | "delete";

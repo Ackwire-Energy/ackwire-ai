@@ -17,7 +17,7 @@ import {
   setupView,
   WORKSPACE_COMPUTER_KIND,
 } from "../src/lib/computer";
-import { errorText, holdText, standingRefusalText } from "../src/lib/errors";
+import { errorText, holdText, standingRefusalText, supportLineOf } from "../src/lib/errors";
 import { canReduceAccess } from "../src/lib/machines";
 import { applyWorkspaceEvent } from "../src/realtime/machines";
 
@@ -337,6 +337,19 @@ describe("the workspace's standing in words (ADR 0056 §8)", () => {
     expect(holdText(t, { state: "active", reason: null })).toBeNull();
     expect(holdText(t, { state: "suspended", reason: null })).toBeNull();
     expect(holdText(t, undefined)).toBeNull();
+  });
+
+  test("where to ask: the server's address, else who runs it; on the Cloud without an address, nowhere", () => {
+    expect(supportLineOf({ supportEmail: "ti@acme.dev", workspaceComputer: false })).toEqual({ email: "ti@acme.dev" });
+    expect(supportLineOf({ supportEmail: "help@agentes.chat", workspaceComputer: true })).toEqual({
+      email: "help@agentes.chat",
+    });
+    expect(supportLineOf({ supportEmail: null, workspaceComputer: false })).toBe("ask");
+    // A server too old to say whether it is the Cloud is someone's own.
+    expect(supportLineOf({ supportEmail: null })).toBe("ask");
+    // Nobody else runs the Cloud: "ask the people who run this server" would point at no one.
+    expect(supportLineOf({ supportEmail: null, workspaceComputer: true })).toBeNull();
+    expect(supportLineOf(undefined)).toBeNull();
   });
 
   test("refusals, from the API or a run, in the person's language with the reason told", () => {

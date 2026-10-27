@@ -29,13 +29,17 @@ export const OVERDUE_REPORT_MS = 10 * 60_000;
 export const RETRY_MS = [5 * 60_000, 30 * 60_000, 2 * 3600_000];
 const SEND_TIMEOUT_MS = 10_000;
 
+/** How this server was installed: `INSTALL_MODE`, else `docker` inside a container, else `native`. */
+export const installMode = (config: Pick<Config, "INSTALL_MODE">, container = inContainer()) =>
+  config.INSTALL_MODE ?? (container ? "docker" : "native");
+
 /** What this process knows about itself and its host. */
 export function telemetryFacts(config: Config): TelemetryFacts {
   const container = inContainer();
   return {
     version,
     edition: isAgentesCloud(config.PUBLIC_URL) ? "cloud" : "selfhost",
-    install: config.INSTALL_MODE ?? (container ? "docker" : "native"),
+    install: installMode(config, container),
     os: process.platform,
     arch: process.arch,
     // FILES_DIR is the compose file's data volume.

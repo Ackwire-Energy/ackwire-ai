@@ -27,7 +27,7 @@ export interface AgentComputerFacts {
   /** The workspace's own computer (the Cloud's), else null. */
   setup: SetupView | null;
   /** The computer the agent works on, from the computers list; null: none. */
-  machine: Pick<Machine, "name" | "online" | "lastSeenAt" | "paused"> | null;
+  machine: Pick<Machine, "name" | "online" | "lastSeenAt" | "paused" | "desktopUse"> | null;
   /** Its screen as `GET …/desktop` says it; null while unknown. */
   desktop: Pick<DesktopStatus, "available" | "reason"> | null;
   /** Its browser can run on its computer now. */
@@ -57,6 +57,8 @@ export type EntryState =
   | { kind: "working" }
   | { kind: "unavailable"; outdated: boolean }
   | { kind: "noScreen" }
+  /** `noScreen` on a computer with no screens for agents (a Mac, a PC): only its browser could show there. */
+  | { kind: "noBrowser" }
   | { kind: "noComputer" }
   | { kind: "available" };
 
@@ -99,7 +101,10 @@ export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryStat
   if (!shown && !neither && (f.machine || f.edition === "cloud")) {
     return { kind: "unavailable", outdated: f.desktop?.reason === "runner_outdated" };
   }
-  if (neither) return { kind: "noScreen" };
+  if (neither) {
+    const screens = f.edition === "cloud" || f.machine?.desktopUse?.available !== false;
+    return { kind: screens ? "noScreen" : "noBrowser" };
+  }
   if (!f.machine && f.edition === "selfhost") return { kind: "noComputer" };
   return { kind: "available" };
 }
@@ -190,6 +195,8 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
         : t("agentComputer.status.unavailable");
     case "noScreen":
       return t("agentComputer.status.noScreen");
+    case "noBrowser":
+      return t("agentComputer.status.noBrowser");
     case "noComputer":
       return t("agentComputer.status.noComputer");
     default:

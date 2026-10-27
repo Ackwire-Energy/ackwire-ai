@@ -30,7 +30,14 @@ import { groupPlans } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
-import { commandInReason, computerKind, computerState } from "@agenteschat/client/lib/machines";
+import {
+  allowsInApp,
+  commandInReason,
+  computerKind,
+  computerState,
+  toolOffReason,
+  toolOnCommand,
+} from "@agenteschat/client/lib/machines";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
@@ -239,13 +246,8 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const member = viewer === "member";
   const reason = work.browser.data?.reason;
   const machineRow = machine ? work.machines.data?.find((m) => m.id === machine.machineId) : undefined;
-  // The steps happen on the computer itself: never on the workspace's own, which nobody here reaches.
-  const steps =
-    !member &&
-    work.browserWord === "waiting" &&
-    machine &&
-    machineRow?.kind !== "managed" &&
-    (reason === "switched_off" || reason === "not_reported");
+  // Only a switch that is off has a step there: `not_reported` and `not_installed` are on, `outdated` has none.
+  const steps = !member && work.browserWord === "waiting" && machine && reason === "switched_off";
   const desktopGranted = (work.scopes.data ?? []).some(
     (s) => s.connectionId === null && s.scope === DESKTOP_TOOL_SCOPE,
   );
@@ -361,13 +363,17 @@ function ThisMacReconnect({ machineId }: { machineId: string }) {
 }
 
 /**
- * The three clicks on the computer that turn its browser on, drawn small; the page notices by itself.
- * In agentes for Mac on this very Mac: one button to Preferences → Ferramentas instead (ADR 0036).
+ * What turns the computer's browser on, there; the page notices by itself. The app's three clicks, drawn small; on a
+ * Linux computer, which may be a server without the app, the command too. In agentes for Mac on this very Mac: one
+ * button to Preferences → Ferramentas instead (ADR 0036). Nothing once its switch is on, or on the workspace's own
+ * computer, which nobody here reaches.
  */
 export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const here = useIsThisMac(org.id, machineId ?? "");
+  const row = useMachines(org.id).data?.find((m) => m.id === machineId);
+  if (row?.kind === "managed" || row?.access?.tools.browser) return null;
   if (here) {
     return (
       <section className="brw-steps" aria-label={t("machines.thisMac.browserTitle")}>
@@ -413,40 +419,48 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
         <b>{t("agentPage.work.steps.title", { computer })}</b>
         <span className="brw-steps__wait">{t("agentPage.work.steps.waiting")}</span>
       </div>
-      <div className="brw-steps__grid">
-        {step(1, bar(true), t("agentPage.work.steps.one"))}
-        {step(
-          2,
-          <>
-            {bar()}
-            <div className="brw-mmenu">
-              <span>{t("agentPage.work.steps.menuOpen")}</span>
-              <hr />
-              <span data-hl>{t("agentPage.work.steps.menuPrefs")}</span>
-              <span>{t("agentPage.work.steps.menuPause")}</span>
-              <hr />
-              <span>{t("agentPage.work.steps.menuQuit")}</span>
-            </div>
-          </>,
-          t("agentPage.work.steps.two"),
-        )}
-        {step(
-          3,
-          <div className="brw-mwin">
-            <div className="brw-mwin__bar">{t("agentPage.work.steps.tools")}</div>
-            <div className="brw-mwin__row">
-              Claude Code <i data-on />
-            </div>
-            <div className="brw-mwin__row">
-              {t("agentPage.work.steps.commands")} <i data-on />
-            </div>
-            <div className="brw-mwin__row" data-hl>
-              {t("agentPage.work.computer.browser")} <i data-flip />
-            </div>
-          </div>,
-          t("agentPage.work.steps.three"),
-        )}
-      </div>
+      {row && !allowsInApp(row.os) ? (
+        <div className="stack-4" style={{ gap: 6 }}>
+          <span className="small">{t("browser.machine.offHelp")}</span>
+          <span className="small muted">{t("machines.access.grantTerminal")}</span>
+          <CommandBlock command={toolOnCommand(row, "browser")} />
+        </div>
+      ) : (
+        <div className="brw-steps__grid">
+          {step(1, bar(true), t("agentPage.work.steps.one"))}
+          {step(
+            2,
+            <>
+              {bar()}
+              <div className="brw-mmenu">
+                <span>{t("agentPage.work.steps.menuOpen")}</span>
+                <hr />
+                <span data-hl>{t("agentPage.work.steps.menuPrefs")}</span>
+                <span>{t("agentPage.work.steps.menuPause")}</span>
+                <hr />
+                <span>{t("agentPage.work.steps.menuQuit")}</span>
+              </div>
+            </>,
+            t("agentPage.work.steps.two"),
+          )}
+          {step(
+            3,
+            <div className="brw-mwin">
+              <div className="brw-mwin__bar">{t("agentPage.work.steps.tools")}</div>
+              <div className="brw-mwin__row">
+                Claude Code <i data-on />
+              </div>
+              <div className="brw-mwin__row">
+                {t("agentPage.work.steps.commands")} <i data-on />
+              </div>
+              <div className="brw-mwin__row" data-hl>
+                {t("agentPage.work.computer.browser")} <i data-flip />
+              </div>
+            </div>,
+            t("agentPage.work.steps.three"),
+          )}
+        </div>
+      )}
       <p className="brw-steps__done ac-iconline">
         <Icon name="check" size={14} />
         {t("agentPage.work.steps.done")}
@@ -803,6 +817,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
       return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
+    if (o.reason === "tool_off" && k !== "model") {
+      const off = toolOffReason(
+        work.machines.data?.find((m) => m.id === view.computer?.machineId),
+        k,
+      );
+      return t(off.key, { computer: view.computer?.name ?? "", command: off.command });
+    }
     return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "" });
   };
   const whereName = home?.name ?? "";
@@ -1519,7 +1540,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
           {blocked && inDesktopApp() && (
             <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
           )}
-          {on && (moveTo ? !ready(moveTo) : !work.browser.data?.available && work.browser.data?.machine) && (
+          {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
             <BrowserSteps
               computer={moveTo?.name ?? work.browser.data?.machine?.name ?? ""}
               machineId={moveTo?.id ?? work.browser.data?.machine?.id}

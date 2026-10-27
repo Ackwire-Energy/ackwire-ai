@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
-import type { OrgStanding } from "../api/types";
+import type { AuthConfig, OrgStanding } from "../api/types";
 import { MAX_UPLOAD_MB } from "./files";
 
 /**
@@ -125,6 +125,19 @@ export function standingRefusalText(
 export function holdText(t: TFunction, standing: OrgStanding | null | undefined): string | null {
   if (standing?.state !== "hold") return null;
   return standingRefusalText(t, "org.paused", { reason: standing.reason });
+}
+
+/**
+ * Where a workspace on hold or suspended asks for help: the server's address (`SUPPORT_EMAIL`), else "ask the
+ * people who run this server" (`support.ask`). On the Cloud nobody else runs it, so without an address, nothing.
+ * Nothing either until `auth-config` answers.
+ */
+export function supportLineOf(
+  config: Pick<AuthConfig, "supportEmail" | "workspaceComputer"> | undefined,
+): { email: string } | "ask" | null {
+  if (!config) return null;
+  if (config.supportEmail) return { email: config.supportEmail };
+  return config.workspaceComputer ? null : "ask";
 }
 
 /** "Continuar" refused: these say why (anything else is a plain "couldn't continue"). */

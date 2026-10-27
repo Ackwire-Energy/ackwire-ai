@@ -15,17 +15,20 @@ import { formatBytes } from "@agenteschat/client/lib/files";
 import { clockAt, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  allowsInApp,
   canReduceAccess,
   computerKind,
   computerState,
-  DESKTOP_TARGET,
+  desktopTargetOf,
   downloadHref,
   folderName,
   hostDescKey,
   installCommand,
+  isHandheld,
   isPaused,
   MACHINE_TOOLS,
   machineTitle,
+  platformOf,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -147,38 +150,40 @@ export function CommandBlock({ command }: { command: string }) {
 }
 
 /**
- * "Baixar o app para Mac" from the latest build, small; nothing while there is none (the connect card says so).
- * In the app itself: "Usar este Mac" instead (ADR 0036).
+ * "Baixar o app para macOS" (or the system this page is open on) from the latest build, small; nothing while there
+ * is none (the connect card says so). In the app itself: "Usar este Mac" instead (ADR 0036).
  */
 export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const latest = useDesktopLatest(DESKTOP_TARGET.target, DESKTOP_TARGET.arch);
+  const target = desktopTargetOf(navigator.userAgent);
+  const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   if (inDesktopApp()) return <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} primary={primary} />;
-  if (!latest.data) return null;
+  if (!target || !latest.data) return null;
   return (
     <Button asChild size="sm" variant={primary ? "primary" : "default"}>
       <a href={downloadHref(latest.data.url, origin)} download>
         <Icon name="download" />
-        {t("machines.download.mac")}
+        {t("machines.download.mac", { system: t(`machines.os.${target.target}`) })}
       </a>
     </Button>
   );
 }
 
 /**
- * How to connect a computer (ADR 0036 §2, §10): "Baixar o app para Mac" from
- * the latest release (version, size, SHA-256), the first-run steps (the app
- * is signed and notarized), and the terminal installer for servers and Linux. The
- * computer shows a code and the person confirms it on `/conectar`. In the app
- * itself (ADR 0036): "Usar este Mac" in one click instead of the download, unless
- * `download` (connecting another computer from the app).
+ * How to connect a computer (ADR 0036 §2, §10): the app for the system this page is open on, from the latest
+ * release (version, size, SHA-256), the first-run steps, and the terminal installer for servers and Linux. The
+ * computer shows a code and the person confirms it on `/conectar`. In the app itself (ADR 0036): "Usar este Mac" in
+ * one click instead of the download, unless `download` (connecting another computer from the app).
  */
 export function ConnectComputer({ orgId, download = false }: { orgId: string; download?: boolean }) {
   const { t, i18n } = useTranslation();
   const copy = useCopy();
-  const latest = useDesktopLatest(DESKTOP_TARGET.target, DESKTOP_TARGET.arch);
+  const platform = platformOf(navigator.userAgent);
+  const handheld = isHandheld(navigator.userAgent);
+  const target = desktopTargetOf(navigator.userAgent);
+  const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
   const [other, setOther] = useState(false);
   const otherId = useId();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
@@ -187,27 +192,28 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
   const app = useAgentsHere() && !download;
   return (
     <div className="machine-connect">
-      {/* With no build published there is nothing to install: the note below says the app isn't out yet. */}
-      {(app || release) && (
+      {/* With no build for this computer there is nothing to install: the note below says the app isn't out yet. A
+          phone or a tablet installs it on the computer: the line alone, no system guessed. */}
+      {(app || release || handheld) && (
         <p className="small muted" style={{ margin: 0 }}>
           {app ? t("machines.thisMac.text") : t("machines.download.text")}
         </p>
       )}
       {app ? (
         <div className="row" style={{ gap: 12, alignItems: "center" }}>
-          <ComputerPortrait kind="mac" state="online" />
+          <ComputerPortrait kind={platform} state="online" />
           <ThisMacButton orgId={orgId} canPair primary />
         </div>
-      ) : latest.isLoading ? (
+      ) : handheld ? null : latest.isLoading ? (
         <LoadingLine width={220} />
-      ) : release ? (
+      ) : release && target ? (
         <div className="machine-connect__release">
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            <ComputerPortrait kind="mac" state="online" />
+            <ComputerPortrait kind={platform} state="online" />
             <Button asChild variant="primary">
               <a href={downloadHref(release.url, origin)} download>
                 <Icon name="download" />
-                {t("machines.download.mac")}
+                {t("machines.download.mac", { system: t(`machines.os.${target.target}`) })}
               </a>
             </Button>
             <span className="small muted">
@@ -240,14 +246,17 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
           )}
         </div>
       ) : (
-        <Alert tone="neutral">{t("machines.download.unavailable")}</Alert>
+        // The command below is a shell script: Windows' own terminal can't run it.
+        <Alert tone="neutral">
+          {t(platform === "windows" ? "machines.download.unavailable" : "machines.download.unavailableCommand")}
+        </Alert>
       )}
       {release && !app && (
         <div className="stack-4" style={{ gap: 6 }}>
           <span className="newag__label">{t("machines.download.firstTime")}</span>
           <ol className="machine-pair__steps small">
-            <li>{t("machines.download.step1")}</li>
-            <li>{t("machines.download.step2")}</li>
+            <li>{t(platform === "mac" ? "machines.download.step1" : "machines.download.step1Install")}</li>
+            <li>{t("machines.download.step2", { device: t(`machines.thisMac.device.${platform}`) })}</li>
           </ol>
         </div>
       )}
@@ -862,7 +871,7 @@ function GrantCard({ machine: m }: { machine: Machine }) {
   // In system mode the runner's settings are root's (ADR 0057): allowing takes the computer's administrator.
   const system = m.mode === "system";
   const allowExample = `${system ? "sudo " : ""}agentes-runner folders allow ${path} --agent ${agent}`;
-  const mac = m.os === "darwin";
+  const app = allowsInApp(m.os);
   return (
     <Card aria-labelledby="sec-machine-grant">
       <h2 id="sec-machine-grant" className="ac-card__title">
@@ -878,13 +887,13 @@ function GrantCard({ machine: m }: { machine: Machine }) {
       ) : m.canManage ? (
         <>
           <p className="small" style={{ margin: 0 }}>
-            {mac
+            {app
               ? t("machines.access.grantText")
               : system
                 ? t("machines.access.grantTextAdmin")
                 : t("machines.access.grantTextTerminal")}
           </p>
-          {mac && <span className="small muted">{t("machines.access.grantTerminal")}</span>}
+          {app && <span className="small muted">{t("machines.access.grantTerminal")}</span>}
           <CommandBlock command={allowExample} />
         </>
       ) : (

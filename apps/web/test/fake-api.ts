@@ -40,6 +40,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SignInOptions,
+  StoragePlatform,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -189,6 +190,8 @@ export interface FakeState {
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
   jev?: JevKey;
+  /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
+  storagePlatform?: StoragePlatform;
   /** `push.webKey`: the server's Web Push key; unset = Web Push off on this server (null). */
   webPushKey?: string;
   /** `push.stale`: the notification ids the server calls stale (read, done, snoozed, gone); unset = none. */
@@ -1989,7 +1992,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
       },
     },
-    storage: createMockStorage(),
+    storage: createMockStorage(() => state.storagePlatform),
     artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,

@@ -4,6 +4,7 @@ import { computerEdition, computerName, etaLine, setupView } from "@agenteschat/
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
+import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   ALL_AGENTS,
@@ -519,6 +520,10 @@ function PlanSteps({
       </>
     );
   } else if (gate.state === "unsupported") {
+    const off = toolOffReason(
+      machines.data?.find((m) => m.id === view?.computer?.machineId),
+      kind,
+    );
     wait = (
       <>
         <SettingNote icon="alert">
@@ -526,7 +531,9 @@ function PlanSteps({
             ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
             : gate.reason === "keys"
               ? t("aiAccounts.connect.needs.keys")
-              : t(`brain.reasons.${gate.reason}`, { computer })}
+              : gate.reason === "tool_off"
+                ? t(off.key, { computer, command: off.command })
+                : t(`brain.reasons.${gate.reason}`, { computer })}
         </SettingNote>
         {useKey}
       </>

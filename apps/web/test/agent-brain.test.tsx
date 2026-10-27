@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AgentBrain, MachineAccount, PlanUsage } from "@agenteschat/client";
+import type { AgentBrain, BrowserUnavailableReason, Machine, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeAgentBrain, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -185,6 +185,29 @@ describe("Quem pensa (its dialog)", () => {
     expect(codex.textContent).toContain("Não está instalado no MacBook.");
     expect(codex.querySelector(".ac-brand--off")).not.toBeNull();
     expect(codex.querySelector(".ac-optrow__side")?.textContent).toBe("Nenhum computador tem");
+  });
+
+  test("a tool turned off says where it turns on: the app on a Mac, the app or the command on Linux", async () => {
+    const reason = async (os: string, name: string) => {
+      cleanup();
+      const state = seedState();
+      const api = createFakeApi(state);
+      fakeMachinesOf.get(api)?.pair({ id: "machine_1", name, os, mode: "system" });
+      const computer = { machineId: "machine_1", name, online: true };
+      const base = fakeAgentBrain(ADA_ID, { computer });
+      const options = base.options.map((o) =>
+        o.kind === "claude_code" ? { ...o, available: false, reason: "tool_off" as const } : o,
+      );
+      api.agents.brain = async () => ({ ...base, options, machines: [{ ...computer, options }] });
+      await open(state, api);
+      return card(await brainDialog(), /^Claude Code/).textContent;
+    };
+    expect(await reason("darwin", "MacBook")).toContain(
+      "Desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+    );
+    expect(await reason("linux", "Servidor")).toContain(
+      "Desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable claude.",
+    );
   });
 });
 
@@ -604,12 +627,108 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
     await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
     expect(d.textContent).toContain("A Ada passa para o MacBook, que tem navegador.");
-    expect(d.textContent).toContain("Falta 1 passo, no próprio MacBook");
+    const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio MacBook" });
+    // The app's icon sits by the clock: at the top on a Mac, at the bottom on a PC.
+    expect(steps.textContent).toContain("Clique no ícone do agentes.chat perto do relógio");
+    expect(steps.querySelector(".machine-command__code")).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args.slice(1)).toEqual([ADA_ID, "machine_1"]);
     expect(state.calls.some((c) => c.method === "access.set")).toBe(true);
     expect(document.body.textContent).toContain("Falta 1 passo no MacBook.");
+  });
+
+  test("on a Linux computer, maybe a server without the app, the step there is the command too", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({
+      id: "machine_1",
+      name: "Servidor",
+      os: "linux",
+      mode: "system",
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: false } },
+      browser: { available: false, version: null, chrome: null, reason: null },
+    });
+    await open(state, api);
+    const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
+    await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
+    const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio Servidor" });
+    expect(steps.textContent).toContain(
+      "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.Sem o app? No terminal do computador:",
+    );
+    expect(steps.querySelector(".machine-command__code")?.textContent).toBe("sudo agentes-runner tools enable browser");
+    expect(steps.querySelector(".brw-steps__grid")).toBeNull();
+  });
+
+  /**
+   * Ada's browser on Servidor, a Linux computer (`machine` over it), and the page open. `reason`: what the server says
+   * of her browser there; null: she is still on a sandbox, so turning it on moves her there.
+   */
+  const onServidor = async (
+    machine: Partial<Machine>,
+    reason: BrowserUnavailableReason | null,
+    { cloud = false, granted = false } = {},
+  ) => {
+    cleanup();
+    const state = seedState();
+    if (granted) state.scopes[ADA_ID] = [...(state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    machines?.pair({ id: "machine_1", name: "Servidor", os: "linux", mode: "system", ...machine });
+    if (cloud) machines?.setSetup({ state: "ready", machineId: "machine_1" });
+    if (reason) {
+      await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+      fakeBrowserOf.get(api)?.settings.set(ADA_ID, {
+        allowedDomains: null,
+        available: false,
+        reason,
+        detail: null,
+        machine: { id: "machine_1", name: "Servidor" },
+      });
+    }
+    await open(state, api);
+  };
+  const tools = (browser?: boolean) => ({
+    folders: [],
+    tools: { claude: true, codex: true, commands: true, ...(browser === undefined ? {} : { browser }) },
+  });
+  const command = (steps: Element | null) => steps?.querySelector(".machine-command__code")?.textContent;
+
+  test("the step is only for a switch that is off, on a computer someone here reaches", async () => {
+    const stepsIn = async (...args: Parameters<typeof onServidor>) => {
+      await onServidor(...args);
+      const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
+      await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
+      return d.querySelector(".brw-steps");
+    };
+    const missing = {
+      available: false,
+      version: "1",
+      chrome: null,
+      reason: "Chrome's libraries are missing: run `agentes-runner browser install --with-deps`",
+    };
+    expect(command(await stepsIn({ access: tools(false) }, "switched_off"))).toBe(
+      "sudo agentes-runner tools enable browser",
+    );
+    // Switched on, and Chrome's libraries missing there: nothing to turn on, where she is or where she'd move.
+    expect(await stepsIn({ access: tools(true), browser: missing }, "not_installed")).toBeNull();
+    expect(await stepsIn({ access: tools(true), browser: missing }, null)).toBeNull();
+    // A runner from before the browser has no switch for it.
+    expect(await stepsIn({ access: tools() }, "outdated")).toBeNull();
+    // The workspace's own computer: nobody here reaches it.
+    expect(
+      await stepsIn({ kind: "managed", os: "other", access: tools(false) }, "switched_off", { cloud: true }),
+    ).toBeNull();
+  });
+
+  test("under the sentence, the step waits for a switch that is off, not for one that is on", async () => {
+    await onServidor({ access: tools(false) }, "switched_off", { granted: true });
+    expect(command(screen().getByRole("region", { name: "Falta 1 passo, no próprio Servidor" }))).toBe(
+      "sudo agentes-runner tools enable browser",
+    );
+    // On, and the computer hasn't said yet whether it runs.
+    await onServidor({ access: tools(true) }, "not_reported", { granted: true });
+    expect(document.querySelector(".brw-steps")).toBeNull();
   });
 });
 

@@ -45,6 +45,7 @@ import {
 import { Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { OnlyYouNote } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useFilterCopy } from "@/components/filters";
 import { LoadingLine, LoadingList } from "@/components/Loading";
@@ -166,6 +167,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           <h2 id="sec-invite" className="ac-card__title">
             {t("members.inviteTitle")}
           </h2>
+          <OnlyYouNote orgId={org.id} viewerId={me.user.id} />
           <div className="row row--end">
             <Field
               label={t("members.emails")}

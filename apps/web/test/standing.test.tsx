@@ -14,9 +14,9 @@ const STATUS = "Status do workspace";
 const OTHER_ID = "00000000-0000-4000-8000-0000000000b2";
 
 /** #eng of Acme with the standing `/me` says, and its socket open to push what the operator changes. */
-async function open(standing?: OrgStanding, other = false, supportEmail: string | null = null) {
+async function open(standing?: OrgStanding, other = false, supportEmail: string | null = null, cloud = false) {
   const state = seedState();
-  state.authConfig = { ...state.authConfig, supportEmail };
+  state.authConfig = { ...state.authConfig, supportEmail, ...(cloud ? { workspaceComputer: true } : {}) };
   if (state.me) {
     state.me.organizations = [
       { id: ORG_ID, name: "Acme", role: "owner", ...(standing ? { standing } : {}) },
@@ -68,6 +68,21 @@ describe("on hold: a line on top of the work area", () => {
     expect(within(banner).getByRole("link", { name: "ajuda@acme.test" }).getAttribute("href")).toBe(
       "mailto:ajuda@acme.test",
     );
+  });
+
+  test("on the Cloud with no address: no line, since nobody else runs that server; with one, where to write", async () => {
+    await open({ state: "hold", reason: null }, false, null, true);
+    const banner = () => screen().getByRole("region", { name: STATUS });
+    expect(banner().textContent).toContain("Os agentes deste workspace estão pausados para uma revisão.");
+    expect(banner().textContent).not.toContain("Precisa de ajuda");
+    expect(banner().querySelector(".support-line")).toBeNull();
+    cleanup();
+    await open({ state: "suspended", reason: null }, false, null, true);
+    expect(document.body.textContent).toContain("As conversas e os agentes dele estão fechados por enquanto.");
+    expect(document.body.textContent).not.toContain("Precisa de ajuda");
+    cleanup();
+    await open({ state: "hold", reason: null }, false, "suporte@agentes.chat", true);
+    expect(banner().textContent).toContain("Precisa de ajuda? Escreva para suporte@agentes.chat.");
   });
 
   test("an active workspace shows nothing", async () => {

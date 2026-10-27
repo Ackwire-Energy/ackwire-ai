@@ -9,7 +9,7 @@ import {
   usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { canReduceAccess, commandInReason } from "@agenteschat/client/lib/machines";
+import { allowsInApp, canReduceAccess, commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -135,10 +135,20 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
             </span>
             <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
           </div>
-        ) : (
+        ) : allowsInApp(m.os) ? (
           <div className="brw-note ac-iconline">
             <Icon name="computer" size={16} />
             <div>{t("browser.machine.offHelp")}</div>
+          </div>
+        ) : (
+          // A Linux computer may be a server without the app: the command too.
+          <div className="brw-note ac-iconline">
+            <Icon name="computer" size={16} />
+            <div className="stack-4" style={{ flex: 1, minWidth: 0, gap: 6 }}>
+              <span>{t("browser.machine.offHelp")}</span>
+              <span>{t("machines.access.grantTerminal")}</span>
+              <CommandBlock command={toolOnCommand(m, "browser")} />
+            </div>
           </div>
         ))}
       {switchedOn && !ready && m.browser?.reason && (

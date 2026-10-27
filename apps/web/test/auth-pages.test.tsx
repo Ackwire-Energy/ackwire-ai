@@ -388,6 +388,17 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("button", { name: "Pedido enviado" }).hasAttribute("disabled")).toBe(true);
   });
 
+  test("expired, on a server that sends no email: whom to ask, and no button for a request nobody would get", async () => {
+    const state = seedState({ me: null, authConfig: { passwordReset: false } });
+    await renderApp("/invite/expired", { api: createFakeApi(state) });
+    expect(screen().getByRole("heading", { name: "Este convite expirou" })).toBeTruthy();
+    expect(document.querySelector(".page-sub")?.textContent).toBe(
+      "Convites valem por 7 dias. Peça um novo a quem mandou.",
+    );
+    expect(screen().queryByRole("button", { name: "Pedir um novo convite" })).toBeNull();
+    expect(state.calls.some((c) => c.method === "invites.requestNew")).toBe(false);
+  });
+
   test("signed in with another email: explains and offers to sign out", async () => {
     await renderApp("/invite/valid", { api: createFakeApi() });
     expect(screen().getByRole("status").textContent).toContain("Este convite foi enviado para marina@acme.com.br");
@@ -581,7 +592,7 @@ describe("Onboarding", () => {
     const state = seedState(patch);
     if (state.me) state.me.organizations = [];
     // A server where people connect their own computers says so before any workspace exists.
-    state.authConfig = { workspaceComputer: false };
+    state.authConfig = { workspaceComputer: false, ...patch.authConfig };
     const api = createFakeApi(state);
     // Each agent's view as the server makes it: the computer it was given (none until then), and that computer's
     // own sign-in where whoever connected it owns the agent (this server's own computer has nobody).
@@ -884,6 +895,24 @@ describe("Onboarding", () => {
     expect(emails.getAttribute("aria-describedby")).toBe("invite-emails-hint invite-emails-help");
   });
 
+  test("team on a server that sends no email: the link alone, and Done promises no email", async () => {
+    const { state } = await start({ authConfig: { passwordReset: false } });
+    await throughAgents(state);
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Compartilhe o link de convite com eles.");
+    // No emails to type: an invitation by email would never arrive.
+    expect(screen().queryByLabelText("E-mails")).toBeNull();
+    expect((screen().getByLabelText("Link de convite") as HTMLInputElement).value).toMatch(
+      /^http:\/\/localhost:3000\/invite\/link-/,
+    );
+    expect(document.getElementById("invite-link-help")?.textContent).toBe("Você aprova cada pessoa que pedir.");
+    expect(button("Continuar")).toBeTruthy();
+    await next();
+    expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
+    expect(welcome()).not.toMatch(/Mandamos|e-mail/);
+    expect(calls(state, "orgs.invite")).toHaveLength(0);
+  });
+
   test("Conectar depois: the agents are there without an AI, and answer once one is connected", async () => {
     const { state } = await start();
     await throughImport(state);
@@ -1169,7 +1198,7 @@ describe("Onboarding", () => {
     await click(button(/Outro computador/), 8);
     // No code made on the site anymore: the computer makes it and the person confirms on /conectar.
     expect(calls(state, "machines.createPairing")).toHaveLength(0);
-    expect(document.body.textContent).toContain("O app para Mac ainda não está disponível.");
+    expect(document.body.textContent).toContain("O app ainda não está disponível. Por enquanto, use o comando abaixo.");
     await click(button("Outras formas: servidor ou Linux"), 2);
     expect(document.querySelector(".machine-command__code")?.textContent).toBe(
       "curl -fsSL http://localhost:3000/api/machines/install.sh | sh",
