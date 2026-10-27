@@ -2630,10 +2630,6 @@ export const ptBR = {
       askedNow: "Pediu agora",
       askedOn: "Pediu em {{date}}",
       unverified: "Não verificado",
-      // A folha de pedidos do celular lê estas três.
-      confirmed: "E-mail confirmado",
-      unconfirmed: "E-mail não confirmado: aprovar manda um convite para ele.",
-      via: "Fecha em {{date}}",
       roleOf: "Papel de {{name}}",
       approve: "Aprovar",
       deny: "Recusar",

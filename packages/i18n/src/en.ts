@@ -2602,10 +2602,6 @@ export const en: Translations = {
       askedNow: "Asked just now",
       askedOn: "Asked on {{date}}",
       unverified: "Not verified",
-      // The phone's request sheet reads these three.
-      confirmed: "Email confirmed",
-      unconfirmed: "Email not confirmed: approving sends an invitation to it.",
-      via: "Closes {{date}}",
       roleOf: "Role for {{name}}",
       approve: "Approve",
       deny: "Deny",
