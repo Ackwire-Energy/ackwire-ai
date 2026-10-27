@@ -28,7 +28,8 @@ function withReleaseSigning(gradle) {
   let out = gradle.replace(configs, (m) => `${m}${RELEASE_CONFIG}`);
   // In `buildTypes { … release { … signingConfig signingConfigs.debug` (the template's), use the release key when set.
   const release = /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/;
-  if (!release.test(out)) throw new Error("with-android-release-signing: the release build type's signing wasn't found");
+  if (!release.test(out))
+    throw new Error("with-android-release-signing: the release build type's signing wasn't found");
   out = out.replace(
     release,
     `$1signingConfig System.getenv("ANDROID_KEYSTORE_PATH") ? signingConfigs.release : signingConfigs.debug`,
