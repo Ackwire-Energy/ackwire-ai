@@ -193,7 +193,7 @@ describe("the menu's banners say only what matters there", () => {
       });
       await until(() => banners(el).some((b) => b.title === "Paused until you resume"));
       expect(banners(el).find((b) => b.title === "Paused until you resume")?.line).toBe(
-        "No agent, from any organization, starts anything new on this Mac.",
+        "No agent, from any workspace, starts anything new on this Mac.",
       );
     }));
 

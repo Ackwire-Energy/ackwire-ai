@@ -58,8 +58,8 @@ describe("desktop strings", () => {
 
   test("translates with plurals in both languages", () => {
     const pt = createDesktopI18n("pt-BR");
-    expect(pt.t("desktop.orgCount", { count: 1 })).toBe("1 organização");
-    expect(pt.t("desktop.orgCount", { count: 2 })).toBe("2 organizações");
+    expect(pt.t("desktop.orgCount", { count: 1 })).toBe("1 workspace");
+    expect(pt.t("desktop.orgCount", { count: 2 })).toBe("2 workspaces");
     const en = createDesktopI18n("en");
     expect(en.t("desktop.tray.now")).toBe("Now");
   });

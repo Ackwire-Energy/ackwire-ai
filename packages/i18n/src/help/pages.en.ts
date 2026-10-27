@@ -68,7 +68,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "folders",
         heading: "Folders",
         blocks: [
-          "Each agent always has its own folder, in `~/agentes/<organization>`. More folders are allowed on the computer itself, never from the website: in the app, **Preferences\u00a0›\u00a0Folders**. Each organization allows its own folders: what you allow for one only counts for its agents. Removing a folder deletes nothing; it only takes the access away.",
+          "Each agent always has its own folder, in `~/agentes/<workspace>`. More folders are allowed on the computer itself, never from the website: in the app, **Preferences\u00a0›\u00a0Folders**. Each workspace allows its own folders: what you allow for one only counts for its agents. Removing a folder deletes nothing; it only takes the access away.",
         ],
       },
       {
@@ -80,9 +80,9 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
       },
       {
         id: "organizations",
-        heading: "Several organizations",
+        heading: "Several workspaces",
         blocks: [
-          "One computer can work for several organizations. Each one has its own agents, folders and tasks there, and disconnecting one doesn't touch the others.",
+          "One computer can work for several workspaces. Each one has its own agents, folders and tasks there, and disconnecting one doesn't touch the others.",
         ],
       },
     ],

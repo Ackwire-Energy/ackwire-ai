@@ -68,7 +68,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "folders",
         heading: "Pastas",
         blocks: [
-          "Cada agente sempre tem a própria pasta, em `~/agentes/<organização>`. Pastas a mais se liberam no próprio computador, nunca pelo site: no app, em **Preferências\u00a0›\u00a0Pastas**. Cada organização libera as próprias pastas: o que você libera para uma vale só para os agentes dela. Remover uma pasta não apaga nada; só tira o acesso.",
+          "Cada agente sempre tem a própria pasta, em `~/agentes/<workspace>`. Pastas a mais se liberam no próprio computador, nunca pelo site: no app, em **Preferências\u00a0›\u00a0Pastas**. Cada workspace libera as próprias pastas: o que você libera para um vale só para os agentes dele. Remover uma pasta não apaga nada; só tira o acesso.",
         ],
       },
       {
@@ -80,9 +80,9 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
       },
       {
         id: "organizations",
-        heading: "Várias organizações",
+        heading: "Vários workspaces",
         blocks: [
-          "Um computador pode trabalhar para várias organizações. Cada uma tem ali os próprios agentes, pastas e tarefas, e desconectar uma não mexe nas outras.",
+          "Um computador pode trabalhar para vários workspaces. Cada um tem ali os próprios agentes, pastas e tarefas, e desconectar um não mexe nos outros.",
         ],
       },
     ],
