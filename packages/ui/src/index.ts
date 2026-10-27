@@ -278,6 +278,13 @@ export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
 export { Token, TokenList } from "./components/Token";
 export {
+  ToolBlock,
+  type ToolBlockHead,
+  type ToolBlockItem,
+  type ToolBlockLine,
+  type ToolBlockState,
+} from "./components/ToolBlock";
+export {
   FilterToggle,
   type FilterToggleProps,
   SearchField,
@@ -297,13 +304,6 @@ export {
 } from "./components/ToolPixels";
 export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
-export {
-  ToolBlock,
-  type ToolBlockHead,
-  type ToolBlockItem,
-  type ToolBlockLine,
-  type ToolBlockState,
-} from "./components/ToolBlock";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
 export { hoverPointer, onScreenKeyboard, onScreenNow } from "./device";

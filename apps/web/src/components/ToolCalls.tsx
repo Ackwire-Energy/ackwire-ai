@@ -28,7 +28,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
-import { CodePanel, formatBytes, OutputView, SteerWell, type SteerNote } from "@/components/LiveCode";
+import { CodePanel, formatBytes, OutputView, type SteerNote, SteerWell } from "@/components/LiveCode";
 import { useOrg } from "@/components/org-context";
 
 /** Our own tools by what they do: their icon in the block (a connector's call shows its logo). */
@@ -100,7 +100,7 @@ function useLogo() {
     }
     return (
       <span className="tool-logo" aria-hidden="true">
-        <Icon name={KIND_ICON[a.kind] ?? "plug"} size={13} />
+        <Icon name={KIND_ICON[a.kind] ?? "plug"} size={14} />
       </span>
     );
   };
@@ -115,7 +115,10 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
       ? t("code.ranSummary", {
           count: lines,
           language: l.code.language,
-          size: formatBytes(locale, output.reduce((n, o) => n + new TextEncoder().encode(o.text).length, 0)),
+          size: formatBytes(
+            locale,
+            output.reduce((n, o) => n + new TextEncoder().encode(o.text).length, 0),
+          ),
         })
       : toolPhrase(t, l);
   const detail = l.code ? (
@@ -226,9 +229,7 @@ export function LiveTools({
   return (
     <>
       <ToolBlock
-        logos={toolApps(items).map((a) => (
-          <span key={`${a.kind}-${a.app ?? ""}`}>{logo(a)}</span>
-        ))}
+        logos={toolApps(items).map((a) => <span key={`${a.kind}-${a.app ?? ""}`}>{logo(a)}</span>)}
         head={head}
         items={blockItems}
         color={color}
@@ -298,9 +299,7 @@ export function SavedTools({
         : [];
   return (
     <ToolBlock
-      logos={apps.map((a) => (
-        <span key={`${a.kind}-${a.app ?? ""}`}>{logo(a)}</span>
-      ))}
+      logos={apps.map((a) => <span key={`${a.kind}-${a.app ?? ""}`}>{logo(a)}</span>)}
       head={{
         text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.see", agentGrammar(t, agentName)),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,
