@@ -13,6 +13,7 @@ import {
   foldersOfAgent,
   formatUserCode,
   installCommand,
+  isHandheld,
   isPaused,
   locationText,
   normalizeUserCode,
@@ -102,10 +103,17 @@ describe("connected computers helpers (ADR 0036)", () => {
     const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15";
     const windows = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
     const linux = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0";
+    const arm = "Mozilla/5.0 (X11; Linux aarch64; rv:131.0) Gecko/20100101 Firefox/131.0";
+    const android = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36";
+    const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
     expect([mac, windows, linux].map(platformOf)).toEqual(["mac", "windows", "linux"]);
-    expect(desktopTargetOf("mac")).toEqual({ target: "darwin", arch: "aarch64" });
-    expect(desktopTargetOf("windows")).toEqual({ target: "windows", arch: "x86_64" });
-    expect(desktopTargetOf("linux")).toEqual({ target: "linux", arch: "x86_64" });
+    expect(desktopTargetOf(mac)).toEqual({ target: "darwin", arch: "aarch64" });
+    expect(desktopTargetOf(windows)).toEqual({ target: "windows", arch: "x86_64" });
+    expect(desktopTargetOf(linux)).toEqual({ target: "linux", arch: "x86_64" });
+    // A phone reads as Linux or a Mac, and a Linux on ARM has no build: none of them gets one.
+    expect([platformOf(android), platformOf(iphone)]).toEqual(["linux", "mac"]);
+    expect([android, iphone, arm].map(desktopTargetOf)).toEqual([null, null, null]);
+    expect([android, iphone, linux, mac].map(isHandheld)).toEqual([true, true, false, false]);
   });
 
   test("a tool turned off: the app's Preferences on a Mac or a PC, the command too elsewhere (sudo in system mode)", () => {

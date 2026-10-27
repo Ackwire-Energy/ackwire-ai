@@ -103,11 +103,20 @@ export function platformOf(userAgent: string): Platform {
   return "linux";
 }
 
-/** The app's build for a system, as `/api/desktop/latest` names it: one build for both Mac chips, x64 elsewhere. */
-export const desktopTargetOf = (platform: Platform) =>
-  platform === "mac"
+/** A phone or a tablet, from its browser's user agent: the app is for computers. */
+export const isHandheld = (userAgent: string) => /Android|iPhone|iPad|iPod/i.test(userAgent);
+
+/**
+ * The app's build for the computer a browser runs on, as `/api/desktop/latest` names it: one build for both Mac
+ * chips, x64 on Windows and Linux. Null where none fits: a phone or a tablet, or a Linux on another chip.
+ */
+export function desktopTargetOf(userAgent: string) {
+  const platform = platformOf(userAgent);
+  if (isHandheld(userAgent) || (platform === "linux" && !/x86_64|x64|amd64/i.test(userAgent))) return null;
+  return platform === "mac"
     ? ({ target: "darwin", arch: "aarch64" } as const)
     : ({ target: platform, arch: "x86_64" } as const);
+}
 
 /** Which portrait a computer gets; same names as `ComputerKind` in @agenteschat/ui. */
 export type ComputerKind = "mac" | "windows" | "linux" | "cloud";

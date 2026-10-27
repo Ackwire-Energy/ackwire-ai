@@ -43,6 +43,9 @@ afterEach(() => {
 const MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15";
 const WINDOWS_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
 const LINUX_UA = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0";
+const ARM_LINUX_UA = "Mozilla/5.0 (X11; Linux aarch64; rv:131.0) Gecko/20100101 Firefox/131.0";
+const ANDROID_UA =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 /** The page as a browser on that system opens it (the test DOM's own user agent comes back after each test). */
 const asBrowserOn = (ua: string) => Object.defineProperty(navigator, "userAgent", { configurable: true, value: ua });
 
@@ -409,6 +412,7 @@ describe("Configurações → Computadores", () => {
 
   test("no build published (404): a calm note instead of the button, and nothing to install; the terminal stays", async () => {
     const api = createFakeApi(seedState());
+    asBrowserOn(LINUX_UA);
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
     await settle(8);
     const card = screen().getByRole("region", { name: "Conectar outro computador" });
@@ -416,6 +420,45 @@ describe("Configurações → Computadores", () => {
     expect(card.textContent).toContain("O app ainda não está disponível. Por enquanto, use o comando abaixo.");
     expect(card.textContent).not.toContain("Instale o app do agentes.chat");
     expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
+    // The command below is a shell script, which Windows' own terminal doesn't run.
+    cleanup();
+    asBrowserOn(WINDOWS_UA);
+    await renderApp(`/org/${ORG_ID}/settings/computers`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const pc = screen().getByRole("region", { name: "Conectar outro computador" });
+    expect(pc.textContent).toContain("O app ainda não está disponível.");
+    expect(pc.textContent).not.toContain("use o comando abaixo");
+  });
+
+  test("a phone gets no system guessed, and a Linux on another chip no x64 build", async () => {
+    const cardOn = async (ua: string) => {
+      cleanup();
+      const state = seedState();
+      const api = createFakeApi(state);
+      fakeMachinesOf.get(api)?.setRelease({
+        version: "0.6.0",
+        url: "/api/desktop/download/0.6.0/agentes_0.6.0_amd64.deb",
+        sha256: "",
+        publishedAt: "2026-10-26T12:00:00.000Z",
+        size: null,
+      });
+      asBrowserOn(ua);
+      await renderApp(`/org/${ORG_ID}/settings/computers`, { api });
+      await settle(8);
+      expect(state.calls.some((c) => c.method === "machines.desktopLatest")).toBe(false);
+      const card = screen().getByRole("region", { name: "Conectar outro computador" });
+      expect(within(card).queryByRole("link", { name: /^Baixar o app para/ })).toBeNull();
+      expect(card.querySelector(".ac-computer, .machine-pair__steps")).toBeNull();
+      expect(within(card).getByRole("button", { name: "Outras formas: servidor ou Linux" })).toBeTruthy();
+      return shownText(card);
+    };
+    // The app goes on the computer: the line alone, never a note that it isn't out.
+    const phone = await cardOn(ANDROID_UA);
+    expect(phone).toContain("Instale o app do agentes.chat no computador.");
+    expect(phone).not.toContain("ainda não está disponível");
+    expect(await cardOn(ARM_LINUX_UA)).toContain(
+      "O app ainda não está disponível. Por enquanto, use o comando abaixo.",
+    );
   });
 
   test("a row: state, details, live status and pause; it opens the computer's page", async () => {

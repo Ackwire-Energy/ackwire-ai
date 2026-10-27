@@ -24,6 +24,7 @@ import {
   folderName,
   hostDescKey,
   installCommand,
+  isHandheld,
   isPaused,
   MACHINE_TOOLS,
   machineTitle,
@@ -155,11 +156,11 @@ export function CommandBlock({ command }: { command: string }) {
 export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const target = desktopTargetOf(platformOf(navigator.userAgent));
-  const latest = useDesktopLatest(target.target, target.arch);
+  const target = desktopTargetOf(navigator.userAgent);
+  const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   if (inDesktopApp()) return <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} primary={primary} />;
-  if (!latest.data) return null;
+  if (!target || !latest.data) return null;
   return (
     <Button asChild size="sm" variant={primary ? "primary" : "default"}>
       <a href={downloadHref(latest.data.url, origin)} download>
@@ -180,8 +181,9 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
   const { t, i18n } = useTranslation();
   const copy = useCopy();
   const platform = platformOf(navigator.userAgent);
-  const target = desktopTargetOf(platform);
-  const latest = useDesktopLatest(target.target, target.arch);
+  const handheld = isHandheld(navigator.userAgent);
+  const target = desktopTargetOf(navigator.userAgent);
+  const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
   const [other, setOther] = useState(false);
   const otherId = useId();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
@@ -190,8 +192,9 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
   const app = useAgentsHere() && !download;
   return (
     <div className="machine-connect">
-      {/* With no build published there is nothing to install: the note below says the app isn't out yet. */}
-      {(app || release) && (
+      {/* With no build for this computer there is nothing to install: the note below says the app isn't out yet. A
+          phone or a tablet installs it on the computer: the line alone, no system guessed. */}
+      {(app || release || handheld) && (
         <p className="small muted" style={{ margin: 0 }}>
           {app ? t("machines.thisMac.text") : t("machines.download.text")}
         </p>
@@ -201,9 +204,9 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
           <ComputerPortrait kind={platform} state="online" />
           <ThisMacButton orgId={orgId} canPair primary />
         </div>
-      ) : latest.isLoading ? (
+      ) : handheld ? null : latest.isLoading ? (
         <LoadingLine width={220} />
-      ) : release ? (
+      ) : release && target ? (
         <div className="machine-connect__release">
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
             <ComputerPortrait kind={platform} state="online" />
@@ -243,7 +246,10 @@ export function ConnectComputer({ orgId, download = false }: { orgId: string; do
           )}
         </div>
       ) : (
-        <Alert tone="neutral">{t("machines.download.unavailable")}</Alert>
+        // The command below is a shell script: Windows' own terminal can't run it.
+        <Alert tone="neutral">
+          {t(platform === "windows" ? "machines.download.unavailable" : "machines.download.unavailableCommand")}
+        </Alert>
       )}
       {release && !app && (
         <div className="stack-4" style={{ gap: 6 }}>
