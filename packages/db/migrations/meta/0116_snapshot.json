@@ -14617,21 +14617,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "organization_join_code_events_org_id_organizations_id_fk": {
-          "name": "organization_join_code_events_org_id_organizations_id_fk",
-          "tableFrom": "organization_join_code_events",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
