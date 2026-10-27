@@ -5,19 +5,23 @@ import {
   artifactDownload,
   assertPublicHttpsUrl,
   createArtifact,
+  createOrganization,
+  deleteAccount,
   drainOutbox,
+  enqueue,
   ForbiddenError,
   getArtifact,
   getMigration,
   getStorage,
   isBlockedAddress,
+  ORG_FILES_PURGE_JOB,
   type S3Input,
   saveStorage,
   startMigration,
   testStorage,
   ValidationError,
 } from "../src";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -181,6 +185,46 @@ describe("org storage", () => {
       secretAccessKey: "",
     });
     expect(again.ok).toBe(true);
+  });
+
+  test("a deleted workspace's files leave platform storage a page at a time, and nobody else's go", async () => {
+    f = await setup();
+    const put = (key: string) => f.platformBlobs.put(key, new Uint8Array([1]), { contentType: "text/plain" });
+    const { organization: second } = await createOrganization(f.db, f.owner.id, { name: "Two" });
+    const bia = await addUser(f.db, "bia");
+    const { organization: hers } = await createOrganization(f.db, bia.id, { name: "Bia's" });
+    // A full page and one key more, then the logo.
+    for (let i = 0; i <= 1000; i++) await put(`orgs/${f.org.id}/artifacts/a${i}/v1`);
+    await put(`org-logos/${f.org.id}/logo.png`);
+    await put(`orgs/${second.id}/skills/s/SKILL.md`);
+    const kept = [`orgs/${hers.id}/artifacts/b/v1`, `org-logos/${hers.id}/logo.png`, `avatars/${bia.id}/me.png`];
+    for (const key of kept) await put(key);
+    const purges = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, ORG_FILES_PURGE_JOB));
+    const runsOf = async (orgId: string) => (await purges()).filter((j) => j.payload.orgId === orgId);
+
+    expect((await deleteAccount(f.db, f.owner.id)).deletedOrgIds.sort()).toEqual([f.org.id, second.id].sort());
+    const queued = (await purges()).map((j) => ({ orgId: j.orgId, payload: j.payload }));
+    expect(queued).toEqual(
+      expect.arrayContaining([
+        { orgId: null, payload: { orgId: f.org.id } },
+        { orgId: null, payload: { orgId: second.id } },
+      ]),
+    );
+    expect(queued).toHaveLength(2);
+
+    await drainOutbox(f.db, f.handlers);
+    expect([...f.platformBlobs.objects.keys()].sort()).toEqual(kept.sort());
+    // The full first page ran the job once more.
+    expect((await runsOf(f.org.id)).map((j) => j.status)).toEqual(["done", "done"]);
+    expect((await runsOf(second.id)).map((j) => j.status)).toEqual(["done"]);
+
+    // Run again, nothing is left and nothing more is queued. A workspace that still exists keeps its files.
+    for (const orgId of [f.org.id, hers.id])
+      await enqueue(f.db, { orgId: null, kind: ORG_FILES_PURGE_JOB, payload: { orgId } });
+    await drainOutbox(f.db, f.handlers);
+    expect([...f.platformBlobs.objects.keys()].sort()).toEqual(kept.sort());
+    expect(await runsOf(f.org.id)).toHaveLength(3);
+    expect((await purges()).every((j) => j.status === "done")).toBe(true);
   });
 
   test("only admins manage storage", async () => {

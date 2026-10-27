@@ -23,6 +23,7 @@ import { deleteJevKey } from "./jev-key";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
+import { enqueue } from "./outbox";
 import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
 
 const {
@@ -583,13 +584,17 @@ export async function removeMember(
   await pauseRoutinesOfCreator({ db, pubsub: options.pubsub }, orgId, targetUserId).catch(() => 0);
 }
 
+/** A deleted workspace's files leave platform storage (`purgeOrgFiles`). */
+export const ORG_FILES_PURGE_JOB = "org.files.purge";
+
 /**
  * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
  * they are the only owner of an organization that has other members
  * (`sole_owner`, with the organizations' names: make someone else an owner
  * first). Organizations where they are the only member go with them, with
- * everything in them. Their AI accounts on computers are signed out and
- * removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
+ * everything in them (their files on platform storage through the job
+ * `org.files.purge`, ADR 0019). Their AI accounts on computers are signed
+ * out and removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
  * sessions, sign-in methods, memberships, channel memberships, notifications
  * and phones are deleted; messages and records they authored stay without an
  * author (the same as any deleted user). Not for a blocked account: it can't
@@ -640,6 +645,8 @@ export async function deleteAccount(
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
+    // No org_id on the job: the outbox row would be deleted with the workspace (cascade).
+    for (const orgId of alone) await enqueue(tx, { orgId: null, kind: ORG_FILES_PURGE_JOB, payload: { orgId } });
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
     if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
