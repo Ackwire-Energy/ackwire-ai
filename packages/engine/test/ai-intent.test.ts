@@ -231,8 +231,8 @@ test("only a plan on a computer and the LLM router: mention an agent (mention_ne
   const fx = await setup({ judge: intentJudge });
   f = fx;
   // Someone else in #general: a person alone with one agent would reach it by the rule.
-  const walter = await addMember(fx.db, fx.org.id, "member", "Walter");
-  await fx.db.insert(schema.channelMembers).values({ orgId: fx.org.id, channelId: fx.general.id, userId: walter.id });
+  const bruna = await addMember(fx.db, fx.org.id, "member", "Bruna");
+  await fx.db.insert(schema.channelMembers).values({ orgId: fx.org.id, channelId: fx.general.id, userId: bruna.id });
   const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, { name: "MacBook" });
   await fx.db
     .update(schema.agents)

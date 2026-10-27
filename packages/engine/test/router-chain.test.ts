@@ -97,14 +97,14 @@ const routedOf = (events: RealtimeEvent[], messageId: string) =>
     | undefined;
 
 /**
- * No Jev and no API key: Dev thinks with Ana's own Claude account on her computer, and Walter is in #general too
+ * No Jev and no API key: Dev thinks with Ana's own Claude account on her computer, and Bruna is in #general too
  * (so a message there isn't Ana alone with one agent).
  */
 async function plansOnly(hub = fakeHub(), publicUrl = "http://localhost:3000") {
   f = await setup({ reply: () => ({ chunks: ["Feito."] }) });
   await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
-  const walter = await addMember(f.db, f.org.id, "member", "Walter");
-  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: walter.id });
+  const bruna = await addMember(f.db, f.org.id, "member", "Bruna");
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bruna.id });
   const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
   const accountId = crypto.randomUUID();
   await f.db.insert(schema.machineAccounts).values({
@@ -126,7 +126,7 @@ async function plansOnly(hub = fakeHub(), publicUrl = "http://localhost:3000") {
     machines: hub,
     router: { enabled: true, model: "claude-haiku-5-5", plans: { hub, publicUrl } },
   };
-  return { hub, walter, machineId, accountId, handlers: createJobHandlers(deps) };
+  return { hub, bruna, machineId, accountId, handlers: createJobHandlers(deps) };
 }
 
 describe("the author's own plan", () => {
@@ -179,8 +179,8 @@ describe("the author's own plan", () => {
   });
 
   test("never for someone else's message: a teammate with no plan of their own gets the rules", async () => {
-    const { hub, walter, handlers } = await plansOnly();
-    const m = await post(walter.id, "alguém sabe se o deploy de ontem saiu?");
+    const { hub, bruna, handlers } = await plansOnly();
+    const m = await post(bruna.id, "alguém sabe se o deploy de ontem saiu?");
     await drain(handlers);
     expect(hub.calls).toHaveLength(0);
     expect(await decisionOf(m.id)).toMatchObject({ strategy: "none", selectedAgentIds: [] });
@@ -284,13 +284,13 @@ describe("the author's own plan", () => {
 
 describe("rules, when nothing can read the message", () => {
   test("R2: a person alone in the channel with its one agent; not with someone else there", async () => {
-    const { handlers, walter } = await plansOnly(fakeHub({ protocol: ROUTE_PROTOCOL - 1 }));
-    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, walter.id));
+    const { handlers, bruna } = await plansOnly(fakeHub({ protocol: ROUTE_PROTOCOL - 1 }));
+    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, bruna.id));
     const alone = await post(f.owner.id, "bom dia");
     await drain(handlers);
     expect(await decisionOf(alone.id)).toMatchObject({ strategy: "rule:only_agent", selectedAgentIds: [f.agent.id] });
 
-    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: walter.id });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bruna.id });
     const company = await post(f.owner.id, "bom dia de novo");
     await drain(handlers);
     expect(await decisionOf(company.id)).toMatchObject({ strategy: "none" });
@@ -308,17 +308,17 @@ describe("rules, when nothing can read the message", () => {
       selectedAgentIds: [f.agent.id],
       reason: "follow-up",
     });
-    const greeting = await post(f.owner.id, "boa noite WÉSLEY");
+    const greeting = await post(f.owner.id, "boa noite BRÚNA");
     await drain(handlers);
     expect(await decisionOf(greeting.id)).toMatchObject({ strategy: "none", selectedAgentIds: [] });
   });
 
-  test("R3 trusts only the author's own talk: Ada answered Ana, so Walter's lunch call goes to nobody", async () => {
-    const { handlers, walter } = await plansOnly(fakeHub({ protocol: ROUTE_PROTOCOL - 1 }));
+  test("R3 trusts only the author's own talk: Dev answered Ana, so Bruna's lunch call goes to nobody", async () => {
+    const { handlers, bruna } = await plansOnly(fakeHub({ protocol: ROUTE_PROTOCOL - 1 }));
     await post(f.owner.id, "@dev como está o deploy?");
     await drain(handlers);
     await byAgent(f.agent.id, "Verde.");
-    const lunch = await post(walter.id, "vamos almoçar?");
+    const lunch = await post(bruna.id, "vamos almoçar?");
     await drain(handlers);
     expect(await decisionOf(lunch.id)).toMatchObject({ strategy: "none", selectedAgentIds: [] });
   });

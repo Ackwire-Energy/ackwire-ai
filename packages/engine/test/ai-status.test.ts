@@ -198,10 +198,10 @@ describe("who picks the agents (ADR 0074)", () => {
   const who = (routing: RoutingSetup | null, userId = f.owner.id) =>
     orgRouting({ db: f.db, gateway: f.gateway }, routing, f.org.id, userId);
 
-  /** Ana's own Claude account on her computer, lent to Dev; no API key; Walter in the workspace. */
+  /** Ana's own Claude account on her computer, lent to Dev; no API key; Bruna in the workspace. */
   async function plans() {
     await revokeKeys();
-    const walter = await addMember(f.db, f.org.id, "member", "Walter");
+    const bruna = await addMember(f.db, f.org.id, "member", "Bruna");
     const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Mac" });
     const accountId = crypto.randomUUID();
     await f.db.insert(schema.machineAccounts).values({
@@ -216,7 +216,7 @@ describe("who picks the agents (ADR 0074)", () => {
       .update(schema.agents)
       .set({ brain: "claude_code", machineId, brainAccountId: accountId })
       .where(eq(schema.agents.id, f.agent.id));
-    return { walter, accountId };
+    return { bruna, accountId };
   }
 
   test("Jev, while its owner sees it working; a small model; off", async () => {
@@ -252,13 +252,13 @@ describe("who picks the agents (ADR 0074)", () => {
 
   test("plans: the owner's own, a teammate gets the rules; coding plans, offline and old computers don't count", async () => {
     f = await setup();
-    const { walter, accountId } = await plans();
+    const { bruna, accountId } = await plans();
     const routing = routingOf({});
     expect(await who(routing)).toEqual({
       apiKey: false,
       routing: { by: "plans", mine: "plan", model: null, noSmallModel: null },
     });
-    expect((await who(routing, walter.id)).routing).toMatchObject({ by: "plans", mine: "rules" });
+    expect((await who(routing, bruna.id)).routing).toMatchObject({ by: "plans", mine: "rules" });
     expect((await who(routingOf({}, { online: false }))).routing).toMatchObject({ by: "rules", mine: "rules" });
     expect((await who(routingOf({}, { protocol: ROUTE_PROTOCOL - 1 }))).routing.by).toBe("rules");
     // The Cloud: never a plan.
