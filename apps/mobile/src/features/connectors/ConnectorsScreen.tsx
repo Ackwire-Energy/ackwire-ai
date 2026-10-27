@@ -2,7 +2,8 @@ import { type ConnectorDef, useCatalog, useConnections, useCustomServers } from 
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
-import { useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -20,7 +21,7 @@ import { brandOf, brandTones, CATEGORIES, connectionOf, searchConnectors, sugges
  * Conectores on the phone: what is connected as a row of icons
  * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
  * brand's tone, then every service as even tiles in two columns, filtered by category. A tile opens a sheet
- * over the gallery with the whole flow in three steps: what agents could do → connect → who uses it.
+ * over the gallery with the whole flow in four steps: what agents could do → connect → its tools → who uses it.
  */
 export function ConnectorsScreen() {
   return (
@@ -66,6 +67,23 @@ function Gallery() {
   // its own with the address.
   const openItem = (item: ConnectedItem) =>
     sheet.open(item.def ? <ConnectSheet def={item.def} item={item} /> : <ServerSheet item={item} />);
+  // Back from a sign-in that finished on the link route (`?connected=<id>`): its tools, as the web opens
+  // "O que faz" for the connection that just came in (admins; anyone else had the toast).
+  const { connected } = useLocalSearchParams<{ connected?: string }>();
+  const returned = useRef<string | null>(null);
+  useEffect(() => {
+    if (!connected || returned.current === connected || !connections.data || !servers.data || !catalog.data) return;
+    returned.current = connected;
+    const item = items.find((i) => i.id === connected);
+    if (!item || !admin) return;
+    sheet.open(
+      item.def ? (
+        <ConnectSheet def={item.def} item={item} start="review" fresh />
+      ) : (
+        <ServerSheet item={item} start="review" fresh />
+      ),
+    );
+  }, [connected, connections.data, servers.data, catalog.data, items, admin, sheet]);
 
   return (
     <PushedLargeTitle
