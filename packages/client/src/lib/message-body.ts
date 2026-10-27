@@ -42,7 +42,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   }
   const params =
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
-  return t(`chat.body.${code}`, { ...params, defaultValue: body });
+  // Waiting for room on a busy computer, not for one that went away.
+  const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
+  return t(`chat.body.${busy ? "brain_busy" : code}`, { ...params, defaultValue: body });
 }
 
 /**

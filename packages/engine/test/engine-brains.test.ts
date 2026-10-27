@@ -11,6 +11,8 @@ import {
   brainFor,
   brainModelFor,
   brainSessionId,
+  COMPUTER_BUSY_RETRY_MS,
+  COMPUTER_BUSY_WAIT_MS,
   COMPUTER_REACT_NOTE,
   COMPUTER_TOOLS_NOTE,
   clearPlanLimits,
@@ -1302,4 +1304,125 @@ test("waiting for its computer isn't working: left out of 'working now' and a th
     bodyCode: "brain_unavailable",
     bodyParams: { brain: "Claude Code" },
   });
+});
+
+test("no room on the computer: the agent says so once, asks again quietly without spending the job's tries, and answers once there is room", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  // No key the API could answer with: nothing can stand in.
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const busy: BrainEvent = { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+  const { brain, seen } = scriptedComputerBrain((n) => (n < 2 ? [busy] : [{ type: "done", text: "Pronto." }]));
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const events: { type: string; status?: string }[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(e as { type: string; status?: string }));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+
+  let [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect(run?.waitingMachineId).toBe(machineId);
+  const notes = async () =>
+    (await f.db.select().from(schema.messages)).filter((m) => m.meta.bodyCode === "brain_unavailable");
+  expect((await notes()).map((m) => m.meta.brainUnavailable)).toEqual([
+    { brain: "claude_code", code: "busy", machineId, agentId: f.agent.id },
+  ]);
+  // The run's own job ended with its first try; the next look is a job of its own, a few seconds later.
+  const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
+  expect(jobs.find((j) => j.dedupeKey === `agent_run.execute:${run?.id}`)).toMatchObject({
+    status: "done",
+    attempts: 1,
+  });
+  const retry = jobs.find((j) => j.dedupeKey?.includes(":room:"));
+  expect(retry?.status).toBe("pending");
+  expect((retry?.nextAttemptAt.getTime() ?? 0) - Date.now()).toBeGreaterThan(COMPUTER_BUSY_RETRY_MS - 5_000);
+
+  // Still full: it waits on, saying nothing more and never flashing "thinking" in the conversation.
+  events.length = 0;
+  const once = { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 1 };
+  await drainOutbox(f.db, handlers, once);
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect(seen.length).toBe(2);
+  expect(await notes()).toHaveLength(1);
+  expect(events.filter((e) => e.type === "agent.thinking" || e.status === "running")).toEqual([]);
+  const steps = await f.db
+    .select()
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run?.id ?? ""));
+  expect(steps.filter((s) => s.data.reason === "brain_unavailable")).toHaveLength(1);
+
+  // Room: the turn runs and the answer comes.
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 2 * COMPUTER_BUSY_RETRY_MS + 2_000) });
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect(seen.length).toBe(3);
+  expect((await timeline(f)).at(-1)?.body).toBe("Pronto.");
+  expect(run?.transcript).not.toHaveProperty("roomWaitSince");
+});
+
+test("no room for the whole wait: the run fails with computer_busy, a reason the apps say in each language", async () => {
+  f = await setup();
+  await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const { brain, seen } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const finished: Record<string, unknown>[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => {
+    if (e.type === "run.finished") finished.push(e as Record<string, unknown>);
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  let [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+
+  // Its first refusal was longer ago than the wait allows.
+  const t = run?.transcript as { roomWaitSince?: number };
+  expect(typeof t.roomWaitSince).toBe("number");
+  await f.db
+    .update(schema.agentRuns)
+    .set({ transcript: { ...t, roomWaitSince: Date.now() - COMPUTER_BUSY_WAIT_MS } })
+    .where(eq(schema.agentRuns.id, run?.id ?? ""));
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("failed");
+  expect(run?.error).toBe("computer_busy");
+  expect(seen.length).toBe(2);
+  expect(finished.at(-1)).toMatchObject({ status: "failed", error: "computer_busy", errorCode: "run.computer_busy" });
+  // Nothing left asking.
+  const pending = (await f.db.select().from(schema.outbox)).filter(
+    (j) => j.kind === "agent_run.execute" && j.status === "pending",
+  );
+  expect(pending).toEqual([]);
+});
+
+test("no room on the computer and a model key: the model brain answers, as for any computer that can't", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+  await computerAgent(f);
+  const { brain } = scriptedComputerBrain(() => [
+    { type: "error", code: "busy", message: "The computer is busy.", retryable: true },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  const last = (await timeline(f)).at(-1);
+  expect(last?.body).toBe("Respondi pela API.");
+  expect(last?.meta).toMatchObject({ brainFallback: { from: "claude_code", code: "busy" } });
 });

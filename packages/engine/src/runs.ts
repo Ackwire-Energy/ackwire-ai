@@ -39,6 +39,8 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
+/** A run's error when its computer had no room for its turn for the whole wait (`COMPUTER_BUSY_WAIT_MS`). */
+export const COMPUTER_BUSY = "computer_busy" as const;
 
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
@@ -52,7 +54,15 @@ export function runErrorDetail(error: string | null | undefined): {
   errorParams?: Record<string, string>;
 } | null {
   if (!error) return null;
-  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived", NO_AI];
+  const simple = [
+    "budget_exceeded",
+    "too_many_tool_calls",
+    "empty_reply",
+    "model_refused",
+    "agent_archived",
+    NO_AI,
+    COMPUTER_BUSY,
+  ];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error.startsWith("provider_error:")) {
     return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };

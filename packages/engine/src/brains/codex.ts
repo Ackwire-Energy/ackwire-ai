@@ -11,7 +11,7 @@ import {
 import type { MachineCaller } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
-import { accountFields, accountUnavailable, steerOnMachine } from "./claude-code";
+import { accountFields, accountUnavailable, busyRefusal, steerOnMachine } from "./claude-code";
 import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
@@ -277,7 +277,7 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: "machine_paused", message: state.failure.message, retryable: true };
     } else if (state.failure !== undefined) {
       const message = state.failure instanceof Error ? state.failure.message : String(state.failure);
-      yield { type: "error", code: "runner_failed", message, retryable: true };
+      yield busyRefusal(state.failure) ?? { type: "error", code: "runner_failed", message, retryable: true };
     } else {
       // The runner finished without saying how: what it streamed is the answer.
       yield { type: "done", text, session: { id: session.id } };

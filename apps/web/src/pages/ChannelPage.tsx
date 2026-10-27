@@ -3085,9 +3085,11 @@ export const TimelineMessage = memo(function TimelineMessage({
               <span style={{ flex: 1 }}>
                 {refusal
                   ? t("channel.runRefused", { agent: name, reason: refusal })
-                  : live.error
-                    ? t("channel.runFailed", { agent: name, reason: live.error })
-                    : t("channel.runFailedNoReason", { agent: name })}
+                  : live.errorCode === "run.computer_busy"
+                    ? t("channel.runBusy", { agent: name })
+                    : live.error
+                      ? t("channel.runFailed", { agent: name, reason: live.error })
+                      : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"

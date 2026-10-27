@@ -338,6 +338,7 @@ test("a failed request becomes the turn's error (offline and old runners may fal
     [new MachineRequestError("bad_request", "Unknown op brain.turn"), "runner_outdated", true],
     [new MachineRequestError("timeout", "too slow"), "timeout", false],
     [new MachineRequestError("internal", "busy"), "busy", true],
+    [new MachineRequestError("no_slot", "This computer is short of memory for more work right now"), "busy", true],
     [new MachineRequestError("canceled", "canceled"), "canceled", false],
   ];
   for (const [fail, code, retryable] of cases) {

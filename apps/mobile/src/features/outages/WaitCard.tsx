@@ -19,7 +19,8 @@ function useBrainWait(m: Pick<Message, "meta" | "author">) {
   const info = brainUnavailableOf(m.meta);
   const outages = useMachineOutages();
   const machines = useMachines(orgId);
-  if (!info?.machineId) return null;
+  // Waiting for room on a computer that is there: the agent's own words, never a card about it coming back.
+  if (!info?.machineId || info.code === "busy") return null;
   const state = waitCardState(info, outages.data?.outages, m.author.type === "agent" ? m.author.id : null);
   const name = machines.data?.find((x) => x.id === info.machineId)?.name ?? null;
   const text = waitCardText(t, state, info.brain, name);
