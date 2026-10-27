@@ -11,6 +11,7 @@ import {
   type MessagePin,
   sendHelpers,
   useAgentsBrowserHandoffs,
+  useAiStatus,
   useApi,
   useChannels,
   useChannelThreads,
@@ -82,6 +83,8 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { AgentReceiptLine } from "./AgentReceipts";
+import { receiptMessageId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
@@ -103,6 +106,8 @@ import {
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
 import { insertMention, mentionQuery } from "./mentions";
+import { NoAiBanner } from "./NoAiBanner";
+import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinsSheet } from "./PinsSheet";
 import {
   appendedKeys,
@@ -259,6 +264,11 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   // ── Live ──
   const live = useChatLive(orgId, channelId, member);
+  // People's messages loaded over HTTP start (or catch up) their agents' receipts, as on the web.
+  const { seed: seedReceipts } = live;
+  useEffect(() => {
+    if (list.length > 0) seedReceipts(list);
+  }, [list, seedReceipts]);
   const runs = useMemo(
     () => live.runs.filter((r) => (isThread ? r.threadId === threadId : inMainTimeline(r, topIds))),
     [live.runs, isThread, threadId, topIds],
@@ -583,7 +593,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     // already going (the server steered it: no second run, its block says "lê na próxima pausa").
     onSent: (message) => {
       const steered = Array.isArray(message.meta?.steeredRunIds) && message.meta.steeredRunIds.length > 0;
-      if (dmAgentId && !steered) live.expect(message.threadId ?? message.id, [dmAgentId]);
+      if (dmAgentId && !steered) live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
     },
     onFailed: (error, { clientId }) => {
       if (error instanceof ApiError) {
@@ -600,6 +610,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const retryRef = useRef(retry);
   retryRef.current = retry;
   const onRetry = useCallback((m: Message) => retryRef.current(m), []);
+  // "Tentar de novo" under a message no agent could answer: the same words again, here (the web's `resend`).
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const onResend = useCallback(
+    (m: Message) => {
+      sendRef.current(m.body, threadId);
+      toEnd();
+    },
+    [threadId, toEnd],
+  );
   const realtime = useRealtime().status;
   const outboxRef = useRef({ list, waiting });
   outboxRef.current = { list, waiting };
@@ -986,6 +1006,35 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   );
   rowsRef.current = rows;
   const pinned = mission && isOpenMission(mission) ? mission : null;
+
+  // ── Agents' receipts and "no AI" ──
+  const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
+  // One receipt line, under the latest person's message on screen.
+  const receiptId = useMemo(() => receiptMessageId(shownMessages), [shownMessages]);
+  // The line redraws when what it shows changes, not on every event that touches the receipt (typing).
+  const receiptNow = receiptId ? live.receipts[receiptId] : undefined;
+  const receiptKey = receiptNow
+    ? JSON.stringify([
+        receiptNow.agents,
+        receiptNow.routed,
+        receiptNow.noAi ?? null,
+        receiptNow.blocked ?? null,
+        receiptNow.referenced ?? null,
+        receiptNow.mentioned ?? null,
+      ])
+    : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `receiptKey` stands for the receipt
+  const receipt = useMemo(() => receiptNow, [receiptKey]);
+  // Above the box: an agent here without an AI, or the whole workspace without one (as on the web).
+  const aiStatus = useAiStatus(orgId);
+  const banner = member
+    ? noAiBanner(aiStatus.data, {
+        agentIds: dmAgentId ? [dmAgentId] : channelAgents,
+        dmAgentId,
+        cardShown: endsOnNoAiCard(shownMessages),
+      })
+    : null;
+  const connectInline = banner === null;
   const loading = isThread ? threadMessages.isLoading : top.isLoading;
 
   const renderItem = useCallback(
@@ -1050,6 +1099,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 onRetry={onRetry}
                 offline={Boolean(item.message.clientId && waiting.has(item.message.clientId))}
               />
+              {item.message.id === receiptId ? (
+                <AgentReceiptLine
+                  message={item.message}
+                  receipt={receipt}
+                  mine={item.message.author.id === meId}
+                  connectInline={connectInline}
+                  onRetry={onResend}
+                />
+              ) : null}
               {item.message.id === seenId ? (
                 <Animated.View entering={FadeIn.duration(200)}>
                   <Text variant="caption" tone="muted" style={styles.seen} accessibilityLiveRegion="polite">
@@ -1074,6 +1132,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       bodyOf,
       waiting,
       seenId,
+      receiptId,
+      receipt,
+      connectInline,
+      onResend,
       t,
     ],
   );
@@ -1215,6 +1277,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               style={StyleSheet.absoluteFill}
             />
             <Connection status={realtime} />
+            {banner ? <NoAiBanner banner={banner} /> : null}
             {/* Who is working, right above the composer (as on the web), while they work. */}
             {member ? (
               <WorkingLine

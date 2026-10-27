@@ -4,6 +4,7 @@ import {
   applyBrowserHandoff,
   applyChannelEvent,
   applyConsultEvent,
+  applyReceiptEvent,
   type ChannelEvent,
   type ConsultsState,
   cacheApproval,
@@ -17,6 +18,7 @@ import {
   dropProvisional,
   emptyStreams,
   expectReply,
+  guessReceipt,
   keys,
   type LiveConsult,
   type LiveRun,
@@ -24,10 +26,12 @@ import {
   markStopping,
   type OpenConsult,
   type ReactionCount,
+  type ReceiptsState,
   reconcileConsults,
   reconcileRuns,
   runsInChannel,
   type StreamsState,
+  seedReceipt,
   staleProvisional,
   unmarkStopping,
   useApi,
@@ -41,20 +45,23 @@ import { withContinued } from "./turn";
  * A conversation, live: subscribes to its channel while the screen is open,
  * keeps the message caches current (new messages, reactions, approvals,
  * agents' questions, threads, missions) and holds the runs in progress (streaming text, who is
- * working, agents asking agents). The database stays the truth: on open and
- * after a reconnect the active runs come from the server.
+ * working, agents asking agents) and the agents' receipts on people's messages (who saw it, who answers;
+ * `receipts.ts`, as on the web). The database stays the truth: on open and after a reconnect the active runs
+ * come from the server, and the lists' receipts seed the rest.
  */
 
 interface LiveState {
   streams: StreamsState;
   consults: ConsultsState;
+  receipts: ReceiptsState;
 }
 
 type Action =
   | { type: "event"; event: ChannelEvent; at: number }
   | { type: "reconcile"; channelId: string; active: Parameters<typeof reconcileRuns>[2]; at: number; askedAt: number }
   | { type: "consults"; channelId: string; open: OpenConsult[]; at: number; askedAt: number }
-  | { type: "expect"; channelId: string; threadId: string; agentIds: string[]; at: number }
+  | { type: "expect"; channelId: string; threadId: string; messageId: string; agentIds: string[]; at: number }
+  | { type: "seed"; messages: readonly Message[] }
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
   | { type: "dismiss"; runId: string }
@@ -66,10 +73,22 @@ export const PROVISIONAL_TTL_MS = 20_000;
 function reduce(state: LiveState, action: Action): LiveState {
   switch (action.type) {
     case "event": {
-      const streams = applyChannelEvent(state.streams, action.event, action.at);
-      const consults = applyConsultEvent(state.consults, action.event, action.at);
-      // Most events (typing, receipts) change neither: no re-render.
-      return streams === state.streams && consults === state.consults ? state : { streams, consults };
+      const { event } = action;
+      const streams = applyChannelEvent(state.streams, event, action.at);
+      const consults = applyConsultEvent(state.consults, event, action.at);
+      // A person's new message starts its receipt before the event itself lands on it (as on the web).
+      const seeded =
+        event.type === "message.created" && event.message ? seedReceipt(state.receipts, event.message) : state.receipts;
+      const receipts = applyReceiptEvent(seeded, event);
+      // Most events (typing) change none of them: no re-render.
+      return streams === state.streams && consults === state.consults && receipts === state.receipts
+        ? state
+        : { streams, consults, receipts };
+    }
+    case "seed": {
+      let receipts = state.receipts;
+      for (const m of action.messages) receipts = seedReceipt(receipts, m);
+      return receipts === state.receipts ? state : { ...state, receipts };
     }
     case "reconcile":
       return {
@@ -85,7 +104,8 @@ function reduce(state: LiveState, action: Action): LiveState {
       let streams = state.streams;
       for (const agentId of action.agentIds)
         streams = expectReply(streams, { channelId: action.channelId, threadId: action.threadId, agentId }, action.at);
-      return { ...state, streams };
+      // The message's receipt guesses the same agents until the server says (unconfirmed; the sweep drops it).
+      return { ...state, streams, receipts: guessReceipt(state.receipts, action.messageId, action.agentIds) };
     }
     case "stopping":
       return { ...state, streams: markStopping(state.streams, action.runId, action.byUserId) };
@@ -96,7 +116,12 @@ function reduce(state: LiveState, action: Action): LiveState {
     case "sweep": {
       const stale = staleProvisional(state.streams, action.at, PROVISIONAL_TTL_MS);
       if (stale.length === 0) return state;
-      return { ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))) };
+      const threads = new Set(stale.map((r) => r.threadId));
+      // A guess the server never confirmed goes with its "pensando…" (the conversation resyncs right after).
+      const receipts = Object.fromEntries(
+        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+      );
+      return { ...state, streams: dropProvisional(state.streams, threads), receipts };
     }
   }
 }
@@ -229,8 +254,12 @@ export interface ChatLive {
   runs: LiveRun[];
   /** Agents asking agents right now. */
   consults: LiveConsult[];
-  /** Right after sending: "pensando…" for the agents that will answer (an agent DM). */
-  expect: (threadId: string, agentIds: string[]) => void;
+  /** Agents' receipts on people's messages, by message id (`receiptView` reads one). */
+  receipts: ReceiptsState;
+  /** Right after sending: "pensando…" for the agents that will answer (an agent DM), on `messageId`'s receipt too. */
+  expect: (threadId: string, agentIds: string[], messageId?: string) => void;
+  /** Messages loaded over HTTP: their receipts (`message.receipts`) start or catch up. */
+  seed: (messages: readonly Message[]) => void;
   /** "Parar" (as on the web): "Parando…" until the run's event; a run that already ended just leaves. */
   stop: (runId: string, byUserId: string) => void;
 }
@@ -239,7 +268,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const connection = useConnection();
   const qc = useQueryClient();
   const api = useApi();
-  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {} });
+  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {}, receipts: {} });
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -307,11 +336,12 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   }, [hasProvisional, qc, orgId, channelId]);
 
   const expect = useCallback(
-    (threadId: string, agentIds: string[]) => {
-      if (agentIds.length > 0) dispatch({ type: "expect", channelId, threadId, agentIds, at: Date.now() });
+    (threadId: string, agentIds: string[], messageId: string = threadId) => {
+      if (agentIds.length > 0) dispatch({ type: "expect", channelId, threadId, messageId, agentIds, at: Date.now() });
     },
     [channelId],
   );
+  const seed = useCallback((messages: readonly Message[]) => dispatch({ type: "seed", messages }), []);
 
   const stop = useCallback(
     (runId: string, byUserId: string) => {
@@ -331,9 +361,11 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     () => ({
       runs: runsInChannel(state.streams, channelId),
       consults: consultsIn(state.consults, channelId),
+      receipts: state.receipts,
       expect,
+      seed,
       stop,
     }),
-    [state, channelId, expect, stop],
+    [state, channelId, expect, seed, stop],
   );
 }
