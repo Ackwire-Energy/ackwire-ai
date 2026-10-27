@@ -203,7 +203,7 @@ export function ServerSheet({ item, start, fresh = false }: { item: ConnectedIte
   return (
     <View style={styles.body}>
       <View style={styles.head}>
-        <ConnectorIcon def={item.def} label={name} size={52} check />
+        <ConnectorIcon def={item.def} image={item.image} label={name} size={52} check />
         <View style={styles.grow}>
           <Text variant="title" numberOfLines={1}>
             {name}

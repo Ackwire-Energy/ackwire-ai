@@ -1,7 +1,7 @@
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import { Text as RNText, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Text as RNText, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
 import { systemText } from "./Text";
@@ -21,6 +21,8 @@ export interface ButtonProps {
   /** Full width. */
   wide?: boolean;
   disabled?: boolean;
+  /** Working on it: a spinner in the icon's place, and it can't be pressed again meanwhile. */
+  loading?: boolean;
 }
 
 export const BUTTON_SIZES = {
@@ -50,6 +52,7 @@ export function Button({
   onPress,
   wide = false,
   disabled = false,
+  loading = false,
 }: ButtonProps) {
   const theme = useTheme();
   const { colors, shadows } = theme;
@@ -60,12 +63,12 @@ export function Button({
   return (
     <PressScale
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       sink
       fill={false}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       style={[
         {
           borderRadius: s.radius,
@@ -96,7 +99,13 @@ export function Button({
             ]}
           />
         ) : null}
-        {leading ? leading(textColor) : icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
+        {loading ? (
+          <ActivityIndicator size="small" color={textColor} />
+        ) : leading ? (
+          leading(textColor)
+        ) : icon ? (
+          <Icon name={icon} size={s.icon} color={textColor} />
+        ) : null}
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}

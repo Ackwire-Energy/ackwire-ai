@@ -10,10 +10,15 @@ use std::time::Duration;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::{Cut, Watch};
+
 /// `status` gets this long to answer.
 const STATUS_WAIT: Duration = Duration::from_secs(2);
-/// `serve` may wait for the person to allow HTTPS in the tailnet's admin page: it is stopped after this.
+/// `serve` gets this long when it asks for nothing.
 const SERVE_WAIT: Duration = Duration::from_secs(20);
+/// Once `serve` asks for HTTPS to be allowed in the tailnet's admin page, it waits there for the person: this long
+/// in all, unless they stop waiting.
+const APPROVE_WAIT: Duration = Duration::from_secs(180);
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "state", rename_all = "camelCase")]
@@ -37,6 +42,10 @@ pub enum ServeError {
     Operator,
     /// Tailscale refused or isn't connected (the Mac App Store variant may never share).
     Serve,
+    /// The person stopped waiting for HTTPS to be allowed.
+    Stopped,
+    /// Tailscale shares it, but the server didn't answer again at its new address (not Tailscale's doing).
+    Start,
 }
 
 /// The tool at the places it installs itself.
@@ -106,13 +115,17 @@ fn https_port(serve: Option<&Value>, device: &str, target: &str) -> u16 {
     }
 }
 
+/// The tailnet's admin page `serve` named, where HTTPS (or Serve) is allowed.
+fn admin_url(out: &str) -> Option<String> {
+    out.split_whitespace()
+        .find(|w| w.starts_with("https://login.tailscale.com/"))
+        .map(|w| w.trim_end_matches(['.', ',', ')']).to_string())
+}
+
 /// Why `serve` failed, from what it printed.
 pub fn serve_error(out: &str) -> ServeError {
     let lower = out.to_ascii_lowercase();
-    let url = out
-        .split_whitespace()
-        .find(|w| w.starts_with("https://login.tailscale.com/"))
-        .map(|w| w.trim_end_matches(['.', ',', ')']).to_string());
+    let url = admin_url(out);
     if url.is_some() || lower.contains("https") && (lower.contains("not enabled") || lower.contains("certificate")) {
         ServeError::Https { url }
     } else if lower.contains("access denied") || lower.contains("operator") {
@@ -122,17 +135,42 @@ pub fn serve_error(out: &str) -> ServeError {
     }
 }
 
-/// Shares `http://127.0.0.1:<port>` on the tailnet over HTTPS; the address it answers at.
-pub fn serve(port: u16) -> Result<String, ServeError> {
+/// Shares `http://127.0.0.1:<port>` on the tailnet over HTTPS; the address it answers at. When HTTPS isn't
+/// allowed in the tailnet yet, Tailscale names its admin page and waits there until it is: `asks` gets that page
+/// at once, and `serve` goes on by itself once the person allowed it (up to `APPROVE_WAIT`), unless `stopped`.
+pub fn serve(port: u16, asks: &mut dyn FnMut(&str), stopped: &dyn Fn() -> bool) -> Result<String, ServeError> {
     let Tailnet::On { device } = tailnet() else { return Err(ServeError::Serve) };
     let target = format!("http://127.0.0.1:{port}");
     let current = run(&["serve", "status", "--json"], STATUS_WAIT).and_then(|(_, out)| serde_json::from_str(&out).ok());
     let https = https_port(current.as_ref(), &device, &target);
     let flag = format!("--https={https}");
-    match run(&["serve", "--bg", &flag, &target], SERVE_WAIT) {
-        Some((true, _)) => Ok(if https == 443 { format!("https://{device}") } else { format!("https://{device}:{https}") }),
-        Some((false, out)) => Err(serve_error(&out)),
-        None => Err(ServeError::Serve),
+    let cli = cli().ok_or(ServeError::Serve)?;
+    let mut asked = false;
+    let mut watch = |so_far: &str| {
+        if stopped() {
+            return Watch::Stop;
+        }
+        if !asked {
+            if let Some(url) = admin_url(so_far) {
+                asked = true;
+                asks(&url);
+            }
+        }
+        if asked {
+            Watch::WaitUpTo(APPROVE_WAIT)
+        } else {
+            Watch::Wait
+        }
+    };
+    let mut command = Command::new(cli);
+    command.args(["serve", "--bg", flag.as_str(), target.as_str()]);
+    let ran = crate::run_watched(&mut command, SERVE_WAIT, &mut watch).map_err(|_| ServeError::Serve)?;
+    match ran.cut {
+        Some(Cut::Stopped) => Err(ServeError::Stopped),
+        _ if ran.code == Some(0) => {
+            Ok(if https == 443 { format!("https://{device}") } else { format!("https://{device}:{https}") })
+        }
+        _ => Err(serve_error(&(ran.out + &ran.err))),
     }
 }
 

@@ -29,7 +29,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
+use std::sync::atomic::{AtomicBool, SeqCst};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -61,6 +61,8 @@ const STDERR_LINES: usize = 60;
 
 pub const STATUS_EVENT: &str = "local-server://status";
 pub const STEP_EVENT: &str = "local-server://step";
+/// What turning reach on or off is doing now, for the windows to say while it takes.
+pub const REACH_EVENT: &str = "local-server://reach";
 
 /// Exit codes of `agentes-server` (apps/server native.ts `EXIT`).
 mod exit {
@@ -872,6 +874,8 @@ pub struct LocalServer {
     busy: Mutex<()>,
     /// Cancel, or the app quitting, while it is set up: every wait of the setup ends.
     cancel: AtomicBool,
+    /// The person stopped waiting for HTTPS to be allowed in their tailnet.
+    reach_stop: AtomicBool,
 }
 
 fn state(app: &AppHandle) -> std::sync::MutexGuard<'_, Inner> {
@@ -1403,7 +1407,11 @@ pub fn ensure_served(app: &AppHandle) {
         return;
     }
     let Some(port) = folder(app).and_then(|f| port_of(&f)) else { return };
-    if crate::tailscale::serve(port).is_ok_and(|now| now == url) && is_running(app) {
+    // Nobody is there to allow HTTPS now: asked for it, it stops (reach turned on again asks the person).
+    let asked = std::cell::Cell::new(false);
+    if crate::tailscale::serve(port, &mut |_| asked.set(true), &|| asked.get()).is_ok_and(|now| now == url)
+        && is_running(app)
+    {
         state(app).served = true;
         crate::cover::server_here_ready(app);
     }
@@ -1697,12 +1705,35 @@ fn start_with_owner(
     Ok(port)
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReachStage<'a> {
+    /// `sharing` (Tailscale), `approve` (HTTPS to allow at `url`), `restarting` (at the new address), `signingIn`.
+    stage: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<&'a str>,
+}
+
+fn reach_stage(app: &AppHandle, stage: &'static str, url: Option<&str>) {
+    let _ = app.emit(REACH_EVENT, ReachStage { stage, url });
+}
+
 /// Reach on: Tailscale shares the server, `PUBLIC_URL` becomes that address and the server starts again
-/// there; the server list follows. The address, or why it didn't work.
+/// there; the server list follows. The address, or why it didn't work. Each stage is said as it starts
+/// (`REACH_EVENT`), and Tailscale's page for allowing HTTPS as soon as it names it.
 fn reach_on(app: &AppHandle) -> Result<String, crate::tailscale::ServeError> {
     let folder = folder(app).ok_or(crate::tailscale::ServeError::Serve)?;
     let port = port_of(&folder).ok_or(crate::tailscale::ServeError::Serve)?;
-    let url = crate::tailscale::serve(port).inspect_err(|reason| {
+    reach_stage(app, "sharing", None);
+    let server = app.state::<LocalServer>();
+    server.reach_stop.store(false, SeqCst);
+    let mut asks = |url: &str| {
+        state(app).https_url = Some(url.to_string());
+        reach_stage(app, "approve", Some(url));
+    };
+    // "Stop waiting", or Cancel and quitting while it is set up.
+    let stopped = || server.reach_stop.load(SeqCst) || cancelled(app);
+    let url = crate::tailscale::serve(port, &mut asks, &stopped).inspect_err(|reason| {
         if let crate::tailscale::ServeError::Https { url } = reason {
             state(app).https_url.clone_from(url);
         }
@@ -1717,7 +1748,8 @@ fn reach_on(app: &AppHandle) -> Result<String, crate::tailscale::ServeError> {
     if let Some(old) = old {
         crate::servers::replace(app, &old, &url);
     }
-    restart(app).map_err(|_| crate::tailscale::ServeError::Serve)?;
+    reach_stage(app, "restarting", None);
+    restart(app).map_err(|_| crate::tailscale::ServeError::Start)?;
     Ok(url)
 }
 
@@ -1737,6 +1769,7 @@ fn address_here(app: &AppHandle, folder: &Folder) -> Result<String, String> {
 fn reach_off(app: &AppHandle) -> Result<String, String> {
     let folder = folder(app).ok_or("no folder")?;
     let local = address_here(app, &folder)?;
+    reach_stage(app, "restarting", None);
     restart(app)?;
     Ok(local)
 }
@@ -1966,7 +1999,8 @@ pub async fn local_server_reach(app: AppHandle, webview: tauri::Webview, on: boo
         let result = if on {
             reach_on(&app).map_err(|reason| json!(reason))
         } else {
-            reach_off(&app).map_err(|_| json!({ "reason": "serve" }))
+            // Turning it off asks nothing of Tailscale that can fail: what fails is the start at the address here.
+            reach_off(&app).map_err(|_| json!(crate::tailscale::ServeError::Start))
         };
         emit_status(&app);
         let url = match result {
@@ -1976,6 +2010,7 @@ pub async fn local_server_reach(app: AppHandle, webview: tauri::Webview, on: boo
         if was_here {
             let folder = folder(&app).ok_or("no folder")?;
             let port = port_of(&folder).ok_or("no port")?;
+            reach_stage(&app, "signingIn", None);
             if let Ok(token) = owner_sign_in(&folder, port, None) {
                 open_signed_in(&app, &url, &token)?;
             }
@@ -1984,6 +2019,14 @@ pub async fn local_server_reach(app: AppHandle, webview: tauri::Webview, on: boo
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// "Stop waiting": reach stops waiting for HTTPS to be allowed in the tailnet (it ends as not turned on).
+#[tauri::command]
+pub fn local_server_reach_stop(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
+    app_window(&webview, &["welcome", "prefs"])?;
+    app.state::<LocalServer>().reach_stop.store(true, SeqCst);
+    Ok(())
 }
 
 /// The usage-statistics switch: `TELEMETRY` in `.env` (the server reads it at start, so it starts again).

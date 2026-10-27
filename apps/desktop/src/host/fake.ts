@@ -23,6 +23,7 @@ import {
   type LocalPhase,
   type LocalServerStatus,
   NO_SERVER,
+  type ReachStage,
   type ServeProblem,
   type SetupStep,
   type StepChange,
@@ -148,6 +149,11 @@ export function createFakeHost(
   };
   const localListeners = new Set<(s: LocalServerStatus) => void>();
   const stepListeners = new Set<(c: StepChange) => void>();
+  const reachListeners = new Set<(s: ReachStage) => void>();
+  const sayReach = (stage: ReachStage) => {
+    for (const l of reachListeners) l(stage);
+  };
+  let reachStopped = false;
   const progressListeners = new Set<(got: number, total: number | null) => void>();
   let cancelSetup: (() => void) | null = null;
   let dropUpdate: (() => void) | null = null;
@@ -432,9 +438,20 @@ export function createFakeHost(
       setLocal({ phase: "running" });
     },
     setLocalReach: async (on) => {
+      reachStopped = false;
+      if (on) sayReach({ stage: "sharing" });
       await wait(900);
       if (on && tailnet.state !== "on") return { ok: false, problem: { reason: "serve" } };
-      if (on && here.fail === "reach") return { ok: false, problem: { reason: "https", url: null } };
+      if (on && here.fail === "reach") {
+        // Tailscale asks for HTTPS to be allowed and waits: until "Stop waiting", or a few seconds as if never allowed.
+        sayReach({ stage: "approve", url: "https://login.tailscale.com/f/serve?node=fake" });
+        for (let i = 0; i < 40 && !reachStopped; i++) await wait(100);
+        return { ok: false, problem: reachStopped ? { reason: "stopped" } : { reason: "https", url: null } };
+      }
+      sayReach({ stage: "restarting" });
+      setLocal({ phase: "starting" });
+      await wait(900);
+      setLocal({ phase: "running" });
       const url = on ? TAILNET_URL : LOCAL_URL;
       list.servers = list.servers.map((s) => (s === local.publicUrl ? url : s));
       if (list.current === local.publicUrl) list.current = url;
@@ -452,6 +469,13 @@ export function createFakeHost(
     },
     localDiagnostics: async () => `agentes.chat app ${version} (macos aarch64)\nserver here: ${local.phase}`,
     syncLocalHomes: async () => {},
+    onLocalReach: (cb) => {
+      reachListeners.add(cb);
+      return () => reachListeners.delete(cb);
+    },
+    stopLocalReach: async () => {
+      reachStopped = true;
+    },
     tailscale: async () => tailnet,
     openTailscale: async (page) => {
       console.info("[fake] open Tailscale:", page);

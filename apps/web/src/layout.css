@@ -3600,7 +3600,8 @@ p {
   background: transparent;
   font-size: 8px;
 }
-.ac-chip > .connector-icon > .connector-icon__mark {
+.ac-chip > .connector-icon > .connector-icon__mark,
+.ac-chip > .connector-icon > .connector-icon__img {
   width: 12px;
   height: 12px;
 }
@@ -6257,6 +6258,10 @@ p {
   border-radius: var(--radius-md);
   background: #fff;
   box-shadow: inset 0 0 0 1px var(--line);
+}
+.phone-code__qr[data-loading] {
+  display: grid;
+  place-items: center;
 }
 .phone-code__qr svg {
   display: block;
