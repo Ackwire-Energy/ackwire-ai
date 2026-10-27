@@ -71,6 +71,7 @@ import {
   unmarkStopping,
 } from "@agenteschat/client";
 import { formatPercent } from "@agenteschat/client/lib/format";
+import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
@@ -80,6 +81,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { checkAppVersion } from "@/lib/app-version";
 import { desktopNotice, inDesktopApp, thisMac } from "@/lib/desktop";
+import { notificationAudience } from "@/lib/sounds";
 import { useToast } from "@/lib/toast";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
@@ -432,6 +434,12 @@ export function RealtimeProvider({
       if (isAgentUnavailable(event)) streams.unavailable(event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
       if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
+      // Its sound (ADR 0070): in one tab only, and in the background only what matters.
+      if (isNotificationEvent(event) && event.type === "notification.upserted") {
+        const { mine, background } = notificationAudience();
+        const sound = mine ? soundForNotification(event.notification, background) : null;
+        if (sound) playSound(sound);
+      }
       // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
       if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
         const notice = desktopNotice(tRef.current, orgId, event.notification);

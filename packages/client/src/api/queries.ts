@@ -21,6 +21,7 @@ import {
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
+import { playSound } from "../lib/sounds";
 import { upsertMessage } from "../lib/timeline";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
@@ -539,6 +540,7 @@ export function usePostMessage(
         ),
       );
       options.onOptimistic?.(local);
+      playSound("send");
       return { local };
     },
     onSuccess: (message, { clientId, threadId, meta }, ctx) => {
@@ -657,7 +659,8 @@ export function useDecideApproval(orgId: string) {
   return useMutation({
     mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "refuse"; reason?: string }) =>
       decision === "approve" ? api.approvals.approve(orgId, id, reason) : api.approvals.refuse(orgId, id, reason),
-    onSuccess: (approval) => {
+    onSuccess: (approval, { decision }) => {
+      playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
     },

@@ -32,6 +32,7 @@ import {
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
+import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useConnection } from "../shared/hooks";
@@ -316,6 +317,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const stop = useCallback(
     (runId: string, byUserId: string) => {
       dispatch({ type: "stopping", runId, byUserId });
+      playSound("stop");
       api.agents.cancelRun(orgId, runId).catch((err: unknown) => {
         // 409 `run_finished`: it ended on its own meanwhile; its message is on the way (or already here).
         if (err instanceof ApiError && err.status === 409) {

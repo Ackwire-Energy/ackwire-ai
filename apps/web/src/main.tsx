@@ -19,6 +19,7 @@ import {
 import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
 import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { snapshotStore } from "./lib/snapshot-store";
+import { installSounds } from "./lib/sounds";
 import { createToastStore } from "./lib/toast";
 import { routeTree } from "./routeTree.gen";
 
@@ -33,6 +34,8 @@ if (platform) {
   if (asksForPhone(window.location.search)) askForPhone();
 }
 const toasts = createToastStore();
+// The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in the account menu.
+installSounds();
 const api = createApiClient();
 
 /** A 401 anywhere means the session ended: back to sign-in, then here again. */

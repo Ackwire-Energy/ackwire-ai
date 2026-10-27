@@ -23,6 +23,7 @@
       "default": "./src/computer/portrait.js"
     },
     "./brand/marks": "./src/brand/marks.ts",
+    "./sfx": "./src/sfx/synth.ts",
     "./sky/engine": "./src/sky/engine.ts",
     "./sky/math": "./src/sky/math.ts",
     "./sky/chart": "./src/sky/chart.ts",
