@@ -601,6 +601,8 @@ interface AppLive {
   /** Also the MCP bridge's id (`mcp --run <id>`). */
   id: string;
   agentId: string;
+  /** The account it signs in with; null: the computer's own sign-in. */
+  account: string | null;
   sessionId: string;
   threadKey: string;
   client: CodexAppClient;
@@ -647,7 +649,8 @@ export class CodexAppServers implements CodexAppRunner {
   private readonly chains = new Map<string, Promise<unknown>>();
   /** Runs on a process now (steering finds them), and runs `codex exec` runs instead. */
   private readonly running = new Map<string, AppLive>();
-  private readonly execRuns = new Set<string>();
+  /** Runs on `codex exec`, with the account each signs in with (null: the computer's own). */
+  private readonly execRuns = new Map<string, string | null>();
   /** `<bin>@<version>` whose app-server didn't start: exec for it from then on. */
   private readonly broken = new Set<string>();
   private closed = false;
@@ -665,6 +668,12 @@ export class CodexAppServers implements CodexAppRunner {
   /** App-servers alive now. */
   get size() {
     return [...this.live.values()].filter((l) => !l.client.exited).length;
+  }
+
+  /** Whether a process of that sign-in is open: a turn, or an app-server kept after one (`null`: the computer's own). */
+  holds(account: string | null): boolean {
+    for (const l of this.live.values()) if (l.account === account && !l.client.exited) return true;
+    return [...this.execRuns.values()].includes(account);
   }
 
   /** The process of an agent's session (tests). */
@@ -698,7 +707,7 @@ export class CodexAppServers implements CodexAppRunner {
     exec: () => Promise<void>,
   ): Promise<void> {
     const viaExec = async () => {
-      this.execRuns.add(input.runId);
+      this.execRuns.set(input.runId, input.account?.id ?? null);
       try {
         await exec();
       } finally {
@@ -850,6 +859,7 @@ export class CodexAppServers implements CodexAppRunner {
       key,
       id,
       agentId: input.agentId ?? "",
+      account: input.account?.id ?? null,
       sessionId: input.sessionId,
       threadKey,
       client,

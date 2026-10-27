@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 22;
+export const MACHINE_PROTOCOL_VERSION = 24;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -962,6 +962,45 @@ export const BRAIN_LIMITS = {
   message: 2000,
 } as const;
 
+/**
+ * From this protocol on (ADR 0074): `brain.route`, a person's own Claude or
+ * ChatGPT plan picking who answers their message nobody mentioned. Claude
+ * Code or Codex answers once with every tool off, nothing of the folder or
+ * its owner loaded and no session kept, in a temporary folder, as the
+ * request's agent's user. A sign-in with a key is refused. While that
+ * sign-in's folder has a process open (a turn, or the one kept after it) the
+ * answer is `busy` at once. The server never sends it to an older runner.
+ */
+export const ROUTE_PROTOCOL = 24;
+/** The runner kills a route's CLI after this long. */
+export const ROUTE_TIMEOUT_MS = 30_000;
+/** Largest `brain.route` fields (characters; the schema as JSON). */
+export const ROUTE_LIMITS = { system: 8000, prompt: 32_000, schema: 8000 } as const;
+
+/** `brain.route` (protocol 24): one answer in `schema`'s shape from the account's CLI. */
+export interface BrainRouteRequest {
+  kind: AccountKind;
+  /** The account folder (`accounts/<kind>/<id>`); absent: the computer's own sign-in. */
+  account?: string;
+  system: string;
+  /** Read by the CLI on its standard input. */
+  prompt: string;
+  /** JSON Schema of the answer. */
+  schema: Record<string, unknown>;
+}
+
+/** What a route answers: the CLI's answer as a JSON object, or `busy` while that sign-in has a process open. */
+export type BrainRouteReply =
+  | {
+      json: Record<string, unknown>;
+      /** The model that answered, as the CLI reports it. */
+      model: string;
+      /** Every input token it read (cache included); `cacheRead` and `cacheWrite` say how much was cache. */
+      usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
+      durationMs: number;
+    }
+  | { busy: true };
+
 /** A task as the runner's journal has it (in `hello` and `task.status`). */
 export interface RunnerTask {
   taskId: string;
@@ -1172,6 +1211,8 @@ export type MachineRequest = (
   | ({ op: "brain.turn" } & BrainTurnRequest)
   /** Protocol 15: messages for a brain turn in progress (live steering). */
   | ({ op: "brain.steer" } & BrainSteerRequest)
+  /** Protocol 24: a plan picks who answers a message (ADR 0074); the request's agent is the one it is lent to. */
+  | ({ op: "brain.route" } & BrainRouteRequest)
   /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
   | ({ op: "git.sync" } & GitSyncRequest)
   /** Protocol 14: the mission's worktree (ADR 0044). */
@@ -1282,6 +1323,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.output",
   "brain.turn",
   "brain.steer",
+  "brain.route",
   "git.sync",
   "mission.worktree",
   "access.request",
@@ -1347,6 +1389,7 @@ export interface MachineReplies {
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
   "brain.steer": BrainSteerReply;
+  "brain.route": BrainRouteReply;
   "git.sync": { repos: GitSyncRepo[] };
   /** `remove` answers `{ removed }` (`false`: the folder was already gone). */
   "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };

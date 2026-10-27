@@ -1080,6 +1080,8 @@ interface Live {
   key: string;
   id: string;
   proc: ClaudeProcess;
+  /** The account folder it signs in with; null: the computer's own sign-in. */
+  account: string | null;
   /** Launch settings: a turn asking for others restarts the process (resumed). */
   sig: string;
   /** What `ran` remembers for it: the session, in its account. */
@@ -1196,6 +1198,12 @@ export class BrainManager {
   /** The live process of a session, if any (tests). */
   process(agentId: string, session: string): ClaudeProcess | undefined {
     return this.live.get(`${agentId}:${session}`)?.proc;
+  }
+
+  /** Whether a process of that sign-in is open: a turn, or the one kept after it (`null`: the computer's own). */
+  holds(account: string | null): boolean {
+    const open = (l: Live) => l.account === account && !l.proc.exited;
+    return [...this.live.values()].some(open) || [...this.running.values()].some(open);
   }
 
   /**
@@ -1573,6 +1581,7 @@ export class BrainManager {
       key,
       id,
       proc,
+      account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
       sig,
       ranKey: ranKeyOf(req, session),
       busy: false,

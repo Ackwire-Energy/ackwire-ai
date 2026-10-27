@@ -12,6 +12,9 @@
 // (as Claude Code 2.1.310 does, ten times with backoff). Control requests: `initialize`, and `get_usage`
 // as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
 // "hang": never).
+// With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
+// `structured_output` gives the schema's first handle 0.9, and a line with the system prompt and the
+// prompt in the log. "SLOW_ROUTE" never answers, "BAD_ROUTE" answers no JSON.
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -22,6 +25,7 @@ if (log) {
   const configDir = process.env.CLAUDE_CONFIG_DIR ?? null;
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
   const authToken = process.env.ANTHROPIC_AUTH_TOKEN ?? null;
+  const baseUrl = process.env.ANTHROPIC_BASE_URL ?? null;
   const at = args.indexOf("--settings");
   let settingsEnv = null;
   try {
@@ -29,13 +33,45 @@ if (log) {
   } catch {}
   appendFileSync(
     log,
-    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, settingsEnv })}\n`,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, baseUrl, settingsEnv })}\n`,
   );
 }
 const flag = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
+if (flag("--json-schema") !== undefined) {
+  await route();
+  process.exit(0);
+}
+
+async function route() {
+  let prompt = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) prompt += chunk;
+  const system = readFileSync(flag("--system-prompt-file"), "utf8");
+  if (log) appendFileSync(log, `${JSON.stringify({ pid: process.pid, route: true, system, prompt })}\n`);
+  if (prompt.includes("SLOW_ROUTE")) await new Promise((resolve) => setTimeout(resolve, 120_000));
+  if (prompt.includes("BAD_ROUTE")) {
+    process.stdout.write("Sorry, I can't help with that.\n");
+    return;
+  }
+  const schema = JSON.parse(flag("--json-schema"));
+  const handle = schema.properties?.scores?.items?.properties?.handle?.enum?.[0];
+  const answer = { needs_agent: 0.9, scores: handle ? [{ handle, score: 0.9 }] : [], reason: "a fake route" };
+  process.stdout.write(
+    `${JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      duration_ms: 3847,
+      result: JSON.stringify(answer),
+      structured_output: answer,
+      usage: { input_tokens: 2, cache_read_input_tokens: 2597, cache_creation_input_tokens: 0, output_tokens: 750 },
+      modelUsage: { "claude-haiku-5-5": { inputTokens: 2, outputTokens: 750 } },
+    })}\n`,
+  );
+}
 const session = flag("--resume") ?? flag("--session-id") ?? "none";
 if (flag("--resume") && process.env.FAKE_CLAUDE_NO_SESSION) {
   process.stderr.write(`No conversation found with session ID: ${session}\n`);

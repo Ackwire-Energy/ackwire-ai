@@ -259,7 +259,12 @@ export class Supervisor {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping; try again in a minute");
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
-    if (req.op === "brain.turn" && typeof req.account === "string" && req.account && this.opts.lend) {
+    if (
+      (req.op === "brain.turn" || req.op === "brain.route") &&
+      typeof req.account === "string" &&
+      req.account &&
+      this.opts.lend
+    ) {
       await this.opts
         .lend(req.kind === "codex" ? "codex" : "claude_code", req.account, w.user.uid)
         .catch((err: unknown) =>
