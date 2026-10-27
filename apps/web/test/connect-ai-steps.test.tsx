@@ -172,9 +172,12 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".grid-options--plans > .ac-option:not(.ai-picker__key)::after")).toContain(
       "top: calc(50% - 9px)",
     );
-    // The API key row has two lines: its check goes on the first, its name's, past the tile's padding.
+    // The API key row has two lines: its check goes on the first, its name's, past the tile's padding (the page's
+    // 22px line where the lh unit is unknown).
     expect(ruleOf(ui, ".ac-option")).toContain("padding: var(--space-3)");
-    expect(ruleOf(layout, ".grid-options--plans > .ac-option.ai-picker__key::after")).toContain(
+    const key = ".grid-options--plans > .ac-option.ai-picker__key::after";
+    expect(ruleOf(layout, key)).toContain("top: calc(var(--space-3) + 11px - 9px)");
+    expect(ruleOf(layout.split("\n@supports (top: 1lh) {")[1] ?? "", key)).toContain(
       "top: calc(var(--space-3) + 0.5lh - 9px)",
     );
     const panel = ruleOf(layout, ".grid-options--plans > .ai-panel");

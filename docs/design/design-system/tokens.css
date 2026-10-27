@@ -72,6 +72,11 @@
   --control-icon-sm: 16px; --control-icon-md: 18px; --control-icon-lg: 20px;
   --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
+  /*
+   * How far a line's capitals' middle sits above its line box's middle, in x-heights (`ex` follows
+   * font-size-adjust). Measured for Source Sans 3 (0.037ex) and Onest (0.040ex): a new font is measured again.
+   */
+  --cap-mid: 0.04ex;
   --text-xs: 12px; --text-sm: 13px; --text-md: 14.5px; --text-base: 15px; --text-lg: 16px;
   --text-h3: 17px; --text-h2: 20px; --text-h1: 28px; --text-display: 32px;
   --track-tight: -0.025em; --track-tighter: -0.035em;

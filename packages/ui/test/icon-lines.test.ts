@@ -31,6 +31,9 @@ const NUDGE = new RegExp(
   String.raw`(?:^|;)\s*(?:margin(?:-top)?|top|vertical-align):\s*${PX}|(?:^|;)\s*translate:\s*0\s+${PX}|translateY\(\s*${PX}`,
 );
 
+/** A placement that adds part of an em under a line's middle: the x-height's middle, lower than where the eye centres. */
+const X_HEIGHT_AIM = /(?:^|;)\s*(?:translate|top|margin(?:-top)?|vertical-align):[^;]*\+\s*[\d.]+em\b/;
+
 /** Leads still placed by hand, and why. An entry leaves when its rule does. */
 const PLACED_BY_HAND: Record<string, string> = {
   "packages/ui/src/styles/components.css .ac-menu__item .ac-icon":
@@ -151,16 +154,52 @@ describe("an icon before text sits on the text's first line", () => {
     expect(lines.map((e) => `${e.where} ${e.classes.join(" ")}`)).toEqual([]);
   });
 
-  test(".ac-iconline centres its lead on the first line's reading middle, with a 22px fallback first", async () => {
+  test("a lead and an ⓘ sit on the first line's capitals' middle (--cap-mid), a 22px-line fallback first", async () => {
     const rules = await allRules();
     const body = (selector: string) =>
-      rules.find(([file, s]) => file === "packages/ui/src/styles/components.css" && s === selector)?.[2] ?? "";
+      rules
+        .filter(([file, s]) => file === "packages/ui/src/styles/components.css" && s === selector)
+        .map(([, , b]) => b)
+        .join("\n");
+    const tokens = await Bun.file(join(ROOT, "packages/ui/src/styles/tokens.css")).text();
+    expect(tokens).toMatch(/--cap-mid:\s*[\d.]+ex;/);
     expect(body(".ac-iconline")).toContain("align-items: flex-start");
-    const lead = body(".ac-iconline > :first-child");
-    const fallback = lead.indexOf("translate: 0 calc(11px + 0.08em - 50%)");
-    const lh = lead.indexOf("translate: 0 calc(0.5lh + 0.08em - 50%)");
-    expect(fallback).toBeGreaterThan(-1);
-    expect(lh).toBeGreaterThan(fallback);
-    expect(lead).toContain("flex: none");
+    expect(body(".ac-iconline > :first-child")).toContain("flex: none");
+    // The ⓘ's half is its 14px glyph's: its target's negative margins put the glyph's top on the line's.
+    for (const [selector, half] of [
+      [".ac-iconline > :first-child", "50%"],
+      [".ac-hint", "7px"],
+    ] as const) {
+      const css = body(selector);
+      const fallback = css.indexOf(`translate: 0 calc(11px - var(--cap-mid) - ${half})`);
+      const lh = css.indexOf(`translate: 0 calc(0.5lh - var(--cap-mid) - ${half})`);
+      expect(fallback).toBeGreaterThan(-1);
+      expect(lh).toBeGreaterThan(fallback);
+    }
+    // A face keeps its initials' type but reads the row's line, its one row as tall as the face so a photo of any
+    // shape fills it; a key centred with its title only rises.
+    expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("line-height: inherit");
+    expect(body(".ac-iconline > .ac-avatar:first-child")).toContain("grid-template-rows: 100%");
+    expect(body(".ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key")).toContain("var(--cap-mid)");
+  });
+
+  // A declaration holding var() parses even where lh is unknown, so as the second of a pair it would replace the px
+  // fallback there and then compute to nothing.
+  test("the lh unit sits behind @supports (top: 1lh), so a browser without it keeps the px fallback", async () => {
+    const bare: string[] = [];
+    for (const file of SOURCES.flatMap((d) => files(join(ROOT, d), ".css"))) {
+      const css = (await Bun.file(file).text())
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/@supports\s*\(\s*top:\s*1lh\s*\)\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "");
+      for (const m of css.matchAll(/[^;{}]*\dlh\b[^;{}]*/g)) bare.push(`${relative(ROOT, file)}: ${m[0].trim()}`);
+    }
+    expect(bare).toEqual([]);
+  });
+
+  test("nothing beside text aims at the x-height's middle (part of an em under the line's middle)", async () => {
+    const aimed = (await allRules())
+      .filter(([, , body]) => X_HEIGHT_AIM.test(body))
+      .map(([file, selector]) => `${file} ${selector}`);
+    expect(aimed).toEqual([]);
   });
 });
