@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
+import { readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import type { ServerWebSocket } from "bun";
 import type { DesktopSessions } from "../../runner/desktop-session";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
-import { DataSockets, openDataSocket } from "../../runner/streams";
+import { DataSockets, openDataSocket, RELAYED_FILE, RelayCount } from "../../runner/streams";
 import type { Terminals } from "../../runner/terminal";
 import { desktopOn, errorCode, fakeXvnc, removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -119,13 +121,59 @@ test("the dial fails when the server refuses the stream, answers something else,
 test("the data sockets of a session all close when it ends", async () => {
   const s = streamServer();
   const sockets = new DataSockets({ url: s.url, token: TOKEN });
-  const a = await sockets.dial(STREAM_ID);
-  await sockets.dial("B".repeat(43));
+  const a = await sockets.dial(STREAM_ID, "desktop");
+  await sockets.dial("B".repeat(43), "terminal");
   a.close();
   await waitFor(() => s.closes.length === 1);
   sockets.closeAll();
   await waitFor(() => s.closes.length === 2);
   expect(s.closes).toEqual([1000, 1001]);
+});
+
+test("what root relayed: each kind's payload both ways once the stream is ready, written whole only when it changed", async () => {
+  const s = streamServer();
+  const t = streamServer();
+  const relayed = new RelayCount();
+  const desktops = new DataSockets({ url: s.url, token: TOKEN, relayed });
+  const terminals = new DataSockets({ url: t.url, token: TOKEN, relayed });
+  const desktop = await desktops.dial(STREAM_ID, "desktop");
+  const terminal = await terminals.dial(STREAM_ID, "terminal");
+  // The handshake isn't the stream's.
+  expect([relayed.desktop, relayed.terminal]).toEqual([
+    { up: 0, down: 0 },
+    { up: 0, down: 0 },
+  ]);
+  desktop.listen({ bytes: () => {}, closed: () => {} });
+  desktop.send(new Uint8Array(1000));
+  s.peer().send(new Uint8Array(70_000));
+  terminal.send("olá");
+  await waitFor(() => relayed.desktop.down === 70_000 && s.got.length === 1 && t.got.length === 1);
+  expect(relayed.desktop).toEqual({ up: 1000, down: 70_000 });
+  expect(relayed.terminal).toEqual({ up: Buffer.byteLength("olá"), down: 0 });
+  expect(relayed.browserView).toEqual({ up: 0, down: 0 });
+
+  const dir = tempDir("relayed-");
+  dirs.push(dir);
+  const file = path.join(dir, RELAYED_FILE);
+  relayed.save(file);
+  expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
+    startedAt: relayed.startedAt,
+    desktop: { up: 1000, down: 70_000 },
+    terminal: { up: 4, down: 0 },
+    browserView: { up: 0, down: 0 },
+  });
+  expect(statSync(file).mode & 0o777).toBe(0o600);
+  expect(relayed.startedAt).toBeGreaterThan(Date.now() - 60_000);
+  // Nothing new: the file isn't touched.
+  const at = statSync(file).mtimeMs;
+  await Bun.sleep(20);
+  relayed.save(file);
+  expect(statSync(file).mtimeMs).toBe(at);
+  relayed.browserView.up += 5;
+  relayed.save(file);
+  expect(JSON.parse(readFileSync(file, "utf8")).browserView).toEqual({ up: 5, down: 0 });
+  desktops.closeAll();
+  terminals.closeAll();
 });
 
 const ACCESS = (tools: Partial<RunnerAccess["tools"]>): RunnerAccess => ({

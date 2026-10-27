@@ -1,7 +1,7 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { LoadWindow, machineSize, sampleLoad } from "@agenteschat/adapters/host-stats";
+import { LoadWindow, machineSize, sampleLoad, TrafficWindow } from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
@@ -83,7 +83,7 @@ import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrg
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
-import { DataSockets } from "./streams";
+import { DataSockets, RELAYED_FILE, RelayCount } from "./streams";
 import {
   launchWorker,
   Supervisor,
@@ -288,6 +288,10 @@ export class RunnerDaemon implements RequestObserver {
   private readonly timers: ReturnType<typeof setInterval>[] = [];
   /** Protocol 22: how busy this computer got over the last day (rides on `pong`). */
   private readonly load = new LoadWindow();
+  /** The agents' browsers' last day of traffic (protocol 23). */
+  private readonly traffic = new TrafficWindow();
+  /** System mode: what this process relayed to the server, per stream (`relayed.json`). */
+  private readonly relayed = new RelayCount();
   private resumeTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private stopping = false;
@@ -469,14 +473,28 @@ export class RunnerDaemon implements RequestObserver {
     const browsers = setInterval(() => this.browsersChanged(), BROWSER_STATE_POLL_MS);
     browsers.unref?.();
     this.timers.push(browsers);
-    const sample = () =>
+    const sample = () => {
+      const s = this.session;
+      this.traffic.add((s?.supervisor ?? s?.browser)?.takeTraffic() ?? { up: 0, down: 0 });
       void sampleLoad()
-        .then((s) => this.load.add(s))
+        .then((l) => this.load.add(l))
         .catch(() => undefined);
+    };
     sample();
     const load = setInterval(sample, LOAD_SAMPLE_MS);
     load.unref?.();
     this.timers.push(load);
+    // System mode: for the Cloud's guard, at most once a minute.
+    const relayed = setInterval(() => {
+      if (!this.session?.supervisor) return;
+      try {
+        this.relayed.save(path.join(this.opts.home, RELAYED_FILE));
+      } catch (err) {
+        this.opts.log(`${RELAYED_FILE}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, 60_000);
+    relayed.unref?.();
+    this.timers.push(relayed);
     this.expireRequests();
   }
 
@@ -798,7 +816,11 @@ export class RunnerDaemon implements RequestObserver {
       numbered: this.desktopRefsGiven,
       log,
     });
-    const streams = new DataSockets({ url: connectUrl(config.server, "stream"), token: config.token });
+    const streams = new DataSockets({
+      url: connectUrl(config.server, "stream"),
+      token: config.token,
+      relayed: this.relayed,
+    });
     let supervisor: Supervisor | null = null;
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
@@ -824,6 +846,7 @@ export class RunnerDaemon implements RequestObserver {
         server: config.server,
         send: (frame) => live?.send(frame) ?? false,
         state: () => this.workerState(),
+        relayed: this.relayed,
         log,
       });
     }
@@ -882,6 +905,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       executors: () => this.helloExecutors(),
       load: () => this.load.summary(),
+      browserTraffic: () => this.traffic.summary(),
       context,
       // System mode: the agents' tasks and MCP calls are their workers'.
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),

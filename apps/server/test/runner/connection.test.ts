@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  type BrowserTraffic,
   MACHINE_PROTOCOL_VERSION,
   type MachineLoad,
   type RunnerInfo,
@@ -159,6 +160,32 @@ test("protocol 22: a new load summary rides on the next pong, once, and again on
   const again = await open(1);
   again.frame({ type: "ping", at: 4 });
   expect(again.sent.at(-1)).toEqual({ type: "pong", at: 4, load });
+  connection.stop();
+  await done;
+});
+
+test("protocol 23: the browsers' traffic rides on the next pong once per new summary, beside the load", async () => {
+  let load: MachineLoad | null = null;
+  let traffic: BrowserTraffic | null = null;
+  const { sockets, connection } = setup({ load: () => load, browserTraffic: () => traffic });
+  const done = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const s = sock(sockets, 0);
+  s.handlers.onOpen();
+  await waitFor(() => s.sent.length === 1);
+  s.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25_000 });
+  s.frame({ type: "ping", at: 1 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 1 });
+  traffic = { up: 2000, down: 90_000, hours: 0.1 };
+  s.frame({ type: "ping", at: 2 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 2, browserTraffic: traffic });
+  s.frame({ type: "ping", at: 3 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 3 });
+  // A new sample with the same bytes is a new summary: it goes too, and the load beside it.
+  traffic = { ...traffic };
+  load = { loadAvg: 0.2, loadPeak: 0.9, memoryAvg: 0.4, memoryPeak: 0.6, hours: 0.1 };
+  s.frame({ type: "ping", at: 4 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 4, load, browserTraffic: traffic });
   connection.stop();
   await done;
 });
