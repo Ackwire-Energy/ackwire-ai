@@ -23,8 +23,8 @@ import {
   acceptAll,
   catalogReviewTools,
   choicesOf,
-  chosenLevel,
   choose,
+  chosenLevel,
   confirm,
   emptyReview,
   isWaiting,
@@ -288,7 +288,14 @@ function Waiting({
           variant="secondary"
           size="sm"
           label={t("toolReview.acceptAll")}
-          onPress={() => onChange(acceptAll(state, hits.map((h) => h.tool)))}
+          onPress={() =>
+            onChange(
+              acceptAll(
+                state,
+                hits.map((h) => h.tool),
+              ),
+            )
+          }
         />
       )}
       {hits.map(({ tool, tech }) => (
