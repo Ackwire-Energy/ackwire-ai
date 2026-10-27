@@ -37,11 +37,15 @@ export function workspaceTones(hour: SkyHour, surface: string): string[] {
   return [surface, ...stops.map((s, i) => mix(surface, s, reach * (0.35 + 0.65 * ((i + 1) / stops.length))))];
 }
 
-/** What is drawn over the field: a cloud's lit top or a bright star, and a cloud's body or a dim star. */
-export function workspaceInk(hour: SkyHour, surface: string): { bright: string; dim: string } {
+/**
+ * What is drawn over the field: a cloud's lit top or a bright star, and a cloud's body or a dim star. `faint`:
+ * over a faint field (the header's), where white would vanish on a light surface: the sky's own deeper tones.
+ */
+export function workspaceInk(hour: SkyHour, surface: string, faint = false): { bright: string; dim: string } {
   const dark = isDarkSurface(surface);
   const tones = workspaceTones(hour, surface);
   const deepest = tones[tones.length - 1] ?? surface;
+  if (faint && !dark) return { bright: deepest, dim: tones[2] ?? deepest };
   if (hour === "day") {
     return dark
       ? { bright: mix(surface, "#ffffff", 0.32), dim: mix(surface, "#ffffff", 0.2) }
@@ -57,13 +61,14 @@ const smooth = (a: number, b: number, x: number) => {
 };
 
 /**
- * The header's sky at (u, v) of its box (the title bar included where there is one): rising from the chevron's
- * side, nothing behind the name, ending at the header's foot; it breathes a little.
+ * The header's sky at (u, v) of its box (the title bar included where there is one): light, from the left (behind
+ * the window's buttons and the mark), thinning out to the right and gone well before the sidebar's edge (no line
+ * against the page), fuller on top, ending at the header's foot; it breathes a little.
  */
 export function headerField(u: number, v: number, t: number): number {
-  const foot = 1 - smooth(0.78, 1, v);
-  const e = Math.max(0, (u - 0.38) / 0.62);
-  return e * e * (0.8 + 0.2 * (1 - v)) * foot + 0.05 * Math.sin(u * 6 + v * 3 + t * 0.5);
+  const foot = 1 - smooth(0.7, 1, v);
+  const across = 1 - smooth(0.05, 0.78, u);
+  return across * (0.42 * (0.7 + 0.3 * (1 - v)) + 0.04 * Math.sin(u * 6 + v * 3 + t * 0.5)) * foot;
 }
 
 /** Conversas' sky on the phone at (u, v): the top of the screen, a little fuller on the right, fading toward the list. */
@@ -72,16 +77,17 @@ export function phoneField(u: number, v: number, t: number): number {
   return down * (0.6 + 0.3 * u) + 0.05 * Math.sin(u * 5 + v * 4 + t * 0.5);
 }
 
-/** Where clouds and stars may be, as shares of the sky's box: right of `x0`, between `y0` and `y1`. */
+/** Where clouds and stars may be, as shares of the sky's box: between `x0` and `x1`, `y0` and `y1`. */
 export interface SkyArea {
   x0: number;
+  x1: number;
   y0: number;
   y1: number;
 }
-/** Right of the workspace's name, above the header's foot. */
-export const HEADER_AREA: SkyArea = { x0: 0.62, y0: 0.04, y1: 0.66 };
+/** In the title bar's band, past the back and forward buttons, short of the sidebar's edge (none over the name). */
+export const HEADER_AREA: SkyArea = { x0: 0.6, x1: 0.88, y0: 0.04, y1: 0.3 };
 /** Above Conversas' title, on the right. */
-export const PHONE_AREA: SkyArea = { x0: 0.5, y0: 0.05, y1: 0.42 };
+export const PHONE_AREA: SkyArea = { x0: 0.5, x1: 1, y0: 0.05, y1: 0.42 };
 
 /** GLSL `mod` (always positive for a positive divisor). */
 const mod = (a: number, b: number) => a - b * Math.floor(a / b);
@@ -124,18 +130,18 @@ export const CLOUDS: readonly { rows: readonly (readonly [number, number])[]; li
 ];
 const CLOUD_W = 10;
 
-/** Cloud `i`'s top-left cell at time t in a w×h sky. */
+/** Cloud `i`'s top-left cell at time t in a w×h sky (it enters at the area's right side). */
 export function cloudOrigin(i: number, w: number, h: number, t: number, area: SkyArea): [number, number] {
-  const span = w * (1 - area.x0) + CLOUD_W + 4;
-  const x = Math.floor(w - mod(t * (0.9 + 0.35 * i) + i * span * 0.37, span));
+  const span = w * (area.x1 - area.x0) + CLOUD_W + 4;
+  const x = Math.floor(w * area.x1 - mod(t * (0.9 + 0.35 * i) + i * span * 0.37, span));
   const y = Math.floor(h * (area.y0 + (area.y1 - area.y0) * (0.1 + 0.4 * i)));
   return [x, y];
 }
 
 /** What the clouds put at cell (x, y) of a w×h sky at time t: 0 nothing, 1 a cloud's body, 2 its lit top. */
 export function cloudAt(x: number, y: number, w: number, h: number, t: number, area: SkyArea): 0 | 1 | 2 {
-  // Only over the sky: never over the name.
-  if (x < w * area.x0) return 0;
+  // Only inside the area: never over the name, never at the sidebar's edge.
+  if (x < w * area.x0 || x >= w * area.x1) return 0;
   for (let i = 0; i < CLOUDS.length; i++) {
     const cloud = CLOUDS[i] as (typeof CLOUDS)[number];
     const [cx, cy] = cloudOrigin(i, w, h, t, area);
@@ -149,7 +155,7 @@ export function cloudAt(x: number, y: number, w: number, h: number, t: number, a
 
 /** What the stars put at cell (x, y) of a w×h sky at time t: 0 nothing, 1 dim, 2 bright (a slow twinkle). */
 export function starAt(x: number, y: number, w: number, h: number, t: number, area: SkyArea): 0 | 1 | 2 {
-  if (x < w * area.x0 || y < h * area.y0 || y > h * area.y1) return 0;
+  if (x < w * area.x0 || x >= w * area.x1 || y < h * area.y0 || y > h * area.y1) return 0;
   const k = cellHash(x, y);
   if (k < 0.975) return 0;
   const phase = mod(t * 0.7 + k * 600, 6);

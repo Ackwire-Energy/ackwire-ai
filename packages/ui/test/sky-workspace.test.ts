@@ -40,14 +40,18 @@ describe("tones", () => {
     expect(isDarkSurface("#f6f9fd")).toBe(false);
     expect(workspaceInk("day", "#f6f9fd").bright).toBe("#ffffff");
     expect(workspaceInk("day", "#0d1015").bright).not.toBe("#ffffff");
+    // Over the header's faint field on a light surface: the sky's own deeper tones, so they show.
+    expect(workspaceInk("dusk", "#f6f9fd", true).bright).toBe(workspaceTones("dusk", "#f6f9fd")[3] ?? "");
   });
 });
 
 describe("fields", () => {
-  test("the header's sky: nothing behind the name, most by the chevron, gone at its foot", () => {
-    for (const v of [0.1, 0.5]) expect(headerField(0.2, v, 0)).toBeLessThan(0.06);
-    expect(headerField(0.95, 0.3, 0)).toBeGreaterThan(0.7);
-    expect(headerField(0.95, 1, 0)).toBeLessThan(0.06);
+  test("the header's sky: light, from the left, gone before the sidebar's edge and at its foot", () => {
+    expect(headerField(0.02, 0.2, 0)).toBeGreaterThan(0.3);
+    expect(headerField(0.02, 0.2, 0)).toBeLessThan(0.5);
+    expect(headerField(0.2, 0.2, 0)).toBeGreaterThan(headerField(0.5, 0.2, 0));
+    for (const t of [0, 3]) expect(headerField(0.85, 0.3, t)).toBeLessThan(0.01);
+    expect(headerField(0.1, 1, 0)).toBeLessThan(0.01);
   });
   test("the phone's sky: fullest on top, gone toward the list", () => {
     expect(phoneField(0.5, 0.05, 0)).toBeGreaterThan(0.6);
@@ -58,10 +62,11 @@ describe("fields", () => {
 describe("clouds and stars", () => {
   const w = 68;
   const h = 26;
-  test("nothing over the name, in either", () => {
+  test("nothing over the name nor at the sidebar's edge, in either", () => {
     for (let t = 0; t < 40; t += 0.5)
       for (let y = 0; y < h; y++)
-        for (let x = 0; x < Math.floor(w * HEADER_AREA.x0); x++) {
+        for (let x = 0; x < w; x++) {
+          if (x >= w * HEADER_AREA.x0 && x < w * HEADER_AREA.x1) continue;
           expect(cloudAt(x, y, w, h, t, HEADER_AREA)).toBe(0);
           expect(starAt(x, y, w, h, t, HEADER_AREA)).toBe(0);
         }
@@ -72,10 +77,9 @@ describe("clouds and stars", () => {
     const first = CLOUDS[0];
     if (!first) throw new Error("no clouds");
     const [a] = first.rows[2] ?? [0];
-    if (cx + a >= w * HEADER_AREA.x0 && cx + a < w) {
-      expect(cloudAt(cx + a, cy + 2, w, h, t, HEADER_AREA)).toBe(1);
-      expect(cloudAt(cx + 2, cy, w, h, t, HEADER_AREA)).toBe(cx + 2 >= w * HEADER_AREA.x0 ? 2 : 0);
-    }
+    const inside = (x: number) => x >= w * HEADER_AREA.x0 && x < w * HEADER_AREA.x1;
+    if (inside(cx + a)) expect(cloudAt(cx + a, cy + 2, w, h, t, HEADER_AREA)).toBe(1);
+    expect(cloudAt(cx + 2, cy, w, h, t, HEADER_AREA)).toBe(inside(cx + 2) ? 2 : 0);
   });
   test("clouds drift left and come back from the right", () => {
     const [x0] = cloudOrigin(1, w, h, 10, HEADER_AREA);

@@ -486,7 +486,7 @@ export function WorkspaceSky({ part }: { part: "bar" | "side" }) {
     pixel: WORKSPACE_SKY_PX,
     surface: "--side",
     palette: (bg) => {
-      const colors = workspaceInk(hour, bg);
+      const colors = workspaceInk(hour, bg, true);
       ink.current = { bright: pixelOf(colors.bright), dim: pixelOf(colors.dim) };
       return workspaceTones(hour, bg);
     },
