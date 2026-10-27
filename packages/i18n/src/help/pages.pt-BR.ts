@@ -103,6 +103,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         heading: "Os seus planos de IA",
         blocks: [
           "Os agentes podem pensar com o seu próprio plano de IA, como Claude, ChatGPT, GLM ou Kimi, com login neste computador: sem chave de API. A conta fica neste computador, e o agentes.chat nunca vê a senha nem o acesso.",
+          "Os planos Google AI Pro e Ultra não funcionam aqui: os termos do Google não permitem usá-los em outros produtos. Uma chave de API do Gemini funciona.",
         ],
       },
       {

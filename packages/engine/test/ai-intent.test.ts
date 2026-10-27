@@ -88,6 +88,20 @@ test("Jev's recorded answers: the step and provider above 0.6, auto-open only at
   }
 });
 
+test("a key of a provider the catalog lists goes along with the step: Gemini", async () => {
+  const judge = createFakeJudge(
+    (_kind, id): JudgeAnswer =>
+      id === "intent"
+        ? { choice: "api_key", probabilities: { api_key: 0.95 } }
+        : { choice: "gemini", probabilities: { gemini: 0.93 } },
+  );
+  expect(await aiConnectIntent(judge, { orgId: "o", text: "vamos de gemini" })).toEqual({
+    intent: "api_key",
+    provider: "gemini",
+    autoOpen: true,
+  });
+});
+
 test("one calibrated request: the message, the five steps, the catalog's providers; usage as the router's", async () => {
   const bodies: { state: Record<string, unknown>; questions: Record<string, { criteria: Record<string, string> }> }[] =
     [];

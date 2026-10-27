@@ -89,7 +89,7 @@ export function pushRoutes(deps: AppDeps) {
     async (c) => {
       const user = c.get("user");
       const limit = await deps.adapters.rateLimiter.consume(`push:${user.id}`, { limit: 30, windowMs: 3600_000 });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many registrations; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many registrations. Try again later.");
       const input = c.req.valid("json");
       if (input.platform !== "web") {
         await registerPushDevice(db, user.id, input);
@@ -126,7 +126,7 @@ export function pushRoutes(deps: AppDeps) {
         limit: 600,
         windowMs: 3600_000,
       });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests; try again later");
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       const stale = await stalePushNotifications(db, user.id, c.req.valid("json").ids);
       return c.json({ stale }, 200);
     },

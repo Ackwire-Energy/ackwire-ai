@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrainLine } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
+import { KEY_MARKS, PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
 import { resources } from "@agenteschat/i18n";
 import { markOf, PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import i18next, { type TFunction } from "i18next";
@@ -109,5 +109,8 @@ describe("the marks as the phone draws them", () => {
     for (const c of chips.slice(1)) expect(-c.marginLeft + STACK_RING).toBeLessThanOrEqual((chip - mark) / 2);
     // The computer's plan line, as on the web.
     expect(stackChips(PLAN_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "zai", "kimi"]);
+    // The API key row's quad: Gemini's sparkle is its third mark, drawn from the phone's own file.
+    expect(stackChips(KEY_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "gemini", "deepseek"]);
+    expect(markShapes("gemini", "light", INK)?.image).toBe(true);
   });
 });

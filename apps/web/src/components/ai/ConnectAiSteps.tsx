@@ -19,7 +19,7 @@ import {
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
 import { isPlanId } from "@agenteschat/client/lib/plans";
-import { keyLooksValid, PROVIDERS, type ProviderId, providerOf } from "@agenteschat/client/lib/providers";
+import { keyLooksValid, keyStepHint, PROVIDERS, type ProviderId, providerOf } from "@agenteschat/client/lib/providers";
 import {
   type AgentAppearance,
   AvatarStack,
@@ -688,6 +688,7 @@ export function KeyPanel({
   const { provider, apiKey } = draft;
   const keyOf = provider === "platform" ? null : provider;
   const maker = keyOf ? providerOf(keyOf) : undefined;
+  const hint = maker && keyStepHint(maker);
   const valid = keyOf === null || keyLooksValid(keyOf, apiKey);
   const wrong = touched && apiKey.trim().length > 0 && !valid;
   const site = maker ? new URL(`https://${maker.site}`) : null;
@@ -734,10 +735,7 @@ export function KeyPanel({
                   </OpenPage>
                 }
               >
-                <StepTitle
-                  title={t("connectAi.key.create", providerGrammar(t, keyOf))}
-                  hint={maker.plans ? t("connectAi.key.notPlan") : undefined}
-                />
+                <StepTitle title={t("connectAi.key.create", providerGrammar(t, keyOf))} hint={hint && t(hint)} />
               </Step>
               <Step n={2}>
                 <label htmlFor={fieldId}>

@@ -1311,7 +1311,7 @@ export class RunnerDaemon implements RequestObserver {
    */
   pairStart(server: string, name?: string, tools?: { claude?: boolean; codex?: boolean }): { started: true } {
     if (this.config && this.connState !== "refused")
-      throw new ControlError("already_paired", "This computer is already connected; disconnect it first");
+      throw new ControlError("already_paired", "This computer is already connected. Disconnect it first.");
     let url: string;
     try {
       url = normalizeServerUrl(String(server ?? ""));

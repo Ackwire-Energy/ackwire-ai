@@ -25,7 +25,13 @@ import { gitAccess } from "./git/proxy";
 import type { MachineCaller } from "./machine-hub";
 import { createMachineSandboxProvider } from "./machine-provider";
 import { computerPreparing } from "./machine-provisioning";
-import { type ComputerTarget, computerTarget, MachineOfflineError, MachinePausedError } from "./machines";
+import {
+  type ComputerTarget,
+  computerTarget,
+  MachineOfflineError,
+  MachinePausedError,
+  REMOVED_COMPUTER_MESSAGE,
+} from "./machines";
 import { missionOfRun } from "./mission-context";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -617,9 +623,7 @@ export async function withConnectedMachine<T>(
 ): Promise<T> {
   const status = await hub.status(machineId);
   if (!status || status.orgId !== ctx.orgId) {
-    throw new SandboxUnavailableError(
-      "Your connected computer was removed; ask an admin or your owner to choose another one.",
-    );
+    throw new SandboxUnavailableError(REMOVED_COMPUTER_MESSAGE);
   }
   if (!status.online) throw new MachineOfflineError(status.name);
   // Paused by its owner (ADR 0036 §6): nothing new starts there; the agent relays why and until when.

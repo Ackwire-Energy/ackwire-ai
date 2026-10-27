@@ -206,7 +206,7 @@ test.skipIf(process.platform === "win32")(
     const pinned = pc.install(installScript("https://x.test"), ["--runner-sha256", "0".repeat(64)]);
     expect(pinned.status).toBe(1);
     expect(pinned.err.trimEnd().split("\n").pop()).toBe(
-      "■  the runner download didn't match --runner-sha256; it was not installed",
+      "■  the runner download didn't match --runner-sha256, so it was not installed",
     );
 
     writeFileSync(path.join(pc.fake, "curl"), CURL_404, { mode: 0o755 });

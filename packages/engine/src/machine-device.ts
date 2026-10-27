@@ -65,7 +65,7 @@ export interface DeviceDeps {
 /** One address holds too many pending codes (the route answers 429). */
 export class DeviceCodeLimitError extends Error {
   constructor() {
-    super("Too many pending connection codes from this address; wait a few minutes and try again.");
+    super("Too many pending connection codes from this address. Wait a few minutes and try again.");
     this.name = "DeviceCodeLimitError";
   }
 }
@@ -117,7 +117,7 @@ export async function startDeviceCode(
   requester: DeviceRequester,
 ) {
   if (input.protocol !== undefined && input.protocol < MIN_RUNNER_PROTOCOL) {
-    throw new ValidationError("This runner is too old; download the latest one", "machine.outdated");
+    throw new ValidationError("This runner is too old. Download the latest one.", "machine.outdated");
   }
   const now = nowOf(deps);
   const ip = requester.ip.slice(0, 100);
@@ -286,7 +286,7 @@ async function pendingCode(db: Database, userCode: string, now: Date) {
 }
 
 const notFound = () =>
-  new NotFoundError("This code is unknown or expired; start again on the computer", "machine.device_not_found");
+  new NotFoundError("This code is unknown or expired. Start again on the computer.", "machine.device_not_found");
 
 /**
  * What the confirm page shows (`GET /api/app/machines/device/{userCode}`), for

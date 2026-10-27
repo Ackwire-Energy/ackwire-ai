@@ -19,7 +19,7 @@ export interface TokenPrices {
 export interface ProviderInfo {
   label: string;
   /** The API it speaks, which picks its adapter (`createModelProviders`). */
-  protocol: "anthropic" | "openai";
+  protocol: "anthropic" | "openai" | "gemini";
   /** Replaces the SDK's default host. */
   baseURL?: string;
   /**
@@ -38,6 +38,7 @@ export interface ProviderInfo {
 export const PROVIDERS = {
   anthropic: { label: "Claude", protocol: "anthropic" },
   openai: { label: "OpenAI", protocol: "openai" },
+  gemini: { label: "Gemini", protocol: "gemini" },
   deepseek: {
     label: "DeepSeek",
     protocol: "anthropic",
@@ -74,6 +75,8 @@ export interface ModelInfo {
   provider: ProviderId;
   label: string;
   prices: TokenPrices;
+  /** Lower prices the provider charges until a day (UTC, exclusive): `prices` apply from then on. */
+  intro?: { until: string; prices: TokenPrices };
   /** Prices for the whole request when its prompt exceeds `aboveInputTokens`. */
   longContext?: { aboveInputTokens: number; prices: TokenPrices };
   /** Ask the API to retry a refused request on a fallback model (Anthropic `fallbacks: "default"`). */
@@ -184,6 +187,40 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     cheap: true,
     router: true,
     leastThinking: "off",
+    tier: "small",
+  },
+  // Gemini (Interactions API), Standard tier, from ai.google.dev/gemini-api/docs/pricing (2026-10-27). Thinking is
+  // billed as output. Caching is implicit, with no write charge, so a cache write costs the input rate (none is ever
+  // reported). Argon and 3.8 Flash cost half until the day in `intro`.
+  "gemini-4-argon": {
+    provider: "gemini",
+    label: "Gemini 4 Argon",
+    prices: { input: 4000, output: 20000, cacheRead: 200, cacheWrite: 4000 },
+    intro: { until: "2026-12-01", prices: { input: 2000, output: 10000, cacheRead: 100, cacheWrite: 2000 } },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    tier: "large",
+  },
+  "gemini-3.8-flash": {
+    provider: "gemini",
+    label: "Gemini 3.8 Flash",
+    prices: { input: 1500, output: 7500, cacheRead: 150, cacheWrite: 1500 },
+    intro: { until: "2027-01-01", prices: { input: 750, output: 3750, cacheRead: 75, cacheWrite: 750 } },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    recommended: true,
+    tier: "medium",
+  },
+  // It can't stop thinking: `minimal` is the least.
+  "gemini-3.5-flash-lite": {
+    provider: "gemini",
+    label: "Gemini 3.5 Flash-Lite",
+    prices: { input: 300, output: 2500, cacheRead: 30, cacheWrite: 300 },
+    contextWindow: 1_048_576,
+    serverSideFallback: false,
+    cheap: true,
+    router: true,
+    leastThinking: "minimal",
     tier: "small",
   },
   // Anthropic-compatible providers, from each one's pricing page (2026-10-24). A cache write costs the
@@ -318,13 +355,24 @@ const tokensCost = (p: TokenPrices, u: ModelUsage) =>
   u.cacheReadTokens * p.cacheRead +
   u.cacheWriteTokens * p.cacheWrite;
 
-/** Cost of one call in nano-USD. Throws for models outside the catalog (we never make a call we can't price). */
-export function costNanoUsd(model: string, usage: ModelUsage): number {
+/**
+ * What a call made at `at` pays per token: the introductory prices before their day. Budget reservations
+ * (`maxCostNanoUsd`, `outputTokensWithin`) keep the list prices on purpose, so they err high while a lower price
+ * lasts; give them `at` too if that ever stops agents early.
+ */
+export const pricesAt = (info: ModelInfo, at = new Date()) =>
+  info.intro && at.getTime() < Date.parse(info.intro.until) ? info.intro.prices : info.prices;
+
+/**
+ * Cost in nano-USD of one call made at `at`. Throws for models outside the catalog (we never make a call we
+ * can't price).
+ */
+export function costNanoUsd(model: string, usage: ModelUsage, at = new Date()): number {
   const info = MODEL_CATALOG[model];
   if (!info) throw new Error(`unknown model ${model}`);
   const prompt = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
   return tokensCost(
-    info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices,
+    info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : pricesAt(info, at),
     usage,
   );
 }

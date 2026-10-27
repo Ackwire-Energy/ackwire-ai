@@ -1339,6 +1339,10 @@ export const featureKeysEn: FeatureTranslations = {
     share: "Share the link",
     rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
   },
+  humanCheck: {
+    title: "Quick check",
+    blocked: "The check didn't load. Try another network.",
+  },
   members: {
     waiting_one: "{{count}} waiting",
     waiting_other: "{{count}} waiting",

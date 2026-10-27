@@ -551,6 +551,196 @@ describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
     expect(row("n-desktop")).toContain("Computador");
     expect(row("n-desktop")).not.toContain("Navegador");
   });
+
+  test("one row: what to do on its second line, the expiry chip on its first, and a click goes to its conversation", async () => {
+    const hand = notification({
+      id: "n-hand",
+      kind: "browser_handoff",
+      waiting: true,
+      actors: [{ type: "agent", id: ADA_ID }],
+      source: { channelId: ENG_ID, handoffId: "h-1" },
+      latest: { text: "Entrar no painel", expiresAt: new Date(Date.now() + 18 * 60_000).toISOString() },
+      updatedAt: ago(2),
+    });
+    const { router } = await go(seedState({ notifications: [hand] }));
+    const row = document.querySelector('[data-n="n-hand"]') as HTMLElement;
+    expect(row.classList.contains("nt-wr")).toBe(true);
+    expect(row.querySelector(".nt-wr__sub")?.textContent).toBe("Entrar no painel");
+    expect(row.querySelector(".nt-wr__l1 > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
+    await click(row.querySelector(".nt-wr__sub") as HTMLElement);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+  });
+});
+
+describe("Esperando você: what only points somewhere is one row", () => {
+  const asks = (over: Partial<AppNotification> = {}) =>
+    notification({
+      id: "n-join",
+      kind: "join_request",
+      waiting: true,
+      source: { label: "Acme" },
+      latest: { title: "Felipe Ramos", names: ["Felipe Ramos"] },
+      ...over,
+    });
+  const row = (id = "n-join") => document.querySelector(`[data-n="${id}"]`) as HTMLElement;
+
+  test("its face, its words, then Abrir, Lembrar depois and Feito; Abrir the white button, with no icon", async () => {
+    const read = asks({ id: "n-read", latest: { title: "Marina Alves", names: ["Marina Alves"] }, readAt: ago(1) });
+    await go(seedState({ notifications: [asks(), read] }));
+    expect(row().classList.contains("nt-wr")).toBe(true);
+    expect(row().querySelector(".nt-meta, .nt-body")).toBeNull();
+    // The words on one line: the headline, where it opens and when.
+    const l1 = row().querySelector(".nt-wr__l1") as HTMLElement;
+    expect(l1.querySelector(".nt-what")?.textContent).toBe("Felipe Ramos pede para entrar");
+    expect(l1.querySelector(".nt-wr__src")?.textContent).toBe("Membros");
+    expect(l1.querySelector(".nt-wr__tm")?.textContent).toBe("agora");
+    const acts = row().querySelector(".nt-wr__acts") as HTMLElement;
+    expect(acts.classList.contains("ac-acts")).toBe(true);
+    const buttons = within(acts).getAllByRole("button");
+    expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual([
+      "Abrir",
+      "Lembrar depois",
+      "Feito",
+    ]);
+    expect(buttons[0]?.className).not.toContain("ac-btn--primary");
+    expect(buttons[0]?.querySelector("svg")).toBeNull();
+    // Remind me later and Done: a group nested in the same row of actions.
+    expect(acts.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);
+    // Unread is the headline's weight, and a screen reader hears it; read, neither.
+    expect(row().classList.contains("is-unread")).toBe(true);
+    expect(row().getAttribute("aria-label")).toBe("Felipe Ramos pede para entrar, não lida");
+    expect(row("n-read").classList.contains("is-unread")).toBe(false);
+    expect(row("n-read").getAttribute("aria-label")).toBe("Marina Alves pede para entrar");
+  });
+
+  test("a click anywhere on it opens it, as Abrir does", async () => {
+    const { state, router } = await go(seedState({ notifications: [asks()] }));
+    await click(row().querySelector(".nt-what") as HTMLElement);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
+    expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-join", true]);
+  });
+
+  test("Lembrar depois and Feito never open it, though the menu's clicks reach the row from its portal", async () => {
+    const other = asks({ id: "n-other", latest: { title: "Marina Alves", names: ["Marina Alves"] } });
+    const { state, router } = await go(seedState({ notifications: [asks(), other] }));
+    const later = within(row()).getByRole("button", { name: "Lembrar depois" });
+    later.focus();
+    await act(async () => {
+      fireEvent.keyDown(later, { key: "Enter" });
+      fireEvent.keyUp(later, { key: "Enter" });
+    });
+    await settle(2);
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: /Em 1 hora/ }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    const until = new Date(String(state.calls.find((c) => c.method === "notifications.snooze")?.args[2]));
+    expect(Math.abs(until.getTime() - Date.now() - 3_600_000)).toBeLessThan(60_000);
+    await click(within(row("n-other")).getByRole("button", { name: "Feito" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(state.calls.find((c) => c.method === "notifications.done")?.args).toEqual([ORG_ID, "n-other", true]);
+    expect(state.calls.some((c) => c.method === "notifications.read")).toBe(false);
+  });
+
+  test("the cards end their action line with the same pair: Abrir em Aprovações before it, no spacer", async () => {
+    const approval = notification({
+      id: "n-ap",
+      kind: "approval",
+      waiting: true,
+      actors: [{ type: "agent", id: ATLAS_ID }],
+      source: { approvalId: "ap-deploy", channelId: ENG_ID },
+      latest: { title: "Run deploy workflow" },
+      updatedAt: ago(5),
+    });
+    const turn = notification({
+      id: "n-turn",
+      kind: "forum_turn",
+      waiting: true,
+      actors: [{ type: "agent", id: ATLAS_ID }],
+      source: { topicId: "t-1", label: "Preço do plano Pro" },
+      latest: { title: "Preço do plano Pro", round: 2, rounds: 3 },
+      updatedAt: ago(8),
+    });
+    const items = inbox();
+    await go(seedState({ notifications: [...items, approval, turn, asks()] }));
+    for (const id of ["n-q", "n-ap", "n-turn"]) {
+      const line = row(id).querySelector(".nt-wacts") as HTMLElement;
+      expect(line.classList.contains("ac-acts")).toBe(true);
+      expect(line.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);
+      expect(line.querySelector(".nt-grow")).toBeNull();
+      expect(
+        within(line.lastElementChild as HTMLElement)
+          .getAllByRole("button")
+          .map((b) => b.getAttribute("aria-label")),
+      ).toEqual(["Lembrar depois", "Feito"]);
+    }
+    expect(row("n-ap").querySelector(".nt-wacts > .nt-tail")?.previousElementSibling?.textContent).toBe(
+      "Abrir em Aprovações",
+    );
+    expect(row().querySelector(".nt-wr__acts > :last-child")?.matches(".nt-tail.ac-acts")).toBe(true);
+  });
+
+  test("its geometry, from the stylesheets: the kit's action rows, the face's middle, one column for every pair", async () => {
+    const read = async (path: string) =>
+      (await Bun.file(new URL(path, import.meta.url).pathname).text()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const css = await read("../src/pages/notifications.css");
+    const kit = await read("../../../packages/ui/src/styles/components.css");
+    const block = (sheet: string, media: string) => sheet.split(`\n@media ${media} {`)[1]?.split("\n}")[0] ?? "";
+    const phone = block(css, "(max-width: 720px)");
+    const wraps = block(css, "(max-width: 1023px)");
+    const wide = block(css, "(min-width: 1024px)");
+    /** The body of a rule written at the top level of `sheet` (two-space indented inside a media block). */
+    const rule = (selector: string, sheet = css) =>
+      new RegExp(`\\n *${selector.replace(/[.()>:*]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
+    const value = (selector: string, prop: string, sheet = css) =>
+      new RegExp(`(?:^|[;\\s])${prop}: ([^;]+);`).exec(rule(selector, sheet))?.[1];
+    const px = (selector: string, prop: string, sheet = css) => Number.parseFloat(value(selector, prop, sheet) ?? "");
+    const right = (selector: string, sheet = css) => {
+      const [top, r = top] = (value(selector, "padding", sheet) ?? "").split(" ");
+      return r;
+    };
+
+    // The pair is a nested `.ac-acts`: in a row it joins the row's actions. In a card's line, which wraps, it keeps a
+    // box, so a wrap never splits it, and its margin pushes it to the end. The kit spaces what is in it.
+    expect(value(".ac-acts > .ac-acts", "display", kit)).toBe("contents");
+    expect(value(".nt-wacts > .nt-tail.ac-acts", "display")).toBe("flex");
+    expect(value(".nt-wacts > .nt-tail.ac-acts", "margin-left")).toBe("auto");
+    expect(value(".nt-wacts", "flex-wrap")).toBe("wrap");
+    expect(css).not.toMatch(/\.nt-tail(?:\.ac-acts)? > [^{]*\{[^}]*margin/);
+    // The words keep the gap the kit puts between actions, and the actions sit on the face's middle.
+    expect(value(".nt-wr__main", "column-gap")).toBe(value(".ac-acts", "column-gap", kit));
+    expect(px(".nt-wr__acts", "height")).toBe(px(".nt-av40", "height"));
+    // Rows and cards end at one padding line, wide and on a phone: every clock and check share two columns.
+    expect(right(".nt-wr")).toBe(right(".nt-wi"));
+    expect(right(".nt-wr", phone)).toBe(right(".nt-wi", phone));
+    // A line alone centres on the face; the line is the chips'.
+    const line = px(".nt-wr__l1", "line-height");
+    expect(line).toBe(px(".ac-chip", "height", kit));
+    expect(px(".nt-wr__l1:only-child", "margin-block-start", wide)).toBe((px(".nt-av40", "height") - line) / 2);
+    // Under 1024px the words wrap, three lines at most, the time at their end and never alone on the last line, their
+    // first line's capitals at the face's top. A chip on its line's top keeps every line the chips' height, and a name
+    // with no spaces breaks instead of running under the clip.
+    expect(value(".nt-wr__l1", "display", wraps)).toBe("-webkit-box");
+    expect(value(".nt-wr__l1", "-webkit-line-clamp", wraps)).toBe("3");
+    expect(value(".nt-wr__l1", "text-wrap", wraps)).toBe("pretty");
+    expect(value(".nt-wr__l1", "overflow-wrap", wraps)).toBe("anywhere");
+    expect(value(".nt-wr .nt-what", "white-space", wraps)).toBe("normal");
+    expect(value(".nt-wr__l1 > .ac-chip", "vertical-align", wraps)).toBe("top");
+    // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard, and the
+    // source chip goes. The faces stay 40px.
+    expect(css).not.toMatch(/\.nt-wr__open[^{]*\{[^}]*display: none/);
+    expect(value(".nt-wr__open:not(:focus-visible)", "position", phone)).toBe("absolute");
+    expect(value(".nt-wr__open:not(:focus-visible)", "clip-path", phone)).toBe("inset(50%)");
+    expect(value(".nt-wr__src", "display", phone)).toBe("none");
+    expect(rule(".nt-av40", phone)).toBe("");
+    expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
+    // A ghost reaches into the item's padding and the item clips: its ring goes inside, as the item's own does.
+    const ring = value(".nt-item:focus-visible", "box-shadow");
+    expect(ring).toStartWith("inset ");
+    expect(value(".nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
+  });
 });
 
 describe("a click on a browser notification (ADR 0071)", () => {

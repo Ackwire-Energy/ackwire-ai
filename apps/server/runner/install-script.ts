@@ -235,7 +235,7 @@ get_runner() {
   }
   if [ -n "$RUNNER_SHA256" ] && [ "$(sha256 "$BUNDLE.download")" != "$RUNNER_SHA256" ]; then
     rm -f "$BUNDLE.download"
-    die "the runner download didn't match --runner-sha256; it was not installed"
+    die "the runner download didn't match --runner-sha256, so it was not installed"
   fi
   chmod 644 "$BUNDLE.download"
   mv -f "$BUNDLE.download" "$BUNDLE"
@@ -444,7 +444,7 @@ install_user() {
   BUNDLE="$RUNNER_HOME/agentes-runner.mjs"
   LAUNCHER="$RUNNER_HOME/bin/agentes-runner"
   if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"managedBy": *"desktop"' "$RUNNER_HOME/config.json" 2>/dev/null; then
-    die "this computer is connected by the agentes app; manage it there (or set AGENTES_RUNNER_HOME to another folder)"
+    die "this computer is connected by the agentes app, so manage it there (or set AGENTES_RUNNER_HOME to another folder)"
   fi
   not_connected_for_host
   start_frame
@@ -581,7 +581,7 @@ main() {
   MAC_HOST=0
   if [ -n "$HOST_TOKEN_FILE" ] && [ "$(uname -s)" = Darwin ]; then MAC_HOST=1; fi
   if [ "$SYSTEM" -eq 1 ]; then
-    [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service; to leave it stopped, use --no-start"
+    [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service (to leave it stopped, use --no-start)"
     [ -z "$DIR" ] || die "--dir doesn't go with --system: each agent works in its own user's home"
     install_system
   elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ] ||

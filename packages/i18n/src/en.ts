@@ -555,6 +555,7 @@ export const en: Translations = {
     keyInvalid: {
       anthropic: "Claude API keys start with sk-ant-. Check it and paste it again.",
       openai: "OpenAI keys start with sk-. Check it and paste it again.",
+      gemini: "Gemini API keys start with AQ. or AIza. Check it and paste it again.",
       deepseek: "DeepSeek keys start with sk-. Check it and paste it again.",
       moonshot: "Kimi keys start with sk-. Check it and paste it again.",
       zai: "Paste the whole Z.ai key, with no spaces. Check it and paste it again.",
@@ -1015,13 +1016,14 @@ export const en: Translations = {
     },
     key: {
       title: "API key",
-      makers: "Claude, OpenAI, DeepSeek, Kimi, Z.ai or MiniMax",
+      makers: "Claude, OpenAI, Gemini and others",
       sub: "You pay per use, straight to the provider.",
       create: "Create your {{provider}} API key",
       paste: "Paste it here",
       forAll: "Every agent without a plan thinks with it.",
       saved: "Saved. Every agent without a plan thinks with it.",
       notPlan: "A coding plan's key goes in its own option above.",
+      billing: "Turn on billing for the key's project. Without billing, Google may use what your agents send.",
       platform: "agentes.chat",
     },
     wait: {
@@ -2608,10 +2610,6 @@ export const en: Translations = {
       askedNow: "Asked just now",
       askedOn: "Asked on {{date}}",
       unverified: "Not verified",
-      // The phone's request sheet reads these three.
-      confirmed: "Email confirmed",
-      unconfirmed: "Email not confirmed: approving sends an invitation to it.",
-      via: "Closes {{date}}",
       roleOf: "Role for {{name}}",
       approve: "Approve",
       deny: "Deny",
