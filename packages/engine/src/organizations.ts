@@ -22,7 +22,15 @@ import { publishOrgEvent } from "./events";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
-import { assertCanWork, isUserBlocked, OrgPausedError, STANDING_COLUMNS, type WorkspaceStanding } from "./standing";
+import {
+  assertCanWork,
+  type BillingHold,
+  isBillingHold,
+  isUserBlocked,
+  OrgPausedError,
+  STANDING_COLUMNS,
+  type WorkspaceStanding,
+} from "./standing";
 
 const {
   organizations,
@@ -38,6 +46,9 @@ const {
 } = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
+
+/** The billing hold of a workspace with no plan yet: the one a new workspace may start on. */
+const PAYMENT: BillingHold = "payment";
 
 /**
  * What each role may do in an organization (docs/adr/0006-auth-and-tenancy.md).
@@ -55,6 +66,7 @@ export type Permission =
   | "manage_connectors" // connect MCP servers (GitHub, Sentry…) for the organization
   | "view_usage" // tokens and cost of every agent
   | "manage_members" // invite, remove, change roles (except owners)
+  | "manage_billing" // open the workspace's plan and billing on the billing service (ADR 0071)
   | "manage_owners"; // grant/revoke owner
 
 const MEMBER: Permission[] = ["read", "post", "create_channels"];
@@ -66,6 +78,7 @@ const ADMIN: Permission[] = [
   "manage_connectors",
   "view_usage",
   "manage_members",
+  "manage_billing",
 ];
 const PERMISSIONS: Record<MemberRole, ReadonlySet<Permission>> = {
   owner: new Set([...ADMIN, "manage_owners"]),
@@ -150,22 +163,45 @@ export function assertInviting(membership: Membership) {
 
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
- * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
- * (`org.create_refused`, the same words whatever the cause).
+ * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
+ * one (`org.create_refused`, the same words whatever the cause). Billing holds refuse nobody, but one person
+ * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
+ * `holdForPayment`: the workspace starts on that hold (ADR 0071), with no audit row or notification.
  */
-export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
-  const [paused] = await db
-    .select({ id: organizations.id })
+export async function createOrganization(
+  db: Database,
+  userId: string,
+  input: { name: string; context?: string },
+  options: { holdForPayment?: boolean } = {},
+) {
+  const held = await db
+    .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
-    .limit(1);
-  if (paused || (await isUserBlocked(db, userId)))
+    .orderBy(asc(organizations.createdAt));
+  if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(db, userId)))
     throw new ForbiddenError("You can't create a workspace right now", "org.create_refused");
+  const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
+  if (unpaid)
+    throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
+      orgId: unpaid.id,
+    });
   return db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
-      .values({ name: input.name, context: input.context ?? "" })
+      .values({
+        name: input.name,
+        context: input.context ?? "",
+        ...(options.holdForPayment
+          ? ({
+              standing: "hold",
+              standingReason: PAYMENT,
+              standingNotice: "shown",
+              standingChangedAt: new Date(),
+            } as const)
+          : {}),
+      })
       .returning();
     if (!organization) throw new Error("organization insert returned nothing");
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
