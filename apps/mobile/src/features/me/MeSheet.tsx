@@ -1,4 +1,4 @@
-import { useCredentials, useIssues, useMe } from "@agenteschat/client";
+import { useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import Constants from "expo-constants";
 import { router } from "expo-router";
@@ -25,6 +25,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { MembersPage } from "../members/MembersPage";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { usePersonPhoto } from "../shared/photo";
 import { AccountPage, ZonePage } from "./AccountPage";
@@ -32,7 +33,15 @@ import { type AccountDraft, openIssuesWithMe } from "./logic";
 import { Page } from "./parts";
 
 /** The screens inside the sheet (its own stack: tap a row, the next one slides in; back slides it out). */
-export type MePage = "root" | "account" | "zone" | "workspaces" | "notifications" | "appearance" | "language";
+export type MePage =
+  | "root"
+  | "account"
+  | "zone"
+  | "workspaces"
+  | "members"
+  | "notifications"
+  | "appearance"
+  | "language";
 
 /** Close the sheet, then open a pushed screen (the sheet's dismissal has to finish first). */
 const closeThenPush = (onClose: () => void, href: string) => {
@@ -42,9 +51,9 @@ const closeThenPush = (onClose: () => void, href: string) => {
 
 /**
  * Você: a short settings list as on the iPhone. Your row opens Conta; the
- * workspace row opens Workspaces; "Do workspace" links Issues and Drive; Notificações, Aparência and
- * Idioma each open their own screen; then Sair and the app's version. A native form sheet over whatever
- * was on screen, with its own small stack.
+ * workspace row opens Workspaces; "Do workspace" opens Membros (admins) and links Issues and Drive;
+ * Notificações, Aparência and Idioma each open their own screen; then Sair and the app's version. A native
+ * form sheet over whatever was on screen, with its own small stack.
  */
 export function MeSheet({ onClose }: { onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -58,6 +67,10 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   const admin = can(org.org?.role, "manage_credentials");
   const credentials = useCredentials(org.orgId, admin);
   const liveKeys = (credentials.data ?? []).filter((k) => !k.revokedAt).length;
+  // Membros, for whoever manages them (the requests to join and the invitation link live there).
+  const manager = can(org.org?.role, "manage_members");
+  const requests = useJoinRequests(org.orgId, manager);
+  const waiting = requests.data?.length ?? 0;
   const [stack, setStack] = useState<MePage[]>(["root"]);
   const [forward, setForward] = useState(true);
   const [push, setPush] = useState<boolean | null>(null);
@@ -153,6 +166,9 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
         </Page>
       );
       break;
+    case "members":
+      body = <MembersPage onBack={back} onRequests={() => closeThenPush(onClose, "/join-requests")} />;
+      break;
     case "notifications":
       body = (
         <Page title={t("mobile.me.notifications")} onBack={back}>
@@ -218,6 +234,15 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
           </GroupedList>
           <GroupedHeader>{t("mobile.me.fromWorkspace")}</GroupedHeader>
           <GroupedList>
+            {manager ? (
+              <GroupedRow
+                icon="members"
+                label={t("members.title")}
+                value={waiting > 0 ? t("mobile.members.waiting", { count: waiting }) : undefined}
+                chevron
+                onPress={() => go("members")}
+              />
+            ) : null}
             <GroupedRow
               icon="checkc"
               label={t("mobile.me.issues")}

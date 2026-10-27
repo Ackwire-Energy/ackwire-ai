@@ -1325,9 +1325,6 @@ export const featureKeysEn: FeatureTranslations = {
     invitedBy: "{{name}} invited you to {{org}}",
     invited: "You were invited to {{org}}",
     joinAs: "You join as {{role}}.",
-    agentsThere_one: "{{names}} already works there.",
-    agentsThere_other: "{{names}} already work there.",
-    onlyEmail: "The invitation is only for this e-mail.",
     apple: "Continue with Apple",
     createPassword: "Create a password",
     haveAccount: "I already have an account",
@@ -1340,6 +1337,10 @@ export const featureKeysEn: FeatureTranslations = {
   joinRequests: {
     share: "Share the link",
     rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
+  },
+  members: {
+    waiting_one: "{{count}} waiting",
+    waiting_other: "{{count}} waiting",
   },
   reset: {
     title: "Pick a new password",
@@ -1368,8 +1369,6 @@ export const featureKeysEn: FeatureTranslations = {
     logoPick: "Choose",
     zone: "Time zone: {{zone}}",
     importSources: "Where the agents come from",
-    importOpenMausBot: "OpenMausBot",
-    importOpenBot: "OpenBot",
     importLead: "Bring them from the web, in Settings\u00a0›\u00a0Import and export.",
     importSkip: "I don't, skip",
     agentsAda: "I'm already here",
@@ -1383,7 +1382,6 @@ export const featureKeysEn: FeatureTranslations = {
     invitesFailed: "Couldn't send these invitations. Try again.",
     removeEmail: "Remove {{email}}",
     later: "Not now",
-    talk: "Talk to {{name}}",
     failed: "Couldn't save. Try again.",
   },
   ai: {

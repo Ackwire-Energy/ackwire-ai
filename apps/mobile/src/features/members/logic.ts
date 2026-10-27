@@ -14,3 +14,8 @@ export function requestTimes(
     t("members.requests.via", { date: formatShortDate(locale, r.expiresAt) }),
   ];
 }
+
+/** The people of the workspace as Membros lists them: by name, in the person's language's order. */
+export function membersByName<M extends { name: string }>(members: readonly M[], locale?: string): M[] {
+  return [...members].sort((a, b) => a.name.localeCompare(b.name, locale, { sensitivity: "base" }));
+}

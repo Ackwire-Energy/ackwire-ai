@@ -1,6 +1,9 @@
 import type { AppNotification, NotificationActor, Routine } from "@agenteschat/client";
 import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { askersOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
+import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
 
 /**
@@ -125,9 +128,33 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): Wait
     return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
   if (n.kind === "forum_turn")
     return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
-  // No actor (they aren't a member yet): the newest name of the burst is the title.
-  if (n.kind === "join_request") return { kind: "join", title: l.title ?? "", expiresAt: null, action: "review" };
+  // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
+  if (n.kind === "join_request")
+    return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
+}
+
+/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people (the web's inbox). */
+export function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
+  const shown = names.slice(0, max);
+  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
+  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
+}
+
+/**
+ * Who asks to join, as the card's line: "Ana asks to join", "Ana and Bruno ask to join", "Ana, Bruno and 2 more ask
+ * to join"; and the faces to lead it (the names shown, as they aren't members yet: their initials).
+ */
+export function joinRequestLine(
+  t: TFunction,
+  n: Pick<AppNotification, "count" | "latest">,
+): { text: string; faces: string[] } {
+  const asked = askersOf(n);
+  const text =
+    asked.total > 1
+      ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
+      : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
+  return { text, faces: asked.names.slice(0, 2) };
 }
 
 /** The next real thing coming: the soonest run of an active routine, still ahead. */

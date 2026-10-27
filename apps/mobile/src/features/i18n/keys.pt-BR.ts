@@ -1330,9 +1330,6 @@ export const featureKeysPtBR = {
     invitedBy: "{{name}} convidou você para a {{org}}",
     invited: "Você foi convidado para a {{org}}",
     joinAs: "Você entra como {{role}}.",
-    agentsThere_one: "{{names}} já trabalha lá.",
-    agentsThere_other: "{{names}} já trabalham lá.",
-    onlyEmail: "O convite vale só para este e-mail.",
     apple: "Continuar com a Apple",
     createPassword: "Criar uma senha",
     haveAccount: "Já tenho conta",
@@ -1346,6 +1343,10 @@ export const featureKeysPtBR = {
     share: "Compartilhar o link",
     rolesHint:
       "Membros conversam, criam tarefas e aprovam os próprios agentes. Admins também gerenciam membros, agentes e chaves.",
+  },
+  members: {
+    waiting_one: "{{count}} esperando",
+    waiting_other: "{{count}} esperando",
   },
   reset: {
     title: "Escolha uma senha nova",
@@ -1374,8 +1375,6 @@ export const featureKeysPtBR = {
     logoPick: "Escolher",
     zone: "Fuso: {{zone}}",
     importSources: "De onde vêm os agentes",
-    importOpenMausBot: "OpenMausBot",
-    importOpenBot: "OpenBot",
     importLead: "Traga pela web, em Configurações\u00a0›\u00a0Importar e exportar.",
     importSkip: "Não uso, pular",
     agentsAda: "Eu já estou aqui",
@@ -1389,7 +1388,6 @@ export const featureKeysPtBR = {
     invitesFailed: "Não deu para enviar esses convites. Tente de novo.",
     removeEmail: "Remover {{email}}",
     later: "Agora não",
-    talk: "Falar com a {{name}}",
     failed: "Não deu para salvar. Tente de novo.",
   },
   ai: {

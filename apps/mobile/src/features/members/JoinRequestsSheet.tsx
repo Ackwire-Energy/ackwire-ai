@@ -125,29 +125,31 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
           </Text>
         </View>
       </View>
-      <View style={styles.line}>
-        <LineIcon
-          name={r.confirmed ? "check" : "mail"}
-          size={14}
-          color={r.confirmed ? c.ok : c.muted}
-          variant="small"
-        />
-        <Text variant="small" tone="ink" style={styles.grow}>
-          {r.confirmed ? t("members.requests.confirmed") : t("members.requests.unconfirmed")}
-        </Text>
-      </View>
-      {r.note ? (
-        <Text variant="body" tone="ink2">
-          {t("members.requests.note", { note: r.note })}
-        </Text>
-      ) : null}
-      <View>
+      {/* The detail in a sunken well, as the web's request card: the address's proof and the two times. */}
+      <View style={[styles.well, { backgroundColor: c.sunken }]}>
+        <View style={styles.line}>
+          <LineIcon
+            name={r.confirmed ? "check" : "mail"}
+            size={14}
+            color={r.confirmed ? c.ok : c.muted}
+            variant="small"
+          />
+          <Text variant="small" tone="ink" style={styles.grow}>
+            {r.confirmed ? t("members.requests.confirmed") : t("members.requests.unconfirmed")}
+          </Text>
+        </View>
         {requestTimes(t, i18n.language, r).map((line) => (
-          <Text key={line} variant="caption" tone="faint">
+          <Text key={line} variant="caption" tone="muted">
             {line}
           </Text>
         ))}
       </View>
+      {/* Their note, in their words, after the detail. */}
+      {r.note ? (
+        <Text variant="body" tone="ink">
+          {t("members.requests.note", { note: r.note })}
+        </Text>
+      ) : null}
       {denying ? (
         <>
           <View style={styles.field}>
@@ -233,6 +235,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 22, paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   who: { flexDirection: "row", alignItems: "center", gap: 10 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  well: { gap: 4, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   field: { gap: 6 },

@@ -42,6 +42,7 @@ import {
   activitySections,
   type DayGroup,
   emojisOf,
+  joinRequestLine,
   nextRoutine,
   placeOf,
   type SayWords,
@@ -138,12 +139,9 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const card = waitingCardOf(n);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
   const request = useWaitingApprovals().find((a) => a.id === n.source.approvalId);
-  const title =
-    card.kind === "approval" && request
-      ? approvalTitle(t, request)
-      : card.kind === "join"
-        ? t("notifications.wait.joinRequest", { count: n.count, name: card.title })
-        : card.title;
+  // Someone asking to join: who asked (the first names, how many in all), with their faces.
+  const join = card.kind === "join" ? joinRequestLine(t, n) : null;
+  const title = card.kind === "approval" && request ? approvalTitle(t, request) : join ? join.text : card.title;
   // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
   // an AI while no agent has one.
   const dms = useDms(orgId);
@@ -173,7 +171,15 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     >
       <View style={styles.hd}>
         {who ? <Face who={who} size={22} live={false} /> : null}
-        {card.kind === "join" ? <PersonAvatar name={card.title} size={22} /> : null}
+        {join ? (
+          <View style={styles.faces}>
+            {join.faces.map((face, i) => (
+              <View key={`${i}-${face}`} style={i > 0 ? styles.overlap : undefined}>
+                <PersonAvatar name={face} size={22} />
+              </View>
+            ))}
+          </View>
+        ) : null}
         {name ? (
           <Text variant="footnote" tone="ink" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
             {name}
@@ -452,6 +458,8 @@ const styles = StyleSheet.create({
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
+  faces: { flexDirection: "row" },
+  overlap: { marginLeft: -6 },
   kind: { flexDirection: "row", alignItems: "center", gap: 4 },
   ft: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 36 },
   fuse: { flex: 0, width: 90 },
