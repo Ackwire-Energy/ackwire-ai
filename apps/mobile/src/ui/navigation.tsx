@@ -9,6 +9,7 @@ import { type ReactNode, useLayoutEffect, useMemo, useState, useSyncExternalStor
 import { useTranslation } from "react-i18next";
 import { Platform } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
+import { sheetColors } from "./palette";
 import { useTheme } from "./theme";
 
 /**
@@ -216,13 +217,15 @@ export const coverBarOptions: NativeStackNavigationOptions = {
  * A native form sheet (Requests, Você): drag to dismiss, detents, the grabber, and on iOS the screen behind
  * scales back. `detents` are fractions of the screen height, ascending. On iOS 26 the system draws its
  * corners (floating, concentric with the screen's); a radius of ours would square them off at the bottom. Sheets sit on the grouped gray
- * (white cards on it, like iOS); `raised` for a sheet that is one white card.
+ * (white cards on it, like iOS), lifted above the screen in dark (`sheetColors`); `raised` for a sheet that is
+ * one white card. The content goes in `SheetSurface` (`SheetScreen` does it): its colors, and Android's grabber.
  */
 export function useFormSheetOptions(
   detents: number[],
   background: "raised" | "bg" = "bg",
 ): NativeStackNavigationOptions {
-  const { colors } = useTheme();
+  const { colors: screen, scheme } = useTheme();
+  const colors = useMemo(() => sheetColors(screen, scheme), [screen, scheme]);
   const key = detents.join(",");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the detents array
   return useMemo<NativeStackNavigationOptions>(
@@ -233,8 +236,9 @@ export function useFormSheetOptions(
       sheetGrabberVisible: true,
       ...(Platform.OS === "ios" && !legacyBlur ? null : { sheetCornerRadius: 28 }),
       sheetExpandsWhenScrolledToEdge: true,
-      contentStyle: { backgroundColor: background === "raised" ? colors.raised : colors.grouped },
+      // One white card in light; in dark the lifted sheet either way.
+      contentStyle: { backgroundColor: background === "raised" ? screen.raised : colors.grouped },
     }),
-    [key, background, colors],
+    [key, background, colors, screen],
   );
 }

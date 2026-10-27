@@ -26,6 +26,8 @@ export interface AppColors extends ThemeColors {
   chip: string;
   /** Unread: the row's dot, the same red as the tab bar's badge (the system red). */
   badge: string;
+  /** A sheet's grabber where we draw it (Android; iOS draws its own), the system's tone for it. */
+  grabber: string;
 }
 
 /** Light, native: what changes from the tokens. */
@@ -63,6 +65,7 @@ export function appColors(scheme: Scheme): AppColors {
       amber: "#e8ac4c",
       chip: darkTokens.sunken,
       badge: "#ff453a",
+      grabber: "rgba(235, 235, 245, 0.3)",
     };
   }
   const base = { ...lightTokens, ...NATIVE_LIGHT };
@@ -73,6 +76,30 @@ export function appColors(scheme: Scheme): AppColors {
     amber: "#b26a00",
     chip: "rgba(120, 120, 128, 0.1)",
     badge: "#ff3b30",
+    grabber: "rgba(60, 60, 67, 0.3)",
+  };
+}
+
+/** A card inside a dark sheet: one step above the sheet, as the sheet is one above the screen. */
+const DARK_SHEET_CARD = "#292928";
+
+/**
+ * The colors inside a form sheet. In dark the sheet is lifted one step above the screen behind it (the dark
+ * page's own color made the two read as one) and its cards one more, as the system's own sheets do. Light
+ * keeps the grouped gray with white cards on it, which already stands apart from the dimmed white screen.
+ */
+export function sheetColors(colors: AppColors, scheme: Scheme): AppColors {
+  if (scheme !== "dark") return colors;
+  return {
+    ...colors,
+    bg: colors.raised,
+    grouped: colors.raised,
+    surface: colors.raised,
+    raised: DARK_SHEET_CARD,
+    raised2: DARK_SHEET_CARD,
+    surfaceRaised: DARK_SHEET_CARD,
+    // Android's "glass" plates (round buttons) are opaque: a card's tone, so they don't vanish into the sheet.
+    glassSolid: DARK_SHEET_CARD,
   };
 }
 
