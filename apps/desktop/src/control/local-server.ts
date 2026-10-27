@@ -36,7 +36,21 @@ export interface LocalServerStatus {
 }
 
 export type Tailnet = { state: "missing" } | { state: "off" } | { state: "on"; device: string };
-export type ServeProblem = { reason: "https"; url: string | null } | { reason: "operator" } | { reason: "serve" };
+/**
+ * Why reach didn't turn on: HTTPS off in the tailnet, Tailscale's permission (Linux), Tailscale refused, the person
+ * stopped waiting for HTTPS, or the server didn't answer again at its new address.
+ */
+export type ServeProblem =
+  | { reason: "https"; url: string | null }
+  | { reason: "operator" }
+  | { reason: "serve" }
+  | { reason: "stopped" }
+  | { reason: "start" };
+/**
+ * What turning reach on or off is doing now (`local-server://reach`): Tailscale sharing it, Tailscale waiting for
+ * HTTPS to be allowed at `url`, the server starting again at its new address, the window signing in there.
+ */
+export type ReachStage = { stage: "sharing" | "restarting" | "signingIn" } | { stage: "approve"; url: string };
 export type ReachResult = { ok: true; url: string } | { ok: false; problem: ServeProblem };
 
 export interface LocalChoice {
@@ -150,6 +164,8 @@ export const REASON_TEXT: Record<ServeProblem["reason"], string> = {
   https: "desktop.here.reason.https",
   operator: "desktop.here.reason.operator",
   serve: "desktop.here.reason.serve",
+  stopped: "desktop.here.reason.stopped",
+  start: "desktop.here.reason.start",
 };
 
 /** The server here in a few words: "Running · only on this Mac", "Starting", … */
