@@ -1,28 +1,38 @@
 import type { ConnectorDef } from "@agenteschat/client";
 import { Image } from "expo-image";
+import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
+import { appHeaders, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { Icon, type IconName, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
-import { brandOf, iconUri, monogram } from "./logic";
+import { brandOf, iconUri, monogram, serverIconUri } from "./logic";
 
 /**
  * A service's mark on a tile (the web's brand icons, CC0, tinted in the brand's color; the ink for near-black
- * brands), a monogram when it has none. `check`: a small check on the corner once it is connected (no tags).
+ * brands); else the icon a server connected by address gave (`image`, in its own colors, loaded with the
+ * session); else a monogram. `check`: a small check on the corner once it is connected (no tags).
  */
 export function ConnectorIcon({
   def,
   label,
   size = 44,
   check = false,
+  image,
 }: {
   def: Pick<ConnectorDef, "iconUrl" | "brandColor"> | null;
   label: string;
   size?: number;
   check?: boolean;
+  image?: string | null;
 }) {
   const c = useColors();
   const uri = def ? iconUri(serverUrl(), def.iconUrl) : null;
+  // Stable per URL, so the image isn't fetched again on every render.
+  const own = useMemo(() => {
+    const at = uri ? null : serverIconUri(serverUrl(), image);
+    return at ? { uri: at, headers: appHeaders(lastCookie()) } : null;
+  }, [uri, image]);
   const tint = (def ? brandOf(def.brandColor) : null) ?? c.ink;
   const radius = Math.round(size * 0.3);
   return (
@@ -39,6 +49,12 @@ export function ConnectorIcon({
           tintColor={tint}
           contentFit="contain"
           style={{ width: Math.round(size * 0.5), height: Math.round(size * 0.5) }}
+        />
+      ) : own ? (
+        <Image
+          source={own}
+          contentFit="contain"
+          style={{ width: Math.round(size * 0.58), height: Math.round(size * 0.58) }}
         />
       ) : (
         <Text variant="body" tone="muted" style={[styles.mono, { fontSize: Math.round(size * 0.36) }]}>

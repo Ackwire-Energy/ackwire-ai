@@ -83,7 +83,7 @@ export function ApprovalMark({ approval: a, size = 20 }: { approval: Approval; s
         : a.connector;
   return (
     <View accessible accessibilityLabel={name}>
-      <ConnectorIcon def={def} label={name} size={size} />
+      <ConnectorIcon def={def} image={custom?.image} label={name} size={size} />
     </View>
   );
 }
