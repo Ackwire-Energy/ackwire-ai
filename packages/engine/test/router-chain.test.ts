@@ -82,7 +82,7 @@ function fakeHub(
   return hub as typeof hub & Pick<MachineCaller, "call" | "status">;
 }
 
-const post = (userId: string, body: string, extra: { replyTo?: string } = {}) =>
+const post = (userId: string, body: string, extra: { replyTo?: string; threadId?: string } = {}) =>
   postPersonMessage({ db: f.db, pubsub: f.pubsub }, userId, f.org.id, f.general.id, { body, ...extra });
 const byAgent = (agentId: string, body: string, minutesAgo = 0) =>
   insertMessage(f.db, {
@@ -284,13 +284,17 @@ describe("the author's own plan", () => {
     });
   });
 
-  test("a reply to an agent goes by the rule, and the plan isn't asked", async () => {
+  test("a reply to an agent, quoted or in its thread, goes by the rule, and the plan isn't asked", async () => {
     const { hub, handlers } = await plansOnly();
     const report = await byAgent(f.agent.id, "O deploy de ontem falhou no passo de migração.");
-    const m = await post(f.owner.id, "por que falhou?", { replyTo: report.id });
+    const quoted = await post(f.owner.id, "por que falhou?", { replyTo: report.id });
+    await drain(handlers);
+    const threaded = await post(f.owner.id, "e o rollback?", { threadId: report.id });
     await drain(handlers);
     expect(hub.calls).toHaveLength(0);
-    expect(await decisionOf(m.id)).toMatchObject({ strategy: "rule:reply", selectedAgentIds: [f.agent.id] });
+    for (const m of [quoted, threaded]) {
+      expect(await decisionOf(m.id)).toMatchObject({ strategy: "rule:reply", selectedAgentIds: [f.agent.id] });
+    }
   });
 
   test("an agent's own message goes through Jev or a model only: no plan, no rule", async () => {
@@ -306,6 +310,28 @@ describe("the author's own plan", () => {
 });
 
 describe("rules, when nothing can read the message", () => {
+  test("R1 in a thread: for the agent it is under, only while no other agent spoke there", async () => {
+    const { handlers } = await plansOnly(fakeHub({ protocol: ROUTE_PROTOCOL - 1 }));
+    const ops = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, { model: "auto" });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+    const report = await byAgent(f.agent.id, "O deploy de ontem falhou no passo de migração.");
+    const hit = await post(f.owner.id, "por que falhou?", { threadId: report.id });
+    await drain(handlers);
+    expect(await decisionOf(hit.id)).toMatchObject({ strategy: "rule:reply", selectedAgentIds: [f.agent.id] });
+
+    const backup = await byAgent(f.agent.id, "A rotina de backup terminou.");
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: backup.id,
+      author: { type: "agent", agentId: ops.id, runId: null, hop: 1 },
+      body: "Aqui o backup do banco falhou.",
+    });
+    const miss = await post(f.owner.id, "e agora?", { threadId: backup.id });
+    await drain(handlers);
+    expect(await decisionOf(miss.id)).toMatchObject({ strategy: "none", selectedAgentIds: [] });
+  });
+
   test("R2: a person alone in the channel with its one agent; not with someone else there", async () => {
     const { handlers, bruna } = await plansOnly(fakeHub({ protocol: ROUTE_PROTOCOL - 1 }));
     await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, bruna.id));

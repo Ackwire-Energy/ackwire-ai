@@ -888,7 +888,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLo
 
 /**
  * Whether the message names another person of the workspace by first name (a whole word, any case and
- * accent): "boa noite walter" right after Ada spoke is for Walter, so R3 doesn't send it to Ada.
+ * accent): "boa noite bruna" right after Ada spoke is for Bruna, so R3 doesn't send it to Ada.
  */
 async function namesAnotherPerson(db: Executor, message: { orgId: string; authorUserId: string | null; body: string }) {
   const words = new Set(fold(message.body).match(/[\p{L}\p{N}]+/gu) ?? []);
