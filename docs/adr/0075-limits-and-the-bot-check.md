@@ -1,0 +1,35 @@
+# 0075. Limits on public routes, and agentes.chat Cloud's bot check
+
+- Status: Accepted (built: server, web and the shared client; the phone app follows)
+- Date: 2026-10-27
+- Code: `apps/server/src/http/client-ip.ts` (`limitIp`, `TRUSTED_PROXIES`), `packages/adapters/src/human-check.ts` (Turnstile), `apps/server/src/http/human-check.ts`, `apps/server/src/auth.ts` (the hook, the email caps), `apps/server/src/start.ts` (the boot probe), `apps/server/src/operator/orgs.ts` (`/health`), `packages/client/src/lib/human-check.ts`, `apps/web/src/lib/human-check.tsx`, `apps/web/public/human-check.html`
+
+## Context
+
+Every route a signed-out person reaches has a limit per IP, but the key was the whole address: an IPv6 /64, which one customer usually holds, gave 2^64 fresh counts. Reset and confirmation emails had no cap per address, so a mailbox could be flooded from many addresses. Behind a public proxy, our own limits counted every request as the proxy's. And agentes.chat Cloud, open to anyone, wants a bot check in front of its forms that most people never see, while self-hosted servers keep nothing of it.
+
+## Decision
+
+1. **Per IP means IPv6 by its /64** (`limitIp`), as Better Auth counts its own: sign-in options, the ask and its code, the waiting list, a new invitation, a computer's pairing and its host sync, desktop and native downloads. The address a pairing records stays whole.
+2. **`TRUSTED_PROXIES` counts for our limits too.** Walking `x-forwarded-for` from the right, its addresses and ranges are skipped like internal hops. An entry that isn't an address or a range is skipped.
+3. **Reset and confirmation emails: at most 3 an hour per address.** More go nowhere, and Better Auth answers the same, so nothing tells whether an email went out. Counted in memory, like Better Auth's own counts per IP.
+4. **The bot check is Cloudflare Turnstile, on only with both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`.** Half a pair stops the server at boot. Without them there is no script, no widget, no check and no request to Cloudflare. Both descriptions start "For agentes.chat Cloud. Unset by default." It is public code switched on by env vars (ADR 0002).
+5. **Six actions:** email lookup, sign-in, sign-up, password reset, the code to ask to join (ADR 0072), the waiting list. The widget is Managed with `appearance: interaction-only`: a checkbox shows only when Cloudflare doubts someone. The token travels in `x-captcha-response`. Each route checks it after its own limits (Better Auth's hook runs after Better Auth's), and sign-up checks it before its policy.
+6. **Our own siteverify call**, an adapter. A missing or refused token is a 403 `human_check`. A token counts only for its action, seen on `PUBLIC_URL`'s host, except the answers of Cloudflare's test keys. One retry, with the same idempotency key, on no answer within 5 s, a 5xx or `internal-error`. Cloudflare out of reach lets the request through, logged: nobody is locked out by someone else's outage, and every limit still holds.
+7. **A page that can't make a token** (the script didn't load, the widget failed, nothing in 30 s) sends `unavailable`, with Turnstile's error code when it gave one. It goes through only while this server can't reach Cloudflare either, asked again at most once a minute: the dummy token to siteverify and the widget's script. Otherwise it is a 403 `human_check_blocked`, read as "The check didn't load. Try another browser or network.", which doesn't blame the browser, since a widget down while siteverify answers looks the same from here. Turnstile's codes for a wrong site key or a host it doesn't allow (110100, 400020, 110200) are logged.
+8. **A wrong key never fails quietly.** At boot, a secret Cloudflare refuses stops the server with the variable's name. While running, it lets requests through, logged. The operator API's `/health` reports `botCheck`: `state` (`off`, `ok`, `unreachable`, `secret_refused`), `since` when it took that state, and `blocked`, the `human_check_blocked` answers of the last 10 minutes. The Cloud's control raises its alerts from it, since a line in core's log reaches nobody there.
+9. **The apps.** `auth-config` gives `turnstileSiteKey`. The web adds `api.js?render=explicit` once, from the first page that checks (the landing waits for a field's first focus), renders a widget per form and action, sends its token, resets the widget after every call, and tries once more on `human_check`, never on `human_check_blocked`. While Cloudflare asks for a click, a call waits for the person. A card that leaves the checkbox less than 300 px gives it room under 480 px, and a place still narrower takes the `compact` widget. The phone runs the same widget in a hidden WebView on this server's `/human-check.html`, so the host is ours, and reads its events there.
+
+## Consequences
+
+- A self-hosted server without the keys loads nothing from Cloudflare and checks nothing. Its limits now count IPv6 by /64 and walk past its trusted proxies.
+- The Cloud sets the keys only once the phone build with the check is in both stores, the desktop release keeps Turnstile's frame in its window, the privacy policy names Cloudflare, and control's alerts read `botCheck`. Turning the check off is unsetting both keys and starting the server again without them.
+- An outage that breaks only Cloudflare's widget, while siteverify still answers this server, refuses people with "The check didn't load". Control's alert counts those refusals, and the way out is to turn the check off.
+- Better Auth's counts per IP and the email caps reset on a restart. The per-address limits of ADR 0072 don't.
+
+## Alternatives considered
+
+- Better Auth's captcha plugin: it fails closed (a 500 when siteverify is down), takes one action for every path, calls Cloudflare in tests, and can't guard our own routes.
+- Turnstile's invisible mode: a person Cloudflare doubts would have no way through.
+- Exempting the phone app: every bot would claim to be it.
+- Siteverify in a private Cloud service: it hides about 50 lines and adds a hop that can fail, and the widget's code stays public anyway, in the web and phone apps.
