@@ -3,6 +3,7 @@ import { ApiError } from "../api/http";
 import type { OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
+import { limitRefusalText } from "./limits";
 
 /**
  * Server error codes the app says in the person's language (the server's
@@ -133,19 +134,24 @@ export const errorCode = (error: unknown) => (error instanceof ApiError ? error.
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
 export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
 
-/** A known server code in the person's language; null for anything else (the caller keeps its own words). */
-export function knownErrorText(t: TFunction, error: unknown): string | null {
+/**
+ * A known server code in the person's language; null for anything else (the caller keeps its own words). `locale`
+ * writes the sizes a limit's refusal names.
+ */
+export function knownErrorText(t: TFunction, error: unknown, locale = "en"): string | null {
   if (!(error instanceof ApiError)) return null;
   const standing = standingRefusalText(t, error.code, error.params);
   if (standing) return standing;
+  const limit = limitRefusalText(t, locale, error.code, error.params);
+  if (limit) return limit;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   return key ? t(key, { max: MAX_UPLOAD_MB, ...error.params }) : null;
 }
 
 /** Translated text for a failed request. */
-export function errorText(t: TFunction, error: unknown): string {
+export function errorText(t: TFunction, error: unknown, locale?: string): string {
   if (error instanceof ApiError) {
-    const known = knownErrorText(t, error);
+    const known = knownErrorText(t, error, locale);
     if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");

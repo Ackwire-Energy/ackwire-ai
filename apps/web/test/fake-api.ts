@@ -39,6 +39,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SignInOptions,
+  WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
@@ -180,6 +181,8 @@ export interface FakeState {
   waitlistError?: ApiError;
   /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
   billingLinkError?: ApiError;
+  /** `orgs.limits` (ADR 0071); unset = no limits, the members counted from `members`. */
+  limits?: WorkspaceLimits;
   /** Make `waitlist.confirm` fail with this error (invalid_token…). */
   waitlistConfirmError?: ApiError;
   /** `agents.aiStatus`; unset = every agent ready. */
@@ -846,6 +849,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.billingLinkError) throw state.billingLinkError;
         return { url: `https://billing.example.com/link?t=${from}`, expiresAt: NOW.toISOString() };
       },
+      limits: async () =>
+        state.limits ?? {
+          members: { used: state.members.length, limit: null },
+          storage: { usedBytes: 0, limitBytes: null, ownStorage: false },
+          uploads: { usedBytes24h: 0, limitBytesPerDay: null },
+        },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
         log("orgs.changeRole", orgId, userId, role);

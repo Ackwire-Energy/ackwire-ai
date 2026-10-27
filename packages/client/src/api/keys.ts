@@ -11,6 +11,8 @@ export const keys = {
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
+  /** Under `members`: someone joining or leaving refreshes it too. */
+  limits: (orgId: string) => ["org", orgId, "members", "limits"] as const,
   invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
   agents: (orgId: string) => ["org", orgId, "agents"] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,

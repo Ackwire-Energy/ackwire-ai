@@ -1,4 +1,5 @@
 import type { ChannelEvent, ConnectIntent, Message, MessageReceipts, RunStatus } from "../api/types";
+import { PLATFORM_CAP } from "../lib/limits";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
 
@@ -31,6 +32,8 @@ export interface MessageReceipt {
   referenced?: string[];
   /** Routed to nobody: the organization has no AI connected (with the Connect step the message asked for). */
   noAi?: { intent?: ConnectIntent; provider?: string };
+  /** Routed to nobody: the workspace used up its platform AI for the month, so only @mentions start agents. */
+  platformCap?: true;
   /** The list receipts last seeded: the same read seeded again changes nothing. */
   server?: MessageReceipts;
 }
@@ -181,6 +184,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
         blocked: r.blocked ?? [],
         // The Connect step `message.routed` asked for stays while the server still says "no AI".
         ...(r.noAi ? { noAi: existing?.noAi ?? {} } : {}),
+        ...(r.platformCap ? { platformCap: true as const } : {}),
         server: r,
       },
     });
@@ -219,7 +223,11 @@ export function applyReceiptEvent(
       for (const id of event.seenBy) next = set(next, event.messageId, id, "seen");
       for (const id of event.pickedBy) next = set(next, event.messageId, id, "picked");
       for (const r of event.runs ?? []) next = linkRun(next, event.messageId, r.runId, r.agentId);
-      const { noAi: _before, ...current } = next[event.messageId] ?? { routed: false, agents: [] };
+      const {
+        noAi: _before,
+        platformCap: _capped,
+        ...current
+      } = next[event.messageId] ?? { routed: false, agents: [] };
       // Mentioned agents that got nothing: said explicitly, or the whole decision was "nobody".
       const blocked = event.blocked ?? (event.strategy === "none" ? event.seenBy : current.blocked);
       const referenced = event.referenced ?? current.referenced;
@@ -233,6 +241,7 @@ export function applyReceiptEvent(
           ...(referenced ? { referenced } : {}),
           // Routed again once an AI is connected: the decision that replaces it says what happens now.
           ...(event.reason === NO_AI ? { noAi: { intent: event.intent, provider: event.provider } } : {}),
+          ...(event.reason === PLATFORM_CAP ? { platformCap: true as const } : {}),
         },
       };
     }
@@ -306,6 +315,8 @@ export interface ReceiptView {
     | { kind: "nobody" }
     /** Nobody will answer for want of an AI (`agents`: those that couldn't think; empty: nobody was asked). */
     | { kind: "no_ai"; agents: string[] }
+    /** Nobody was asked: the workspace used up its platform AI for the month, an @mention still gets an answer. */
+    | { kind: "platform_cap" }
     | null;
   /** Everyone who answered answered: the row can shrink to avatars. */
   done: boolean;
@@ -314,7 +325,7 @@ export interface ReceiptView {
 }
 
 export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
-  if (!receipt || (receipt.agents.length === 0 && !receipt.noAi))
+  if (!receipt || (receipt.agents.length === 0 && !receipt.noAi && !receipt.platformCap))
     return { seen: [], status: null, done: false, referenced: [] };
   const seen = receipt.agents.map(([id]) => id);
   const referenced = (receipt.referenced ?? []).filter((id) => seen.includes(id));
@@ -329,6 +340,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   }
   const handled = with_("handled");
   if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced };
+  if (receipt.platformCap) return { seen, status: { kind: "platform_cap" }, done: false, referenced };
   // A mention always gets an answer unless the server said that agent can't, or that the message only
   // references it (never "nobody" on a guess).
   const blocked = new Set([...(receipt.blocked ?? []), ...(receipt.referenced ?? [])]);

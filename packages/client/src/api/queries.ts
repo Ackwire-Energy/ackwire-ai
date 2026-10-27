@@ -1419,6 +1419,12 @@ export function useDecideProposal(orgId: string) {
   });
 }
 
+/** People, files and today's uploads against the workspace's limits (ADR 0071): any member. */
+export const useWorkspaceLimits = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.limits(orgId), queryFn: () => api.orgs.limits(orgId), enabled });
+};
+
 export const useStorage = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.storage(orgId), queryFn: () => api.storage.get(orgId), enabled });

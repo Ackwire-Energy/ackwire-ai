@@ -40,6 +40,14 @@ export interface AuthConfig {
   billingUrl?: string | null;
 }
 
+/** A workspace's use against its limits (ADR 0071, `GET …/limits`), for any member; a null limit: none. */
+export interface WorkspaceLimits {
+  members: { used: number; limit: number | null };
+  /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
+  storage: { usedBytes: number; limitBytes: number | null; ownStorage: boolean };
+  uploads: { usedBytes24h: number; limitBytesPerDay: number | null };
+}
+
 /** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0071). */
 export type BillingFrom =
   | "settings"
@@ -442,6 +450,8 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** Nobody was asked: the workspace used up its platform AI for the month, so only @mentions start agents. */
+  platformCap?: boolean;
 }
 
 /** What a person who met "no AI" asked for (Jev): a Connect dialog step; `any` and `task` open its first step. */
@@ -667,7 +677,10 @@ export type ChannelEvent =
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
-      /** `no_ai`: the organization has no AI connected; `mention_needed`: only a mention gets an answer. */
+      /**
+       * `no_ai`: the organization has no AI connected; `mention_needed`: only a mention gets an answer;
+       * `platform_cap`: the workspace used up its platform AI for the month, so only a mention gets one.
+       */
       reason?: string;
       /** With `no_ai`: the Connect step the message asked for, and whether it opens by itself (Jev ≥ 0.9). */
       intent?: ConnectIntent;

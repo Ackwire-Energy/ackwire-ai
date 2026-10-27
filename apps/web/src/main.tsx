@@ -51,7 +51,7 @@ const queryClient = createQueryClient({
   onUnauthorized,
   onMutationError: (message) => toasts.show(message, "error"),
   unknownError: () => i18n.t("common.unknownError"),
-  describeError: (error) => knownErrorText(i18n.t, error),
+  describeError: (error) => knownErrorText(i18n.t, error, i18n.language),
 });
 
 // The last lists and chats saved on this device show at once; everything revalidates as usual.

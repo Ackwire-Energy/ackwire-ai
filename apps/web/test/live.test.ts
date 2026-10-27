@@ -96,6 +96,26 @@ describe("receipts", () => {
     expect(receiptView(s.m1)).toMatchObject({ seen: ["ada", "atlas"], status: { kind: "nobody" } });
   });
 
+  test("past the workspace's platform AI nobody is asked: the row says to mention an agent, live and from the list", () => {
+    const live = step(seedReceipt({}, person()), {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: [],
+      pickedBy: [],
+      strategy: "none",
+      reason: "platform_cap",
+    });
+    expect(receiptView(live.m1)).toMatchObject({ seen: [], status: { kind: "platform_cap" } });
+    const listed = seedReceipt(
+      {},
+      { ...person(), receipts: { seenBy: [], pickedBy: [], handled: [], platformCap: true } },
+    );
+    expect(receiptView(listed.m1).status).toEqual({ kind: "platform_cap" });
+    // Routed again later (answer now), the new decision says what happens.
+    const again = step(live, { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"] });
+    expect(receiptView(again.m1).status).toEqual({ kind: "picked", agents: ["ada"] });
+  });
+
   test("claimed and failed; server receipts seed the row", () => {
     let s = step({}, { type: "message.claimed", messageId: "m1", agentId: "atlas" });
     expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["atlas"] });

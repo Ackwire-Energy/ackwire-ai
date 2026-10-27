@@ -195,6 +195,7 @@ import type {
   WikiUpdateInput,
   WikiVersion,
   WorkingRun,
+  WorkspaceLimits,
 } from "./types";
 
 /**
@@ -243,6 +244,8 @@ export interface ApiClient {
      * on a server without billing.
      */
     billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
+    /** People, files and today's uploads against the workspace's limits (any member; ADR 0071). */
+    limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;

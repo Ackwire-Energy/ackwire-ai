@@ -33,7 +33,7 @@ export function MessageReceipts({ message }: { message: Message }) {
   const receipt = useLive((s) => s.receipts[message.id]);
   const view = receiptView(receipt);
   const status = view.status;
-  if (view.seen.length === 0 && status?.kind !== "no_ai") return null;
+  if (view.seen.length === 0 && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const names = (ids: string[]) => joinNames(ids.map(name), t("newAgent.and"));
@@ -44,7 +44,9 @@ export function MessageReceipts({ message }: { message: Message }) {
         ? t("receipts.nobody")
         : status.kind === "no_ai"
           ? t("noAi.receipt")
-          : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
+          : status.kind === "platform_cap"
+            ? t("receipts.platformCap")
+            : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
   const label = [view.seen.length > 0 && t("receipts.seenBy", { names: names(view.seen) }), statusText]
     .filter(Boolean)
     .join("; ");
@@ -97,6 +99,7 @@ export function MessageReceipts({ message }: { message: Message }) {
           <CallAgentMenu />
         </>
       )}
+      {status?.kind === "platform_cap" && <span>{t("receipts.platformCap")}</span>}
       {status?.kind === "no_ai" && (
         <>
           <span>
