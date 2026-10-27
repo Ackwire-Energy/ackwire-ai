@@ -55,6 +55,23 @@ describe("requester", () => {
     await request("/x", { query: { a: 1, b: undefined, c: null, d: "z" } }).catch(() => {});
     expect(calls[0]?.url).toBe("/x?a=1&d=z");
   });
+
+  test("the bot check's token rides only on the calls that carry one", async () => {
+    const { fetch, calls } = fakeFetch({
+      "POST /api/app/sign-in-options": { status: 200, body: { account: false } },
+      "POST /api/app/invitations/tok/code": { status: 202, body: { email: "a@x.com", resendIn: 60 } },
+      "POST /api/waitlist": { status: 202, body: { ok: true } },
+    });
+    const api = createHttpApi({ fetch });
+    await api.account.signInOptions({ email: "a@x.com" }, "tok-1");
+    await api.invites.sendCode("tok", { email: "a@x.com" }, "tok-2");
+    await api.waitlist.join({ email: "a@x.com", locale: "en" }, "tok-3");
+    await api.account.signInOptions({ email: "a@x.com" });
+    const header = (c: Call) => (c.init.headers as Record<string, string>)["x-captcha-response"];
+    expect(calls.map(header)).toEqual(["tok-1", "tok-2", "tok-3", undefined]);
+    // Never in the body.
+    expect(calls.every((c) => !String(c.init.body).includes("tok-"))).toBe(true);
+  });
 });
 
 describe("transport options (the phone app)", () => {

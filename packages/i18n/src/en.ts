@@ -6837,6 +6837,8 @@ export const en: Translations = {
     invitation: {
       askToJoin: "This link goes through an admin now. Open it again to ask to join.",
     },
+    humanCheck: "We couldn't confirm you're a person. Try again.",
+    humanCheckBlocked: "The check didn't load. Try another browser or network.",
     mission: {
       notFound: "Mission not found.",
       notOwner: "Only the mission's owner can do this.",
