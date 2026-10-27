@@ -132,6 +132,29 @@ describe("Anthropic adapter (scripted transport)", () => {
   });
 });
 
+test("effort none: Haiku 5.5 thinks not at all at low effort; a model that can't stop thinking gets low", async () => {
+  const done = sse([
+    start(1),
+    { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" },
+  ]);
+  const sent = async (model: string) => {
+    const { fetcher, requests } = scripted(done);
+    const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+    await provider.stream(
+      { model, system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 512, effort: "none" },
+      { apiKey: "k", onDelta: () => {} },
+    );
+    return requests[0]?.body as Record<string, unknown>;
+  };
+  const haiku = await sent("claude-haiku-5-5");
+  expect(haiku.thinking).toEqual({ type: "disabled" });
+  expect(haiku.output_config).toEqual({ effort: "low" });
+  const sonnet = await sent("claude-sonnet-5-5");
+  expect(sonnet).not.toHaveProperty("thinking");
+  expect(sonnet.output_config).toEqual({ effort: "low" });
+});
+
 test("a workspace id is sent as the anthropic-workspace-id header", async () => {
   const { fetcher, requests } = scripted(
     sse([

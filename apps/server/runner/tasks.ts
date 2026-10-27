@@ -34,6 +34,7 @@ import {
   type TaskExecutor,
   type TaskStart,
 } from "@agenteschat/adapters/machine-protocol";
+import { yieldRoute } from "./accounts";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
 import { readJson, writeJson } from "./json-file";
@@ -1036,6 +1037,9 @@ export class TaskManager {
     });
     if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
+    // Claude Code and Codex tasks run on the computer's own sign-in: a route there stops first (two processes on
+    // one sign-in race on its refresh token), right before the task starts.
+    if (executor !== "shell") await yieldRoute(executor === "codex" ? "codex" : "claude_code");
     let child: ChildProcess;
     try {
       // Codex hands our MCP process these by name (`env_vars`): the token never goes on a command line.

@@ -41,6 +41,10 @@ export const mobileEn: MobileTranslations = {
       notAgentes: "{{host}} isn't an agentes.chat server. Check the address.",
       serverTooOld: "{{host}} needs an update to work with this app.",
       appTooOld: "Update the agentes app to use {{host}}.",
+      down: {
+        line: "{{host}} didn't answer.",
+        text: "It may be down or outside your network. The app opens on its own once it's back.",
+      },
     },
     connect: {
       title: "Connect to this server?",

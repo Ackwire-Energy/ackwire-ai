@@ -19,6 +19,18 @@ export interface ServerTelemetry {
   report: Record<string, unknown>;
 }
 
+/** The installation's Jev key, for its pinned owner on a self-hosted server (`GET /api/app/jev`, ADR 0073). */
+export interface JevKey {
+  /** `env`: `TYPESAFE_API_KEY`, read-only here. `settings`: added in Settings. Null: none. */
+  source: "env" | "settings" | null;
+  /** The key's last 4 characters (the key itself is never returned). */
+  hint: string | null;
+  /** What its owner can fix: TypeSafe refused the key, or its account is out of credit. Else `ok`. */
+  state: "off" | "ok" | "invalid" | "no_credit";
+  /** Jev's calls this month (UTC), every workspace together. */
+  month: { decisions: number; costUsd: number };
+}
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
@@ -36,6 +48,8 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
+  /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
+  turnstileSiteKey?: string | null;
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -171,6 +185,12 @@ export interface AskToJoinResult {
   emailed: boolean;
 }
 
+/** `invites.sendCode` (ADR 0072): the code went to `email`; another can go after `resendIn` seconds. */
+export interface JoinCodeSent {
+  email: string;
+  resendIn: number;
+}
+
 /** A workspace's invitation link people can still ask with (admins). */
 export interface InviteLink {
   id: string;
@@ -191,7 +211,12 @@ export interface JoinRequest {
   email: string;
   /** Their words: shown here only, never in an email or a push. */
   note: string | null;
-  /** Asked signed in with this address confirmed: approving lets them in at once; else it sends an invitation. */
+  /**
+   * A code proved the address, or a confirmed account with it asked (ADR 0072). False only on a server without
+   * email, or for a request typed before codes: approving can't add anyone at once then.
+   */
+  verified: boolean;
+  /** @deprecated Read `verified`. Kept for phone builds from before it: approving lets an account in at once. */
   confirmed: boolean;
   createdAt: string;
   /** Closes unanswered after this. */
@@ -430,6 +455,32 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** Who picked the agents for it (ADR 0074); absent on a decision from before. */
+  decidedBy?: DecidedBy;
+  /** No step could read it and no rule fit: only a mention reaches an agent. */
+  reason?: "mention_needed";
+}
+
+/**
+ * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule.
+ */
+export type DecidedBy =
+  | { step: "jev" }
+  | { step: "model"; model: string; provider: string }
+  | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+
+/**
+ * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
+ * the person asking (a plan picks only for its owner's own messages). `off`: only mentions. `model`: the small
+ * model while it picks. `noSmallModel`: with `rules`, the default key's provider, which has none (Kimi).
+ */
+export interface AiRouting {
+  by: "jev" | "model" | "plans" | "rules" | "off";
+  mine: "jev" | "model" | "plan" | "rules" | "off";
+  model: string | null;
+  noSmallModel: string | null;
 }
 
 /** What a person who met "no AI" asked for (Jev): a Connect dialog step; `any` and `task` open its first step. */
@@ -439,6 +490,10 @@ export type ConnectIntent = "claude" | "chatgpt" | "api_key" | "any" | "task";
 export interface AiStatus {
   /** An agent that isn't archived is ready, or waits for its computer. */
   any: boolean;
+  /** Who picks the agents (absent from an older server). */
+  routing?: AiRouting;
+  /** The organization has a key of its own, or the server's own Claude key. */
+  apiKey?: boolean;
   agents: {
     agentId: string;
     /** `waiting`: its computer is away for now (not "no AI"). */
@@ -655,13 +710,20 @@ export type ChannelEvent =
       /** Agents it only references (part of the request to another agent): no run, by design. */
       referenced?: string[];
       strategy?: "mention" | "dm" | "router" | "none";
-      /** `no_ai`: the organization has no AI connected; `mention_needed`: only a mention gets an answer. */
+      /**
+       * `no_ai`: the organization has no AI connected. `mention_needed`: no step could pick an agent (no Jev, no
+       * small model, no plan of the author, no rule): a mention still calls one.
+       */
       reason?: string;
+      /** Who picked (ADR 0074). */
+      decidedBy?: DecidedBy;
       /** With `no_ai`: the Connect step the message asked for, and whether it opens by itself (Jev ≥ 0.9). */
       intent?: ConnectIntent;
       provider?: string;
       autoOpen?: boolean;
     }
+  /** The author's own plan is picking who answers (seconds): until `message.routed`. */
+  | { type: "message.routing"; channelId: string; messageId: string; step: "plan" }
   | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId?: string }
   | {
       type: "message.handled";

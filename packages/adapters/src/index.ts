@@ -1,6 +1,7 @@
 import type { BlobStore } from "./blob";
 import type { DatabaseDriver } from "./database";
 import type { EmailSender } from "./email";
+import type { HumanCheck } from "./human-check";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { MailAdapters } from "./mail";
 import type { Presence } from "./presence";
@@ -17,6 +18,7 @@ export * from "./command-policy";
 export * from "./composio";
 export * from "./database";
 export * from "./email";
+export * from "./human-check";
 export * from "./imap";
 export * from "./keys";
 export * from "./machine-protocol";
@@ -63,4 +65,6 @@ export interface Adapters {
   mail?: MailAdapters;
   /** People's Postgres databases for agents (ADR 0039); null/absent = no database connector. */
   databases?: DatabaseDriver | null;
+  /** A bot check before public forms (ADR 0075): Turnstile when both of its keys are set; null/absent = none. */
+  humanCheck?: HumanCheck | null;
 }

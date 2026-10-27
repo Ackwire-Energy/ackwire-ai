@@ -19,7 +19,14 @@ import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import {
+  type DecidedBy,
+  decidedByOf,
+  MENTION_NEEDED,
+  publishChannelEvent,
+  publishMessageCreated,
+  publishUserEvent,
+} from "./events";
 import { type Judge, personMentionAddressees } from "./judge";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
@@ -162,6 +169,10 @@ export interface Receipts {
   referenced?: string[];
   /** Routed to nobody: the organization had no AI connected. */
   noAi?: true;
+  /** The router's step that picked (ADR 0074); absent for a decision made before the chain. */
+  decidedBy?: DecidedBy;
+  /** No step could read it and no rule fit: only a mention reaches an agent. */
+  reason?: typeof MENTION_NEEDED;
 }
 
 /** `meta.referencedAgentIds`: agents a person's message only references (no run; see `classifyAddressees`). */
@@ -198,6 +209,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         messageId: schema.routingDecisions.messageId,
         candidates: schema.routingDecisions.candidates,
         error: schema.routingDecisions.error,
+        strategy: schema.routingDecisions.strategy,
       })
       .from(schema.routingDecisions)
       .where(and(eq(schema.routingDecisions.orgId, orgId), inArray(schema.routingDecisions.messageId, ids))),
@@ -221,6 +233,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   ]);
   const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
+  const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
   const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
   const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
   for (const m of list) {
@@ -252,9 +265,18 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
       ...(noAi.has(m.id) ? { noAi: true as const } : {}),
+      ...decisionOf(strategyOf.get(m.id), m.authorUserId),
     });
   }
   return out;
+}
+
+/** What a routing decision's `strategy` tells a receipt: who picked, or that nobody could. */
+function decisionOf(strategy: string | undefined, authorUserId: string | null): Pick<Receipts, "decidedBy" | "reason"> {
+  if (strategy === undefined) return {};
+  if (strategy === "none") return { reason: MENTION_NEEDED };
+  const decidedBy = decidedByOf(strategy, authorUserId);
+  return decidedBy ? { decidedBy } : {};
 }
 
 /** `@handle` tokens in a message, lower-cased and de-duplicated. Emails (`a@b.c`) are not mentions. */

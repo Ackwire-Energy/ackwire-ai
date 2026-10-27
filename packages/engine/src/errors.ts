@@ -50,6 +50,18 @@ export class ValidationError extends Error {
   }
 }
 
+/** Too many of something for now (HTTP 429). */
+export class TooManyError extends Error {
+  constructor(
+    message: string,
+    readonly code: string = "rate_limited",
+    readonly params?: ErrorParams,
+  ) {
+    super(message);
+    this.name = "TooManyError";
+  }
+}
+
 /** The agent reached its monthly budget. Checked before every model call. */
 export class BudgetExceededError extends Error {
   constructor(

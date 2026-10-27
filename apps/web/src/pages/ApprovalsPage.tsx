@@ -564,7 +564,7 @@ function Traits({ approval }: { approval: Approval }) {
   );
 }
 
-function expiryText(t: TFunction, a: Approval) {
+export function expiryText(t: TFunction, a: Approval) {
   const left = timeLeft(t, a.expiresAt);
   if (!left) return t("approval.expired");
   return new Date(a.expiresAt).getTime() - Date.now() <= URGENT_MS

@@ -200,7 +200,7 @@ async function modelSmoke(db: Database) {
 /** The agent's desktop and terminal through the server at PUBLIC_URL, as whoever may drive its computer. */
 async function desktopSmoke(db: Database, agent: string) {
   const origin = new URL(config.PUBLIC_URL).origin;
-  const auth = createAuth({ db, config, log: createLogger("error") });
+  const auth = createAuth({ db, config, log: createLogger("error"), rateLimiter: createMemoryRateLimiter() });
   const session = await signInForDesktop({ db, auth, base: origin, origin }, agent);
   step(`desktop: @${session.handle} through ${origin}, signed in as ${session.person}`);
   try {

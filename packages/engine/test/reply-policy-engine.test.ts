@@ -9,6 +9,7 @@ import {
   createPassToolSource,
   drainOutbox,
   insertMessage,
+  loadReplyPolicy,
   openDm,
   postPersonMessage,
   resolveBrain,
@@ -184,6 +185,32 @@ describe("a run nobody called by name may stay quiet", () => {
     );
     expect(await agentMessages()).toEqual(["No GitHub Actions."]);
   });
+});
+
+test("only code marks a follow-up: a model's words with the marker leave the agent free to stay quiet", async () => {
+  f = await setup();
+  const policyFor = async (reason: string) => {
+    const message = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "e agora?",
+    });
+    const [run] = await f.db.transaction((tx) => createAgentRuns(tx, message, [f.agent.id], "router"));
+    await f.db.insert(schema.routingDecisions).values({
+      orgId: f.org.id,
+      channelId: f.general.id,
+      messageId: message.id,
+      strategy: "plan:claude_code",
+      candidates: [{ agentId: f.agent.id, score: 1 }],
+      selectedAgentIds: [f.agent.id],
+      reason,
+    });
+    await f.db.update(schema.agentRuns).set({ status: "done" });
+    return loadReplyPolicy(f.db, f.org.id, run?.id ?? "");
+  };
+  expect((await policyFor("plan: follow-up of the talk with dev"))?.mayPass).toBe(true);
+  expect((await policyFor("follow-up; plan: the person asks dev again"))?.mayPass).toBe(false);
 });
 
 describe("background runs", () => {

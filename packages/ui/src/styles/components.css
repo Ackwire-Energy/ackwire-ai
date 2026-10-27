@@ -5180,6 +5180,272 @@ a.ac-list__row:focus-visible {
   }
 }
 /* Pending: the pixel orbit alone (a square in the round tick would poke out). */
+/*
+ * The tools of one reply (ToolBlock): a card in one line while it works (the apps' logos, what it
+ * does now, the steps, the orbit), opening into every call. Flat like every card: the hairline and the cut corner.
+ */
+.ac-tools {
+  margin: 10px 0 12px;
+  max-width: 560px;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+.ac-tools__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.ac-tools__head:hover {
+  background: var(--plate-soft);
+}
+/* Inside the card's clip: the ring goes inward. */
+.ac-tools__head:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.ac-tools__logos {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+/* Each logo centered in its own box, never on the text's baseline (a letter tile sat lower than an icon). */
+.ac-tools__logos > * {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  margin-left: -5px;
+  box-shadow: 0 0 0 1.5px var(--surface-raised);
+  border-radius: 5px;
+}
+.ac-tools__logos > :first-child {
+  margin-left: 0;
+}
+.ac-tools__now {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ac-tools__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--ink2);
+}
+.ac-tools__count,
+.ac-tools__time {
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ac-tools__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.ac-tools__chev,
+.ac-tools__linechev {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--faint);
+  transition: transform 0.25s var(--out);
+}
+.ac-tools__head[aria-expanded="true"] .ac-tools__chev,
+.ac-tools__row[aria-expanded="true"] .ac-tools__linechev {
+  transform: rotate(90deg);
+}
+/* Working on it: the words shimmer from faint to ink. */
+.ac-tools__shimmer {
+  background: linear-gradient(90deg, var(--faint) 0%, var(--ink2) 50%, var(--faint) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ac-tools__fold {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.ac-tools__fold > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.ac-tools__fold[data-folded] {
+  grid-template-rows: 0fr;
+}
+.ac-tools__lines {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.ac-tools__line {
+  border-radius: var(--radius-item);
+}
+.ac-tools__line[data-s="fail"] {
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
+}
+.ac-tools__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink2);
+  text-align: left;
+}
+button.ac-tools__row {
+  cursor: pointer;
+}
+button.ac-tools__row:hover {
+  background: var(--plate-soft);
+}
+button.ac-tools__row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-tools__logo {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  line-height: 0;
+}
+.ac-tools__label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ac-tools__label b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.ac-tools__label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--faint);
+}
+.ac-tools__line[data-s="stop"] .ac-tools__label b {
+  color: var(--faint);
+}
+.ac-tools__why {
+  margin: -4px 0 0;
+  padding: 0 8px 8px 38px;
+  font-size: 12px;
+  color: var(--danger);
+}
+.ac-tools__detail {
+  margin: 0 8px 8px 38px;
+}
+/* What it was given and answered: the code well's look (mono only for this). */
+.ac-tools__io {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-item);
+  background: var(--card-well, var(--sunken));
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: 12px / 1.55 var(--font-mono, ui-monospace, monospace);
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow: auto;
+}
+.ac-tools__io b {
+  display: block;
+  font-weight: 400;
+  color: var(--faint);
+}
+.ac-tools__io b + * {
+  margin-bottom: 8px;
+}
+.ac-tools__note {
+  margin: 2px 8px 4px 38px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-tools {
+    animation: ac-rise 0.3s var(--out) both;
+  }
+  .ac-tools__fold {
+    transition: grid-template-rows 0.45s var(--out);
+  }
+  .ac-tools__text {
+    animation: ac-tools-swap 0.35s var(--out) both;
+  }
+  .ac-tools__shimmer {
+    animation: ac-tools-shimmer 1.6s linear infinite;
+  }
+  .ac-tools__line {
+    animation: ac-rise 0.25s var(--out) both;
+  }
+}
+@keyframes ac-tools-swap {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@keyframes ac-tools-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+/* Failed: an exclamation of two pixels (PixelFail). */
+.ac-pixfail {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--px-gap, 1px);
+  flex: none;
+  vertical-align: middle;
+}
+.ac-pixfail::before,
+.ac-pixfail::after {
+  content: "";
+  width: var(--px, 4px);
+  height: var(--px, 4px);
+  background: var(--danger);
+}
+.ac-pixfail::before {
+  height: calc(var(--px, 4px) * 2);
+}
 .ac-tick--pending {
   background: transparent;
   color: var(--muted);
