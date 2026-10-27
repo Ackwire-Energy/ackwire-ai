@@ -64,7 +64,6 @@ export const featureKeysEn: FeatureTranslations = {
   approval: {
     asksIn: "asks for your approval · #{{channel}}",
     asksYou: "asks for your approval",
-    highRisk: "High risk",
     expiresIn_one: "expires in {{count}} min",
     expiresIn_other: "expires in {{count}} min",
     refuse: "Decline",
@@ -262,7 +261,7 @@ export const featureKeysEn: FeatureTranslations = {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
-      held: "{{name}} reads it after your decision on the card",
+      held: "{{name}} reads it after your decision",
       read: "{{name}} read it",
       resolved: "{{name}} closed the help request",
       well: "Read your note",
@@ -286,10 +285,6 @@ export const featureKeysEn: FeatureTranslations = {
       back: "Connected again",
     },
     longPressHint: "Hold to react and see more actions",
-    steps_one: "{{count}} step",
-    steps_other: "{{count}} steps",
-    stepsFailed: "Couldn't load the steps.",
-    stepsNone: "Answered without using tools.",
     consult: {
       answered: "{{name}} answered",
       expiredF: "{{name}} didn't answer in time",
@@ -310,8 +305,6 @@ export const featureKeysEn: FeatureTranslations = {
     fileDeleted: "File removed",
     fileFailed: "Couldn't open the file.",
     approval: {
-      asks: "Asks for your OK",
-      see: "See request",
       approved: "Approved: {{title}}",
       refused: "Declined: {{title}}",
       expired: "Expired: {{title}}",

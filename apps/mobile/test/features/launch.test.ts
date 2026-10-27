@@ -48,6 +48,19 @@ describe("launch splash", () => {
     expect(spriteY(s, 0.5, LAUNCH.sky) as number).toBeLessThan(spriteY(s, 0, LAUNCH.sky) as number);
   });
 
+  test("waiting on the person, the sprites rise only above the panel at the bottom", () => {
+    const bottom = 0.6;
+    for (const s of SPRITES)
+      for (let t = 0; t < 30; t += 0.7) {
+        const y = spriteY(s, t, LAUNCH.waitingSky, bottom);
+        expect(y).not.toBeNull();
+        expect(y as number).toBeLessThanOrEqual(bottom);
+        expect(y as number).toBeGreaterThan(1 - LAUNCH.waitingSky + 0.05);
+      }
+    // No room between the sky's top and the panel: none.
+    expect(spriteY(SPRITES[0], 1, LAUNCH.waitingSky, 0.48)).toBeNull();
+  });
+
   test("a sprite blinks for a moment every 3.6 s", () => {
     const s = SPRITES[0];
     const blinks = Array.from({ length: 360 }, (_, i) => spriteBlinks(s, i / 100)).filter(Boolean).length;

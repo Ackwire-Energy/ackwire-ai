@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-10-23",
+  updated: "2026-10-27",
   sections: [
     {
       id: "overview",
@@ -64,7 +64,7 @@ export const privacyEn: LegalDocument = {
             "**Connectors.** When the organization connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the organization gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes go through Composio.",
             "**Databases.** Database connections are read-only; credentials are stored encrypted and each query is checked before it runs.",
             "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through our servers in memory and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
-            "**Cloud computers.** If the organization uses cloud computers for its agents, they run at Daytona and are archived and deleted as described in the app.",
+            "**Cloud computers.** If the organization uses cloud computers for its agents, they run at Daytona and are archived and deleted as described in the app. On the computers we run for your workspace, we count how much data each agent's browser, AI tools and other programs send and receive, per day.",
           ],
         },
         "Actions that are hard to undo (such as merging code, deploying or sending on someone's behalf) become an approval request for a person before they happen. Text that comes from outside the workspace (web pages, emails, files) is marked as untrusted before an agent reads it.",

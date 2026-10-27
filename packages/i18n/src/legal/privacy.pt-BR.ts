@@ -4,7 +4,7 @@ export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
   summary:
     "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu espaço de trabalho e os seus direitos.",
-  updated: "2026-10-23",
+  updated: "2026-10-27",
   sections: [
     {
       id: "overview",
@@ -65,7 +65,7 @@ export const privacyPtBR: LegalDocument = {
             "**Conectores.** Quando a organização conecta um serviço (como GitHub, Google, Linear, Sentry, uma caixa de e-mail ou qualquer servidor MCP), guardamos os tokens de acesso cifrados e lemos ou escrevemos nesse serviço só dentro dos escopos que a organização deu a cada agente. O serviço conectado trata esses dados sob os próprios termos. Conexões com caixas do Gmail e do Outlook passam pela Composio.",
             "**Bancos de dados.** Conexões com bancos de dados são só de leitura; as credenciais ficam cifradas e cada consulta é verificada antes de rodar.",
             "**Computadores conectados.** Quando alguém conecta um computador, os agentes podem rodar comandos e usar um navegador nele, dentro das pastas e permissões definidas nesse computador. A visão ao vivo do navegador de um agente passa pelos nossos servidores em memória e não é gravada; um resumo dos passos que o agente deu (como os endereços visitados e as ações) fica junto do trabalho dele, para a equipe ver o que ele fez.",
-            "**Computadores na nuvem.** Se a organização usa computadores na nuvem para os agentes, eles rodam na Daytona e são arquivados e apagados como o app descreve.",
+            "**Computadores na nuvem.** Se a organização usa computadores na nuvem para os agentes, eles rodam na Daytona e são arquivados e apagados como o app descreve. Nos computadores que mantemos para o seu workspace, contamos o volume de dados que o navegador, as ferramentas de IA e os outros programas de cada agente enviam e recebem, por dia.",
           ],
         },
         "Ações difíceis de desfazer (como fazer merge de código, publicar ou enviar em nome de alguém) viram um pedido de aprovação para uma pessoa antes de acontecer. Texto que vem de fora do espaço de trabalho (páginas da web, e-mails, arquivos) é marcado como não confiável antes de um agente ler.",

@@ -97,10 +97,13 @@ describe("work summary", () => {
     await settle(4);
     expect(asked).toEqual(["r-1"]);
     expect(head.getAttribute("aria-expanded")).toBe("true");
-    expect(head.textContent).toContain("2 passos · himetrica, Drive · 12 s");
-    const work = head.closest(".ac-work") as HTMLElement;
+    // Once loaded, the block's line says how many tools and how long.
+    expect(head.textContent).toContain("Usou 2 ferramentas");
+    expect(head.textContent).toContain("12 s");
+    const work = head.closest(".ac-tools") as HTMLElement;
     expect(within(work).getByText("Consultou o Himetrica")).toBeTruthy();
-    expect(within(work).getByText("Escreveu no Drive")).toBeTruthy();
+    // The one that failed says so, and doesn't read as done.
+    expect(within(work).getByText("Deu erro escrevendo no Drive")).toBeTruthy();
   });
 });
 
