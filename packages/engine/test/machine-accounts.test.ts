@@ -430,26 +430,30 @@ function keyRunner(machineId: string, protocol = PLAN_KEYS_PROTOCOL) {
   };
 }
 
+/** A GLM Coding key the whole way, as the fixture's owner: begin, the sealed key, the poll that finds it done. */
+async function signInKey(runner: ReturnType<typeof keyRunner>, machineId: string, key: string) {
+  const login = await beginAccountLogin(
+    runner.deps,
+    f.owner.id,
+    f.org.id,
+    machineId,
+    "claude_code",
+    undefined,
+    undefined,
+    "zai",
+  );
+  const box = await sealSecret(login.publicKey ?? "", key, accountCodeAad(login.loginId, f.org.id));
+  await sendAccountLoginCode(runner.deps, f.owner.id, f.org.id, machineId, login.loginId, box);
+  return { login, status: await accountLoginStatus(runner.deps, f.owner.id, f.org.id, machineId, login.loginId) };
+}
+
+const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+
 test("a coding plan's key: no sign-in page but the plan's key page, the key sealed to the computer, its last 4 only to its owner", async () => {
   f = await setup();
   const { machineId } = await ownedMachine(PLAN_KEYS_PROTOCOL);
   const runner = keyRunner(machineId);
-  const add = async (key: string) => {
-    const login = await beginAccountLogin(
-      runner.deps,
-      f.owner.id,
-      f.org.id,
-      machineId,
-      "claude_code",
-      undefined,
-      undefined,
-      "zai",
-    );
-    const box = await sealSecret(login.publicKey ?? "", key, accountCodeAad(login.loginId, f.org.id));
-    await sendAccountLoginCode(runner.deps, f.owner.id, f.org.id, machineId, login.loginId, box);
-    return { login, status: await accountLoginStatus(runner.deps, f.owner.id, f.org.id, machineId, login.loginId) };
-  };
-  const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+  const add = (key: string) => signInKey(runner, machineId, key);
   const { login, status } = await add(KEY);
   expect(login).toMatchObject({ kind: "claude_code", provider: "zai", url: "https://z.ai/manage-apikey/apikey-list" });
   expect(runner.calls[0]).toEqual({
@@ -466,9 +470,10 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
   expect(row).toMatchObject({ provider: "zai", keyHint: "MnOp", email: null });
   expect(JSON.stringify(row)).not.toContain("0123456789abcdef");
 
-  // The same key again: refused, and the new one goes.
+  // The same key again: another login of that account (one per agent), under its name. Another key is another.
   const again = await add(KEY);
-  expect(again.status).toMatchObject({ state: "failed", duplicate: { label: "GLM Coding" } });
+  expect(again.status).toMatchObject({ state: "done", account: { label: "GLM Coding", keyHint: "MnOp" } });
+  expect(again.status.account?.id).not.toBe(login.loginId);
   const second = await add(`${KEY.slice(0, -4)}WxYz`);
   expect(second.status.account).toMatchObject({ label: "GLM Coding 2", keyHint: "WxYz" });
 
@@ -478,10 +483,12 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
   expect(seen.map((a) => [a.provider, a.keyHint])).toEqual([
     ["zai", null],
     ["zai", null],
+    ["zai", null],
   ]);
   // The AI accounts page: the caller's own, with where each is; the computers they can add to.
   const page = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
   expect(page.accounts.map((a) => [a.label, a.computer, a.keyHint])).toEqual([
+    ["GLM Coding", "mac", "MnOp"],
     ["GLM Coding", "mac", "MnOp"],
     ["GLM Coding 2", "mac", "WxYz"],
   ]);
@@ -676,6 +683,110 @@ test("the same email twice for one owner on one computer is refused, and the new
     state: "done",
     account: { label: "Claude Pro" },
   });
+});
+
+/** A runner where ChatGPT signs in with a device code at once, as `email`. */
+function codexRunner(machineId: string, email: string) {
+  return fakeHub(machineId, (req) => {
+    if (req.action === "begin") return { url: "https://auth.openai.com/codex/device", userCode: "ABCD-1234" };
+    if (req.action === "status") {
+      return { state: "done", account: { id: req.loginId, kind: "codex", loggedIn: true, email, plan: "plus" } };
+    }
+    return {};
+  });
+}
+
+test("one login per agent where the account allows it: a key's logins share its name, each thinks for one agent, and a rename renames them all, never another account named alike", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(PLAN_KEYS_PROTOCOL);
+  const runner = keyRunner(machineId);
+  const signedIn = async (key: string) => {
+    const { account } = (await signInKey(runner, machineId, key)).status;
+    if (!account) throw new Error("not signed in");
+    return account;
+  };
+  const ada = await signedIn(KEY);
+  const theo = await signedIn(KEY);
+  const other = await signedIn(`${KEY.slice(0, -4)}WxYz`);
+  expect([ada.label, theo.label, other.label]).toEqual(["GLM Coding", "GLM Coding", "GLM Coding 2"]);
+  expect([ada.keyHint, theo.keyHint]).toEqual(["MnOp", "MnOp"]);
+
+  // Each login thinks for one agent.
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", name: "Ada" })
+    .where(eq(schema.agents.id, f.agent.id));
+  const [theoAgent] = await f.db
+    .insert(schema.agents)
+    .values({
+      orgId: f.org.id,
+      name: "Theo",
+      handle: "theo",
+      model: "claude-sonnet-5-5",
+      ownerUserId: f.owner.id,
+      machineId,
+      brain: "claude_code",
+    })
+    .returning();
+  if (!theoAgent) throw new Error("no agent");
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { account: ada.id });
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, theoAgent.id, { account: theo.id });
+  const listed = await listMachineAccounts({ db: f.db }, f.org.id, machineId, f.owner.id);
+  expect(listed.map((a) => [a.id, a.usedBy])).toEqual([
+    [ada.id, ["Ada"]],
+    [theo.id, ["Theo"]],
+    [other.id, []],
+  ]);
+
+  // The other key named alike, then the account renamed from one of its logins: both of its logins, and only them.
+  await renameMachineAccount(runner.deps, f.owner.id, f.org.id, machineId, other.id, "Equipe");
+  await renameMachineAccount(runner.deps, f.owner.id, f.org.id, machineId, theo.id, "Equipe");
+  await renameMachineAccount(runner.deps, f.owner.id, f.org.id, machineId, ada.id, "Time");
+  const labels = async () => Object.fromEntries((await accountRows(machineId)).map((r) => [r.id, r.label]));
+  expect(await labels()).toEqual({ [ada.id]: "Time", [theo.id]: "Time", [other.id]: "Equipe" });
+  // One audit entry per login renamed.
+  const renamed = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "account.renamed"));
+  const entry = (id: string, from: string, to: string) => `${id} on ${machineId}: ${from} > ${to}`;
+  const entries = renamed.map((a) => {
+    const d = a.details as Record<string, string>;
+    return `${a.targetId} on ${d.machineId}: ${d.from} > ${d.to}`;
+  });
+  expect(entries.sort()).toEqual(
+    [
+      entry(other.id, "GLM Coding 2", "Equipe"),
+      entry(ada.id, "GLM Coding", "Equipe"),
+      entry(theo.id, "GLM Coding", "Equipe"),
+      entry(ada.id, "Equipe", "Time"),
+      entry(theo.id, "Equipe", "Time"),
+    ].sort(),
+  );
+
+  // The computer signed the same key in by itself (the desktop app): one more login, under the account's name.
+  const DESKTOP_ID = "0193dddd-0000-4000-8000-000000000010";
+  const report = (id: string, keyHint: string) => ({
+    id,
+    kind: "claude_code" as const,
+    loggedIn: true,
+    provider: "zai",
+    keyHint,
+  });
+  const remove = await syncMachineAccounts({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, [
+    report(ada.id, "MnOp"),
+    report(theo.id, "MnOp"),
+    report(other.id, "WxYz"),
+    report(DESKTOP_ID, "MnOp"),
+  ]);
+  expect(remove).toEqual([]);
+  expect(await accountRow(DESKTOP_ID)).toMatchObject({ label: "Time", createdBy: f.owner.id, status: "active" });
+
+  // ChatGPT's and Claude's sign-ins stay one per account: the same ChatGPT account again is refused.
+  const chatgpt = codexRunner(machineId, "ana@example.com");
+  const signInChatGpt = async () => {
+    const login = await beginAccountLogin(chatgpt.deps, f.owner.id, f.org.id, machineId, "codex");
+    return accountLoginStatus(chatgpt.deps, f.owner.id, f.org.id, machineId, login.loginId);
+  };
+  expect(await signInChatGpt()).toMatchObject({ state: "done", account: { label: "ChatGPT Plus" } });
+  expect(await signInChatGpt()).toMatchObject({ state: "failed", duplicate: { label: "ChatGPT Plus" } });
 });
 
 test("rename and remove: the owner renames; the owner or the pairer removes; offline, a tombstone until the next hello", async () => {
