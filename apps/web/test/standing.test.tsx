@@ -165,6 +165,21 @@ describe("a billing hold (ADR 0071): its own words, and its fix for whoever runs
       "Ada não respondeu. Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
     );
   });
+
+  test("an invitation to a workspace on one says the hold's words, never its code", async () => {
+    const state = seedState({ previews: { held: { orgName: "Acme", email: "walter@acme.com.br", role: "member" } } });
+    const api = createFakeApi(state);
+    api.orgs.acceptInvitation = async () => {
+      throw new ApiError(403, "org.paused", "This workspace is on hold: unpaid", { reason: "unpaid" });
+    };
+    await renderApp("/invite/held", { api });
+    await settle(4);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Aceitar e entrar na Acme" })));
+    await settle(4);
+    expect(screen().getByRole("alert").textContent).toBe(
+      "O pagamento do plano do agentes.chat deste workspace não passou, e os agentes pararam.",
+    );
+  });
 });
 
 describe("suspended: a screen of its own", () => {

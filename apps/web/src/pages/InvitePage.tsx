@@ -1,6 +1,6 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { invitationQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
-import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, knownErrorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { ANSWER_POLL_MS, askView, JOIN_NAME_MAX, JOIN_NOTE_MAX } from "@agenteschat/client/lib/join-requests";
@@ -20,7 +20,7 @@ import "./invite.css";
 
 /** An invitation, valid or expired; an invitation link only lets people ask to join (`AskToJoin`). */
 export function InvitePage({ token }: { token: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const api = useApi();
   const auth = useAuth();
   const qc = useQueryClient();
@@ -44,9 +44,8 @@ export function InvitePage({ token }: { token: string }) {
         // Full: the person invited can only ask whoever invited them to make room.
         errorCode(e) === "org.members_full"
           ? t("errors.org.membersFull")
-          : e instanceof Error
-            ? e.message
-            : t("common.unknownError"),
+          : // A known code in the person's words (a hold's code never as it comes), else the server's own.
+            (knownErrorText(t, e, i18n.language) ?? (e instanceof Error ? e.message : t("common.unknownError"))),
       ),
   });
 
