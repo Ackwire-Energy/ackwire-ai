@@ -190,9 +190,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   {view.canUsePlans && view.canManageAccounts ? (
                     <GroupedRow
                       icon="plus"
-                      label={
-                        signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount")
-                      }
+                      label={signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount")}
                       onPress={connect}
                     />
                   ) : null}
