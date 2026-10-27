@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { OrgStanding } from "../api/types";
+import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
 
 /**
@@ -75,6 +76,7 @@ const KNOWN = {
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
   "audience.plan_terms_required": "aiAccounts.errors.planTermsRequired",
   "org.create_refused": "standing.createRefused",
+  "org.create_unpaid": "standing.createUnpaid",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",
@@ -96,8 +98,8 @@ const STANDING_REFUSALS = {
 
 /**
  * A refusal by the workspace's standing in the person's words, with the reason when the workspace is told
- * one: the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`… Null for any
- * other code.
+ * one: the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`… A billing hold's
+ * code is said in words of its own, never as the reason. Null for any other code.
  */
 export function standingRefusalText(
   t: TFunction,
@@ -108,6 +110,8 @@ export function standingRefusalText(
   const keys = plain ? STANDING_REFUSALS[plain as keyof typeof STANDING_REFUSALS] : undefined;
   if (!keys) return null;
   const reason = typeof params?.reason === "string" ? params.reason.trim() : "";
+  const billing = plain === "org.paused" ? billingHoldOf({ state: "hold", reason }) : null;
+  if (billing) return t(`standing.billing.${billing}`);
   return reason ? t(keys[1], { reason }) : t(keys[0]);
 }
 

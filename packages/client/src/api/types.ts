@@ -36,7 +36,19 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
+  /** The billing service (ADR 0071): owners and admins open a workspace's plan there; null or absent: no billing. */
+  billingUrl?: string | null;
 }
+
+/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0071). */
+export type BillingFrom =
+  | "settings"
+  | "hold"
+  | "onboarding"
+  | "new_workspace"
+  | "invite_full"
+  | "upload_full"
+  | "storage";
 
 export type SignInProvider = "google" | "github" | "apple";
 
@@ -3899,6 +3911,8 @@ export interface NotificationLatest {
   quote?: string;
   statusFrom?: string;
   statusTo?: string;
+  /** `org_standing`: the billing hold put on (ADR 0071), in place of `text`. */
+  billingHold?: string;
   /** Missions and routines. */
   steps?: { done: number; total: number; failedAt?: number };
   /** An agent's question with options. */

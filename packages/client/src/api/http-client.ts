@@ -344,6 +344,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
       setLogo: (orgId, input) => request<{ logo: string }>(`${org(orgId)}/logo`, { method: "PUT", json: input }),
       removeLogo: (orgId) => request<void>(`${org(orgId)}/logo`, { method: "DELETE" }),
+      billingLink: (orgId, from) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from } }),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,

@@ -178,6 +178,8 @@ export interface FakeState {
   holdPosts?: Promise<void>;
   /** Make `waitlist.join` fail with this error (429, 400…). */
   waitlistError?: ApiError;
+  /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
+  billingLinkError?: ApiError;
   /** Make `waitlist.confirm` fail with this error (invalid_token…). */
   waitlistConfirmError?: ApiError;
   /** `agents.aiStatus`; unset = every agent ready. */
@@ -838,6 +840,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       removeLogo: async (orgId) => {
         log("orgs.removeLogo", orgId);
         setOrgLogo(orgId, null);
+      },
+      billingLink: async (orgId, from) => {
+        log("orgs.billingLink", orgId, from);
+        if (state.billingLinkError) throw state.billingLinkError;
+        return { url: `https://billing.example.com/link?t=${from}`, expiresAt: NOW.toISOString() };
       },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
