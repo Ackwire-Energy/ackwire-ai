@@ -42,23 +42,34 @@ import {
   markFinishing,
   stateOf,
 } from "./logic";
+import { Problem } from "./Problem";
+import { ADDRESS_STEPS, CATALOG_STEPS, firstStep, STEP_KEYS, type Step } from "./review";
+import { ReviewStep } from "./ToolReview";
 
 /** Where the browser brings the answer back (APP_OAUTH_REDIRECT on the server). */
 const RETURN_URL = "agenteschat://connectors/oauth";
 
-type Step = "about" | "connect" | "who";
-
 /**
- * One service in a sheet over the gallery, in three steps: what agents could
- * do there (what always asks marked "pede sua aprovação") → connect (sign in in the browser and come back,
- * or paste a key) → who uses it and how far. A connected one opens on who uses it (`item`: that connection,
- * when the service is connected more than once).
+ * One service in a sheet over the gallery, in four steps as on the web: what agents could do there (what
+ * always asks marked "pede sua aprovação") → connect (sign in in the browser and come back, or paste a key) →
+ * its tools ("O que faz") → who uses it and how far. A connected one opens on who uses it, or on its tools while
+ * they wait for a review (`item`: that connection, when the service is connected more than once; `start`, back
+ * from a sign-in that finished elsewhere, with `fresh` saying it just connected).
  */
-export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: ConnectedItem }) {
+export function ConnectSheet({
+  def,
+  item,
+  start,
+  fresh = false,
+}: {
+  def: ConnectorDef;
+  item?: ConnectedItem;
+  start?: Step;
+  fresh?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const { org } = useOrg();
-  const sheet = useSheet();
   const orgId = useOrgId();
   const catalog = useCatalog();
   const connections = useConnections(orgId);
@@ -68,9 +79,9 @@ export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: Connecte
     item ??
     connectionOf(def, connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]));
   const [connectionId, setConnectionId] = useState<string | null>(existing?.id ?? null);
-  const [step, setStep] = useState<Step>(existing ? "who" : "about");
-  // Connected in this sheet: it says so on top of who uses it (the list catching up must not take that away).
-  const [justConnected, setJustConnected] = useState(false);
+  const [step, setStep] = useState<Step>(() => firstStep(existing, admin, start));
+  // Connected in this sheet: it says so on top of its tools (the list catching up must not take that away).
+  const [justConnected, setJustConnected] = useState(fresh);
   const name = connectorName(t, def);
   const tr = t as unknown as (key: string) => string;
   const lines = capabilityLines(
@@ -79,7 +90,6 @@ export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: Connecte
     def,
     (s) => scopeText(t, s).label,
   );
-  const index = step === "about" ? 0 : step === "connect" ? 1 : 2;
   return (
     <View style={styles.body}>
       <View style={styles.head}>
@@ -91,7 +101,7 @@ export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: Connecte
           </Text>
         </View>
       </View>
-      <Progress index={index} />
+      <Progress steps={CATALOG_STEPS} step={step} />
       {step === "about" ? (
         <>
           <Text variant="footnote" tone="faint" style={styles.label}>
@@ -122,28 +132,19 @@ export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: Connecte
           onConnected={(id) => {
             setConnectionId(id);
             setJustConnected(true);
-            setStep("who");
+            setStep("review");
           }}
         />
       ) : connectionId ? (
-        <>
-          {justConnected ? (
-            <ConnectedNote name={name} />
-          ) : (
-            <Text variant="body" style={styles.bold}>
-              {t("mobile.connectors.whoTitle")}
-            </Text>
-          )}
-          <AgentLevels connectionId={connectionId} />
-          {def.kind === "remote_mcp" ? (
-            <Text variant="small" tone="muted">
-              {t("mobile.connectors.reviewOnComputer")}
-            </Text>
-          ) : null}
-          <SafeNote />
-          <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
-          {admin && existing ? <DisconnectButton item={existing} name={name} /> : null}
-        </>
+        <ConnectedSteps
+          step={step}
+          onStep={setStep}
+          connectionId={connectionId}
+          def={def}
+          name={name}
+          justConnected={justConnected}
+          item={existing}
+        />
       ) : null}
     </View>
   );
@@ -153,7 +154,7 @@ export function ConnectSheet({ def, item }: { def: ConnectorDef; item?: Connecte
 export function AddressSheet() {
   const { t } = useTranslation();
   const [connected, setConnected] = useState<{ id: string; name: string } | null>(null);
-  const sheet = useSheet();
+  const [step, setStep] = useState<Step>("connect");
   return (
     <View style={styles.body}>
       <View style={styles.head}>
@@ -165,32 +166,39 @@ export function AddressSheet() {
           </Text>
         </View>
       </View>
+      <Progress steps={ADDRESS_STEPS} step={step} />
       {connected ? (
-        <>
-          <ConnectedNote name={connected.name} />
-          <AgentLevels connectionId={connected.id} />
-          <Text variant="small" tone="muted">
-            {t("mobile.connectors.reviewOnComputer")}
-          </Text>
-          <SafeNote />
-          <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
-        </>
+        <ConnectedSteps
+          step={step}
+          onStep={setStep}
+          connectionId={connected.id}
+          def={null}
+          name={connected.name}
+          justConnected
+        />
       ) : (
-        <ConnectStep def={null} name="" onConnected={(id, name) => setConnected({ id, name })} />
+        <ConnectStep
+          def={null}
+          name=""
+          onConnected={(id, name) => {
+            setConnected({ id, name });
+            setStep("review");
+          }}
+        />
       )}
     </View>
   );
 }
 
 /**
- * A server connected by its address that isn't in the catalog: its name and address, who uses it and how
- * far, and disconnecting it (its tools are reviewed on the computer).
+ * A server connected by its address that isn't in the catalog: its name and address, then its tools and who
+ * uses it (the same steps as connecting it), and disconnecting it.
  */
-export function ServerSheet({ item }: { item: ConnectedItem }) {
+export function ServerSheet({ item, start, fresh = false }: { item: ConnectedItem; start?: Step; fresh?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const sheet = useSheet();
   const admin = can(org?.role, "configure");
+  const [step, setStep] = useState<Step>(() => firstStep(item, admin, start));
   const name = itemName(t, item);
   return (
     <View style={styles.body}>
@@ -207,19 +215,86 @@ export function ServerSheet({ item }: { item: ConnectedItem }) {
           ) : null}
         </View>
       </View>
+      <Progress steps={ADDRESS_STEPS} step={step} />
+      <ConnectedSteps
+        step={step}
+        onStep={setStep}
+        connectionId={item.id}
+        def={item.def}
+        name={name}
+        justConnected={fresh}
+        item={item}
+      />
+    </View>
+  );
+}
+
+/**
+ * After connecting, the web's last two steps: its tools ("O que faz", then Continuar) and who uses it (one level
+ * per agent). Admins go back to the tools from who uses it, as the web's "Ferramentas" (or "Revisar" while they
+ * wait); anyone else is told when they still wait for an admin.
+ */
+function ConnectedSteps({
+  step,
+  onStep,
+  connectionId,
+  def,
+  name,
+  justConnected,
+  item,
+}: {
+  step: Step;
+  onStep: (step: Step) => void;
+  connectionId: string;
+  def: ConnectorDef | null;
+  name: string;
+  justConnected: boolean;
+  /** The connection as it was opened (the live lists win once they have it). */
+  item?: ConnectedItem;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const sheet = useSheet();
+  const orgId = useOrgId();
+  const catalog = useCatalog();
+  const connections = useConnections(orgId);
+  const servers = useCustomServers(orgId);
+  const admin = can(org?.role, "configure");
+  const live =
+    connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []).find(
+      (i) => i.id === connectionId,
+    ) ?? item;
+  if (step === "review") {
+    return (
+      <>
+        {justConnected ? <ConnectedNote name={name} /> : null}
+        <ReviewStep connectionId={connectionId} def={def} name={name} onNext={() => onStep("who")} />
+      </>
+    );
+  }
+  return (
+    <>
       <Text variant="body" style={styles.bold}>
         {t("mobile.connectors.whoTitle")}
       </Text>
-      <AgentLevels connectionId={item.id} />
-      {item.needsReview ? (
+      <AgentLevels connectionId={connectionId} />
+      {live?.needsReview && !admin ? (
         <Text variant="small" tone="muted">
-          {t("mobile.connectors.reviewOnComputer")}
+          {t("mobile.connectors.review.waiting")}
         </Text>
       ) : null}
       <SafeNote />
       <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
-      {admin ? <DisconnectButton item={item} name={name} /> : null}
-    </View>
+      {admin ? (
+        <Button
+          variant="ghost"
+          wide
+          label={live?.needsReview ? t("connectors.review") : t("connectors.tools")}
+          onPress={() => onStep("review")}
+        />
+      ) : null}
+      {admin && live ? <DisconnectButton item={live} name={name} /> : null}
+    </>
   );
 }
 
@@ -287,26 +362,6 @@ function ConnectedNote({ name }: { name: string }) {
           {t("mobile.connectors.connectedSub")}
         </Text>
       </View>
-    </Animated.View>
-  );
-}
-
-/** What went wrong, in the sheet itself (a toast would sit under it). */
-function Problem({ text }: { text: string }) {
-  const { colors, reducedMotion } = useTheme();
-  return (
-    <Animated.View
-      entering={reducedMotion ? undefined : FadeIn.duration(180)}
-      accessibilityRole="alert"
-      accessibilityLiveRegion="polite"
-      style={[styles.note, styles.notice, { borderColor: colors.line }]}
-    >
-      <View style={[styles.badge, { backgroundColor: colors.danger }]}>
-        <Icon name="x" size={16} color="#ffffff" />
-      </View>
-      <Text variant="small" style={styles.grow}>
-        {text}
-      </Text>
     </Animated.View>
   );
 }
@@ -607,14 +662,23 @@ function SafeNote() {
   );
 }
 
-/** Three dashes: where the flow is (about, connect, who). */
-function Progress({ index }: { index: number }) {
+/** One dash per step, the ones done and the current in ink (`step`: "Passo 3 de 4: O que faz"). */
+function Progress({ steps, step }: { steps: Step[]; step: Step }) {
   const { t } = useTranslation();
   const c = useColors();
+  const index = steps.indexOf(step);
   return (
-    <View style={styles.progress} accessible accessibilityLabel={t("mobile.connectors.step", { n: index + 1 })}>
-      {[0, 1, 2].map((i) => (
-        <View key={i} style={[styles.dash, { backgroundColor: i <= index ? c.ink : c.line2 }]} />
+    <View
+      style={styles.progress}
+      accessible
+      accessibilityLabel={t("mobile.connectors.step", {
+        n: index + 1,
+        total: steps.length,
+        label: t(STEP_KEYS[step]),
+      })}
+    >
+      {steps.map((s, i) => (
+        <View key={s} style={[styles.dash, { backgroundColor: i <= index ? c.ink : c.line2 }]} />
       ))}
     </View>
   );
@@ -646,7 +710,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  // A neutral card with a colored badge: the outcome of connecting (done, or what went wrong).
+  // A neutral card with a colored badge: the outcome of connecting (`Problem` draws what went wrong the same).
   notice: {
     alignItems: "center",
     gap: 12,

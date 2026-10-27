@@ -72,3 +72,46 @@ export function planState(
   const until = full.length > 0 && resets.length === full.length ? (resets.sort().at(-1) ?? null) : null;
   return { state: "limited", until, used };
 }
+
+/** What `limitOffers` reads of an AI account (the API's `MachineAccount`). */
+export interface OfferAccount {
+  id: string;
+  kind: string;
+  /** A coding plan's maker; null: the CLI's own sign-in. */
+  provider: string | null;
+  mine: boolean;
+  status: string;
+  usedBy: readonly string[];
+  usage: PlanMeterUsage | null;
+}
+
+/**
+ * At the limit, the owner's other accounts that could think instead: of the
+ * same kind and plan maker (another maker's models would think instead),
+ * signed in, not at their own limit and free. One another agent thinks with
+ * is never offered (an account serves one agent; moving plans between agents
+ * to dodge a limit isn't). Most headroom first, unknown usage last. Shared by
+ * the web's and the phone's agent settings.
+ */
+export function limitOffers<A extends OfferAccount>(
+  accounts: readonly A[],
+  kind: string,
+  current: string | null,
+  now = Date.now(),
+): { account: A; used: number | null }[] {
+  const provider = accounts.find((a) => a.id === current)?.provider ?? null;
+  return accounts
+    .filter(
+      (a) =>
+        a.mine &&
+        a.kind === kind &&
+        (a.provider ?? null) === provider &&
+        a.id !== current &&
+        a.status === "active" &&
+        a.usedBy.length === 0,
+    )
+    .map((account) => ({ account, plan: account.usage ? planState(account.usage, now) : null }))
+    .filter((o) => o.plan?.state !== "limited")
+    .map((o) => ({ account: o.account, used: o.plan?.used ?? null }))
+    .sort((a, b) => (a.used ?? 101) - (b.used ?? 101));
+}

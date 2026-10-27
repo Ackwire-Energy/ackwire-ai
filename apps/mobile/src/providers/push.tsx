@@ -1,3 +1,5 @@
+import { type AiStatus, keys, useApi } from "@agenteschat/client";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from "react";
@@ -42,6 +44,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const setOrgRef = useRef(setOrgId);
   setOrgRef.current = setOrgId;
   const locale = i18n.language;
+  const api = useApi();
+  const qc = useQueryClient();
 
   const ask = useCallback(() => registerForPush({ ask: true, locale }), [locale]);
 
@@ -79,9 +83,23 @@ export function PushProvider({ children }: { children: ReactNode }) {
       if (opened.has(id)) return;
       opened.add(id);
       const data = readPushData(response.notification.request.content.data);
-      if (data.orgId) setOrgRef.current?.(data.orgId);
-      const href = hrefForPush(data);
-      setTimeout(() => router.push(href), 0);
+      const orgId = data.orgId;
+      if (orgId) setOrgRef.current?.(orgId);
+      // The computer being ready opens Connect an AI while no agent has one: its AI status is asked first.
+      const ai: Promise<AiStatus | undefined> =
+        data.kind === "computer_ready" && orgId
+          ? qc
+              .fetchQuery({
+                queryKey: keys.aiStatus(orgId),
+                queryFn: () => api.agents.aiStatus(orgId),
+                staleTime: 30_000,
+              })
+              .catch(() => undefined)
+          : Promise.resolve(undefined);
+      void ai.then((status) => {
+        const href = hrefForPush(data, status);
+        setTimeout(() => router.push(href), 0);
+      });
     };
     try {
       open(Notifications.getLastNotificationResponse());
@@ -90,7 +108,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
     }
     const sub = Notifications.addNotificationResponseReceivedListener(open);
     return () => sub.remove();
-  }, [ready]);
+  }, [ready, api, qc]);
 
   const value = useMemo(() => ({ ask }), [ask]);
   return <PushContext.Provider value={value}>{children}</PushContext.Provider>;

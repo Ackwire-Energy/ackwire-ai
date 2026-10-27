@@ -2,9 +2,11 @@ import type { MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useComputerSetup, useMachines } from "@agenteschat/client";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AiChoice,
+  firstAgent,
+  gateDims,
   KEY_MARKS,
   kindOf,
   type PlanChoice,
@@ -17,47 +19,34 @@ import {
 import { isPlanId, PLAN_IDS } from "@agenteschat/client/lib/plans";
 import { keyLooksValid, PROVIDERS, providerOf, providersForKey } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Clipboard from "expo-clipboard";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ActionSheetIOS,
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
+import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 import {
   Button,
-  fieldText,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
   GroupedRow,
   Icon,
   type IconName,
-  InkOrbit,
   ProviderLogo,
   ProviderQuad,
   Text,
   useTheme,
   useToast,
 } from "@/ui";
-import { setupLine } from "../computer/logic";
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
-import { offersKeyNow } from "./logic";
-import { useAiOrg, useInWorkspace } from "./org";
-import { Note, openPage } from "./parts";
+import { offersKeyNow, PLAN_POLL_MS, pollsPlan } from "./logic";
+import { useAiOrg } from "./org";
+import { Note, OpenPage, PasteField, Step, StepsCard } from "./parts";
 
 /*
- * "Conectar uma IA" on the phone (ConectarIA A · Ajustes, approved 2026-10-26): the web's content and rules
+ * "Conectar uma IA" on the phone: the web's content and rules
  * (ADR 0059, ADR 0061) in the app's own line. The first page is two grouped lists like iOS Settings: your AI plan
  * (Claude, ChatGPT, the coding plans in one row) and pay as you go (the API key). Each row pushes its page inside
  * the sheet: a plan's mark, for which agent, and its numbered steps on the agent's computer (or why they wait); the
@@ -65,26 +54,49 @@ import { Note, openPage } from "./parts";
  * none, "Conectar um computador", and the key stays one tap away.
  */
 
-/** What each plan can do now for one agent (`planGate`), from its brain view, its computer's row and the setup. */
+/**
+ * What each plan can do now for one agent (`planGate`), from its brain view, its computer's row and the setup.
+ * `poll`: asked again this often while a plan waits (the first run opens no socket, so nothing else keeps them
+ * current there).
+ */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
   const brain = useAgentBrain(orgId, agentId ?? "", agentId !== undefined, poll);
   const ai = useAiAccounts(orgId, agentId !== undefined, poll);
-  const setupQ = useComputerSetup(orgId);
+  const setupQ = useComputerSetup(orgId, true, poll);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const view = brain.data;
   const row = ai.data?.computers.find((c) => c.machineId === view?.computer?.machineId);
+  // Once ready, the workspace's computer is every agent's: a view from before that still has none is asked again
+  // now with the accounts (a coding plan reads that computer's row there), not at their next poll. Until both
+  // answers are in, every plan reads as ready with its sign-in loading, as the rest of the page says ready.
+  const behind = edition === "cloud" && setup?.phase === "ready" && view !== undefined && !view.computer;
+  const [asking, setAsking] = useState(false);
+  const { refetch: brainAgain } = brain;
+  const { refetch: accountsAgain } = ai;
+  useEffect(() => {
+    if (!behind) return;
+    setAsking(true);
+    void Promise.allSettled([brainAgain(), accountsAgain()]).then(() => setAsking(false));
+  }, [behind, brainAgain, accountsAgain]);
+  const catching = behind || asking;
+  // A plan's page waited for that computer: once it's ready, it says so whenever a plan's page shows again
+  // (another plan, the key's page and back). Kept here, above the pages.
+  const [waited, setWaited] = useState(false);
+  const markWaited = useCallback(() => setWaited(true), []);
   const gateOf = (choice: PlanChoice): PlanGate =>
-    planGate({
-      choice,
-      edition,
-      setup,
-      // A coding plan also needs to know whether that computer takes a plan's key.
-      brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
-      computer: row,
-    });
+    catching
+      ? { state: "ready" }
+      : planGate({
+          choice,
+          edition,
+          setup,
+          // A coding plan also needs to know whether that computer takes a plan's key.
+          brain: view && (ai.data || !isPlanId(choice)) ? view : undefined,
+          computer: row,
+        });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, failed: brain.isError && !view, edition };
+  return { gateOf, view, failed: brain.isError && !view, edition, waited, markWaited, catching };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -127,11 +139,34 @@ export interface ConnectAiFlowProps {
   sheetTitle?: string;
 }
 
-/** The whole flow: its head and the page it is on. */
+/**
+ * The whole flow: its head and the page it is on. The agent a plan is for and what each plan can do for it live
+ * here, above the pages: the first page dims a plan that can't sign in there, and a plan's page that waited for the
+ * computer says it's ready when it shows again.
+ */
 export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
-  const { view, onView, sheetTitle } = props;
+  const { orgId } = useAiOrg();
+  const { view, onView, sheetTitle, agents, hasAi, startAgentId, locked } = props;
+  // Only a pick is kept; else the first agent is worked out on each render (the agents may load after this opens).
+  const [pickedAgent, setPickedAgent] = useState<string>();
+  const agentId = locked ? undefined : (pickedAgent ?? firstAgent(agents, hasAi, startAgentId)?.id);
+  const [polls, setPolls] = useState(false);
+  const gates = usePlanGates(orgId, agentId, polls ? PLAN_POLL_MS : false);
+  const shown = gates.gateOf(view.page === "plan" ? view.choice : "claude").state;
+  useEffect(() => setPolls(agentId !== undefined && pollsPlan(shown)), [agentId, shown]);
+  const { markWaited } = gates;
+  const onPlan = view.page === "plan";
+  useEffect(() => {
+    if (onPlan && shown === "preparing") markWaited();
+  }, [onPlan, shown, markWaited]);
+  const dims = (choice: PlanChoice) => agentId !== undefined && gateDims(gates.gateOf(choice));
+  const go = (next: FlowView) => {
+    // Another plan moves on to the next agent with no AI once this one thinks with a plan from here.
+    if (next.page === "plan" && pickedAgent !== undefined && hasAi(pickedAgent)) setPickedAgent(undefined);
+    onView(next);
+  };
   const to: FlowView | null =
     view.page === "home" ? null : view.page === "plan" && isPlanId(view.choice) ? { page: "coding" } : { page: "home" };
   const title =
@@ -145,9 +180,9 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
   return (
     <>
       {sheetTitle !== undefined ? (
-        <SheetHeader title={title} icon={to ? "back" : "x"} {...(to ? { onPress: () => onView(to) } : {})} />
+        <SheetHeader title={title} icon={to ? "back" : "x"} {...(to ? { onPress: () => go(to) } : {})} />
       ) : to ? (
-        <Pressable onPress={() => onView(to)} accessibilityRole="button" style={styles.backRow} hitSlop={8}>
+        <Pressable onPress={() => go(to)} accessibilityRole="button" style={styles.backRow} hitSlop={8}>
           <Icon name="back" size={16} color={c.muted} />
           <Text variant="subhead" tone="muted" style={styles.bold}>
             {t("mobile.common.back")}
@@ -155,11 +190,19 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
         </Pressable>
       ) : null}
       {view.page === "home" ? (
-        <Home onView={onView} />
+        <Home onView={go} dims={dims} />
       ) : view.page === "coding" ? (
-        <Coding onView={onView} />
+        <Coding onView={go} dims={dims} />
       ) : view.page === "plan" ? (
-        <PlanPage key={view.choice} {...props} choice={view.choice} />
+        <PlanPage
+          key={view.choice}
+          {...props}
+          onView={go}
+          choice={view.choice}
+          gates={gates}
+          agentId={agentId}
+          onAgent={setPickedAgent}
+        />
       ) : (
         <KeyPage {...props} />
       )}
@@ -167,8 +210,8 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
   );
 }
 
-/** The first page: your AI plan, then pay as you go. */
-function Home({ onView }: { onView: (v: FlowView) => void }) {
+/** The first page: your AI plan, then pay as you go. A plan that can't sign in on the agent's computer is dimmed. */
+function Home({ onView, dims }: { onView: (v: FlowView) => void; dims: (choice: PlanChoice) => boolean }) {
   const { t } = useTranslation();
   return (
     <View>
@@ -177,7 +220,7 @@ function Home({ onView }: { onView: (v: FlowView) => void }) {
         {(["claude", "chatgpt"] as const).map((c) => (
           <GroupedRow
             key={c}
-            leading={<ProviderLogo id={planMark(c)} size="sm" />}
+            leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
             label={planLabel(t, c)}
             sub={t(`connectAi.plan.${c}.tiers`)}
             chevron
@@ -185,7 +228,7 @@ function Home({ onView }: { onView: (v: FlowView) => void }) {
           />
         ))}
         <GroupedRow
-          leading={<ProviderQuad ids={CODING_MARKS} />}
+          leading={<ProviderQuad ids={CODING_MARKS} off={PLAN_IDS.every(dims)} />}
           label={t("mobile.ai.coding")}
           sub={t("mobile.ai.codingSub")}
           chevron
@@ -209,7 +252,7 @@ function Home({ onView }: { onView: (v: FlowView) => void }) {
 }
 
 /** The four coding plans. */
-function Coding({ onView }: { onView: (v: FlowView) => void }) {
+function Coding({ onView, dims }: { onView: (v: FlowView) => void; dims: (choice: PlanChoice) => boolean }) {
   const { t } = useTranslation();
   return (
     <View>
@@ -218,7 +261,7 @@ function Coding({ onView }: { onView: (v: FlowView) => void }) {
         {PLAN_IDS.map((c) => (
           <GroupedRow
             key={c}
-            leading={<ProviderLogo id={planMark(c)} size="sm" />}
+            leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
             label={planLabel(t, c)}
             sub={t(`connectAi.plan.${c}.tiers`)}
             chevron
@@ -261,22 +304,24 @@ function InfoCard({ icon, children, action }: { icon: IconName; children: ReactN
 }
 
 /** One plan's page: its mark, for which agent, then its steps on the agent's computer. */
-function PlanPage(props: ConnectAiFlowProps & { choice: PlanChoice }) {
+function PlanPage(
+  props: ConnectAiFlowProps & {
+    choice: PlanChoice;
+    gates: PlanGates;
+    agentId: string | undefined;
+    onAgent: (id: string) => void;
+  },
+) {
   const { t } = useTranslation();
-  const { orgId } = useAiOrg();
   const { colors: c } = useTheme();
-  const { choice, agents, hasAi, startAgentId, locked, onView } = props;
-  const [picked, setPicked] = useState<string>();
-  const first = agents.find((a) => a.id === startAgentId) ?? agents.find((a) => !hasAi(a.id)) ?? agents[0];
-  const agentId = picked ?? first?.id;
+  const { choice, agents, locked, onView, gates, agentId, onAgent } = props;
   const agent = agents.find((a) => a.id === agentId);
-  const gates = usePlanGates(orgId, agentId);
-  const [done, setDone] = useState<{ agent: string; label: string } | null>(null);
+  const [done, setDone] = useState<{ agentId: string; agent: string; label: string } | null>(null);
   const pick = () => {
     const names = agents.map((a) => a.name);
     const choose = (i: number) => {
       const a = agents[i];
-      if (a) setPicked(a.id);
+      if (a) onAgent(a.id);
     };
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -290,10 +335,10 @@ function PlanPage(props: ConnectAiFlowProps & { choice: PlanChoice }) {
       ]);
     }
   };
-  if (done && agent) {
+  if (done) {
     return (
       <View style={styles.done}>
-        <AgentFace agentId={agent.id} size={64} live={false} />
+        <AgentFace agentId={done.agentId} size={64} live={false} />
         <Text variant="title2" tone="ink" style={styles.center}>
           {t("aiAccounts.done.savedAgent", { agent: done.agent, label: done.label })}
         </Text>
@@ -333,7 +378,9 @@ function PlanPage(props: ConnectAiFlowProps & { choice: PlanChoice }) {
             onComputer={props.onComputer}
             onKey={() => onView({ page: "key" })}
             onDone={(account) => {
-              setDone({ agent: agent.name, label: account?.label ?? planLabel(t, choice) });
+              // The flow stays on that agent; another plan moves on to the next one with no AI.
+              onAgent(agent.id);
+              setDone({ agentId: agent.id, agent: agent.name, label: account?.label ?? planLabel(t, choice) });
               props.onPlanDone(agent.id);
             }}
           />
@@ -366,8 +413,6 @@ function PlanSteps({
 }) {
   const { t } = useTranslation();
   const { orgId, org } = useAiOrg();
-  // The computer's wait reads the chosen workspace: the first run says the plain line instead.
-  const inWorkspace = useInWorkspace();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -380,11 +425,8 @@ function PlanSteps({
   const [failedAccount, setFailedAccount] = useState<MachineAccount | null>(null);
   const [saving, setSaving] = useState(false);
   const [other, setOther] = useState(false);
-  // It turns ready while the person watches, or they came because it did: said once, in place.
-  const [waited, setWaited] = useState(gate.state === "preparing" || justReady === true);
-  useEffect(() => {
-    if (gate.state === "preparing") setWaited(true);
-  }, [gate.state]);
+  // It turned ready while the person watched (here or on another plan's page), or they came because it did.
+  const waited = gates.waited || justReady === true;
 
   const managed = machines.data?.find((m) => m.kind === "managed");
   const computer = edition === "cloud" ? computerName(t, org?.name ?? "", managed) : (view?.computer?.name ?? "");
@@ -444,18 +486,13 @@ function PlanSteps({
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "preparing") {
     const setup = gate.view;
-    const line = setup && !inWorkspace ? setupLine(t, setup) : null;
-    // A hold decides when anything runs there: it speaks alone.
+    // A hold decides when anything runs there: it speaks alone. The wait is the app's own (its steps, the time left,
+    // who hears when it's ready), for the workspace these pages connect for: the first run's too.
     wait = hold ? (
       <InfoCard icon="pause">{hold}</InfoCard>
     ) : (
       <View style={styles.gap}>
-        {setup && inWorkspace ? <SetupWait view={setup} /> : null}
-        {line ? (
-          <Note icon={line.icon === "orbit" ? <InkOrbit size={15} /> : line.icon} live>
-            {line.text}
-          </Note>
-        ) : null}
+        {setup ? <SetupWait view={setup} workspace={{ orgId, name: org?.name ?? "" }} /> : null}
         <InfoCard icon="clock">{t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}</InfoCard>
       </View>
     );
@@ -544,6 +581,7 @@ function PlanSteps({
           askEmail={view?.ownSignIn || view?.accounts.some((a) => a.mine && a.kind === kind && !a.provider)}
           local={view?.ownSignIn}
           ready={ready}
+          loading={gates.catching}
           note={!coding ? <Note icon="lock">{t("connectAi.onlyYou", agentGrammar(t, agentName))}</Note> : null}
           onAdded={(a) => void assign(a)}
         />
@@ -552,11 +590,15 @@ function PlanSteps({
   );
 }
 
-/** The API key's page: whose key (a radio list), where it is made, then the key; saved by its button. */
+/**
+ * The API key's page: whose key (a radio list; paid per use, straight to its maker), then the web's two numbered
+ * steps: create the key on the maker's page, paste it here. Saved by its button.
+ */
 function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const [touched, setTouched] = useState(false);
+  const [opened, setOpened] = useState(false);
   const maker = providerOf(form.provider);
   const clean = form.key.trim();
   const valid = keyLooksValid(form.provider, clean);
@@ -573,6 +615,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
       </View>
     );
   }
+  const site = maker ? new URL(`https://${maker.site}`) : null;
   return (
     <View>
       <GroupedHeader>{t("mobile.ai.whose")}</GroupedHeader>
@@ -587,83 +630,73 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
           />
         ))}
       </GroupedList>
-      {maker ? (
-        <>
-          <GroupedHeader>
-            {t(maker.masculine ? "mobile.ai.keyOfM" : "mobile.ai.keyOfF", { provider: maker.label })}
-          </GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              icon="out"
-              label={t("mobile.ai.createKey")}
-              sub={maker.site}
-              onPress={() => openPage(`https://${maker.site}`)}
+      <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
+      {maker && site ? (
+        <View style={styles.keySteps}>
+          <StepsCard>
+            <Step
+              n={1}
+              state={opened || clean ? "done" : "now"}
+              title={t("connectAi.key.create", providerGrammar(t, form.provider))}
+              hint={"plans" in maker && maker.plans ? t("connectAi.key.notPlan") : undefined}
+              side={
+                <OpenPage
+                  href={site.href}
+                  primary={!clean}
+                  label={t("aiAccounts.add.openKeys", { site: site.host })}
+                  onOpened={() => setOpened(true)}
+                />
+              }
             />
-            <View style={styles.keyField}>
-              <TextInput
+            <Step n={2} divider title={t("connectAi.key.paste")}>
+              <PasteField
                 value={form.key}
                 onChangeText={form.setKey}
+                onPasted={form.setKey}
                 onBlur={() => setTouched(true)}
+                label={t("connectAi.key.paste")}
                 placeholder={maker.placeholder}
-                placeholderTextColor={c.faint}
-                accessibilityLabel={t("connectAi.key.paste")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                spellCheck={false}
-                secureTextEntry
-                textContentType="none"
-                returnKeyType="done"
-                onSubmitEditing={() => {
+                secret
+                onSubmit={() => {
                   setTouched(true);
                   if (valid && keyButton) onSaveKey?.();
                 }}
-                style={[styles.keyInput, { color: c.ink }]}
               />
-              <Button
-                size="sm"
-                variant="secondary"
-                label={t("aiAccounts.add.paste")}
-                onPress={() =>
-                  void Clipboard.getStringAsync().then((v) => {
-                    if (v.trim()) form.setKey(v.trim());
-                  })
-                }
-              />
-            </View>
-          </GroupedList>
-          {wrong ? (
-            <View style={styles.foot}>
-              <Text variant="footnote" tone="danger" accessibilityLiveRegion="polite">
-                {t(`onboarding.keyInvalid.${form.provider}`)}
-              </Text>
-              {others.length > 0 ? (
+              {wrong ? (
                 <View style={styles.others}>
-                  <Text variant="footnote" tone="faint">
-                    {t("onboarding.keyFromOther")}
+                  <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+                    {t(`onboarding.keyInvalid.${form.provider}`)}
                   </Text>
-                  {others.map((p) => (
-                    <Pressable
-                      key={p.id}
-                      onPress={() => form.setProvider(p.id)}
-                      accessibilityRole="button"
-                      style={[styles.other, { backgroundColor: c.chip }]}
-                    >
-                      <ProviderLogo id={p.id} size="xs" />
-                      <Text variant="footnote" tone="ink" style={styles.bold}>
-                        {p.label}
+                  {others.length > 0 ? (
+                    <>
+                      <Text variant="small" tone="faint">
+                        {t("onboarding.keyFromOther")}
                       </Text>
-                    </Pressable>
-                  ))}
+                      {others.map((p) => (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => form.setProvider(p.id)}
+                          accessibilityRole="button"
+                          style={[styles.other, { backgroundColor: c.chip }]}
+                        >
+                          <ProviderLogo id={p.id} size="xs" />
+                          <Text variant="footnote" tone="ink" style={styles.bold}>
+                            {p.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </>
+                  ) : null}
                 </View>
               ) : null}
-            </View>
-          ) : form.failed ? (
-            <GroupedFooter>{t("mobile.ai.failed")}</GroupedFooter>
+            </Step>
+          </StepsCard>
+          {form.failed ? (
+            <Note icon="x" live>
+              {t("mobile.ai.failed")}
+            </Note>
           ) : (
-            <GroupedFooter>
-              {"plans" in maker && maker.plans ? t("connectAi.key.notPlan") : t("connectAi.key.forAll")}
-            </GroupedFooter>
+            <Note icon="info">{t("connectAi.key.forAll")}</Note>
           )}
           {keyButton ? (
             <View style={styles.save}>
@@ -676,7 +709,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               />
             </View>
           ) : null}
-        </>
+        </View>
       ) : null}
     </View>
   );
@@ -692,10 +725,8 @@ const styles = StyleSheet.create({
   hero: { alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 4 },
   done: { alignItems: "center", gap: 12, paddingVertical: 28, paddingHorizontal: 10 },
   info: { borderRadius: 14, padding: 14, gap: 10 },
-  keyField: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52, paddingLeft: 14, paddingRight: 8 },
-  keyInput: { flex: 1, minWidth: 0, paddingVertical: 12, ...fieldText("body") },
-  foot: { paddingTop: 7, paddingHorizontal: 16, gap: 8 },
-  others: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  keySteps: { marginTop: 16, gap: 10 },
+  others: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 },
   other: {
     flexDirection: "row",
     alignItems: "center",
@@ -704,5 +735,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
   },
-  save: { marginTop: 16 },
+  save: { marginTop: 6 },
 });

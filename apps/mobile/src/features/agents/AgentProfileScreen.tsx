@@ -38,6 +38,7 @@ import {
   useToast,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
+import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { chatHref } from "../links/logic";
@@ -60,6 +61,7 @@ import {
   spendOf,
   usesOf,
 } from "./logic";
+import { MonthPixels } from "./MonthPixels";
 import { workTitle } from "./work";
 
 /** Rows of "O que fez por você" before "Ver tudo". */
@@ -313,6 +315,19 @@ function Profile({ id }: { id: string }) {
                 {t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })}
               </Text>
             ) : null}
+            {/* Its month, day by day, in its own tones (the web's Atividade tab). */}
+            {detail.data && detail.data.runsThisMonth > 0 ? (
+              <View style={styles.pixels}>
+                <MonthPixels
+                  perDay={detail.data.runsByDay}
+                  color={look.color}
+                  label={t("agentPage.activity.chartLabel", {
+                    count: detail.data.runsThisMonth,
+                    month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(new Date()),
+                  })}
+                />
+              </View>
+            ) : null}
             {did.length > 0 ? (
               <Card>
                 {shownDid.map((l) => (
@@ -381,9 +396,11 @@ function Profile({ id }: { id: string }) {
         {thinks ? (
           <Section title={t("mobile.intentAgents.thinks")}>
             <Card>
+              {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
               <Row
                 leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
                 title={thinks.text}
+                {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
               />
             </Card>
           </Section>
@@ -639,6 +656,7 @@ const styles = StyleSheet.create({
   },
   nowText: { flexShrink: 1, fontWeight: "500" },
   lead: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },
+  pixels: { paddingHorizontal: 4, marginBottom: 12 },
   monthCards: { gap: 10 },
   foot: { paddingHorizontal: 4, marginTop: 8 },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },

@@ -1,4 +1,4 @@
-import type { AppNotification, DirectMessage } from "@agenteschat/client";
+import type { AiStatus, AppNotification, DirectMessage } from "@agenteschat/client";
 import { ROUTINE_TROUBLE } from "@agenteschat/client/lib/notifications";
 import { isSafeId } from "../shared/logic";
 
@@ -20,7 +20,9 @@ export type AppHref =
   | `/issues/${number}`
   | "/activity"
   | "/threads"
-  | "/join-requests";
+  | "/join-requests"
+  | "/computer-setup"
+  | "/connect-ai?ready=1";
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
@@ -52,12 +54,21 @@ export interface PushPayload {
 const MISSION_KINDS = new Set(["mission_finished", "mission_stopped"]);
 
 /**
- * The screen a push opens. A high-risk approval opens the request, and someone asking to join opens the requests
- * (neither is ever answered from the push).
+ * Where "your workspace's computer is ready" opens (its push, its row in Atividade): Connect an AI, saying the
+ * computer is ready, while no agent has an AI yet (what comes next is connecting one); else the computer's wait,
+ * which says it's ready. `ai` unknown: the computer's.
  */
-export function hrefForPush(p: PushPayload): AppHref {
+export const computerReadyHref = (ai: Pick<AiStatus, "any" | "agents"> | undefined): AppHref =>
+  ai !== undefined && !ai.any && ai.agents.length > 0 ? "/connect-ai?ready=1" : "/computer-setup";
+
+/**
+ * The screen a push opens. A high-risk approval opens the request, and someone asking to join opens the requests
+ * (neither is ever answered from the push). `ai`: the workspace's AI status, for the computer being ready.
+ */
+export function hrefForPush(p: PushPayload, ai?: Pick<AiStatus, "any" | "agents">): AppHref {
   if (isSafeId(p.approvalId)) return `/approval/${p.approvalId}`;
   if (p.kind === "join_request") return "/join-requests";
+  if (p.kind === "computer_ready") return computerReadyHref(ai);
   // An agent needs a person in its browser: its conversation, with the request's card in control.
   if (p.kind === "browser_handoff" && isSafeId(p.handoffId)) return handoffHref(p.handoffId, p.channelId, p.threadId);
   if (isSafeId(p.missionId) && typeof p.kind === "string" && MISSION_KINDS.has(p.kind))
@@ -130,13 +141,15 @@ export const agentDmOf =
  * Where an inbox item opens in the app; null when the app has no screen for it (issues, forum). What a
  * routine found opens the agent's message in its conversation; a routine's trouble (failed, paused,
  * waiting for its computer) opens the agent's DM (`dmOf`, its known DM), else the agent: the phone has
- * no Rotinas screen yet.
+ * no Rotinas screen yet. The computer being ready: `computerReadyHref` with the workspace's AI status (`ai`).
  */
 export function notificationHref(
   n: Pick<AppNotification, "kind" | "source" | "actors">,
   dmOf: (agentId: string) => string | null = () => null,
+  ai?: Pick<AiStatus, "any" | "agents">,
 ): AppHref | null {
   const s = n.source;
+  if (n.kind === "computer_ready") return computerReadyHref(ai);
   if (ROUTINE_TROUBLE.has(n.kind)) {
     const agent = n.actors.find((a) => a.type === "agent");
     if (!agent || !isSafeId(agent.id)) return null;

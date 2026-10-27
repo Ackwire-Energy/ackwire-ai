@@ -1,18 +1,25 @@
 import { expoClient } from "@better-auth/expo/client";
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
+import i18n from "i18next";
 import { SCHEME, STORAGE_PREFIX } from "@/config";
 import { serverUrl } from "./server";
 
 /**
  * Better Auth for the app (ADR 0035 §3): the session cookie lives in SecureStore (Expo plugin), social
- * sign-in goes through the system browser and comes back on `agenteschat://`.
+ * sign-in goes through the system browser and comes back on `agenteschat://`. Every request says the app's
+ * language in `Accept-Language`, as the web's does: an account made here keeps it, and its first emails come in it.
  */
 const createClient = (server: string) =>
   createAuthClient({
     baseURL: server,
     basePath: "/api/auth",
-    fetchOptions: { headers: { "X-Agentes-Client": "mobile" } },
+    fetchOptions: {
+      headers: { "X-Agentes-Client": "mobile" },
+      onRequest: (request) => {
+        if (i18n.language) request.headers.set("accept-language", i18n.language);
+      },
+    },
     plugins: [expoClient({ scheme: SCHEME, storagePrefix: STORAGE_PREFIX, storage: SecureStore })],
   });
 

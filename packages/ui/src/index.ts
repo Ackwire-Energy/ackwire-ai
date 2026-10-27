@@ -192,6 +192,8 @@ export {
   type PixelSpinnerSize,
 } from "./components/PixelSpinner";
 export {
+  limitOffers,
+  type OfferAccount,
   PLAN_ALMOST,
   PlanMeter,
   type PlanMeterText,

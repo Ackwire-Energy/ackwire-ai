@@ -21,8 +21,8 @@ export const STRIP_ROWS = 7;
 const COLUMN_W = 3;
 const COLUMN_GAP = 1;
 
-/** The cells grouped by color, in the order the colors first appear. */
-class Cells {
+/** The cells grouped by color, in the order the colors first appear (also the agent's month, `month-pixels.ts`). */
+export class CellGrid {
   private readonly byColor = new Map<string, number[]>();
   put(x: number, y: number, color: string) {
     let list = this.byColor.get(color);
@@ -38,7 +38,7 @@ class Cells {
 }
 
 /** Bayer between a column's tones, `h` cells up from `base` (the web's `column`). */
-function column(out: Cells, x0: number, w: number, h: number, base: number, pal: string[]) {
+export function column(out: CellGrid, x0: number, w: number, h: number, base: number, pal: string[]) {
   const last = pal.length - 1;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -78,7 +78,7 @@ export const stripWidth = (steps: number) => Math.max(1, steps * (COLUMN_W + COL
 /** The steps in order, oldest left: an open the whole column, a read most of it, an action a stub, a print two cells. */
 export function stripCells(kinds: BrowserTrailKind[], color: AgentColorName, tones: TrailTones): CellRun[] {
   const pal = trailPalette(color, tones);
-  const out = new Cells();
+  const out = new CellGrid();
   kinds.forEach((k, i) => {
     column(out, i * (COLUMN_W + COLUMN_GAP), COLUMN_W, rowsOf(k, STRIP_ROWS), STRIP_ROWS - 1, pal[k]);
   });
@@ -88,7 +88,7 @@ export function stripCells(kinds: BrowserTrailKind[], color: AgentColorName, ton
 /** One step's column, marking its line in the list (3 × 7 cells). */
 export const MARK_W = COLUMN_W;
 export function markCells(kind: BrowserTrailKind, color: AgentColorName, tones: TrailTones): CellRun[] {
-  const out = new Cells();
+  const out = new CellGrid();
   column(out, 0, COLUMN_W, rowsOf(kind, STRIP_ROWS), STRIP_ROWS - 1, trailPalette(color, tones)[kind]);
   return out.runs();
 }
@@ -121,7 +121,7 @@ export function skyEdgeCells(width: number, color: AgentColorName, raised: strin
       : [raised, mixHex(raised, top, 0.35), mixHex(raised, top, 0.7), top]
   ).map(muteHex);
   const last = pal.length - 1;
-  const out = new Cells();
+  const out = new CellGrid();
   for (let y = 0; y < 2; y++)
     for (let x = 0; x < w; x++) {
       const u = x / w;
@@ -161,7 +161,7 @@ export function pageCells(w: number, h: number, color: AgentColorName, dark: boo
   const fade = [paper, mixHex(paper, tint, 0.5), tint];
   const inBlock = (x: number, y: number) =>
     PAGE_BLOCKS.some(([x0, y0, x1, y1]) => x >= x0 * w && x < x1 * w && y >= y0 * h && y < y1 * h);
-  const out = new Cells();
+  const out = new CellGrid();
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const b = bayer(x, y);

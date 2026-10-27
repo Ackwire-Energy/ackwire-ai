@@ -58,9 +58,10 @@ export function useConnectKey(orgId: string, asked?: string) {
 export type ConnectKey = ReturnType<typeof useConnectKey>;
 
 /**
- * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>`): the
- * plans first, each signing in on the agent's computer, then the workspace's API key (ConnectAiFlow); a message
+ * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>&ready=1`):
+ * the plans first, each signing in on the agent's computer, then the workspace's API key (ConnectAiFlow); a message
  * that asked for one of them opens on its page. Once connected from a message, the agent answers it by itself.
+ * `ready`: opened because the workspace's computer just got ready (its notification): a plan's page says so.
  */
 export function ConnectAiSheet() {
   const { t } = useTranslation();
@@ -70,7 +71,13 @@ export function ConnectAiSheet() {
   const meId = useMeId();
   const dir = useDirectory();
   const status = useAiStatus(orgId);
-  const params = useLocalSearchParams<{ from?: string; provider?: string; agentId?: string; intent?: string }>();
+  const params = useLocalSearchParams<{
+    from?: string;
+    provider?: string;
+    agentId?: string;
+    intent?: string;
+    ready?: string;
+  }>();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org?.role, "manage_credentials");
   const mine = dir.agents.filter((a) => a.ownerUserId === meId);
@@ -114,6 +121,7 @@ export function ConnectAiSheet() {
           hasAi={hasAi}
           {...(params.agentId ? { startAgentId: params.agentId } : {})}
           locked={locked}
+          justReady={params.ready === "1"}
           mayAddKey={mayAddKey}
           keyForm={form}
           keySaved={keySaved}

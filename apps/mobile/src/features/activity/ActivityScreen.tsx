@@ -1,6 +1,7 @@
 import {
   type AppNotification,
   type Routine,
+  useAiStatus,
   useDms,
   useNotificationAction,
   useNotifications,
@@ -41,6 +42,7 @@ import {
   activitySections,
   type DayGroup,
   emojisOf,
+  joinRequestLine,
   nextRoutine,
   placeOf,
   type SayWords,
@@ -137,15 +139,14 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const card = waitingCardOf(n);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
   const request = useWaitingApprovals().find((a) => a.id === n.source.approvalId);
-  const title =
-    card.kind === "approval" && request
-      ? approvalTitle(t, request)
-      : card.kind === "join"
-        ? t("notifications.wait.joinRequest", { count: n.count, name: card.title })
-        : card.title;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
+  // Someone asking to join: who asked (the first names, how many in all), with their faces.
+  const join = card.kind === "join" ? joinRequestLine(t, n) : null;
+  const title = card.kind === "approval" && request ? approvalTitle(t, request) : join ? join.text : card.title;
+  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
+  // an AI while no agent has one.
   const dms = useDms(orgId);
-  const href = notificationHref(n, agentDmOf(dms.data));
+  const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
+  const href = notificationHref(n, agentDmOf(dms.data), ai);
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
@@ -170,7 +171,15 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     >
       <View style={styles.hd}>
         {who ? <Face who={who} size={22} live={false} /> : null}
-        {card.kind === "join" ? <PersonAvatar name={card.title} size={22} /> : null}
+        {join ? (
+          <View style={styles.faces}>
+            {join.faces.map((face, i) => (
+              <View key={`${i}-${face}`} style={i > 0 ? styles.overlap : undefined}>
+                <PersonAvatar name={face} size={22} />
+              </View>
+            ))}
+          </View>
+        ) : null}
         {name ? (
           <Text variant="footnote" tone="ink" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
             {name}
@@ -312,9 +321,11 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const when = useWhen();
   const act = useNotificationAction(orgId);
   const x = useRef(new Animated.Value(0)).current;
-  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet).
+  // A routine's trouble opens the agent's DM (the phone has no Rotinas screen yet); the computer being ready, Connect
+  // an AI while no agent has one.
   const dms = useDms(orgId);
-  const href = notificationHref(n, agentDmOf(dms.data));
+  const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
+  const href = notificationHref(n, agentDmOf(dms.data), ai);
   const unread = n.readAt === null;
 
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));
@@ -447,6 +458,8 @@ const styles = StyleSheet.create({
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },
   hd: { flexDirection: "row", alignItems: "center", gap: 8 },
+  faces: { flexDirection: "row" },
+  overlap: { marginLeft: -6 },
   kind: { flexDirection: "row", alignItems: "center", gap: 4 },
   ft: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 36 },
   fuse: { flex: 0, width: 90 },

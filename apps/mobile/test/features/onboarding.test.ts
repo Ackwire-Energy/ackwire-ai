@@ -1,12 +1,22 @@
 import { expect, test } from "bun:test";
+import type { AiStatus } from "@agenteschat/client";
 import { isInviteToken } from "../../src/features/auth/links";
 import {
+  askLineOf,
+  type CrewMember,
+  DEFAULT_TEAM,
   emailsFrom,
+  firstAskOf,
   HOST,
+  IMPORT_ROWS,
+  importRowName,
   introducesAt,
   inviteEach,
+  joiningLeft,
   nextStep,
   OPTIONAL,
+  PRESET_ROWS,
+  PRESETS,
   type Preset,
   prevStep,
   progressAt,
@@ -58,17 +68,94 @@ test("the time zone reads as its city; invitation tokens only url-safe", () => {
   expect(isInviteToken(undefined)).toBe(false);
 });
 
-test("the import step shows each app's official logo: the files the web app ships", async () => {
+test("the import step names every app the web brings agents from, in its order, with its logo", async () => {
+  const en = await translator("en");
+  expect(IMPORT_ROWS.map((r) => importRowName(en, r))).toEqual([
+    "OpenClaw",
+    "Hermes Agent",
+    "OpenBot.Run",
+    "Paperclip",
+    "OpenMausBot",
+    "OpenBot",
+    "agentes.chat export",
+    "Another app",
+  ]);
   const phone = (name: string) => Bun.file(new URL(`../../assets/images/brands/${name}`, import.meta.url).pathname);
-  const web = (name: string) => Bun.file(new URL(`../../../web/public/brands/${name}`, import.meta.url).pathname);
+  const web = (name: string) => Bun.file(new URL(`../../../web/public/${name}`, import.meta.url).pathname);
   // OpenBot has no vector logo: its raster, byte for byte.
   expect(Buffer.from(await phone("openbot.png").arrayBuffer())).toEqual(
-    Buffer.from(await web("openbot.png").arrayBuffer()),
+    Buffer.from(await web("brands/openbot.png").arrayBuffer()),
   );
-  // OpenMausBot's SVG, rendered for the phone at 96 px (the PNG header's width and height).
-  expect(await web("openmausbot.svg").exists()).toBe(true);
-  const png = new DataView(await phone("openmausbot.png").arrayBuffer());
-  expect([png.getUint32(16), png.getUint32(20)]).toEqual([96, 96]);
+  // Every other mark is the web's SVG (a dark one where the maker has one), rendered for the phone at 96 px (the PNG
+  // header's width and height).
+  const rendered: [phone: string, web: string][] = [
+    ["openclaw.png", "brands/openclaw.svg"],
+    ["hermes.png", "brands/hermes.svg"],
+    ["hermes-dark.png", "brands/hermes-dark.svg"],
+    ["openbotrun.png", "brands/openbotrun.svg"],
+    ["paperclip.png", "brands/paperclip.svg"],
+    ["paperclip-dark.png", "brands/paperclip-dark.svg"],
+    ["openmausbot.png", "brands/openmausbot.svg"],
+    ["agenteschat.png", "favicon.svg"],
+  ];
+  for (const [png, svg] of rendered) {
+    expect(await web(svg).exists()).toBe(true);
+    const header = new DataView(await phone(png).arrayBuffer());
+    expect([png, header.getUint32(16), header.getUint32(20)]).toEqual([png, 96, 96]);
+  }
+});
+
+test("the team as the web has it: Theo first, everyone chosen, Ada already here and not counted", () => {
+  expect([...PRESETS]).toEqual(["theo", "ada", "lia", "atlas"]);
+  expect([...DEFAULT_TEAM]).toEqual([...PRESETS]);
+  // The phone's own rows: Ada first ("I'm already here"), then the others in the team's order.
+  expect([...PRESET_ROWS]).toEqual(["ada", "theo", "lia", "atlas"]);
+  const all = new Set<Preset>(DEFAULT_TEAM);
+  expect(joiningLeft(all, {})).toBe(3);
+  expect(joiningLeft(all, { theo: "a1", ada: "a2" })).toBe(2);
+  expect(joiningLeft(new Set<Preset>(["ada"]), {})).toBe(0);
+});
+
+const crewOf = (...keys: Preset[]): CrewMember[] =>
+  keys.map((key) => ({ key, id: `id-${key}`, handle: key, name: `${key.charAt(0).toUpperCase()}${key.slice(1)}` }));
+
+test("Done's first message: Theo offers it (no browser counted on), else Lia, else Ada", async () => {
+  const en = await translator("en");
+  expect(firstAskOf(en, crewOf("theo", "ada", "lia"))).toEqual({
+    asker: "theo",
+    text: "@theo Plan our first week: what should each of us do first?",
+  });
+  expect(firstAskOf(en, crewOf("ada", "lia"))?.asker).toBe("lia");
+  expect(firstAskOf(en, crewOf("ada"))?.text).toBe("@ada What could you build or automate for us first?");
+  expect(firstAskOf(en, [])).toBeNull();
+});
+
+test("the line under the first message: whether the agent it names can start, or that no agent has an AI", async () => {
+  const en = await translator("en");
+  const theo = { id: "id-theo", name: "Theo" };
+  const status = (state: AiStatus["agents"][number]["state"], any = state !== "no_ai"): AiStatus => ({
+    any,
+    agents: [{ agentId: "id-theo", state }],
+  });
+  const line = (over: Partial<Parameters<typeof askLineOf>[1]>) =>
+    askLineOf(en, { text: "@theo plan", mentioned: theo, status: undefined, computer: "Acme's computer", ...over });
+  expect(line({ status: status("ready") })).toEqual({
+    state: "ready",
+    icon: "check",
+    text: "Theo starts right away, in #general.",
+  });
+  expect(line({ status: status("waiting") })?.text).toBe("Theo starts as soon as Acme's computer is back.");
+  expect(line({ status: status("no_ai") })?.text).toBe(
+    "No AI connected yet: Theo answers once you connect one.",
+  );
+  // Nobody named: only that no agent has an AI, else nothing.
+  expect(line({ mentioned: undefined, status: status("no_ai", false) })?.text).toBe(
+    "No AI connected yet: your agents answer once you connect one.",
+  );
+  expect(line({ mentioned: undefined, status: status("ready") })).toBeNull();
+  // No text, or the status not in yet: nothing to say.
+  expect(line({ text: "  ", status: status("ready") })).toBeNull();
+  expect(line({})).toBeNull();
 });
 
 test("each step's question and its one line: the phone's own where it can't do what the web does, none on Team", async () => {
@@ -96,9 +183,13 @@ test("each step's question and its one line: the phone's own where it can't do w
     "Welcome to Acme",
     "Ada is already in #general.",
   ]);
-  expect(stepText(en, "done", acme)[1]).toBe("Ada, Theo and Lia are already in #general.");
+  // In the team's order, as the web's welcome; then the invitations emailed, if any.
+  expect(stepText(en, "done", acme)[1]).toBe("Theo, Ada and Lia are already in #general.");
+  expect(stepText(en, "done", { ...acme, invited: 2 })[1]).toBe(
+    "Theo, Ada and Lia are already in #general. We emailed 2 invitations.",
+  );
   const pt = await translator("pt-BR");
-  expect(stepText(pt, "done", acme)).toEqual(["Boas-vindas à Acme", "Ada, Theo e Lia já estão no #general."]);
+  expect(stepText(pt, "done", acme)).toEqual(["Boas-vindas à Acme", "Theo, Ada e Lia já estão no #general."]);
   expect(stepText(pt, "done", { ...acme, chosen: new Set<Preset>() })[1]).toBe(
     "O #general está pronto. Crie um agente quando quiser.",
   );

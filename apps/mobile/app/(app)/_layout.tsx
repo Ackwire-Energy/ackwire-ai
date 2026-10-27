@@ -55,6 +55,7 @@ function AppStack() {
       <Stack.Screen name="ai-accounts" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="usage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-usage/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={formSheet} />
