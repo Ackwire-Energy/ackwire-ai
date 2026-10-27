@@ -111,7 +111,7 @@ import { sendNewLink } from "@/lib/email-confirmation";
 import { importedModel } from "@/lib/import";
 import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
-import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
+import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./onboarding.css";
 
@@ -545,6 +545,9 @@ export function OnboardingPage() {
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, useAuthConfig().data?.workspaceComputer);
   const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
+  // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
+  const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);
+  const leaveTo = others.find((o) => o.id === storage.get(STORAGE_KEYS.lastOrg)) ?? others[0];
   const email = me.data?.user.email ?? "";
   // The address this tab's sign-up was emailed a link to confirm: the first step says where it went. Read once and
   // forgotten once confirmed or set up, so a later onboarding (another workspace) says nothing of it.
@@ -931,12 +934,22 @@ export function OnboardingPage() {
         }}
       >
         <div className="onb__body" key={`${step.id}-${agentsPhase}`} ref={column}>
-          {(index > 0 || aiOpen) && (
+          {index > 0 || aiOpen ? (
             <button type="button" className="onb__back" onClick={back} disabled={busy}>
               <Icon name="chevronLeft" size={16} />
               {t("onboarding.back")}
             </button>
-          )}
+          ) : leaveTo ? (
+            <button
+              type="button"
+              className="onb__back"
+              onClick={() => void navigate({ to: "/org/$orgId", params: { orgId: leaveTo.id } })}
+              disabled={busy}
+            >
+              <Icon name="chevronLeft" size={16} />
+              {t("onboarding.leave", { name: leaveTo.name })}
+            </button>
+          ) : null}
 
           {ask && (
             <HostAsk

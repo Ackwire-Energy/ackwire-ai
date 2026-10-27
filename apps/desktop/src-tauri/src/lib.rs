@@ -496,6 +496,9 @@ pub fn run() {
             WindowEvent::Focused(true) if window.label() == main_window::LABEL => {
                 main_window::focused(window.app_handle());
             }
+            WindowEvent::Focused(false) if window.label() == main_window::LABEL => {
+                main_window::keep_lights(window.app_handle());
+            }
             // Welcome and Preferences really close (made again when they open).
             WindowEvent::CloseRequested { .. } if MADE_ON_OPEN.contains(&window.label()) => {}
             WindowEvent::Destroyed if MADE_ON_OPEN.contains(&window.label()) => sync_dock(window.app_handle()),

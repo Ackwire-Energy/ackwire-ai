@@ -46,6 +46,8 @@ export const STORED = {
   threadsCollapsed: "threads-collapsed",
   /** An invitation opened before signing in: dealt with once the person is in (features/auth/invite.ts). */
   invite: "invite",
+  /** The app's sounds on this phone: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
+  sounds: "sounds",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

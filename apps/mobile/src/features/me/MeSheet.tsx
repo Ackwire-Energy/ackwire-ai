@@ -1,5 +1,6 @@
 import { useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { type ReactNode, useEffect, useState } from "react";
@@ -11,6 +12,7 @@ import { appHeaders, lastCookie } from "@/lib/auth";
 import { photoSource } from "@/lib/photo";
 import { pushPermission, registerForPush, unregisterPush } from "@/lib/push";
 import { serverUrl } from "@/lib/server";
+import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import {
@@ -40,8 +42,15 @@ export type MePage =
   | "workspaces"
   | "members"
   | "notifications"
+  | "sounds"
   | "appearance"
   | "language";
+
+const SOUND_LABELS: Record<SoundStyle, string> = {
+  tactile: "mobile.me.soundTactile",
+  sky: "mobile.me.soundSky",
+  pixel: "mobile.me.soundPixel",
+};
 
 /** Close the sheet, then open a pushed screen (the sheet's dismissal has to finish first). */
 const closeThenPush = (onClose: () => void, href: string) => {
@@ -51,9 +60,9 @@ const closeThenPush = (onClose: () => void, href: string) => {
 
 /**
  * Você: a short settings list as on the iPhone. Your row opens Conta; the
- * workspace row opens Workspaces; "Do workspace" opens Membros (admins) and links Issues and Drive;
- * Notificações, Aparência and Idioma each open their own screen; then Sair and the app's version. A native
- * form sheet over whatever was on screen, with its own small stack.
+ * workspace row opens Workspaces; "Do workspace" opens Membros (admins) and links Issues and Drive; Notificações,
+ * Sons, Aparência and Idioma each open their own screen; then Sair and the app's version. A native form sheet over
+ * whatever was on screen, with its own small stack.
  */
 export function MeSheet({ onClose }: { onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -109,6 +118,8 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
   const role = org.org ? t(`mobile.me.role.${org.org.role}`) : "";
   const themeLabel = t(`mobile.theme.${theme.preference}`);
+  const sounds = useSoundChoice();
+  const styleLabel = (style: SoundStyle) => t(SOUND_LABELS[style]);
   const en = i18n.language.startsWith("en");
   const withMe = openIssuesWithMe(issues.data, meId);
   const version = Constants.expoConfig?.version ?? "";
@@ -181,6 +192,36 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
             />
           </GroupedList>
           <GroupedFooter>{t("mobile.me.notificationsHint")}</GroupedFooter>
+        </Page>
+      );
+      break;
+    case "sounds":
+      body = (
+        <Page title={t("mobile.me.sounds")} onBack={back}>
+          <View style={styles.gap} />
+          <GroupedList>
+            <GroupedRow
+              label={t("mobile.me.soundsOn")}
+              toggle={sounds !== "off"}
+              onPress={() => setSoundChoice(sounds === "off" ? "tactile" : "off")}
+            />
+          </GroupedList>
+          <GroupedFooter>{t("mobile.me.soundsHint")}</GroupedFooter>
+          {sounds !== "off" && (
+            <>
+              <GroupedHeader>{t("mobile.me.soundStyle")}</GroupedHeader>
+              <GroupedList>
+                {SOUND_STYLES.map((style) => (
+                  <GroupedRow
+                    key={style}
+                    label={styleLabel(style)}
+                    checked={sounds === style}
+                    onPress={() => setSoundChoice(style)}
+                  />
+                ))}
+              </GroupedList>
+            </>
+          )}
         </Page>
       );
       break;
@@ -290,6 +331,13 @@ export function MeSheet({ onClose }: { onClose: () => void }) {
               value={push === null ? undefined : push ? t("mobile.me.on") : t("mobile.me.off")}
               chevron
               onPress={() => go("notifications")}
+            />
+            <GroupedRow
+              icon="sound"
+              label={t("mobile.me.sounds")}
+              value={sounds === "off" ? t("mobile.me.soundsOff") : styleLabel(sounds)}
+              chevron
+              onPress={() => go("sounds")}
             />
             <GroupedRow
               icon={theme.scheme === "dark" ? "moon" : "sun"}

@@ -76,6 +76,7 @@ import {
 } from "@/lib/context-menu";
 import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { markOpen } from "@/lib/perf";
+import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
@@ -90,7 +91,7 @@ import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
-import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon } from "./Sky";
+import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /** The chosen item's sky: both themes, the CSS picks one. */
@@ -276,6 +277,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
       <div className="sidebar__top">
+        <WorkspaceSky part="side" rail={rail} />
         <div className="sidebar__org">
           <WorkspaceMenu
             summary={
@@ -756,7 +758,7 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button; under the name, the workspace's budget use this month
  * (a percentage, never money). It opens the account's full-screen menu:
- * profile, time zone, opening the phone app, theme, language, the budget and
+ * profile, time zone, opening the phone app, theme, language, sounds, the budget and
  * signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
@@ -765,6 +767,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const dir = useDirectory(org.id);
   const theme = useTheme();
   const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
+  const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -882,6 +885,20 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
               options={locales.map((l) => ({ value: l.code, label: l.label }))}
             />
           </MenuOverlayRow>
+          <MenuOverlayRow icon="sound" label={t("shell.sounds")}>
+            <Segmented
+              size="sm"
+              label={t("shell.sounds")}
+              value={sounds}
+              onValueChange={(v) => setSoundChoice(v as SoundChoice)}
+              options={[
+                { value: "tactile", label: t("shell.soundTactile") },
+                { value: "sky", label: t("shell.soundSky") },
+                { value: "pixel", label: t("shell.soundPixel") },
+                { value: "off", label: t("shell.soundOff") },
+              ]}
+            />
+          </MenuOverlayRow>
           {inDesktopApp() && (
             <MenuOverlayRow icon="pointer" label={t("contextMenu.look")}>
               <Segmented
@@ -971,7 +988,7 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
         anchor={trigger}
         closeLabel={t("common.close")}
         backdrop={<MenuHorizon />}
-        mark={<OrgMark logo={org.logo} size={64} />}
+        mark={<OrgMark logo={org.logo} size={82} />}
         title={org.name}
         meta={
           <>

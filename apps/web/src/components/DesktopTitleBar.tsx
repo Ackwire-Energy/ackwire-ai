@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { openPalette } from "./CommandMenu";
 import { useMediaQuery } from "./NavDrawer";
 import { TABLET_QUERY, useSidebarCollapsed } from "./Sidebar";
+import { WorkspaceSky } from "./Sky";
 
 /**
  * The Mac app's title bar (ADR 0036): room for the
@@ -36,6 +37,8 @@ export function DesktopTitleBar() {
 
   return (
     <header className="titlebar" data-tauri-drag-region="deep">
+      {/* Over the sidebar, the workspace's sky goes on up behind the window's buttons (one sky with its header). */}
+      <WorkspaceSky part="bar" rail={collapsed || tablet} />
       <nav className="titlebar__nav">
         {!tablet && (
           <Button

@@ -7,7 +7,7 @@
  * the bottom like the web's mask; 2 = no fade), `clear` (1 = the first tone is see-through, for a drawing
  * over glass). Arrays are only read with loop indices (SkSL rule).
  */
-export type DitherKind = "sky" | "fuse" | "bar" | "track" | "sweep" | "pill" | "pillwork" | "horizon";
+export type DitherKind = "sky" | "fuse" | "bar" | "track" | "sweep" | "pill" | "pillwork" | "horizon" | "workspace";
 
 const PRELUDE = `
 uniform float2 size;
@@ -63,7 +63,95 @@ half4 main(float2 pos) {
 }
 `;
 
+/**
+ * Drawings that put something over their field (the workspace sky's clouds and stars): `overlay` gives 0 (the
+ * field shows), 1 (tone 6) or 2 (tone 7); the field's own tones end at `top`, not at the last one.
+ */
+const MAIN_OVERLAY = `
+half4 main(float2 pos) {
+  float x = floor(pos.x / px);
+  float y = floor(pos.y / px);
+  float w = max(2.0, ceil(size.x / px));
+  float h = max(2.0, ceil(size.y / px));
+  float u = x / w;
+  float v = y / h;
+  float f = clamp(field(u, v, x, y), 0.0, 1.0);
+  float s = f * top;
+  float b = floor(s);
+  float idx = min((s - b > bayer(x, y)) ? b + 1.0 : b, top);
+  float o = overlay(x, y, w, h);
+  if (o > 0.5) idx = o > 1.5 ? 7.0 : 6.0;
+  if (clear > 0.5 && idx < 0.5) return half4(0.0);
+  float4 c = tone(idx);
+  float yy = pos.y / size.y;
+  float a = yy < fade ? 1.0 : clamp(1.0 - (yy - fade) / max(0.001, 1.0 - fade), 0.0, 1.0);
+  return half4(c.rgb * a, a);
+}
+`;
+
+/** Kinds drawn with `MAIN_OVERLAY`. */
+const OVERLAID: ReadonlySet<DitherKind> = new Set(["workspace"]);
+
 const FIELDS: Record<DitherKind, string> = {
+  // The workspace's sky (@agenteschat/ui sky/workspace): `phoneField`, then `cloudAt` (hour 0, the Cloud) or
+  // `starAt` (hour 1, a server of one's own) in PHONE_AREA, line by line.
+  workspace: `
+uniform float hour;
+uniform float top;
+float smooth01(float a, float b, float x) {
+  float e = clamp((x - a) / (b - a), 0.0, 1.0);
+  return e * e * (3.0 - 2.0 * e);
+}
+float field(float u, float v, float x, float y) {
+  float down = 1.0 - smooth01(0.25, 1.0, v);
+  return down * (0.6 + 0.3 * u) + 0.05 * sin(u * 5.0 + v * 4.0 + t * 0.5);
+}
+float run(float dx, float a, float b) {
+  return (dx >= a && dx < b) ? 1.0 : 0.0;
+}
+float cloudCell(float i, float dx, float row) {
+  if (i < 0.5) {
+    if (abs(row) < 0.5) return run(dx, 2.0, 6.0) * 2.0;
+    if (abs(row - 1.0) < 0.5) return run(dx, 1.0, 8.0) * 2.0;
+    if (abs(row - 2.0) < 0.5) return run(dx, 0.0, 10.0);
+    if (abs(row - 3.0) < 0.5) return run(dx, 1.0, 9.0);
+    return 0.0;
+  }
+  if (i < 1.5) {
+    if (abs(row) < 0.5) return run(dx, 1.0, 4.0) * 2.0;
+    if (abs(row - 1.0) < 0.5) return run(dx, 0.0, 7.0);
+    if (abs(row - 2.0) < 0.5) return run(dx, 1.0, 6.0);
+    return 0.0;
+  }
+  if (abs(row) < 0.5) return run(dx, 2.0, 5.0) * 2.0;
+  if (abs(row - 1.0) < 0.5) return run(dx, 1.0, 8.0) * 2.0;
+  if (abs(row - 2.0) < 0.5) return run(dx, 0.0, 9.0);
+  return 0.0;
+}
+float overlay(float x, float y, float w, float h) {
+  float x0 = 0.5;
+  float y0 = 0.05;
+  float y1 = 0.42;
+  if (x < w * x0) return 0.0;
+  if (hour < 0.5) {
+    float span = w * (1.0 - x0) + 14.0;
+    for (int n = 0; n < 3; n++) {
+      float i = float(n);
+      float cx = floor(w - mod(t * (0.9 + 0.35 * i) + i * span * 0.37, span));
+      float cy = floor(h * (y0 + (y1 - y0) * (0.1 + 0.4 * i)));
+      float c = cloudCell(i, x - cx, y - cy);
+      if (c > 0.5) return c;
+    }
+    return 0.0;
+  }
+  if (y < h * y0 || y > h * y1) return 0.0;
+  float k = hash2(x, y);
+  if (k < 0.975) return 0.0;
+  float phase = mod(t * 0.7 + k * 600.0, 6.0);
+  if (phase > 5.2) return 0.0;
+  return phase < 0.6 ? 1.0 : 2.0;
+}
+`,
   sky: `
 float field(float u, float v, float x, float y) {
   float dx = (u - 0.5) * 1.5;
@@ -145,4 +233,4 @@ float field(float u, float v, float x, float y) {
 };
 
 /** The full SkSL source of one drawing. */
-export const shaderSource = (kind: DitherKind) => `${PRELUDE}${FIELDS[kind]}${MAIN}`;
+export const shaderSource = (kind: DitherKind) => `${PRELUDE}${FIELDS[kind]}${OVERLAID.has(kind) ? MAIN_OVERLAY : MAIN}`;

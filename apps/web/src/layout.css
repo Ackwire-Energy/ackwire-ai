@@ -605,16 +605,17 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Two tight lines, as in the workspace header above: the name, then the budget. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
 }
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
+  line-height: 18px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -625,16 +626,18 @@ p {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  line-height: 16px;
 }
 .sidebar__usage-label {
   font-size: 11px;
   color: var(--ink-muted);
 }
+/* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
-  background: var(--surface-sunken);
+  background: var(--line2);
   overflow: hidden;
 }
 .sidebar__usage-bar {
@@ -2844,11 +2847,19 @@ p {
   align-items: center;
   gap: 4px;
 }
+/* The same insets and gap as the workspace header's button, so both cards line up. */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
-  padding: 10px 14px 10px 10px;
+  gap: var(--space-2);
+  padding: 6px 10px 6px 8px;
   border-radius: inherit;
+}
+/* The person's face about as tall as its two lines (32px). */
+.sidebar__me > .sidebar__user > .ac-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
 }
 
 /* Settings: a grouped left sub-nav + one section. */
@@ -5850,6 +5861,26 @@ button.live-call__head:hover {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+}
+/*
+ * The workspace's sky (Sky.tsx WorkspaceSky): behind the header, from the sidebar's top edge to the header's
+ * foot (16px of the sidebar's padding + the 48px header), edge to edge but for the hairline against the page.
+ */
+.sidebar__top {
+  position: relative;
+  isolation: isolate;
+}
+.workspace-sky {
+  position: absolute;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.workspace-sky--side {
+  top: -16px;
+  left: -12px;
+  right: -11px;
+  height: 64px;
 }
 /* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {

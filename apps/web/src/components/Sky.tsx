@@ -5,8 +5,12 @@ import {
   type AgentColor,
   agentGradient,
   agentTones,
+  cloudAt,
+  cx,
   drawSprite,
   EYE,
+  HEADER_AREA,
+  headerField,
   Icon,
   Logo,
   mix,
@@ -16,10 +20,14 @@ import {
   pixelOf,
   SKY_TONES,
   type SkyOptions,
+  skyHourOf,
   softTones,
   spriteTone,
+  starAt,
+  workspaceInk,
+  workspaceTones,
 } from "@agenteschat/ui";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -442,6 +450,75 @@ export function SidebarHorizon({ working, total, clear }: { working: number; tot
   };
   return (
     <span className="sidebar__horizon" aria-hidden="true">
+      <PixelSky options={opts} />
+    </span>
+  );
+}
+
+/** The two parts of the workspace's sky, in CSS pixels: the Mac app's title bar over the sidebar (0 elsewhere). */
+const workspaceSkyLayout = { bar: 0, side: 0 };
+const WORKSPACE_SKY_PX = 4;
+
+/**
+ * The workspace's sky behind its header (the sidebar's top) and, in the Mac app, the title bar above it as one
+ * sky: the Cloud's is day with pixel clouds drifting by, a server of one's own the same sky at dusk with a few
+ * stars (`@agenteschat/ui` sky/workspace). Both parts read one field over their joint height and the same clouds
+ * and stars (from the clock), so they meet without a seam.
+ */
+export function WorkspaceSky({ part, rail = false }: { part: "bar" | "side"; rail?: boolean }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const hour = skyHourOf(window.location.host);
+  const ink = useRef({ bright: 0, dim: 0 });
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => {
+      workspaceSkyLayout[part] = el.getBoundingClientRect().height;
+    };
+    measure();
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    watch?.observe(el);
+    return () => {
+      watch?.disconnect();
+      workspaceSkyLayout[part] = 0;
+    };
+  }, [part]);
+  const opts: SkyOptions = {
+    pixel: WORKSPACE_SKY_PX,
+    // The icon rail is its own glass; the title bar keeps the sidebar's paper.
+    surface: rail && part === "side" ? "--glass-solid" : "--side",
+    palette: (bg) => {
+      const colors = workspaceInk(hour, bg, true);
+      ink.current = { bright: pixelOf(colors.bright), dim: pixelOf(colors.dim) };
+      return workspaceTones(hour, bg);
+    },
+    sprites: 0,
+    light: 0,
+    base: (u, v, tt) => {
+      const { bar, side } = workspaceSkyLayout;
+      const total = bar + side || 1;
+      return headerField(u, (part === "bar" ? v * bar : bar + v * side) / total, tt);
+    },
+    after: ({ buf, w, h }) => {
+      const { bar, side } = workspaceSkyLayout;
+      const offset = part === "bar" ? 0 : Math.round(bar / WORKSPACE_SKY_PX);
+      const rows = Math.round((bar + side) / WORKSPACE_SKY_PX) || h;
+      // The clock, not this sky's own time: the other part draws the same clouds and stars.
+      const now = performance.now() / 1000;
+      const draw = hour === "day" ? cloudAt : starAt;
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const k = draw(x, y + offset, w, rows, now, HEADER_AREA);
+          if (k) buf[y * w + x] = k === 2 ? ink.current.bright : ink.current.dim;
+        }
+    },
+  };
+  return (
+    <span
+      ref={box}
+      className={cx("workspace-sky", `workspace-sky--${part}`, rail && "workspace-sky--rail")}
+      aria-hidden="true"
+    >
       <PixelSky options={opts} />
     </span>
   );

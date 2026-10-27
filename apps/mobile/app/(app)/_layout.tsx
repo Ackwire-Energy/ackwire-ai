@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { View } from "react-native";
 import { useRememberAgentLooks } from "@/features/shared/hooks";
 import { useUserEvents } from "@/features/shared/userEvents";
+import { useSounds } from "@/lib/sounds";
 import { useOrg, useOrgGate } from "@/providers/org";
 import { coverBarOptions, useFormSheetOptions, usePushedOptions, useScrollUnderPushedOptions, useTheme } from "@/ui";
 
@@ -28,6 +29,8 @@ export default function AppLayout() {
 function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
+  // The app's sounds (ADR 0070): the player and its audio session.
+  useSounds();
   useRememberAgentLooks();
   // The unread and latest conversations load while the app is idle: opening them is instant.
   usePrefetchRecent(useOrg().orgId);

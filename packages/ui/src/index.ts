@@ -350,6 +350,16 @@ export {
 export { selectionSkyUrl } from "./sky/selection";
 export { agentTones, EYE, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones, spriteTone } from "./sky/tones";
 export {
+  cloudAt,
+  HEADER_AREA,
+  headerField,
+  type SkyHour,
+  skyHourOf,
+  starAt,
+  workspaceInk,
+  workspaceTones,
+} from "./sky/workspace";
+export {
   allZones,
   cityOf,
   FALLBACK_ZONES,

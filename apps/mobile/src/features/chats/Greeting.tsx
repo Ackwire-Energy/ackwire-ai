@@ -2,7 +2,7 @@ import { useMe } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { AgentAvatar, Button, Card, Icon, PixelOrbit, Sky, Text } from "@/ui";
+import { AgentAvatar, Button, Card, Icon, PixelOrbit, Sky, Text, WorkspaceSky } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook, firstName, greetingKey } from "../shared/logic";
@@ -27,9 +27,9 @@ const FACES = 4;
 /** Opens Agentes (who is working, doing what). */
 const openAgents = () => router.navigate("/agents");
 
-/** The light sky behind Conversas' bar, large title and greeting, fading out toward the list. */
+/** The workspace's sky behind Conversas' bar, large title and greeting, fading out toward the list. */
 export function GreetingSky() {
-  return <Sky color="sky" depth={0.9} fade={0.45} style={StyleSheet.absoluteFill} />;
+  return <WorkspaceSky fade={0.45} style={StyleSheet.absoluteFill} />;
 }
 
 /**
