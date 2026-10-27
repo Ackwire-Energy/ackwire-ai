@@ -364,7 +364,7 @@ describe("OpenBot (CopilotKit)", () => {
   });
 });
 
-describe("OpenBot.Run", () => {
+describe("OpenBot.run", () => {
   test("the Grok Bot migrator's archive: agents, skill folders, routines, memories, group chats", () => {
     const files = [...folder("openbot-run"), { name: "agents/scout/avatar.png", text: "" }];
     const b = parseImport(files, { models: MODELS });

@@ -1,11 +1,12 @@
 /**
  * The official marks of the AI makers the product names, as 24×24 path data shared by the web, the
- * desktop app and the phone (`ProviderLogo`). A mark goes next to its provider's name, never inside our
- * own feature names; the trademarks stay with their owners. Each drawing is the maker's own file (a press
- * kit, a brand page, or its repository at a pinned commit), scaled so its longer side is 24 and centred;
- * each entry names its source. A mark is drawn as provided: never recoloured, and dimmed only with opacity.
+ * desktop app and the phone (`ProviderLogo`), or an image where the maker's own files are a raster. A mark
+ * goes next to its provider's name, never inside our own feature names; the trademarks stay with their
+ * owners. Each drawing is the maker's own file (a press kit, a brand page, its repository at a pinned
+ * commit, or the icon its own site serves), and each entry names its source. A path is scaled so its
+ * longer side is 24 and centred. A mark is drawn as provided: never recoloured, and dimmed only with opacity.
  */
-export interface ProviderMark {
+export interface PathMark {
   /** The brand's color; absent for a one-color mark, drawn in the theme's ink, never a muted text's grey. */
   color?: string;
   /** One path on a 24×24 grid, nonzero fill. */
@@ -15,6 +16,16 @@ export interface ProviderMark {
   /** Fills `path` left to right across the grid, in place of `color` (which still tints the tile). */
   gradient?: [string, string];
 }
+
+/**
+ * A mark the maker publishes only as a raster, on a neutral tile: the file as the web app serves it
+ * (`apps/web/public/brands`, whose README names its source). The phone bundles its own copy.
+ */
+export interface ImageMark {
+  image: string;
+}
+
+export type ProviderMark = PathMark | ImageMark;
 
 const MARKS = {
   // The Claude Spark (Clay), from the press kit: https://www.anthropic.com/press-kit
@@ -26,6 +37,10 @@ const MARKS = {
   openai: {
     path: "M22.212 9.264C22.755 7.228 22.228 4.966 20.631 3.369C19.034 1.771 16.772 1.245 14.736 1.788C13.245.299 11.022-.375 8.841.209C6.659.794 5.072 2.489 4.524 4.524C2.489 5.072.794 6.659.209 8.841C-.375 11.022.299 13.245 1.788 14.736C1.245 16.772 1.772 19.034 3.369 20.631C4.966 22.228 7.228 22.755 9.264 22.212C10.755 23.7 12.978 24.375 15.159 23.791C17.341 23.206 18.928 21.511 19.476 19.476C21.511 18.928 23.206 17.341 23.791 15.159C24.375 12.978 23.701 10.755 22.212 9.264L22.212 9.264ZM19.651 4.349C20.733 5.432 21.179 6.909 20.99 8.317L15.907 5.383C15.693 5.259 15.429 5.259 15.215 5.383L9.264 8.818L9.264 6.565C9.264 6.407 9.348 6.26 9.485 6.18L14.017 3.564C15.813 2.561 18.125 2.823 19.651 4.349L19.651 4.349ZM12 8.84L14.736 10.42L14.736 13.58L12 15.16L9.264 13.58L9.264 10.42L12 8.84ZM5.703 6.035C5.732 3.979 7.115 2.108 9.2 1.549C10.678 1.153 12.181 1.505 13.305 2.373L8.223 5.308C8.008 5.431 7.876 5.66 7.876 5.907L7.876 12.779L5.925 11.652C5.788 11.573 5.703 11.426 5.703 11.268L5.703 6.035L5.703 6.035ZM1.549 9.2C1.945 7.721 3.001 6.596 4.315 6.056L4.315 11.925C4.315 12.172 4.447 12.401 4.662 12.525L10.613 15.961L8.662 17.087C8.525 17.166 8.354 17.167 8.217 17.088L3.686 14.471C1.919 13.418.99 11.284 1.549 9.2ZM4.349 19.651C3.267 18.569 2.821 17.091 3.01 15.683L8.093 18.618C8.307 18.741 8.571 18.741 8.785 18.618L14.736 15.182L14.736 17.435C14.736 17.593 14.652 17.741 14.515 17.82L9.983 20.436C8.187 21.439 5.875 21.177 4.349 19.651L4.349 19.651ZM18.297 17.965C18.268 20.021 16.885 21.893 14.8 22.451C13.322 22.847 11.819 22.495 10.695 21.627L15.777 18.693C15.992 18.569 16.124 18.34 16.124 18.093L16.124 11.221L18.075 12.348C18.212 12.427 18.297 12.574 18.297 12.732L18.297 17.965L18.297 17.965ZM22.451 14.8C22.055 16.279 20.999 17.404 19.685 17.944L19.685 12.075C19.685 11.828 19.553 11.599 19.338 11.475L13.387 8.04L15.338 6.913C15.475 6.834 15.646 6.833 15.783 6.913L20.314 9.529C22.081 10.582 23.01 12.716 22.451 14.8Z",
   },
+  // The sparkle gemini.google.com serves as its icon, scaled from 512 to 128 px:
+  // https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png. Google's own vector
+  // file fills the sparkle with a raster too.
+  gemini: { image: "/brands/gemini.png" },
   // The whale from https://github.com/deepseek-ai/DeepSeek-V2/blob/ec98ee3/figures/logo.svg
   deepseek: {
     color: "#4D6BFE",

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   coverHere,
+  FAIL_TEXT,
+  failedStep,
   hereBanner,
   hereLine,
   hereView,
@@ -8,8 +10,11 @@ import {
   type LocalServerStatus,
   NO_SERVER,
   REASON_TEXT,
+  STEP_SLOW_MS,
   setupSteps,
+  stepClock,
   stepStates,
+  UPDATE_SLOW_MS,
 } from "../src/control/local-server";
 import { menuLabels } from "../src/control/menu-labels";
 import { createDesktopI18n } from "../src/i18n";
@@ -64,7 +69,13 @@ describe("setting it up", () => {
       const has = (key: string) => i18n.exists(key);
       for (const step of setupSteps(true))
         expect({ step, ok: has(`desktop.here.step.${step}`) }).toEqual({ step, ok: true });
-      for (const key of [...Object.values(REASON_TEXT), "desktop.here.fail.start", "desktop.here.fail.account"]) {
+      for (const key of [
+        ...Object.values(REASON_TEXT),
+        ...Object.values(FAIL_TEXT),
+        "desktop.here.slow",
+        "desktop.here.copyDetails",
+        "desktop.here.serveFix",
+      ]) {
         expect({ key, ok: has(key) }).toEqual({ key, ok: true });
       }
       const reason = i18n.t(REASON_TEXT.https);
@@ -73,6 +84,34 @@ describe("setting it up", () => {
       for (const state of ["active", "done", "failed", "warn"])
         expect({ state, ok: has(`desktop.here.stepState.${state}`) }).toEqual({ state, ok: true });
     }
+  });
+
+  test("a step's time shows from 10 s, and from 30 s it takes a little longer than expected (two minutes for an update)", () => {
+    expect(stepClock(9_999)).toEqual({ time: false, slow: false });
+    expect(stepClock(10_000)).toEqual({ time: true, slow: false });
+    expect(stepClock(STEP_SLOW_MS - 1)).toEqual({ time: true, slow: false });
+    expect(stepClock(30_000)).toEqual({ time: true, slow: true });
+    expect(UPDATE_SLOW_MS).toBe(120_000);
+    expect(stepClock(30_000, UPDATE_SLOW_MS)).toEqual({ time: true, slow: false });
+    expect(stepClock(120_000, UPDATE_SLOW_MS)).toEqual({ time: true, slow: true });
+  });
+
+  test("a setup that ended in an error always stops on a step", () => {
+    const steps = setupSteps(false);
+    const at = (...changes: Parameters<typeof stepStates>[1]) => failedStep(steps, stepStates(steps, changes));
+    const done = (step: (typeof steps)[number]) => [
+      { step, state: "active" as const },
+      { step, state: "done" as const },
+    ];
+    // The step that said so.
+    expect(at(...done("database"), { step: "start", state: "active" }, { step: "start", state: "failed" })).toBe(
+      "start",
+    );
+    // Else the one under way.
+    expect(at(...done("database"), ...done("start"), { step: "account", state: "active" })).toBe("account");
+    // Else the first one not done, and with every step done, the last.
+    expect(at()).toBe("database");
+    expect(at(...done("database"), ...done("start"), ...done("account"), ...done("computer"))).toBe("computer");
   });
 });
 
@@ -161,6 +200,19 @@ describe("what the popover, the cover and Preferences say", () => {
     const labels = menuLabels(createDesktopI18n("en", "linux").t);
     expect(labels.serverTitle).toBe("agentes.chat on this computer");
     expect(labels.serverStop).toBe("Stop");
-    expect(labels.hereBack).toBe("The update didn't start; agentes.chat is back on {version}.");
+    expect(labels.hereBack).toBe("The update didn't start. agentes.chat is back on {version}.");
+  });
+
+  test("Rust's notification for a setup that failed while its window was closed, in both languages", () => {
+    const en = menuLabels(createDesktopI18n("en", "mac").t);
+    expect([en.setupFailed, en.setupFailedBody]).toEqual([
+      "Setting up agentes.chat on this Mac didn't finish",
+      "Open agentes.chat to see what happened.",
+    ]);
+    const pt = menuLabels(createDesktopI18n("pt-BR", "windows").t);
+    expect([pt.setupFailed, pt.setupFailedBody]).toEqual([
+      "A preparação do agentes.chat neste PC não terminou",
+      "Abra o agentes.chat para ver o que aconteceu.",
+    ]);
   });
 });

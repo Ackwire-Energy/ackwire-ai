@@ -60,7 +60,7 @@ From https://github.com/NousResearch/hermes-agent, MIT License, Copyright (c) 20
 | Folder | Format |
 |---|---|
 | `openmausbot-team/` | OpenMausBot's team file (`docs/headless-cli.md`) |
-| `openbot-run/` | OpenBot.Run's agent import archive (`openbot-agent-import` v1), from its documentation only: that project's license (PolyForm Noncommercial) keeps its files out of this repository |
+| `openbot-run/` | OpenBot.run's agent import archive (`openbot-agent-import` v1), from its documentation only: that project's license (PolyForm Noncommercial) keeps its files out of this repository |
 | `openclaw-workspace/` | an OpenClaw workspace (`docs/concepts/agent-workspace.md`) |
 | `hermes-profile/` | a Hermes Agent profile export (`website/docs/user-guide/profile-distributions.md`) |
 | `paperclip-company/` | an Agent Companies package (Paperclip's `docs/companies/companies-spec.md`) |

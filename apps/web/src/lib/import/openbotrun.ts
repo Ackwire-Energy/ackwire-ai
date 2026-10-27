@@ -19,7 +19,7 @@ import {
 } from "./shared";
 
 /**
- * OpenBot.Run (Synthetify Labs, github.com/nightly-labs/openbot), read from
+ * OpenBot.run (Synthetify Labs, github.com/nightly-labs/openbot), read from
  * its documented formats only:
  * - `openbot-import.json` (`openbot-agent-import` v1), the archive "Migrator
  *   by OpenBot" writes for Grok Bot users (its skill:

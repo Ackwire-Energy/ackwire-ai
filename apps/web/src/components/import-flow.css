@@ -18,10 +18,21 @@
 }
 
 /* ── Source cards ───────────────────────────────────────────────────────── */
+/*
+ * Never one card alone on the last row: a card is over a quarter of the row, so three columns at most, which
+ * the nine cards (IMPORT_CARDS) fill. Where only two fit (under three 168px cards and their gaps), an odd last
+ * card takes the whole row.
+ */
 .imp-sources {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(min(100%, 168px), 26%), 1fr));
   gap: 8px;
+  container-type: inline-size;
+}
+@container (width < 520px) {
+  .imp-source:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 .imp-source {
   padding: 12px;

@@ -149,7 +149,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
         id: "other-apps",
         heading: "De outro app",
         blocks: [
-          "Escolha **Outro app**, copie o pedido e cole numa conversa nova nesse app. Depois traga o que ele devolver: solte o arquivo ou cole a resposta inteira. Onde cada app entrega:",
+          "Escolha **Grok Bot**, **ChatGPT dots** ou **Outro app**. Copie o pedido, cole nesse app e traga o que ele devolver: solte o arquivo ou cole a resposta inteira. Onde cada app entrega:",
           {
             list: [
               "**Grok Bot**: na conversa com o seu bot. Ele responde com o JSON: copie a resposta inteira.",
@@ -157,6 +157,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
               "**Claude**: numa conversa nova, ou no projeto dos seus agentes. Baixe o arquivo que ele criar.",
               "**Manus**: numa tarefa nova. O arquivo fica nos resultados da tarefa.",
               "**Rakazo**: mande para o seu agente. Ele responde com o JSON: copie a resposta inteira.",
+              "**OpenBot**: sem pedido. Arraste a pasta do tenant (agents.yaml, agents/, model.yaml, skills.yaml) ou cole o link do GitHub dela.",
             ],
           },
         ],

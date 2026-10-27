@@ -50,37 +50,18 @@ export const joiningLeft = (chosen: ReadonlySet<Preset>, created: Partial<Record
   PRESETS.filter((p) => p !== GUIDE && chosen.has(p) && !created[p]).length;
 
 /**
- * The apps the import step names, in the web's order (its `IMPORT_CARDS`): each with its maker's logo, then any other
- * app. The phone can't read their files; it names them and says where on the web they come in.
+ * The import step's rows: the three most used apps the web brings agents from, in its order (its `IMPORT_CARDS`). The
+ * phone can't read their files; it names them and says where on the web they come in.
  */
-export const IMPORT_ROWS = [
-  "openclaw",
-  "hermes",
-  "openbotrun",
-  "paperclip",
-  "openmausbot",
-  "openbot",
-  "agenteschat",
-  "other",
-] as const;
+export const IMPORT_ROWS = ["grok-bot", "chatgpt-dots", "openbotrun"] as const;
 export type ImportRow = (typeof IMPORT_ROWS)[number];
 
-/** Brand names, not translated (the web's `SOURCE_NAME`). */
-const IMPORT_BRAND: Record<Exclude<ImportRow, "agenteschat" | "other">, string> = {
-  openclaw: "OpenClaw",
-  hermes: "Hermes Agent",
-  openbotrun: "OpenBot.Run",
-  paperclip: "Paperclip",
-  openmausbot: "OpenMausBot",
-  openbot: "OpenBot",
+/** Brand names, not translated (the web's card names). */
+export const IMPORT_BRAND: Record<ImportRow, string> = {
+  "grok-bot": "Grok Bot",
+  "chatgpt-dots": "ChatGPT dots",
+  openbotrun: "OpenBot.run",
 };
-
-/** A row's name: the brand, or the web's words for our own export and for any other app. */
-export function importRowName(t: TFunction, row: ImportRow): string {
-  if (row === "other") return t("onboarding.import.otherName");
-  if (row === "agenteschat") return t("onboarding.import.agenteschatName");
-  return IMPORT_BRAND[row];
-}
 
 /** Who hosts each step (introducing itself the first time it appears). */
 export const HOST: Record<StepId, Preset> = {

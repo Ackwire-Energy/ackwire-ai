@@ -55,12 +55,10 @@
   padding: 38px 0 16px;
   box-sizing: border-box;
 }
-/*
- * The step title's ⓘ: the line is as tall as the title's (`.onb__title`), so the ⓘ sits on its first line; the
- * type stays small, so the ⓘ's nudge under the middle stays a hair, as beside a label.
- */
+/* The step title's ⓘ: the line takes the title's type (`.onb__title`), so the ⓘ sits on its first line's capitals. */
 .ac-hintline:has(> .newag__title) {
-  line-height: calc(var(--onb-title-size) * var(--onb-title-leading));
+  font-size: var(--onb-title-size);
+  line-height: var(--onb-title-leading);
 }
 .newag__cap {
   display: flex;

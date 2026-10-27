@@ -10,22 +10,58 @@ import { type MarkId, markOf, PROVIDER_MARKS } from "../src/brand/marks";
 afterEach(() => cleanup());
 
 const logo = (container: HTMLElement) => container.querySelector(".ac-brand") as HTMLElement;
+/** A mark drawn from path data: every maker's but Gemini's, which is an image. */
+const pathMark = (id: MarkId) => {
+  const mark = PROVIDER_MARKS[id];
+  if (!("path" in mark)) throw new Error(`${id} is an image mark`);
+  return mark;
+};
 
 describe("provider marks", () => {
-  test("every mark renders its path on the 24×24 grid, in the brand's color or the theme's", () => {
+  test("every mark renders its path on the 24×24 grid in the brand's color or the theme's, or its image", () => {
     for (const id of Object.keys(PROVIDER_MARKS) as MarkId[]) {
       const { container } = render(<ProviderLogo id={id} size="sm" />);
       const el = logo(container);
       expect(el.dataset.mark).toBe(id);
+      const mark = PROVIDER_MARKS[id];
+      if ("image" in mark) {
+        expect(el.querySelector("img")?.getAttribute("src")).toBe(mark.image);
+        expect(el.classList.contains("ac-brand--mono")).toBe(true);
+        cleanup();
+        continue;
+      }
       expect(el.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 24 24");
       const d = el.querySelector("path")?.getAttribute("d") ?? "";
-      expect(d).toBe(PROVIDER_MARKS[id].path);
+      expect(d).toBe(mark.path);
       expect(d).toMatch(/^[Mm][\d.\s,a-zA-Z-]+$/);
-      const color = PROVIDER_MARKS[id].color;
-      if (color) expect(el.style.getPropertyValue("--brand")).toBe(color);
+      if (mark.color) expect(el.style.getPropertyValue("--brand")).toBe(mark.color);
       else expect(el.classList.contains("ac-brand--mono")).toBe(true);
       cleanup();
     }
+  });
+
+  test("Gemini draws its own image on the neutral tile, at a path mark's size, dimmed only by opacity", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    for (const size of ["xs", "chip", "sm", "tile"] as const) {
+      const el = logo(render(<ProviderLogo id="gemini" size={size} />).container);
+      expect(el.dataset.mark).toBe("gemini");
+      const img = el.querySelector("img") as HTMLImageElement;
+      expect([img.getAttribute("src"), img.getAttribute("alt")]).toEqual(["/brands/gemini.png", ""]);
+      // The size the stylesheet gives a path mark's drawing in this tile, so the kit's rules stay as they are.
+      const px = /width: (\d+)px/.exec(rule(`.ac-brand--${size} svg`))?.[1];
+      expect([size, img.getAttribute("width"), img.getAttribute("height")]).toEqual([size, px ?? "", px ?? ""]);
+      expect(el.querySelector("svg")).toBeNull();
+      // No brand tint: Google's sparkle sits on the neutral tile.
+      expect(el.className).toBe(`ac-brand ac-brand--${size} ac-brand--mono`);
+      expect(el.style.getPropertyValue("--brand")).toBe("");
+      cleanup();
+    }
+    const off = logo(render(<ProviderLogo id="gemini" size="sm" off />).container);
+    expect(off.className).toBe("ac-brand ac-brand--sm ac-brand--mono ac-brand--off");
+    expect(rule(".ac-brand--off")).toContain("opacity: 0.5");
+    expect(rule(".ac-brand--off")).not.toContain("filter");
+    expect(off.querySelector("img")?.hasAttribute("style")).toBe(false);
   });
 
   test("brains, executors and API providers find their maker's mark; anything else has none", () => {
@@ -36,6 +72,7 @@ describe("provider marks", () => {
     expect(markOf("anthropic")).toBe("claude");
     expect(markOf("moonshot")).toBe("kimi");
     expect(markOf("zai")).toBe("zai");
+    expect(markOf("gemini")).toBe("gemini");
     for (const id of ["model", "agent", "mistral", "", null, undefined, "constructor", "__proto__", "toString"])
       expect(markOf(id)).toBeNull();
   });
@@ -44,17 +81,17 @@ describe("provider marks", () => {
     const el = logo(render(<ProviderLogo id="anthropic" size="sm" />).container);
     expect(el.dataset.mark).toBe("claude");
     expect(el.style.getPropertyValue("--brand")).toBe("#D97757");
-    expect(el.querySelector("path")?.getAttribute("d")).toBe(PROVIDER_MARKS.claude.path);
+    expect(el.querySelector("path")?.getAttribute("d")).toBe(pathMark("claude").path);
   });
 
   test("a mark's second color is its own part, with the maker's dark color where it has one", () => {
     const kimi = logo(render(<ProviderLogo id="moonshot" size="sm" />).container);
     const [k, dot] = [...kimi.querySelectorAll("path")];
     // The K follows the theme; the dot is always Kimi's blue, drawn over it.
-    expect(k?.getAttribute("d")).toBe(PROVIDER_MARKS.kimi.path);
+    expect(k?.getAttribute("d")).toBe(pathMark("kimi").path);
     expect(k?.getAttribute("class")).toBeNull();
     expect(dot?.getAttribute("class")).toBe("ac-brand__part");
-    expect(dot?.getAttribute("d")).toBe(PROVIDER_MARKS.kimi.parts?.[0]?.path ?? "");
+    expect(dot?.getAttribute("d")).toBe(pathMark("kimi").parts?.[0]?.path ?? "");
     expect(dot?.style.getPropertyValue("--part")).toBe("#1783FF");
     expect(dot?.style.getPropertyValue("--part-dark")).toBe("#1783FF");
     cleanup();
@@ -179,7 +216,7 @@ describe("provider marks", () => {
     const claude = logo(render(<BrainLogo kind="claude_code" />).container);
     expect(claude.dataset.mark).toBe("claude");
     expect(claude.className).toContain("ac-brand--tile");
-    expect(claude.querySelector("path")?.getAttribute("d")).toBe(PROVIDER_MARKS.claude.path);
+    expect(claude.querySelector("path")?.getAttribute("d")).toBe(pathMark("claude").path);
     cleanup();
     const codex = logo(render(<BrainLogo kind="codex" size="sm" off label="Codex" />).container);
     expect(codex.dataset.mark).toBe("openai");
