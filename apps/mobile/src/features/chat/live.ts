@@ -80,7 +80,7 @@ function reduce(state: LiveState, action: Action): LiveState {
       const seeded =
         event.type === "message.created" && event.message ? seedReceipt(state.receipts, event.message) : state.receipts;
       const receipts = applyReceiptEvent(seeded, event);
-      // Most events (typing) change none of them: no re-render.
+      // An event that changes none of them (a person typing) doesn't re-render.
       return streams === state.streams && consults === state.consults && receipts === state.receipts
         ? state
         : { streams, consults, receipts };
