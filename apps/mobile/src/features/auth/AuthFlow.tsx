@@ -1,5 +1,5 @@
-import { ApiError, invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
-import { ACCOUNT_BLOCKED } from "@agenteschat/client/lib/errors";
+import { invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
+import { type HumanAction, humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -22,6 +22,8 @@ import { Icon } from "@/ui/Icon";
 import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";
+import { useHumanCheck } from "./HumanCheck";
+import { CheckCancelled, failureText, refusalOf, refusalText, signUpClosed } from "./human-check";
 import { pendingInvite } from "./invite";
 import { signInPurpose } from "./links";
 
@@ -50,6 +52,18 @@ const BACK: Record<Step, Step | null> = {
   sent: "password",
 };
 
+/**
+ * The steps that send something a bot could flood, and what their bot check is for (ADR 0075). The name step
+ * leads to the new password's, so its token is ready by the sign-up.
+ */
+const STEP_ACTIONS: Partial<Record<Step, HumanAction>> = {
+  email: "email-lookup",
+  password: "sign-in",
+  name: "sign-up",
+  newPassword: "sign-up",
+  forgot: "password-reset",
+};
+
 export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; email?: string }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -67,6 +81,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState(false);
   const [wink, setWink] = useState(false);
+  const human = useHumanCheck(STEP_ACTIONS[step] ?? null);
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
@@ -92,7 +107,9 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setPending(true);
     setError(null);
     try {
-      const found = await api.account.signInOptions({ email: value.trim() });
+      const found = await withHumanCheck(human.check, (token) =>
+        api.account.signInOptions({ email: value.trim() }, token),
+      );
       setOptions(found);
       setPassword("");
       // No password and no provider this server signs in with (the owner's account made by the desktop
@@ -102,21 +119,21 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       if (found.account) go(found.password ? "password" : usable ? "social" : "noPassword");
       else go(found.canSignUp ? "name" : "closed");
     } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? t(e.status === 429 ? "auth.tooManyTries" : "mobile.auth.errors.generic")
-          : t("mobile.auth.errors.network"),
-      );
+      if (!(e instanceof CheckCancelled)) setError(failureText(t, e));
     } finally {
       setPending(false);
     }
   };
 
-  // Came with the e-mail ("Criar conta" from somewhere that knew it): straight to the next step.
+  // Came with the e-mail ("Criar conta" from somewhere that knew it): straight to the next step, once the server
+  // has said whether a bot check guards it.
+  const lookedUp = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, for the e-mail it came with
   useEffect(() => {
+    if (lookedUp.current || config.isPending) return;
+    lookedUp.current = true;
     if (initialEmail && isEmail(initialEmail)) void lookUp(initialEmail);
-  }, []);
+  }, [config.isPending]);
 
   // Mounted under the launch splash: the keyboard comes up once the splash leaves.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the splash leaves
@@ -124,46 +141,49 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     if (launched && step === "email" && !initialEmail) emailField.current?.focus();
   }, [launched]);
 
+  /** Better Auth's refusal → the sentence to show (never the server's raw text). */
+  const failed = (refusal: { status: number; code?: string }) =>
+    setError(refusal.status ? refusalText(t, refusal) : t("mobile.auth.errors.network"));
+
   /**
    * What a throw means: only a request that never got an answer (fetch's "Network request failed") is
-   * "Sem conexão"; anything else in the app (the Keychain, a bug) reads as the generic failure.
+   * "Sem conexão"; anything else in the app (the Keychain, a bug) reads as the generic failure. A bot check
+   * closed with Cancel says nothing: the button is there to press again.
    */
-  const thrown = (error: unknown): number | undefined => {
-    if (error instanceof TypeError && /network|fetch/i.test(error.message)) return undefined;
-    console.warn("[auth]", error);
-    return -1;
+  const thrown = (error: unknown) => {
+    if (error instanceof CheckCancelled) return;
+    const network = error instanceof TypeError && /network|fetch/i.test(error.message);
+    if (!network) console.warn("[auth]", error);
+    setError(t(network ? "mobile.auth.errors.network" : "mobile.auth.errors.generic"));
   };
-
-  /** Better Auth's answer → the sentence to show (never the server's raw text). */
-  const failed = (status: number | undefined) =>
-    setError(
-      status === 429
-        ? t("auth.tooManyTries")
-        : status === undefined || status === 0
-          ? t("mobile.auth.errors.network")
-          : t("mobile.auth.errors.generic"),
-    );
 
   const signIn = async () => {
     setPending(true);
     setError(null);
     try {
-      const res = await authClient().signIn.email({ email: email.trim(), password });
-      if (res.error) {
+      const refused = await withHumanCheck(human.check, async (token) =>
+        refusalOf(
+          await authClient().signIn.email({
+            email: email.trim(),
+            password,
+            fetchOptions: { headers: humanCheckHeaders(token) },
+          }),
+        ),
+      );
+      if (refused) {
         haptics.warning();
-        if (res.error.status === 401) {
+        if (refused.status === 401) {
           setWrong(true);
           // The wrong password goes, so the next try starts on an empty field.
           setPassword("");
-        } else if (res.error.code === ACCOUNT_BLOCKED) setError(t("auth.accountBlocked"));
-        else failed(res.error.status);
+        } else failed(refused);
         return;
       }
       haptics.success();
       rememberSignIn("email");
       void writeValue(LAST_EMAIL, email.trim());
     } catch (error) {
-      failed(thrown(error));
+      thrown(error);
     } finally {
       setPending(false);
     }
@@ -173,11 +193,21 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setPending(true);
     setError(null);
     try {
-      const res = await authClient().signUp.email({ name: name.trim(), email: email.trim(), password });
-      if (res.error) {
+      const refused = await withHumanCheck(human.check, async (token) =>
+        refusalOf(
+          await authClient().signUp.email({
+            name: name.trim(),
+            email: email.trim(),
+            password,
+            fetchOptions: { headers: humanCheckHeaders(token) },
+          }),
+        ),
+      );
+      if (refused) {
         haptics.warning();
-        if (res.error.status === 403) go("closed");
-        else failed(res.error.status);
+        // Checked by code: the bot check refuses with a 403 too, and that isn't sign-up being closed.
+        if (signUpClosed(refused)) go("closed");
+        else failed(refused);
         return;
       }
       haptics.success();
@@ -186,7 +216,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       // A server that sends email sent this address a link to confirm it: the first run says where it went.
       if (canReset) rememberConfirmationSent(email);
     } catch (error) {
-      failed(thrown(error));
+      thrown(error);
     } finally {
       setPending(false);
     }
@@ -198,12 +228,20 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     try {
       // The answer is the same whether or not the account exists. Relative: the server resolves it
       // against its own address, so the link opens its web page whatever address the app reached it at.
-      const res = await authClient().requestPasswordReset({ email: email.trim(), redirectTo: "/reset-password" });
-      if (res.error) return failed(res.error.status);
+      const refused = await withHumanCheck(human.check, async (token) =>
+        refusalOf(
+          await authClient().requestPasswordReset({
+            email: email.trim(),
+            redirectTo: "/reset-password",
+            fetchOptions: { headers: humanCheckHeaders(token) },
+          }),
+        ),
+      );
+      if (refused) return failed(refused);
       haptics.success();
       go("sent");
     } catch (error) {
-      failed(thrown(error));
+      thrown(error);
     } finally {
       setPending(false);
     }
@@ -279,6 +317,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       onBack={onBack}
       agentMode={pending ? "run" : "idle"}
       expression={expression}
+      overlay={human.view}
       footer={
         step === "email" ? (
           <View style={{ gap: 14, alignItems: "center" }}>

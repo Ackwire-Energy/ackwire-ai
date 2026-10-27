@@ -20,6 +20,7 @@ import {
   MachineOfflineError,
   machineOnline,
   publishMachineUpdated,
+  REMOVED_COMPUTER_MESSAGE,
   requireMachineManager,
 } from "./machines";
 import { insertMessage, messageView } from "./messages";
@@ -95,7 +96,7 @@ export async function reduceMachineAccess(
   }
   if (machine.protocol < ACCESS_PROTOCOL) {
     throw new ValidationError(
-      "This computer's app is too old to change its access from here; update it",
+      "This computer's app is too old to change its access from here. Update it.",
       "machine.access_outdated",
     );
   }
@@ -151,7 +152,7 @@ export async function requestFolderAccess(
   }
   const machine = await getMachineById(deps.db, machineId);
   if (!machine || machine.deletedAt || machine.orgId !== ctx.orgId) {
-    throw new ValidationError("Your connected computer was removed; ask an admin or your owner to choose another one.");
+    throw new ValidationError(REMOVED_COMPUTER_MESSAGE);
   }
   if (machine.protocol < ACCESS_PROTOCOL) {
     throw new ValidationError(
@@ -285,7 +286,7 @@ export function accessDecisionNotice(row: AccessRequestRow, computer: string) {
       ? `The owner allowed ${row.path} on ${computer}${row.scope === "all" ? " for every agent" : ""}.`
       : row.status === "denied"
         ? `The owner didn't allow ${row.path} on ${computer}.`
-        : `Nobody answered the request for ${row.path} on ${computer} in time; it expired.`;
+        : `Nobody answered the request for ${row.path} on ${computer} in time, so it expired.`;
   return {
     body,
     meta: {

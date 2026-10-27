@@ -78,6 +78,20 @@ export async function assertPublicHttpsUrl(raw: string, resolve: ResolveHost = r
 
 const HOST_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
+/** Name suffixes that never leave a local network: loopback, mDNS, private use and the special-use ones. */
+const LOCAL_SUFFIXES = [".localhost", ".local", ".internal", ".lan", ".home.arpa", ".test", ".example", ".invalid"];
+
+/**
+ * Whether a host is a public DNS name, from the name alone (nothing is resolved): dotted, not an IP
+ * address, not `localhost` and under no local-only suffix. For a name others read as this server's own
+ * (a Web Push contact), never as a check before connecting (`publicHostAddress` resolves).
+ */
+export function isPublicHostName(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/\.$/, "");
+  if (isIP(h) || !HOST_NAME.test(h)) return false;
+  return !LOCAL_SUFFIXES.some((suffix) => h.endsWith(suffix));
+}
+
 /**
  * A host a person typed for a direct connection (a database): an address
  * to connect to that is not private, loopback, link-local or metadata.

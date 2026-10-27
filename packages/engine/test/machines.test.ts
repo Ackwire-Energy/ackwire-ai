@@ -776,7 +776,7 @@ describe("tools on a connected machine", () => {
     await runner.disconnect();
     const offline = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(offline).toMatchObject({ isError: true });
-    expect(offline.content).toContain("The computer Build box is offline; ask its owner to start the runner.");
+    expect(offline.content).toContain("The computer Build box is offline. Ask its owner to start the runner.");
   });
 
   test("commands turned off on the machine are explained", async () => {

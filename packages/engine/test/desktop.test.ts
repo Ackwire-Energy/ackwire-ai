@@ -345,9 +345,9 @@ describe("pause (protocol 9)", () => {
   test("the message the agent relays, in the owner's time zone", () => {
     const now = new Date("2026-10-17T18:00:00Z");
     expect(pausedMessage("MacBook", "2026-10-17T19:24:00Z", "America/Sao_Paulo", now)).toContain(
-      "paused the computer MacBook until 16:24;",
+      "paused the computer MacBook until 16:24.",
     );
-    expect(pausedMessage("MacBook", "2026-10-17T19:24:00Z", null, now)).toContain("until 19:24 UTC;");
+    expect(pausedMessage("MacBook", "2026-10-17T19:24:00Z", null, now)).toContain("until 19:24 UTC.");
     expect(pausedMessage("MacBook", null)).toContain("until they resume it");
   });
 

@@ -641,7 +641,7 @@ export function diagnoseAppLogs(logs: string): Problem | null {
   const issues = [...logs.slice(at).matchAll(/^\s+- (.+)$/gm)].map((m) => (m[1] ?? "").trim()).slice(0, 5);
   return {
     check: "app.config",
-    error: `The app refused its configuration${issues.length ? `: ${issues.join("; ")}` : ""}.`,
+    error: `The app refused its configuration${issues.length ? `: ${issues.join(". ")}` : ""}.`,
     fix: "Fix those values in .env, then run the setup again. docker compose logs agentes shows the whole message.",
   };
 }
@@ -763,7 +763,7 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
   return {
     mac,
     yes: false,
-    why: `This machine has ${gb} GB of memory; each agent's screen needs about 0.2 GB and its browser 0.6 GB more.`,
+    why: `This machine has ${gb} GB of memory. Each agent's screen needs about 0.2 GB, and its browser 0.6 GB more.`,
   };
 }
 
@@ -1147,7 +1147,7 @@ export function planSteps(p: PlanInput): string[] {
   const steps: string[] = [];
   if (p.image) steps.push("Docker: not checked here (setup inside the image)");
   else if (p.docker) steps.push(p.docker);
-  if (p.questions.length) steps.push(`asks: ${p.questions.join("; ")}`);
+  if (p.questions.length) steps.push(`asks: ${p.questions.join(", ")}`);
   steps.push(
     p.envExists
       ? `.env: keep it and add only what's missing${p.newSecrets.length ? ` (${p.newSecrets.join(", ")})` : ""}`
@@ -1167,7 +1167,7 @@ export function planSteps(p: PlanInput): string[] {
   } else if (p.network === "domain") {
     steps.push(`network: public domain ${p.domain ?? "(asked)"}, HTTPS by Caddy on ports 80 and 443`);
   } else if (p.network === "proxy") {
-    steps.push(`network: your own proxy or tunnel at ${p.publicUrl.now}; PUBLIC_URL and COMPOSE_PROFILES stay`);
+    steps.push(`network: your own proxy or tunnel at ${p.publicUrl.now} (PUBLIC_URL and COMPOSE_PROFILES stay)`);
   } else {
     steps.push("network: this machine only, http://localhost");
   }

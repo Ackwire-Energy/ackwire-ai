@@ -647,7 +647,7 @@ describe("from issues, the chat and routines", () => {
     await runRoutineNow(routineDeps, f.owner.id, f.org.id, routine.id);
     await drainOutbox(f.db, f.handlers);
     const [topic] = await listForumTopics(f.db, f.owner.id, f.org.id);
-    expect(topic?.title.startsWith("Retrospectiva — ")).toBe(true);
+    expect(topic?.title.startsWith("Retrospectiva · ")).toBe(true);
     expect(topic?.goal).toBe("O que deu certo e o que não deu nesta semana?");
     expect(topic?.agentIds.sort()).toEqual([f.agent.id, ops.id].sort());
     expect(topic?.status).toBe("done");

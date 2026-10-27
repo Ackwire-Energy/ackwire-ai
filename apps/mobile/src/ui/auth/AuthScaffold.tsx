@@ -31,6 +31,8 @@ export interface AuthScaffoldProps {
   /** The agent works while a request is out ("run": writing dashes) and reacts with a face. */
   agentMode?: "idle" | "run";
   expression?: Expression;
+  /** Over the screen and outside the steps, so a step's change never remounts it (the bot check's WebView). */
+  overlay?: ReactNode;
 }
 
 /** One calm question per screen: the pixel sky with an agent on top, a large title, the answer below. */
@@ -43,6 +45,7 @@ export function AuthScaffold({
   stepKey,
   agentMode = "idle",
   expression,
+  overlay,
 }: AuthScaffoldProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -101,6 +104,7 @@ export function AuthScaffold({
           {footer ? <View style={{ marginTop: 24, alignItems: "center" }}>{footer}</View> : null}
         </Animated.View>
       </ScrollView>
+      {overlay}
     </KeyboardAvoidingView>
   );
 }

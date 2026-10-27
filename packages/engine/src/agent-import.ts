@@ -91,12 +91,12 @@ export async function readGithubImport(
         deps,
         `https://api.github.com/repos/${target.owner}/${target.repo}/git/trees/${encodeURIComponent(target.ref)}?recursive=1`,
         "application/vnd.github+json",
-        { maxBytes: 8 * 1024 * 1024, tooLarge: "The repository is too large to list; link a file" },
+        { maxBytes: 8 * 1024 * 1024, tooLarge: "The repository is too large to list. Link a file instead." },
       ),
     ),
   ) as { tree?: TreeEntry[]; truncated?: boolean };
   if (!Array.isArray(listing.tree)) throw new ValidationError("That URL is not a folder");
-  if (listing.truncated) throw new ValidationError("The repository is too large to list; link a file");
+  if (listing.truncated) throw new ValidationError("The repository is too large to list. Link a file instead.");
   const base = target.path.replace(/^\/+|\/+$/g, "");
   const prefix = base ? `${base}/` : "";
   const found = listing.tree.flatMap((entry) => {

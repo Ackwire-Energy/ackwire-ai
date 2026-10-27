@@ -6,12 +6,12 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, InfoHint, LineIcon, PersonAvatar, Segmented, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Chip, InfoHint, PersonAvatar, Segmented, SheetScreen, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { requestTimes } from "./logic";
+import { requestChips } from "./logic";
 
 /**
  * Requests to join through the invitation link (ADR 0068), as a native form sheet: the web's Members › Requests on
@@ -65,12 +65,12 @@ export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** One request: who, their address and whether it is proven, their note, and the answer. */
+/** One request: who and their address, its chips (`requestChips`), their note, and the answer. */
 function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (url: string) => void }) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
-  const c = useColors();
   const surface = useSurface();
+  const chips = requestChips(t, i18n.language, r);
   const toast = useToast();
   const approve = useApproveJoinRequest(orgId);
   const deny = useDenyJoinRequest(orgId);
@@ -125,26 +125,11 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
           </Text>
         </View>
       </View>
-      {/* The detail in a sunken well, as the web's request card: the address's proof and the two times. */}
-      <View style={[styles.well, { backgroundColor: c.sunken }]}>
-        <View style={styles.line}>
-          <LineIcon
-            name={r.confirmed ? "check" : "mail"}
-            size={14}
-            color={r.confirmed ? c.ok : c.muted}
-            variant="small"
-          />
-          <Text variant="small" tone="ink" style={styles.grow}>
-            {r.confirmed ? t("members.requests.confirmed") : t("members.requests.unconfirmed")}
-          </Text>
-        </View>
-        {requestTimes(t, i18n.language, r).map((line) => (
-          <Text key={line} variant="caption" tone="muted">
-            {line}
-          </Text>
-        ))}
+      <View style={styles.chips}>
+        {chips.unverified ? <Chip icon="mail" label={chips.unverified} /> : null}
+        <Chip icon="clock" label={chips.asked} />
       </View>
-      {/* Their note, in their words, after the detail. */}
+      {/* Their note, in their words. */}
       {r.note ? (
         <Text variant="body" tone="ink">
           {t("members.requests.note", { note: r.note })}
@@ -234,8 +219,7 @@ function HandOff({ name, onShare }: { name: string; onShare: () => void }) {
 const styles = StyleSheet.create({
   card: { borderRadius: 22, paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   who: { flexDirection: "row", alignItems: "center", gap: 10 },
-  line: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  well: { gap: 4, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   field: { gap: 6 },

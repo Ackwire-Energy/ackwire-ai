@@ -507,7 +507,7 @@ describe("Docker", () => {
       "Invalid configuration:\n  - AGENTES_SECRET is required\n  - PUBLIC_URL: Invalid URL\n\nCopy .env.example";
     expect(diagnoseAppLogs(logs)).toMatchObject({
       check: "app.config",
-      error: "The app refused its configuration: AGENTES_SECRET is required; PUBLIC_URL: Invalid URL.",
+      error: "The app refused its configuration: AGENTES_SECRET is required. PUBLIC_URL: Invalid URL.",
     });
     expect(diagnoseAppLogs('{"level":"info","msg":"starting agentes.chat"}')).toBeNull();
   });
@@ -536,10 +536,10 @@ describe("the agents' computer", () => {
     expect(computerOffer({ ...server, memory: 2 * GB }, null, false)).toEqual({
       mac: false,
       yes: false,
-      why: "This machine has 2 GB of memory; each agent's screen needs about 0.2 GB and its browser 0.6 GB more.",
+      why: "This machine has 2 GB of memory. Each agent's screen needs about 0.2 GB, and its browser 0.6 GB more.",
     });
     expect(computerOffer({ ...server, memory: 1.9 * GB }, null, false)).toMatchObject({
-      why: expect.stringMatching(/^This machine has 1\.9 GB of memory;/),
+      why: expect.stringMatching(/^This machine has 1\.9 GB of memory\./),
     });
     expect(computerOffer({ ...server, apt: false }, null, false)).toEqual({
       mac: false,
@@ -1109,7 +1109,7 @@ describe("the plan", () => {
 
   test("a dry run lists the questions the real run asks", () => {
     const steps = planSteps({ ...base, questions: ["how people reach it", "email"] });
-    expect(steps[0]).toBe("asks: how people reach it; email");
+    expect(steps[0]).toBe("asks: how people reach it, email");
   });
 
   test("Docker is in the plan only when it's not fine: the run says it is, once, above the plan", () => {
@@ -1146,7 +1146,7 @@ describe("the plan", () => {
       publicUrl: { now: "https://chat.example.com", next: null },
     });
     expect(proxy).toContain(
-      "network: your own proxy or tunnel at https://chat.example.com; PUBLIC_URL and COMPOSE_PROFILES stay",
+      "network: your own proxy or tunnel at https://chat.example.com (PUBLIC_URL and COMPOSE_PROFILES stay)",
     );
     expect(proxy.some((s) => s.startsWith("PUBLIC_URL:"))).toBe(false);
     expect(proxy.at(-1)).toBe(finishLine);

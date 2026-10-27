@@ -102,7 +102,7 @@ export const envVars = {
     section: "Database",
   },
   AGENTES_SECRET: {
-    schema: z.string().min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`"),
+    schema: z.string().min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`"),
     description:
       "Master secret. Session signing and the key that encrypts stored provider credentials (API keys of model providers) derive from it. Generate with `openssl rand -base64 48`. **Changing it makes stored credentials unreadable.** Back it up.",
     section: "Security",
@@ -573,6 +573,33 @@ export const envVars = {
     section: "Push",
     secret: true,
   },
+  WEB_PUSH: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("on"),
+    description:
+      "Push notifications to browsers (Web Push), for people who turn them on in the web app. Nothing to set up: the server makes its own key pair on first use and keeps it in the database. `off` turns it off.",
+    section: "Push",
+  },
+  WEB_PUSH_VAPID_PUBLIC_KEY: {
+    schema: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{86,88}={0,2}$/, "must be a base64url P-256 public key (65 bytes)")
+      .optional(),
+    description:
+      "Pins the Web Push key pair (VAPID public key, base64url) instead of the one the server makes; set it with `WEB_PUSH_VAPID_PRIVATE_KEY`. Changing it makes every browser subscribe again.",
+    section: "Push",
+  },
+  WEB_PUSH_VAPID_PRIVATE_KEY: {
+    schema: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{42,44}={0,2}$/, "must be a base64url P-256 private key (32 bytes)")
+      .optional(),
+    description: "The private half of `WEB_PUSH_VAPID_PUBLIC_KEY` (base64url).",
+    section: "Push",
+    secret: true,
+  },
   FILES_DIR: {
     // `/data/files`, or on Windows (the desktop app's server) `C:\…` or `\\server\share\…`.
     schema: z
@@ -671,7 +698,7 @@ export const envVars = {
   HOST_COMPUTER_TOKEN: {
     schema: z
       .string()
-      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
       .optional(),
     description:
       "Makes the machine this server runs on a computer for its agents: `agentes-runner host` on it, with the same token, joins the organizations the installation's first account made and is an owner or admin of (one computer per organization). Can't be set with `ALLOW_SIGNUP=true` or `MACHINE_PROVISIONING=external`. Unset: off.",
@@ -698,7 +725,7 @@ export const envVars = {
   OPERATOR_API_TOKEN: {
     schema: z
       .string()
-      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
       .optional(),
     description:
       "Turns on the operator API (ADR 0056): a second listener on `OPERATOR_API_PORT` that serves `/api/operator/v1` to your own automation, called with this value as `Authorization: Bearer`. It reaches every workspace and account on the instance, so never publish that port or put it behind your reverse proxy. While it is set the server also keeps 90 days of events for it (sign-ups, sign-ins with their IP address, workspaces, agents, runs; metadata only). Unset (default): nothing listens there and nothing is recorded. Generate with `openssl rand -base64 48`.",

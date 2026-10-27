@@ -159,7 +159,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (agentCredentialId) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, agentCredentialId);
       if (!credential) {
-        throw new MissingCredentialError("This agent's API key was revoked; pick another one in the agent's settings");
+        throw new MissingCredentialError("This agent's API key was revoked. Pick another one in the agent's settings.");
       }
       if (credential.provider !== provider) {
         throw new MissingCredentialError(
