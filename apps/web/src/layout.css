@@ -131,8 +131,13 @@ p {
 .grid-options--plans > .ac-option.ai-picker__key::after {
   /* Browsers without the lh unit: the page's 22px line. */
   top: calc(var(--space-3) + 11px - 9px);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
-  top: calc(var(--space-3) + 0.5lh - 9px);
+}
+/* Behind @supports: a declaration holding var() parses even where lh is unknown, so as a second `top` it would
+   replace the fallback there and then compute to auto. */
+@supports (top: 1lh) {
+  .grid-options--plans > .ac-option.ai-picker__key::after {
+    top: calc(var(--space-3) + 0.5lh - 9px);
+  }
 }
 /* The chosen plan's panel right under the plans, on a row of its own and 12px under them, before the API key row:
    nothing comes between an option and its steps. */
@@ -3555,6 +3560,12 @@ p {
   background: var(--connector-color, var(--ink));
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
+}
+/* A mark in its maker's own colors (PostgreSQL's), which a mask would flatten to one color. */
+.connector-icon__img {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
 }
 /* A service in a chip: its bare mark in the box of the chip's icons, a little smaller since it fills its square. */
 .ac-chip > .connector-icon {

@@ -45,54 +45,41 @@ export {
 } from "./shared";
 
 export type ImportSource =
-  | "openclaw"
-  | "hermes"
   | "openbotrun"
-  | "paperclip"
   | "openmausbot"
+  | "hermes"
+  | "openclaw"
+  | "paperclip"
   | "openbot"
   | "agenteschat";
-/** The source cards, in the order they are offered. */
+/** Every app the parsers read. */
 export const IMPORT_SOURCES: ImportSource[] = [
-  "openclaw",
-  "hermes",
   "openbotrun",
-  "paperclip",
   "openmausbot",
+  "hermes",
+  "openclaw",
+  "paperclip",
   "openbot",
   "agenteschat",
 ];
 /** Brand names (not translated). */
 export const SOURCE_NAME: Record<ImportSource, string> = {
-  openclaw: "OpenClaw",
-  hermes: "Hermes Agent",
-  openbotrun: "OpenBot.Run",
-  paperclip: "Paperclip",
+  openbotrun: "OpenBot.run",
   openmausbot: "OpenMausBot",
+  hermes: "Hermes Agent",
+  openclaw: "OpenClaw",
+  paperclip: "Paperclip",
   openbot: "OpenBot",
   agenteschat: "agentes.chat",
-};
-/**
- * Each source's tile: its official mark (apps/web/public/brands/README.md), and the maker's own dark file where
- * the mark would vanish on a dark theme.
- */
-export const SOURCE_MARK: Record<ImportSource, { icon: string; dark?: string }> = {
-  openclaw: { icon: "/brands/openclaw.svg" },
-  hermes: { icon: "/brands/hermes.svg", dark: "/brands/hermes-dark.svg" },
-  openbotrun: { icon: "/brands/openbotrun.svg" },
-  paperclip: { icon: "/brands/paperclip.svg", dark: "/brands/paperclip-dark.svg" },
-  openmausbot: { icon: "/brands/openmausbot.svg" },
-  openbot: { icon: "/brands/openbot.png" },
-  agenteschat: { icon: "/favicon.svg" },
 };
 const ARCHIVES = ".zip,.tar.gz,.tgz,.tar,application/zip,application/gzip,application/x-tar";
 /** What the file picker offers for each source. */
 export const SOURCE_ACCEPT: Record<ImportSource, string> = {
-  openclaw: `.md,.json,.json5,${ARCHIVES}`,
-  hermes: `.md,.yaml,.yml,.json,${ARCHIVES}`,
   openbotrun: `.json,${ARCHIVES}`,
-  paperclip: `.md,.yaml,.yml,${ARCHIVES}`,
   openmausbot: ".json,.md,.markdown,.yaml,.yml,.txt,application/json,text/markdown",
+  hermes: `.md,.yaml,.yml,.json,${ARCHIVES}`,
+  openclaw: `.md,.json,.json5,${ARCHIVES}`,
+  paperclip: `.md,.yaml,.yml,${ARCHIVES}`,
   openbot: `.yaml,.yml,${ARCHIVES}`,
   agenteschat: ".json,.txt,.md,application/json",
 };

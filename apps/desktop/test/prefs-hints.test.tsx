@@ -114,8 +114,8 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
           { title: "Let me know when an agent asks for a folder", hint: null, switch: null, line: null },
           {
             title: "Let me know when an agent needs me in its browser",
-            hint: "The request already reaches your phone and the site; this also tells you here.",
-            switch: "The request already reaches your phone and the site; this also tells you here.",
+            hint: "The request already reaches your phone and the site. This tells you here too.",
+            switch: "The request already reaches your phone and the site. This tells you here too.",
             line: null,
           },
           {
@@ -364,6 +364,43 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         await act(async () => (acts.querySelector("button") as HTMLButtonElement).click());
         await until(() => el.textContent?.includes("Download version 9.9.9"));
         expect(el.querySelector(".dk-ver__acts .dk-help")?.textContent).toBe("Your servers and settings stay.");
+      },
+    );
+  });
+
+  test("Updates: the download with its bar and Cancel, which drops it; once whole, Installing… with no Cancel", async () => {
+    const latest = { version: "9.9.9", url: "https://agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
+    const update: UpdateCheck = {
+      state: { latest, available: true, required: false },
+      checkedAt: null,
+      checking: false,
+      failed: false,
+      check: async () => null,
+      version: "0.6.0",
+    };
+    await pane(
+      "selfhost",
+      <Updates update={update} />,
+      (el) => el.querySelector(".dk-ver__acts"),
+      async (el) => {
+        const install = () => act(async () => (el.querySelector(".dk-ver__acts button") as HTMLButtonElement).click());
+        const bar = () => el.querySelector('.dk-upd [role="progressbar"]');
+        await install();
+        await until(() => Number(bar()?.getAttribute("aria-valuenow")) > 0);
+        expect(el.querySelector(".dk-upd__label")?.textContent).toBe("Downloading…");
+        expect([...el.querySelectorAll(".dk-upd button")].map((b) => b.textContent)).toEqual(["Cancel"]);
+        // Cancel: nothing installed, Update and reopen again, and no manual way.
+        await act(async () => (el.querySelector(".dk-upd button") as HTMLButtonElement).click());
+        await until(() => el.querySelector(".dk-ver__acts")?.textContent === "Update and reopen");
+        expect(el.querySelector(".dk-upd")).toBeNull();
+        expect(el.textContent).not.toContain("Update by hand");
+        await install();
+        await until(() => el.querySelector(".dk-upd__label")?.textContent === "Installing…");
+        expect(el.querySelector(".dk-upd button")).toBeNull();
+        expect(bar()?.getAttribute("aria-valuenow")).toBe("100");
+        // The fake ends the install a moment later (nothing installs here): wait for it, or its state lands after
+        // the DOM is gone and breaks the next file.
+        await until(() => el.textContent?.includes("Download version 9.9.9"));
       },
     );
   });

@@ -1374,13 +1374,15 @@ describe("Onboarding", () => {
       card.querySelector(".ac-option__title")?.textContent,
       card.querySelector(".imp-mark img")?.getAttribute("src") ?? card.querySelector(".imp-mark svg")?.tagName,
     ]);
+    // The most used apps first; "Outro app" always last.
     expect(tiles).toEqual([
-      ["OpenClaw", "/brands/openclaw.svg"],
-      ["Hermes Agent", "/brands/hermes.svg"],
-      ["OpenBot.Run", "/brands/openbotrun.svg"],
-      ["Paperclip", "/brands/paperclip.svg"],
+      ["Grok Bot", "/brands/grok-bot.svg"],
+      ["ChatGPT dots", "/brands/chatgpt-dots.svg"],
+      ["OpenBot.run", "/brands/openbotrun.svg"],
       ["OpenMausBot", "/brands/openmausbot.svg"],
-      ["OpenBot", "/brands/openbot.png"],
+      ["Hermes Agent", "/brands/hermes.svg"],
+      ["OpenClaw", "/brands/openclaw.svg"],
+      ["Paperclip", "/brands/paperclip.svg"],
       ["Exportação do agentes.chat", "/favicon.svg"],
       ["Outro app", "svg"],
     ]);
@@ -1552,7 +1554,9 @@ describe("Onboarding", () => {
       ],
     };
     await throughContext(state);
-    await click(button(/^OpenBot$/), 1);
+    // OpenBot has no card of its own: it's one of the other apps.
+    expect(screen().queryByRole("button", { name: /^OpenBot$/ })).toBeNull();
+    await click(button(/^Outro app$/), 1);
 
     const field = "Ou cole um link do GitHub ou a resposta do outro app";
     await type(field, "https://github.com/acme/nada/blob/main/agents.yaml");

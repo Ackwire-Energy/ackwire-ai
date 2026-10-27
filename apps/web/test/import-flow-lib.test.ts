@@ -45,21 +45,18 @@ const item = (id: string, action: ImportItemResult["action"] = "create"): Import
 
 describe("where a bundle came from", () => {
   test("a parsed app, our own export, a reply to the export request, an app we don't know", () => {
+    const from = (app: string, ref: string) => bundleOrigin(bundle({ source: { app, ref, name: "x", files: [] } }));
     expect(bundleOrigin(bundle())).toEqual({ card: "openclaw", app: "OpenClaw" });
-    expect(
-      bundleOrigin(bundle({ source: { app: "agenteschat", ref: "agenteschat:org-1", name: "Acme", files: [] } })),
-    ).toEqual({ card: "agenteschat", app: "agentes.chat" });
-    expect(
-      bundleOrigin(bundle({ source: { app: "agenteschat", ref: "grok-bot:my-bots", name: "Bots", files: [] } })),
-    ).toEqual({ card: "other", app: "Grok Bot" });
-    expect(bundleOrigin(bundle({ source: { app: "agenteschat", ref: "viktor", name: "Viktor", files: [] } }))).toEqual({
-      card: "other",
-      app: null,
-    });
-    expect(bundleOrigin(bundle({ source: { app: "cli", ref: "x", name: "x", files: [] } }))).toEqual({
-      card: "other",
-      app: null,
-    });
+    expect(from("openbotrun", "grok-bot")).toEqual({ card: "openbotrun", app: "OpenBot.run" });
+    expect(from("agenteschat", "agenteschat:org-1")).toEqual({ card: "agenteschat", app: "agentes.chat" });
+    // The two most used apps that answer the request have cards of their own; the others share Outro app's.
+    expect(from("agenteschat", "grok-bot:my-bots")).toEqual({ card: "grok-bot", app: "Grok Bot" });
+    expect(from("agenteschat", "chatgpt-dots:my-dot")).toEqual({ card: "chatgpt-dots", app: "ChatGPT dots" });
+    expect(from("agenteschat", "claude:projects")).toEqual({ card: "other", app: "Claude" });
+    // OpenBot is still read, without a card of its own.
+    expect(from("openbot", "tenant")).toEqual({ card: "other", app: "OpenBot" });
+    expect(from("agenteschat", "viktor")).toEqual({ card: "other", app: null });
+    expect(from("cli", "x")).toEqual({ card: "other", app: null });
   });
 
   test("Tentar de novo only where the network or the server failed", () => {

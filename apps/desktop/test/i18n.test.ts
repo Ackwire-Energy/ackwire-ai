@@ -105,6 +105,7 @@ describe("desktop strings", () => {
       "tray.unreachable",
       "cover.offline",
       "cover.unreachable",
+      "cover.otherServer",
       "link.question",
       "link.questionSignIn",
       "link.questionClaim",

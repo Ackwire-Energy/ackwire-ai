@@ -496,7 +496,7 @@ computer and opens agentes.chat, signed in.
   (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
   and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
   brings both back.
-- **Something went wrong?** **Copy diagnostics** copies what the app knows and the end of
+- **Something went wrong?** **Copy details** copies what the app knows, the setup's steps and the end of
   `~/.agentes/logs/server.log`.
 - A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
   offers **Use it** instead, and opens its owner link while it waits for its owner; when it isn't
