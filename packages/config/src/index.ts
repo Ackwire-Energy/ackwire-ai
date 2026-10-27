@@ -46,6 +46,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       "HOST_COMPUTER_TOKEN can't be set with MACHINE_PROVISIONING=external: every workspace gets its own computer, and no other computer joins it",
     ]);
   }
+  if (Boolean(config.BILLING_URL) !== Boolean(config.BILLING_LINK_SECRET)) {
+    throw new ConfigError(["BILLING_URL and BILLING_LINK_SECRET go together: set both or neither"]);
+  }
+  // Only the billing service lifts that hold, through the operator API: without them a new workspace would wait forever.
+  if (config.BILLING_HOLD_NEW_WORKSPACES && !(config.BILLING_URL && config.OPERATOR_API_TOKEN)) {
+    throw new ConfigError([
+      "BILLING_HOLD_NEW_WORKSPACES=true needs BILLING_URL, BILLING_LINK_SECRET and OPERATOR_API_TOKEN",
+    ]);
+  }
   const site = new URL(config.PUBLIC_URL);
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     if (raw.LANDING_PAGE === undefined) config.LANDING_PAGE = true;

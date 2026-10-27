@@ -97,6 +97,30 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
   });
 
+  test("billing: the address and the link's secret together, the hold on new workspaces only with them and the operator API", () => {
+    const off = loadConfig(valid);
+    expect([off.BILLING_URL, off.BILLING_LINK_SECRET, off.BILLING_HOLD_NEW_WORKSPACES]).toEqual([
+      undefined,
+      undefined,
+      false,
+    ]);
+    const secret = "b".repeat(32);
+    const billing = { ...valid, BILLING_URL: "https://billing.example.com", BILLING_LINK_SECRET: secret };
+    expect(loadConfig(billing).BILLING_URL).toBe("https://billing.example.com");
+    expect(() => loadConfig({ ...valid, BILLING_URL: "https://billing.example.com" })).toThrow(/set both or neither/);
+    expect(() => loadConfig({ ...valid, BILLING_LINK_SECRET: secret })).toThrow(/set both or neither/);
+    expect(() => loadConfig({ ...billing, BILLING_URL: "http://billing.example.com" })).toThrow(/BILLING_URL/);
+    expect(() => loadConfig({ ...billing, BILLING_LINK_SECRET: "short" })).toThrow(/BILLING_LINK_SECRET/);
+
+    const hold = { ...billing, BILLING_HOLD_NEW_WORKSPACES: "true" };
+    expect(() => loadConfig(hold)).toThrow(/OPERATOR_API_TOKEN/);
+    expect(() =>
+      loadConfig({ ...valid, BILLING_HOLD_NEW_WORKSPACES: "true", OPERATOR_API_TOKEN: "o".repeat(32) }),
+    ).toThrow(/BILLING_HOLD_NEW_WORKSPACES/);
+    expect(loadConfig({ ...hold, OPERATOR_API_TOKEN: "o".repeat(32) }).BILLING_HOLD_NEW_WORKSPACES).toBe(true);
+    expect(redactConfig(loadConfig(billing)).BILLING_LINK_SECRET).toBe("********");
+  });
+
   test("the usage report is on unless TELEMETRY says off (on/off, or any yes/no word)", () => {
     expect(loadConfig(valid).TELEMETRY).toBe("on");
     expect(loadConfig(valid).TELEMETRY_URL).toBe("https://telemetry.agentes.chat/v1/report");
