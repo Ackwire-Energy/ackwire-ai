@@ -398,6 +398,9 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         await until(() => el.querySelector(".dk-upd__label")?.textContent === "Installing…");
         expect(el.querySelector(".dk-upd button")).toBeNull();
         expect(bar()?.getAttribute("aria-valuenow")).toBe("100");
+        // The fake ends the install a moment later (nothing installs here): wait for it, or its state lands after
+        // the DOM is gone and breaks the next file.
+        await until(() => el.textContent?.includes("Download version 9.9.9"));
       },
     );
   });
