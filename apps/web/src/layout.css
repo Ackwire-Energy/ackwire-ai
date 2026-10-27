@@ -3556,6 +3556,12 @@ p {
   -webkit-mask: var(--connector-icon) center / contain no-repeat;
   mask: var(--connector-icon) center / contain no-repeat;
 }
+/* A mark in its maker's own colors (PostgreSQL's), which a mask would flatten to one color. */
+.connector-icon__img {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+}
 /* A service in a chip: its bare mark in the box of the chip's icons, a little smaller since it fills its square. */
 .ac-chip > .connector-icon {
   width: 14px;

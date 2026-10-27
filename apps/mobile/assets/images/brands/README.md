@@ -6,4 +6,6 @@ The logos of the three apps the onboarding's "Bring your agents" step names, the
 - `chatgpt-dots.png`: `chatgpt-dots.svg`
 - `openbotrun.png`: `openbotrun.svg`
 
+`gemini.png` is Gemini's mark for `ProviderLogo`, the web's `gemini.png` byte for byte (its source and terms are in that README).
+
 Each logo is a trademark of its owner, used only to name the project.

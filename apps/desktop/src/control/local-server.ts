@@ -89,6 +89,37 @@ export function stepStates(steps: readonly SetupStep[], changes: readonly StepCh
   return out;
 }
 
+/**
+ * A setup normally ends in under 30 s, so a step under way shows its time from 10 s, and from 30 s it is "taking a
+ * little longer than expected". The server here updating says "This can take a minute": it is slow only after two.
+ */
+export const STEP_TIME_MS = 10_000;
+export const STEP_SLOW_MS = 30_000;
+export const UPDATE_SLOW_MS = 120_000;
+export const stepClock = (ms: number, slowAfter = STEP_SLOW_MS) => ({
+  time: ms >= STEP_TIME_MS,
+  slow: ms >= slowAfter,
+});
+
+/** Where a setup that ended in an error stops: the failed step, else the one under way, else the first not done. */
+export function failedStep(steps: readonly SetupStep[], states: Record<SetupStep, StepState>): SetupStep {
+  return (
+    steps.find((s) => states[s] === "failed") ??
+    steps.find((s) => states[s] === "active") ??
+    steps.find((s) => states[s] !== "done" && states[s] !== "warn") ??
+    (steps[steps.length - 1] as SetupStep)
+  );
+}
+
+/** What a failed step says (`computer` and `reach` never fail on their own: the general line if they ever do). */
+export const FAIL_TEXT: Record<SetupStep, string> = {
+  database: "desktop.here.fail.database",
+  start: "desktop.here.fail.start",
+  account: "desktop.here.fail.account",
+  computer: "desktop.common.error",
+  reach: "desktop.common.error",
+};
+
 /** What "Run agentes.chat on this computer" shows. */
 export type HereView =
   /** The form; `ask`: the owner's name and email (no owner yet). */
@@ -137,7 +168,7 @@ export function hereLine(status: LocalServerStatus): string {
   }
 }
 
-/** The popover's banner about the server here: stopped (Start it), not starting (diagnostics), or an update that went back. */
+/** The popover's banner about the server here: stopped (Start it), not starting (Copy details), or an update that went back. */
 export function hereBanner(status: LocalServerStatus): "stopped" | "failing" | "back" | null {
   if (!status.run) return null;
   if (status.phase === "failing") return "failing";

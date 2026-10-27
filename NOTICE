@@ -20,9 +20,12 @@ Third-party software keeps its own license. The license texts are next to what t
 - packages/engine/assets/fonts: the Onest and Martian Mono fonts (SIL Open Font License 1.1),
   embedded in exported PDFs.
 - apps/web/public/connectors: icons from Simple Icons (CC0 1.0).
-- packages/ui/src/brand/marks.ts: the marks of Claude, OpenAI, DeepSeek, Kimi, Z.ai, MiniMax
-  and OpenCode; apps/desktop/src/ui/here.tsx: Tailscale's icon. Each is drawn from its maker's
-  own files (a press kit, a brand page or the maker's repository), named in the code beside it.
+- packages/ui/src/brand/marks.ts: the marks of Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai,
+  MiniMax and OpenCode, Gemini's as gemini.png in apps/web/public/brands and
+  apps/mobile/assets/images/brands. apps/web/public/brands/postgresql.svg: PostgreSQL's
+  elephant. apps/desktop/src/ui/here.tsx: Tailscale's icon. Each is drawn from its maker's own
+  files (a press kit, a brand page, the maker's repository or the icon its own site serves),
+  named in the code or the README beside it.
 - apps/web/public/brands, apps/mobile/assets/images/brands and
   apps/web/test/fixtures/agent-import: the logos of Grok Bot (SpaceXAI LLC), ChatGPT dots
   (OpenAI) and OpenBot.run, without any of their code. Logos and sample files of OpenMausBot

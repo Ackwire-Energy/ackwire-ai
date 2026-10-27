@@ -14,7 +14,7 @@ describe("equal side padding", () => {
       ".dk-fr__here",
       ".dk-fr__end[data-near]",
       ".dk-fr__steps",
-      ".dk-fr__bar",
+      ".dk-bar",
     ]) {
       expect(rule(selector)).toBeDefined();
       expect(rule(selector)).not.toContain("max-width");

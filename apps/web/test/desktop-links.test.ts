@@ -15,7 +15,7 @@ let root: HTMLElement;
 let opened: string[];
 let pluginSaw: string[];
 let stop: () => void;
-const realOpen = window.open;
+let realOpen: typeof window.open;
 const plugin = (e: Event) => {
   const link = (e.target as Element).closest("a");
   if (link) pluginSaw.push(link.href);
@@ -23,6 +23,7 @@ const plugin = (e: Event) => {
 };
 
 beforeEach(() => {
+  realOpen = window.open;
   opened = [];
   pluginSaw = [];
   window.open = ((url?: string | URL) => {
@@ -69,8 +70,11 @@ describe("links that open a new window in the app", () => {
     const a = link("mailto:dev@example.com", "_blank");
     const word = document.createElement("span");
     a.replaceChildren(word);
-    click(word);
-    expect(opened).toEqual(["mailto:dev@example.com"]);
+    const e = click(word);
+    expect(e.defaultPrevented).toBe(true);
+    // happy-dom runs the link's own default action at the link, while the click still bubbles up to the root, so
+    // it opens there too. A browser runs it after the dispatch, where the root's preventDefault stops it.
+    expect(opened).toContain("mailto:dev@example.com");
   });
 
   test("a click the page already handled (a popup) is left alone", () => {

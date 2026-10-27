@@ -93,7 +93,7 @@ export const receiptShows = (line: ReceiptLine | null, steered: boolean): line i
 export function receiptMessageId(messages: readonly Message[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (!m || m.author.type !== "person" || m.local || isEventLine(m.meta)) continue;
+    if (m?.author.type !== "person" || m.local || isEventLine(m.meta)) continue;
     return m.id;
   }
   return null;

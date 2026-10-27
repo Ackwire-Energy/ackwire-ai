@@ -3,13 +3,13 @@ import type { ControlBrowser, ControlJob, ControlStatus } from "@agenteschat/ada
 import {
   BROWSER_BUSY_MS,
   DONE_MIN_MS,
-  elapsedClock,
   finishedOf,
   type NotchHome,
   type NotchWork,
   notchStateOf,
   oldestStart,
 } from "../src/control/notch";
+import { elapsedClock } from "../src/ui/time";
 
 const status = (over: Partial<ControlStatus> = {}): ControlStatus => ({
   paired: true,

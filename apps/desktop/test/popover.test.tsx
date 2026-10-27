@@ -156,13 +156,13 @@ describe("the menu's banners say only what matters there", () => {
       );
     }));
 
-  test("agentes.chat not starting here: its title, Copy diagnostics and Try again", () =>
+  test("agentes.chat not starting here: its title, Copy details and Try again", () =>
     withMenu(
       (el) =>
         expect(banners(el)).toContainEqual({
           title: "agentes.chat isn't starting on this Mac",
           line: null,
-          actions: ["Copy diagnostics", "Try again"],
+          actions: ["Copy details", "Try again"],
         }),
       createFakeHost("popover", "here", { here: { phase: "failing" } }),
       (el) => banners(el).length > 0,

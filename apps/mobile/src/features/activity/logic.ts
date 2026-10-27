@@ -120,7 +120,7 @@ export interface WaitingCard {
 }
 
 /** A waiting inbox item as a card: who asks (`actors`), the kind, the exact request, the deadline, one button. */
-export function waitingCardOf(n: Pick<AppNotification, "kind" | "latest">): WaitingCard {
+export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "latest">): WaitingCard {
   const l = n.latest;
   if (n.kind === "browser_handoff")
     return { kind: "browser", title: l.text ?? l.title ?? "", expiresAt: l.expiresAt ?? null, action: "open" };

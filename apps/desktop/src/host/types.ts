@@ -101,8 +101,15 @@ export interface Host {
   autostart(): Promise<boolean>;
   setAutostart(on: boolean): Promise<void>;
   notify(title: string, body: string): Promise<void>;
-  /** Installs the newer version and relaunches the app; false when there is nothing to install. */
+  /**
+   * Downloads the newer version (its progress at `onUpdateProgress`), installs it and relaunches the app; false when
+   * there is nothing to install. Rejects with "cancelled" after `cancelUpdate`.
+   */
   installUpdate(): Promise<boolean>;
+  /** Drops the download under way: nothing is installed until it is whole. */
+  cancelUpdate(): Promise<void>;
+  /** The download's bytes so far, and its size when the server says it. */
+  onUpdateProgress(cb: (got: number, total: number | null) => void): () => void;
   /** Creates (on) or destroys (off) the notch window. */
   setNotch(on: boolean): Promise<void>;
   /** The notch of this Mac's screen; null without one (an external display alone). */
@@ -135,9 +142,11 @@ export interface Host {
   /**
    * "Run agentes.chat on this computer": sets it up, starts it, makes the owner, makes this computer its agents'
    * computer, turns reach on when asked, and opens the main window there, signed in. Rejects with the step that
-   * failed; each step's progress arrives at `onSetupStep`.
+   * failed, or "cancelled" after `cancelLocalSetup`; each step's progress arrives at `onSetupStep`.
    */
   installLocalServer(choice: LocalChoice): Promise<void>;
+  /** Cancel while it is set up: what it started stops and the database it made goes, then it rejects. */
+  cancelLocalSetup(): Promise<void>;
   onSetupStep(cb: (change: StepChange) => void): () => void;
   startLocalServer(): Promise<void>;
   /** Stops it; `forget`: it no longer starts with the app (its data stays). */
@@ -149,7 +158,7 @@ export interface Host {
   setLocalUsage(on: boolean): Promise<void>;
   /** "Back up now": the file it wrote. */
   backupLocalServer(): Promise<string>;
-  /** What "Copy diagnostics" copies. */
+  /** What "Copy details" copies. */
   localDiagnostics(): Promise<string>;
   /** The server here's homes again, with new tokens for the organizations in `rotate`. */
   syncLocalHomes(rotate: string[]): Promise<void>;

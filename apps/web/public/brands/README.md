@@ -14,4 +14,11 @@ The marks on the agent import's cards (`CARD_MARK` in `apps/web/src/lib/import-f
 
 The full license texts are next to the import fixtures, in `apps/web/test/fixtures/agent-import/`.
 
+Two more marks name products elsewhere in the app, each from its maker's own file:
+
+| File | Product | Source | Terms |
+|---|---|---|---|
+| `postgresql.svg` | PostgreSQL, for the database connector | `PostgreSQL_logo.3colors.svg` from https://wiki.postgresql.org/wiki/Logo (the vector of https://www.postgresql.org/media/img/about/press/elephant.png), in the 24×24 view box. The color mark reads on light and dark, so there is no dark file | The PostgreSQL Trademark Policy (https://www.postgresql.org/about/policies/trademarks/), used only to name the product |
+| `gemini.png` | Gemini, where an AI provider is named (`ProviderLogo`) | The icon https://gemini.google.com serves, https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png, scaled from 512 to 128 px and otherwise unchanged. Google publishes no vector file of the sparkle: its own SVG fills the outline with a raster. The phone ships the same file in `apps/mobile/assets/images/brands/` | Google's brand terms (Google APIs Terms of Service, section 6), used only to name the product |
+
 Each logo is a trademark of its owner, used only to name the project; none of these licenses grants trademark rights.

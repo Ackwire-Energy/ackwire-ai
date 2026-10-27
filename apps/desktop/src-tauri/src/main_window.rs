@@ -31,6 +31,10 @@ const BROWSER_SIGN_IN: &str = "/desktop/sign-in";
 const SIGNED_IN: &str = "/desktop/signed-in";
 /// The help pages: background reading opens in the browser, never in place of the conversation.
 const HELP: &str = "/help/";
+/// Cloudflare Turnstile, the bot check of the site's sign-in pages: its frame loads inside the page. On macOS and
+/// Linux the web view asks about frames too, so sent outside it would open a tab on every sign-in page and never
+/// load in the window.
+const BOT_CHECK_HOST: &str = "challenges.cloudflare.com";
 
 /// The server the window loads: the one open now (`servers.json`); None before the first run chose one.
 pub fn site(app: &AppHandle) -> Option<Url> {
@@ -79,6 +83,7 @@ fn route(url: &Url, site: &Url) -> Route {
             path if path.starts_with(HELP) => Route::Outside,
             _ => Route::Stay,
         },
+        "https" if url.host_str() == Some(BOT_CHECK_HOST) && url.port().is_none() => Route::Stay,
         "http" | "https" => Route::Outside,
         // The site's own previews (sandboxed HTML, PDFs) load from these.
         "blob" | "data" | "about" => Route::Stay,
@@ -867,6 +872,20 @@ mod tests {
         let cloud = "https://agentes.chat";
         assert_eq!(r("https://agentes.chat/help/memory?lang=en#learns", cloud), Route::Outside);
         assert_eq!(r("https://agentes.chat/org/x", cloud), Route::Stay);
+    }
+
+    #[test]
+    fn the_bot_check_s_frame_stays_in_the_window_and_nothing_else_of_its_host() {
+        for site in ["https://agentes.chat", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
+            let frame = "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2/av0/rcv/x";
+            assert_eq!(r(frame, site), Route::Stay);
+            assert_eq!(r("https://challenges.cloudflare.com:443/turnstile/v0/api.js", site), Route::Stay);
+            assert_eq!(r("http://challenges.cloudflare.com/turnstile/v0/api.js", site), Route::Outside);
+            assert_eq!(r("https://challenges.cloudflare.com:8443/x", site), Route::Outside);
+            assert_eq!(r("https://challenges.cloudflare.com.evil.example/x", site), Route::Outside);
+            assert_eq!(r("https://evil.example/challenges.cloudflare.com", site), Route::Outside);
+            assert_eq!(r("https://www.cloudflare.com/turnstile-privacy-policy/", site), Route::Outside);
+        }
     }
 
     #[test]
