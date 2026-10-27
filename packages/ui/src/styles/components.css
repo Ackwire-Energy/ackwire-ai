@@ -78,11 +78,11 @@ samp {
 }
 
 /*
- * A line of text led by an icon (or a mark, a spinner, a stack of logos): the lead sits on the first line, centred
- * where the eye reads it (a hair under the line's middle, 0.08em for Source Sans 3), whatever the text size, the
- * line height or the lead's size, so it stays with the first line when the text wraps. The row sets the font size
- * and the line height; the lead is its first child. `lh` and `em` are the lead's own, so a lead with a font size of
- * its own (an avatar) needs the row's line height as a length. Mirrors the phone app's LineIcon (`readingMiddle`).
+ * A line of text led by an icon (or a mark, a spinner, a stack of logos): the lead's middle sits on the first line's
+ * capitals' middle, where the eye centres a sign beside words (Apple centres SF Symbols on the cap height too),
+ * whatever the text size, the line height or the lead's size, so it stays with the first line when the text wraps.
+ * The row sets the font size and the line height; the lead is its first child. `lh` and `ex` are the lead's own, so
+ * a lead with a font size of its own (a face) needs the row's line height as a length.
  */
 .ac-iconline {
   display: flex;
@@ -92,9 +92,15 @@ samp {
 .ac-iconline > :first-child {
   flex: none;
   /* Browsers without the lh unit: the page's 22px line. */
-  translate: 0 calc(11px + 0.08em - 50%);
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
   /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
-  translate: 0 calc(0.5lh + 0.08em - 50%);
+  translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+}
+/* A face keeps its initials' small type but takes the row's line, so its `lh` is the line it sits on. */
+.ac-iconline > .ac-avatar:first-child {
+  line-height: inherit;
+  /* The initials' line, taller than the face, stays centred on it. */
+  place-content: center;
 }
 
 /* Button */
@@ -965,10 +971,14 @@ textarea.ac-input {
 .ac-approval__who a {
   color: var(--ink);
 }
-/* Asked while nobody watched: on the line of who asks, with its icon in the middle of the words' x-height. */
+/* Asked while nobody watched: on the line of who asks, its icon placed from the line's top as an `.ac-iconline` lead. */
 .ac-approval__origin > svg {
   margin: 0 3px 0 1px;
-  vertical-align: middle;
+  vertical-align: top;
+  /* Browsers without the lh unit: who asks' 18px line. */
+  translate: 0 calc(9px - var(--cap-mid) - 50%);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: lh with an 18px fallback for older browsers */
+  translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
 }
 .ac-approval__action {
   min-width: 0;
@@ -3844,9 +3854,13 @@ a.ac-list__row:focus-visible {
   min-width: 0;
   line-height: 20px;
 }
-/* A title alone sits in the middle of a taller action. */
+/* A title alone sits in the middle of a taller action, and its key with it: already centred on the title's line, the
+   key only rises to the capitals' middle. */
 .ac-card__head:not(:has(.ac-card__sub)) {
   align-items: center;
+}
+.ac-card__head:not(:has(.ac-card__sub)) > .ac-card__key {
+  translate: 0 calc(-1 * var(--cap-mid));
 }
 .ac-card__key {
   display: grid;
@@ -3911,9 +3925,9 @@ a.ac-list__row:focus-visible {
 /*
  * A hint (InfoHint): a label and its ⓘ in one `.ac-hintline`, the setting's explanation in a glass bubble. The ⓘ
  * is a 24px target around its 14px glyph, its negative margins keeping the label's line as tall as before, and
- * sits on the label's first line where an `.ac-iconline` lead would (the glyph's middle a hair under the line's),
+ * sits on the label's first line where an `.ac-iconline` lead would (the glyph's middle on the capitals' middle),
  * so it stays there when the label wraps. The line sets the label's font size and line height (a field's and a
- * card title's below) and the ⓘ inherits them, so its `lh` and `em` are the label's.
+ * card title's below) and the ⓘ inherits them, so its `lh` and `ex` are the label's.
  */
 .ac-hintline {
   display: inline-flex;
@@ -3942,14 +3956,16 @@ a.ac-list__row:focus-visible {
   border: 0;
   border-radius: var(--radius-full);
   background: none;
-  /* The line's type, not the browser's button font: its `lh` and `em` place the glyph. */
+  /* The line's type, not the browser's button font: its `lh` and `ex` place the glyph. */
   font: inherit;
   color: var(--ink-muted);
   cursor: help;
+  /* Inline at the end of a sentence (a dialog's description), placed from its line's top as in a hint line. */
+  vertical-align: top;
   /* Browsers without the lh unit: the page's 22px line. */
-  translate: 0 calc(11px + 0.08em - 7px);
+  translate: 0 calc(11px - var(--cap-mid) - 7px);
   /* biome-ignore lint/suspicious/noDuplicateProperties: lh with a 22px fallback for older browsers */
-  translate: 0 calc(0.5lh + 0.08em - 7px);
+  translate: 0 calc(0.5lh - var(--cap-mid) - 7px);
 }
 .ac-hint:hover,
 .ac-hint[data-state="open"] {
