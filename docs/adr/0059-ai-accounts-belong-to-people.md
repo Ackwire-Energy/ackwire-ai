@@ -46,6 +46,7 @@ Automatic names are the maker and the plan, numbered per owner: "Claude Max", "C
 - Turning the switch off shows the provider's own words about personal use and that answering others might go against its terms. Accepting sets the audience to everyone and is audited with the date. Choosing a plan no longer asks anything; only sharing it does.
 - Only the plan's owner can widen the audience of an agent that thinks with their plan. Admins can only narrow it.
 - With sharing on, anyone who can talk to the agent can make it use the owner's plan and, on a computer where agents share one OS user, reach its sign-in.
+- A plan also picks who answers its owner's own messages nobody mentioned, only on a self-hosted server, and never for anyone else's (ADR 0074 §3).
 
 ### 6. The sign-in code never passes through our servers in the clear
 
