@@ -1,6 +1,6 @@
 import type { OrgStanding } from "../api/types";
 
-/** Mirror of the server's billing holds (`packages/engine/src/standing.ts`, ADR 0071). */
+/** Mirror of the server's billing holds (`packages/engine/src/standing.ts`, ADR 0077). */
 export const BILLING_HOLDS = ["payment", "unpaid", "ended"] as const;
 export type BillingHold = (typeof BILLING_HOLDS)[number];
 

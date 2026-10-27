@@ -1,5 +1,5 @@
 {
-  "id": "6c8711d9-f69a-4a25-9a54-c9acca9ab0ac",
+  "id": "95324d39-3bf7-47cb-867e-e670b3e6ba1e",
   "prevId": "0f90630d-0797-4040-9d29-b1577c28ae0d",
   "version": "7",
   "dialect": "postgresql",
@@ -9022,6 +9022,50 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.instance_push": {
+      "name": "instance_push",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "vapid_public_key": {
+          "name": "vapid_public_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vapid_private_key": {
+          "name": "vapid_private_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "instance_push_one_row": {
+          "name": "instance_push_one_row",
+          "value": "\"instance_push\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.push_devices": {
       "name": "push_devices",
       "schema": "",
@@ -9049,6 +9093,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "web_keys": {
+          "name": "web_keys",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "locale": {
           "name": "locale",
@@ -15137,48 +15187,6 @@
         "standing_changed_at": {
           "name": "standing_changed_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_members": {
-          "name": "limit_members",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_storage_bytes": {
-          "name": "limit_storage_bytes",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_upload_bytes_per_day": {
-          "name": "limit_upload_bytes_per_day",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_platform_nano_usd": {
-          "name": "limit_platform_nano_usd",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limits_updated_at": {
-          "name": "limits_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_month": {
-          "name": "platform_alert_month",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_percent": {
-          "name": "platform_alert_percent",
-          "type": "smallint",
           "primaryKey": false,
           "notNull": false
         },

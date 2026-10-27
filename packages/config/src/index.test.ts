@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { generateKeyPairSync } from "node:crypto";
 import { ConfigError, envVars, loadConfig, redactConfig, testConfig } from "./index";
 import { parsePemKey } from "./pem";
 
@@ -6,6 +7,17 @@ const valid = {
   DATABASE_URL: "postgres://u:p@localhost:5432/db",
   AGENTES_SECRET: "x".repeat(48),
 };
+
+/** A VAPID pair as the env takes it: the uncompressed public point and the private `d`, base64url. */
+function vapidPair() {
+  const jwk = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "jwk" });
+  const point = Buffer.concat([
+    Buffer.from([4]),
+    Buffer.from(jwk.x ?? "", "base64url"),
+    Buffer.from(jwk.y ?? "", "base64url"),
+  ]);
+  return { WEB_PUSH_VAPID_PUBLIC_KEY: point.toString("base64url"), WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d ?? "" };
+}
 
 describe("loadConfig", () => {
   test("applies defaults", () => {
@@ -154,6 +166,19 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, TURNSTILE_SITE_KEY: pair.TURNSTILE_SITE_KEY })).toThrow(/go together/);
     expect(() => loadConfig({ ...valid, TURNSTILE_SECRET_KEY: pair.TURNSTILE_SECRET_KEY })).toThrow(/go together/);
     expect(redactConfig(loadConfig({ ...valid, ...pair })).TURNSTILE_SECRET_KEY).toBe("********");
+  });
+
+  test("browser push: on by default, a VAPID pair or nothing, two halves of one pair", () => {
+    expect(loadConfig(valid).WEB_PUSH).toBe("on");
+    expect(loadConfig({ ...valid, WEB_PUSH: "off" }).WEB_PUSH).toBe("off");
+    const pair = vapidPair();
+    expect(loadConfig({ ...valid, ...pair }).WEB_PUSH_VAPID_PUBLIC_KEY).toBe(pair.WEB_PUSH_VAPID_PUBLIC_KEY);
+    expect(() => loadConfig({ ...valid, WEB_PUSH_VAPID_PUBLIC_KEY: pair.WEB_PUSH_VAPID_PUBLIC_KEY })).toThrow(
+      /go together/,
+    );
+    // The public half of another pair: every push would be refused.
+    const mixed = { ...valid, ...pair, WEB_PUSH_VAPID_PUBLIC_KEY: vapidPair().WEB_PUSH_VAPID_PUBLIC_KEY };
+    expect(() => loadConfig(mixed)).toThrow(/public half/);
   });
 
   test("TRUSTED_PROXIES: a list, trimmed", () => {

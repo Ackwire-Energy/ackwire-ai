@@ -573,6 +573,33 @@ export const envVars = {
     section: "Push",
     secret: true,
   },
+  WEB_PUSH: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("on"),
+    description:
+      "Push notifications to browsers (Web Push), for people who turn them on in the web app. Nothing to set up: the server makes its own key pair on first use and keeps it in the database. `off` turns it off.",
+    section: "Push",
+  },
+  WEB_PUSH_VAPID_PUBLIC_KEY: {
+    schema: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{86,88}={0,2}$/, "must be a base64url P-256 public key (65 bytes)")
+      .optional(),
+    description:
+      "Pins the Web Push key pair (VAPID public key, base64url) instead of the one the server makes; set it with `WEB_PUSH_VAPID_PRIVATE_KEY`. Changing it makes every browser subscribe again.",
+    section: "Push",
+  },
+  WEB_PUSH_VAPID_PRIVATE_KEY: {
+    schema: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{42,44}={0,2}$/, "must be a base64url P-256 private key (32 bytes)")
+      .optional(),
+    description: "The private half of `WEB_PUSH_VAPID_PUBLIC_KEY` (base64url).",
+    section: "Push",
+    secret: true,
+  },
   FILES_DIR: {
     // `/data/files`, or on Windows (the desktop app's server) `C:\…` or `\\server\share\…`.
     schema: z

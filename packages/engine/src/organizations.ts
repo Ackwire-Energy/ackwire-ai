@@ -70,7 +70,7 @@ export type Permission =
   | "manage_connectors" // connect MCP servers (GitHub, Sentry…) for the organization
   | "view_usage" // tokens and cost of every agent
   | "manage_members" // invite, remove, change roles (except owners)
-  | "manage_billing" // open the workspace's plan and billing on the billing service (ADR 0071)
+  | "manage_billing" // open the workspace's plan and billing on the billing service (ADR 0077)
   | "manage_owners"; // grant/revoke owner
 
 const MEMBER: Permission[] = ["read", "post", "create_channels"];
@@ -170,7 +170,7 @@ export function assertInviting(membership: Membership) {
  * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
  * one (`org.create_refused`, the same words whatever the cause). Billing holds refuse nobody, but one person
  * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
- * `holdForPayment`: the workspace starts on that hold (ADR 0071), with no audit row or notification.
+ * `holdForPayment`: the workspace starts on that hold (ADR 0077), with no audit row or notification.
  */
 export async function createOrganization(
   db: Database,

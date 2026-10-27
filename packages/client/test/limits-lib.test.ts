@@ -20,7 +20,7 @@ const limits = (over: { members?: [number, number | null]; storage?: [number, nu
   } satisfies WorkspaceLimits;
 };
 
-describe("a workspace's limits in words (ADR 0071)", () => {
+describe("a workspace's limits in words (ADR 0077)", () => {
   test("full only at the limit; no limit is never full", () => {
     expect(membersFull(limits({ members: [10, 10] }))).toEqual({ members: 10, limit: 10 });
     expect(membersFull(limits({ members: [11, 10] }))).toEqual({ members: 11, limit: 10 });

@@ -105,7 +105,7 @@ describe("on hold: a line on top of the work area", () => {
   });
 });
 
-describe("a billing hold (ADR 0071): its own words, and its fix for whoever runs the workspace", () => {
+describe("a billing hold (ADR 0077): its own words, and its fix for whoever runs the workspace", () => {
   const BILLING = "https://billing.example.com";
 
   test("owners and admins get the button of its code: it opens the billing service, signed in", async () => {

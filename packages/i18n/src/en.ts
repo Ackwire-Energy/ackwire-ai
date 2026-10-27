@@ -759,6 +759,11 @@ export const en: Translations = {
     soundSky: "Sky",
     soundPixel: "Pixel",
     soundOff: "Off",
+    browserNotices: "Notifications in this browser",
+    browserNoticesHint: "Even with the tab closed",
+    browserNoticesBlocked:
+      "Your browser blocked them. To allow them, click the icon next to the site's address and turn notifications on.",
+    browserNoticesFailed: "Couldn't turn notifications on right now. Try again.",
     languageCurrent: "Language: {{name}}",
     orgSettings: "Workspace settings",
     switchOrg: "Switch workspace",
@@ -8332,14 +8337,14 @@ export const en: Translations = {
       hold: "The workspace is on hold: its agents are paused",
       suspended: "The workspace was suspended",
       active: "The workspace is working again",
-      /** A hold the billing service set (ADR 0071): its code, never shown as it comes. */
+      /** A hold the billing service set (ADR 0077): its code, never shown as it comes. */
       billing: {
         payment: "The workspace needs an agentes.chat plan",
         unpaid: "The agentes.chat plan payment didn't go through",
         ended: "The workspace's agentes.chat plan ended",
       },
     },
-    /** A hold the billing service set (ADR 0071), said in place of its code. */
+    /** A hold the billing service set (ADR 0077), said in place of its code. */
     billing: {
       payment: "This workspace doesn't have an agentes.chat plan yet. Its agents start working once it does.",
       unpaid: "This workspace's agentes.chat plan payment didn't go through, and its agents stopped.",
@@ -8360,7 +8365,7 @@ export const en: Translations = {
     writeAfter: ".",
     ask: "Need help? Ask the people who run this server.",
   },
-  /** The billing service (ADR 0071): this server shows no plan, price or currency, only the way there. */
+  /** The billing service (ADR 0077): this server shows no plan, price or currency, only the way there. */
   billing: {
     open: "Open plan and billing",
     opening: "Opening…",
@@ -8373,7 +8378,7 @@ export const en: Translations = {
     noLimit: "No limit",
     ownBucket: "On your own bucket, with no limit from us",
   },
-  /** A workspace's limits, set by the billing service (ADR 0071): people and files. */
+  /** A workspace's limits, set by the billing service (ADR 0077): people and files. */
   limits: {
     members: {
       full: "This workspace has {{members}} of {{limit}} people.",

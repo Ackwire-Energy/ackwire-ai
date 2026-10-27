@@ -6,6 +6,7 @@ import {
   createLocalKeyWrapper,
   deriveSecret,
   openSecret,
+  SealedValueError,
   sealSecret,
   sha256,
 } from "../src";
@@ -36,11 +37,14 @@ test("envelope encryption: random data key per secret, wrapped by the KEK", asyn
 test("opening fails with another master secret, another owner, or an unknown KEK", async () => {
   const wrapper = createLocalKeyWrapper(SECRET);
   const sealed = await sealSecret(wrapper, "sk", "org-a|cred-1");
+  // Another key or owner can never open it (`SealedValueError`); a wrapper this process lacks is no such proof.
   await expect(
     openSecret([createLocalKeyWrapper("another-secret".padEnd(48, "y"))], sealed, "org-a|cred-1"),
-  ).rejects.toThrow();
-  await expect(openSecret([wrapper], sealed, "org-b|cred-1")).rejects.toThrow();
-  await expect(openSecret([wrapper], { ...sealed, kekId: "kms:v9" }, "org-a|cred-1")).rejects.toThrow(/no key wrapper/);
+  ).rejects.toBeInstanceOf(SealedValueError);
+  await expect(openSecret([wrapper], sealed, "org-b|cred-1")).rejects.toBeInstanceOf(SealedValueError);
+  const unknown = await openSecret([wrapper], { ...sealed, kekId: "kms:v9" }, "org-a|cred-1").catch((e) => e);
+  expect(String(unknown)).toContain("no key wrapper");
+  expect(unknown).not.toBeInstanceOf(SealedValueError);
 });
 
 test("KEK rotation: old secrets open with a legacy wrapper", async () => {

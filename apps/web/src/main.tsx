@@ -21,6 +21,7 @@ import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmat
 import { snapshotStore } from "./lib/snapshot-store";
 import { installSounds } from "./lib/sounds";
 import { createToastStore } from "./lib/toast";
+import { withWebPushSignOut } from "./lib/web-push";
 import { routeTree } from "./routeTree.gen";
 
 const i18n = await loadI18n(savedLocale());
@@ -111,7 +112,11 @@ if (connectorError) {
 
 const services: AppServices = {
   api,
-  auth: createBetterAuthClient(window.location.origin, () => i18n.language),
+  // Signing out also stops this browser's notifications for the account (ADR 0071).
+  auth: withWebPushSignOut(
+    createBetterAuthClient(window.location.origin, () => i18n.language),
+    api,
+  ),
   queryClient,
   i18n,
   toasts,

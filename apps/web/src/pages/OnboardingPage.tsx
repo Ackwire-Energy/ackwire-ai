@@ -562,7 +562,7 @@ export function OnboardingPage() {
   const edition = computerEdition(setup.data, server?.workspaceComputer);
   const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
   const hold = holdText(t, standing);
-  // A new workspace waiting for its first plan (ADR 0071): its computer and its invitations come with the plan.
+  // A new workspace waiting for its first plan (ADR 0077): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
   // Creating another refused while one waits for its plan: the way to that one's plan.
   const refused = saveWorkspace.error;

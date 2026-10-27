@@ -9,7 +9,7 @@ import { usesOwnBucket } from "./storage";
 import { monthStartUtc } from "./usage";
 
 /**
- * A workspace's limits (ADR 0071): plain numbers a billing service sets through the operator API, enforced here
+ * A workspace's limits (ADR 0077): plain numbers a billing service sets through the operator API, enforced here
  * without knowing any plan. Null is no limit, all a self-hosted server ever has.
  *
  * - `members`: membership rows, blocked accounts included; agents, invitations and requests to join never count.

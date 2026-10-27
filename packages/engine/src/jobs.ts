@@ -1,4 +1,11 @@
-import type { EmailSender, PushSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
+import type {
+  EmailSender,
+  Presence,
+  PushSender,
+  SearchIndexResolver,
+  SearchKind,
+  WebPushSender,
+} from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
@@ -77,6 +84,10 @@ export interface JobDeps extends RunExecutorDeps {
   emailArt?: EmailArt;
   /** Push to the phone app (job `push.send`); absent = push off. */
   push?: PushSender | null;
+  /** Web Push to browsers (job `push.send`, ADR 0071); absent = off. */
+  webPush?: WebPushSender | null;
+  /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
+  presence?: Presence | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
   /** Drive (job `forum.advance` saves the forum synthesis). */
@@ -527,9 +538,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
     },
-    // A notification for a person's phones (ADR 0035): skipped if read, done or snoozed meanwhile.
+    // A notification for a person's phones and browsers (ADR 0035, 0071): skipped if read, done or snoozed meanwhile.
     "push.send": async (job) => {
-      await deliverPush({ db: deps.db, push: deps.push }, String(job.payload.notificationId));
+      await deliverPush(
+        { db: deps.db, push: deps.push, webPush: deps.webPush, presence: deps.presence },
+        String(job.payload.notificationId),
+        { held: job.payload.held === true },
+      );
     },
     // Receipts of a push ~15 min later: tokens whose device is gone are deleted.
     "push.receipts": async (job) => {

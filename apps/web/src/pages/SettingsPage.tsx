@@ -181,7 +181,7 @@ export function SettingsPage({
 }
 
 /**
- * Plano e cobrança (ADR 0071): people and files against the plan's limits; the plan, card and invoices live on the
+ * Plano e cobrança (ADR 0077): people and files against the plan's limits; the plan, card and invoices live on the
  * billing service, opened signed in.
  */
 function BillingSection() {

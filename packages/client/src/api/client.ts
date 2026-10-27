@@ -142,6 +142,7 @@ import type {
   Person,
   PhoneSignIn,
   Proposal,
+  PushDeviceInput,
   ReactionCount,
   Reminder,
   ReminderInput,
@@ -234,6 +235,23 @@ export interface ApiClient {
     /** A password for an account that has none (`password_set` 409 when it has one). */
     addPassword(password: string): Promise<void>;
   };
+  /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
+  push: {
+    /** The server's Web Push public key (base64url); `null` when this server has Web Push off (`web_push_off` 404). */
+    webKey(): Promise<string | null>;
+    /** Registers (or refreshes, or moves to me) a phone's token or a browser's subscription. Rate limited (429). */
+    register(input: PushDeviceInput): Promise<void>;
+    /**
+     * Stops pushes to a phone's token or a browser's endpoint (only my own; anything else is a no-op). In the
+     * body, not the path: an endpoint's encoded slashes don't survive every proxy.
+     */
+    unregister(token: string): Promise<void>;
+    /**
+     * Of these notification ids (at most 100), the ones no longer open and unread for me (read, done, snoozed or
+     * gone): a browser closes the notifications it still shows for them (clear on read, ADR 0071).
+     */
+    stale(ids: string[]): Promise<string[]>;
+  };
   orgs: {
     create(input: {
       name: string;
@@ -255,7 +273,7 @@ export interface ApiClient {
      * on a server without billing.
      */
     billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
-    /** People, files and today's uploads against the workspace's limits (any member; ADR 0071). */
+    /** People, files and today's uploads against the workspace's limits (any member; ADR 0077). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;

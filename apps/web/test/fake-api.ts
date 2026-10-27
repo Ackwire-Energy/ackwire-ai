@@ -182,7 +182,7 @@ export interface FakeState {
   waitlistError?: ApiError;
   /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
   billingLinkError?: ApiError;
-  /** `orgs.limits` (ADR 0071); unset = no limits, the members counted from `members`. */
+  /** `orgs.limits` (ADR 0077); unset = no limits, the members counted from `members`. */
   limits?: WorkspaceLimits;
   /** Make `waitlist.confirm` fail with this error (invalid_token…). */
   waitlistConfirmError?: ApiError;
@@ -194,6 +194,10 @@ export interface FakeState {
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
   jev?: JevKey;
+  /** `push.webKey`: the server's Web Push key; unset = Web Push off on this server (null). */
+  webPushKey?: string;
+  /** `push.stale`: the notification ids the server calls stale (read, done, snoozed, gone); unset = none. */
+  stalePushIds?: string[];
   /** What `orgs.previewInvitation` answers per token (an invitation link's page); else "valid" is an email one. */
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
@@ -814,6 +818,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           server: state.phoneServer ?? "https://agentes.chat",
           expiresIn: 180,
         };
+      },
+    },
+    push: {
+      webKey: async () => state.webPushKey ?? null,
+      register: async (input) => {
+        log("push.register", input);
+      },
+      unregister: async (token) => {
+        log("push.unregister", token);
+      },
+      stale: async (ids) => {
+        log("push.stale", ids);
+        return ids.filter((id) => state.stalePushIds?.includes(id));
       },
     },
     orgs: {

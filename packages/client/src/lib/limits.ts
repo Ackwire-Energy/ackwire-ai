@@ -3,7 +3,7 @@ import type { WorkspaceLimits } from "../api/types";
 import { formatBytes } from "./files";
 
 /**
- * A workspace's limits in the apps (ADR 0071): numbers a billing service set, said without a plan, price or
+ * A workspace's limits in the apps (ADR 0077): numbers a billing service set, said without a plan, price or
  * currency. Platform-neutral (web and phone).
  */
 

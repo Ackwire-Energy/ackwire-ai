@@ -1,4 +1,4 @@
-# 0071. Billing hooks: billing holds, limits and a signed link
+# 0077. Billing hooks: billing holds, limits and a signed link
 
 - Status: Accepted
 - Date: 2026-10-27

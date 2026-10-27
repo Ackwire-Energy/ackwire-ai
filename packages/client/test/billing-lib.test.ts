@@ -13,7 +13,7 @@ const t = ((key: string, o?: Record<string, unknown>) =>
 
 const standingNotice = (latest: AppNotification["latest"]) => ({ kind: "org_standing" as const, latest });
 
-describe("billing holds in words (ADR 0071)", () => {
+describe("billing holds in words (ADR 0077)", () => {
   test("a hold whose reason is a billing code is one; nothing else is", () => {
     for (const code of BILLING_HOLDS) expect(billingHoldOf({ state: "hold", reason: code })).toBe(code);
     expect(billingHoldOf({ state: "hold", reason: "verificação de pagamento" })).toBeNull();

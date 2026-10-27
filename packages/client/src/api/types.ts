@@ -31,6 +31,14 @@ export interface JevKey {
   month: { decisions: number; costUsd: number };
 }
 
+/**
+ * A device that hears pushes (`POST /api/app/push/devices`): the phone app's Expo token (ADR 0035), or this
+ * browser's Web Push subscription (ADR 0071: its endpoint and keys, from `PushSubscription.toJSON()`).
+ */
+export type PushDeviceInput =
+  | { platform: "ios" | "android"; token: string; locale: string }
+  | { platform: "web"; endpoint: string; keys: { p256dh: string; auth: string }; locale: string };
+
 export interface AuthConfig {
   socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
@@ -48,13 +56,13 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
-  /** The billing service (ADR 0071): owners and admins open a workspace's plan there; null or absent: no billing. */
+  /** The billing service (ADR 0077): owners and admins open a workspace's plan there; null or absent: no billing. */
   billingUrl?: string | null;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
 }
 
-/** A workspace's use against its limits (ADR 0071, `GET …/limits`), for any member; a null limit: none. */
+/** A workspace's use against its limits (ADR 0077, `GET …/limits`), for any member; a null limit: none. */
 export interface WorkspaceLimits {
   members: { used: number; limit: number | null };
   /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
@@ -62,7 +70,7 @@ export interface WorkspaceLimits {
   uploads: { usedBytes24h: number; limitBytesPerDay: number | null };
 }
 
-/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0071). */
+/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0077). */
 export type BillingFrom =
   | "settings"
   | "hold"
@@ -3986,7 +3994,7 @@ export interface NotificationLatest {
   quote?: string;
   statusFrom?: string;
   statusTo?: string;
-  /** `org_standing`: the billing hold put on (ADR 0071), in place of `text`. */
+  /** `org_standing`: the billing hold put on (ADR 0077), in place of `text`. */
   billingHold?: string;
   /** Missions and routines. */
   steps?: { done: number; total: number; failedAt?: number };

@@ -113,7 +113,7 @@ export interface NotificationLatest {
   quote?: string;
   statusFrom?: string;
   statusTo?: string;
-  /** `org_standing`: the billing hold put on (`payment`, `unpaid`, `ended`; ADR 0071), in place of `text`. */
+  /** `org_standing`: the billing hold put on (`payment`, `unpaid`, `ended`; ADR 0077), in place of `text`. */
   billingHold?: string;
   steps?: { done: number; total: number; failedAt?: number };
   suggestions?: string[];

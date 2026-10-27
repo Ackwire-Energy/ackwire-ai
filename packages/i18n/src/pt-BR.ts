@@ -770,6 +770,11 @@ export const ptBR = {
     soundSky: "Céu",
     soundPixel: "Pixel",
     soundOff: "Sem som",
+    browserNotices: "Avisos neste navegador",
+    browserNoticesHint: "Mesmo com a aba fechada",
+    browserNoticesBlocked:
+      "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
+    browserNoticesFailed: "Não deu para ligar os avisos agora. Tente de novo.",
     languageCurrent: "Idioma: {{name}}",
     orgSettings: "Configurações do workspace",
     switchOrg: "Trocar de workspace",
@@ -8379,14 +8384,14 @@ export const ptBR = {
       hold: "O workspace está em espera: os agentes estão pausados",
       suspended: "O workspace foi suspenso",
       active: "O workspace voltou a funcionar",
-      /** A hold the billing service set (ADR 0071): its code, never shown as it comes. */
+      /** A hold the billing service set (ADR 0077): its code, never shown as it comes. */
       billing: {
         payment: "O workspace precisa de um plano do agentes.chat",
         unpaid: "O pagamento do plano do agentes.chat não passou",
         ended: "O plano do agentes.chat do workspace terminou",
       },
     },
-    /** A hold the billing service set (ADR 0071), said in place of its code. */
+    /** A hold the billing service set (ADR 0077), said in place of its code. */
     billing: {
       payment:
         "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
@@ -8408,7 +8413,7 @@ export const ptBR = {
     writeAfter: ".",
     ask: "Precisa de ajuda? Fale com quem cuida deste servidor.",
   },
-  /** The billing service (ADR 0071): this server shows no plan, price or currency, only the way there. */
+  /** The billing service (ADR 0077): this server shows no plan, price or currency, only the way there. */
   billing: {
     open: "Abrir plano e cobrança",
     opening: "Abrindo…",
@@ -8421,7 +8426,7 @@ export const ptBR = {
     noLimit: "Sem limite",
     ownBucket: "No seu próprio bucket, sem limite nosso",
   },
-  /** A workspace's limits, set by the billing service (ADR 0071): people and files. */
+  /** A workspace's limits, set by the billing service (ADR 0077): people and files. */
   limits: {
     members: {
       full: "Este workspace está com {{members}} de {{limit}} pessoas.",

@@ -14,7 +14,7 @@ import { useOrg } from "@/components/org-context";
  * The workspace's standing (ADR 0056 §8), as its people see it: on hold, a line at the top of the work area
  * (the reason only when the workspace is told one, else only that its agents are paused for review);
  * suspended, a screen of its own in place of the shell. Both say where to ask about it. `org.standing` events
- * move both live. A billing hold (ADR 0071) says what it is in its own words, and gives its owners and admins
+ * move both live. A billing hold (ADR 0077) says what it is in its own words, and gives its owners and admins
  * the way to fix it on the billing service.
  */
 

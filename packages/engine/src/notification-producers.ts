@@ -734,7 +734,7 @@ export async function notifyComputerReady(
 /**
  * The people who run this server held, suspended or restored the workspace, with the notice shown: its
  * owners and admins hear it, with the reason (`latest.text`), or a billing hold's code (`latest.billingHold`,
- * ADR 0071), which the apps say in the person's words. One row per change.
+ * ADR 0077), which the apps say in the person's words. One row per change.
  */
 export async function notifyOrgStanding(
   deps: NotificationDeps,

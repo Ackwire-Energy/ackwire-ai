@@ -4,7 +4,7 @@ import { appLocale } from "@agenteschat/i18n/locale";
 import { operatorOrg } from "./operator";
 import { requirePermission, type UserLocale } from "./organizations";
 
-/** Where in the app a billing link was opened from: the billing service opens on what it came for (ADR 0071). */
+/** Where in the app a billing link was opened from: the billing service opens on what it came for (ADR 0077). */
 export const BILLING_FROM = [
   "settings",
   "hold",

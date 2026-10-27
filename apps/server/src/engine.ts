@@ -178,7 +178,7 @@ export function buildEngine(o: EngineOptions) {
   // Claude or an OpenAI key, the catalog's routing pick on the others.
   const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
   // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
-  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0071).
+  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0077).
   if (!context.judge) {
     const llmJudge = createLlmJudge({
       gateway,
@@ -423,6 +423,10 @@ export function buildEngine(o: EngineOptions) {
     email: adapters.email,
     emailArt: o.emailArt ?? emailArtAt(config.PUBLIC_URL),
     push: adapters.push,
+    // Browsers (ADR 0071): full text, encrypted to the browser.
+    webPush: adapters.webPush,
+    // A push not waiting on the person holds while they have the app open (ADR 0071 §7).
+    presence: adapters.presence,
     storage,
     artifacts,
     sandbox,

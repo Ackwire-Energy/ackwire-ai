@@ -201,6 +201,7 @@ export * from "./untrusted";
 export * from "./uploads";
 export * from "./usage";
 export * from "./waitlist";
+export * from "./web-push";
 export * from "./webhooks";
 export * from "./wiki";
 export * from "./wiki-links";
