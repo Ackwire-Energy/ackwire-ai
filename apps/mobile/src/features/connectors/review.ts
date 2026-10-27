@@ -100,7 +100,8 @@ export interface ReviewState {
 export const emptyReview = (): ReviewState => ({ levels: {}, decided: new Set() });
 
 /** A tool's level: the person's choice, else the server's (its decision or our suggestion). */
-export const chosenLevel = (state: ReviewState, tool: ReviewTool): ToolDecision => state.levels[tool.name] ?? tool.level;
+export const chosenLevel = (state: ReviewState, tool: ReviewTool): ToolDecision =>
+  state.levels[tool.name] ?? tool.level;
 
 /** Still in "Precisam da sua decisão": the name couldn't decide it and the person hasn't yet. */
 export const isWaiting = (state: ReviewState, tool: ReviewTool) => tool.pending && !state.decided.has(tool.name);

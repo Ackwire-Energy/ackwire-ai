@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createFakeEmailSender, EmailError } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
@@ -100,6 +101,23 @@ describe("every email, in both languages", () => {
       expect(renderEmail(sample, art).html).toMatchSnapshot();
     });
   }
+
+  test("every kind has a sample, so the preview and a send to a test inbox show them all", () => {
+    const kinds: Record<EmailTemplate["kind"], true> = {
+      verify_email: true,
+      password_reset: true,
+      invitation: true,
+      invite_request: true,
+      calendar_invite: true,
+      waitlist_confirm: true,
+      budget: true,
+      approval_digest: true,
+      computer_ready: true,
+      join_request: true,
+      join_answer: true,
+    };
+    expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
+  });
 });
 
 describe("the look", () => {
@@ -112,6 +130,55 @@ describe("the look", () => {
     expect(html).toContain("@media (prefers-color-scheme:dark){.bg{background:#0f0f0e!important}");
     expect(html).toContain("[data-ogsb] .logo-ink{display:none!important}");
     expect(html).toContain('<!--[if !mso]><!--><img class="logo-bone"');
+  });
+
+  test("the button is the app's primary at its large size, in layers a client can drop one by one", () => {
+    const { html } = renderEmail(EMAIL_SAMPLES["join_request.en"] as EmailTemplate, art);
+    const lift =
+      "inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)";
+    // The flat fill, then the gradient in the shorthand, then the lift. Gmail for Android breaks an inline
+    // background-image.
+    expect(html).toContain(
+      `background-color:#151514;background:#151514 linear-gradient(180deg,#3e3e3d 0%,#151514 100%);border-radius:14px;box-shadow:${lift}`,
+    );
+    expect(html).not.toMatch(/style="[^"]*background-image/);
+    expect(html).toContain("font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 16px");
+    // Dark: the flat bone wherever our dark applies, and the bone gradient in a block of its own after Outlook's hooks.
+    expect(html).toContain(".btn{background:#efefec!important;color:#0f0f0e!important}");
+    const gradient =
+      "<style>\n@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,#c7c7c4 0%,#efefec 100%)!important}}\n</style>";
+    expect(html.indexOf(gradient)).toBeGreaterThan(html.lastIndexOf("[data-ogsb] "));
+    // Classic Outlook: its spacers in em at the 15 px label, both labels raised alike, no exact line height on a link.
+    expect(html).toContain('<i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i>');
+    expect(html).toContain('<i style="mso-font-width:107%" hidden>&emsp;&#8203;</i>');
+    expect(html).toContain('<span style="mso-text-raise:93%;color:#fbfbfa">Approve</span>');
+    expect(html).toContain('<span style="mso-text-raise:93%">Deny</span>');
+    expect(html).not.toMatch(/<a [^>]*mso-line-height-rule:exactly/);
+    // Deny 16 px after the button, as the app spaces its actions. Four spaces where the width is ignored.
+    expect(html).toContain(
+      '<span style="display:inline-block;width:16px;font-size:15px;line-height:20px">&nbsp;&nbsp;&nbsp;&nbsp;</span><a class="ln-d"',
+    );
+  });
+
+  test("the app's primary button is still the one the emails copy", () => {
+    const styles = resolve(import.meta.dir, "../../ui/src/styles");
+    const css = readFileSync(`${styles}/components.css`, "utf8");
+    const at = css.lastIndexOf(".ac-btn--primary {");
+    const primary = css.slice(at, css.indexOf("}", at));
+    expect(primary).toContain(
+      "linear-gradient(180deg, color-mix(in srgb, var(--ink) 82%, var(--bg)) 0%, var(--ink) 100%)",
+    );
+    for (const layer of [
+      "inset 0 1px 0 var(--b1-light)",
+      "inset 0 -1px 0 rgba(0, 0, 0, 0.3)",
+      "0 1px 2px rgba(0, 0, 0, 0.18)",
+      "0 6px 14px -6px rgba(0, 0, 0, 0.45)",
+    ])
+      expect(primary).toContain(layer);
+    expect(css).toMatch(/\[data-theme="light"\] \{[^}]*--b1-light: rgba\(255, 255, 255, 0\.18\);/);
+    const tokens = readFileSync(`${styles}/tokens.css`, "utf8");
+    for (const lg of ["--control-h-lg: 48px", "--control-r-lg: 14px", "--control-px-lg: 16px", "--control-fs-lg: 15px"])
+      expect(tokens).toContain(lg);
   });
 
   test("the preheader is hidden by display alone, never coloured like the page", () => {

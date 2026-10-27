@@ -174,6 +174,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         {join ? (
           <View style={styles.faces}>
             {join.faces.map((face, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: two names at most, and two people can share one
               <View key={`${i}-${face}`} style={i > 0 ? styles.overlap : undefined}>
                 <PersonAvatar name={face} size={22} />
               </View>

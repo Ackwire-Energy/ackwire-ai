@@ -42,6 +42,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { POSTGRES_MARK } from "@/lib/brands";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -57,10 +58,10 @@ const DB_LEVELS: Level[] = ["none", "read"];
 export function DatabaseIcon({ size = "md" }: { size?: "md" | "lg" }) {
   return (
     <span
-      className={`connector-icon${size === "lg" ? " connector-icon--lg" : ""} connector-icon--mono`}
+      className={`connector-icon${size === "lg" ? " connector-icon--lg" : ""} connector-icon--brand`}
       aria-hidden="true"
     >
-      <Icon name="database" />
+      <img className="connector-icon__img" src={POSTGRES_MARK} alt="" />
     </span>
   );
 }
